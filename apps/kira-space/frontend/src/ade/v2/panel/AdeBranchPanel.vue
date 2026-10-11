@@ -141,9 +141,9 @@ const branchUrl = computed(() =>
 const PR_TONE: Record<string, Tone> = { open: 'green', merged: 'purple', closed: 'red', draft: 'grey' };
 const PR_STATE = {
   open: 'common.action.open.label',
-  merged: 'space.ade.branchPanel.state.merged.status',
-  closed: 'space.ade.branchPanel.state.closed.status',
-  draft: 'space.ade.branchPanel.state.draft.status',
+  merged: 'common.merged.status',
+  closed: 'common.closed.status',
+  draft: 'common.draft.status',
 } as const satisfies Record<string, MessageKey>;
 const prStateLabel = (state: string): string => (state in PR_STATE ? t(PR_STATE[state as keyof typeof PR_STATE]) : state);
 const FORCE_PUSH_CMD = 'git push --force-with-lease';
@@ -195,8 +195,8 @@ const canMerge = computed(() => branch.value.kind === 'mine' && branch.value.nam
 
 const INTO_TONE: Record<Integration['status'], Tone> = { merged: 'green', stale: 'amber', 'not merged': 'grey' };
 const INTO_STATUS = {
-  merged: 'space.ade.branchPanel.state.merged.status',
-  stale: 'space.ade.branchPanel.state.stale.status',
+  merged: 'common.merged.status',
+  stale: 'common.stale.status',
   'not merged': 'space.ade.branchPanel.state.notMerged.status',
 } as const satisfies Record<Integration['status'], MessageKey>;
 function intoNote(i: Integration): string {
@@ -213,7 +213,7 @@ const DEPLOY_TONE: Record<Deployment['status'], Tone> = {
 };
 const DEPLOY_STATUS = {
   deployed: 'space.ade.branchPanel.state.deployed.status',
-  stale: 'space.ade.branchPanel.state.stale.status',
+  stale: 'common.stale.status',
   'not deployed': 'space.ade.branchPanel.state.notDeployed.status',
   unknown: 'space.ade.branchPanel.state.unknown.status',
 } as const satisfies Record<Deployment['status'], MessageKey>;
@@ -229,7 +229,7 @@ function deployNote(d: Deployment): string {
     v-model="ui.branchTab"
     :title="t('common.field.branch.label')"
     :tabs="[
-      { value: 'details', label: t('space.ade.branchPanel.details.label') },
+      { value: 'details', label: t('common.details.title') },
       { value: 'changes', label: t('space.ade.branchPanel.changes.label') },
       { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },
     ]"
@@ -290,7 +290,7 @@ function deployNote(d: Deployment): string {
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
           >
-            {{ t('space.common.forcePush.label') }}
+            {{ t('common.forcePush.label') }}
           </Button>
         </AdeTip>
         <template v-for="a in actions" :key="(a.kind === 'rebase' ? a.act.id : a.kind) + a.label">
@@ -410,7 +410,7 @@ function deployNote(d: Deployment): string {
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"
           >
-            {{ i.status === 'stale' ? t('space.ade.needs.action.reMerge.label') : t('space.ade.branchPanel.merge.label') }}
+            {{ i.status === 'stale' ? t('space.ade.needs.action.reMerge.label') : t('common.merge.label') }}
           </Button>
         </div>
         <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">

@@ -13,20 +13,20 @@ export const JOB_STATE_LABEL = {
   awaiting: 'memory.import.state.awaiting.status',
   running: 'common.state.running.status',
   paused: 'memory.import.state.paused.status',
-  done: 'space.common.status.done.status',
-  cancelled: 'memory.import.state.cancelled.status',
+  done: 'common.done.status',
+  cancelled: 'common.cancelled.status',
   failed: 'common.state.failed.status',
 } as const satisfies Record<ImportJobState, MessageKey>;
 
 export const FILE_STATE_LABEL = {
   pending: 'space.common.pending.status',
-  skipped: 'space.common.skipped.status',
+  skipped: 'common.skipped.status',
   extracting: 'memory.import.fileState.extracting.status',
   extracted: 'memory.import.fileState.extracted.status',
   finalizing: 'memory.import.fileState.finalizing.status',
-  done: 'space.common.status.done.status',
+  done: 'common.done.status',
   failed: 'common.state.failed.status',
-  cancelled: 'memory.import.state.cancelled.status',
+  cancelled: 'common.cancelled.status',
 } as const satisfies Record<ImportFileState, MessageKey>;
 
 export function jobTitle(job: ImportJob): string {

@@ -25,7 +25,7 @@ const last = computed(
 );
 const text = computed(() => {
   const s = schedule.value;
-  if (!s?.enabled) return t('automations.schedule.off.status');
+  if (!s?.enabled) return t('common.off.status');
   const at = next.data.value?.[0];
   return at === undefined ? '' : t('automations.schedule.next.label', { times: clockText(at, s.timezone) });
 });

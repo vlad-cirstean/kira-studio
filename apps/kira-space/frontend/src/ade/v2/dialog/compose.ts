@@ -465,7 +465,7 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
           value: s.id,
           label: t('space.common.claudeSession.label', { id: shortId(s.id) }),
         }))
-      : [{ value: 'new', label: t('space.ade.claudeDialog.newSession.label') }];
+      : [{ value: 'new', label: t('common.newSession.label') }];
     return {
       repo: b ? ctx.repo(b.codeRepoId).nick : '',
       repoId: b?.codeRepoId ?? '',

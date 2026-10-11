@@ -54,7 +54,7 @@ function onSendTest(): void {
       data-testid="settings-notify-prompts-test"
       @click="onSendTest"
     >
-      {{ t('workbench.settings.notifyTest.label') }}
+      {{ t('common.sendTest.label') }}
     </Button>
   </Field>
 </template>

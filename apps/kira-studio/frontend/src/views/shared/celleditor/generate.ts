@@ -83,7 +83,7 @@ export const GENERATORS: readonly Generator[] = [
   },
   {
     id: 'now',
-    labelKey: 'studio.dateTimePicker.now.label',
+    labelKey: 'common.now.status',
     hintKey: 'studio.cellEditor.generate.now.description',
     run: generateNow,
   },

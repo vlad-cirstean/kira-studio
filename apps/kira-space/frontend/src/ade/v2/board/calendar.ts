@@ -160,7 +160,7 @@ export function firstWork(cal: Calendar, k: number): number {
 }
 
 export function dayLabel(cal: Calendar, k: number): string {
-  if (k === LATER) return t('space.common.day.later.label');
+  if (k === LATER) return t('common.later.label');
   if (k === 0) return t('space.common.day.today.label');
   const p = dateParts(cal, k);
   return `${WD[p.dow]} ${p.date}`;

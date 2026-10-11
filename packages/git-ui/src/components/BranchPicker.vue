@@ -96,7 +96,7 @@ function prFor(
 function prTooltip(shortName: string): string {
   const pr = prFor(shortName);
   if (!pr) return '';
-  return t('git.picker.prTitle.tooltip', { title: pr.title, state: prStateLabel(pr.state) });
+  return t('common.dashPair.label', { first: pr.title, second: prStateLabel(pr.state) });
 }
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
@@ -608,7 +608,7 @@ watch(visibleBranchNames, (names) => {
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="truncate">{{ row.shortName }}</span>
-                <Badge v-if="row.checkedOutIn" :data-kira-tip="t('git.picker.checkedOutIn.tooltip', { path: row.checkedOutIn })">{{ t('git.picker.worktree.label') }}</Badge>
+                <Badge v-if="row.checkedOutIn" :data-kira-tip="t('git.picker.checkedOutIn.tooltip', { path: row.checkedOutIn })">{{ t('common.worktree.label') }}</Badge>
                 <span v-if="formatTrack(row.track)" class="text-kira-sm text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </button>
               <button

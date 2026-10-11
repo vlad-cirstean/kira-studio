@@ -34,7 +34,7 @@ export function opLogMenuItems<R extends OpLogRecord>(
     {
       type: 'item',
       id: 'copy-command',
-      label: t('workbench.opLog.copyCommand.label'),
+      label: t('common.copyCommand.label'),
       icon: 'copy',
       disabled: !record.command,
       run: () =>

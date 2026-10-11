@@ -30,7 +30,7 @@ const text = computed(() => {
   if (isError.value && windows.value.length === 0) return t('space.workbench.claudeUsage.unavailable.status');
   if (windows.value.length === 0) return t('space.workbench.claudeUsage.unknown.status');
   return windows.value
-    .map((w) => t('space.workbench.claudeUsage.item.label', { label: w.label, percent: Math.round(w.window.usedPercent) }))
+    .map((w) => t('common.progressPercent.label', { label: w.label, percent: Math.round(w.window.usedPercent) }))
     .join(' · ');
 });
 

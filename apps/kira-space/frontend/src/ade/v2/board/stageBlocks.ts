@@ -147,10 +147,8 @@ function showRuns(s: StepProgress, script: boolean): boolean {
 
 function modeText(stage: Stage): string {
   if (stage.kind === 'agent') return t('space.ade.stage.modeAgent.label');
-  if (stage.kind === 'script') return t('space.ade.stage.modeScript.label');
-  return stage.session
-    ? t('space.ade.stage.modeUserSession.label')
-    : t('memory.common.author.user.label');
+  if (stage.kind === 'script') return t('common.script.label');
+  return stage.session ? t('space.ade.stage.modeUserSession.label') : t('common.user.label');
 }
 
 /** One block per workflow stage. Without the workflow file only the current stage is known. */

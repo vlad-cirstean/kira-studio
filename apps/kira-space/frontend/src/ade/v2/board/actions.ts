@@ -66,7 +66,7 @@ const STATUS_LABEL = {
   'In progress': 'space.common.status.inProgress.status',
   'In review': 'space.common.status.inReview.status',
   Blocked: 'space.common.status.blocked.status',
-  Done: 'space.common.status.done.status',
+  Done: 'common.done.status',
 } as const satisfies Record<DerivedStatus, MessageKey>;
 
 export const statusLabel = (s: DerivedStatus): string => t(STATUS_LABEL[s]);
@@ -408,7 +408,7 @@ const conflict: Rule = (i) => {
 };
 
 const SHORT = {
-  rebase: 'space.common.rebase.label',
+  rebase: 'common.rebase.label',
   queue: 'space.ade.rebase.queueAfterShort.label',
   changeBase: 'space.ade.rebase.changeBase.label',
   abortRebase: 'space.ade.rebase.abort.label',
@@ -581,7 +581,7 @@ const notPushed: Rule = (i) =>
         [
           {
             kind: 'forcePush',
-            label: t('space.common.forcePush.label'),
+            label: t('common.forcePush.label'),
             tip: 'git push --force-with-lease',
           },
         ],

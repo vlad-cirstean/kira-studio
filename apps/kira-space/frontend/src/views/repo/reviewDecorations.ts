@@ -297,8 +297,8 @@ export function attachReviewDecorations(
             glyphMargin: { position: mod.editor.GlyphMarginLane.Right },
             glyphMarginHoverMessage: {
               value: reviewed
-                ? t('space.repo.reviewEditor.markUnreviewed.tooltip')
-                : t('space.repo.reviewEditor.markReviewed.tooltip'),
+                ? t('common.markUnreviewed.tooltip')
+                : t('common.markReviewed.tooltip'),
             },
           },
         });

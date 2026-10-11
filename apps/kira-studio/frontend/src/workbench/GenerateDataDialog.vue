@@ -275,7 +275,7 @@ function onSequenceStartChange(index: number, start: number): void {
             :disabled="running"
             @update:model-value="(v) => onRecipeChange(index, String(v))"
           >
-            <option value="skip">{{ t('studio.generateData.recipe.skip.label') }}</option>
+            <option value="skip">{{ t('common.skip.label') }}</option>
             <option value="null">{{ t('studio.common.nullValue.label') }}</option>
             <option value="constant">{{ t('studio.generateData.recipe.constant.label') }}</option>
             <option v-if="plan.column.typeClass === 'number'" value="sequence">{{ t('studio.common.nodeKind.sequence.label') }}</option>

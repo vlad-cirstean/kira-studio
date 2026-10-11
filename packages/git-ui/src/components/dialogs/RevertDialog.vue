@@ -134,7 +134,7 @@ function confirm(): void {
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canConfirm" @click="confirm">
-          {{ t('git.dialog.revert.confirm') }}
+          {{ t('common.revert.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

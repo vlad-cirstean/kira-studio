@@ -95,8 +95,7 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
     'repo-graph': {
       mode: SPACE_TAB_KIND_MODE['repo-graph'],
       title: (tab) =>
-        useCodeReposStore().codeRepoRecord(tab.workspaceId ?? '')?.name ??
-        t('space.ade.workflows.editor.graph.label'),
+        useCodeReposStore().codeRepoRecord(tab.workspaceId ?? '')?.name ?? t('common.graph.label'),
       icon: () => 'source-control',
       railColor: repoRailColor,
       defaultState: (): RepoGraphTabState => defaultRepoGraphTabState(),

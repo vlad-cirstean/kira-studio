@@ -118,7 +118,7 @@ async function removeFromStack(branch: string): Promise<void> {
             :class="refBadgeClass('warn')"
             :data-kira-tip="row.staleText"
           >
-            {{ t('git.stack.stale.status') }}
+            {{ t('common.stale.status') }}
           </span>
           <button
             v-if="row.pr"

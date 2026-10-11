@@ -1,13 +1,13 @@
 import { type MessageKey, t } from '@theme/i18n';
 
 const RUN_STATE = {
-  done: 'space.common.status.done.status',
+  done: 'common.done.status',
   failed: 'common.state.failed.status',
-  stuck: 'space.common.needsYou.label',
+  stuck: 'common.needsYou.status',
   back: 'space.ade.outcome.back.status',
   running: 'common.state.running.status',
   pending: 'space.common.pending.status',
-  skipped: 'space.common.skipped.status',
+  skipped: 'common.skipped.status',
 } as const satisfies Record<string, MessageKey>;
 
 /** A run's state as the user reads it; an unknown state shows as sent. */

@@ -26,9 +26,9 @@ const emit = defineEmits<{
 
 const FIELD_LABEL_KEY: Record<PasteField, MessageKey> = {
   host: 'studio.project.connectionDialog.host.label',
-  port: 'studio.project.connectionDialog.port.label',
+  port: 'common.port.label',
   database: 'studio.project.connectionDialog.database.label',
-  username: 'studio.project.connectionDialog.user.label',
+  username: 'common.user.label',
   password: 'studio.project.connectionDialog.password.label',
   region: 'studio.project.connectionDialog.region.label',
   profile: 'studio.project.credentialPaste.field.awsProfile.label',

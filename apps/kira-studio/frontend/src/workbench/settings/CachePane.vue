@@ -25,7 +25,7 @@ function onCacheBudgetInput(e: Event): void {
 
 const cacheBudgetError = computed<string | null>(() => {
   const v = props.draft.cache.l2BudgetMb;
-  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
+  if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < CACHE_L2_BUDGET_MB_RANGE.min || v > CACHE_L2_BUDGET_MB_RANGE.max) {
     return t('studio.settings.range.mb.status', {
       min: CACHE_L2_BUDGET_MB_RANGE.min,

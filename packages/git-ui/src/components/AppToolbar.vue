@@ -181,7 +181,7 @@ const pushMenuSections = computed<readonly MenuSection[]>(() => [
     items: [
       {
         id: 'force-push-trigger',
-        label: t('git.toolbar.forcePush.label'),
+        label: t('common.forcePush.label'),
         disabled: false,
         disabledReason: undefined,
         danger: true,
@@ -216,7 +216,7 @@ async function doForcePush(): Promise<void> {
 }
 
 const remoteOpLabel: Record<string, MessageKey> = {
-  fetch: 'git.toolbar.fetching.loading',
+  fetch: 'common.fetching.loading',
   pull: 'git.toolbar.pulling.loading',
   push: 'git.toolbar.pushing.loading',
   forcePush: 'git.toolbar.forcePushing.loading',
@@ -232,7 +232,7 @@ const progressText = computed(() => {
   const phase =
     progress.percent === undefined
       ? progress.phase
-      : t('git.toolbar.progress.status', { phase: progress.phase, percent: progress.percent });
+      : t('common.progressPercent.label', { label: progress.phase, percent: progress.percent });
   return progress.remote ? t('git.toolbar.progressRemote.status', { phase }) : phase;
 });
 
@@ -338,7 +338,7 @@ const stashDisabled = computed(
             {{ t('git.toolbar.fetch.label') }}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ t('git.toolbar.fetch.tooltip', { remote: defaultRemote ?? '' }) }}</TooltipContent>
+        <TooltipContent>{{ t('common.fetchTarget.tooltip', { name: defaultRemote ?? '' }) }}</TooltipContent>
       </Tooltip>
 
       <PullStrategyPicker

@@ -460,7 +460,7 @@ function reviewStatusFor(path: string): ReviewFileStatus | undefined {
 }
 function reviewToggleTitle(path: string): string {
   const kind = reviewStatusFor(path)?.kind ?? 'none';
-  return kind === 'none' ? t('git.review.markReviewed.tooltip') : t('git.review.markUnreviewed.tooltip');
+  return kind === 'none' ? t('common.markReviewed.tooltip') : t('common.markUnreviewed.tooltip');
 }
 function reviewCheckboxState(path: string): boolean | 'indeterminate' {
   const kind = reviewStatusFor(path)?.kind;
@@ -566,7 +566,7 @@ const parentSelectId = useId();
           />
           <span class="font-ui truncate">{{ row.node.name }}</span>
           <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
-            {{ t('git.common.fileCount.label', { count: row.node.fileCount }) }}
+            {{ t('common.fileCount.label', { count: row.node.fileCount }) }}
           </span>
         </template>
         <template v-else>
@@ -659,7 +659,7 @@ const parentSelectId = useId();
           />
           <span class="font-ui truncate">{{ row.node.name }}</span>
           <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
-            {{ t('git.common.fileCount.label', { count: row.node.fileCount }) }}
+            {{ t('common.fileCount.label', { count: row.node.fileCount }) }}
           </span>
         </template>
         <template v-else>

@@ -33,7 +33,7 @@ const used = computed(() => parts.value.length > 1);
 
 <template>
   <Field>
-    <FieldLabel for="script-command">{{ isSmart ? t('automations.script.prompt.label') : t('common.field.command.label') }}</FieldLabel>
+    <FieldLabel for="script-command">{{ isSmart ? t('common.prompt.label') : t('common.field.command.label') }}</FieldLabel>
     <AutocompleteField
       id="script-command"
       v-model="body"

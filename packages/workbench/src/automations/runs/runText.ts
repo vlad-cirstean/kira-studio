@@ -5,10 +5,10 @@ const STATE_LABEL: Record<ScriptRun['state'], MessageKey> = {
   running: 'common.state.running.status',
   done: 'automations.run.state.done.status',
   failed: 'common.state.failed.status',
-  cancelled: 'automations.run.state.cancelled.status',
-  blocked: 'automations.run.state.blocked.status',
+  cancelled: 'common.cancelled.status',
+  blocked: 'common.needsYou.status',
   waiting: 'automations.run.state.waiting.status',
-  skipped: 'git.op.skipped.announce',
+  skipped: 'common.skipped.status',
 };
 
 export function stateLabel(state: ScriptRun['state']): string {
@@ -36,7 +36,7 @@ export function runReportText(run: ScriptRun, tail: string): string {
     t('automations.run.report.script.label', { value: run.scriptName }),
     smart
       ? t('automations.run.report.model.label', { value: run.model })
-      : t('automations.run.report.command.label', { value: run.command }),
+      : t('common.command.label', { value: run.command }),
     t('automations.run.report.folder.label', { value: run.cwd }),
     out?.reason
       ? t('automations.run.report.resultReason.label', { state, reason: out.reason })

@@ -53,7 +53,7 @@ const fieldId = useId();
       :model-value="advanced[leaf]"
       @update:model-value="onLogLevelChange"
     >
-      <option value="off">{{ t('automations.schedule.off.status') }}</option>
+      <option value="off">{{ t('common.off.status') }}</option>
       <option value="error">{{ t('workbench.opLog.error.status') }}</option>
       <option value="warn">{{ t('workbench.settings.logLevelWarn.option') }}</option>
       <option value="info">{{ t('workbench.settings.logLevelInfo.option') }}</option>

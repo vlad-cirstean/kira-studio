@@ -187,7 +187,7 @@ function onClose(): void {
       <DialogBody>
         <template v-if="active">
           <Field>
-            <FieldLabel :for="pathId">{{ t('git.dialog.worktree.path.label') }}</FieldLabel>
+            <FieldLabel :for="pathId">{{ t('common.path.label') }}</FieldLabel>
             <Input
               :id="pathId"
               v-model="path"

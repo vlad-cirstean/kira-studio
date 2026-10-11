@@ -130,7 +130,7 @@ function confirm(): void {
         </DialogDescription>
 
         <FieldSet>
-          <FieldLegend>{{ t('git.dialog.reset.mode.label') }}</FieldLegend>
+          <FieldLegend>{{ t('common.mode.label') }}</FieldLegend>
           <RadioGroup :model-value="mode" @update:model-value="(v) => selectMode(v as ResetMode)">
             <Field orientation="horizontal" class="items-start py-1">
               <RadioGroupItem :id="`${modeId}-soft`" value="soft" class="mt-0.5" />

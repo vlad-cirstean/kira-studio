@@ -5,7 +5,7 @@ const isNamed = (f: { enabled: boolean; name: string }): boolean =>
   f.enabled && f.name.trim() !== '';
 
 export function bodyTabLabel(state: HttpRequestTabState): string {
-  const plain = t('studio.http.pane.body.label');
+  const plain = t('common.body.label');
   switch (state.bodyMode) {
     case 'none':
       return plain;

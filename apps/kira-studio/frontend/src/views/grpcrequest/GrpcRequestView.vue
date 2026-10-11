@@ -201,7 +201,7 @@ const unresolvedTooltip = computed(() =>
 );
 
 const REQUEST_PANE_OPTIONS = computed(() => [
-  { value: 'message' as const, label: t('studio.grpc.pane.message.option'), testid: 'grpc-request-pane-message' },
+  { value: 'message' as const, label: t('common.message.label'), testid: 'grpc-request-pane-message' },
   { value: 'metadata' as const, label: t('studio.grpc.pane.metadata.option'), testid: 'grpc-request-pane-metadata' },
   { value: 'schema' as const, label: t('studio.common.nodeKind.schema.label'), testid: 'grpc-request-pane-schema' },
 ]);
@@ -299,7 +299,7 @@ onUnmounted(() => {
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{ t('studio.api.common.unresolved.status', { count: unresolvedRefs.length }) }}</Badge>
+          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{ t('common.unresolved.label', { count: unresolvedRefs.length }) }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>

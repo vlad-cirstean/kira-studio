@@ -54,7 +54,7 @@ const waitingRun = computed(() => runs.value?.find((r) => r.id === props.runId) 
 const due = computed(() => {
   const at = waitingRun.value?.createdAt;
   const tz = script.value?.schedule?.timezone ?? 'UTC';
-  return at === undefined ? t('automations.schedule.now.status') : t('automations.schedule.due.status', { time: clockText(at, tz) });
+  return at === undefined ? t('common.now.status') : t('automations.schedule.due.status', { time: clockText(at, tz) });
 });
 
 const error = ref<string | null>(null);
@@ -69,7 +69,7 @@ const accept = useMutation(
         : ctx.runs.runScheduleNow(props.scriptId, current.hash, secrets.value);
     },
     onSuccess: (started) => {
-      ctx.openRunTab(started.runId, script.value?.name ?? t('automations.script.fallback.label'));
+      ctx.openRunTab(started.runId, script.value?.name ?? t('common.script.label'));
       emit('close');
     },
     onError: (err) => {
@@ -144,7 +144,7 @@ useShortcut(window, ['form.submit'], run);
             </CatalogText>
           </div>
           <Field v-if="script.kind === 'smart' && pv" data-testid="schedule-confirm-prompt">
-            <FieldLabel>{{ t('automations.script.prompt.label') }}</FieldLabel>
+            <FieldLabel>{{ t('common.prompt.label') }}</FieldLabel>
             <Card class="font-data text-kira-sm">
               <VarText :parts="promptParts" />
             </Card>
@@ -174,7 +174,7 @@ useShortcut(window, ['form.submit'], run);
 
       <DialogFooter>
         <template v-if="more > 0" #start>
-          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{ t('automations.dialog.scheduleConfirm.more.status', { count: more }) }}</span>
+          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{ t('common.moreWaiting.status', { count: more }) }}</span>
         </template>
         <Button
           variant="dialog"

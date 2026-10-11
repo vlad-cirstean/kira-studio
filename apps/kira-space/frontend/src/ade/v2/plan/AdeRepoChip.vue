@@ -26,15 +26,15 @@ const emit = defineEmits<{ toggle: []; refresh: [] }>();
 
 const ago = useRelativeTime(() => props.lastFetchAt ?? 0);
 const note = computed(() => {
-  if (props.busy) return t('space.ade.plan.repoChip.fetching.loading');
+  if (props.busy) return t('common.fetching.loading');
   if (props.error) return props.error;
   if (props.remote === '') {
     const none = t('space.ade.plan.repoChip.noRemote.status');
-    return props.summary ? t('space.common.dotPair.label', { first: none, second: props.summary }) : none;
+    return props.summary ? t('common.dotPair.label', { first: none, second: props.summary }) : none;
   }
   if (props.lastFetchAt === null) return t('space.ade.plan.repoChip.neverFetched.status');
   return props.summary
-    ? t('space.common.dotPair.label', { first: String(ago.value), second: props.summary })
+    ? t('common.dotPair.label', { first: String(ago.value), second: props.summary })
     : String(ago.value);
 });
 const repoLinks = useRepoLinksStore();
@@ -68,7 +68,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
       data-testid="ade-repo-note"
       >{{ note }}</span
     >
-    <AdeTip :text="remote === '' ? t('space.ade.plan.repoChip.rescan.tooltip', { label }) : t('space.ade.plan.repoChip.fetch.tooltip', { label })">
+    <AdeTip :text="remote === '' ? t('space.ade.plan.repoChip.rescan.tooltip', { label }) : t('common.fetchTarget.tooltip', { name: label })">
       <Button
         variant="toolbar"
         size="kira-icon"

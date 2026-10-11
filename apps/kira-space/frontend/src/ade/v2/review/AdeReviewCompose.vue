@@ -52,7 +52,7 @@ const { start: armHint, stop: stopHint } = useTimeoutFn(
 );
 
 const STATUS_TEXT = {
-  sent: 'space.ade.review.compose.sent.status',
+  sent: 'common.sent.status',
   answering: 'space.ade.review.compose.answering.loading',
   noSubmit: 'space.ade.review.compose.noSubmit.hint',
 } as const satisfies Record<Exclude<Status, ''>, MessageKey>;

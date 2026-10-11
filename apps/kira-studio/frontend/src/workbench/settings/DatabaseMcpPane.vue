@@ -76,11 +76,11 @@ const dbMcpInstallMessage = computed(() => {
   if (!result) return null;
   switch (result.outcome) {
     case 'installed':
-      return t('studio.settings.dbMcp.install.installed.body');
+      return t('common.claudeCodeRegistered.description');
     case 'notFound':
-      return t('studio.settings.dbMcp.install.notFound.body');
+      return t('common.claudeCliNotFound.error');
     case 'installFailed':
-      return t('studio.settings.dbMcp.install.failed.body', { detail: result.detail });
+      return t('common.claudeRegistrationRefused.error', { detail: result.detail });
     default:
       return null;
   }
@@ -151,7 +151,7 @@ const dbMcpEnabledId = useId();
             @click="onInstallDbMcpClaudeCode"
           >{{
               dbMcpStore.status.claudeAvailable
-                ? t('studio.settings.dbMcp.register.label')
+                ? t('common.registerWithClaudeCode.label')
                 : t('studio.settings.dbMcp.copyCommandAbove.label')
             }}
           </Button>

@@ -2,20 +2,20 @@ import type { MemoryAuthor, MemoryEvent } from '@shared/domain/memory';
 import { type MessageKey, t } from '@theme/i18n';
 
 export const AUTHOR_LABEL = {
-  user: 'memory.common.author.user.label',
+  user: 'common.user.label',
   agent: 'memory.common.author.agent.label',
 } as const satisfies Record<MemoryAuthor, MessageKey>;
 
 const ACTION_LABEL = {
   noop: 'memory.start.event.action.reconfirmed.status',
-  add: 'memory.add.outcome.added.status',
+  add: 'common.added.status',
   update: 'memory.start.event.action.updated.status',
 } as const satisfies Record<MemoryEvent['action'], MessageKey>;
 
 const SOURCE_LABEL = {
-  mcp: 'memory.start.event.source.mcp.label',
+  mcp: 'common.mcp.label',
   ui: 'memory.start.event.source.ui.label',
-  import: 'memory.start.event.source.import.label',
+  import: 'common.import.label',
 } as const satisfies Record<MemoryEvent['source'], MessageKey>;
 
 /** One line of a version's trail: what happened, by whom, through which door, and why. */

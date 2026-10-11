@@ -157,7 +157,7 @@ onUnmounted(() => {
           @click="goToFile(section.path)"
         >
           <CodiconIcon name="go-to-file" :size="13" />
-          {{ t('space.repo.view.goToFile.label') }}
+          {{ t('common.goToFile.label') }}
         </Button>
       </ViewToolbar>
       <template v-if="section.expanded">

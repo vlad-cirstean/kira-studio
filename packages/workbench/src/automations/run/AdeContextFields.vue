@@ -38,7 +38,7 @@ function pickTask(id: string): void {
 <template>
   <div class="flex flex-col gap-3" data-testid="run-ade">
     <Field v-if="needs.tasks.length > 0">
-      <FieldLabel :for="`${idBase}-task`">{{ t('automations.run.task.label') }} <span class="text-error">*</span></FieldLabel>
+      <FieldLabel :for="`${idBase}-task`">{{ t('common.task.label') }} <span class="text-error">*</span></FieldLabel>
       <Popover v-model:open="taskOpen">
         <PopoverTrigger as-child>
           <Button :id="`${idBase}-task`" variant="dialog" size="kira-lg" class="justify-between" data-testid="run-task">

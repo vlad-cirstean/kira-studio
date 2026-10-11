@@ -84,7 +84,7 @@ const subClass = computed(() => {
   return props.band.overflowHours > 0 && !props.band.isLater ? 'text-tone-red' : 'text-muted-foreground';
 });
 const sub = computed(() => {
-  if (props.band.dayOff) return t('space.ade.plan.band.off.status');
+  if (props.band.dayOff) return t('common.off.status');
   return props.band.hours ? t('format.relative.unitHour', { count: props.band.hours }) : '';
 });
 const solidBorder = computed(

@@ -65,7 +65,7 @@ watch(
 const notYetRevealed = () => props.row.isSecret && props.row.value === '';
 const valueToggleLabel = computed(() => {
   if (notYetRevealed()) return t('common.action.reveal.label');
-  return visible.value ? t('studio.api.variables.hideValue.label') : t('studio.api.variables.showValue.label');
+  return visible.value ? t('common.hideValue.label') : t('studio.api.variables.showValue.label');
 });
 
 function onEyeClick(): void {
@@ -212,7 +212,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
           </Checkbox>
         </TooltipDisabledTrigger>
       </TooltipTrigger>
-      <TooltipContent>{{ secretsUnavailable ? t('studio.api.variables.secretsUnavailable.tooltip') : t('studio.api.variables.secret.label') }}</TooltipContent>
+      <TooltipContent>{{ secretsUnavailable ? t('studio.api.variables.secretsUnavailable.tooltip') : t('common.secret.label') }}</TooltipContent>
     </Tooltip>
     <Popover
       :open="showHistory && variableSetStore.variableId === row.id"

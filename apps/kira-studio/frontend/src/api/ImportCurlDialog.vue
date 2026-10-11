@@ -89,7 +89,7 @@ useFocusOnMount(curlEl);
             :disabled="text.trim() === '' || preview.error !== null"
             @click="onImport"
           >
-            {{ t('studio.common.import.label') }}
+            {{ t('common.import.label') }}
           </Button>
       </DialogFooter>
     </DialogContent>

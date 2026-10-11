@@ -56,22 +56,22 @@ const facts = computed(() => {
     @keydown.self.enter="emit('pick')"
     @keydown.self.space.prevent="emit('pick')"
   >
-    <AdeTip :text="t('space.ade.backlog.moveUp.tooltip')">
+    <AdeTip :text="t('common.moveUp.tooltip')">
       <Button
         variant="toolbar"
         size="kira-icon"
-        :aria-label="t('space.ade.backlog.moveUp.tooltip')"
+        :aria-label="t('common.moveUp.tooltip')"
         data-testid="ade-backlog-up"
         @click.stop="emit('move', -1)"
       >
         ↑
       </Button>
     </AdeTip>
-    <AdeTip :text="t('space.ade.backlog.moveDown.tooltip')">
+    <AdeTip :text="t('common.moveDown.tooltip')">
       <Button
         variant="toolbar"
         size="kira-icon"
-        :aria-label="t('space.ade.backlog.moveDown.tooltip')"
+        :aria-label="t('common.moveDown.tooltip')"
         data-testid="ade-backlog-down"
         @click.stop="emit('move', 1)"
       >

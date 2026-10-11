@@ -76,7 +76,7 @@ async function submit(): Promise<void> {
       </Label>
 
       <Label class="flex flex-col gap-0.5">
-        <span class="text-kira-md text-muted-foreground">{{ t('studio.http.pane.body.label') }}</span>
+        <span class="text-kira-md text-muted-foreground">{{ t('common.body.label') }}</span>
         <Textarea
           v-model="body"
           class="font-data"

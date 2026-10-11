@@ -39,7 +39,7 @@ const { canOpen, open } = useNewTerminal();
                   @click="open"
                 >
                   <CodiconIcon name="terminal-bash" :size="13" />
-                  {{ t('automations.start.newTerminal.label') }}
+                  {{ t('common.newTerminal.label') }}
                 </Button>
               </TooltipDisabledTrigger>
             </TooltipTrigger>

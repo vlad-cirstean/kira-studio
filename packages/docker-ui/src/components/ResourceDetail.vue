@@ -62,7 +62,7 @@ const facts = computed<Array<[string, string]>>(() => {
       [t('docker.resource.tags.label'), i.tags.join(', ') || '<none>'],
       [t('docker.resource.id.label'), i.id],
       [t('docker.field.size.label'), formatBytes(i.size)],
-      [t('docker.field.created.label'), formatDateTime(i.created)],
+      [t('common.created.label'), formatDateTime(i.created)],
     ];
   }
   if (props.kind === 'volume' && volume.value) {
@@ -71,7 +71,7 @@ const facts = computed<Array<[string, string]>>(() => {
       [t('docker.resource.driver.label'), v.driver],
       [t('docker.resource.mountPoint.label'), v.mountpoint],
       [t('docker.resource.scope.label'), v.scope],
-      [t('docker.field.created.label'), displayValue(v.created)],
+      [t('common.created.label'), displayValue(v.created)],
       ...Object.entries(v.labels).map(([k, val]): [string, string] => [t('docker.resource.labelKey.label', { key: k }), val]),
     ];
   }
@@ -118,7 +118,7 @@ const usedByRows = computed(() =>
     </div>
     <div class="@container p-3">
       <div class="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2">
-        <DetailSection :title="t('docker.section.details.title')">
+        <DetailSection :title="t('common.details.title')">
           <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
             <template v-for="[k, v] in facts" :key="k">
               <dt class="text-muted-foreground">{{ k }}</dt>
@@ -140,7 +140,7 @@ const usedByRows = computed(() =>
             {{ row.name }}
           </button>
         </DetailSection>
-        <DetailSection :title="t('docker.resource.raw.title')" class="@3xl:col-span-2">
+        <DetailSection :title="t('common.raw.label')" class="@3xl:col-span-2">
           <div class="h-80">
             <InspectView v-if="inspect.data.value" :raw="inspect.data.value.raw" />
           </div>

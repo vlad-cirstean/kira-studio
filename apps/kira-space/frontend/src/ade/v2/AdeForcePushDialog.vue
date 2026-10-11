@@ -26,7 +26,7 @@ const { busy, error, confirm } = useConfirmRun(
     :open="target !== null"
     :title="t('space.ade.forcePushConfirm.title')"
     :message="t('space.ade.forcePushConfirm.body', { branch: target?.branchName ?? '', repo: target?.repo ?? '' })"
-    :confirm-label="t('space.common.forcePush.label')"
+    :confirm-label="t('common.forcePush.label')"
     tone="danger"
     :busy="busy"
     :error="error ?? ''"

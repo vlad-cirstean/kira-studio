@@ -234,7 +234,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
           !(await useConfirmDialogStore().confirm({
             title: t('studio.project.readOnlyConfirm.title'),
             message: t('studio.project.readOnlyConfirm.body'),
-            confirmLabel: t('studio.common.continue.label'),
+            confirmLabel: t('common.continue.label'),
             tone: 'primary',
           }))
         ) {
@@ -503,7 +503,7 @@ export function emptyBackgroundMenu(): MenuItem[] {
     {
       type: 'item',
       id: 'refresh-all',
-      label: t('studio.project.menu.refreshAll.label'),
+      label: t('common.refreshAll.label'),
       icon: 'refresh',
       run: () => useTreeStore().refreshAllConnections(),
     },

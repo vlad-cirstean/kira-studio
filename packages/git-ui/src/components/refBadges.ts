@@ -272,7 +272,7 @@ export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
     'data-kira-tip',
     prs.length > 1
       ? t('git.refBadge.prMore.tooltip', { title: best.title, state, count: prs.length - 1 })
-      : t('git.picker.prTitle.tooltip', { title: best.title, state }),
+      : t('common.dashPair.label', { first: best.title, second: state }),
   );
 
   const label = document.createElement('span');

@@ -126,7 +126,7 @@ async function guarded(fn: () => Promise<void>): Promise<void> {
 async function newCollection(): Promise<string | null> {
   let id: string | null = null;
   await guarded(async () => {
-    const created = await scripts.createCollection(t('automations.collection.new.label'));
+    const created = await scripts.createCollection(t('common.newCollection.label'));
     openGroup(created.id);
     renamingId.value = created.id;
     id = created.id;
@@ -136,7 +136,7 @@ async function newCollection(): Promise<string | null> {
 
 async function moveToNewCollection(script: CustomScript): Promise<void> {
   await guarded(async () => {
-    const created = await scripts.createCollection(t('automations.collection.new.label'));
+    const created = await scripts.createCollection(t('common.newCollection.label'));
     await scripts.move(script.id, created.id);
     openGroup(created.id);
     renamingId.value = created.id;
@@ -150,7 +150,7 @@ function commitRename(collection: ScriptCollection, name: string): void {
 
 async function confirmDeleteCollection(collection: ScriptCollection): Promise<void> {
   const ok = await confirmDialogStore.confirm({
-    title: t('automations.collection.deleteConfirm.title'),
+    title: t('common.deleteCollectionConfirm.title'),
     message: t('automations.collection.deleteConfirm.body', { name: collection.name }),
     confirmLabel: t('common.action.delete.label'),
     tone: 'danger',
@@ -322,7 +322,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
     {
       type: 'item',
       id: 'new-collection',
-      label: t('automations.collection.new.label'),
+      label: t('common.newCollection.label'),
       icon: 'new-folder',
       run: async () => {
         await newCollection();
@@ -354,7 +354,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           />
           <TooltipIconButton
             icon="new-folder"
-            :label="t('automations.collection.new.label')"
+            :label="t('common.newCollection.label')"
             data-testid="automations-new-collection"
             @click="newCollection"
           />

@@ -49,7 +49,7 @@ watch(
 
 const portError = computed(() => {
   const port = parseIntField(portDraft.value);
-  if (!Number.isInteger(port)) return t('space.workbench.mobileAccess.port.integer.error');
+  if (!Number.isInteger(port)) return t('common.enterWholeNumber.error');
   if (port < MOBILE_PORT_RANGE.min || port > MOBILE_PORT_RANGE.max) {
     return t('space.workbench.mobileAccess.port.range.error', { min: MOBILE_PORT_RANGE.min, max: MOBILE_PORT_RANGE.max });
   }
@@ -239,7 +239,7 @@ const activeDevices = computed(() =>
     </Field>
 
     <Field>
-      <Label :for="portId">{{ t('space.workbench.mobileAccess.port.label') }}</Label>
+      <Label :for="portId">{{ t('common.port.label') }}</Label>
       <NumberStepperInput
         :id="portId"
         :min="MOBILE_PORT_RANGE.min"

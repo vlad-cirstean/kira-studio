@@ -133,11 +133,11 @@ async function confirmRemove(): Promise<void> {
     >
       <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
         <span v-if="entry.isCurrent" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.current.tooltip')">●</span>
-        <span v-if="entry.isMain" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.main.tooltip')">{{ t('git.worktree.mainBadge.label') }}</span>
+        <span v-if="entry.isMain" class="text-kira-sm text-subtle" :data-kira-tip="t('common.mainWorktree.tooltip')">{{ t('git.worktree.mainBadge.label') }}</span>
         <span v-if="entry.locked" class="text-kira-sm text-subtle" :data-kira-tip="entry.locked.reason">
           <CodiconIcon name="lock" :size="13" />
         </span>
-        <span v-if="entry.openElsewhere" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.openElsewhere.tooltip')">
+        <span v-if="entry.openElsewhere" class="text-kira-sm text-subtle" :data-kira-tip="t('common.openElsewhere.tooltip')">
           <CodiconIcon name="window" :size="13" />
         </span>
         <span class="truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>

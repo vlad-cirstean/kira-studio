@@ -69,12 +69,12 @@ const responseCookiesCount = computed(
 );
 
 const RESPONSE_PANE_OPTIONS = computed(() => [
-  { value: 'body' as const, label: t('studio.http.pane.body.label'), testid: 'http-response-pane-body' },
+  { value: 'body' as const, label: t('common.body.label'), testid: 'http-response-pane-body' },
   { value: 'headers' as const, label: t('studio.http.pane.headers.label'), testid: 'http-response-pane-headers' },
   { value: 'history' as const, label: t('common.module.history.label'), testid: 'http-response-pane-history' },
   // P9 D12/F19: the fourth segment — never on screen at the same time as the body's own Pretty/Raw
   // toggle (gated on responsePane === 'body' below), so the shared "Raw" label never collides.
-  { value: 'raw' as const, label: t('studio.common.raw.label'), testid: 'http-response-pane-raw' },
+  { value: 'raw' as const, label: t('common.raw.label'), testid: 'http-response-pane-raw' },
   // P10 D11/F19: the fifth segment — where the time went, per hop.
   { value: 'timeline' as const, label: t('studio.http.pane.timeline.label'), testid: 'http-response-pane-timeline' },
 ]);
@@ -126,7 +126,7 @@ const {
 
 const RESPONSE_VIEW_OPTIONS = computed(() => [
   { value: 'pretty' as const, label: t('studio.http.view.pretty.label'), testid: 'http-response-view-pretty' },
-  { value: 'raw' as const, label: t('studio.common.raw.label'), testid: 'http-response-view-raw' },
+  { value: 'raw' as const, label: t('common.raw.label'), testid: 'http-response-view-raw' },
 ]);
 
 function setResponseView(view: 'pretty' | 'raw'): void {

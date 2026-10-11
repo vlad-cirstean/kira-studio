@@ -35,7 +35,7 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
           @click="emit('refreshAll')"
         >
           <CodiconIcon name="refresh" :size="12" />
-          {{ allBusy ? t('space.ade.plan.header.refreshing.loading') : t('space.ade.plan.header.refreshAll.label') }}
+          {{ allBusy ? t('space.ade.plan.header.refreshing.loading') : t('common.refreshAll.label') }}
         </Button>
       </template>
     </PanelHeader>

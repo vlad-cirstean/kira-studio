@@ -122,7 +122,7 @@ function stageEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
     })),
     {
       id: 'ade-task-stage-done',
-      label: t('space.common.status.done.status'),
+      label: t('common.done.status'),
       cmd: { kind: 'moveStage', stageId: DONE },
       checked: current === DONE,
       disabled: live,

@@ -88,7 +88,7 @@ export function blameLineText(state: Extract<BlameLineState, { kind: 'resolved' 
   const age = formatRelativeDate(state.authorTimeSeconds);
   return subject.length > 0
     ? t('space.repo.blame.line.label', { author: state.author, when: age, subject })
-    : t('space.repo.blame.authorWhen.label', { author: state.author, when: age });
+    : t('common.commaPair.label', { first: state.author, second: age });
 }
 
 /** Two lines: the clamped subject, then `<author>, <absolute date>`. */
@@ -96,9 +96,9 @@ export function blameLineTooltip(state: Extract<BlameLineState, { kind: 'resolve
   const subject = clampSubject(state.summary);
   return [
     subject.length > 0 ? subject : t('space.repo.blame.noMessage.label'),
-    t('space.repo.blame.authorWhen.label', {
-      author: state.author,
-      when: formatAbsoluteDate(state.authorTimeSeconds),
+    t('common.commaPair.label', {
+      first: state.author,
+      second: formatAbsoluteDate(state.authorTimeSeconds),
     }),
   ];
 }

@@ -14,7 +14,7 @@ import AdeWorkflowYaml from './AdeWorkflowYaml.vue';
 // loads on first use so the board bundle does not carry it.
 const AdeWorkflowGraph = defineAsyncComponent(() => import('./AdeWorkflowGraph.vue'));
 const modeItems = [
-  { value: 'graph', label: t('space.ade.workflows.editor.graph.label'), testid: 'ade-wf-mode-graph' },
+  { value: 'graph', label: t('common.graph.label'), testid: 'ade-wf-mode-graph' },
   { value: 'yaml', label: t('space.ade.workflows.editor.yaml.label'), testid: 'ade-wf-mode-yaml' },
 ];
 const props = defineProps<{ entry: WorkflowEntry }>();

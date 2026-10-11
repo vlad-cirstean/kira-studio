@@ -66,7 +66,7 @@ export function scriptCandidates(
       .map((p) => ({
         label: paramEnvName(p.name),
         insert: paramEnvName(p.name) + close,
-        detail: p.secret ? t('automations.params.secret.label') : paramDetail(p),
+        detail: p.secret ? t('common.secret.label') : paramDetail(p),
         icon: 'symbol-variable',
       }));
     for (const b of builtins(src))
@@ -144,7 +144,7 @@ export function scriptHover(
     if (ref.param.label) lines.push(ref.param.label);
     if (src.kind === 'smart' && ref.param.secret)
       lines.push(t('automations.script.secretInPrompt.error'));
-    else if (ref.param.secret) lines.push(t('automations.params.secret.label'));
+    else if (ref.param.secret) lines.push(t('common.secret.label'));
     else if (ref.param.default.length > 0)
       lines.push(
         t('automations.script.defaultValue.label', { value: ref.param.default.join(', ') }),

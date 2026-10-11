@@ -152,7 +152,7 @@ function short(sha: string): string {
             <li v-for="f in result.failed" :key="f.path" class="truncate">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span>{{ t('space.common.dashPair.label', { first: f.path, second: f.error }) }}</span>
+                  <span>{{ t('common.dashPair.label', { first: f.path, second: f.error }) }}</span>
                 </TooltipTrigger>
                 <TooltipContent>{{ f.error }}</TooltipContent>
               </Tooltip>

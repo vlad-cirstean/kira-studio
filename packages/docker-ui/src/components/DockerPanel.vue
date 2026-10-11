@@ -144,7 +144,7 @@ async function refresh(): Promise<void> {
           <CodiconIcon v-if="status.data.value" name="debug-disconnect" :size="24" class="text-error" />
           <Spinner v-else :size="24" label="" />
         </EmptyMedia>
-        <EmptyTitle>{{ status.data.value ? t('docker.panel.unavailable.title') : t('docker.panel.connecting.loading') }}</EmptyTitle>
+        <EmptyTitle>{{ status.data.value ? t('docker.panel.unavailable.title') : t('common.connecting.loading') }}</EmptyTitle>
         <EmptyDescription v-if="status.data.value">{{ t('docker.panel.unavailable.description') }}</EmptyDescription>
       </EmptyHeader>
       <Button v-if="status.data.value" size="kira" variant="toolbar" :disabled="retrying" @click="retry">{{ t('common.action.retry.label') }}</Button>

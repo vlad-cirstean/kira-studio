@@ -128,7 +128,7 @@ async function createNew(): Promise<void> {
             data-testid="ade-wf-import-go"
             @click="runImport"
           >
-            {{ t('memory.start.event.source.import.label') }}
+            {{ t('common.import.label') }}
           </Button>
         </div>
       </div>

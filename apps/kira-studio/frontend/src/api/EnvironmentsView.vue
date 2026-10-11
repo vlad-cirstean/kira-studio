@@ -309,7 +309,7 @@ useEventListener(listEl, 'keydown', (e) => {
             <Input
               v-model="nameDrafts[env.id]"
               size="kira"
-              :aria-label="t('studio.api.environments.name.aria')"
+              :aria-label="t('common.environmentName.aria')"
               data-testid="environment-name"
               @blur="onFieldBlur(env.id)"
             />
@@ -347,7 +347,7 @@ useEventListener(listEl, 'keydown', (e) => {
         </div>
         <Empty v-if="variablesStore.environments.length === 0" data-testid="environments-empty">
           <EmptyMedia><CodiconIcon name="server-environment" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('studio.api.environments.empty') }}</EmptyTitle>
+          <EmptyTitle>{{ t('common.noEnvironments.empty') }}</EmptyTitle>
         </Empty>
         <Empty
           v-else-if="isFiltered && displayEnvironments.length === 0"

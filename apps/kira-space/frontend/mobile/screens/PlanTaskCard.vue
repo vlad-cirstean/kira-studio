@@ -68,7 +68,7 @@ const stopFirst = computed(() => props.card.moves.live);
           <span aria-hidden="true">{{ block.state === 'done' ? '✓' : block.state === 'now' ? '▸' : '○' }}</span>
           {{ block.stage.name }}
           <span v-if="block.count" class="text-kira-sm text-subtle">{{ block.count }}</span>
-          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">{{ t('space.common.skipped.status') }}</span>
+          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">{{ t('common.skipped.status') }}</span>
         </span>
         <ul v-if="block.steps.length" class="m-0 flex list-none flex-col gap-0.5 p-0 pl-5">
           <li v-for="view in block.steps" :key="view.step.id" class="flex items-center gap-2 text-kira-sm">

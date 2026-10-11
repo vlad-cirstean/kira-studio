@@ -24,8 +24,8 @@ export function describePullStrategySource(source: PullStrategySource): string {
 
 const PULL_STRATEGY_KEYS: Record<PullStrategy, MessageKey> = {
   'ff-only': 'git.pullStrategy.ffOnly.option',
-  merge: 'git.pullStrategy.merge.option',
-  rebase: 'git.pullStrategy.rebase.option',
+  merge: 'common.merge.label',
+  rebase: 'common.rebase.label',
 };
 
 export function pullStrategyLabel(strategy: PullStrategy): string {

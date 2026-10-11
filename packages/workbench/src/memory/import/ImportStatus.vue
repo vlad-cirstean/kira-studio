@@ -52,7 +52,7 @@ function open(): void {
           })
         }}
       </span>
-      <Button variant="toolbar" size="kira" data-testid="memory-import-open" @click="open">{{ t('memory.import.status.view.label') }}</Button>
+      <Button variant="toolbar" size="kira" data-testid="memory-import-open" @click="open">{{ t('common.view.label') }}</Button>
     </div>
     <Progress v-if="job.state === 'running'" :model-value="percent" />
   </div>

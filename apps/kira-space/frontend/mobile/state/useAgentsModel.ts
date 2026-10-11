@@ -146,7 +146,7 @@ export const useAgentsModel = createSharedComposable(() => {
       const day = b.plan.day[card.task.id] ?? '';
       const group = groups.get(day) ?? {
         key: day || 'later',
-        label: day ? dayLabel(day, today) : t('space.common.day.later.label'),
+        label: day ? dayLabel(day, today) : t('common.later.label'),
         cards: [],
       };
       group.cards.push(card);

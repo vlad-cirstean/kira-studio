@@ -88,7 +88,7 @@ const reportSummary = computed(() => {
   ];
   if (passwords > 0)
     parts.push(t('studio.project.dataGripImport.summary.passwords.body', { count: passwords }));
-  if (failed > 0) parts.push(t('studio.project.dataGripImport.summary.failed.body', { count: failed }));
+  if (failed > 0) parts.push(t('common.failedCount.label', { count: failed }));
   return parts.join(' ');
 });
 const reportTone = computed<'info' | 'warn'>(() =>
@@ -105,9 +105,9 @@ function skipLabel(row: DataGripPreviewRow): string {
   if (!key) return row.skipDetail ?? t('studio.project.dataGripImport.skip.notImportable.label');
   const label = t(key);
   return reason === 'sqlite-path-not-absolute'
-    ? t('studio.project.dataGripImport.reason.withDetail.label', {
-        reason: label,
-        detail: row.skipDetail ?? '',
+    ? t('common.withDetail.label', {
+        first: label,
+        second: row.skipDetail ?? '',
       })
     : label;
 }
@@ -128,7 +128,7 @@ function reportErrorLabel(row: DataGripReportRow): string {
   if (!key) return row.error;
   const detail = sep === -1 ? '' : row.error.slice(sep + 2);
   const label = t(key);
-  return detail ? t('studio.project.dataGripImport.reason.withDetail.label', { reason: label, detail }) : label;
+  return detail ? t('common.withDetail.label', { first: label, second: detail }) : label;
 }
 
 function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'warn' | 'error' } {
@@ -148,7 +148,7 @@ function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'w
       }),
       tone: 'warn',
     };
-  return { label: t('studio.project.dataGripImport.outcome.created.label'), tone: 'ok' };
+  return { label: t('common.created.label'), tone: 'ok' };
 }
 
 async function onConfirm(): Promise<void> {

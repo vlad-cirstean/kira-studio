@@ -96,8 +96,8 @@ async function discard(): Promise<void> {
         <span>{{ t('memory.import.totals.added.label', { count: job.totals.added }) }}</span>
         <span>{{ t('memory.import.totals.updated.label', { count: job.totals.updated }) }}</span>
         <span>{{ t('memory.import.totals.known.label', { count: job.totals.noop }) }}</span>
-        <span v-if="job.totals.unresolved > 0">{{ t('memory.import.totals.unresolved.label', { count: job.totals.unresolved }) }}</span>
-        <span v-if="job.totals.failedFiles > 0">{{ t('memory.import.totals.failed.label', { count: job.totals.failedFiles }) }}</span>
+        <span v-if="job.totals.unresolved > 0">{{ t('common.unresolved.label', { count: job.totals.unresolved }) }}</span>
+        <span v-if="job.totals.failedFiles > 0">{{ t('common.failedCount.label', { count: job.totals.failedFiles }) }}</span>
         <span v-if="job.totals.skippedFiles > 0">{{ t('memory.import.totals.skipped.label', { count: job.totals.skippedFiles }) }}</span>
       </div>
     </div>

@@ -62,7 +62,7 @@ const rowColoringId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <FieldLegend class="pt-0">{{ t('studio.settings.appearance.typography.label') }}</FieldLegend>
+    <FieldLegend class="pt-0">{{ t('common.typography.label') }}</FieldLegend>
     <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="fontFamilyId">{{ t('studio.settings.appearance.dataFont.label') }}</Label>

@@ -21,11 +21,11 @@ const message = computed(() => {
   if (!r) return null;
   switch (r.outcome) {
     case 'installed':
-      return t('memory.mcp.install.installed.description');
+      return t('common.claudeCodeRegistered.description');
     case 'notFound':
-      return t('memory.mcp.install.notFound.error');
+      return t('common.claudeCliNotFound.error');
     default:
-      return t('memory.mcp.install.refused.error', { detail: r.detail });
+      return t('common.claudeRegistrationRefused.error', { detail: r.detail });
   }
 });
 </script>
@@ -54,7 +54,7 @@ const message = computed(() => {
     <p v-if="message" class="m-0 text-kira-sm text-muted-foreground" data-testid="memory-mcp-install-outcome">{{ message }}</p>
     <div class="flex items-center gap-1">
       <Button variant="dialog" size="kira-lg" :disabled="!command" data-testid="memory-mcp-copy" @click="copy(command)">
-        {{ copied ? t('common.copy.copied.announce') : t('memory.mcp.copyCommand.label') }}
+        {{ copied ? t('common.copy.copied.announce') : t('common.copyCommand.label') }}
       </Button>
       <Button
         variant="dialog-primary"
@@ -63,7 +63,7 @@ const message = computed(() => {
         data-testid="memory-mcp-install"
         @click="install.mutate()"
       >
-        <CodiconIcon name="plug" :size="12" /> {{ t('memory.mcp.register.label') }}
+        <CodiconIcon name="plug" :size="12" /> {{ t('common.registerWithClaudeCode.label') }}
       </Button>
     </div>
   </FieldSet>

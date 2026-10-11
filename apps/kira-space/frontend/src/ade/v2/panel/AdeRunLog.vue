@@ -40,8 +40,8 @@ function failed(c: LogChunk): boolean {
         <InlineState kind="error" data-testid="ade-run-log-error">{{ message }}</InlineState>
       </template>
       <template #default="{ data }">
-        <div v-if="data.truncated" class="text-subtle">{{ t('space.ade.runLog.truncated.status') }}</div>
-        <div v-if="data.chunks.length === 0" class="text-subtle">{{ t('space.ade.runLog.empty.empty') }}</div>
+        <div v-if="data.truncated" class="text-subtle">{{ t('common.truncated.status') }}</div>
+        <div v-if="data.chunks.length === 0" class="text-subtle">{{ t('common.noOutput.emptyHint') }}</div>
         <div
           v-for="c in data.chunks"
           :key="c.seq"

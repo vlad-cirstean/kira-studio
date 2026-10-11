@@ -44,7 +44,7 @@ function onCancel(): void {
 
       <DialogBody>
         <p class="m-0 text-subtle" data-testid="git-credential-repo">
-          {{ t('space.common.dotPair.label', { first: prompt.source, second: prompt.repoLabel }) }}
+          {{ t('common.dotPair.label', { first: prompt.source, second: prompt.repoLabel }) }}
         </p>
         <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
         <p class="m-0 font-data whitespace-pre-wrap" data-testid="git-credential-prompt">
@@ -63,7 +63,7 @@ function onCancel(): void {
       <DialogFooter>
         <template v-if="more > 0" #start>
           <span class="text-kira-sm text-muted-foreground" data-testid="git-credential-more">
-            {{ t('space.workbench.queue.more.status', { count: more }) }}
+            {{ t('common.moreWaiting.status', { count: more }) }}
           </span>
         </template>
         <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
@@ -75,7 +75,7 @@ function onCancel(): void {
           data-testid="git-credential-submit"
           @click="onSubmit"
         >
-          {{ t('space.workbench.gitCredential.continue.label') }}
+          {{ t('common.continue.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

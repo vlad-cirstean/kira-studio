@@ -496,7 +496,7 @@ onUnmounted(() => {
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="http-unresolved-chip">{{ t('studio.api.common.unresolved.status', { count: unresolvedRefs.length }) }}</Badge>
+          <Badge variant="warn" data-testid="http-unresolved-chip">{{ t('common.unresolved.label', { count: unresolvedRefs.length }) }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>

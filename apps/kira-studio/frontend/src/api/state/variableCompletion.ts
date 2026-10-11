@@ -227,7 +227,7 @@ export function variableSupport(
     })),
     ...secretNames.map((name) => ({
       label: name,
-      detail: t('studio.api.variables.secret.label'),
+      detail: t('common.secret.label'),
       icon: 'symbol-variable',
     })),
   ].sort((a, b) => compareNatural(a.label, b.label));

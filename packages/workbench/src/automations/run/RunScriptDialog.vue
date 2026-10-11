@@ -151,7 +151,7 @@ useShortcut(window, ['form.submit'], run);
           <ParamsForm v-if="script.params.length > 0" v-model="values" :params="script.params" />
 
           <Field v-if="isSmart && pv" data-testid="run-prompt">
-            <FieldLabel>{{ t('automations.script.prompt.label') }}</FieldLabel>
+            <FieldLabel>{{ t('common.prompt.label') }}</FieldLabel>
             <template v-if="oneOff === null">
               <Card class="font-data text-kira-sm" data-testid="run-prompt-text">
                 <VarText :parts="promptParts" />

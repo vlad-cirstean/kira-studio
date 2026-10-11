@@ -61,7 +61,7 @@ const facts = computed(() => {
   const e = props.card.entry;
   const cal = props.model.cal;
   const span =
-    e.day === LATER ? t('space.common.day.later.label') : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
+    e.day === LATER ? t('common.later.label') : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
   const repos: string[] = [];
   for (const row of props.card.rows) if (!repos.includes(row.repo)) repos.push(row.repo);
   const p = props.card.progress;
@@ -87,9 +87,9 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
 <template>
   <AdePanelFrame
     v-model="ui.taskTab"
-    :title="t('space.ade.taskPanel.task.label')"
+    :title="t('common.task.label')"
     :tabs="[
-      { value: 'task', label: t('space.ade.taskPanel.task.label') },
+      { value: 'task', label: t('common.task.label') },
       { value: 'notes', label: t('space.common.notes.label') },
       { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },
     ]"
@@ -122,7 +122,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
       </AdeTip>
       <TooltipIconButton
         icon="ellipsis"
-        :label="t('space.ade.taskPanel.more.label')"
+        :label="t('common.moreActions.tooltip')"
         class="shrink-0"
         data-testid="ade-panel-more"
         @click="openMore"

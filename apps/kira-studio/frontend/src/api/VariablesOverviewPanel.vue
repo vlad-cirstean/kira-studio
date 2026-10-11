@@ -147,7 +147,7 @@ function editEnvironmentVariables(): void {
             </TooltipTrigger>
             <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
           </Tooltip>
-          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">{{ t('studio.api.variables.secret.label') }}</Badge>
+          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">{{ t('common.secret.label') }}</Badge>
           <span v-else class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle" data-testid="variables-overview-value">{{ row.value }}</span>
           <Tooltip v-if="row.shadowed">
             <TooltipTrigger as-child>

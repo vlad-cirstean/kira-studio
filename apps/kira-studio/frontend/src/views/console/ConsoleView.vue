@@ -668,7 +668,7 @@ const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
   if (r.status === 'running') return t('common.state.running.status');
-  if (r.status === 'cancelled') return t('studio.console.status.cancelled.status');
+  if (r.status === 'cancelled') return t('common.cancelled.status');
   if (r.status === 'idle' && r.results.length > 0) {
     return t('studio.console.status.results.status', { count: r.results.length });
   }

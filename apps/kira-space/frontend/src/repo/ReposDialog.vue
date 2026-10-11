@@ -207,7 +207,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 <Tooltip v-if="selectedConfig" :disabled="selectedConfig.source === 'added'">
                   <TooltipTrigger as-child>
                     <Badge class="shrink-0" data-testid="repos-dialog-repo-source">{{
-                      selectedConfig.source === 'added' ? t('memory.add.outcome.added.status') : baseName(selectedConfig.source)
+                      selectedConfig.source === 'added' ? t('common.added.status') : baseName(selectedConfig.source)
                     }}</Badge>
                   </TooltipTrigger>
                   <TooltipContent>{{ selectedConfig.source }}</TooltipContent>
@@ -264,7 +264,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               </Tooltip>
               <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-folder-count">{{
                 f.hiddenCount > 0
-                  ? t('space.common.dotPair.label', {
+                  ? t('common.dotPair.label', {
                       first: t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount }),
                       second: t('space.repo.dialog.folder.hiddenCount.label', { count: f.hiddenCount }),
                     })

@@ -293,7 +293,7 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
   });
   const label =
     finished || !stage
-      ? t('space.common.status.done.status')
+      ? t('common.done.status')
       : stage.name + (stage.kind === 'agent' ? ` ${doneSteps}/${steps.length}` : '');
   const nick = (id: string): string => i.repoNick(i.branch(id)?.codeRepoId ?? '');
   return {
@@ -376,7 +376,7 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
   } else if (pos.run.state === 'back') {
     label =
       pos.run.route === 'retry'
-        ? t('space.common.dotPair.label', { first: pos.step.name, second: pos.run.note })
+        ? t('common.dotPair.label', { first: pos.step.name, second: pos.run.note })
         : t('space.ade.progress.sentBack.label', { step: pos.step.name });
   } else {
     const base = pos.run.loops

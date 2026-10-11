@@ -1451,7 +1451,7 @@ export class OpsState {
   async abortOp(): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'opAbort' },
-      (ok) => (ok ? t('git.op.aborted.announce') : undefined),
+      (ok) => (ok ? t('common.aborted.status') : undefined),
       'abort',
     );
   }
@@ -1463,7 +1463,7 @@ export class OpsState {
   async skipOp(): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'opSkip' },
-      (ok) => (ok ? t('git.op.skipped.announce') : undefined),
+      (ok) => (ok ? t('common.skipped.status') : undefined),
       'skip',
     );
   }
@@ -1767,7 +1767,7 @@ export class OpsState {
       const result = await this.#bridge.request('remote.run', { repoId, ...op });
       if (this.#repo.repoId !== repoId) return result;
       this.#applyRemoteResult(result);
-      if (result.ok) this.announcement.value = announceOk(result) ?? t('git.op.done.announce');
+      if (result.ok) this.announcement.value = announceOk(result) ?? t('common.done.status');
       else this.#fail(action, result.error, true);
       return result;
     } catch (error) {
@@ -1859,7 +1859,7 @@ export class OpsState {
     try {
       const result = await this.#bridge.request('op.run', { repoId, op });
       this.#applyResult(repoId, result);
-      if (result.ok) this.announcement.value = announceOk(true) ?? t('git.op.done.announce');
+      if (result.ok) this.announcement.value = announceOk(true) ?? t('common.done.status');
       else this.#fail(action, result.error, true);
       return result;
     } catch (error) {

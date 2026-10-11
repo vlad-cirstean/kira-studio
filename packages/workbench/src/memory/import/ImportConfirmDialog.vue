@@ -75,7 +75,7 @@ async function dismiss(): Promise<void> {
           <p class="m-0" data-testid="import-estimate">
             {{
               t('memory.import.confirm.estimate.description', {
-                files: t('memory.import.confirm.files.label', { count: job.estimate.files }),
+                files: t('common.fileCount.label', { count: job.estimate.files }),
                 chunks: t('memory.import.confirm.chunks.label', { count: job.estimate.chunks }),
                 calls: t('memory.import.confirm.calls.label', { count: job.estimate.calls }),
                 duration: formatDuration(job.estimate.seconds * 1000),

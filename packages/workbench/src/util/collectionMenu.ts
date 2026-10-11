@@ -43,7 +43,7 @@ export function moveToCollectionMenu(opts: {
     {
       type: 'item',
       id: 'move-to-new',
-      label: t('automations.collection.new.label'),
+      label: t('common.newCollection.label'),
       icon: 'new-folder',
       run: () => opts.onNew(),
     },

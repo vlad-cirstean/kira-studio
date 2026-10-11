@@ -69,7 +69,7 @@ async function move(stageId: string): Promise<void> {
             :disabled="o.skipped"
             @select="move(o.id)"
           >
-            {{ o.name }}<span v-if="o.skipped" class="text-subtle"> {{ t('space.common.skipped.status') }}</span>
+            {{ o.name }}<span v-if="o.skipped" class="text-subtle"> {{ t('common.skipped.status') }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

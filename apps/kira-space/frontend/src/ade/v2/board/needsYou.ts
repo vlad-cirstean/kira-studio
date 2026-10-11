@@ -41,7 +41,7 @@ const ACTION: Record<
 const KIND_LABEL = {
   'stuck run': 'space.ade.needs.kind.stuckRun.label',
   failed: 'common.state.failed.status',
-  rebase: 'space.common.rebase.label',
+  rebase: 'common.rebase.label',
   question: 'space.ade.needs.kind.question.label',
   approval: 'space.ade.needs.kind.approval.label',
   'setup failed': 'space.ade.needs.kind.setupFailed.label',
@@ -318,7 +318,7 @@ export function buildNeedsYou(i: NeedsYouInput): NeedsYou {
   const c: Ctx = {
     i,
     nick: (id) => i.repoNick(branches.get(id)?.codeRepoId ?? ''),
-    nameOf: (id) => branches.get(id)?.name || t('space.common.newBranch.label'),
+    nameOf: (id) => branches.get(id)?.name || t('common.newBranch.label'),
     age: (at) => (at ? Math.max(0, i.nowMs - at) : null),
     sessionsById: new Map(i.sessions.map((s) => [s.id, s])),
   };
@@ -335,7 +335,7 @@ export function buildNeedsYou(i: NeedsYouInput): NeedsYou {
     badge: items.length,
     backgroundRuns,
     interactiveSessions,
-    footer: t('space.common.dotPair.label', {
+    footer: t('common.dotPair.label', {
       first: t('space.ade.needs.backgroundRuns.label', { count: backgroundRuns }),
       second: t('space.ade.needs.interactiveSessions.label', { count: interactiveSessions }),
     }),

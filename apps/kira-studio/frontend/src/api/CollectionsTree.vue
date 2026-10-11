@@ -101,7 +101,7 @@ function folderTarget(row: CollectionRowVm): string | null {
 
 const DELETE_CONFIRM = {
   collection: {
-    title: 'studio.api.collections.deleteCollectionConfirm.title',
+    title: 'common.deleteCollectionConfirm.title',
     body: 'studio.api.collections.deleteTreeConfirm.body',
   },
   folder: {

@@ -377,7 +377,7 @@ const secondText = computed<string>({
       />
       <TooltipIconButton
         icon="clock"
-        :label="t('studio.dateTimePicker.now.label')"
+        :label="t('common.now.status')"
         data-testid="datetime-picker-now"
         @click="pickNow"
       />

@@ -30,7 +30,7 @@ const NATIVE_COST_KEY: Record<string, MessageKey> = {
 const nativeCostLabel = computed(() => {
   const cost = plan.value?.nativeCost;
   if (!cost) return null;
-  return t(NATIVE_COST_KEY[cost.unit] ?? 'studio.console.plan.cost.generic.label', {
+  return t(NATIVE_COST_KEY[cost.unit] ?? 'common.cost.label', {
     value: formatCount(cost.value),
   });
 });
@@ -158,7 +158,7 @@ const rawLanguage = computed(() =>
           <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-sm"
             >{{ t('studio.console.plan.nodeRows.label', { count: row.node.estimatedRows }) }}</span
           >
-          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">{{ t('studio.console.plan.cost.generic.label', { value: formatCount(row.node.cost.total) }) }}</span>
+          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">{{ t('common.cost.label', { value: formatCount(row.node.cost.total) }) }}</span>
           <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{ row.node.detail }}</span>
           <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-sm">{{ metricsLine(row.node) }}</span>
         </div>
@@ -173,7 +173,7 @@ const rawLanguage = computed(() =>
           data-testid="explain-raw-toggle"
           @click="showRaw = !showRaw"
         />
-        <span class="text-muted-foreground text-kira-sm">{{ t('studio.common.raw.label') }}</span>
+        <span class="text-muted-foreground text-kira-sm">{{ t('common.raw.label') }}</span>
       </div>
       <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />

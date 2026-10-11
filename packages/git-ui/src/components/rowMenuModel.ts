@@ -68,7 +68,7 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
       ctx.inProgress,
       'codicon-check',
     ),
-    plainItem('createBranchHere', t('git.menu.newBranch.label'), 'codicon-git-branch'),
+    plainItem('createBranchHere', t('common.newBranch.label'), 'codicon-git-branch'),
     plainItem('createTagHere', t('git.menu.newTag.label'), 'codicon-tag'),
     // P76 §8: worktreeAdd is not in GATED_OP_KINDS (git-core/src/model/operation.ts) — canRunOp
     // returns true for it unconditionally, so plainItem (not gatedItem, which would gate nothing)
@@ -144,7 +144,7 @@ export function buildReadOnlyRowMenu(): MenuSection[] {
 export function buildFileRowMenu(goToFileEnabled: boolean): MenuSection[] {
   const items: MenuItem[] = [];
   if (goToFileEnabled)
-    items.push(plainItem('goToFile', t('git.menu.goToFile.label'), 'codicon-go-to-file'));
+    items.push(plainItem('goToFile', t('common.goToFile.label'), 'codicon-go-to-file'));
   items.push(plainItem('copyPath', t('common.action.copyPath.label'), 'codicon-copy'));
   return [{ items }];
 }

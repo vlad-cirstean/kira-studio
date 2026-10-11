@@ -69,9 +69,9 @@ const menuSections = computed<MenuSection[]>(() => [
         detail: previewLoading.value
           ? t('git.toolbar.pullResolving.loading')
           : preview.value
-            ? t('git.toolbar.pullPreview.status', {
-                strategy: pullStrategyLabel(preview.value.strategy),
-                source: describePullStrategySource(preview.value.source),
+            ? t('common.withDetail.label', {
+                first: pullStrategyLabel(preview.value.strategy),
+                second: describePullStrategySource(preview.value.source),
               })
             : undefined,
       },

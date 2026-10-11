@@ -45,7 +45,7 @@ function onDisableCookieJarChange(checked: boolean): void {
 
 const requestTimeoutMsError = computed<string | null>(() => {
   const v = props.draft.api.requestTimeoutMs;
-  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
+  if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < REQUEST_TIMEOUT_MS_RANGE.min || v > REQUEST_TIMEOUT_MS_RANGE.max) {
     return t('studio.settings.range.ms.status', {
       min: REQUEST_TIMEOUT_MS_RANGE.min,
@@ -58,7 +58,7 @@ props.registerFieldError('api.requestTimeoutMs', requestTimeoutMsError);
 
 const maxResponseMbError = computed<string | null>(() => {
   const v = props.draft.api.maxResponseMb;
-  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
+  if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < MAX_RESPONSE_MB_RANGE.min || v > MAX_RESPONSE_MB_RANGE.max) {
     return t('studio.settings.range.mb.status', { min: MAX_RESPONSE_MB_RANGE.min, max: MAX_RESPONSE_MB_RANGE.max });
   }
@@ -68,7 +68,7 @@ props.registerFieldError('api.maxResponseMb', maxResponseMbError);
 
 const maxRedirectsError = computed<string | null>(() => {
   const v = props.draft.api.maxRedirects;
-  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
+  if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < MAX_REDIRECTS_RANGE.min || v > MAX_REDIRECTS_RANGE.max) {
     return t('studio.settings.range.plain.status', { min: MAX_REDIRECTS_RANGE.min, max: MAX_REDIRECTS_RANGE.max });
   }

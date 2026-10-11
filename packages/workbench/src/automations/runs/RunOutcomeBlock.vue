@@ -27,7 +27,7 @@ async function copyForAgent(): Promise<void> {
     <span data-testid="run-outcome-reason">{{ run.outcome?.reason || t('automations.run.outcome.none.emptyHint') }}</span>
     <span v-if="run.outcome?.summary" data-testid="run-outcome-summary">{{ run.outcome.summary }}</span>
     <span v-if="run.outcome?.costUsd !== undefined" class="text-muted-foreground" data-testid="run-outcome-cost">
-      {{ t('automations.run.outcome.cost.label', { cost: costText(run.outcome.costUsd) }) }}
+      {{ t('common.cost.label', { value: costText(run.outcome.costUsd) }) }}
     </span>
     <span v-if="run.outcome?.permissionDenials?.length" class="text-muted-foreground" data-testid="run-outcome-denials">
       {{ t('automations.run.outcome.denied.label', { tools: run.outcome.permissionDenials.join(', ') }) }}
@@ -43,7 +43,7 @@ async function copyForAgent(): Promise<void> {
     <span v-if="copyError" class="text-error">{{ copyError }}</span>
     <div v-if="run.state !== 'running' && run.state !== 'waiting'" class="flex gap-1">
       <Button variant="dialog" size="kira-lg" data-testid="run-copy" @click="copyForAgent">
-        {{ copied ? t('common.copy.copied.announce') : t('automations.run.copyForAgent.label') }}
+        {{ copied ? t('common.copy.copied.announce') : t('common.copyForAgent.label') }}
       </Button>
       <Button v-if="run.scriptId" variant="dialog" size="kira-lg" data-testid="run-again" @click="emit('rerun')">
         {{ t('automations.run.again.label') }}

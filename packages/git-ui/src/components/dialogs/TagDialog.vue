@@ -123,7 +123,7 @@ async function submit(): Promise<void> {
           <FieldLabel :for="annotatedId">{{ t('git.tag.annotated.status') }}</FieldLabel>
         </Field>
         <Field v-if="annotated">
-          <FieldLabel :for="messageId">{{ t('git.dialog.tag.message.label') }}</FieldLabel>
+          <FieldLabel :for="messageId">{{ t('common.message.label') }}</FieldLabel>
           <Textarea :id="messageId" v-model="message" rows="3" class="w-full" />
         </Field>
       </DialogBody>

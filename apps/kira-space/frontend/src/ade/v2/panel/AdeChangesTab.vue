@@ -40,7 +40,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
       <span class="text-muted-foreground">{{ t('space.common.base.label') }}</span>
       <span class="font-data text-kira-sm">{{ base }} · ↑{{ branch.ahead }} ↓{{ branch.behind }}</span>
-      <span class="text-muted-foreground">{{ t('space.common.worktree.label') }}</span>
+      <span class="text-muted-foreground">{{ t('common.worktree.label') }}</span>
       <span
         class="font-data text-kira-sm"
         :class="branch.dirty.length ? 'text-tone-amber' : undefined"
@@ -86,7 +86,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
         <AdeTip :text="commitTitle(c)"><span class="truncate">{{ c.message }}</span></AdeTip>
       </div>
       <div v-if="branch.commitCount > branch.commits.length" class="text-kira-sm text-muted-foreground">
-        {{ t('space.ade.changes.moreCommits.label', { count: branch.commitCount - branch.commits.length }) }}
+        {{ t('common.more.label', { count: branch.commitCount - branch.commits.length }) }}
       </div>
     </div>
 

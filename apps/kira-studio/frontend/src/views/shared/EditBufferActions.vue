@@ -85,7 +85,7 @@ const resetTitle = computed<string>(
     <TooltipIconButton
       icon="discard"
       :label="resetTitle"
-      :aria-label="t('studio.editBuffer.revert.label')"
+      :aria-label="t('common.revert.label')"
       disabled-trigger
       :data-testid="`${testidPrefix}-beautify-reset`"
       :disabled="!buffer.isDirty.value"

@@ -22,7 +22,7 @@ function taskOf(taskId: string): { title: string; color: string } {
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" data-testid="ade-needs-page">
     <PanelHeader>
-      {{ t('space.common.needsYou.label') }}
+      {{ t('common.needsYou.status') }}
       <template v-if="needs && !needs.empty" #actions>
         <span class="normal-case tracking-normal" data-testid="ade-needs-summary"
           >{{ t('space.ade.needsPage.summary.label', { count: needs.items.length }) }}</span

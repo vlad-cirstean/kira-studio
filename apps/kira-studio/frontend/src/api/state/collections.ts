@@ -312,7 +312,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   const createCollectionMutation = useMutation(
     {
       mutationKey: ['apiCollectionsTree', 'createCollection'],
-      mutationFn: () => control.collectionsCreateCollection(t('studio.api.collections.new.label')),
+      mutationFn: () => control.collectionsCreateCollection(t('common.newCollection.label')),
       onSuccess: afterTreeListChange,
     },
     queryClient,

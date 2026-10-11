@@ -98,7 +98,7 @@ const PATH_DISPLAY_CAP = 20;
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
       >
-        {{ t('git.common.continue.label') }}
+        {{ t('common.continue.label') }}
       </Button>
       <Button
         v-if="inProgress.canSkip"
@@ -107,7 +107,7 @@ const PATH_DISPLAY_CAP = 20;
         :disabled="busyAction !== undefined"
         @click="onSkip"
       >
-        {{ t('git.common.skip.label') }}
+        {{ t('common.skip.label') }}
       </Button>
       <Button
         v-if="inProgress.canAbort"
@@ -116,7 +116,7 @@ const PATH_DISPLAY_CAP = 20;
         :disabled="busyAction !== undefined"
         @click="onAbort"
       >
-        {{ t('git.common.abort.label') }}
+        {{ t('common.abort.label') }}
       </Button>
     </div>
 
@@ -147,7 +147,7 @@ const PATH_DISPLAY_CAP = 20;
         v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"
         class="text-muted-foreground"
       >
-        {{ t('git.conflict.more.label', { count: inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }) }}
+        {{ t('common.more.label', { count: inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }) }}
       </li>
     </ul>
   </Alert>

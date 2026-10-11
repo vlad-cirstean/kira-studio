@@ -139,7 +139,7 @@ const COLUMN_LABEL_KEYS = {
   timestamp: 'studio.stream.column.timestamp.label',
   headers: 'studio.http.pane.headers.label',
   attrs: 'studio.stream.column.attributes.label',
-  body: 'studio.http.pane.body.label',
+  body: 'common.body.label',
 } as const satisfies Record<string, MessageKey>;
 function columnLabel(id: keyof typeof COLUMN_LABEL_KEYS): string {
   return t(COLUMN_LABEL_KEYS[id]);

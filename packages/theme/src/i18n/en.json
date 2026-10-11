@@ -2,11 +2,7 @@
   "automations": {
     "collection": {
       "deleteConfirm": {
-        "body": "Delete “{name}” and everything inside it.",
-        "title": "Delete collection?"
-      },
-      "new": {
-        "label": "New collection"
+        "body": "Delete “{name}” and everything inside it."
       }
     },
     "dialog": {
@@ -26,24 +22,15 @@
         }
       },
       "scheduleConfirm": {
-        "more": {
-          "status": "{count} more waiting"
-        },
         "title": "Run {name}?",
         "untitledConfirm": {
           "title": "Run script?"
         }
       },
       "script": {
-        "choose": {
-          "label": "Choose…"
-        },
         "chooseFolder": {
           "label": "Choose folder…",
           "title": "Choose a run folder"
-        },
-        "collection": {
-          "label": "Collection"
         },
         "edit": {
           "title": "Edit script"
@@ -151,12 +138,6 @@
       "default": {
         "aria": "Default {option}"
       },
-      "moveDown": {
-        "tooltip": "Move down"
-      },
-      "moveUp": {
-        "tooltip": "Move up"
-      },
       "multiselect": {
         "option": "Multiselect"
       },
@@ -169,14 +150,8 @@
       "removeOption": {
         "tooltip": "Remove option"
       },
-      "required": {
-        "label": "Required"
-      },
       "scriptHint": {
         "description": "Parameters reach the command as {variable}."
-      },
-      "secret": {
-        "label": "Secret"
       },
       "smartHint": {
         "description": "Use {token} in the prompt. A secret reaches the run as {variable} only, never in the prompt."
@@ -194,9 +169,6 @@
       },
       "continue": {
         "label": "Continue in terminal"
-      },
-      "copyForAgent": {
-        "label": "Copy for agent"
       },
       "decline": {
         "label": "Decline"
@@ -216,14 +188,6 @@
       "limits": {
         "label": "Model {model}, budget {budget}, timeout {timeout}"
       },
-      "log": {
-        "none": {
-          "emptyHint": "No output yet."
-        },
-        "truncated": {
-          "status": "Earlier output dropped"
-        }
-      },
       "mcpServers": {
         "label": "MCP servers: {servers}"
       },
@@ -234,9 +198,6 @@
         "empty": "No tasks"
       },
       "outcome": {
-        "cost": {
-          "label": "Cost {cost}"
-        },
         "denied": {
           "label": "Denied: {tools}"
         },
@@ -251,9 +212,6 @@
         "label": "Prompt sent"
       },
       "report": {
-        "command": {
-          "label": "Command: {value}"
-        },
         "cost": {
           "label": "Cost: {value}"
         },
@@ -295,21 +253,12 @@
         "label": "Review and run"
       },
       "state": {
-        "blocked": {
-          "status": "Needs you"
-        },
-        "cancelled": {
-          "status": "Cancelled"
-        },
         "done": {
           "status": "Succeeded"
         },
         "waiting": {
           "status": "Waiting for you"
         }
-      },
-      "task": {
-        "label": "Task"
       },
       "taskOnBranch": {
         "label": "Task {task} on {branch}"
@@ -387,12 +336,6 @@
       "note": {
         "hint": "Runs only while {app} is open. Missed runs are skipped. A run still going, or still waiting for your answer, makes the next one skip."
       },
-      "now": {
-        "status": "Now"
-      },
-      "off": {
-        "status": "Off"
-      },
       "presets": {
         "aria": "Presets",
         "option": "Choose preset…"
@@ -450,9 +393,6 @@
       "editSchedule": {
         "label": "Edit schedule…"
       },
-      "fallback": {
-        "label": "Script"
-      },
       "fromTask": {
         "status": "From the task"
       },
@@ -470,9 +410,6 @@
       },
       "paramNamed": {
         "label": "Parameter {name}"
-      },
-      "prompt": {
-        "label": "Prompt"
       },
       "promptExample": {
         "example": "Summarize the open TODOs in this folder"
@@ -544,9 +481,6 @@
     "start": {
       "homeUnavailable": {
         "tooltip": "Home folder unavailable"
-      },
-      "newTerminal": {
-        "label": "New terminal"
       },
       "none": {
         "empty": "No terminal open",
@@ -799,6 +733,12 @@
     }
   },
   "common": {
+    "abort": {
+      "label": "Abort"
+    },
+    "aborted": {
+      "status": "Aborted"
+    },
     "action": {
       "add": {
         "label": "Add"
@@ -1023,10 +963,52 @@
         "label": "Take over"
       }
     },
+    "added": {
+      "status": "Added"
+    },
+    "body": {
+      "label": "Body"
+    },
+    "cancelled": {
+      "status": "Cancelled"
+    },
+    "changed": {
+      "status": "Changed"
+    },
+    "claudeCliNotFound": {
+      "error": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
+    },
+    "claudeCodeRegistered": {
+      "description": "Registered with Claude Code."
+    },
+    "claudeRegistrationRefused": {
+      "error": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
+    },
+    "closed": {
+      "status": "Closed"
+    },
+    "collection": {
+      "label": "Collection"
+    },
+    "command": {
+      "label": "Command: {value}"
+    },
+    "commaPair": {
+      "label": "{first}, {second}"
+    },
+    "comment": {
+      "label": "Comment"
+    },
     "confirm": {
       "irreversible": {
         "body": "This can’t be undone."
       }
+    },
+    "connecting": {
+      "loading": "Connecting…"
+    },
+    "continue": {
+      "label": "Continue"
     },
     "copy": {
       "copied": {
@@ -1053,6 +1035,57 @@
       "failed": {
         "error": "Couldn’t copy: {error}"
       }
+    },
+    "copyCommand": {
+      "label": "Copy command"
+    },
+    "copyForAgent": {
+      "label": "Copy for agent"
+    },
+    "cost": {
+      "label": "Cost {value}"
+    },
+    "created": {
+      "label": "Created"
+    },
+    "dashPair": {
+      "label": "{first} — {second}"
+    },
+    "deleteCollectionConfirm": {
+      "title": "Delete collection?"
+    },
+    "details": {
+      "title": "Details"
+    },
+    "done": {
+      "status": "Done"
+    },
+    "dotPair": {
+      "label": "{first} · {second}"
+    },
+    "draft": {
+      "status": "Draft"
+    },
+    "enterNumber": {
+      "error": "Enter a number."
+    },
+    "enterWholeNumber": {
+      "error": "Enter a whole number."
+    },
+    "environmentName": {
+      "aria": "Environment name"
+    },
+    "expiresIn": {
+      "status": "Expires in {seconds}s"
+    },
+    "failedCount": {
+      "label": "{count} failed"
+    },
+    "fetching": {
+      "loading": "Fetching…"
+    },
+    "fetchTarget": {
+      "tooltip": "Fetch {name}"
     },
     "field": {
       "branch": {
@@ -1119,6 +1152,24 @@
         "label": "Value"
       }
     },
+    "fileCount": {
+      "label": "{count} file | {count} files"
+    },
+    "forcePush": {
+      "label": "Force push"
+    },
+    "goToFile": {
+      "label": "Go to file"
+    },
+    "graph": {
+      "label": "Graph"
+    },
+    "hideValue": {
+      "label": "Hide value"
+    },
+    "import": {
+      "label": "Import"
+    },
     "key": {
       "enter": {
         "label": "Enter"
@@ -1129,6 +1180,36 @@
       "tab": {
         "label": "Tab"
       }
+    },
+    "later": {
+      "label": "Later"
+    },
+    "mainWorktree": {
+      "tooltip": "Main worktree"
+    },
+    "markReviewed": {
+      "tooltip": "Mark reviewed"
+    },
+    "markUnreviewed": {
+      "tooltip": "Mark unreviewed"
+    },
+    "matchPosition": {
+      "status": "Match {position} of {total}"
+    },
+    "mcp": {
+      "label": "MCP"
+    },
+    "merge": {
+      "label": "Merge"
+    },
+    "merged": {
+      "status": "Merged"
+    },
+    "message": {
+      "label": "Message"
+    },
+    "mode": {
+      "label": "Mode"
     },
     "module": {
       "automations": {
@@ -1174,6 +1255,57 @@
         "label": "Worktrees"
       }
     },
+    "more": {
+      "label": "{count} more"
+    },
+    "moreActions": {
+      "tooltip": "More actions"
+    },
+    "moreWaiting": {
+      "status": "{count} more waiting"
+    },
+    "moveDown": {
+      "tooltip": "Move down"
+    },
+    "moveUp": {
+      "tooltip": "Move up"
+    },
+    "needsYou": {
+      "status": "Needs you"
+    },
+    "newBranch": {
+      "label": "New branch"
+    },
+    "newCollection": {
+      "label": "New collection"
+    },
+    "newSession": {
+      "label": "New session"
+    },
+    "newTerminal": {
+      "label": "New terminal"
+    },
+    "noEnvironments": {
+      "empty": "No environments yet"
+    },
+    "noOutput": {
+      "emptyHint": "No output yet."
+    },
+    "now": {
+      "status": "Now"
+    },
+    "off": {
+      "status": "Off"
+    },
+    "openElsewhere": {
+      "tooltip": "Open in another window"
+    },
+    "path": {
+      "label": "Path"
+    },
+    "port": {
+      "label": "Port"
+    },
     "product": {
       "claudeCode": {
         "label": "Claude Code"
@@ -1193,6 +1325,63 @@
       "kiraStudio": {
         "label": "Kira Studio"
       }
+    },
+    "progressPercent": {
+      "label": "{label} {percent}%"
+    },
+    "prompt": {
+      "label": "Prompt"
+    },
+    "raw": {
+      "label": "Raw"
+    },
+    "rebase": {
+      "label": "Rebase"
+    },
+    "refreshAll": {
+      "label": "Refresh all"
+    },
+    "registerWithClaudeCode": {
+      "label": "Register with Claude Code"
+    },
+    "removed": {
+      "status": "Removed"
+    },
+    "required": {
+      "label": "Required"
+    },
+    "revert": {
+      "label": "Revert"
+    },
+    "script": {
+      "label": "Script"
+    },
+    "searching": {
+      "loading": "Searching…"
+    },
+    "searchResults": {
+      "aria": "Search results"
+    },
+    "secret": {
+      "label": "Secret"
+    },
+    "sendTest": {
+      "label": "Send test notification"
+    },
+    "sent": {
+      "status": "Sent"
+    },
+    "skip": {
+      "label": "Skip"
+    },
+    "skipped": {
+      "status": "Skipped"
+    },
+    "smartScript": {
+      "label": "Smart script"
+    },
+    "stale": {
+      "status": "Stale"
     },
     "state": {
       "all": {
@@ -1234,6 +1423,30 @@
       "unsavedChanges": {
         "status": "Unsaved changes"
       }
+    },
+    "task": {
+      "label": "Task"
+    },
+    "truncated": {
+      "status": "Earlier output dropped"
+    },
+    "typography": {
+      "label": "Typography"
+    },
+    "unresolved": {
+      "label": "{count} unresolved"
+    },
+    "user": {
+      "label": "User"
+    },
+    "view": {
+      "label": "View"
+    },
+    "withDetail": {
+      "label": "{first} ({second})"
+    },
+    "worktree": {
+      "label": "Worktree"
     }
   },
   "docker": {
@@ -1393,9 +1606,6 @@
       },
       "change": {
         "label": "{label}: {from} -> {to}"
-      },
-      "changed": {
-        "status": "Changed"
       },
       "command": {
         "label": "Command (one argument per line)"
@@ -1574,9 +1784,6 @@
       "pids": {
         "label": "PIDs limit"
       },
-      "port": {
-        "label": "Port"
-      },
       "preserved": {
         "label": "Kept as is"
       },
@@ -1588,9 +1795,6 @@
       },
       "recreates": {
         "title": "Recreates container"
-      },
-      "removed": {
-        "status": "Removed"
       },
       "restored": {
         "body": "The original container was restored."
@@ -1673,9 +1877,6 @@
       }
     },
     "env": {
-      "hideValue": {
-        "tooltip": "Hide value"
-      },
       "revealValue": {
         "tooltip": "Reveal value"
       }
@@ -1683,9 +1884,6 @@
     "exec": {
       "close": {
         "tooltip": "Close {title}"
-      },
-      "new": {
-        "label": "New session"
       },
       "none": {
         "empty": "No terminal session",
@@ -1696,9 +1894,6 @@
       }
     },
     "field": {
-      "created": {
-        "label": "Created"
-      },
       "entrypoint": {
         "label": "Entrypoint"
       },
@@ -1737,9 +1932,6 @@
       },
       "started": {
         "label": "Started"
-      },
-      "user": {
-        "label": "User"
       },
       "workingFolder": {
         "label": "Working folder"
@@ -1843,9 +2035,6 @@
       }
     },
     "panel": {
-      "connecting": {
-        "loading": "Connecting…"
-      },
       "engineOverview": {
         "tooltip": "Engine overview"
       },
@@ -1891,9 +2080,6 @@
       "noContainers": {
         "emptyHint": "No containers."
       },
-      "raw": {
-        "title": "Raw"
-      },
       "scope": {
         "label": "Driver scope"
       },
@@ -1916,9 +2102,6 @@
     "section": {
       "containers": {
         "label": "Containers"
-      },
-      "details": {
-        "title": "Details"
       },
       "images": {
         "label": "Images"
@@ -2154,23 +2337,14 @@
       }
     },
     "common": {
-      "abort": {
-        "label": "Abort"
-      },
       "branchName": {
         "label": "Branch name"
       },
       "confirmToken": {
         "aria": "Confirmation token"
       },
-      "continue": {
-        "label": "Continue"
-      },
       "currentBranch": {
         "tooltip": "Current branch"
-      },
-      "fileCount": {
-        "label": "{count} file | {count} files"
       },
       "forceDelete": {
         "body": "“{name}” is not fully merged.",
@@ -2178,9 +2352,6 @@
       },
       "mergeParent": {
         "option": "Parent {number}: {sha} {subject}"
-      },
-      "moreActions": {
-        "tooltip": "More actions"
       },
       "operationInProgress": {
         "body": "An operation is already in progress. Resolve or abort it first."
@@ -2190,15 +2361,9 @@
       },
       "restack": {
         "label": "Restack"
-      },
-      "skip": {
-        "label": "Skip"
       }
     },
     "conflict": {
-      "more": {
-        "label": "{count} more"
-      },
       "resolve": {
         "description": "Resolve the remaining {count} file in your own editor and stage it, then continue. | Resolve the remaining {count} files in your own editor and stage them, then continue."
       },
@@ -2392,9 +2557,6 @@
         "githubEnabled": {
           "label": "Show pull request status for this repository"
         },
-        "graph": {
-          "label": "Graph"
-        },
         "includeUntracked": {
           "label": "Check the untracked files option by default in the stash dialog"
         },
@@ -2451,9 +2613,6 @@
           "description": "Branch pointer moves, index reset. Changes appear unstaged. Working tree files untouched. Nothing is lost.",
           "label": "Mixed"
         },
-        "mode": {
-          "label": "Mode"
-        },
         "more": {
           "status": "And more…"
         },
@@ -2479,7 +2638,6 @@
         }
       },
       "revert": {
-        "confirm": "Revert",
         "description": "Reverting applies the inverse of this commit as a new commit. The original stays in history, so this is safe on branches you’ve already pushed.",
         "detachedHead": {
           "hint": "HEAD is detached. The revert commit won’t belong to any branch until you create one."
@@ -2627,9 +2785,6 @@
         "existsAnnotated": {
           "hint": "An annotated tag named “{name}” already exists."
         },
-        "message": {
-          "label": "Message"
-        },
         "replace": {
           "label": "Replace the existing tag"
         },
@@ -2687,14 +2842,13 @@
           }
         },
         "path": {
-          "example": "../my-repo-feature-x",
-          "label": "Path"
+          "example": "../my-repo-feature-x"
         },
         "startFrom": {
           "label": "Start from"
         },
         "startPoint": {
-          "example": "main",
+          "example": "origin/main",
           "label": "Start point"
         },
         "title": "Create worktree"
@@ -2874,12 +3028,6 @@
       "globalStashRemove": {
         "label": "Remove from global stash"
       },
-      "goToFile": {
-        "label": "Go to file"
-      },
-      "newBranch": {
-        "label": "New branch…"
-      },
       "newTag": {
         "label": "New tag…"
       },
@@ -2935,9 +3083,6 @@
       }
     },
     "op": {
-      "aborted": {
-        "announce": "Aborted"
-      },
       "applied": {
         "announce": "Applied {label}"
       },
@@ -3048,9 +3193,6 @@
       },
       "detachedTarget": {
         "label": "{target} (detached)"
-      },
-      "done": {
-        "announce": "Done"
       },
       "dropStash": {
         "body": "Dropped {ref}: {message}. Undo is available until your next operation."
@@ -3343,9 +3485,6 @@
       "setStackParent": {
         "announce": "Set the stack parent of {branch} to {parent}"
       },
-      "skipped": {
-        "announce": "Skipped"
-      },
       "stashBranch": {
         "announce": "Created branch {name} from {label}"
       },
@@ -3390,9 +3529,6 @@
       "filterWorktrees": {
         "placeholder": "Filter worktrees"
       },
-      "prTitle": {
-        "tooltip": "{title} — {state}"
-      },
       "region": {
         "aria": "{tab} picker"
       },
@@ -3408,21 +3544,9 @@
       },
       "unborn": {
         "label": "{name} (unborn)"
-      },
-      "worktree": {
-        "label": "Worktree"
       }
     },
     "pr": {
-      "closed": {
-        "status": "Closed"
-      },
-      "draft": {
-        "status": "Draft"
-      },
-      "merged": {
-        "status": "Merged"
-      },
       "noAnswer": {
         "hint": "GitHub did not answer."
       },
@@ -3449,14 +3573,8 @@
       "ffOnly": {
         "option": "Fast-forward only"
       },
-      "merge": {
-        "option": "Merge"
-      },
       "pullConfig": {
         "status": "Your {rebase} or {ff} config"
-      },
-      "rebase": {
-        "option": "Rebase"
       },
       "setting": {
         "status": "Your {setting} setting"
@@ -3624,12 +3742,6 @@
       "loadMore": {
         "label": "Load more"
       },
-      "markReviewed": {
-        "tooltip": "Mark reviewed"
-      },
-      "markUnreviewed": {
-        "tooltip": "Mark unreviewed"
-      },
       "noBranch": {
         "emptyHint": "Choose a branch to compare its commits against a base you set or one Kira detects."
       },
@@ -3671,9 +3783,6 @@
       "start": {
         "title": "Review branch changes"
       },
-      "summary": {
-        "label": "{commits} · {files}"
-      },
       "swap": {
         "tooltip": "Swap branch and base"
       },
@@ -3691,9 +3800,6 @@
         },
         "authorEmail": {
           "label": "Author email"
-        },
-        "body": {
-          "label": "Body"
         },
         "committerEmail": {
           "label": "Committer email"
@@ -3723,20 +3829,11 @@
       "options": {
         "aria": "Search options"
       },
-      "position": {
-        "status": "Match {position} of {total}"
-      },
-      "results": {
-        "aria": "Search results"
-      },
       "scope": {
         "aria": "Search scope",
         "both": {
           "option": "Both"
         }
-      },
-      "searching": {
-        "loading": "Searching…"
       },
       "tailFailed": {
         "error": "Couldn’t search unloaded history: {error}"
@@ -3799,9 +3896,6 @@
       },
       "setParent": {
         "tooltip": "Set stack parent…"
-      },
-      "stale": {
-        "status": "Stale"
       }
     },
     "stash": {
@@ -3876,23 +3970,13 @@
         "loading": "Deleting remote branch…"
       },
       "fetch": {
-        "label": "Fetch",
-        "tooltip": "Fetch {remote}"
-      },
-      "fetching": {
-        "loading": "Fetching…"
-      },
-      "forcePush": {
-        "label": "Force push…"
+        "label": "Fetch"
       },
       "forcePushing": {
         "loading": "Force pushing…"
       },
       "nothingRunning": {
         "hint": "Nothing is running."
-      },
-      "progress": {
-        "status": "{phase} {percent}%"
       },
       "progressRemote": {
         "status": "Remote: {phase}"
@@ -3912,9 +3996,6 @@
       },
       "pullOptions": {
         "aria": "Pull strategy options"
-      },
-      "pullPreview": {
-        "status": "{strategy} ({source})"
       },
       "pullResolving": {
         "loading": "Resolving…"
@@ -3993,14 +4074,8 @@
       "list": {
         "empty": "No worktrees yet"
       },
-      "main": {
-        "tooltip": "Main worktree"
-      },
       "mainBadge": {
         "label": "M"
-      },
-      "openElsewhere": {
-        "tooltip": "Open in another window"
       },
       "remove": {
         "tooltip": "Remove worktree"
@@ -4024,9 +4099,6 @@
       },
       "label": "Add memory",
       "outcome": {
-        "added": {
-          "status": "Added"
-        },
         "failed": {
           "error": "Couldn’t add: {error}"
         },
@@ -4049,9 +4121,6 @@
       "author": {
         "agent": {
           "label": "Agent"
-        },
-        "user": {
-          "label": "User"
         }
       },
       "historical": {
@@ -4083,9 +4152,6 @@
         },
         "estimate": {
           "description": "{files}, {chunks}, {calls}, {duration}."
-        },
-        "files": {
-          "label": "{count} file | {count} files"
         },
         "ignored": {
           "label": "{count} file or folder ignored | {count} files and folders ignored"
@@ -4150,9 +4216,6 @@
         "awaiting": {
           "status": "Awaiting"
         },
-        "cancelled": {
-          "status": "Cancelled"
-        },
         "paused": {
           "status": "Paused"
         },
@@ -4169,17 +4232,11 @@
         },
         "running": {
           "label": "Importing: {title} · {done} / {count} file | Importing: {title} · {done} / {count} files"
-        },
-        "view": {
-          "label": "View"
         }
       },
       "totals": {
         "added": {
           "label": "{count} added"
-        },
-        "failed": {
-          "label": "{count} failed"
         },
         "files": {
           "label": "{done} / {count} file | {done} / {count} files"
@@ -4189,9 +4246,6 @@
         },
         "skipped": {
           "label": "{count} skipped"
-        },
-        "unresolved": {
-          "label": "{count} unresolved"
         },
         "updated": {
           "label": "{count} updated"
@@ -4205,23 +4259,6 @@
       "connect": {
         "description": "Registers the kira-memory MCP server. Claude Code then gets the store_memory, search_memories and memory_history tools and the /mcp__kira-memory__remember command. The Claude Code CLI must be installed for the store check to run.",
         "title": "Connect Claude Code"
-      },
-      "copyCommand": {
-        "label": "Copy command"
-      },
-      "install": {
-        "installed": {
-          "description": "Registered with Claude Code."
-        },
-        "notFound": {
-          "error": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
-        },
-        "refused": {
-          "error": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
-        }
-      },
-      "register": {
-        "label": "Register with Claude Code"
       }
     },
     "module": {
@@ -4291,12 +4328,6 @@
           "label": "{action} · {author} · {source}"
         },
         "source": {
-          "import": {
-            "label": "Import"
-          },
-          "mcp": {
-            "label": "MCP"
-          },
           "ui": {
             "label": "App"
           }
@@ -4549,9 +4580,6 @@
         "label": "Release"
       },
       "status": {
-        "connecting": {
-          "status": "Connecting"
-        },
         "ended": {
           "status": "Ended"
         },
@@ -4763,12 +4791,6 @@
         },
         "jira": {
           "placeholder": "Paste a Jira link or key"
-        },
-        "moveDown": {
-          "tooltip": "Move down"
-        },
-        "moveUp": {
-          "tooltip": "Move up"
         },
         "notPlanned": {
           "label": "Backlog · not planned"
@@ -5146,9 +5168,6 @@
         "deployedTo": {
           "label": "Deployed to"
         },
-        "details": {
-          "label": "Details"
-        },
         "draftTitle": {
           "title": "New branch ({repo})"
         },
@@ -5160,9 +5179,6 @@
         },
         "lastRebase": {
           "label": "Last rebase"
-        },
-        "merge": {
-          "label": "Merge"
         },
         "mergedInto": {
           "label": "Merged into"
@@ -5186,17 +5202,8 @@
           "status": "Runs {sha}"
         },
         "state": {
-          "closed": {
-            "status": "Closed"
-          },
           "deployed": {
             "status": "Deployed"
-          },
-          "draft": {
-            "status": "Draft"
-          },
-          "merged": {
-            "status": "Merged"
           },
           "notDeployed": {
             "status": "Not deployed"
@@ -5205,9 +5212,6 @@
             "status": "Not merged"
           },
           "open": {},
-          "stale": {
-            "status": "Stale"
-          },
           "unknown": {
             "status": "Unknown"
           }
@@ -5222,9 +5226,6 @@
         },
         "createdOnStart": {
           "status": "Created on start"
-        },
-        "moreCommits": {
-          "label": "{count} more"
         },
         "noWorktree": {
           "status": "No worktree"
@@ -5267,9 +5268,6 @@
         },
         "message": {
           "label": "Message to Claude"
-        },
-        "newSession": {
-          "label": "New session"
         },
         "noOp": {
           "hint": "The branch already sits on this base. Saving only records it."
@@ -5379,9 +5377,6 @@
         },
         "notAWorktree": {
           "status": "Not a worktree"
-        },
-        "openElsewhere": {
-          "status": "Open in another window"
         }
       },
       "forcePushConfirm": {
@@ -5563,9 +5558,6 @@
         }
       },
       "outcome": {
-        "aborted": {
-          "status": "Aborted"
-        },
         "back": {
           "status": "Sent back"
         },
@@ -5585,9 +5577,6 @@
           "gitError": {
             "label": "Last git error: {error}"
           },
-          "head": {
-            "label": "{title} ({state})"
-          },
           "headReason": {
             "label": "{title} ({state}): {reason}"
           },
@@ -5602,9 +5591,6 @@
             "label": "Verified by git"
           },
           "yes": {}
-        },
-        "copyForAgent": {
-          "label": "Copy for agent"
         },
         "endedBy": {
           "label": "Ended by {source}"
@@ -5675,10 +5661,7 @@
       },
       "plan": {
         "band": {
-          "hours": {},
-          "off": {
-            "status": "Off"
-          }
+          "hours": {}
         },
         "branchRow": {
           "menuTitle": {
@@ -5708,9 +5691,6 @@
           "onMerge": {
             "label": "On merge"
           },
-          "refreshAll": {
-            "label": "Refresh all"
-          },
           "refreshing": {
             "loading": "Refreshing…"
           }
@@ -5728,12 +5708,6 @@
           "title": {}
         },
         "repoChip": {
-          "fetch": {
-            "tooltip": "Fetch {label}"
-          },
-          "fetching": {
-            "loading": "Fetching…"
-          },
           "neverFetched": {
             "status": "Never fetched"
           },
@@ -5924,9 +5898,6 @@
           "question": {
             "aria": "Question for the review agent",
             "placeholder": "Ask about this branch"
-          },
-          "sent": {
-            "status": "Sent"
           }
         },
         "header": {
@@ -6023,14 +5994,6 @@
           "title": "Run {stage} in the background"
         }
       },
-      "runLog": {
-        "empty": {
-          "empty": "No output yet"
-        },
-        "truncated": {
-          "status": "Earlier output dropped"
-        }
-      },
       "sessionList": {
         "empty": {
           "empty": "Nothing running"
@@ -6071,9 +6034,6 @@
         },
         "modeAgent": {
           "label": "Agent · background claude -p"
-        },
-        "modeScript": {
-          "label": "Script"
         },
         "modeUser": {},
         "modeUserSession": {
@@ -6122,10 +6082,7 @@
           "label": "Skip this stage"
         },
         "state": {
-          "next": {},
-          "now": {
-            "status": "Now"
-          }
+          "next": {}
         }
       },
       "stageMover": {
@@ -6143,17 +6100,11 @@
         "body": "“{step}” is still running. Taking over stops it, marks it stuck and continues it in Claude Code."
       },
       "taskPanel": {
-        "more": {
-          "label": "More actions"
-        },
         "reviewNote": {
           "body": "{owner}’s work. Read-only here; you can keep your own notes."
         },
         "someone": {
           "label": "Someone"
-        },
-        "task": {
-          "label": "Task"
         }
       },
       "taskTab": {
@@ -6238,9 +6189,6 @@
           "copyYaml": {
             "label": "Copy YAML"
           },
-          "graph": {
-            "label": "Graph"
-          },
           "mode": {
             "aria": "Editor mode"
           },
@@ -6295,14 +6243,6 @@
         "kind": {
           "agentBackground": {
             "option": "Agent (background)"
-          }
-        },
-        "mode": {
-          "prompt": {
-            "label": "Prompt"
-          },
-          "smart": {
-            "label": "Smart script"
           }
         },
         "onFailure": {
@@ -6499,9 +6439,6 @@
       }
     },
     "common": {
-      "abort": {
-        "label": "Abort"
-      },
       "archive": {
         "label": "Archive"
       },
@@ -6517,15 +6454,9 @@
       "claudeSession": {
         "label": "Claude {id}"
       },
-      "dashPair": {
-        "label": "{first} — {second}"
-      },
       "day": {
         "earlier": {
           "label": "Earlier"
-        },
-        "later": {
-          "label": "Later"
         },
         "today": {
           "label": "Today"
@@ -6533,12 +6464,6 @@
         "tomorrow": {
           "label": "Tomorrow"
         }
-      },
-      "dotPair": {
-        "label": "{first} · {second}"
-      },
-      "forcePush": {
-        "label": "Force push"
       },
       "githubIssue": {
         "label": "Issue {ref}"
@@ -6558,14 +6483,8 @@
       "nameFailed": {
         "label": "{name} · failed"
       },
-      "needsYou": {
-        "label": "Needs you"
-      },
       "needYou": {
         "label": "Need you"
-      },
-      "newBranch": {
-        "label": "New branch"
       },
       "noBranches": {
         "empty": "No branches"
@@ -6579,17 +6498,11 @@
       "plan": {
         "label": "Plan"
       },
-      "rebase": {
-        "label": "Rebase"
-      },
       "reply": {
         "label": "Reply"
       },
       "showLog": {
         "label": "Show log"
-      },
-      "skipped": {
-        "status": "Skipped"
       },
       "stage": {
         "label": "Stage"
@@ -6597,9 +6510,6 @@
       "status": {
         "blocked": {
           "status": "Blocked"
-        },
-        "done": {
-          "status": "Done"
         },
         "inProgress": {
           "status": "In progress"
@@ -6616,9 +6526,6 @@
       },
       "workflows": {
         "label": "Workflows"
-      },
-      "worktree": {
-        "label": "Worktree"
       }
     },
     "module": {
@@ -6626,9 +6533,6 @@
     },
     "repo": {
       "blame": {
-        "authorWhen": {
-          "label": "{author}, {when}"
-        },
         "line": {
           "label": "{author}, {when} · {subject}"
         },
@@ -6644,9 +6548,6 @@
       },
       "config": {
         "basePath": {
-          "choose": {
-            "label": "Choose…"
-          },
           "chooseTitle": {
             "title": "Choose worktree base path"
           },
@@ -6663,9 +6564,6 @@
         "nickname": {
           "description": "Shown everywhere instead of the repository name.",
           "label": "Nickname"
-        },
-        "path": {
-          "label": "Path"
         },
         "prepare": {
           "description": "Setup script. Runs in the root of every new worktree of this repository, before any agent starts, for example {command}. A non-zero exit marks setup as failed.",
@@ -6758,11 +6656,7 @@
         "command": {
           "label": "Command that prints the deployed SHA"
         },
-        "empty": {
-          "empty": "No environments yet"
-        },
         "name": {
-          "aria": "Environment name",
           "example": "staging"
         },
         "remove": {
@@ -6787,7 +6681,6 @@
         }
       },
       "newTerminal": {
-        "label": "New terminal",
         "tooltip": "New terminal at repository root"
       },
       "noRepoOpen": {
@@ -6806,9 +6699,6 @@
         },
         "importPrompt": {
           "emptyHint": "Import a repository to get started."
-        },
-        "mainWorktree": {
-          "tooltip": "Main worktree"
         },
         "noWorktrees": {
           "empty": "No worktrees"
@@ -6851,24 +6741,16 @@
           "error": "Couldn’t load review data for this file."
         },
         "markReviewed": {
-          "label": "Mark selection reviewed",
-          "tooltip": "Mark reviewed"
+          "label": "Mark selection reviewed"
         },
         "markUnreviewed": {
-          "label": "Mark selection unreviewed",
-          "tooltip": "Mark unreviewed"
+          "label": "Mark selection unreviewed"
         },
         "noBase": {
           "error": "No base branch configured for this repository."
         }
       },
       "search": {
-        "results": {
-          "aria": "Search results"
-        },
-        "searching": {
-          "loading": "Searching…"
-        },
         "stopped": {
           "status": "{summary} (stopped at 10,000)"
         },
@@ -6901,11 +6783,7 @@
           "empty": "This file is binary and can’t be previewed"
         },
         "comment": {
-          "label": "Comment",
           "placeholder": "Leave a review comment"
-        },
-        "goToFile": {
-          "label": "Go to file"
         },
         "missing": {
           "empty": "This file no longer exists"
@@ -6965,9 +6843,6 @@
         "rowDensity": {
           "description": "Applies to the file tree and every list."
         },
-        "typography": {
-          "label": "Typography"
-        },
         "wordWrap": {
           "description": "Long lines wrap instead of scrolling, in the file viewer."
         }
@@ -6993,9 +6868,6 @@
         "notifyRunEnded": {
           "label": "When a background ADE run ends"
         },
-        "sendTest": {
-          "label": "Send test notification"
-        },
         "usage": {
           "description": "Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space report. Claude Code hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on Claude subscription plans only.",
           "label": "Show Claude Code usage limits in the ADE status bar"
@@ -7004,9 +6876,6 @@
       "claudeUsage": {
         "fiveHourLong": {
           "label": "Five-hour"
-        },
-        "item": {
-          "label": "{label} {percent}%"
         },
         "line": {
           "status": "{window}: {percent}% used · resets {when} (in {left})"
@@ -7034,17 +6903,11 @@
         }
       },
       "gitCredential": {
-        "continue": {
-          "label": "Continue"
-        },
         "dialog": {
           "title": "Git credentials"
         }
       },
       "gitSettings": {
-        "enterNumber": {
-          "error": "Enter a number."
-        },
         "fetchInterval": {
           "description": "Zero disables background fetching. It never prompts for a credential. After a credential or remote error it stops until the next explicit fetch, and network errors retry with backoff.",
           "label": "Auto-fetch interval (minutes)"
@@ -7147,10 +7010,6 @@
           "apply": {
             "label": "Apply port"
           },
-          "integer": {
-            "error": "Enter a whole number."
-          },
-          "label": "Port",
           "range": {
             "error": "Ports run from {min} to {max}."
           }
@@ -7189,16 +7048,6 @@
           "hint": "Clears this window’s list only. The log resets when Kira Space quits."
         }
       },
-      "pairing": {
-        "expires": {
-          "status": "Expires in {seconds}s"
-        }
-      },
-      "queue": {
-        "more": {
-          "status": "{count} more waiting"
-        }
-      },
       "settings": {}
     }
   },
@@ -7230,9 +7079,6 @@
         "copyName": {
           "label": "{name} copy"
         },
-        "deleteCollectionConfirm": {
-          "title": "Delete collection?"
-        },
         "deleteFolderConfirm": {
           "title": "Delete folder?"
         },
@@ -7256,9 +7102,6 @@
         },
         "import": {
           "title": "Import Postman collection"
-        },
-        "new": {
-          "label": "New collection"
         },
         "newFolder": {
           "label": "New folder"
@@ -7330,9 +7173,6 @@
         },
         "unknownDynamic": {
           "tooltip": "{name} is an unknown dynamic value"
-        },
-        "unresolved": {
-          "status": "{count} unresolved"
         }
       },
       "copyAsCurl": {
@@ -7409,12 +7249,8 @@
         "editVariables": {
           "label": "Edit variables"
         },
-        "empty": "No environments yet",
         "manage": {
           "label": "Manage environments"
-        },
-        "name": {
-          "aria": "Environment name"
         },
         "new": {
           "label": "New environment"
@@ -7537,12 +7373,6 @@
       "variables": {
         "duplicate": {
           "status": "Duplicate name"
-        },
-        "hideValue": {
-          "label": "Hide value"
-        },
-        "secret": {
-          "label": "Secret"
         },
         "secretsUnavailable": {
           "tooltip": "Secret storage is unavailable"
@@ -7864,9 +7694,6 @@
       "connectionReadOnly": {
         "tooltip": "Connection is read-only"
       },
-      "continue": {
-        "label": "Continue"
-      },
       "copiedUrl": {
         "announce": "Copied URL"
       },
@@ -7888,18 +7715,9 @@
       "grpc": {
         "label": "gRPC"
       },
-      "import": {
-        "label": "Import"
-      },
-      "more": {
-        "label": "{count} more"
-      },
       "nodeKind": {
         "bucket": {
           "label": "Bucket"
-        },
-        "collection": {
-          "label": "Collection"
         },
         "connection": {
           "label": "Connection"
@@ -7949,9 +7767,6 @@
       },
       "pickDateTime": {
         "tooltip": "Choose a date and time"
-      },
-      "raw": {
-        "label": "Raw"
       },
       "reconnectAndLoad": {
         "label": "Reconnect and load"
@@ -8103,9 +7918,6 @@
           "label": "{access} access on {name}"
         },
         "cost": {
-          "generic": {
-            "label": "Cost {value}"
-          },
           "mariadb": {
             "label": "MariaDB cost {value}"
           },
@@ -8257,9 +8069,6 @@
         "title": "Saved queries"
       },
       "status": {
-        "cancelled": {
-          "status": "Cancelled"
-        },
         "results": {
           "status": "{count} result | {count} results"
         }
@@ -8430,9 +8239,6 @@
       "nextYears": {
         "tooltip": "Next 16 years"
       },
-      "now": {
-        "label": "Now"
-      },
       "previousMonth": {
         "tooltip": "Previous month"
       },
@@ -8474,17 +8280,11 @@
         "estimate": {
           "body": "Estimated {count} row read, threshold {threshold}. | Estimated {count} rows read, threshold {threshold}."
         },
-        "expires": {
-          "status": "Expires in {seconds}s"
-        },
         "heavy": {
           "body": "{connection} ({kind}) wants to run a query estimated to read {count} row, over your threshold of {threshold}. | {connection} ({kind}) wants to run a query estimated to read {count} rows, over your threshold of {threshold}."
         },
         "other": {
           "body": "{connection} ({kind}) wants to run a statement through the database MCP server."
-        },
-        "queue": {
-          "status": "{count} more waiting"
         },
         "read": {
           "body": "{connection} ({kind}) wants to run a read statement through the database MCP server."
@@ -8504,9 +8304,6 @@
       }
     },
     "definition": {
-      "comment": {
-        "label": "Comment"
-      },
       "constraint": {
         "openReferenced": {
           "tooltip": "Open the definition of “{table}”"
@@ -8611,9 +8408,6 @@
         },
         "noValidator": {
           "empty": "No validator is set for this collection"
-        },
-        "required": {
-          "label": "Required"
         }
       }
     },
@@ -8695,7 +8489,6 @@
         "status": "Modified"
       },
       "revert": {
-        "label": "Revert",
         "tooltip": "Revert to the stored value"
       },
       "reverted": {
@@ -8811,9 +8604,6 @@
         },
         "phoneNumber": {
           "label": "Phone number"
-        },
-        "skip": {
-          "label": "Skip"
         },
         "stringUuid": {
           "label": "UUID"
@@ -9068,9 +8858,6 @@
         }
       },
       "pane": {
-        "message": {
-          "option": "Message"
-        },
         "metadata": {
           "option": "Metadata"
         }
@@ -9217,23 +9004,14 @@
         },
         "remove": {
           "aria": "Remove cookie"
-        },
-        "sent": {
-          "label": "Sent"
         }
       },
       "diff": {
-        "added": {
-          "status": "Added"
-        },
         "after": {
           "label": "After"
         },
         "before": {
           "label": "Before"
-        },
-        "changed": {
-          "status": "Changed"
         },
         "loadingMerge": {
           "loading": "Loading the compare view…"
@@ -9243,9 +9021,6 @@
         },
         "rawBytes": {
           "description": "Comparing raw bytes because the two bodies aren’t both JSON or both XML."
-        },
-        "removed": {
-          "status": "Removed"
         },
         "title": "Compare responses",
         "unchanged": {
@@ -9297,9 +9072,6 @@
         }
       },
       "pane": {
-        "body": {
-          "label": "Body"
-        },
         "bodyCode": {
           "label": "Body (code)"
         },
@@ -9690,9 +9462,6 @@
       "clear": {
         "hint": "Clears the in-memory ring only. Retention of op_log is automatic."
       },
-      "command": {
-        "status": "Command: {command}"
-      },
       "commandTruncated": {
         "status": "Command (truncated at 64 kibibytes, can’t be re-run): {command}"
       },
@@ -9854,7 +9623,6 @@
           }
         },
         "mode": {
-          "label": "Mode",
           "uri": {
             "label": "Connection URI"
           }
@@ -9870,9 +9638,6 @@
         },
         "pasteCredentials": {
           "label": "Paste credentials…"
-        },
-        "port": {
-          "label": "Port"
         },
         "preconnect": {
           "description": "Runs in your shell before connecting, for example a port-forward or a single sign-on session keeper.",
@@ -9934,9 +9699,6 @@
           "general": {
             "label": "General"
           },
-          "mcp": {
-            "label": "MCP"
-          },
           "preconnect": {
             "label": "Pre-connect"
           },
@@ -9959,9 +9721,6 @@
         "throttle": {
           "description": "A value of 0 disables the limit. Reads served from cache are never throttled, and connecting is never throttled. Applies immediately to a connected connection.",
           "label": "Throttle commands",
-          "number": {
-            "error": "Enter a number."
-          },
           "range": {
             "status": "Unlimited (0), or {min}–{max}"
           }
@@ -9985,9 +9744,6 @@
           "unparsable": {
             "hint": "Can’t parse this URI into fields. It will be used as is."
           }
-        },
-        "user": {
-          "label": "User"
         }
       },
       "connectionScope": {
@@ -10093,9 +9849,6 @@
           "label": "Import {count} connection | Import {count} connections"
         },
         "outcome": {
-          "created": {
-            "label": "Created"
-          },
           "createdWithNote": {
             "label": "Created. {reason}"
           },
@@ -10144,9 +9897,6 @@
           },
           "unsupportedEngine": {
             "label": "No adapter for this engine"
-          },
-          "withDetail": {
-            "label": "{reason} ({detail})"
           }
         },
         "report": {
@@ -10169,9 +9919,6 @@
         "summary": {
           "created": {
             "body": "{created} of {count} connection created. | {created} of {count} connections created."
-          },
-          "failed": {
-            "body": "{count} failed."
           },
           "passwords": {
             "body": "{count} password imported. | {count} passwords imported."
@@ -10329,9 +10076,6 @@
         "openDefinition": {
           "label": "Open definition"
         },
-        "refreshAll": {
-          "label": "Refresh all"
-        },
         "savedFilters": {
           "empty": "No saved filters",
           "label": "Saved filters"
@@ -10380,9 +10124,6 @@
         "pasteHint": {
           "hint": "Paste output from {pgDump}, {showCreate} or {sqliteSchema}. Use whichever your connection’s engine gives you."
         },
-        "summary": {
-          "status": "{tables}, {columns}"
-        },
         "tables": {
           "status": "{count} table | {count} tables"
         }
@@ -10412,9 +10153,6 @@
     "search": {
       "capped": {
         "status": "First {count} shown"
-      },
-      "count": {
-        "status": "Match {index} of {total}"
       },
       "filteringRows": {
         "tooltip": "Showing only matching rows. Click to show all"
@@ -10504,9 +10242,6 @@
         "rowDensity": {
           "description": "Applies to the tree, the grid and every list."
         },
-        "typography": {
-          "label": "Typography"
-        },
         "wordWrap": {
           "description": "Long lines wrap instead of scrolling. Applies to the query console, the MongoDB console and the cell editor."
         }
@@ -10548,17 +10283,6 @@
           "description": "Deny by default. Only connections checked here are visible to an MCP client through this server.",
           "label": "Exposed connections"
         },
-        "install": {
-          "failed": {
-            "body": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
-          },
-          "installed": {
-            "body": "Registered with Claude Code."
-          },
-          "notFound": {
-            "body": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
-          }
-        },
         "masked": {
           "status": "{count} masked column | {count} masked columns"
         },
@@ -10573,9 +10297,6 @@
         },
         "regenerate": {
           "label": "Regenerate token"
-        },
-        "register": {
-          "label": "Register with Claude Code"
         },
         "tokenExpired": {
           "body": "Token expired. Regenerate it above."
@@ -10605,9 +10326,6 @@
       },
       "restartNote": {
         "hint": "Takes effect after restart."
-      },
-      "wholeNumber": {
-        "error": "Enter a whole number."
       }
     },
     "shortcuts": {
@@ -11175,9 +10893,6 @@
       "copiedError": {
         "announce": "Copied error"
       },
-      "copyCommand": {
-        "label": "Copy command"
-      },
       "copyError": {
         "label": "Copy error"
       },
@@ -11212,9 +10927,6 @@
       "fontSize": {
         "label": "Data font size"
       },
-      "fontSizeNumber": {
-        "error": "Enter a number."
-      },
       "fontSizeRange": {
         "label": "{min}–{max} px"
       },
@@ -11230,9 +10942,6 @@
       "notifyPrompts": {
         "description": "Posts a system notification when a popup waits in a window that is not in front.",
         "label": "Notify me when a popup waits for an answer"
-      },
-      "notifyTest": {
-        "label": "Send test notification"
       },
       "rowComfortable": {
         "option": "Comfortable · 28 px"
@@ -11258,11 +10967,6 @@
     "showMore": {
       "remaining": {
         "label": "Show more ({count} remaining)"
-      }
-    },
-    "tabKind": {
-      "smartScript": {
-        "title": "Smart script"
       }
     },
     "tabStrip": {
@@ -11314,9 +11018,6 @@
       },
       "installing": {
         "body": "Downloading and verifying {app} {version}. {app} quits once the new version is ready."
-      },
-      "later": {
-        "label": "Later"
       },
       "versions": {
         "body": "{app} {latest} is available. You have {current}."

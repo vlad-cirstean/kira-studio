@@ -135,9 +135,9 @@ interface HeaderRow {
   status: 'added' | 'removed' | 'changed' | 'unchanged';
 }
 const HEADER_STATUS_KEYS: Record<HeaderRow['status'], MessageKey> = {
-  added: 'studio.http.diff.added.status',
-  removed: 'studio.http.diff.removed.status',
-  changed: 'studio.http.diff.changed.status',
+  added: 'common.added.status',
+  removed: 'common.removed.status',
+  changed: 'common.changed.status',
   unchanged: 'studio.http.diff.unchangedRow.status',
 };
 function headerStatusText(status: HeaderRow['status']): string {

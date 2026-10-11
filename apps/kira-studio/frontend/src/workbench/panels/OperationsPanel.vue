@@ -178,7 +178,7 @@ function menuFor(record: OpRecord): MenuItem[] {
           :doc="
             record.commandTruncated
               ? t('studio.operations.commandTruncated.status', { command: record.command ?? '' })
-              : t('studio.operations.command.status', { command: record.command ?? '' })
+              : t('common.command.label', { value: record.command ?? '' })
           "
           :language="record.kind === 'http' ? 'plain' : 'sql'"
           :sql-dialect="opSqlDialect(record)"

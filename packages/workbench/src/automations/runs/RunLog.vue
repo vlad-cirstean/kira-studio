@@ -28,8 +28,8 @@ useFollowTail(el, () => log.data.value?.chunks.length);
         <FieldError data-testid="run-log-error">{{ message }}</FieldError>
       </template>
       <template #default="{ data }">
-        <div v-if="data.truncated" class="text-subtle">{{ t('automations.run.log.truncated.status') }}</div>
-        <div v-if="data.chunks.length === 0" class="text-subtle">{{ t('automations.run.log.none.emptyHint') }}</div>
+        <div v-if="data.truncated" class="text-subtle">{{ t('common.truncated.status') }}</div>
+        <div v-if="data.chunks.length === 0" class="text-subtle">{{ t('common.noOutput.emptyHint') }}</div>
         <div
           v-for="c in data.chunks"
           :key="c.seq"

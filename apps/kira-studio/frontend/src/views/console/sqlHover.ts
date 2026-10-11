@@ -42,9 +42,7 @@ function tableHoverInfo(table: DdlTable, from: number, to: number): ConsoleHover
   const shown = table.columns.slice(0, MAX_TABLE_COLUMNS);
   for (const col of shown) lines.push(`  ${col.name}  ${col.type}`);
   if (table.columns.length > shown.length) {
-    lines.push(
-      `  ${t('studio.common.more.label', { count: table.columns.length - shown.length })}`,
-    );
+    lines.push(`  ${t('common.more.label', { count: table.columns.length - shown.length })}`);
   }
   return { from, to, lines };
 }

@@ -75,7 +75,7 @@ async function chooseBasePath(): Promise<void> {
 }
 
 const source = computed(() =>
-  t('space.common.dotPair.label', {
+  t('common.dotPair.label', {
     first:
       props.repo.source === 'added'
         ? t('space.repo.config.source.added.status')
@@ -239,7 +239,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             <TooltipContent>{{ repo.name }}</TooltipContent>
           </Tooltip>
         </dd>
-        <dt class="text-muted-foreground">{{ t('space.repo.config.path.label') }}</dt>
+        <dt class="text-muted-foreground">{{ t('common.path.label') }}</dt>
         <dd class="m-0 min-w-0">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -303,7 +303,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             @keydown="basePath.onKeydown"
           />
           <Button variant="dialog" size="kira-lg" data-testid="repo-base-path-choose" @click="chooseBasePath">
-            {{ t('space.repo.config.basePath.choose.label') }}
+            {{ t('common.action.choose.label') }}
           </Button>
         </div>
         <FieldError v-if="basePath.error.value" data-testid="repo-base-path-error">{{ basePath.error.value }}</FieldError>
@@ -337,7 +337,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
         </CatalogText>
       </p>
       <p v-if="envRows.length === 0" class="m-0 text-kira-md text-muted-foreground" data-testid="repo-env-empty">
-        {{ t('space.repo.env.empty.empty') }}
+        {{ t('common.noEnvironments.empty') }}
       </p>
       <div v-else class="flex flex-col gap-1.5">
         <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground" aria-hidden="true">

@@ -74,7 +74,7 @@ function addMount(): void {
       <Input v-model="rc.image" :disabled="disabled" data-testid="docker-edit-image" />
     </EditField>
 
-    <EditField field="user" :label="t('docker.field.user.label')" mode="recreate" :changed="changed('user')">
+    <EditField field="user" :label="t('common.user.label')" mode="recreate" :changed="changed('user')">
       <Input v-model="rc.user" :placeholder="t('docker.edit.imageDefault.placeholder')" :disabled="disabled" data-testid="docker-edit-user" />
     </EditField>
 

@@ -146,7 +146,7 @@ onUnmounted(() => {
       />
       <TooltipIconButton
         icon="new-folder"
-        :label="t('studio.api.collections.new.label')"
+        :label="t('common.newCollection.label')"
         data-testid="new-collection"
         @click="onNewCollection"
       />

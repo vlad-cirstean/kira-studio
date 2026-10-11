@@ -43,7 +43,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
           <TableCell class="def-val-name font-data">{{ f.name }}</TableCell>
           <TableCell class="def-val-type font-data">{{ f.bsonType ?? '' }}</TableCell>
           <TableCell class="def-val-required">
-            <Badge v-if="f.required">{{ t('studio.definition.validation.required.label') }}</Badge>
+            <Badge v-if="f.required">{{ t('common.required.label') }}</Badge>
           </TableCell>
           <TableCell class="text-muted-foreground">{{ f.description ?? '' }}</TableCell>
         </TableRow>

@@ -101,7 +101,7 @@ const countLabel = computed(() => {
   const { n, exact } = props.search.matchCount.value;
   if (n === 0) return t('common.state.noMatches.empty');
   const position = props.search.activeIndex.value >= 0 ? props.search.activeIndex.value + 1 : 1;
-  return t('git.search.position.status', { position, total: exact ? String(n) : `${n}+` });
+  return t('common.matchPosition.status', { position, total: exact ? String(n) : `${n}+` });
 });
 
 // ---------------------------------------------------------------------------------------

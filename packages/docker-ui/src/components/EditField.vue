@@ -31,9 +31,9 @@ const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recr
       <span class="text-muted-foreground">{{ label }}</span>
       <Tooltip v-if="changed">
         <TooltipTrigger as-child>
-          <StatusDot tone="muted" :label="t('docker.edit.changed.status')" />
+          <StatusDot tone="muted" :label="t('common.changed.status')" />
         </TooltipTrigger>
-        <TooltipContent>{{ t('docker.edit.changed.status') }}</TooltipContent>
+        <TooltipContent>{{ t('common.changed.status') }}</TooltipContent>
       </Tooltip>
     </div>
     <slot />

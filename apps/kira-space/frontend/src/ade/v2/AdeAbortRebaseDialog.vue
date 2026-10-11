@@ -20,7 +20,7 @@ const { busy, error, confirm } = useConfirmRun(
     :open="dialogs.abortTarget !== null"
     :title="t('space.ade.abortConfirm.title')"
     :message="t('space.ade.abortConfirm.body', { branch: dialogs.abortTarget?.name ?? '' })"
-    :confirm-label="t('space.common.abort.label')"
+    :confirm-label="t('common.abort.label')"
     tone="danger"
     :busy="busy"
     :error="error ?? ''"

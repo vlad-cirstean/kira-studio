@@ -167,7 +167,7 @@ const DETAIL_TABS = computed<readonly { value: DetailTab; label: string; testid:
   { value: 'General', label: t('studio.project.connectionDialog.tab.general.label'), testid: 'connection-tab-general' },
   { value: 'Advanced', label: t('studio.project.connectionDialog.tab.advanced.label'), testid: 'connection-tab-advanced' },
   { value: 'Pre-connect', label: t('studio.project.connectionDialog.tab.preconnect.label'), testid: 'connection-tab-preconnect' },
-  { value: 'MCP', label: t('studio.project.connectionDialog.tab.mcp.label'), testid: 'connection-tab-mcp' },
+  { value: 'MCP', label: t('common.mcp.label'), testid: 'connection-tab-mcp' },
   { value: 'Privacy', label: t('studio.project.connectionDialog.tab.privacy.label'), testid: 'connection-tab-privacy' },
 ]);
 
@@ -471,7 +471,7 @@ function setThrottlePerSec(value: string): void {
 // outside CONNECTION_THROTTLE_RANGE is not — mirrors connections/input.go's Validate().
 const throttlePerSecError = computed<string | null>(() => {
   const v = draft.value?.throttlePerSec ?? 0;
-  if (!Number.isFinite(v)) return t('studio.project.connectionDialog.throttle.number.error');
+  if (!Number.isFinite(v)) return t('common.enterNumber.error');
   if (v !== 0 && (v < CONNECTION_THROTTLE_RANGE.min || v > CONNECTION_THROTTLE_RANGE.max)) {
     return t('studio.project.connectionDialog.throttle.range.status', {
       min: CONNECTION_THROTTLE_RANGE.min,
@@ -763,7 +763,7 @@ const preconnectText = computed({
 
           <div class="flex items-end gap-2">
           <Field class="flex-1">
-            <FieldLabel>{{ t('studio.project.connectionDialog.mode.label') }}</FieldLabel>
+            <FieldLabel>{{ t('common.mode.label') }}</FieldLabel>
             <SecondaryTabs
               variant="segmented"
               size="kira-lg"
@@ -821,7 +821,7 @@ const preconnectText = computed({
                 />
               </Field>
               <Field class="flex-none basis-24">
-                <FieldLabel>{{ t('studio.project.connectionDialog.port.label') }}</FieldLabel>
+                <FieldLabel>{{ t('common.port.label') }}</FieldLabel>
                 <NumberStepperInput
                   :model-value="draft.port != null ? String(draft.port) : ''"
                   data-testid="connection-port"
@@ -862,7 +862,7 @@ const preconnectText = computed({
               </Field>
               <div class="flex gap-2 items-start">
                 <Field class="flex-1">
-                  <FieldLabel>{{ t('studio.project.connectionDialog.user.label') }}</FieldLabel>
+                  <FieldLabel>{{ t('common.user.label') }}</FieldLabel>
                   <Input
                     :model-value="draft.username ?? ''"
                     class="font-data"
@@ -1234,7 +1234,7 @@ const preconnectText = computed({
       <DialogFooter v-if="step === 'engine'">
         <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" @click="continueToDetails">
-          {{ t('studio.common.continue.label') }}
+          {{ t('common.continue.label') }}
           <CodiconIcon name="chevron-right" :size="13" />
         </Button>
       </DialogFooter>

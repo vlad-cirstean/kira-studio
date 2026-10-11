@@ -90,7 +90,7 @@ function submit(): void {
         <Button variant="toolbar" size="kira" @click="emit('cancel')">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="toolbar-primary" size="kira" @click="submit">
           <CodiconIcon name="comment" :size="13" />
-          {{ t('space.repo.view.comment.label') }}
+          {{ t('common.comment.label') }}
         </Button>
       </div>
     </template>

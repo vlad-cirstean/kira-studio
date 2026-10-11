@@ -45,16 +45,16 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
 // appended when the whole run hit the cap, "K files skipped" appended when non-zero — the skip
 // count is surfaced, never silent (D4).
 const statusLine = computed(() => {
-  if (running.value) return t('space.repo.search.searching.loading');
+  if (running.value) return t('common.searching.loading');
   const s = stats.value;
   if (!s) return '';
   let line = t('space.repo.search.summary.status', {
     count: s.matches,
-    files: t('memory.import.confirm.files.label', { count: s.filesMatched }),
+    files: t('common.fileCount.label', { count: s.filesMatched }),
   });
   if (s.truncated) line = t('space.repo.search.stopped.status', { summary: line });
   if (s.filesSkipped > 0) {
-    line = t('space.common.dashPair.label', {
+    line = t('common.dashPair.label', {
       first: line,
       second: t('memory.import.confirm.skipped.label', { count: s.filesSkipped }),
     });
@@ -192,7 +192,7 @@ const nav = useListNavigation<RepoSearchRowVm>({
       class="flex-1 min-h-0 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
-      :aria-label="t('space.repo.search.results.aria')"
+      :aria-label="t('common.searchResults.aria')"
       @scroll="onScroll"
     >
       <div class="relative" :style="{ height: `${totalSize}px` }">

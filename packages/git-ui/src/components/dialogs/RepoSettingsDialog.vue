@@ -105,8 +105,8 @@ const graphScopeOptions: readonly SelectOption[] = [
 const pullStrategyOptions: readonly SelectOption[] = [
   { value: 'auto', label: 'git.pullStrategy.auto.option' },
   { value: 'ff-only', label: 'git.pullStrategy.ffOnly.option' },
-  { value: 'merge', label: 'git.pullStrategy.merge.option' },
-  { value: 'rebase', label: 'git.pullStrategy.rebase.option' },
+  { value: 'merge', label: 'common.merge.label' },
+  { value: 'rebase', label: 'common.rebase.label' },
 ];
 
 function onGraphScopeChange(value: string): void {
@@ -202,7 +202,7 @@ async function save(): Promise<void> {
       </DialogHeader>
       <DialogBody>
         <FieldSet>
-          <FieldLegend>{{ t('git.dialog.repoSettings.graph.label') }}</FieldLegend>
+          <FieldLegend>{{ t('common.graph.label') }}</FieldLegend>
           <Field>
             <FieldLabel :for="pageSizeId">{{ t('git.dialog.repoSettings.pageSize.label') }}</FieldLabel>
             <NumberStepperInput

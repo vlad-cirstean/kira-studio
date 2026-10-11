@@ -651,7 +651,7 @@ onUnmounted(() => {
                     <TooltipTrigger as-child>
                       <span class="worktree-badge shrink-0 text-kira-sm text-subtle">{{ t('space.ade.basePicker.main.label') }}</span>
                     </TooltipTrigger>
-                    <TooltipContent>{{ t('space.repo.panel.mainWorktree.tooltip') }}</TooltipContent>
+                    <TooltipContent>{{ t('common.mainWorktree.tooltip') }}</TooltipContent>
                   </Tooltip>
                   <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
                     <TooltipTrigger as-child>

@@ -53,7 +53,7 @@ const BLOCKED_REASON = {
   notAWorktree: 'space.ade.flow.notAWorktree.status',
   mainWorktree: 'space.ade.flow.mainWorktree.status',
   currentWorktree: 'space.ade.flow.currentWorktree.status',
-  openInAnotherWindow: 'space.ade.flow.openElsewhere.status',
+  openInAnotherWindow: 'common.openElsewhere.tooltip',
   locked: 'space.ade.flow.locked.status',
 } as const satisfies Record<string, MessageKey>;
 const blockedReason = (reason: string): string =>

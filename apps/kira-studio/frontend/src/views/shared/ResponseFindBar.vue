@@ -148,7 +148,7 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
       />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="http-find-count">
-      {{ totalMatches === 0 ? t('common.state.noMatches.empty') : t('studio.search.count.status', { index: displayIndex, total: totalMatches }) }}
+      {{ totalMatches === 0 ? t('common.state.noMatches.empty') : t('common.matchPosition.status', { position: displayIndex, total: totalMatches }) }}
     </span>
     <TooltipIconButton
       icon="chevron-up"

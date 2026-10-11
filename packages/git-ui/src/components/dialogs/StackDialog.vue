@@ -190,7 +190,7 @@ function closeDialog(): void {
                   k="git.dialog.stack.planEntry.label"
                   :params="{
                     count: entry.commits,
-                    reason: entry.reason === 'stale' ? t('git.stack.stale.status') : t('git.dialog.stack.reasonAncestor.status'),
+                    reason: entry.reason === 'stale' ? t('common.stale.status') : t('git.dialog.stack.reasonAncestor.status'),
                     source: entry.baseSource,
                   }"
                 >

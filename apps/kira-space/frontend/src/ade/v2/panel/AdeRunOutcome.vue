@@ -88,7 +88,7 @@ const endedBy = computed(() => {
     t(o.reported ? 'space.ade.outcome.endedByReported.label' : 'space.ade.outcome.endedBy.label', {
       source: o.source,
     }),
-    ...(rebase.value?.aborted ? [t('space.ade.outcome.aborted.status')] : []),
+    ...(rebase.value?.aborted ? [t('common.aborted.status')] : []),
     ...(rebase.value?.inProgress ? [t('space.ade.outcome.inProgress.status')] : []),
   ].join(' · ');
 });
@@ -101,7 +101,7 @@ function text(): string {
   const lines = [
     o?.reason
       ? t('space.ade.outcome.copy.headReason.label', { ...head, reason: o.reason })
-      : t('space.ade.outcome.copy.head.label', head),
+      : t('common.withDetail.label', { first: head.title, second: head.state }),
   ];
   if (o) {
     lines.push(
@@ -149,7 +149,7 @@ function copy(): void {
       />
       <span class="flex-1" />
       <Button size="kira" variant="ghost" class="text-muted-foreground" data-testid="ade-outcome-copy" @click="copy">
-        {{ copied ? t('common.copy.copied.announce') : t('space.ade.outcome.copyForAgent.label') }}
+        {{ copied ? t('common.copy.copied.announce') : t('common.copyForAgent.label') }}
       </Button>
     </div>
     <p v-if="outcome?.reason" class="m-0 text-kira-md" data-testid="ade-outcome-reason">{{ outcome.reason }}</p>

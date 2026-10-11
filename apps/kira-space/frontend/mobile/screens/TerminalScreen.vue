@@ -24,7 +24,7 @@ const props = defineProps<{ sessionId: string }>();
 const FONT_MIN = 8;
 const FONT_MAX = 20;
 const STATUS_LABEL = {
-  connecting: 'mobile.terminal.status.connecting.status',
+  connecting: 'common.connecting.loading',
   live: 'mobile.terminal.status.live.status',
   reconnecting: 'mobile.terminal.status.reconnecting.status',
   ended: 'mobile.terminal.status.ended.status',

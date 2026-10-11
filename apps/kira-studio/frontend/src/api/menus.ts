@@ -190,7 +190,7 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
     {
       type: 'item',
       id: 'new-collection',
-      label: t('studio.api.collections.new.label'),
+      label: t('common.newCollection.label'),
       icon: 'add',
       run: () => actions.newCollection(),
     },

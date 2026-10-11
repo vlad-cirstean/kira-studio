@@ -80,7 +80,7 @@ const STATUS_LABEL: Record<OpStatus, MessageKey> = {
   running: 'common.state.running.status',
   ok: 'automations.run.state.done.status',
   error: 'workbench.opLog.error.status',
-  cancelled: 'automations.run.state.cancelled.status',
+  cancelled: 'common.cancelled.status',
 };
 
 const filterTextModel = computed({
@@ -272,7 +272,7 @@ function durationText(ms: number | null): string | null {
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <slot name="detail" :record="listItems[vi.index].record" part="command">
-                <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{ t('automations.run.report.command.label', { value: listItems[vi.index].record.command ?? '' }) }}</span>
+                <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{ t('common.command.label', { value: listItems[vi.index].record.command ?? '' }) }}</span>
               </slot>
             </li>
             <li

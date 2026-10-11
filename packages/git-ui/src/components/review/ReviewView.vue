@@ -626,7 +626,7 @@ const comparisonSummaryLabel = computed(() => {
   const commits = commitCountLabel.value;
   if (!commits) return '';
   const files = filesChangedCount.value;
-  return t('git.review.summary.label', { commits, files: t('git.review.filesChanged.label', { count: files }) });
+  return t('common.dotPair.label', { first: commits, second: t('git.review.filesChanged.label', { count: files }) });
 });
 
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;

@@ -64,13 +64,13 @@ function optionClass(option: SearchOption): string {
     <!-- ARIA's listbox role only permits `option`/`group` children (`aria-required-children`) —
          the status line, section titles and options live inside this inner listbox div; the
          stale hint, footers and the body-search button are its *siblings*, not its children. -->
-    <div :id="SEARCH_LISTBOX_ID" role="listbox" :aria-label="t('git.search.results.aria')">
+    <div :id="SEARCH_LISTBOX_ID" role="listbox" :aria-label="t('common.searchResults.aria')">
       <div
         v-if="searching"
         class="text-kira-sm text-subtle py-1 px-1.5"
         data-testid="search-status"
       >
-        {{ t('git.search.searching.loading') }}
+        {{ t('common.searching.loading') }}
       </div>
 
       <template v-for="section in model.sections" :key="section.title">

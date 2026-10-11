@@ -118,7 +118,7 @@ const error = ref<string | null>(null);
 
 const TAB_IDS: readonly EditorTab[] = ['script', 'params', 'schedule'];
 const TAB_LABEL_KEYS = {
-  script: 'automations.script.fallback.label',
+  script: 'common.script.label',
   params: 'automations.params.title.label',
   schedule: 'automations.schedule.title.label',
 } as const satisfies Record<EditorTab, MessageKey>;
@@ -246,7 +246,7 @@ useShortcut(window, ['form.submit'], () => void save());
 
             <div class="flex items-end gap-3">
               <Field class="flex-1 min-w-0">
-                <FieldLabel for="script-collection">{{ t('automations.dialog.script.collection.label') }}</FieldLabel>
+                <FieldLabel for="script-collection">{{ t('common.collection.label') }}</FieldLabel>
                 <NativeSelect
                   id="script-collection"
                   v-model="collection"
@@ -308,7 +308,7 @@ useShortcut(window, ['form.submit'], () => void save());
                   {{ workingDir || t('automations.dialog.script.noFolder.status') }}
                 </span>
                 <Button variant="dialog" size="kira-lg" data-testid="script-dialog-workingdir-choose" @click="chooseWorkingDir">
-                  {{ t('automations.dialog.script.choose.label') }}
+                  {{ t('common.action.choose.label') }}
                 </Button>
               </div>
               <FieldDescription v-else-if="dirMode === 'home'" data-testid="script-dialog-home-notice">

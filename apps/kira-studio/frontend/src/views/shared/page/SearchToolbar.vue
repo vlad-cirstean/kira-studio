@@ -302,7 +302,7 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap" :data-testid="`${testidPrefix}search-count`">
         <template v-if="scanning">{{ t('studio.search.scanning.loading', { count: foundSoFar }) }}</template>
         <template v-else-if="entry && entry.matches.length > 0">
-          <CatalogText k="studio.search.count.status">
+          <CatalogText k="common.matchPosition.status">
             <template #index><b class="font-data">{{ entry.index + 1 }}</b></template>
             <template #total><b class="font-data">{{ formatCount(entry.found ?? entry.matches.length) }}</b></template>
           </CatalogText>

@@ -30,10 +30,10 @@ const rows = (): Array<[string, string]> => [
   [t('common.field.command.label'), join(props.detail.command)],
   [t('docker.field.entrypoint.label'), join(props.detail.entrypoint)],
   [t('docker.field.workingFolder.label'), displayValue(props.detail.workingDir)],
-  [t('docker.field.user.label'), displayValue(props.detail.user)],
+  [t('common.user.label'), displayValue(props.detail.user)],
   [t('docker.field.restartPolicy.label'), props.detail.restartPolicy || 'no'],
   [t('docker.field.health.label'), displayValue(props.detail.health)],
-  [t('docker.field.created.label'), formatDateTime(props.detail.container.created * 1000)],
+  [t('common.created.label'), formatDateTime(props.detail.container.created * 1000)],
   [t('docker.field.started.label'), dateOrDash(props.detail.startedAt)],
   [t('docker.field.finished.label'), dateOrDash(props.detail.finishedAt)],
   [t('docker.field.exitCode.label'), props.detail.container.state === 'running' ? displayValue(null) : String(props.detail.exitCode)],
@@ -44,7 +44,7 @@ const rows = (): Array<[string, string]> => [
   <div class="h-full overflow-auto p-3" data-testid="docker-overview">
     <div class="@container">
       <div class="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2">
-        <DetailSection :title="t('docker.section.details.title')">
+        <DetailSection :title="t('common.details.title')">
           <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
             <template v-for="[k, v] in rows()" :key="k">
               <dt class="text-muted-foreground">{{ k }}</dt>
@@ -90,7 +90,7 @@ const rows = (): Array<[string, string]> => [
           >
             <span class="shrink-0 text-muted-foreground">{{ splitEnv(entry).key }}=</span>
             <span class="min-w-0 flex-1 break-all" data-testid="docker-env-value">{{ revealed.has(i) ? splitEnv(entry).value : '••••••••' }}</span>
-            <TooltipIconButton :icon="revealed.has(i) ? 'eye-closed' : 'eye'" :label="revealed.has(i) ? t('docker.env.hideValue.tooltip') : t('docker.env.revealValue.tooltip')" data-testid="docker-env-reveal" @click="toggle(i)" />
+            <TooltipIconButton :icon="revealed.has(i) ? 'eye-closed' : 'eye'" :label="revealed.has(i) ? t('common.hideValue.label') : t('docker.env.revealValue.tooltip')" data-testid="docker-env-reveal" @click="toggle(i)" />
             <TooltipIconButton icon="copy" :label="t('common.action.copyValue.label')" @click="copyText(splitEnv(entry).value)" />
           </div>
         </DetailSection>

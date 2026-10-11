@@ -28,7 +28,7 @@ const inlineBlameId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <FieldLegend class="pt-0">{{ t('space.workbench.appearance.typography.label') }}</FieldLegend>
+    <FieldLegend class="pt-0">{{ t('common.typography.label') }}</FieldLegend>
     <FontSizeField
       :appearance="draft.appearance"
       :is-at-default="isAtDefault"

@@ -156,7 +156,7 @@ function mapChanges(
         field: `${prefix}.${k}`,
         label: label(k),
         from: base[k] ?? t('docker.edit.unset.status'),
-        to: draft[k] ?? t('docker.edit.removed.status'),
+        to: draft[k] ?? t('common.removed.status'),
         mode: 'recreate',
       });
     }
@@ -183,7 +183,7 @@ function setChanges(field: string, label: string, base: string[], draft: string[
   const out: Unsectioned[] = [];
   for (const x of base) {
     if (!draft.includes(x))
-      out.push({ field, label, from: x, to: t('docker.edit.removed.status'), mode: 'recreate' });
+      out.push({ field, label, from: x, to: t('common.removed.status'), mode: 'recreate' });
   }
   for (const x of draft) {
     if (!base.includes(x))
@@ -204,7 +204,7 @@ function mountChanges(
         field: 'mounts',
         label: t('docker.edit.mount.label'),
         from: mountText(m),
-        to: t('docker.edit.removed.status'),
+        to: t('common.removed.status'),
         mode: 'recreate',
       });
   }
@@ -285,7 +285,7 @@ function recreateChanges(base: DockerRecreateSpec, draft: DockerRecreateSpec): U
     draft.entrypoint.join(' '),
   );
   scalar('cmd', t('common.field.command.label'), base.cmd.join(' '), draft.cmd.join(' '));
-  scalar('user', t('docker.field.user.label'), base.user, draft.user);
+  scalar('user', t('common.user.label'), base.user, draft.user);
   scalar('hostname', t('docker.edit.hostname.label'), base.hostname, draft.hostname);
   out.push(
     ...mapChanges(
@@ -306,7 +306,7 @@ function recreateChanges(base: DockerRecreateSpec, draft: DockerRecreateSpec): U
   out.push(
     ...setChanges(
       'ports',
-      t('docker.edit.port.label'),
+      t('common.port.label'),
       base.ports.map(portText),
       draft.ports.map(portText),
     ),

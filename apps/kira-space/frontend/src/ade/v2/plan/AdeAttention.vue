@@ -21,7 +21,7 @@ function onClick(): void {
     <Button size="kira"
       type="button"
       variant="ghost"
-      :aria-label="t('space.common.needsYou.label')"
+      :aria-label="t('common.needsYou.status')"
       class="size-4.5 cursor-pointer rounded-full border-0 p-0 text-kira-sm font-extrabold shadow-[0_0_0_3px_var(--color-tone-amber-tint)]"
       :class="TONE_SOLID_CLASS.amber"
       :disabled="busy"

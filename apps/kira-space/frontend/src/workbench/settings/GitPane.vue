@@ -51,7 +51,7 @@ function resetProtectedBranches(): void {
 
 const fetchAutoIntervalError = computed<string | null>(() => {
   const v = props.draft.git.fetchAutoIntervalMinutes;
-  if (!Number.isFinite(v)) return t('space.workbench.gitSettings.enterNumber.error');
+  if (!Number.isFinite(v)) return t('common.enterNumber.error');
   if (v < FETCH_AUTO_INTERVAL_MINUTES_RANGE.min || v > FETCH_AUTO_INTERVAL_MINUTES_RANGE.max) {
     return t('space.workbench.gitSettings.fetchRange.error', {
       min: FETCH_AUTO_INTERVAL_MINUTES_RANGE.min,
@@ -67,7 +67,7 @@ props.registerFieldError('git.fetchAutoIntervalMinutes', fetchAutoIntervalError)
 // itself accepts the full 0..max range (a stored out-of-range value must still hydrate).
 const graphFontSizeError = computed<string | null>(() => {
   const v = props.draft.git.graphFontSize;
-  if (!Number.isFinite(v)) return t('space.workbench.gitSettings.enterNumber.error');
+  if (!Number.isFinite(v)) return t('common.enterNumber.error');
   if (v === 0) return null;
   if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
     return t('space.workbench.gitSettings.graphFont.range.error', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max });
@@ -162,7 +162,7 @@ const graphFontSizeId = useId();
       />
       <FieldDescription>{{ t('space.workbench.gitSettings.gitPath.description') }}</FieldDescription>
     </Field>
-    <h3 class="text-kira-lg">{{ t('space.ade.workflows.editor.graph.label') }}</h3>
+    <h3 class="text-kira-lg">{{ t('common.graph.label') }}</h3>
     <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="graphFontSizeId">{{ t('space.workbench.gitSettings.graphFont.label') }}</Label>

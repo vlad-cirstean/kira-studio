@@ -2,9 +2,9 @@ import { type MessageKey, t } from '@theme/i18n';
 
 const PR_STATE_KEYS: Readonly<Record<string, MessageKey>> = {
   open: 'common.action.open.label',
-  draft: 'git.pr.draft.status',
-  merged: 'git.pr.merged.status',
-  closed: 'git.pr.closed.status',
+  draft: 'common.draft.status',
+  merged: 'common.merged.status',
+  closed: 'common.closed.status',
 };
 
 /** Display word for a pull request state; an unknown state shows as given. */

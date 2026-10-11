@@ -8,5 +8,5 @@ import { t } from '@theme/i18n';
 </script>
 
 <template>
-  <TooltipIconButton icon="ellipsis" data-testid="row-actions" :label="t('git.common.moreActions.tooltip')" />
+  <TooltipIconButton icon="ellipsis" data-testid="row-actions" :label="t('common.moreActions.tooltip')" />
 </template>

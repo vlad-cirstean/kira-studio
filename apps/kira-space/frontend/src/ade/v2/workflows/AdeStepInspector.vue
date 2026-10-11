@@ -19,8 +19,8 @@ import type { PipelineStep } from '../wire';
 import AdeStepResults from './AdeStepResults.vue';
 
 const modeItems = computed(() => [
-  { value: 'prompt', label: t('space.ade.workflows.mode.prompt.label'), testid: 'ade-wf-step-mode-prompt' },
-  { value: 'smart', label: t('space.ade.workflows.mode.smart.label'), testid: 'ade-wf-step-mode-smart' },
+  { value: 'prompt', label: t('common.prompt.label'), testid: 'ade-wf-step-mode-prompt' },
+  { value: 'smart', label: t('common.smartScript.label'), testid: 'ade-wf-step-mode-smart' },
 ]);
 
 // The selected step: name, run scope, approval gate, timeout, tools, prompt or smart script, results.
@@ -130,7 +130,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       @update:model-value="setMode"
     />
     <div v-if="smart" class="flex flex-col gap-2" data-testid="ade-wf-step-smart">
-      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">{{ t('space.ade.workflows.mode.smart.label') }}</Label>
+      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">{{ t('common.smartScript.label') }}</Label>
       <NativeSelect
         :id="id('script')"
         variant="bordered"
@@ -170,11 +170,11 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
           @update:model-value="onTools"
         />
       </div>
-      <Label :for="id('prompt')" class="sr-only">{{ t('space.ade.workflows.mode.prompt.label') }}</Label>
+      <Label :for="id('prompt')" class="sr-only">{{ t('common.prompt.label') }}</Label>
       <Textarea
         :id="id('prompt')"
         :model-value="step.prompt"
-        :placeholder="t('space.ade.workflows.mode.prompt.label')"
+        :placeholder="t('common.prompt.label')"
         class="min-h-24 w-auto resize-y leading-normal"
         data-testid="ade-wf-step-prompt"
         @update:model-value="(v: string | number) => patch({ prompt: String(v) })"

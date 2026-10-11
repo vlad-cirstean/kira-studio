@@ -95,10 +95,10 @@ const reportRun = (runId: string) => {
 const heldRow = (rl: { run: { branchId: string }; note: string }) =>
   WAITING_SETUP_NOTES.includes(rl.note) ? props.card.rows.find((r) => r.id === rl.run.branchId) : undefined;
 const STATE_LABEL = {
-  done: 'space.common.status.done.status',
-  now: 'space.ade.stageBlock.state.now.status',
+  done: 'common.done.status',
+  now: 'common.now.status',
   next: 'common.action.next.label',
-  skipped: 'space.common.skipped.status',
+  skipped: 'common.skipped.status',
 } as const satisfies Record<StageBlock['state'], MessageKey>;
 const stateLabel = (s: StageBlock['state']): string => t(STATE_LABEL[s]);
 

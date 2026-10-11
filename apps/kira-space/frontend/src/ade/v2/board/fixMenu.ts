@@ -62,7 +62,7 @@ export function fixItems(i: FixInput): FixItem[] | null {
     out.push({
       id: 'ade-fix-force-push',
       kind: 'forcePush',
-      label: t('space.common.forcePush.label'),
+      label: t('common.forcePush.label'),
     });
   return out;
 }

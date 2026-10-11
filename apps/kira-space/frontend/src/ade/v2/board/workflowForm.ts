@@ -31,8 +31,8 @@ export function failureLabel(value: OnFailure | ''): string {
 }
 
 export function kindLabel(kind: StageKind, background = false): string {
-  if (kind === 'user') return t('memory.common.author.user.label');
-  if (kind === 'script') return t('space.ade.stage.modeScript.label');
+  if (kind === 'user') return t('common.user.label');
+  if (kind === 'script') return t('common.script.label');
   return t(
     background
       ? 'space.ade.workflows.kind.agentBackground.option'

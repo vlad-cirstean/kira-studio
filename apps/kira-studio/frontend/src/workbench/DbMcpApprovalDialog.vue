@@ -125,13 +125,13 @@ const DETAIL_CLASS = 'm-0 text-subtle';
             <strong>{{ issue.severity }}</strong> {{ issue.message }}
           </p>
           <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" :class="DETAIL_CLASS">
-            {{ t('studio.common.more.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
+            {{ t('common.more.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
           </p>
         </div>
 
-        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">{{ t('studio.dbMcp.approval.expires.status', { seconds: remainingSeconds }) }}</p>
+        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">{{ t('common.expiresIn.status', { seconds: remainingSeconds }) }}</p>
         <p v-if="more > 0" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
-          {{ t('studio.dbMcp.approval.queue.status', { count: more }) }}
+          {{ t('common.moreWaiting.status', { count: more }) }}
         </p>
       </DialogBody>
 

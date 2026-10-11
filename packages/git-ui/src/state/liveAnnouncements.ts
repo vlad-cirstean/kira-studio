@@ -168,7 +168,7 @@ export function composeCherryPickMismatchAnnouncement(
 ): string {
   const key = CHERRY_PICK_MISMATCH[mismatch.predicted][mismatch.actual];
   // predicted and actual never agree on a mismatch
-  return key === undefined ? t('git.op.done.announce') : t(key);
+  return key === undefined ? t('common.done.status') : t(key);
 }
 
 const OP_ERROR_REASON: Record<OpErrorKind, MessageKey> = {
@@ -408,7 +408,7 @@ export function composeStashAnnouncement(
   const origin = currentBranch === undefined ? undefined : originLabel(entry, currentBranch);
   if (mismatch) {
     const key = STASH_MISMATCH[verb][mismatch.predicted][mismatch.actual];
-    const parts = [key === undefined ? t('git.op.done.announce') : t(key)];
+    const parts = [key === undefined ? t('common.done.status') : t(key)];
     if (origin !== undefined) parts.push(t('git.op.mismatchOrigin.body', { origin }));
     if (mismatch.stashKept) parts.push(t('git.op.mismatchKept.body'));
     return parts.join(' ');

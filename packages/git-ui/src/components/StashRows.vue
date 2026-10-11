@@ -97,7 +97,7 @@ function onMenuSelect(entry: StashEntry, id: string): void {
       >
       <span data-testid="stash-message" class="flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
       <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" :data-kira-tip="t('git.stash.untracked.hint')">{{ UNTRACKED_FLAG }}</span>
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ t('git.common.fileCount.label', { count: entry.fileCount }) }}</span>
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ t('common.fileCount.label', { count: entry.fileCount }) }}</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </button>
     <RowActionsButton

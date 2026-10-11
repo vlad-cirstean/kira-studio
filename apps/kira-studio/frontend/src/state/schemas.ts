@@ -160,9 +160,9 @@ export function ddlParseSummary(kind: ConnectionKind | undefined, text: string):
   const schema = parseDdl(dialect, text);
   if (schema.tables.length === 0) return t('studio.project.schemaDialog.noTables.status');
   const columns = schema.tables.reduce((n, table) => n + table.columns.length, 0);
-  return t('studio.project.schemaDialog.summary.status', {
-    tables: t('studio.project.schemaDialog.tables.status', { count: schema.tables.length }),
-    columns: t('studio.grid.columnCount.status', { count: columns }),
+  return t('common.commaPair.label', {
+    first: t('studio.project.schemaDialog.tables.status', { count: schema.tables.length }),
+    second: t('studio.grid.columnCount.status', { count: columns }),
   });
 }
 

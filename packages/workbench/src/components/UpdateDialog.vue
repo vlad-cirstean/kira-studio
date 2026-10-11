@@ -89,7 +89,7 @@ function onEscapeOrOutside(e: Event): void {
             data-testid="update-dialog-later"
             @click="store.later()"
           >
-            {{ t('workbench.update.later.label') }}
+            {{ t('common.later.label') }}
           </Button>
           <Button
             variant="dialog-primary"

@@ -32,10 +32,10 @@ const { remainingSeconds } = usePendingDecision({
       <DialogBody>
         <slot />
         <p class="m-0 text-subtle" :data-testid="`${testidPrefix}-expires`">
-          {{ t('space.workbench.pairing.expires.status', { seconds: remainingSeconds }) }}
+          {{ t('common.expiresIn.status', { seconds: remainingSeconds }) }}
         </p>
         <p v-if="more > 0" class="m-0 text-subtle" :data-testid="`${testidPrefix}-queue-count`">
-          {{ t('space.workbench.queue.more.status', { count: more }) }}
+          {{ t('common.moreWaiting.status', { count: more }) }}
         </p>
       </DialogBody>
 

@@ -64,7 +64,7 @@ export interface SearchResultsModel {
  *  it. */
 const FIELD_LABEL_KEYS = {
   subject: 'git.search.field.subject.label',
-  body: 'git.search.field.body.label',
+  body: 'common.body.label',
   authorName: 'git.search.field.author.label',
   authorEmail: 'git.search.field.authorEmail.label',
   committerName: 'git.commit.committer.label',

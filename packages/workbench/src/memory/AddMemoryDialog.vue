@@ -67,7 +67,7 @@ function cancel(): void {
 function actionLabel(o: MemoryStoreResult['outcomes'][number]): string {
   switch (o.action) {
     case 'add':
-      return t('memory.add.outcome.added.status');
+      return t('common.added.status');
     case 'update':
       return t('memory.add.outcome.updated.status', { from: o.version - 1, to: o.version });
     case 'noop':
@@ -144,7 +144,7 @@ function select(id: string): void {
       </DialogBody>
       <DialogFooter>
         <template v-if="stored">
-          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">{{ t('space.common.status.done.status') }}</Button>
+          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">{{ t('common.done.status') }}</Button>
         </template>
         <template v-else>
           <Button v-if="busy" variant="dialog" size="kira-lg" data-testid="add-memory-cancel" @click="cancel">{{ t('common.action.cancel.label') }}</Button>

@@ -93,7 +93,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           :class="tabChipVariants({ active: ui.view === 'needs', size: 'wide' })"
           data-testid="ade-tab-needs"
         >
-          {{ t('space.common.needsYou.label') }}
+          {{ t('common.needsYou.status') }}
           <Badge v-if="needsCount > 0" variant="count" data-testid="ade-needs-count">{{ needsCount }}</Badge>
         </TabsTrigger>
         <TabsTrigger

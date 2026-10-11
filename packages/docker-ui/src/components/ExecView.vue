@@ -50,7 +50,7 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
       </EmptyHeader>
       <Button size="kira" variant="toolbar" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
-        {{ t('docker.exec.new.label') }}
+        {{ t('common.newSession.label') }}
       </Button>
     </Empty>
     <template v-else>
@@ -72,7 +72,7 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
       </span>
       <Button variant="toolbar" size="kira" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
-        {{ t('docker.exec.new.label') }}
+        {{ t('common.newSession.label') }}
       </Button>
     </div>
     <div class="relative min-h-0 flex-1">

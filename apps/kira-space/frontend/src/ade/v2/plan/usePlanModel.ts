@@ -131,7 +131,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
     repo: c.repoLabel(br.codeRepoId),
     base: baseMarker(br, graph, main),
     draft,
-    name: draft ? t('space.common.newBranch.label') : br.name,
+    name: draft ? t('common.newBranch.label') : br.name,
     isReview: br.kind === 'review',
     context,
     tag: branchTag({

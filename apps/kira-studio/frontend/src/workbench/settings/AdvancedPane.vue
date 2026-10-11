@@ -29,7 +29,7 @@ function onExpensiveQueryRowsInput(e: Event): void {
 
 const opLogRetentionError = computed<string | null>(() => {
   const v = props.draft.advanced.opLogRetentionDays;
-  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
+  if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < OP_LOG_RETENTION_DAYS_RANGE.min || v > OP_LOG_RETENTION_DAYS_RANGE.max) {
     return t('studio.settings.range.days.status', {
       min: OP_LOG_RETENTION_DAYS_RANGE.min,
@@ -42,7 +42,7 @@ props.registerFieldError('advanced.opLogRetentionDays', opLogRetentionError);
 
 const expensiveQueryRowsError = computed<string | null>(() => {
   const v = props.draft.advanced.expensiveQueryRows;
-  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
+  if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < EXPENSIVE_QUERY_ROWS_RANGE.min || v > EXPENSIVE_QUERY_ROWS_RANGE.max) {
     return t('studio.settings.range.plain.status', {
       min: formatCount(EXPENSIVE_QUERY_ROWS_RANGE.min),

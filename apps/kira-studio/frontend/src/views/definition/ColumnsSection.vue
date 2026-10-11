@@ -52,7 +52,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           <TableHead>{{ t('common.field.type.label') }}</TableHead>
           <TableHead class="w-20">{{ t('studio.definition.nullable.label') }}</TableHead>
           <TableHead>{{ t('common.state.default.option') }}</TableHead>
-          <TableHead class="max-w-60 overflow-hidden text-ellipsis">{{ t('studio.definition.comment.label') }}</TableHead>
+          <TableHead class="max-w-60 overflow-hidden text-ellipsis">{{ t('common.comment.label') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

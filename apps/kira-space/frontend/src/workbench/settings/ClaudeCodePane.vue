@@ -105,7 +105,7 @@ function setKeepAwake(on: boolean): void {
         data-testid="settings-claude-code-notify-test"
         @click="sendTest"
       >
-        {{ t('space.workbench.claudeCode.sendTest.label') }}
+        {{ t('common.sendTest.label') }}
       </Button>
     </Field>
 

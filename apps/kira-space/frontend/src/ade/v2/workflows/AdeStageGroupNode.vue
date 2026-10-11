@@ -19,7 +19,7 @@ const detail = computed(() => {
   if (s.kind === 'script') {
     const command = s.command || t('space.ade.workflows.stageNode.noCommand.label');
     return s.onFailure.startsWith('retry')
-      ? t('space.common.dotPair.label', { first: command, second: failureLabel(s.onFailure) })
+      ? t('common.dotPair.label', { first: command, second: failureLabel(s.onFailure) })
       : command;
   }
   return s.session ? t('space.ade.workflows.stageNode.session.label') : t('space.ade.workflows.stageNode.manual.label');

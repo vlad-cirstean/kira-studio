@@ -24,7 +24,7 @@ export function scriptRunTabKind<
 
   return {
     mode,
-    title: (tab) => (tab as RunRecord).state.label || t('workbench.tabKind.smartScript.title'),
+    title: (tab) => (tab as RunRecord).state.label || t('common.smartScript.label'),
     icon: () => 'sparkle' as Icon,
     railColor: () => undefined,
     defaultState: (): RunState => ({ runId: '', label: '' }) as RunState,
@@ -40,7 +40,7 @@ export function scriptRunTabKind<
         case 'failed':
           return { icon: 'error', tooltip: t('common.state.failed.status') };
         case 'blocked':
-          return { icon: 'warning', tooltip: t('automations.run.state.blocked.status') };
+          return { icon: 'warning', tooltip: t('common.needsYou.status') };
         case 'waiting':
           return { icon: 'bell', tooltip: t('automations.run.state.waiting.status') };
         default:

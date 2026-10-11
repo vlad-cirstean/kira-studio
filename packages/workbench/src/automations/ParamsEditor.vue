@@ -146,8 +146,8 @@ function toggleDefault(i: number, option: string, on: boolean): void {
             :data-testid="`param-option-${i}-${k}`"
             @update:model-value="(v) => setOption(i, k, String(v))"
           />
-          <TooltipIconButton icon="arrow-up" :label="t('automations.params.moveUp.tooltip')" @click="moveOption(i, k, -1)" />
-          <TooltipIconButton icon="arrow-down" :label="t('automations.params.moveDown.tooltip')" @click="moveOption(i, k, 1)" />
+          <TooltipIconButton icon="arrow-up" :label="t('common.moveUp.tooltip')" @click="moveOption(i, k, -1)" />
+          <TooltipIconButton icon="arrow-down" :label="t('common.moveDown.tooltip')" @click="moveOption(i, k, 1)" />
           <TooltipIconButton icon="close" :label="t('automations.params.removeOption.tooltip')" @click="removeOption(i, k)" />
         </div>
         <Button variant="dialog" size="kira-lg" class="self-start" :data-testid="`param-option-add-${i}`" @click="addOption(i)">
@@ -164,7 +164,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          <Label :for="`${idBase}-req-${i}`">{{ t('automations.params.required.label') }}</Label>
+          <Label :for="`${idBase}-req-${i}`">{{ t('common.required.label') }}</Label>
         </div>
         <div v-if="p.type === 'text'" class="flex items-center gap-1.5">
           <Checkbox
@@ -176,7 +176,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          <Label :for="`${idBase}-sec-${i}`">{{ t('automations.params.secret.label') }}</Label>
+          <Label :for="`${idBase}-sec-${i}`">{{ t('common.secret.label') }}</Label>
         </div>
       </div>
     </Card>

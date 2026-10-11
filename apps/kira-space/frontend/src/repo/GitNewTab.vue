@@ -28,7 +28,7 @@ function onClick(): void {
 <template>
   <TabStripNewButton
     v-if="visible"
-    :label="t('space.repo.newTerminal.label')"
+    :label="t('common.newTerminal.label')"
     :tooltip="t('space.repo.newTerminal.tooltip')"
     @click="onClick"
   />
