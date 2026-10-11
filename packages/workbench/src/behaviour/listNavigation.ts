@@ -275,7 +275,12 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
     if (!target || target.closest(TEXT_FIELD)) return;
     const list = opts.items();
     const view = rows();
-    const activeIndex = view.findIndex((r) => r.key === tabStopKey.value);
+    // Focus wins over the roving stop: a selection reset behind a focused row must not strand Home/Up.
+    const focusedKey = target.closest<HTMLElement>('[data-nav-key]')?.dataset.navKey;
+    const focusedIndex =
+      focusedKey === undefined ? -1 : view.findIndex((r) => r.key === focusedKey);
+    const activeIndex =
+      focusedIndex >= 0 ? focusedIndex : view.findIndex((r) => r.key === tabStopKey.value);
     const cx: KeyContext = {
       list,
       view,

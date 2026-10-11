@@ -522,6 +522,7 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   rowHeights: () => rowHeights.value,
   scrollElement: scrollEl,
   overscan: () => overscanRows.value,
+  pinned: () => rt.value?.selectedRow ?? null,
 });
 
 const nav = useListNavigation<number>({
