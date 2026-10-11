@@ -8,28 +8,9 @@ permanent U58 packages/workbench/src/components/AutocompleteField.vue # caret-an
 permanent U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
 permanent U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
 permanent U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
+permanent U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
 permanent U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
 permanent U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
-packages/docker-ui/src/components/ContainerDetail.vue
-packages/docker-ui/src/components/ContainerList.vue
-packages/docker-ui/src/components/ContainerOverview.vue
-packages/docker-ui/src/components/ContainerSizeSection.vue
-packages/docker-ui/src/components/ContainerTable.vue
-packages/docker-ui/src/components/EngineDiskSection.vue
-packages/docker-ui/src/components/EngineOverview.vue
-packages/docker-ui/src/components/ImageList.vue
-packages/docker-ui/src/components/LogsView.vue
-packages/docker-ui/src/components/NetworkList.vue
-packages/docker-ui/src/components/ResourceDetail.vue
-packages/docker-ui/src/components/VirtualList.vue
-packages/docker-ui/src/components/VolumeList.vue
-packages/docker-ui/src/lib/format.ts
-packages/docker-ui/src/queries.ts
-packages/docker-ui/src/state/useStatsSubscription.ts
-packages/git-ui/src/graph/layoutClient.ts
-packages/git-ui/src/state/graphView.ts
-packages/git-ui/src/state/pr.ts
-packages/git-ui/src/state/search.ts
 packages/workbench/src/automations/AutomationsPanel.vue
 packages/workbench/src/automations/ScriptDialog.vue
 packages/workbench/src/automations/run/RunScriptDialog.vue

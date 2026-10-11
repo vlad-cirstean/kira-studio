@@ -4,8 +4,12 @@ import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
 import { cn } from '@theme/lib/utils';
-import { computed } from 'vue';
-import { formatPercent, formatSize, publishedPorts, stateDotTone } from '../lib/format';
+import { displayValue, formatBytes, formatPercent } from '@workbench/behaviour/format';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { compareNatural } from '@workbench/behaviour/match';
+import QueryState from '@workbench/components/QueryState.vue';
+import { computed, ref } from 'vue';
+import { publishedPorts, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -22,7 +26,7 @@ const rows = computed(() =>
   [...(containers.data.value ?? [])].sort((a, b) => {
     const ra = a.state === 'running' ? 0 : 1;
     const rb = b.state === 'running' ? 0 : 1;
-    return ra - rb || a.name.localeCompare(b.name);
+    return ra - rb || compareNatural(a.name, b.name);
   }),
 );
 
@@ -30,25 +34,32 @@ const COLUMNS =
   'grid-cols-[0.5rem_minmax(0,1fr)_6rem_7rem_5.5rem] @4xl:grid-cols-[0.5rem_minmax(8rem,1.2fr)_minmax(8rem,1.4fr)_minmax(5rem,0.8fr)_7rem_8rem_5.5rem]';
 
 function act(c: DockerContainer, action: 'start' | 'stop' | 'restart'): void {
-  void actions.run(c.id, action).catch(() => undefined);
+  actions.run(c.id, action).catch(() => {
+    // Surfaced through `actions.error`.
+  });
 }
 
 function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overview'): void {
   ui.select({ kind: 'container', id: c.id }, tab);
 }
+
+const tableEl = ref<HTMLElement | null>(null);
+const activeKey = ref<string | null>(null);
+const nav = useListNavigation<DockerContainer>({
+  container: tableEl,
+  items: () => rows.value,
+  key: (c) => c.id,
+  activeKey,
+  onOpen: (c) => open(c),
+});
 </script>
 
 <template>
-  <ListState
-    v-if="containers.isPending.value || containers.isError.value || rows.length === 0"
-    :loading="containers.isPending.value"
-    :error="containers.isError.value"
-    icon="server"
-    empty-title="No containers yet"
-    empty-hint="Start one with docker run or docker compose up."
-    @retry="containers.refetch()"
-  />
-  <div v-else class="@container" role="listbox" data-testid="docker-table">
+  <QueryState :query="containers" :is-empty="() => rows.length === 0">
+    <template #empty>
+      <ListState icon="server" title="No containers yet" hint="Start one with docker run or docker compose up." />
+    </template>
+  <div ref="tableEl" class="@container" role="listbox" data-testid="docker-table">
     <div :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-x-3 px-3', COLUMNS)">
       <span />
       <span>Name</span>
@@ -58,6 +69,8 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
       <span class="text-right">Memory</span>
       <span />
     </div>
+    <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+    <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
     <div
       v-for="c in rows"
       :key="c.id"
@@ -67,9 +80,8 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
       :data-state="c.state"
       role="option"
       :aria-selected="false"
-      tabindex="0"
+      v-bind="nav.rowProps(c.id)"
       @click="open(c)"
-      @keydown.enter="open(c)"
       @dblclick="open(c, 'logs')"
     >
       <StatusDot :tone="stateDotTone(c.state)" />
@@ -81,20 +93,20 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
         <span class="truncate text-kira-sm text-muted-foreground @4xl:hidden">{{ c.image }}</span>
       </span>
       <span class="hidden truncate text-muted-foreground @4xl:block">{{ c.image }}</span>
-      <span class="hidden truncate font-data text-kira-sm text-muted-foreground @4xl:block">{{ publishedPorts(c.ports).join(' ') || '-' }}</span>
+      <span class="hidden truncate font-data text-kira-sm text-muted-foreground @4xl:block">{{ displayValue(publishedPorts(c.ports).join(' ')) }}</span>
       <template v-if="c.state === 'running' && stats.latest.get(c.id)">
         <span class="flex flex-col items-end gap-0.5">
           <span class="font-data text-kira-sm">{{ formatPercent(stats.latest.get(c.id)!.cpuPercent) }}</span>
           <UsageBar :percent="stats.latest.get(c.id)!.cpuPercent" />
         </span>
         <span class="flex flex-col items-end gap-0.5">
-          <span class="font-data text-kira-sm">{{ formatSize(stats.latest.get(c.id)!.memUsage) }}</span>
+          <span class="font-data text-kira-sm">{{ formatBytes(stats.latest.get(c.id)!.memUsage) }}</span>
           <UsageBar :percent="stats.latest.get(c.id)!.memPercent" />
         </span>
       </template>
       <template v-else>
-        <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : '-' }}</span>
-        <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : '-' }}</span>
+        <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : displayValue(null) }}</span>
+        <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : displayValue(null) }}</span>
       </template>
       <span class="flex items-center justify-end">
         <Spinner v-if="actions.isBusy(c.id)" label="" />
@@ -106,4 +118,5 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
       </span>
     </div>
   </div>
+  </QueryState>
 </template>

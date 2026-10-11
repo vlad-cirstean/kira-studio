@@ -5,9 +5,10 @@ import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
+import { displayValue, formatBytes, formatDateTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useDocker } from '../context';
-import { formatCreated, formatSize, shortId, stateDotTone } from '../lib/format';
+import { shortId, stateDotTone } from '../lib/format';
 import { useContainers, useImages, useInspect, useNetworks, useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { InspectKind } from '../wire';
@@ -42,7 +43,9 @@ const title = computed(() => {
 const registryUrl = computed(() => (props.kind === 'image' ? (image.value?.registryUrl ?? '') : ''));
 
 function openRegistry(): void {
-  void docker.openExternal(registryUrl.value).catch(() => undefined);
+  docker.openExternal(registryUrl.value).catch(() => {
+    // The OS refused to open the link; nothing on screen depends on it.
+  });
 }
 
 const facts = computed<Array<[string, string]>>(() => {
@@ -51,8 +54,8 @@ const facts = computed<Array<[string, string]>>(() => {
     return [
       ['Tags', i.tags.join(', ') || '<none>'],
       ['ID', i.id],
-      ['Size', formatSize(i.size)],
-      ['Created', formatCreated(i.created)],
+      ['Size', formatBytes(i.size)],
+      ['Created', formatDateTime(i.created)],
     ];
   }
   if (props.kind === 'volume' && volume.value) {
@@ -61,7 +64,7 @@ const facts = computed<Array<[string, string]>>(() => {
       ['Driver', v.driver],
       ['Mountpoint', v.mountpoint],
       ['Scope', v.scope],
-      ['Created', v.created || '-'],
+      ['Created', displayValue(v.created)],
       ...Object.entries(v.labels).map(([k, val]): [string, string] => [`Label ${k}`, val]),
     ];
   }
@@ -70,7 +73,7 @@ const facts = computed<Array<[string, string]>>(() => {
     return [
       ['Driver', n.driver],
       ['Scope', n.scope],
-      ['Subnets', n.subnets.join(', ') || '-'],
+      ['Subnets', displayValue(n.subnets.join(', '))],
       ['Internal', n.internal ? 'yes' : 'no'],
     ];
   }

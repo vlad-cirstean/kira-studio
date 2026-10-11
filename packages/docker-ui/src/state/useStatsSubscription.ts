@@ -5,6 +5,10 @@ import { useDockerStatsStore } from './dockerStats';
 
 const RESUBSCRIBE_DEBOUNCE_MS = 300;
 
+function statsBestEffort(): void {
+  // Live stats are best effort; the next visibility or id change subscribes again.
+}
+
 /** Keeps Go's stats stream subscribed to `ids` while mounted and visible. */
 export function useStatsSubscription(ids: Ref<string[]>): void {
   const { control } = useDocker();
@@ -17,12 +21,12 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
     if (visibility.value !== 'visible' || ids.value.length === 0) {
       if (subscribed) {
         subscribed = false;
-        void control.statsUnsubscribe().catch(() => undefined);
+        void control.statsUnsubscribe().catch(statsBestEffort);
       }
       return;
     }
     subscribed = true;
-    void control.statsSubscribe(ids.value).catch(() => undefined);
+    void control.statsSubscribe(ids.value).catch(statsBestEffort);
   }, RESUBSCRIBE_DEBOUNCE_MS);
 
   function listen(): void {
@@ -42,7 +46,7 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
       if (v !== prevV && v !== 'visible') {
         sync.cancel?.();
         subscribed = false;
-        void control.statsUnsubscribe().catch(() => undefined);
+        void control.statsUnsubscribe().catch(statsBestEffort);
         return;
       }
       void sync();
@@ -58,6 +62,6 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
   onScopeDispose(() => {
     unlisten();
     sync.cancel?.();
-    if (subscribed) void control.statsUnsubscribe().catch(() => undefined);
+    if (subscribed) void control.statsUnsubscribe().catch(statsBestEffort);
   });
 }

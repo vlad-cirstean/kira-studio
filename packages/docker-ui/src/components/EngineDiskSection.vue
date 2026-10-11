@@ -4,9 +4,8 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useTimeAgo } from '@vueuse/core';
+import { displayValue, formatBytes, formatDateTime, useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { formatSize } from '../lib/format';
 import { useEngineDiskUsage } from '../queries';
 import DetailSection from './DetailSection.vue';
 
@@ -17,7 +16,7 @@ const { query, refresh } = useEngineDiskUsage();
 const usage = computed(() => query.data.value);
 const measuring = computed(() => query.isFetching.value);
 const takenAt = computed(() => (usage.value ? new Date(usage.value.takenAt) : new Date()));
-const ago = useTimeAgo(takenAt);
+const ago = useRelativeTime(takenAt);
 
 const categories = computed(() => {
   const u = usage.value;
@@ -32,7 +31,7 @@ const categories = computed(() => {
 
 const topVolumes = computed(() => (usage.value?.volumeSizes ?? []).slice(0, VOLUME_LIMIT));
 const moreVolumes = computed(() => Math.max(0, (usage.value?.volumeSizes.length ?? 0) - VOLUME_LIMIT));
-const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
+const sizeText = (n: number): string => (n < 0 ? displayValue(null) : formatBytes(n));
 </script>
 
 <template>
@@ -43,7 +42,7 @@ const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
           <TooltipTrigger as-child>
             <span data-testid="docker-disk-taken">{{ ago }}</span>
           </TooltipTrigger>
-          <TooltipContent>{{ new Date(usage.takenAt).toLocaleString() }}</TooltipContent>
+          <TooltipContent>{{ formatDateTime(usage.takenAt) }}</TooltipContent>
         </Tooltip>
         <TooltipIconButton
           icon="refresh"
@@ -72,12 +71,12 @@ const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
         <span class="text-right text-kira-sm text-muted-foreground">Reclaimable</span>
         <template v-for="r in categories" :key="r.key">
           <span>{{ r.label }}</span>
-          <span class="text-right font-data" :data-testid="`docker-disk-${r.key}`">{{ formatSize(r.c.size) }}</span>
+          <span class="text-right font-data" :data-testid="`docker-disk-${r.key}`">{{ formatBytes(r.c.size) }}</span>
           <span class="text-right font-data">{{ r.c.count }} ({{ r.c.active }})</span>
-          <span class="text-right font-data">{{ formatSize(r.c.reclaimable) }}</span>
+          <span class="text-right font-data">{{ formatBytes(r.c.reclaimable) }}</span>
         </template>
         <span class="font-medium">Used by Docker</span>
-        <span class="text-right font-data font-medium" data-testid="docker-disk-total">{{ formatSize(usage.total) }}</span>
+        <span class="text-right font-data font-medium" data-testid="docker-disk-total">{{ formatBytes(usage.total) }}</span>
         <span />
         <span />
       </div>

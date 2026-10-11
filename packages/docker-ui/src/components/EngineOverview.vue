@@ -5,8 +5,8 @@ import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { cn } from '@theme/lib/utils';
+import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { formatPercent, formatSize } from '../lib/format';
 import { useContainerAction, useContainers, useDockerStatus, useImages, useNetworks, useVolumes } from '../queries';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { type DockerSection, useDockerUiStore } from '../state/dockerUi';
@@ -93,7 +93,7 @@ const facts = computed<Array<[string, string]>>(() => {
     ['OS / arch', `${e.operatingSystem || e.os} / ${e.arch}`],
     ['Kernel', e.kernelVersion],
     ['CPUs', String(e.cpus)],
-    ['Memory', formatSize(e.memTotal)],
+    ['Memory', formatBytes(e.memTotal)],
     ['Endpoint', status.data.value?.endpoint.host ?? ''],
   ];
 });
@@ -102,7 +102,11 @@ const stoppedIds = computed(() => (containers.data.value ?? []).filter((c) => c.
 const anyBusy = computed(() => [...runningIds.value, ...stoppedIds.value].some((id) => actions.isBusy(id)));
 
 function runAll(ids: Iterable<string>, action: 'start' | 'stop'): void {
-  for (const id of ids) void actions.run(id, action).catch(() => undefined);
+  for (const id of ids) {
+    actions.run(id, action).catch(() => {
+      // Surfaced through `actions.error`.
+    });
+  }
 }
 
 function openSection(section: DockerSection): void {
@@ -172,8 +176,8 @@ function refresh(): Promise<void> {
           </DetailSection>
           <DetailSection title="Memory">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-medium" data-testid="docker-engine-mem">{{ formatSize(totals.mem) }}</span>
-              <span class="text-muted-foreground">of {{ formatSize(engine.memTotal) }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-mem">{{ formatBytes(totals.mem) }}</span>
+              <span class="text-muted-foreground">of {{ formatBytes(engine.memTotal) }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="memPercentOfTotal" /></div>
             <div class="mt-2"><StatsSparkline :values="memSeries" :max="engine.memTotal" height-class="h-[2rem]" /></div>

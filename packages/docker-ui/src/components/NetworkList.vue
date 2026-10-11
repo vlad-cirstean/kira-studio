@@ -3,6 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
+import QueryState from '@workbench/components/QueryState.vue';
 import { computed } from 'vue';
 import { useNetworks } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -13,26 +15,30 @@ const ui = useDockerUiStore();
 const networks = useNetworks();
 
 const rows = computed(() => {
-  const q = ui.search.trim().toLowerCase();
   return (networks.data.value ?? [])
-    .filter((n) => q === '' || n.name.toLowerCase().includes(q))
+    .filter((n) => matchesQuery(n.name, ui.search))
     .map((network) => ({ key: network.id, network }))
-    .sort((a, b) => a.network.name.localeCompare(b.network.name));
+    .sort((a, b) => compareNatural(a.network.name, b.network.name));
 });
+
+function open(row: { network: { id: string } }): void {
+  ui.select({ kind: 'network', id: row.network.id });
+}
 </script>
 
 <template>
-  <ListState
-    v-if="networks.isPending.value || networks.isError.value || rows.length === 0"
-    :loading="networks.isPending.value"
-    :error="networks.isError.value"
-    icon="globe"
-    :empty-title="ui.search.trim() ? 'No matches' : 'No networks'"
-    :empty-hint="ui.search.trim() ? 'No network matches the search.' : undefined"
-    @retry="networks.refetch()"
-  />
-  <VirtualList v-else :rows="rows" testid="docker-network-list">
-    <template #row="{ row }">
+  <QueryState :query="networks" :is-empty="() => rows.length === 0">
+    <template #empty>
+      <ListState
+        icon="globe"
+        :title="ui.search.trim() ? 'No matches' : 'No networks'"
+        :hint="ui.search.trim() ? 'No network matches the search.' : undefined"
+      />
+    </template>
+  <VirtualList :rows="rows" testid="docker-network-list" :open="open">
+    <template #row="{ row, nav }">
+      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
       <div
         :class="
           cn(
@@ -45,9 +51,8 @@ const rows = computed(() => {
         :data-id="row.network.id"
         role="option"
         :aria-selected="ui.selection?.kind === 'network' && ui.selection.id === row.network.id"
-        tabindex="0"
-        @click="ui.select({ kind: 'network', id: row.network.id })"
-        @keydown.enter="ui.select({ kind: 'network', id: row.network.id })"
+        v-bind="nav"
+        @click="open(row)"
       >
         <CodiconIcon name="globe" :size="13" class="shrink-0 text-muted-foreground" />
         <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.network.name }}</span>
@@ -56,4 +61,5 @@ const rows = computed(() => {
       </div>
     </template>
   </VirtualList>
+  </QueryState>
 </template>

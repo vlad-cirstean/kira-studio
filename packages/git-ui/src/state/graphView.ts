@@ -11,6 +11,7 @@ import {
   LayoutClientStaleError,
 } from '../graph/layoutClient.ts';
 import { LayoutStore } from '../graph/layoutStore.ts';
+import { createCancellableTimer } from './cancellableTimer.ts';
 import { composeGraphFailureNotice, type FailureNotice } from './failureNotice.ts';
 import type { GraphOrderState } from './graphOrder.ts';
 import { composeRevealSearchHitAnnouncement, createAnnouncementRef } from './liveAnnouncements.ts';
@@ -118,7 +119,9 @@ export class GraphViewState {
 
   readonly #unsubscribeChanged: () => void;
   readonly #unsubscribeLoading: () => void;
-  #autoRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  readonly #autoRefreshTimer = createCancellableTimer(() => {
+    void this.#runAutoRefresh();
+  }, AUTO_REFRESH_COALESCE_MS);
   #autoRefreshPending = false;
   #lastAutoRefreshAt = 0;
 
@@ -433,7 +436,11 @@ export class GraphViewState {
     );
     const repoId = this.#repoId;
     if (repoId) {
-      this.#bridge.request('graph.reportFailure', { repoId, reason: 'corrupted' }).catch(() => {});
+      this.#bridge
+        .request('graph.reportFailure', { repoId, reason: 'corrupted' })
+        .catch((error: unknown) => {
+          console.error('graphView: reporting a corrupted stream failed', error);
+        });
     }
   }
 
@@ -443,13 +450,10 @@ export class GraphViewState {
    *  absorbs further arrivals for free (the same "leading window" shape the server's own watcher
    *  debounce already uses, F3). */
   #scheduleAutoRefresh(): void {
-    if (this.#autoRefreshTimer !== undefined) return;
+    if (this.#autoRefreshTimer.pending) return;
     const sinceLastRefresh = Date.now() - this.#lastAutoRefreshAt;
     const delay = Math.max(AUTO_REFRESH_COALESCE_MS, AUTO_REFRESH_MIN_GAP_MS - sinceLastRefresh);
-    this.#autoRefreshTimer = setTimeout(() => {
-      this.#autoRefreshTimer = undefined;
-      void this.#runAutoRefresh();
-    }, delay);
+    this.#autoRefreshTimer.start(delay);
   }
 
   async #runAutoRefresh(): Promise<void> {
@@ -477,10 +481,7 @@ export class GraphViewState {
   }
 
   #cancelAutoRefresh(): void {
-    if (this.#autoRefreshTimer !== undefined) {
-      clearTimeout(this.#autoRefreshTimer);
-      this.#autoRefreshTimer = undefined;
-    }
+    this.#autoRefreshTimer.stop();
     this.#autoRefreshPending = false;
   }
 

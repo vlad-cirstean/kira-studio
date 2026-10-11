@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { formatPercent, formatSize } from '../lib/format';
 import { useDockerStatsStore } from '../state/dockerStats';
 import ContainerSizeSection from './ContainerSizeSection.vue';
 import DetailSection from './DetailSection.vue';
@@ -31,17 +31,17 @@ const mem = computed(() => history.value.map((s) => s.memUsage));
         </DetailSection>
         <DetailSection title="Memory">
           <div class="mb-2 flex items-baseline justify-between">
-            <span class="text-kira-xl font-medium" data-testid="docker-stats-mem">{{ formatSize(latest.memUsage) }}</span>
-            <span class="text-kira-sm text-muted-foreground">of {{ formatSize(latest.memLimit) }} ({{ formatPercent(latest.memPercent) }})</span>
+            <span class="text-kira-xl font-medium" data-testid="docker-stats-mem">{{ formatBytes(latest.memUsage) }}</span>
+            <span class="text-kira-sm text-muted-foreground">of {{ formatBytes(latest.memLimit) }} ({{ formatPercent(latest.memPercent) }})</span>
           </div>
           <StatsSparkline :values="mem" :max="latest.memLimit" height-class="h-24" />
         </DetailSection>
         <DetailSection title="I/O" class="@3xl:col-span-2">
           <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
             <dt class="text-muted-foreground">Network rx / tx</dt>
-            <dd class="font-data">{{ formatSize(latest.netRx) }} / {{ formatSize(latest.netTx) }}</dd>
+            <dd class="font-data">{{ formatBytes(latest.netRx) }} / {{ formatBytes(latest.netTx) }}</dd>
             <dt class="text-muted-foreground">Block read / write</dt>
-            <dd class="font-data">{{ formatSize(latest.blockRead) }} / {{ formatSize(latest.blockWrite) }}</dd>
+            <dd class="font-data">{{ formatBytes(latest.blockRead) }} / {{ formatBytes(latest.blockWrite) }}</dd>
             <dt class="text-muted-foreground">PIDs</dt>
             <dd class="font-data">{{ latest.pids }}</dd>
           </dl>

@@ -3,6 +3,7 @@ import type { GhStatus, PrLookupResult, PrRecord } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createCancellableTimer } from './cancellableTimer.ts';
 
 /** D7's own selection debounce — arrow-keying through forty rows in one second costs one call,
  *  not forty. */
@@ -88,7 +89,10 @@ export class PrState {
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
   #sha: string | null = null;
-  #selectTimer: ReturnType<typeof setTimeout> | undefined;
+  #selectSha: string | undefined;
+  readonly #selectTimer = createCancellableTimer(() => {
+    if (this.#selectSha !== undefined) void this.#requestCommit(this.#selectSha);
+  }, SELECTION_DEBOUNCE_MS);
   #selectController: AbortController | undefined;
   readonly #branchRequests = new Set<string>();
   /** G31 round-2 performance review, finding #3: branches whose `branch.resolvePr` answer came
@@ -167,10 +171,7 @@ export class PrState {
   #cancelInFlight(): void {
     this.#clearGeneration++;
     this.#selectController?.abort();
-    if (this.#selectTimer !== undefined) {
-      clearTimeout(this.#selectTimer);
-      this.#selectTimer = undefined;
-    }
+    this.#selectTimer.stop();
     this.#branchRequests.clear();
   }
 
@@ -223,10 +224,7 @@ export class PrState {
    *  request. */
   select(sha: string | null): void {
     this.#selectController?.abort();
-    if (this.#selectTimer !== undefined) {
-      clearTimeout(this.#selectTimer);
-      this.#selectTimer = undefined;
-    }
+    this.#selectTimer.stop();
     this.#sha = sha;
     if (sha === null) {
       this.selected.value = undefined;
@@ -237,10 +235,8 @@ export class PrState {
       return;
     }
     this.selected.value = undefined;
-    this.#selectTimer = setTimeout(() => {
-      this.#selectTimer = undefined;
-      void this.#requestCommit(sha);
-    }, SELECTION_DEBOUNCE_MS);
+    this.#selectSha = sha;
+    this.#selectTimer.start();
   }
 
   async #requestCommit(sha: string): Promise<void> {
@@ -516,7 +512,7 @@ export class PrState {
 
   dispose(): void {
     this.#selectController?.abort();
-    if (this.#selectTimer !== undefined) clearTimeout(this.#selectTimer);
+    this.#selectTimer.stop();
     this.#unsubscribe();
   }
 }

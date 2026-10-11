@@ -10,11 +10,13 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@t
 import { FieldError } from '@theme/components/ui/field';
 import { Skeleton } from '@theme/components/ui/skeleton';
 import { copyText } from '@workbench/behaviour/clipboard';
+import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
+import QueryState from '@workbench/components/QueryState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
-import { formatPercent, formatSize, publishedPorts, shortId, stateDotTone } from '../lib/format';
+import { publishedPorts, shortId, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainerDetail } from '../queries';
 import { useDockerEditStore } from '../state/dockerEdit';
 import { useDockerStatsStore } from '../state/dockerStats';
@@ -93,7 +95,9 @@ function openRegistry(url: string): void {
 }
 
 function act(action: 'start' | 'stop' | 'restart'): void {
-  void actions.run(props.containerId, action).catch(() => undefined);
+  void actions.run(props.containerId, action).catch(() => {
+    // Surfaced through `actions.error`.
+  });
 }
 </script>
 
@@ -102,19 +106,24 @@ function act(action: 'start' | 'stop' | 'restart'): void {
     <div v-if="recreating" class="flex items-center gap-2 p-4 text-muted-foreground" data-testid="docker-detail-recreating">
       <Spinner label="" />Recreating…
     </div>
-    <Empty v-else-if="detail.isError.value" class="h-full" data-testid="docker-detail-error">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="warning" :size="24" class="text-warn" /></EmptyMedia>
-        <EmptyTitle>Container not found</EmptyTitle>
-        <EmptyDescription>It was removed, or the engine changed.</EmptyDescription>
-      </EmptyHeader>
-      <Button size="kira" variant="toolbar" @click="ui.select(null)">Back to overview</Button>
-    </Empty>
-    <div v-else-if="!detail.data.value" class="flex flex-col gap-2 p-3" aria-busy="true">
-      <Skeleton class="h-control-lg w-1/3" />
-      <Skeleton class="h-4 w-2/3" />
-    </div>
-    <template v-else-if="c">
+    <QueryState v-else :query="detail" :is-empty="() => false">
+    <template #error>
+      <Empty class="h-full" data-testid="docker-detail-error">
+        <EmptyHeader>
+          <EmptyMedia><CodiconIcon name="warning" :size="24" class="text-warn" /></EmptyMedia>
+          <EmptyTitle>Container not found</EmptyTitle>
+          <EmptyDescription>It was removed, or the engine changed.</EmptyDescription>
+        </EmptyHeader>
+        <Button size="kira" variant="toolbar" @click="ui.select(null)">Back to overview</Button>
+      </Empty>
+    </template>
+    <template #loading>
+      <div class="flex flex-col gap-2 p-3" aria-busy="true">
+        <Skeleton class="h-control-lg w-1/3" />
+        <Skeleton class="h-4 w-2/3" />
+      </div>
+    </template>
+    <template v-if="c" #default="{ data }">
       <div class="flex shrink-0 flex-col gap-1 border-b border-border px-3 py-2">
         <div class="flex min-w-0 items-center gap-2">
           <StatusDot :tone="stateDotTone(c.state)" />
@@ -153,7 +162,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
               <UsageBar :percent="live.cpuPercent" class="flex-1" />
             </span>
             <span class="flex w-32 items-center gap-1.5">
-              RAM <span class="font-data text-fg">{{ formatSize(live.memUsage) }}</span>
+              RAM <span class="font-data text-fg">{{ formatBytes(live.memUsage) }}</span>
               <UsageBar :percent="live.memPercent" class="flex-1" />
             </span>
           </span>
@@ -171,13 +180,14 @@ function act(action: 'start' | 'stop' | 'restart'): void {
         />
       </ViewToolbar>
       <div class="min-h-0 flex-1">
-        <ContainerOverview v-if="ui.detailTab === 'overview'" :detail="detail.data.value" />
+        <ContainerOverview v-if="ui.detailTab === 'overview'" :detail="data" />
         <LogsView v-else-if="ui.detailTab === 'logs'" :container-id="containerId" />
         <ExecView v-else-if="ui.detailTab === 'terminal' && running" :container-id="containerId" />
         <StatsView v-else-if="ui.detailTab === 'stats'" :container-id="containerId" :running="running" />
-        <InspectView v-else-if="ui.detailTab === 'inspect'" :raw="detail.data.value.raw" />
+        <InspectView v-else-if="ui.detailTab === 'inspect'" :raw="data.raw" />
         <ContainerEditView v-else-if="ui.detailTab === 'edit'" :container-id="containerId" />
       </div>
     </template>
+    </QueryState>
   </div>
 </template>

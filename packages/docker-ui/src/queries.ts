@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { useDocumentVisibility, useLocalStorage } from '@vueuse/core';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { TIMING } from '@workbench/behaviour/timing';
 import {
   computed,
   type MaybeRefOrGetter,
   onScopeDispose,
   type Ref,
   reactive,
-  ref,
   toValue,
   watch,
 } from 'vue';
@@ -21,14 +22,13 @@ import type {
 } from './wire';
 
 const STATUS_KEY = ['docker', 'status'] as const;
-const UNAVAILABLE_POLL_MS = 5000;
 
 export function useDockerStatus() {
   const { control } = useDocker();
   return useQuery({
     queryKey: STATUS_KEY,
     queryFn: () => control.status(false),
-    refetchInterval: (query) => (query.state.data?.state === 'ok' ? false : UNAVAILABLE_POLL_MS),
+    refetchInterval: (query) => (query.state.data?.state === 'ok' ? false : TIMING.pollFast),
     staleTime: 0,
   });
 }
@@ -37,16 +37,10 @@ export function useDockerStatus() {
 export function useRetryStatus() {
   const { control } = useDocker();
   const qc = useQueryClient();
-  const retrying = ref(false);
-  async function retry(): Promise<void> {
-    retrying.value = true;
-    try {
-      qc.setQueryData<DockerStatus>(STATUS_KEY, await control.status(true));
-    } finally {
-      retrying.value = false;
-    }
-  }
-  return { retrying, retry };
+  const { run, pending: retrying } = useAsyncAction(async () => {
+    qc.setQueryData<DockerStatus>(STATUS_KEY, await control.status(true));
+  });
+  return { retrying, retry: run };
 }
 
 /** Scope for every resource query: a context switch must not serve the old engine's cache. */
@@ -185,9 +179,7 @@ export function useEngineDiskUsage() {
     queryKey: computed(() => ['docker-disk', scope.value, 'engine'] as const),
     queryFn: () => control.diskUsage(),
     enabled: false,
-    staleTime: Infinity,
     gcTime: Infinity,
-    retry: false,
     initialData: () => storedDisk.value[scope.value],
     initialDataUpdatedAt: () => {
       const at = Date.parse(storedDisk.value[scope.value]?.takenAt ?? '');
@@ -210,9 +202,7 @@ export function useContainerSize(id: MaybeRefOrGetter<string>) {
     queryKey: computed(() => ['docker-disk', scope.value, 'container', toValue(id)] as const),
     queryFn: () => control.containerSize(toValue(id)),
     enabled: false,
-    staleTime: Infinity,
     gcTime: Infinity,
-    retry: false,
   });
   return { query, refresh: () => query.refetch() };
 }
@@ -260,6 +250,10 @@ function invalidateKinds(qc: ReturnType<typeof useQueryClient>, kinds: readonly 
   });
 }
 
+function liveSyncBestEffort(): void {
+  // Live sync is best effort; status polling and refetch on show still keep lists current.
+}
+
 /** While mounted and the document is visible: engine events invalidate lists, status pushes land
  *  in the cache. Hidden or unmounted: the Go watcher is released. */
 export function useDockerLiveSync() {
@@ -275,14 +269,14 @@ export function useDockerLiveSync() {
       control.onChanged((e) => invalidateKinds(qc, e.kinds)),
       control.onStatus((s) => qc.setQueryData<DockerStatus>(STATUS_KEY, s)),
     ];
-    void control.watch().catch(() => undefined);
+    control.watch().catch(liveSyncBestEffort);
   }
 
   function stop(): void {
     if (offs.length === 0) return;
     for (const off of offs) off();
     offs = [];
-    void control.unwatch().catch(() => undefined);
+    control.unwatch().catch(liveSyncBestEffort);
   }
 
   watch(

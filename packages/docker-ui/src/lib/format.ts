@@ -4,28 +4,6 @@ export function shortId(id: string): string {
   return id.replace(/^sha256:/, '').slice(0, 12);
 }
 
-/** One decimal under 100%, whole numbers above (multi-core CPU can pass 100%). */
-export function formatPercent(n: number): string {
-  return n >= 100 ? `${Math.round(n)}%` : `${n.toFixed(1)}%`;
-}
-
-const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
-
-/** '0 B' / '341 MB' / '1.2 GB': 1024 steps, one decimal under 100, none above. */
-export function formatSize(bytes: number): string {
-  let value = Math.max(0, bytes);
-  let unit = 0;
-  while (unit < UNITS.length - 1 && Math.round(value) >= 1024) {
-    value /= 1024;
-    unit++;
-  }
-  if (unit === 0) return `${Math.round(value)} B`;
-  const digits = value < 99.95 ? 1 : 0;
-  const text = value.toFixed(digits);
-  if (text === '1024' && unit < UNITS.length - 1) return `1.0 ${UNITS[unit + 1]}`;
-  return `${text} ${UNITS[unit]}`;
-}
-
 export function isActiveState(state: ContainerState): boolean {
   return state === 'running' || state === 'paused' || state === 'restarting';
 }
@@ -50,8 +28,4 @@ export function publishedPorts(ports: readonly DockerPort[]): string[] {
   const seen = new Set<number>();
   for (const p of ports) if (p.publicPort > 0) seen.add(p.publicPort);
   return [...seen].sort((a, b) => a - b).map(String);
-}
-
-export function formatCreated(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleString();
 }

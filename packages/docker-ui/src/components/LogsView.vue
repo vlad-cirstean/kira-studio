@@ -5,9 +5,12 @@ import { FieldError } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useDebounceFn } from '@vueuse/core';
+import { useFollowTail } from '@workbench/behaviour/followTail';
+import { matchesQuery } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { useDocker } from '../context';
 import { parseAnsi, splitMatches } from '../lib/ansi';
 import type { DockerLogLine } from '../wire';
@@ -48,7 +51,7 @@ let off: (() => void) | null = null;
 const needle = computed(() => filter.value.trim().toLowerCase());
 const visible = computed(() => {
   const q = needle.value;
-  return q === '' ? lines.value : lines.value.filter((l) => l.text.toLowerCase().includes(q));
+  return q === '' ? lines.value : lines.value.filter((l) => matchesQuery(l.text, q));
 });
 const wrapped = computed(() => visible.value.slice(-WRAP_RENDER_LINES));
 
@@ -60,31 +63,11 @@ const { virtualItems, totalSize, onScroll: onVirtualScroll } = useVirtualRows({
   overscan: 20,
 });
 
-const atBottom = ref(true);
-
-function stick(): void {
-  const el = scrollEl.value;
-  if (el) el.scrollTop = el.scrollHeight;
-}
-
-function onScroll(): void {
-  onVirtualScroll();
-  const el = scrollEl.value;
-  if (!el) return;
-  const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-  atBottom.value = bottom;
-  if (!bottom && follow.value) follow.value = false;
-}
-
-function jumpToLatest(): void {
-  follow.value = true;
-  void nextTick(stick);
-}
+const { atBottom, jumpToLatest, stick } = useFollowTail(scrollEl, lines, { follow });
 
 function append(batch: DockerLogLine[]): void {
   const next = lines.value.concat(batch.map((l) => ({ ...l, n: seq++ })));
   lines.value = next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
-  if (follow.value) void nextTick(stick);
 }
 
 async function close(): Promise<void> {
@@ -94,8 +77,12 @@ async function close(): Promise<void> {
   streamId = '';
   if (!id) return;
   // LogsClose can reach Go before the in-flight LogsOpen registers the stream.
-  await opening.catch(() => undefined);
-  await control.logsClose(id).catch(() => undefined);
+  await opening.catch(() => {
+    // The open failure is reported by `open()`; there is no stream left to close.
+  });
+  await control.logsClose(id).catch(() => {
+    // The stream is gone either way; Go drops it with the window.
+  });
 }
 
 async function open(): Promise<void> {
@@ -128,11 +115,11 @@ async function open(): Promise<void> {
   }
 }
 
-const reopen = useDebounceFn(() => void open(), 150);
+const reopen = useDebounceFn(() => void open(), TIMING.search);
 
 watch([() => props.containerId, tail, timestamps], () => void reopen(), { immediate: true });
 watch(follow, (v) => {
-  if (v) void nextTick(stick);
+  if (v) stick();
 });
 onBeforeUnmount(() => {
   reopen.cancel?.();
@@ -164,7 +151,7 @@ function clear(): void {
         ref="scrollEl"
         class="h-full overflow-auto bg-bg py-1 font-data text-kira-sm"
         data-testid="docker-logs-body"
-        @scroll="onScroll"
+        @scroll="onVirtualScroll"
       >
         <div v-if="wrap" class="px-2">
           <div v-for="l in wrapped" :key="l.n" class="whitespace-pre-wrap break-all" :class="l.stream === 'stderr' ? 'text-error' : ''" data-testid="docker-log-line" :data-stream="l.stream">
@@ -210,7 +197,7 @@ function clear(): void {
         {{ needle ? 'No lines match the filter.' : ended ? 'No log output.' : 'Waiting for output…' }}
       </p>
       <Button
-        v-if="!atBottom && !follow"
+        v-if="!atBottom() && !follow"
         variant="toolbar"
         size="kira"
         class="absolute bottom-2 right-4"

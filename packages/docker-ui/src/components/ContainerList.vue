@@ -5,6 +5,8 @@ import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/behaviour/clipboard';
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
+import QueryState from '@workbench/components/QueryState.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useRowHeight } from '@workbench/util/rowHeight';
@@ -41,11 +43,9 @@ const contextMenu = useContextMenuStore();
 const searching = computed(() => ui.search.trim() !== '');
 
 const visible = computed(() => {
-  const q = ui.search.trim().toLowerCase();
   return (containers.data.value ?? []).filter((c) => {
     if (!ui.showStopped && !isActiveState(c.state)) return false;
-    if (q === '') return true;
-    return [c.name, c.image, c.composeProject, c.composeService].some((v) => v.toLowerCase().includes(q));
+    return [c.name, c.image, c.composeProject, c.composeService].some((v) => matchesQuery(v, ui.search));
   });
 });
 
@@ -56,9 +56,9 @@ const rows = computed<Row[]>(() => {
     list.push(c);
     byProject.set(c.composeProject, list);
   }
-  const byName = (a: DockerContainer, b: DockerContainer) => a.name.localeCompare(b.name);
+  const byName = (a: DockerContainer, b: DockerContainer) => compareNatural(a.name, b.name);
   const out: Row[] = [];
-  const projects = [...byProject.keys()].filter((p) => p !== '').sort((a, b) => a.localeCompare(b));
+  const projects = [...byProject.keys()].filter((p) => p !== '').sort(compareNatural);
   for (const project of projects) {
     const members = (byProject.get(project) ?? []).sort(byName);
     out.push({ kind: 'group', key: `g:${project}`, name: project, members });
@@ -102,7 +102,9 @@ function runningCount(g: GroupRow): number {
 }
 
 function act(c: DockerContainer, action: 'start' | 'stop' | 'restart'): void {
-  void actions.run(c.id, action).catch(() => undefined);
+  actions.run(c.id, action).catch(() => {
+    // Surfaced through `actions.error`.
+  });
 }
 
 function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
@@ -110,7 +112,7 @@ function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
   for (const c of targets) act(c, action);
 }
 
-function onContextMenu(e: MouseEvent, c: DockerContainer): void {
+function menuItems(c: DockerContainer): MenuItem[] {
   const running = c.state === 'running';
   const items: MenuItem[] = [
     { type: 'item', id: 'start', label: 'Start', icon: 'play', iconClass: 'text-ok', disabled: running, run: () => act(c, 'start') },
@@ -123,24 +125,53 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
     { type: 'item', id: 'copy-id', label: 'Copy ID', icon: 'copy', run: () => copyText(c.id) },
     { type: 'item', id: 'copy-name', label: 'Copy name', icon: 'copy', run: () => copyText(c.name) },
   ];
-  contextMenu.openContextMenu(e, items);
+  return items;
 }
+
+function onContextMenu(e: MouseEvent, c: DockerContainer): void {
+  contextMenu.openContextMenu(e, menuItems(c));
+}
+
+function onKeyMenu(row: Row, rect: DOMRect): void {
+  if (row.kind !== 'container') return;
+  contextMenu.openContextMenuAt(rect.left, rect.bottom, menuItems(row.container));
+}
+
+function openRow(row: Row): void {
+  if (row.kind === 'group') ui.toggleGroup(row.name);
+  else ui.select({ kind: 'container', id: row.container.id });
+}
+
+const groupTree = {
+  depth: (row: Row) => (row.kind === 'group' || !row.grouped ? 0 : 1),
+  isExpanded: (row: Row) => row.kind === 'group' && isOpen(row.name),
+  hasChildren: (row: Row) => row.kind === 'group',
+  expand: (row: Row) => {
+    if (row.kind === 'group' && !isOpen(row.name)) ui.toggleGroup(row.name);
+  },
+  collapse: (row: Row) => {
+    if (row.kind === 'group' && isOpen(row.name)) ui.toggleGroup(row.name);
+  },
+};
 </script>
 
 <template>
-  <ListState
-    v-if="containers.isPending.value || containers.isError.value || rows.length === 0"
-    :loading="containers.isPending.value"
-    :error="containers.isError.value"
-    icon="server"
-    :empty-title="emptyCopy.title"
-    :empty-hint="emptyCopy.hint"
-    @retry="containers.refetch()"
-  />
-  <VirtualList v-else :rows="rows" :row-heights="rowHeights" testid="docker-container-list">
-    <template #row="{ row }">
+  <QueryState :query="containers" :is-empty="() => rows.length === 0">
+    <template #empty>
+      <ListState icon="server" :title="emptyCopy.title" :hint="emptyCopy.hint" />
+    </template>
+  <VirtualList
+    :rows="rows"
+    :row-heights="rowHeights"
+    testid="docker-container-list"
+    :open="openRow"
+    :menu="onKeyMenu"
+    :tree="groupTree"
+  >
+    <template #row="{ row, nav }">
       <div
         v-if="row.kind === 'group'"
+        v-bind="nav"
         :class="cn(rowVariants({ layout: 'tree' }), 'group/row h-full')"
         :style="rowIndent(0)"
         data-testid="docker-group"
@@ -160,6 +191,8 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
           <TooltipIconButton icon="debug-stop" label="Stop all" class="text-error hover:text-error" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
         </span>
       </div>
+      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
       <div
         v-else
         :class="
@@ -175,10 +208,9 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         :data-state="row.container.state"
         role="option"
         :aria-selected="isSelected(row.container)"
-        tabindex="0"
+        v-bind="nav"
         @click="ui.select({ kind: 'container', id: row.container.id })"
         @dblclick="ui.select({ kind: 'container', id: row.container.id }, 'logs')"
-        @keydown.enter="ui.select({ kind: 'container', id: row.container.id })"
         @contextmenu.prevent="onContextMenu($event, row.container)"
       >
         <StatusDot :tone="stateDotTone(row.container.state)" data-testid="docker-state-dot" />
@@ -225,4 +257,5 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
       </div>
     </template>
   </VirtualList>
+  </QueryState>
 </template>

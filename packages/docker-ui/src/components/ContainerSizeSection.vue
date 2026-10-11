@@ -4,9 +4,8 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useTimeAgo } from '@vueuse/core';
+import { formatBytes, formatDateTime, useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { formatSize } from '../lib/format';
 import { useContainerSize } from '../queries';
 import DetailSection from './DetailSection.vue';
 
@@ -17,7 +16,7 @@ const { query, refresh } = useContainerSize(() => props.id);
 const size = computed(() => query.data.value);
 const measuring = computed(() => query.isFetching.value);
 const takenAt = computed(() => (size.value ? new Date(size.value.takenAt) : new Date()));
-const ago = useTimeAgo(takenAt);
+const ago = useRelativeTime(takenAt);
 </script>
 
 <template>
@@ -28,7 +27,7 @@ const ago = useTimeAgo(takenAt);
           <TooltipTrigger as-child>
             <span data-testid="docker-size-taken">{{ ago }}</span>
           </TooltipTrigger>
-          <TooltipContent>{{ new Date(size.takenAt).toLocaleString() }}</TooltipContent>
+          <TooltipContent>{{ formatDateTime(size.takenAt) }}</TooltipContent>
         </Tooltip>
         <TooltipIconButton
           icon="refresh"
@@ -51,9 +50,9 @@ const ago = useTimeAgo(takenAt);
     </div>
     <dl v-else class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
       <dt class="text-muted-foreground">Writable layer</dt>
-      <dd class="font-data" data-testid="docker-size-rw">{{ formatSize(size.sizeRw) }}</dd>
+      <dd class="font-data" data-testid="docker-size-rw">{{ formatBytes(size.sizeRw) }}</dd>
       <dt class="text-muted-foreground">Total (with image)</dt>
-      <dd class="font-data" data-testid="docker-size-rootfs">{{ formatSize(size.sizeRootFs) }}</dd>
+      <dd class="font-data" data-testid="docker-size-rootfs">{{ formatBytes(size.sizeRootFs) }}</dd>
     </dl>
   </DetailSection>
 </template>

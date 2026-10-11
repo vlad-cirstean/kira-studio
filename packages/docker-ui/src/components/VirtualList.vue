@@ -1,21 +1,56 @@
 <script setup lang="ts" generic="T extends { key: string }">
+import { type ListNavigationOptions, useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
-const props = withDefaults(defineProps<{ rows: readonly T[]; rowHeight?: number; rowHeights?: readonly number[]; testid?: string }>(), {
-  testid: 'docker-list',
-});
+const props = withDefaults(
+  defineProps<{
+    rows: readonly T[];
+    rowHeight?: number;
+    rowHeights?: readonly number[];
+    testid?: string;
+    /** Enter on a row. */
+    open?: (row: T) => void;
+    /** ContextMenu key and Shift+F10 on a row. */
+    menu?: (row: T, rect: DOMRect) => void;
+    /** Group rows that expand and collapse (Right and Left). */
+    tree?: ListNavigationOptions<T>['tree'];
+  }>(),
+  { testid: 'docker-list' },
+);
 
-defineSlots<{ row(props: { row: T }): unknown }>();
+defineSlots<{ row(props: { row: T; nav: { 'data-nav-key': string; tabindex: 0 | -1; onFocus: () => void } }): unknown }>();
 
 const { single: defaultRowHeight } = useRowHeight();
 const scrollEl = ref<HTMLElement | null>(null);
-const { virtualItems, totalSize, onScroll } = useVirtualRows({
+const activeKey = ref<string | null>(null);
+const activeIndex = computed(() => props.rows.findIndex((r) => r.key === activeKey.value));
+
+const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => props.rows.length,
   rowHeight: () => props.rowHeight ?? defaultRowHeight.value,
   rowHeights: () => props.rowHeights,
   scrollElement: scrollEl,
+  pinned: () => (activeIndex.value < 0 ? null : activeIndex.value),
+});
+
+const nav = useListNavigation<T>({
+  container: scrollEl,
+  items: () => props.rows,
+  key: (row) => row.key,
+  activeKey,
+  onOpen: (row) => props.open?.(row),
+  onMenu: (row, rect) => props.menu?.(row, rect),
+  tree: props.tree && {
+    depth: (row) => props.tree?.depth(row) ?? 0,
+    isExpanded: (row) => props.tree?.isExpanded(row) ?? false,
+    hasChildren: (row) => props.tree?.hasChildren(row) ?? false,
+    expand: (row) => props.tree?.expand(row),
+    collapse: (row) => props.tree?.collapse(row),
+  },
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualItems.value,
 });
 </script>
 
@@ -28,7 +63,7 @@ const { virtualItems, totalSize, onScroll } = useVirtualRows({
         :class="VIRTUAL_ROW_CLASS"
         :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
       >
-        <slot name="row" :row="rows[vi.index]!" />
+        <slot name="row" :row="rows[vi.index]!" :nav="nav.rowProps(rows[vi.index]!.key)" />
       </div>
     </div>
   </div>

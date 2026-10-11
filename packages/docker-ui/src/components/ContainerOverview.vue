@@ -3,6 +3,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/behaviour/clipboard';
+import { displayValue, formatDateTime } from '@workbench/behaviour/format';
 import { reactive } from 'vue';
 import type { DockerContainerDetail } from '../wire';
 import DetailSection from './DetailSection.vue';
@@ -21,20 +22,20 @@ function toggle(i: number): void {
   else revealed.add(i);
 }
 
-const dateOrDash = (s: string): string => (s && !s.startsWith('0001-') ? new Date(s).toLocaleString() : '-');
-const join = (parts: string[]): string => parts.join(' ') || '-';
+const dateOrDash = (s: string): string => (s && !s.startsWith('0001-') ? formatDateTime(s) : displayValue(null));
+const join = (parts: string[]): string => displayValue(parts.join(' '));
 
 const rows = (): Array<[string, string]> => [
   ['Command', join(props.detail.command)],
   ['Entrypoint', join(props.detail.entrypoint)],
-  ['Working dir', props.detail.workingDir || '-'],
-  ['User', props.detail.user || '-'],
+  ['Working dir', displayValue(props.detail.workingDir)],
+  ['User', displayValue(props.detail.user)],
   ['Restart policy', props.detail.restartPolicy || 'no'],
-  ['Health', props.detail.health || '-'],
-  ['Created', new Date(props.detail.container.created * 1000).toLocaleString()],
+  ['Health', displayValue(props.detail.health)],
+  ['Created', formatDateTime(props.detail.container.created * 1000)],
   ['Started', dateOrDash(props.detail.startedAt)],
   ['Finished', dateOrDash(props.detail.finishedAt)],
-  ['Exit code', props.detail.container.state === 'running' ? '-' : String(props.detail.exitCode)],
+  ['Exit code', props.detail.container.state === 'running' ? displayValue(null) : String(props.detail.exitCode)],
 ];
 </script>
 

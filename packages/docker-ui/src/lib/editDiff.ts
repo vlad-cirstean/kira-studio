@@ -1,10 +1,10 @@
+import { formatBytes } from '@workbench/behaviour/format';
 import type {
   DockerEditNetwork,
   DockerInPlaceSpec,
   DockerRecreateSpec,
   DockerResources,
 } from '../wire';
-import { formatSize } from './format';
 
 export type EditMode = 'now' | 'recreate';
 
@@ -109,7 +109,7 @@ function showResource(key: keyof DockerResources, v: number | string): string {
   if (v === 0 || v === '') return key === 'memorySwap' ? 'engine default' : 'none';
   if (typeof v === 'string') return v;
   if (key === 'memorySwap' && v === -1) return 'unlimited';
-  if (SIZE_KEYS.has(key)) return formatSize(v);
+  if (SIZE_KEYS.has(key)) return formatBytes(v);
   if (key === 'nanoCpus') return `${v / 1e9}`;
   return String(v);
 }

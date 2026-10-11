@@ -3,6 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
+import QueryState from '@workbench/components/QueryState.vue';
 import { computed } from 'vue';
 import { useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -13,26 +15,30 @@ const ui = useDockerUiStore();
 const volumes = useVolumes();
 
 const rows = computed(() => {
-  const q = ui.search.trim().toLowerCase();
   return (volumes.data.value ?? [])
-    .filter((v) => q === '' || v.name.toLowerCase().includes(q))
+    .filter((v) => matchesQuery(v.name, ui.search))
     .map((volume) => ({ key: volume.name, volume }))
-    .sort((a, b) => a.volume.name.localeCompare(b.volume.name));
+    .sort((a, b) => compareNatural(a.volume.name, b.volume.name));
 });
+
+function open(row: { volume: { name: string } }): void {
+  ui.select({ kind: 'volume', id: row.volume.name });
+}
 </script>
 
 <template>
-  <ListState
-    v-if="volumes.isPending.value || volumes.isError.value || rows.length === 0"
-    :loading="volumes.isPending.value"
-    :error="volumes.isError.value"
-    icon="database"
-    :empty-title="ui.search.trim() ? 'No matches' : 'No volumes'"
-    :empty-hint="ui.search.trim() ? 'No volume matches the search.' : 'Containers create volumes for persistent data.'"
-    @retry="volumes.refetch()"
-  />
-  <VirtualList v-else :rows="rows" testid="docker-volume-list">
-    <template #row="{ row }">
+  <QueryState :query="volumes" :is-empty="() => rows.length === 0">
+    <template #empty>
+      <ListState
+        icon="database"
+        :title="ui.search.trim() ? 'No matches' : 'No volumes'"
+        :hint="ui.search.trim() ? 'No volume matches the search.' : 'Containers create volumes for persistent data.'"
+      />
+    </template>
+  <VirtualList :rows="rows" testid="docker-volume-list" :open="open">
+    <template #row="{ row, nav }">
+      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
       <div
         :class="
           cn(
@@ -45,9 +51,8 @@ const rows = computed(() => {
         :data-id="row.volume.name"
         role="option"
         :aria-selected="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name"
-        tabindex="0"
-        @click="ui.select({ kind: 'volume', id: row.volume.name })"
-        @keydown.enter="ui.select({ kind: 'volume', id: row.volume.name })"
+        v-bind="nav"
+        @click="open(row)"
       >
         <CodiconIcon name="database" :size="13" class="shrink-0 text-muted-foreground" />
         <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.volume.name }}</span>
@@ -56,4 +61,5 @@ const rows = computed(() => {
       </div>
     </template>
   </VirtualList>
+  </QueryState>
 </template>

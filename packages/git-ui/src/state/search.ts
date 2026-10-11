@@ -2,9 +2,11 @@ import type { CompiledQuery, LoadedScanResult, SearchField, SearchScope } from '
 import { compileQuery, matchRef, searchLoadedCommits } from '@kira/git-core';
 import type { RefRow, ResultOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { type ComputedRef, computed, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createCancellableTimer } from './cancellableTimer.ts';
 import type { GraphViewState } from './graphView.ts';
 import type { PrState } from './pr.ts';
 import type { RefsState } from './refs.ts';
@@ -12,17 +14,12 @@ import type { RefsState } from './refs.ts';
 export type SearchRunResult = ResultOf<'search.run'>;
 
 /** §5.1's client-side ceiling (hard part 4) — `searchLoadedCommits`'s own time box, unrelated to
- *  `TAIL_DEBOUNCE_MS` below (that one bounds how often a *process* spawns; this one bounds how
+ *  `TIMING.search` (that one bounds how often a *process* spawns; this one bounds how
  *  long a single synchronous scan may hold the main thread). */
 const LOADED_SCAN_BUDGET_MS = 120;
 /** OQ3: loaded-hit cap. A scan that hit it is `truncated`, so `matchCount` reports inexact — this
  *  bounds how many rows `SearchResults.vue` could ever render from the client-side half. */
 const LOADED_HIT_LIMIT = 500;
-/** OQ3: the wire's own default, restated here only so `#runTail`'s request literal has a name
- *  instead of a bare number — `rpcHandlers.ts`'s `DEFAULT_SEARCH_LIMIT` is the actual default
- *  applied when `limit` is omitted; passing it explicitly here would just be the same number
- *  twice, so this request omits `limit` entirely. */
-const TAIL_DEBOUNCE_MS = 200;
 /** G30 round-1 performance review, finding #4: `#runLoadedScan` re-scans the ENTIRE loaded store
  *  from row 0 every time it runs (`searchLoadedCommits` has no incremental/resume mode), and used
  *  to be wired to fire on every single `loadedRows` change — the `revealSha` "load page after page
@@ -233,8 +230,11 @@ export class SearchState {
   readonly #pr: PrState | undefined;
   #repoId: string | undefined;
   #tailController: AbortController | undefined;
-  #tailTimer: ReturnType<typeof setTimeout> | undefined;
-  #loadedScanTimer: ReturnType<typeof setTimeout> | undefined;
+  readonly #tailTimer = createCancellableTimer(() => this.#runTail(), TIMING.search);
+  readonly #loadedScanTimer = createCancellableTimer(
+    () => this.#runLoadedScanNow(),
+    LOADED_SCAN_COALESCE_MS,
+  );
   readonly #unsubscribeRefsChanged: () => void;
   readonly #stopWatchers: readonly (() => void)[];
 
@@ -365,8 +365,7 @@ export class SearchState {
 
   setRepoId(repoId: string | undefined): void {
     this.#repoId = repoId;
-    this.#tailTimer !== undefined && clearTimeout(this.#tailTimer);
-    this.#tailTimer = undefined;
+    this.#tailTimer.stop();
     this.#tailController?.abort();
     this.tail.value = undefined;
     this.tailStale.value = false;
@@ -420,8 +419,7 @@ export class SearchState {
   /** Cancels any pending coalesced scan (see `LOADED_SCAN_COALESCE_MS`) and runs one immediately —
    *  the query/scope watcher's own handler, and `#scheduleLoadedScan`'s own settled call. */
   #runLoadedScanNow(): void {
-    if (this.#loadedScanTimer !== undefined) clearTimeout(this.#loadedScanTimer);
-    this.#loadedScanTimer = undefined;
+    this.#loadedScanTimer.stop();
     const compiled = this.compiled.value;
     if (compiled.kind !== 'ok' || this.scope.value === 'refs') {
       this.loaded.value = undefined;
@@ -443,13 +441,11 @@ export class SearchState {
       this.#runLoadedScanNow();
       return;
     }
-    if (this.#loadedScanTimer !== undefined) clearTimeout(this.#loadedScanTimer);
-    this.#loadedScanTimer = setTimeout(() => this.#runLoadedScanNow(), LOADED_SCAN_COALESCE_MS);
+    this.#loadedScanTimer.start();
   }
 
   #scheduleTail(): void {
-    if (this.#tailTimer !== undefined) clearTimeout(this.#tailTimer);
-    this.#tailTimer = undefined;
+    this.#tailTimer.stop();
     const compiled = this.compiled.value;
     if (compiled.kind !== 'ok' || !this.#shouldRunTail(compiled)) {
       this.#tailController?.abort();
@@ -458,7 +454,7 @@ export class SearchState {
       this.tailError.value = undefined;
       return;
     }
-    this.#tailTimer = setTimeout(() => this.#runTail(), TAIL_DEBOUNCE_MS);
+    this.#tailTimer.start();
   }
 
   #runTail(): void {
@@ -509,8 +505,8 @@ export class SearchState {
   dispose(): void {
     this.#unsubscribeRefsChanged();
     for (const stop of this.#stopWatchers) stop();
-    if (this.#tailTimer !== undefined) clearTimeout(this.#tailTimer);
-    if (this.#loadedScanTimer !== undefined) clearTimeout(this.#loadedScanTimer);
+    this.#tailTimer.stop();
+    this.#loadedScanTimer.stop();
     this.#tailController?.abort();
   }
 }
