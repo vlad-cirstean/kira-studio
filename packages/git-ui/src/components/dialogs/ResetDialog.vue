@@ -90,6 +90,7 @@ function confirm(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       size="md"
+      destructive
     >
       <DialogHeader>
         <DialogTitle>
@@ -196,7 +197,7 @@ function confirm(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">Cancel</Button>
         <Button
           v-if="isHardDestructive && canStashFirst"
           variant="dialog-primary"

@@ -12,7 +12,7 @@ const emit = defineEmits<{ cancel: []; confirm: [] }>();
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('cancel')">
-    <DialogContent size="lg" data-testid="docker-edit-dialog">
+    <DialogContent size="lg" destructive data-testid="docker-edit-dialog">
       <DialogHeader>
         <DialogTitle>Recreate container</DialogTitle>
         <DialogDescription>
@@ -57,7 +57,7 @@ const emit = defineEmits<{ cancel: []; confirm: [] }>();
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="docker-edit-cancel" @click="emit('cancel')">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss data-testid="docker-edit-cancel" @click="emit('cancel')">Cancel</Button>
         <Button variant="dialog-danger" size="kira-lg" :disabled="busy" data-testid="docker-edit-confirm" @click="emit('confirm')">
           Recreate container
         </Button>

@@ -94,6 +94,7 @@ function confirmPlain(): void {
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       size="md"
+      destructive
     >
       <DialogHeader>
         <DialogTitle>Force push {{ pending.branch }} to {{ pending.remote }}?</DialogTitle>
@@ -159,7 +160,7 @@ function confirmPlain(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">Cancel</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"

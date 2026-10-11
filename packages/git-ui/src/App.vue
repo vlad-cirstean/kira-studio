@@ -904,10 +904,6 @@ const renameRefDialogState = ref<{ open: boolean; currentName: string }>({
   currentName: '',
 });
 const forceDeleteRefCandidate = ref<{ name: string; x: number; y: number } | undefined>(undefined);
-// P131 Part 2 §5.5: reka's own Popper flip/shift positioning replaces the hand-rolled
-// computeFloatPosition watch (G20 D4) — Popover owns placement now, this file only owns the
-// candidate/open state. `cancelEl` is the open-auto-focus target (never the destructive button).
-const cancelEl = ref<InstanceType<typeof Button> | null>(null);
 
 function handleGridRefContextMenu(detail: {
   kind: 'branch' | 'remoteBranch';
@@ -1935,17 +1931,12 @@ onBeforeUnmount(() => {
               align="start"
               :side-offset="0"
               class="w-auto flex-row items-center gap-1 px-2 py-1"
-              @open-auto-focus="
-                (e) => {
-                  e.preventDefault();
-                  cancelEl?.$el.focus();
-                }
-              "
+              destructive
             >
               <span>“{{ forceDeleteRefCandidate?.name }}” is not fully merged.</span>
               <Button variant="danger" size="kira" @click="confirmForceDeleteRef">Force delete</Button>
               <Button
-                ref="cancelEl"
+                data-dialog-dismiss
                 variant="toolbar"
                 size="kira"
                 @click="forceDeleteRefCandidate = undefined"
