@@ -201,7 +201,9 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
   await page.keyboard.type('echo two');
   const box = await script.boundingBox();
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(150);
-  await page.keyboard.press('ControlOrMeta+Enter');
+  // The app matches the platform chord from the page's own user agent (WebKit reports a Mac).
+  const mac = await page.evaluate(() => navigator.userAgent.includes('Mac'));
+  await page.keyboard.press(mac ? 'Meta+Enter' : 'Control+Enter');
   await expect
     .poll(() => control.log().find((entry) => entry.channel === IPC.customScriptsCreate)?.args)
     .toEqual({

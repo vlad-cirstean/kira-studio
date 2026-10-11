@@ -20,6 +20,8 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { refDebounced } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
+import QueryState from '@workbench/components/QueryState.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId, watch } from 'vue';
 import { errorText } from '../../bridge/codedError';
@@ -47,7 +49,7 @@ function patch(change: Partial<ScriptSchedule>): void {
 }
 
 const cronNow = computed(() => schedule.value.cron);
-const cron = refDebounced(cronNow, 250);
+const cron = refDebounced(cronNow, TIMING.preview);
 const fires = useNextFires(cron, () => schedule.value.timezone, 3);
 const nextText = computed(() =>
   (fires.data.value ?? []).map((ms) => fireText(ms, schedule.value.timezone)).join(', '),
@@ -112,7 +114,6 @@ const tasks = useQuery(
     enabled: computed(() => ctx.ade && where.value === 'task' && props.scriptId !== null),
     placeholderData: keepPreviousData,
     staleTime: 0,
-    retry: false,
   },
   queryClient,
 );
@@ -251,16 +252,20 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
         <FieldDescription v-if="scriptId === null" data-testid="schedule-task-save">
           Save the script, then edit it to pick a task.
         </FieldDescription>
-        <AdeContextFields
-          v-else-if="tasks.data.value"
-          v-model:task-id="taskId"
-          v-model:branch-id="branchId"
-          :needs="tasks.data.value.needs"
-          :ade="tasks.data.value.ade"
-        />
-        <FieldError v-if="tasks.isError.value" data-testid="schedule-task-error">
-          {{ tasks.error.value?.message }}
-        </FieldError>
+        <QueryState v-else :query="tasks" variant="inline" :is-empty="() => false">
+          <template #loading />
+          <template #error="{ message }">
+            <FieldError data-testid="schedule-task-error">{{ message }}</FieldError>
+          </template>
+          <template #default="{ data }">
+            <AdeContextFields
+              v-model:task-id="taskId"
+              v-model:branch-id="branchId"
+              :needs="data.needs"
+              :ade="data.ade"
+            />
+          </template>
+        </QueryState>
       </template>
     </Field>
 

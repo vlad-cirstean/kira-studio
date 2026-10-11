@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import QueryState from '@workbench/components/QueryState.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -51,32 +52,39 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
   <FieldSet data-testid="smart-mcp">
     <FieldLegend>MCP tools</FieldLegend>
     <FieldDescription>Only servers from your user Claude config are listed.</FieldDescription>
-    <span v-if="servers.data.value?.length === 0" class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">
-      No MCP servers.
-    </span>
-    <Alert v-if="servers.isError.value" variant="error">
-      <AlertDescription>{{ servers.error.value?.message }}</AlertDescription>
-    </Alert>
-    <div v-for="s in servers.data.value ?? []" :key="s.name" class="flex flex-col gap-1" data-testid="smart-mcp-server" :data-server="s.name">
-      <div class="flex items-center gap-2">
-        <Checkbox
-          :id="`${idBase}-${s.name}`"
-          :model-value="enabled.includes(s.name)"
-          :data-testid="`smart-mcp-switch-${s.name}`"
-          @update:model-value="(v) => setServer(s.name, v === true)"
-        />
-        <Label :for="`${idBase}-${s.name}`">{{ s.name }}</Label>
-        <span class="truncate font-data text-kira-sm text-muted-foreground">{{ s.transport }} {{ s.target }}</span>
-      </div>
-      <McpServerTools
-        v-if="enabled.includes(s.name)"
-        :server="s.name"
-        :chosen="chosen(s.name) ?? []"
-        :typed="typed[s.name] ?? ''"
-        @tool="(tool, on) => setTool(s.name, tool, on)"
-        @typed="(v) => (typed = { ...typed, [s.name]: v })"
-        @add="addByName(s.name)"
-      />
-    </div>
+    <QueryState :query="servers" variant="inline">
+      <template #loading />
+      <template #empty>
+        <span class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">No MCP servers.</span>
+      </template>
+      <template #error="{ message }">
+        <Alert variant="error">
+          <AlertDescription>{{ message }}</AlertDescription>
+        </Alert>
+      </template>
+      <template #default="{ data }">
+        <div v-for="s in data" :key="s.name" class="flex flex-col gap-1" data-testid="smart-mcp-server" :data-server="s.name">
+          <div class="flex items-center gap-2">
+            <Checkbox
+              :id="`${idBase}-${s.name}`"
+              :model-value="enabled.includes(s.name)"
+              :data-testid="`smart-mcp-switch-${s.name}`"
+              @update:model-value="(v) => setServer(s.name, v === true)"
+            />
+            <Label :for="`${idBase}-${s.name}`">{{ s.name }}</Label>
+            <span class="truncate font-data text-kira-sm text-muted-foreground">{{ s.transport }} {{ s.target }}</span>
+          </div>
+          <McpServerTools
+            v-if="enabled.includes(s.name)"
+            :server="s.name"
+            :chosen="chosen(s.name) ?? []"
+            :typed="typed[s.name] ?? ''"
+            @tool="(tool, on) => setTool(s.name, tool, on)"
+            @typed="(v) => (typed = { ...typed, [s.name]: v })"
+            @add="addByName(s.name)"
+          />
+        </div>
+      </template>
+    </QueryState>
   </FieldSet>
 </template>

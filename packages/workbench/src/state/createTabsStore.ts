@@ -1,6 +1,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { type Ref, reactive, toRefs } from 'vue';
+import { TIMING } from '../behaviour/timing';
 import { cleanupTabRuntime } from './tabRuntime';
 
 // P103 Part 2 (§5.2): the shared skeleton both apps' `state/tabs.ts` used to duplicate —
@@ -235,7 +236,7 @@ export function createTabsStore<
       void enqueueSave(JSON.stringify(persistableTabs()));
     }
 
-    const saveDebounced = useDebounceFn(saveIfChanged, 1000);
+    const saveDebounced = useDebounceFn(saveIfChanged, TIMING.tabsSave);
 
     function saveNow(): void {
       saveDebounced.cancel();

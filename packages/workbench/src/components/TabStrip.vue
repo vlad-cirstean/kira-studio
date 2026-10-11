@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass } from '@theme/connColor';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../behaviour/clipboard';
+import { revealElement } from '../behaviour/focus';
 import { useSortableReorder } from '../behaviour/sortableReorder';
 import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -170,9 +171,8 @@ watch(
   (id) => {
     if (!id) return;
     void nextTick(() => {
-      stripRef.value
-        ?.querySelector<HTMLElement>(`[data-tab-id="${id}"]`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const tab = stripRef.value?.querySelector<HTMLElement>(`[data-tab-id="${id}"]`);
+      if (tab) revealElement(tab);
     });
   },
   { immediate: true },

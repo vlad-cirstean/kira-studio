@@ -10,6 +10,9 @@ import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
 import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
+import QueryState from '@workbench/components/QueryState.vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
 import { errorText } from '../../bridge/codedError';
@@ -49,7 +52,7 @@ const args = computed<ScriptRunArgs>(() => ({
   taskId: taskId.value,
   branchId: branchId.value,
 }));
-const debounced = refDebounced(args, 250);
+const debounced = refDebounced(args, TIMING.preview);
 
 const preview = useQuery(
   {
@@ -57,7 +60,6 @@ const preview = useQuery(
     queryFn: () => ctx.runs.preview(debounced.value),
     placeholderData: keepPreviousData,
     staleTime: 0,
-    retry: false,
   },
   queryClient,
 );
@@ -126,16 +128,13 @@ function run(): void {
   startError.value = null;
   start.mutate();
 }
+
+useShortcut(window, ['form.submit'], run);
 </script>
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent
-      size="lg"
-      data-testid="run-dialog"
-      @keydown.meta.enter.prevent="run"
-      @keydown.ctrl.enter.prevent="run"
-    >
+    <DialogContent size="lg" data-testid="run-dialog">
       <DialogHeader>
         <DialogTitle>Run {{ script?.name ?? 'script' }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
@@ -184,10 +183,17 @@ function run(): void {
             :ade="pv.ade"
           />
 
-          <RunPreview v-if="pv" :preview="pv" />
-          <Alert v-if="preview.isError.value" variant="error" data-testid="run-preview-error">
-            <AlertDescription>{{ preview.error.value?.message }}</AlertDescription>
-          </Alert>
+          <QueryState :query="preview" variant="inline" :is-empty="() => false">
+            <template #loading />
+            <template #error="{ message }">
+              <Alert variant="error" data-testid="run-preview-error">
+                <AlertDescription>{{ message }}</AlertDescription>
+              </Alert>
+            </template>
+            <template #default="{ data }">
+              <RunPreview :preview="data" />
+            </template>
+          </QueryState>
           <FieldError v-if="pv && pv.missing.length > 0" data-testid="run-missing">
             Fill in: {{ pv.missing.join(', ') }}
           </FieldError>

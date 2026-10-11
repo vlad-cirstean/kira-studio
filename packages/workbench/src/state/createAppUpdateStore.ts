@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/vue-query';
-import { useLocalStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { computed, type InjectionKey, ref, watch } from 'vue';
+import { usePersistedState } from '../behaviour/persisted';
 import { errorText } from '../bridge/codedError';
 import type { AppUpdateStatus } from '../bridge/createCoreControl';
 import { queryClient } from './queryClient';
@@ -52,7 +52,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
 
     // Shared by every window of this app (same origin) — VueUse syncs it across windows via the
     // `storage` event, so **Later** in one window silences the dialog in every other one too.
-    const dismissedVersion = useLocalStorage('kira.appUpdate.dismissedVersion', '');
+    const dismissedVersion = usePersistedState('kira.appUpdate.dismissedVersion', '');
 
     const dialogOpen = ref(false);
     const installError = ref<string | null>(null);
@@ -70,7 +70,9 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
     watch([available, latestVersion, dismissedVersion], ([isAvailable, latest, dismissed]) => {
       if (installing.value) return;
       if (isAvailable && latest !== dismissed) {
-        void control.promptsRaiseUpdate(latest).catch(() => undefined);
+        control.promptsRaiseUpdate(latest).catch(() => {
+          // Routing the popup is best effort; the status-bar item still opens the dialog.
+        });
       } else if (dismissed === latest) {
         dialogOpen.value = false;
       }
@@ -89,7 +91,9 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       if (installing.value) return;
       dismissedVersion.value = latestVersion.value;
       dialogOpen.value = false;
-      void control.promptsDismiss(`update:${latestVersion.value}`).catch(() => undefined);
+      control.promptsDismiss(`update:${latestVersion.value}`).catch(() => {
+        // The popup is already hidden here; a stale one in another window closes with its own Later.
+      });
     }
 
     async function install(): Promise<void> {

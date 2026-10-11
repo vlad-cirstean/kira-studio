@@ -32,7 +32,6 @@ export function usePrompts() {
     {
       queryKey: PROMPTS_KEY,
       queryFn: () => control.promptsList(),
-      staleTime: Number.POSITIVE_INFINITY,
     },
     queryClient,
   );

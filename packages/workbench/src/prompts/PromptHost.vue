@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PromptKind, RoutedPrompt } from '@shared/domain/prompts';
+import { compareNatural } from '@workbench/behaviour/match';
 import { windowKey } from '@workbench/util/window';
 import { type Component, computed, onScopeDispose, watch } from 'vue';
 import { usePrompts, usePromptsControl, usePromptVisibility } from './promptsQueries';
@@ -21,7 +22,7 @@ watch(
 const visible = computed<RoutedPrompt[]>(() =>
   (data.value ?? [])
     .filter((p) => p.target === windowKey && props.kinds[p.kind] && !hidden.value.includes(p.id))
-    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+    .sort((a, b) => a.createdAt - b.createdAt || compareNatural(a.id, b.id)),
 );
 const head = computed(() => visible.value.find((p) => p.id === revealed.value) ?? visible.value[0]);
 const more = computed(() => Math.max(0, visible.value.length - 1));

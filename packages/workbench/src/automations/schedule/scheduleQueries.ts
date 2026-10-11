@@ -24,7 +24,6 @@ export function useNextFires(
       ]),
       queryFn: () => runs.nextFires(toValue(cron), toValue(timezone), count),
       enabled: computed(() => toValue(enabled) && toValue(cron).trim() !== ''),
-      retry: false,
       staleTime: 0,
       // Re-ask just after the first instant passes, so a row's `next` moves on by itself.
       refetchInterval: (q) => {

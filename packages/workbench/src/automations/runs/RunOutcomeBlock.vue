@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { Button } from '@theme/components/ui/button';
-import { copyOrReportError } from '@workbench/behaviour/clipboard';
-import { ref } from 'vue';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { costText, runReportText } from './runText';
 
 // The run's result: reason, exit code, and the two actions. `tail` supplies the last terminal
@@ -14,24 +13,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ rerun: [] }>();
 
-const copied = ref(false);
-const copyError = ref<string | null>(null);
+const { copy, copied, error: copyError } = useCopy();
 
 async function copyForAgent(): Promise<void> {
-  copyError.value = null;
   const tail = props.tail ? await props.tail() : '';
-  await copyOrReportError(
-    runReportText(props.run, tail),
-    (m) => {
-      copyError.value = m;
-    },
-    () => {
-      copied.value = true;
-      setTimeout(() => {
-        copied.value = false;
-      }, 1500);
-    },
-  );
+  await copy(runReportText(props.run, tail), { what: 'report' });
 }
 </script>
 

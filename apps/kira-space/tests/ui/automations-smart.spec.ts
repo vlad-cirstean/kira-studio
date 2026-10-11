@@ -317,7 +317,7 @@ test('the run tab follows a run: Running, a pushed log line, then its result', a
   const view = page.locator('[data-testid="script-run-view"]');
   await expect(view.locator('[data-testid="run-status"]')).toHaveText('Running');
   await page.clock.runFor(3000);
-  await expect(view.locator('[data-testid="run-elapsed"]')).toHaveText('3s');
+  await expect(view.locator('[data-testid="run-elapsed"]')).toHaveText('0:03');
 
   await emitWailsEvent(page, IPC.scriptRunLog, {
     runId: 'run-9',

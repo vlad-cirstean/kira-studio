@@ -2,6 +2,7 @@
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type {
   CustomScript,
+  CustomScriptFields,
   ScriptDir,
   ScriptDirMode,
   ScriptKind,
@@ -25,9 +26,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import VarText from '@theme/components/VarText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
+import { useFocus } from '@vueuse/core';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { queryClient } from '@workbench/state/queryClient';
-import { computed, reactive, ref, toRaw, useTemplateRef, watch } from 'vue';
+import { type ComponentPublicInstance, computed, reactive, ref, toRaw, useTemplateRef, watch } from 'vue';
 import { errorText } from '../bridge/codedError';
 import type { ScriptsSeam } from './module';
 import ParamsEditor from './ParamsEditor.vue';
@@ -111,7 +115,6 @@ const homeParts = computed<TextPart[]>(() => [
 const collection = ref(props.script?.collectionId ?? props.collectionId ?? '');
 const color = ref<PaletteColor>((props.script?.color as PaletteColor | undefined) ?? 'none');
 const error = ref<string | null>(null);
-const saving = ref(false);
 
 const TABS: readonly { id: EditorTab; label: string }[] = [
   { id: 'script', label: 'Script' },
@@ -155,11 +158,16 @@ async function chooseWorkingDir(): Promise<void> {
   }
 }
 
+const persist = useAsyncAction(async (fields: CustomScriptFields) => {
+  if (props.script) await props.scripts.update(props.script.id, fields);
+  else await props.scripts.create(fields);
+});
+const saving = persist.pending;
+
 async function save(): Promise<void> {
   if (!canSave.value || saving.value) return;
   error.value = null;
-  saving.value = true;
-  const fields = {
+  const ok = await persist.run({
     name: name.value.trim(),
     command: command.value.trim(),
     kind,
@@ -171,23 +179,19 @@ async function save(): Promise<void> {
     color: color.value,
     collectionId: collection.value === '' ? null : collection.value,
     useAdeDir: useAdeDir.value,
-  };
-  try {
-    if (props.script) await props.scripts.update(props.script.id, fields);
-    else await props.scripts.create(fields);
-    emit('close');
-  } catch (err) {
-    error.value = errorText(err);
-  } finally {
-    saving.value = false;
-  }
+  });
+  if (ok) emit('close');
+  else error.value = persist.error.value;
 }
 
-const nameEl = useTemplateRef<InstanceType<typeof Input>>('nameEl');
+const nameEl = useTemplateRef<ComponentPublicInstance>('nameEl');
+const { focused: nameFocused } = useFocus(nameEl);
+// Reka's focus scope settles after mount; focusing from its open hook keeps the name field focused.
 function onOpenAutoFocus(e: Event): void {
   e.preventDefault();
-  (nameEl.value?.$el as HTMLElement | undefined)?.focus();
+  nameFocused.value = true;
 }
+useShortcut(window, ['form.submit'], () => void save());
 </script>
 
 <template>
@@ -196,8 +200,6 @@ function onOpenAutoFocus(e: Event): void {
       size="lg"
       data-testid="script-dialog"
       @open-auto-focus="onOpenAutoFocus"
-      @keydown.meta.enter.prevent="save"
-      @keydown.ctrl.enter.prevent="save"
     >
       <DialogHeader close-testid="script-dialog-close">
         <DialogTitle>{{ title }}</DialogTitle>

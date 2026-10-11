@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { sleep } from '../testing/unit/async';
 import { createOrderedWriter } from './orderedWrites';
 
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -14,7 +15,7 @@ function manualSend() {
   return { calls, send };
 }
 
-const tick = () => new Promise((r) => setTimeout(r, 0));
+const tick = () => sleep(0);
 
 describe('createOrderedWriter', () => {
   test('an idle id sends at once; keys typed while in flight coalesce in order', async () => {

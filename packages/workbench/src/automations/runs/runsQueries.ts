@@ -48,7 +48,6 @@ export function useScriptRuns() {
         mirrorRuns(list);
         return list;
       },
-      staleTime: Number.POSITIVE_INFINITY,
     },
     queryClient,
   );
@@ -68,7 +67,6 @@ export function useTaskScriptRuns(taskId: MaybeRefOrGetter<string>) {
       queryKey: computed(key),
       queryFn: () => runs.list(LIST_LIMIT, toValue(taskId)),
       enabled: computed(() => toValue(taskId) !== ''),
-      staleTime: Number.POSITIVE_INFINITY,
     },
     queryClient,
   );
@@ -143,7 +141,6 @@ export function useRunLog(id: MaybeRefOrGetter<string>) {
     {
       queryKey: computed(key),
       queryFn: () => runs.readLog(toValue(id), 0),
-      staleTime: Number.POSITIVE_INFINITY,
     },
     queryClient,
   );

@@ -8,6 +8,9 @@ import { Field, FieldError, FieldLabel } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
 import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
+import QueryState from '@workbench/components/QueryState.vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, watch } from 'vue';
 import { errorText } from '../../bridge/codedError';
@@ -27,7 +30,7 @@ const ctx = useAutomationsModule();
 const script = computed(() => ctx.scripts.records().find((s) => s.id === props.scriptId) ?? null);
 const secretParams = computed(() => (script.value?.params ?? []).filter((p) => p.secret));
 const secrets = ref<Record<string, string[]>>({});
-const debounced = refDebounced(secrets, 250);
+const debounced = refDebounced(secrets, TIMING.preview);
 
 // Secret values stay out of the query key; a change refetches by hand.
 const preview = useQuery(
@@ -36,7 +39,6 @@ const preview = useQuery(
     queryFn: () => ctx.runs.schedulePreview(props.scriptId, secrets.value),
     staleTime: 0,
     gcTime: 0,
-    retry: false,
   },
   queryClient,
 );
@@ -115,16 +117,13 @@ function run(): void {
   error.value = null;
   accept.mutate();
 }
+
+useShortcut(window, ['form.submit'], run);
 </script>
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent
-      size="lg"
-      data-testid="schedule-confirm"
-      @keydown.meta.enter.prevent="run"
-      @keydown.ctrl.enter.prevent="run"
-    >
+    <DialogContent size="lg" data-testid="schedule-confirm">
       <DialogHeader close-testid="schedule-confirm-close">
         <DialogTitle>Run {{ script?.name ?? 'script' }}?</DialogTitle>
         <SmartBadge v-if="script?.kind === 'smart'" />
@@ -147,10 +146,17 @@ function run(): void {
             <div class="font-data text-kira-sm text-muted-foreground">{{ pv.suffix }}</div>
           </Field>
           <ParamsForm v-if="secretParams.length > 0" v-model="secrets" :params="secretParams" />
-          <RunPreview v-if="pv" :preview="pv" />
-          <Alert v-if="preview.isError.value" variant="error" data-testid="schedule-confirm-preview-error">
-            <AlertDescription>{{ preview.error.value?.message }}</AlertDescription>
-          </Alert>
+          <QueryState :query="preview" variant="inline" :is-empty="() => false">
+            <template #loading />
+            <template #error="{ message }">
+              <Alert variant="error" data-testid="schedule-confirm-preview-error">
+                <AlertDescription>{{ message }}</AlertDescription>
+              </Alert>
+            </template>
+            <template #default="{ data }">
+              <RunPreview :preview="data" />
+            </template>
+          </QueryState>
           <FieldError v-if="pv && pv.missing.length > 0" data-testid="schedule-confirm-missing">
             Fill in: {{ pv.missing.join(', ') }}
           </FieldError>

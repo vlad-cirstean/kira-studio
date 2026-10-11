@@ -18,7 +18,9 @@ const props = defineProps<{
 const switchId = useId();
 
 function onSendTest(): void {
-  void props.sendTest().catch(() => undefined);
+  props.sendTest().catch(() => {
+    // A failed test notification has no UI to report to; the permission state shows the cause.
+  });
 }
 </script>
 

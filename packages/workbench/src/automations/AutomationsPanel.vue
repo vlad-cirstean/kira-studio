@@ -12,8 +12,10 @@ import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
-import { useEventListener, useLocalStorage } from '@vueuse/core';
+import { useEventListener } from '@vueuse/core';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -65,7 +67,7 @@ interface ScriptGroup {
 }
 
 function matches(script: CustomScript, q: string): boolean {
-  return script.name.toLowerCase().includes(q) || script.command.toLowerCase().includes(q);
+  return matchesQuery(script.name, q) || matchesQuery(script.command, q);
 }
 
 // §11.1: panel search filters rows by name and command; a collection shows when its name matches
@@ -80,26 +82,17 @@ const view = computed(() => {
   const groups: ScriptGroup[] = [];
   for (const collection of scripts.collections()) {
     const own = records.filter((s) => s.collectionId === collection.id);
-    const nameHit = q !== '' && collection.name.toLowerCase().includes(q);
+    const nameHit = q !== '' && matchesQuery(collection.name, q);
     const rows = q === '' || nameHit ? own : own.filter((s) => matches(s, q));
     if (q === '' || nameHit || rows.length > 0) groups.push({ collection, rows });
   }
   return { ungrouped, groups };
 });
 
-// Renamed from kira.quickCommands.collapsedCollections: copy the old value once.
-const COLLAPSED_KEY = 'kira.automations.collapsedCollections';
-const LEGACY_COLLAPSED_KEY = 'kira.quickCommands.collapsedCollections';
-try {
-  const legacy = localStorage.getItem(LEGACY_COLLAPSED_KEY);
-  if (legacy !== null && localStorage.getItem(COLLAPSED_KEY) === null) {
-    localStorage.setItem(COLLAPSED_KEY, legacy);
-  }
-  localStorage.removeItem(LEGACY_COLLAPSED_KEY);
-} catch {
-  // storage unavailable: start with nothing collapsed
-}
-const collapsed = useLocalStorage<string[]>(COLLAPSED_KEY, []);
+// Renamed from kira.quickCommands.collapsedCollections: the old value is copied once.
+const collapsed = usePersistedState<string[]>('kira.automations.collapsedCollections', [], {
+  migrateFrom: 'kira.quickCommands.collapsedCollections',
+});
 
 // A search shows every matching row, collapsed or not.
 function isOpen(id: string): boolean {

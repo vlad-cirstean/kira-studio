@@ -6,7 +6,7 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { cn } from '@theme/lib/utils';
-import { useLocalStorage } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import { computed, ref } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -20,7 +20,7 @@ const emit = defineEmits<{ rerun: [run: ScriptRun] }>();
 const ctx = useAutomationsModule();
 
 type Filter = 'all' | 'running' | 'failed';
-const open = useLocalStorage('kira.automations.runsOpen', true);
+const open = usePersistedState('kira.automations.runsOpen', true);
 const filter = ref<Filter>('all');
 const FILTER_ITEMS = [
   { value: 'all', label: 'All', testid: 'runs-filter-all' },

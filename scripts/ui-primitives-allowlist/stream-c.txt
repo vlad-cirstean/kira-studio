@@ -3,6 +3,7 @@
 permanent U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 permanent U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
 permanent U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording is domain text, not a display format
+permanent U41 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup reads modifiers for its own accept keys
 permanent U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
 permanent U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
 permanent U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
@@ -11,26 +12,3 @@ permanent U47 packages/git-ui/src/components/SearchResults.vue # listbox of the 
 permanent U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
 permanent U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
 permanent U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
-packages/workbench/src/automations/AutomationsPanel.vue
-packages/workbench/src/automations/ScriptDialog.vue
-packages/workbench/src/automations/run/RunScriptDialog.vue
-packages/workbench/src/automations/runs/RunElapsed.vue
-packages/workbench/src/automations/runs/RunLog.vue
-packages/workbench/src/automations/runs/RunOutcomeBlock.vue
-packages/workbench/src/automations/runs/RunsSection.vue
-packages/workbench/src/automations/runs/RunsStatusItem.vue
-packages/workbench/src/automations/runs/runText.ts
-packages/workbench/src/automations/runs/runsQueries.ts
-packages/workbench/src/automations/schedule/ScheduleConfirmDialog.vue
-packages/workbench/src/automations/schedule/ScheduleFields.vue
-packages/workbench/src/automations/schedule/scheduleQueries.ts
-packages/workbench/src/automations/smart/McpServerTools.vue
-packages/workbench/src/automations/smart/McpToolsField.vue
-packages/workbench/src/components/AutocompleteField.vue
-packages/workbench/src/components/TabStrip.vue
-packages/workbench/src/prompts/PromptHost.vue
-packages/workbench/src/prompts/promptsQueries.ts
-packages/workbench/src/settings/fields/NotifyPromptsField.vue
-packages/workbench/src/state/createAppUpdateStore.ts
-packages/workbench/src/state/createTabsStore.ts
-packages/workbench/src/state/orderedWrites.spec.ts

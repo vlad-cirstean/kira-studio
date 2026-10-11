@@ -19,17 +19,6 @@ export function costText(usd: number): string {
   return `${usd.toFixed(2)} USD`;
 }
 
-/** "12s", "2m 03s", "1h 02m". */
-export function formatElapsed(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
-  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
-  return `${s}s`;
-}
-
 /** Elapsed for a run at `now`: live while running, fixed once finished. */
 export function runElapsedMs(run: ScriptRun, now: number): number | null {
   const start = run.startedAt ?? run.createdAt;
