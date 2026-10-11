@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { FieldError } from '@theme/components/ui/field';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { stageMoves } from '../board/stageMoves';
 import type { CardModel } from '../plan/usePlanModel';
@@ -34,7 +35,7 @@ async function move(stageId: string): Promise<void> {
   try {
     await setStage.mutateAsync({ taskId: props.card.task.id, stageId });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 </script>

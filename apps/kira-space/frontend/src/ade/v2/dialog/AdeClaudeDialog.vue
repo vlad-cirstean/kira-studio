@@ -8,6 +8,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { FieldLabel } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import AdeBasePicker from '../AdeBasePicker.vue';
@@ -53,7 +54,7 @@ const view = computed(() => {
 
 const previewError = computed(() => {
   const e = preview.error.value;
-  return e ? (e instanceof Error ? e.message : String(e)) : '';
+  return e ? (errorText(e)) : '';
 });
 
 // Change base: the branch being rebased, for the picker's repo and the base it shows now.

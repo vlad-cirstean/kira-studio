@@ -1,5 +1,6 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript } from '@shared/domain/scripts';
+import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
 import { type RunDialogRequest, useScriptRunDialogStore } from './run/runDialog';
 import { isBuiltinVar, varsUsed } from './smart/smartSettings';
@@ -27,7 +28,7 @@ export function useRunScript(): (
     try {
       dir = await ctx.runs.resolveDir(script.id);
     } catch (err) {
-      return err instanceof Error ? err.message : String(err);
+      return errorText(err);
     }
     if (dir.blocker !== '') return dir.blocker;
     ctx.openTerminalTab({

@@ -1,5 +1,6 @@
 import type { BaseResolution, CommitRange } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { DetailState } from './detail.ts';
@@ -333,7 +334,7 @@ export class ReviewSessionState {
       if (error instanceof TransportError && error.code === 'cancelled') return;
       if (!stillCurrent()) return;
       this.phase.value = 'error';
-      this.resolveError.value = error instanceof Error ? error.message : String(error);
+      this.resolveError.value = errorText(error);
     } finally {
       if (this.#resolveController === controller) this.#resolveController = undefined;
     }
@@ -416,7 +417,7 @@ export class ReviewSessionState {
   #failStream(repoId: string, branch: string, base: string, error: unknown): void {
     if (this.repoId.value !== repoId || this.branch.value !== branch || this.#base !== base) return;
     this.phase.value = 'error';
-    this.resolveError.value = error instanceof Error ? error.message : String(error);
+    this.resolveError.value = errorText(error);
   }
 
   async #checkForChange(): Promise<void> {

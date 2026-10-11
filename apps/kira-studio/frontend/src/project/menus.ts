@@ -1,9 +1,9 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { AWS_STYLE_KINDS, CONNECTION_COLOR_CHOICES, FILE_KINDS } from '@shared/domain/connection';
 import { formatConnectionUri } from '@shared/domain/uri';
+import { copyText } from '@workbench/behaviour/clipboard';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
 import { control } from '../bridge/control';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import { useConsoleDefaultsStore } from '../state/consoleDefaults';

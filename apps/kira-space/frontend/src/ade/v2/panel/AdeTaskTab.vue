@@ -5,6 +5,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
@@ -47,7 +48,7 @@ async function write(patch: Partial<TaskPatch>): Promise<boolean> {
     await update.mutateAsync({ taskId: task.value.id, patch: taskPatch(patch) });
     return true;
   } catch (err) {
-    fieldError.value = err instanceof Error ? err.message : String(err);
+    fieldError.value = errorText(err);
     return false;
   }
 }
@@ -86,7 +87,7 @@ async function saveEst(value: string): Promise<void> {
   try {
     await update.mutateAsync({ taskId: task.value.id, patch: taskPatch({ est: value }) });
   } catch (err) {
-    estError.value = err instanceof Error ? err.message : String(err);
+    estError.value = errorText(err);
   }
 }
 const spanDays = computed(() => props.card.entry.span);
@@ -105,7 +106,7 @@ async function onAddRepo(value: unknown): Promise<void> {
   try {
     await addRepo.mutateAsync({ taskId: task.value.id, codeRepoId: id, base: null });
   } catch (err) {
-    fieldError.value = err instanceof Error ? err.message : String(err);
+    fieldError.value = errorText(err);
   }
 }
 

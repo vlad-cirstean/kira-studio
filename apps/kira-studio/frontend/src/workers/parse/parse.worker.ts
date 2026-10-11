@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { handlers } from './handlers';
 import type { JobKind, WorkerRequest, WorkerResponse } from './protocol';
 
@@ -13,6 +14,6 @@ ctx.addEventListener('message', async (e) => {
     const run = handlers[kind as JobKind] as (i: unknown) => unknown;
     ctx.postMessage({ id, ok: true, output: await run(input) });
   } catch (err) {
-    ctx.postMessage({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
+    ctx.postMessage({ id, ok: false, error: errorText(err) });
   }
 });

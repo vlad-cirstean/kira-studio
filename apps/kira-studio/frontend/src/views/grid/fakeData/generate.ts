@@ -1,5 +1,6 @@
 import type { Caps } from '@shared/caps';
 import type { MutationRowOp } from '@shared/domain/mutations';
+import { errorText } from '@workbench/bridge/codedError';
 import { data } from '../../../bridge/data';
 import type { SqlDialect } from '../../shared/sqlIdent';
 import { parseTypeBounds, type TypeBounds } from './typeBounds';
@@ -343,7 +344,7 @@ export async function runGeneration(args: RunGenerationArgs): Promise<void> {
       });
     } catch (err) {
       const code = (err as { code?: string } | undefined)?.code ?? 'E_QUERY';
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorText(err);
       throw new GenerationError(message, code, committed);
     }
     committed += count;

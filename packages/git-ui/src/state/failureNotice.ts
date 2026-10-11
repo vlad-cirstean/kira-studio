@@ -1,4 +1,5 @@
 import type { OpErrorKind } from '@kira/git-ipc';
+import { errorText } from '@workbench/bridge/codedError';
 import { composeOpFailureParts, type OpFailureError } from './liveAnnouncements.ts';
 
 export interface FailureNotice {
@@ -43,7 +44,7 @@ export function composeFailureNotice(
 /** A rejected fire-and-forget call outside the op executors: no hint beyond "Try again", and never
  *  in the Operations log. */
 export function composeAsyncFailureNotice(prefix: string, error: unknown): FailureNotice {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorText(error);
   const { detail } = composeOpFailureParts(prefix, { kind: 'Unknown', message });
   return { title: `${prefix}.`, detail, hint: DEFAULT_HINT, logged: false, retryGraph: false };
 }

@@ -1,4 +1,4 @@
-import { TransportError } from '@kira/git-ipc';
+import { errorText } from '../bridge/codedError';
 
 export type LatestRequestOutcome<T> =
   | { readonly status: 'ok'; readonly value: T }
@@ -15,7 +15,7 @@ export type LatestRequestOutcome<T> =
  * for the "cancel with nothing new to show" case (closing the pane, disposing the state) where no
  * replacement request follows.
  */
-export function createLatestRequest<T>(): {
+export function createLatestRequest<T>(isCancelled: (error: unknown) => boolean = () => false): {
   run(
     request: (signal: AbortSignal) => Promise<T>,
     isStillCurrent: () => boolean,
@@ -34,10 +34,9 @@ export function createLatestRequest<T>(): {
         if (controller !== own || !isStillCurrent()) return { status: 'stale' };
         return { status: 'ok', value };
       } catch (error) {
-        if (error instanceof TransportError && error.code === 'cancelled')
-          return { status: 'stale' };
+        if (isCancelled(error)) return { status: 'stale' };
         if (controller !== own || !isStillCurrent()) return { status: 'stale' };
-        return { status: 'error', message: error instanceof Error ? error.message : String(error) };
+        return { status: 'error', message: errorText(error) };
       } finally {
         if (controller === own) controller = undefined;
       }

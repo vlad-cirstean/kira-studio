@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
+import { errorText } from '@workbench/bridge/codedError';
 import { ref, watch } from 'vue';
 import { newIntentKey, useAdeWrites } from '../state/useAdeWrites';
 
@@ -42,7 +43,7 @@ async function send(): Promise<void> {
     await writes.sendReply.mutateAsync({ sessionId: props.sessionId, message: text, key });
     emit('close');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 </script>

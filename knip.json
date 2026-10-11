@@ -20,7 +20,7 @@
     // (lib/utils.ts/components/ui/**/theme/primitives/*) resolves fine without the ignore.
     "tw-animate-css"
     // @tanstack/vue-virtual dropped (P104 A-final, §3.4/§7.3/§8.3): VirtualList/TreeHost's own
-    // Stream A conversion (util/virtualRows.ts, util/treeVirtualRows.ts) now imports it for real —
+    // Stream A conversion (behaviour/virtualRows.ts, behaviour/treeVirtualRows.ts) now imports it for real —
     // knip resolves that usage fine without the ignore.
   ],
   "workspaces": {
@@ -67,7 +67,7 @@
     },
     "packages/workbench": {
       // Same alias-boundary reasoning as packages/theme above (`@workbench/*`, P103 Part 1) —
-      // every file here is its own entry. `formatBytes` (util/format.ts) and `runMenuShortcut`
+      // every file here is its own entry. `formatBytes` (behaviour/format.ts) and `runMenuShortcut`
       // (state/contextMenu.ts) each have exactly one real consumer today (Kira Studio only) — an
       // expected, not-a-finding shape per the plan's own §9 gate, not an unused export.
       "entry": ["src/**/*.{ts,vue}"],

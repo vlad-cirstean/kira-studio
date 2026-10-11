@@ -8,6 +8,7 @@ import type {
   VariableScope,
 } from '@shared/domain/variables';
 import { useMutation, useQuery } from '@tanstack/vue-query';
+import { errorText } from '@workbench/bridge/codedError';
 import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
@@ -109,7 +110,7 @@ export const useVariablesStore = defineStore('variables', () => {
       state.error = null;
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return false;
     }
   }
@@ -183,7 +184,7 @@ export const useVariablesStore = defineStore('variables', () => {
       state.error = null;
       return env;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return undefined;
     }
   }
@@ -212,7 +213,7 @@ export const useVariablesStore = defineStore('variables', () => {
       renameVariableSetTabs('environment', id, name);
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -237,7 +238,7 @@ export const useVariablesStore = defineStore('variables', () => {
       closeVariableSetTabsForOwner('environment', id);
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -257,7 +258,7 @@ export const useVariablesStore = defineStore('variables', () => {
       state.error = null;
       return env;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return undefined;
     }
   }
@@ -287,7 +288,7 @@ export const useVariablesStore = defineStore('variables', () => {
       state.error = null;
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return false;
     }
   }
@@ -542,7 +543,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       setVariableSetError(tabId, null);
       return true;
     } catch (err) {
-      setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+      setVariableSetError(tabId, errorText(err));
       return false;
     }
   }
@@ -567,7 +568,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       await deleteVariableMutation.mutateAsync({ scope, ownerId, id });
       setVariableSetError(tabId, null);
     } catch (err) {
-      setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+      setVariableSetError(tabId, errorText(err));
     }
   }
 
@@ -593,7 +594,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       setVariableSetError(tabId, null);
       return true;
     } catch (err) {
-      setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+      setVariableSetError(tabId, errorText(err));
       return false;
     }
   }
@@ -749,7 +750,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       }
     } catch (err) {
       if (historyMenuState.variableId === variableId) {
-        setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+        setVariableSetError(tabId, errorText(err));
       }
     }
   }

@@ -9,6 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Toggle } from '@theme/components/ui/toggle';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { useRepoLinksStore } from '../../repo/state/repoLinks';
 import { useRepos } from '../../repo/state/reposQueries';
@@ -97,7 +98,7 @@ async function addNew(): Promise<void> {
     bases.value = {};
     open.value = false;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 
@@ -124,7 +125,7 @@ async function pick(b: CandidateBranch): Promise<void> {
     ui.select(res.task.id);
     open.value = false;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 </script>

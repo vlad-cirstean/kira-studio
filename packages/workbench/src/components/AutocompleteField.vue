@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computeFloatPosition, pointReference } from '@kira/kira-ui';
 import type { EditorLanguageId } from '@shared/domain/editor';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
@@ -6,7 +7,6 @@ import { InputGroup } from '@theme/components/ui/input-group';
 import { autoClosePairsOnType, wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { loadMonaco, type MonacoModule } from '@workbench/editor/monaco';
-import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { AutocompleteRoot, ComboboxAnchor, ComboboxContent, ComboboxItem, ComboboxPortal, ComboboxViewport } from 'reka-ui';
 import { computed, type HTMLAttributes, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../editor/fieldCompletion';
@@ -422,6 +422,8 @@ function closeHover(): void {
   lastHoverKey = null;
 }
 
+const FLOAT_MAX_VAR_PREFIX = '--kira-float-max-';
+
 async function openHoverAt(x: number, y: number, lines: string[]): Promise<void> {
   hoverLines.value = lines;
   await nextTick();
@@ -429,6 +431,7 @@ async function openHoverAt(x: number, y: number, lines: string[]): Promise<void>
   if (!panel) return;
   const { left, top } = await computeFloatPosition(pointReference(x, y), panel, {
     placement: 'bottom-start',
+    maxVarPrefix: FLOAT_MAX_VAR_PREFIX,
   });
   hoverStyle.value = { left: `${left}px`, top: `${top}px` };
 }

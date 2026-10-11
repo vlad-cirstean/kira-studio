@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
+import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -76,7 +77,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
   try {
     await update.mutateAsync({ taskId, patch: taskPatch({ notes: value }) });
   } catch (err) {
-    notesError.value = err instanceof Error ? err.message : String(err);
+    notesError.value = errorText(err);
   }
 }
 </script>

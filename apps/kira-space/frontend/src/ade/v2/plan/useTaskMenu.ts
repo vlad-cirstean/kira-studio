@@ -1,4 +1,5 @@
 import { useClipboard } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { type MaybeRefOrGetter, toValue } from 'vue';
 import { control } from '../../../bridge/control';
@@ -46,7 +47,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
 
   function fail(taskId: string, err: unknown): void {
     ui.select(taskId);
-    ui.actionError[taskId] = err instanceof Error ? err.message : String(err);
+    ui.actionError[taskId] = errorText(err);
   }
 
   async function run(cmd: TaskMenuCmd): Promise<void> {

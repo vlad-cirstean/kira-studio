@@ -1,5 +1,6 @@
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { ObjectMeta } from '@shared/domain/tree';
+import { errorText } from '@workbench/bridge/codedError';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
@@ -69,7 +70,7 @@ export const useDefinitionViewStore = defineStore('definitionView', () => {
       // flips when a connection dies (§0 note 14), so the disconnected case corrects itself here.
       const err = definitionResult.reason;
       rt.status = 'error';
-      rt.error = err instanceof Error ? err.message : String(err);
+      rt.error = errorText(err);
       return;
     }
     rt.definition = definitionResult.value.definition;

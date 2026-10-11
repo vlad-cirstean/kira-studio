@@ -3,7 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
-import { copyOrReportError } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';

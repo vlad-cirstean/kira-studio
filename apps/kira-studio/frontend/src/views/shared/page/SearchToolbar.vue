@@ -2,6 +2,7 @@
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
@@ -123,7 +124,7 @@ function startSearch(autoScroll = true): void {
     );
   } catch (err) {
     // An invalid regex is reported inline, never thrown into an unhandled rejection (D28).
-    errorMessage.value = err instanceof Error ? err.message : String(err);
+    errorMessage.value = errorText(err);
     scanning.value = false;
     return;
   }

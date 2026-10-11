@@ -38,8 +38,10 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import { useLiveRegion } from '@workbench/behaviour/liveRegion';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
@@ -54,7 +56,6 @@ import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
 import { buildRefListSections } from '../refListModel.ts';
-import { useLiveRegion } from '../useLiveRegion.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';
@@ -110,7 +111,7 @@ const { text: liveAnnouncement, announce } = useLiveRegion();
 
 function reportAsyncError(err: unknown, prefix: string): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  announce(`${prefix} — ${err instanceof Error ? err.message : String(err)}`);
+  announce(`${prefix} — ${errorText(err)}`);
 }
 
 async function applyTarget(
@@ -441,7 +442,7 @@ onMounted(() => {
     performance.measure('kira:first-paint', undefined, 'kira:first-paint');
   });
   void bootstrap().catch((err: unknown) => {
-    bootError.value = err instanceof Error ? err.message : String(err);
+    bootError.value = errorText(err);
   });
 });
 

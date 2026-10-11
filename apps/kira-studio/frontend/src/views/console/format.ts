@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { splitSqlStatements } from '@shared/domain/sql-split';
+import { errorText } from '@workbench/bridge/codedError';
 import { beautifyShellText } from '../shared/document/ejson';
 import { hashCommentsFor, lexOptionsFor, sqlDialectFor } from '../shared/sqlIdent';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
@@ -212,7 +213,7 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
           text: mod.formatDialect(stmtText, { dialect: sqlDialectObject, ...SQL_FORMAT_OPTIONS }),
         };
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorText(err);
         return { reason: firstLine(message) };
       }
     };

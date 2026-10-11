@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { errorText } from '@workbench/bridge/codedError';
 /**
  * `docs/plans/P4.md` W11: the real shell. P0 sketched two empty regions and P3 hung a live-data
  * strip on them "replaced by P4's real list and toolbar" (that comment's own words) — this file
@@ -23,6 +24,7 @@ import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { onClickOutside, useEventListener, useResizeObserver } from '@vueuse/core';
+import { useLiveRegion } from '@workbench/behaviour/liveRegion';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -70,7 +72,6 @@ import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
-import { useLiveRegion } from './components/useLiveRegion.ts';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { useGraphVisible } from './graphVisibility.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
@@ -275,7 +276,7 @@ const { text: liveAnnouncement, announce } = useLiveRegion();
  *  lands, so there is nothing left to announce it to. */
 function reportAsyncError(err: unknown, prefix: string): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  announce(`${prefix} — ${err instanceof Error ? err.message : String(err)}`);
+  announce(`${prefix} — ${errorText(err)}`);
   // A cancel announces but never raises the banner; a graph stream failure already has its own
   // (with Retry) that this generic one would replace.
   if (err instanceof TransportError && err.code === 'cancelled') return;
@@ -1186,7 +1187,7 @@ onMounted(() => {
   // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
   // it, once, the first time that happens; nothing here needs to know when that is.
   void bootstrap().then(onBootstrapSuccess).catch((err: unknown) => {
-    bootError.value = err instanceof Error ? err.message : String(err);
+    bootError.value = errorText(err);
   });
 });
 

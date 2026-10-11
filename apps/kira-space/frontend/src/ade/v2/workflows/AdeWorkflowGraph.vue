@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { errorText } from '@workbench/bridge/codedError';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -77,7 +78,7 @@ async function saveNow(): Promise<void> {
     });
     draft.saved(sent, entry.hash);
   } catch (err) {
-    draft.error = err instanceof Error ? err.message : String(err);
+    draft.error = errorText(err);
     draft.conflict = (err as { code?: string }).code === 'E_CONFLICT';
   }
 }

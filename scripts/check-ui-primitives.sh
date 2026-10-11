@@ -107,7 +107,7 @@ U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
 U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
 U25 packages/workbench/src/automations/runs/RunLog.vue # stderr line colour is log data, not chrome
 U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
-U36 packages/workbench/src/components/InlineRenameInput.vue # bare rename input, not a card
+U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not
@@ -154,7 +154,7 @@ U31@@v@@@@hand-written resize cursor or handle look, or a separator without resi
 U32@@v@@@@scrollbar styling in a component (use scrollbar-none, base.css)@@\[scrollbar-|${TOK}scrollbar-(?!none(?![\w-]))[\w-]+|::-webkit-scrollbar
 U33@@v@@@@keyboard hint text (use Kbd)@@Cmd/Ctrl|\(\{\{\s*formatShortcut
 U34@@vt@@monacoTheme.ts|ansi.ts|/setiFileIcon|/ade/v2/palette.ts@@colour literal in app code (use tokens)@@(?:["'\`\[(]|:\s*)#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|(?=[0-9]*[a-fA-F])[0-9a-fA-F]{3,4}|(?<d>\d)\k<d>\k<d>\k<d>?)\b|${TOK}(?:bg|text|border)-(?:black|white)(?![\w-])
-U35@@v@@CommitGrid.vue|/git-ui/src/App.vue|AdeNotesEditor.vue|ReviewThread.vue|AutocompleteField.vue|InlineRenameInput.vue@@outline-none, border-focus, not-allowed cursor or odd disabled opacity (one focus and disabled recipe)@@${TOK}outline-(?:none|hidden|0)(?![\w-])|focus:outline|focus-visible:outline-|${TOK}focus(?:-visible|-within)?:border-focus|${TOK}cursor-not-allowed|${TOK}disabled:opacity-(?!50(?![\w-]))|data-\[off\]
+U35@@v@@CommitGrid.vue|/git-ui/src/App.vue|AdeNotesEditor.vue|ReviewThread.vue|AutocompleteField.vue|InlineEditInput.vue@@outline-none, border-focus, not-allowed cursor or odd disabled opacity (one focus and disabled recipe)@@${TOK}outline-(?:none|hidden|0)(?![\w-])|focus:outline|focus-visible:outline-|${TOK}focus(?:-visible|-within)?:border-focus|${TOK}cursor-not-allowed|${TOK}disabled:opacity-(?!50(?![\w-]))|data-\[off\]
 U36@@v@@@@hand-rolled box (use Card)@@\bclass="(?=[^"]*${TOK}rounded-kira(?:-sm|-lg)?(?![\w-]))(?=[^"]*${TOK}border(?![\w-]))(?=[^"]*${TOK}(?:p|px|py)-)
 U37@@vt@@createSettingsStore.ts@@raw table markup, density formula, or hand-rolled row state (use Table, useRowHeight, rowVariants)@@<(?:table|thead|tbody|tr|th|td)\b|rowDensity\s*===|${TOK}(?:hover:)?bg-(?:select|hover)(?![\w-])
 U38@@v@@@@scale leftovers: text-kira-xs, stock text size/radius, text-[Npx], raw h-5..h-12@@${TOK}text-kira-xs(?![\w-])|${TOK}text-(?:xs|sm|base|lg|xl|2xl)(?![\w-])|${TOK}text-\[\d|${TOK}rounded(?:-md|-lg|-xl)?(?![\w-])|${TOK}h-(?:5|6|7|8|9|10|12)(?![\w.-])

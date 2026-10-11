@@ -1,5 +1,5 @@
+import { copyText } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
 import { openRepoDiffTab, openRepoFileTab } from '../state/repoTabs';
 import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
 

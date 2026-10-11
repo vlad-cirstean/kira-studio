@@ -2,6 +2,7 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import { useAgentSessionsStore } from '../../state/agentSessions';
@@ -67,7 +68,7 @@ async function start(): Promise<void> {
       setupWait.start();
     } else {
       setupWait.stop();
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = errorText(err);
     }
   } finally {
     await agent.refetch();

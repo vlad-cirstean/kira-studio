@@ -11,8 +11,8 @@ import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/compone
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { computed, nextTick, ref } from 'vue';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../util/virtualRows';
 import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from './opLog';
 
 // P132 Part 1 (§2.3): hoisted from Kira Studio's own workbench/panels/OperationsPanel.vue —

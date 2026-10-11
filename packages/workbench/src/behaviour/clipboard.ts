@@ -1,3 +1,4 @@
+import { errorText } from '../bridge/codedError';
 // Extracted from what used to be three separate copy-paste-identical definitions
 // (project/menus.ts, TabStrip.vue) — a fourth and fifth (grid, ops panel) made a shared module
 // worth having (P6 realities #3).
@@ -29,7 +30,7 @@ export async function copyOrReportError(
     await copyText(text);
     onSuccess?.();
   } catch (err) {
-    onError(err instanceof Error ? err.message : String(err));
+    onError(errorText(err));
   }
 }
 
@@ -52,6 +53,6 @@ export async function copyOrReportErrorLazy(
     }
     onSuccess?.();
   } catch (err) {
-    onError(err instanceof Error ? err.message : String(err));
+    onError(errorText(err));
   }
 }

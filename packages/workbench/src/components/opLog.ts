@@ -1,6 +1,6 @@
 import type { OpLogRecord } from '@shared/domain/ops';
+import { copyText } from '../behaviour/clipboard';
 import type { MenuItem } from '../state/contextMenu';
-import { copyText } from '../util/clipboard';
 
 // P132 Part 1 (§2.3): OpLogPanel.vue's own column contract — `columns` is a plain prop array
 // rather than a slot-per-column scheme, so a consumer states its own column set (order + width)

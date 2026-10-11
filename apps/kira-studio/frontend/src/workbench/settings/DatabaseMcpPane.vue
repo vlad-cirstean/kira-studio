@@ -5,7 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
-import { useBusyAction } from '@workbench/util/useBusyAction';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, useId } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
@@ -35,13 +35,13 @@ function tokenExpired(expiresAt: string): boolean {
 }
 
 const { error: actionError, guard } = useActionError();
-const { busy: dbMcpToggling, run: onToggleDbMcpEnabled } = useBusyAction(
+const { pending: dbMcpToggling, run: onToggleDbMcpEnabled } = useAsyncAction(
   guard((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled)),
 );
-const { busy: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useBusyAction(
+const { pending: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useAsyncAction(
   guard(() => dbMcpStore.regenerateDbMcpToken()),
 );
-const { busy: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useBusyAction(
+const { pending: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useAsyncAction(
   guard(() => dbMcpStore.installDbMcpClaudeCode()),
 );
 

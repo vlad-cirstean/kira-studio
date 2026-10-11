@@ -2,7 +2,7 @@
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { cn } from '@theme/lib/utils';
-import { copyText } from '@workbench/util/clipboard';
+import { copyText } from '@workbench/behaviour/clipboard';
 import { reactive } from 'vue';
 import type { DockerContainerDetail } from '../wire';
 import DetailSection from './DetailSection.vue';

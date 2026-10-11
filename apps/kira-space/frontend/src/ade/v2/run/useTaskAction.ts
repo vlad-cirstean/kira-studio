@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, type MaybeRefOrGetter, ref, toValue } from 'vue';
 import type { TaskAction } from '../board/actions';
 import type { CardModel } from '../plan/usePlanModel';
@@ -44,7 +45,7 @@ export function useTaskAction(card: MaybeRefOrGetter<CardModel>) {
         await done.mutateAsync({ taskId });
       }
     } catch (err) {
-      ui.actionError[taskId] = err instanceof Error ? err.message : String(err);
+      ui.actionError[taskId] = errorText(err);
       ui.select(taskId);
     }
   }

@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
+import { errorText } from '@workbench/bridge/codedError';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
 import { onMounted, ref } from 'vue';
@@ -39,7 +40,7 @@ async function attempt(action: () => Promise<void>): Promise<void> {
   try {
     await action();
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+    error.value = errorText(e);
   }
 }
 

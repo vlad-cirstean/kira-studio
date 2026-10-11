@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import type { BridgeClient } from '../bridge/client.ts';
 
 export interface ClipboardOutcome {
@@ -27,7 +28,7 @@ export async function copyToClipboard(
     return { ok: true, message: `Copied ${whatCopied}` };
   } catch (error) {
     console.error(`clipboard.write failed (${whatCopied}):`, error);
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = errorText(error);
     return { ok: false, message: `Couldn't copy — ${reason}` };
   }
 }

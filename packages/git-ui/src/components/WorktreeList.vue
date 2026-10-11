@@ -30,11 +30,12 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
 import { type PickerList, worktreeLabel } from './pickerModel.ts';
-import ShowMoreButton from './ShowMoreButton.vue';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 
 const props = defineProps<{
   section: PickerList<WorktreeEntry>;
@@ -154,7 +155,7 @@ async function confirmRemove(): Promise<void> {
         @click="requestRemove(entry)"
       />
     </div>
-    <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
+    <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No worktrees</div>
 
     <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's

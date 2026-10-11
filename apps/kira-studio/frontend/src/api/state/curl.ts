@@ -7,7 +7,7 @@ import {
   toCurl,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
-import { copyOrReportError } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';

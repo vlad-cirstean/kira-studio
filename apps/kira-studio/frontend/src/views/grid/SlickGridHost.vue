@@ -10,9 +10,10 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
+import { copyText } from '@workbench/behaviour/clipboard';
+import { errorText } from '@workbench/bridge/codedError';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
 import { useRowHeight } from '@workbench/util/rowHeight';
 import type {
   Column,
@@ -657,7 +658,7 @@ function refreshMaskTagsAndRerender(): void {
     },
     (err: unknown) => {
       gridViewStore.setMaskPreview(props.tabId, false);
-      gridViewStore.setActionError(props.tabId, err instanceof Error ? err.message : String(err));
+      gridViewStore.setActionError(props.tabId, errorText(err));
       if (!grid || !dataSource) return;
       dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
       grid.invalidateAllRows();
@@ -2456,7 +2457,7 @@ watch(
       // turning preview ON), and reassigning this watch's own `rt().maskPreview` dependency to the
       // same false-vs-already-false value it may already hold means this fires at most once more.
       gridViewStore.setMaskPreview(props.tabId, false);
-      gridViewStore.setActionError(props.tabId, err instanceof Error ? err.message : String(err));
+      gridViewStore.setActionError(props.tabId, errorText(err));
     }
     if (!grid || !dataSource) return;
     const p = getPage(props.tabId);

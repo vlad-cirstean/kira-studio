@@ -15,12 +15,13 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { errorText } from '@workbench/bridge/codedError';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -342,7 +343,7 @@ async function commitCreate(): Promise<void> {
     creatingNew.value = false;
     newBuffer.reseed();
   } catch (err) {
-    documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    documentViewStore.setActionError(props.tab.id, errorText(err));
   } finally {
     saving.value = false;
   }
@@ -639,7 +640,7 @@ async function commitEdit(): Promise<void> {
     editingRow.value = null;
     editingId.value = null;
   } catch (err) {
-    documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    documentViewStore.setActionError(props.tab.id, errorText(err));
   } finally {
     saving.value = false;
   }
@@ -670,7 +671,7 @@ async function onDeleteRow(id: string): Promise<void> {
   deleteDocument(props.tab.id, id)
     .then(() => documentViewStore.setActionError(props.tab.id, null))
     .catch((err: unknown) => {
-      documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+      documentViewStore.setActionError(props.tab.id, errorText(err));
     });
 }
 

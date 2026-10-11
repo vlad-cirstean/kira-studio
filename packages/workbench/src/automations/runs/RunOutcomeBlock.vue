@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { Button } from '@theme/components/ui/button';
-import { copyOrReportError } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { ref } from 'vue';
 import { costText, runReportText } from './runText';
 

@@ -1,5 +1,6 @@
 import type { FileStatusCode } from '@shared/domain/repo';
 import type { StickyRowLike } from '@theme/stickyBand';
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
@@ -193,7 +194,7 @@ export const useFileTreeStore = defineStore('fileTree', () => {
       state.loaded = true;
     } catch (err) {
       if (latestRefresh.get(repoId) !== seq) return;
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     } finally {
       if (latestRefresh.get(repoId) === seq) state.loading = false;
     }

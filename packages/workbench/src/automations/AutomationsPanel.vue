@@ -13,15 +13,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import { useEventListener, useLocalStorage } from '@vueuse/core';
-import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
+import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
+import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { moveToCollectionMenu } from '@workbench/util/collectionMenu';
-import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
+import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
 import { useRerun, useRunScript } from './runScript';
 import RunElapsed from './runs/RunElapsed.vue';
@@ -122,7 +123,7 @@ async function guarded(fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : String(err);
+    actionError.value = errorText(err);
   }
 }
 
@@ -424,7 +425,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   @toggle="toggleGroup(group.collection.id)"
                 />
                 <CodiconIcon name="folder-library" :size="13" class="shrink-0 text-muted-foreground" />
-                <InlineRenameInput
+                <InlineEditInput
                   v-if="renamingId === group.collection.id"
                   :name="group.collection.name"
                   data-testid="script-collection-rename-input"

@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, ref, watch } from 'vue';
 
 /** A text field that commits on blur or Enter. While it holds uncommitted edits a push never
@@ -32,7 +33,7 @@ export function useCommitField(
       error.value = '';
       dirty.value = false;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = errorText(err);
     }
   }
   return { text, error, onInput, onCommit };

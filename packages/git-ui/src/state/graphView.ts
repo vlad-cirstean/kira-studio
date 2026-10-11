@@ -2,6 +2,7 @@ import type { CommitStore, LayoutChunk, RowPlan } from '@kira/git-core';
 import { identityRowPlan, projectLayoutInput } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { errorText } from '@workbench/bridge/codedError';
 import { markRaw, type Ref, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import {
@@ -328,7 +329,7 @@ export class GraphViewState {
       await this.#runLoadSteps(state, request);
     } catch (error) {
       if (!(error instanceof TransportError && error.code === 'cancelled')) {
-        const detail = error instanceof Error ? error.message : String(error);
+        const detail = errorText(error);
         this.streamFailure.value = composeGraphFailureNotice(
           'Graph failed to load.',
           detail,

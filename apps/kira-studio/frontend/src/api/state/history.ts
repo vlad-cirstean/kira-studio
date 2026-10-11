@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/vue-query';
+import { errorText } from '@workbench/bridge/codedError';
 import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, type MaybeRefOrGetter, reactive, toValue, watch } from 'vue';
@@ -41,7 +42,7 @@ interface HistoryUi {
 }
 
 function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  return errorText(err);
 }
 
 export function createHistoryQueries<

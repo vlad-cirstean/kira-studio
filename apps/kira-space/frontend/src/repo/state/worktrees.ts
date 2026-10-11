@@ -1,5 +1,6 @@
 import { worktreeLabel } from '@kira/git-core';
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { watch } from 'vue';
 import { useCodeReposStore } from '../../state/coderepos';
@@ -81,7 +82,7 @@ export const useWorktreesStore = defineStore('worktrees', () => {
       state.error = null;
     } catch (err) {
       if (!byRepo.get(codeRepoId)?.expanded) return;
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     } finally {
       if (byRepo.get(codeRepoId)?.expanded) state.loading = false;
     }
@@ -166,7 +167,7 @@ export const useWorktreesStore = defineStore('worktrees', () => {
         );
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 

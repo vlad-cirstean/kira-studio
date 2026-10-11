@@ -1,10 +1,11 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { newIntentKey, useAdeWrites } from './useAdeWrites';
 import type { PlanCard } from './useAgentsModel';
 
 export type TaskIntent = 'back' | 'next' | 'start';
 
-const message = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const message = (err: unknown): string => errorText(err);
 
 /** The Back, Next and Start buttons of one plan card: the confirm text for each, and the write. */
 export function useTaskActions(card: () => PlanCard) {

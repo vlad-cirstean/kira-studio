@@ -4,6 +4,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/compone
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { useElementSize, useScroll } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, ref } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
@@ -56,7 +57,7 @@ async function runRefresh(codeRepoIds: string[], all: boolean): Promise<void> {
     }
     ui.refreshSummary = summaries;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errorText(err);
     for (const id of ids) errs[id] = msg;
   } finally {
     refreshErrors.value = errs;

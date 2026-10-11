@@ -10,7 +10,7 @@ import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
-import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
+import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { nextProjectionFromSelectedColumns } from './menu';

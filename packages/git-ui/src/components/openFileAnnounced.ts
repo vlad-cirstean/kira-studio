@@ -1,4 +1,5 @@
 import { TransportError } from '@kira/git-ipc';
+import { errorText } from '@workbench/bridge/codedError';
 import type { DetailActions } from '../state/detailActions.ts';
 
 /** Runs a file-open request; a rejection is announced instead of dropped, so a click the host
@@ -10,6 +11,6 @@ export function openFileAnnounced(
 ): void {
   open().catch((err: unknown) => {
     if (err instanceof TransportError && err.code === 'transport-closed') return;
-    actions.announce(`Couldn't open ${path} — ${err instanceof Error ? err.message : String(err)}`);
+    actions.announce(`Couldn't open ${path} — ${errorText(err)}`);
   });
 }

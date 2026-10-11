@@ -9,7 +9,7 @@ import { PopoverContent } from '@theme/components/ui/popover';
 import { tableCellClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
-import { copyOrReportError } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { computed, ref } from 'vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';

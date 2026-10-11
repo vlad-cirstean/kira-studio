@@ -12,6 +12,7 @@ import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
+import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
 import SmartBadge from '../smart/SmartBadge.vue';
 import AdeContextFields from './AdeContextFields.vue';
@@ -96,7 +97,7 @@ const start = useMutation(
       emit('close');
     },
     onError: (err) => {
-      startError.value = err instanceof Error ? err.message : String(err);
+      startError.value = errorText(err);
       void preview.refetch();
     },
   },

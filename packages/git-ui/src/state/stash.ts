@@ -1,9 +1,11 @@
 import type { FileChange, ResultOf, StashEntry } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { createLatestRequest } from '@workbench/behaviour/latest';
+import { errorText } from '@workbench/bridge/codedError';
 import { type ComputedRef, computed, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { FileListCursor, type FileListMode } from './fileListCursor.ts';
-import { createLatestRequest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
 /**
@@ -62,8 +64,9 @@ export class StashState {
   #showController: AbortController | undefined;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — separate
    *  trackers so `reload()`'s own ordering never interferes with `reloadGlobal()`'s. */
-  readonly #reloadRequest = createLatestRequest<ResultOf<'stash.list'>>();
-  readonly #reloadGlobalRequest = createLatestRequest<ResultOf<'globalStash.list'>>();
+  readonly #reloadRequest = createLatestRequest<ResultOf<'stash.list'>>(isCancelledTransport);
+  readonly #reloadGlobalRequest =
+    createLatestRequest<ResultOf<'globalStash.list'>>(isCancelledTransport);
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -182,7 +185,7 @@ export class StashState {
     } catch (error) {
       if (error instanceof TransportError && error.code === 'cancelled') return;
       if (this.selectedSha.value !== sha) return;
-      this.error.value = error instanceof Error ? error.message : String(error);
+      this.error.value = errorText(error);
     } finally {
       if (this.#showController === controller) this.#showController = undefined;
     }

@@ -1,5 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { Page } from '@shared/protocol/page';
+import { errorText } from '@workbench/bridge/codedError';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
@@ -611,7 +612,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
         rt.opId = null;
         rt.status = classifyLoadError(err).kind === 'cancelled' ? 'cancelled' : 'idle';
       }
-      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+      return { ok: false, reason: errorText(err) };
     }
   }
 

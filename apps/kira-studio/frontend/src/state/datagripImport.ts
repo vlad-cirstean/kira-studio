@@ -1,4 +1,5 @@
 import type { DataGripPreview, DataGripPreviewRow, DataGripReport } from '@shared/domain/datagrip';
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -47,7 +48,7 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
   }
 
   function failToDialog(err: unknown): false {
-    state.error = err instanceof Error ? err.message : String(err);
+    state.error = errorText(err);
     state.preview = null;
     state.report = null;
     state.open = true;
@@ -116,7 +117,7 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
       state.report = report;
       return report;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return null;
     } finally {
       state.busy = false;

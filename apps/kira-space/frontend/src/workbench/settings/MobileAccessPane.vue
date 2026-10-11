@@ -7,9 +7,9 @@ import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useIntervalFn, useNow } from '@vueuse/core';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { formatRelative } from '@workbench/behaviour/format';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { formatRelative } from '@workbench/util/format';
-import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed, ref, useId, watch } from 'vue';
 import { useMobileAccessStore } from '../../state/mobileAccess';
 import { useMobileTerminalsStore } from '../../state/mobileTerminals';
@@ -60,19 +60,19 @@ const portError = computed(() => {
 });
 const portChanged = computed(() => parseIntField(portDraft.value) !== store.status.port);
 
-const { busy: toggling, run: onToggle } = useBusyAction((on: boolean) => store.setEnabled(on));
-const { busy: togglingAgentInput, run: onToggleAgentInput } = useBusyAction((on: boolean) =>
+const { pending: toggling, run: onToggle } = useAsyncAction((on: boolean) => store.setEnabled(on));
+const { pending: togglingAgentInput, run: onToggleAgentInput } = useAsyncAction((on: boolean) =>
   store.setAgentInput(on),
 );
-const { run: onSetPermissions } = useBusyAction(
+const { run: onSetPermissions } = useAsyncAction(
   (id: string, write: boolean, agentInput: boolean) =>
     store.setDevicePermissions(id, { write, agentInput }),
 );
-const { busy: applying, run: onApplyPort } = useBusyAction(() =>
+const { pending: applying, run: onApplyPort } = useAsyncAction(() =>
   store.setPort(parseIntField(portDraft.value)),
 );
-const { busy: trusting, run: runTrust } = useBusyAction(() => store.trustNetwork());
-const { run: runForget } = useBusyAction(() => store.forgetNetwork());
+const { pending: trusting, run: runTrust } = useAsyncAction(() => store.trustNetwork());
+const { run: runForget } = useAsyncAction(() => store.forgetNetwork());
 
 const current = computed(() => store.status.current);
 const trusted = computed(() => store.status.trusted);

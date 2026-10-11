@@ -5,6 +5,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
 import { useSetTaskWorkflow, useSpaceTools, useWorkflows } from '../queries';
@@ -30,7 +31,7 @@ async function pick(value: unknown): Promise<void> {
   try {
     await setWorkflow.mutateAsync({ taskId: props.card.task.id, workflowId: String(value ?? '') });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 

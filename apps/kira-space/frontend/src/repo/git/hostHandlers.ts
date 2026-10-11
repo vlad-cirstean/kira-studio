@@ -24,7 +24,7 @@ import type {
   ServerAppInitResult,
   Transport,
 } from '@kira/git-ipc';
-import { copyText } from '@workbench/util/clipboard';
+import { copyText } from '@workbench/behaviour/clipboard';
 import { control } from '../../bridge/control';
 import { useCodeReposStore } from '../../state/coderepos';
 import { useLayoutStore } from '../../state/layout';

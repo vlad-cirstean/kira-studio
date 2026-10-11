@@ -1,4 +1,4 @@
-import { formatBytes } from '@workbench/util/format';
+import { formatBytes } from '@workbench/behaviour/format';
 import { type ComputedRef, computed, type Ref, ref } from 'vue';
 import type { BeautifyMode, BeautifyResult } from '../../beautify';
 

@@ -2,7 +2,7 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatBytes } from '@workbench/util/format';
+import { formatBytes } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';

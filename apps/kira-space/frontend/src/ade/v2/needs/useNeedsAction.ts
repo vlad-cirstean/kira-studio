@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import type { NeedsItem } from '../board/needsYou';
@@ -7,7 +8,7 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 
-const errMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const errMessage = (err: unknown): string => errorText(err);
 
 /** The one action behind a needs-you item: the Needs you row button and the `!` circle share it. */
 export function useNeedsAction() {

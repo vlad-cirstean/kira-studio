@@ -5,6 +5,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { cn } from '@theme/lib/utils';
 import { useScroll } from '@vueuse/core';
 import { nextTick, ref, watch } from 'vue';
+import { errorText } from '../../bridge/codedError';
 import { useRunLog } from './runsQueries';
 
 // A smart run's log: the first page, then pushed chunks, following the end unless the reader
@@ -33,7 +34,7 @@ watch(
   >
     <InlineState v-if="log.isPending.value" kind="loading">Loading…</InlineState>
     <FieldError v-else-if="log.isError.value" data-testid="run-log-error">
-      {{ log.error.value instanceof Error ? log.error.value.message : String(log.error.value) }}
+      {{ errorText(log.error.value) }}
     </FieldError>
     <template v-else-if="log.data.value">
       <div v-if="log.data.value.truncated" class="text-subtle">… earlier output dropped</div>

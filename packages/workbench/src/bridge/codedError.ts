@@ -40,3 +40,9 @@ export function toCodedError(err: unknown): CodedError {
   out.details = details;
   return out;
 }
+
+/** Display text of anything a bridge call threw: the unwrapped `message` of `toCodedError`. */
+export function errorText(err: unknown): string {
+  if (err === null || err === undefined) return String(err);
+  return toCodedError(err).message;
+}

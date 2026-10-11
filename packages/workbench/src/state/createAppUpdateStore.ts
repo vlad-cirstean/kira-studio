@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { useLocalStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { computed, type InjectionKey, ref, watch } from 'vue';
+import { errorText } from '../bridge/codedError';
 import type { AppUpdateStatus } from '../bridge/createCoreControl';
 import { queryClient } from './queryClient';
 
@@ -102,7 +103,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
           installError.value = null;
           return;
         }
-        installError.value = err instanceof Error ? err.message : String(err);
+        installError.value = errorText(err);
       }
     }
 

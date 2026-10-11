@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { useClipboard } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -69,7 +70,7 @@ async function onRetrySetup(): Promise<void> {
   try {
     await retrySetup.mutateAsync({ branchId: branch.value.id });
   } catch (err) {
-    setupError.value = err instanceof Error ? err.message : String(err);
+    setupError.value = errorText(err);
   }
 }
 const runs = computed(() => props.card.task.runs);

@@ -4,6 +4,7 @@ import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import type { TerminalEvent } from '@shared/protocol/events';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
+import { errorText } from '../bridge/codedError';
 import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
 import { createOrderedWriter } from './orderedWrites';
 
@@ -212,7 +213,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
         const sess = byTabId.get(tabId);
         if (sess) {
           sess.status = 'failed';
-          sess.error = err instanceof Error ? err.message : String(err);
+          sess.error = errorText(err);
         }
       }
     }

@@ -11,9 +11,9 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import { formatBytes } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
-import { formatBytes } from '@workbench/util/format';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import { findRanges } from '../../../editor/findRanges';

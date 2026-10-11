@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { usePendingDecision } from '@workbench/util/usePendingDecision';
+import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 
 // Shared shell for a pairing prompt PromptHost mounts. Renders nothing while `requestId` is absent;
 // Escape and the frame's close hide it (`hide`), only Deny denies. The countdown keys on the

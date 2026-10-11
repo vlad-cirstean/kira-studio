@@ -30,6 +30,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { cn } from '@theme/lib/utils';
+import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 import { ACTION_ICONS, codiconName } from '../icons/index.ts';
@@ -463,7 +464,7 @@ async function goToFile(path: string): Promise<void> {
     }
   } catch (err) {
     props.actions.announce(
-      `Couldn't open ${path} — ${err instanceof Error ? err.message : String(err)}`,
+      `Couldn't open ${path} — ${errorText(err)}`,
     );
   }
 }

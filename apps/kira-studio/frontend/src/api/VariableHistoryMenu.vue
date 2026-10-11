@@ -4,7 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
-import { formatRelative } from '@workbench/util/format';
+import { formatRelative } from '@workbench/behaviour/format';
 import { useVariableSetStore } from './state/variables';
 
 const variableSetStore = useVariableSetStore();

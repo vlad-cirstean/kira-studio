@@ -9,6 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
@@ -117,7 +118,7 @@ async function onTogglePreview(): Promise<void> {
       ? (await data.preview({ connectionId: t.connectionId, path: t.path, ops })).statements
       : [];
   } catch (err) {
-    previewError.value = err instanceof Error ? err.message : String(err);
+    previewError.value = errorText(err);
   } finally {
     previewLoading.value = false;
   }
@@ -166,7 +167,7 @@ async function onGenerate(): Promise<void> {
             ? `${err.message} — ${committedText} committed before this batch, which was rolled back.`
             : `${err.message} — ${committedText} committed before this batch. This connection has no transactions, so any rows the failing batch already wrote stay written.`;
     } else {
-      runError.value = err instanceof Error ? err.message : String(err);
+      runError.value = errorText(err);
     }
     if (committedRows.value > 0) await gridViewStore.reloadAfterMutation(t.id);
   }

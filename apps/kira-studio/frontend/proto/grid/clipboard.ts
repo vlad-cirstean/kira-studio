@@ -1,4 +1,4 @@
-import { copyText } from '@workbench/util/clipboard';
+import { copyText } from '@workbench/behaviour/clipboard';
 import {
   columnsToTsv,
   type RowSnapshot,

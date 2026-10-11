@@ -4,6 +4,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { useTimeAgo } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -37,7 +38,7 @@ async function write(over: Parameters<typeof backlogPatch>[0]): Promise<boolean>
     await update.mutateAsync({ id: props.item.id, patch: backlogPatch(over) });
     return true;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
     return false;
   }
 }

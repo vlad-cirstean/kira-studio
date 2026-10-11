@@ -6,9 +6,11 @@ import type {
   ReviewDiffMode,
   ReviewFileEntry,
 } from '@kira/git-ipc';
+import { createLatestRequest, runLatest } from '@workbench/behaviour/latest';
+import { errorText } from '@workbench/bridge/codedError';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { createLatestRequest, runLatest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 
 export type ReviewFileDiffBody = ResultOf<'review.fileDiff'>['body'];
 
@@ -84,8 +86,8 @@ export class ReviewFilesState {
   #markChain: Promise<void> = Promise.resolve();
   #markState = { count: 0 };
   #lastQueuedKey: string | undefined;
-  readonly #filesRequest = createLatestRequest<ResultOf<'review.files'>>();
-  readonly #diffRequest = createLatestRequest<ResultOf<'review.fileDiff'>>();
+  readonly #filesRequest = createLatestRequest<ResultOf<'review.files'>>(isCancelledTransport);
+  readonly #diffRequest = createLatestRequest<ResultOf<'review.fileDiff'>>(isCancelledTransport);
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -296,7 +298,7 @@ export class ReviewFilesState {
       if (this.selectedPath.value === path) await this.#loadDiff();
     } catch (error) {
       if (this.#target !== target) return;
-      this.markError.value = error instanceof Error ? error.message : String(error);
+      this.markError.value = errorText(error);
     } finally {
       state.count--;
       if (state === this.#markState && state.count === 0) {

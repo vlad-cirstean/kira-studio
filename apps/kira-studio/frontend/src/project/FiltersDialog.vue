@@ -9,6 +9,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import {
@@ -66,7 +67,7 @@ watch(
     try {
       await treeStore.loadVisibility(connectionId);
     } catch (err) {
-      loadError.value = err instanceof Error ? err.message : String(err);
+      loadError.value = errorText(err);
     }
     if (filtersDialogStore.connectionId !== connectionId) return;
     loading.value = false;
@@ -162,7 +163,7 @@ async function onSave(): Promise<void> {
     await treeStore.saveVisibility(connectionId, draft.value);
     filtersDialogStore.closeFiltersDialog();
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err);
+    saveError.value = errorText(err);
   } finally {
     saving.value = false;
   }

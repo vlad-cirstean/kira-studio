@@ -3,7 +3,7 @@ import type { AppMetricsSample } from '@shared/protocol/events';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatBytes } from '@workbench/util/format';
+import { formatBytes } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 
 // P116 H7: the status bar's CPU/memory readout, hoisted verbatim from Kira Studio's own

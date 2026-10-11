@@ -2,6 +2,7 @@
 import InlineState from '@theme/components/InlineState.vue';
 import { Card } from '@theme/components/ui/card';
 import { useScroll } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, nextTick, useTemplateRef, watch } from 'vue';
 import { useLog } from '../readQueries';
 import type { LogChunk, LogKind } from '../wire';
@@ -43,7 +44,7 @@ watch(
   >
     <InlineState v-if="log.isPending.value" kind="loading">Loading…</InlineState>
     <InlineState v-else-if="log.isError.value" kind="error" data-testid="ade-run-log-error">
-      {{ log.error.value instanceof Error ? log.error.value.message : String(log.error.value) }}
+      {{ errorText(log.error.value) }}
     </InlineState>
     <template v-else-if="log.data.value">
       <div v-if="log.data.value.truncated" class="text-subtle">… earlier output dropped</div>

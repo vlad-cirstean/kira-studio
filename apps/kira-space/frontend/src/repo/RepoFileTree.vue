@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useDebounceFn, useEventListener } from '@vueuse/core';
+import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
+import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
-import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { menuForRepoRow } from './menus';

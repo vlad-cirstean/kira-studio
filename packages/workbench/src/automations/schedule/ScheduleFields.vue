@@ -22,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { refDebounced } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId, watch } from 'vue';
+import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
 import AdeContextFields from '../run/AdeContextFields.vue';
 import ParamsForm from '../run/ParamsForm.vue';
@@ -54,7 +55,7 @@ const nextText = computed(() =>
 const cronError = computed(() => {
   if (!fires.isError.value) return null;
   const e = fires.error.value;
-  return e instanceof Error ? e.message : String(e);
+  return errorText(e);
 });
 
 watch(cronError, (e) => emit('valid', e === null), { immediate: true });

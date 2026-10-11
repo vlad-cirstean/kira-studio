@@ -1,6 +1,7 @@
+import { copyOrReportError as sharedCopyOrReportError } from '@workbench/behaviour/clipboard';
+import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyOrReportError as sharedCopyOrReportError } from '@workbench/util/clipboard';
 import { beautifyJson } from '../../beautify';
 import { parseIdLabel, toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
@@ -152,10 +153,7 @@ export function rowMenu(
           await deleteDocument(tabId, id);
           useDocumentViewStore().setActionError(tabId, null);
         } catch (err) {
-          useDocumentViewStore().setActionError(
-            tabId,
-            err instanceof Error ? err.message : String(err),
-          );
+          useDocumentViewStore().setActionError(tabId, errorText(err));
         }
       },
     },

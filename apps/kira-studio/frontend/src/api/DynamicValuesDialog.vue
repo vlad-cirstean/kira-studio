@@ -8,7 +8,8 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { copyOrReportError } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useDynamicValuesStore } from './state/dynamicValues';
 
@@ -41,7 +42,7 @@ onMounted(async () => {
       samples[entry.name] = generate(entry.name) ?? '';
     }
   } catch (err) {
-    error.value = `Could not load sample values: ${err instanceof Error ? err.message : String(err)}`;
+    error.value = `Could not load sample values: ${errorText(err)}`;
   }
 });
 

@@ -31,6 +31,7 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/c
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import { enabledNeighbour, firstEnabled, type MenuItem } from '../lib/menuModel.ts';
@@ -60,7 +61,6 @@ import {
   remoteCheckoutTarget,
 } from './refListModel.ts';
 import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
-import ShowMoreButton from './ShowMoreButton.vue';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import { childOf, parentOf } from './stackListModel.ts';
@@ -705,7 +705,7 @@ watch(visibleBranchNames, (names) => {
               <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
             </div>
           </Alert>
-          <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
+          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
           <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">No branches</InlineState>
         </section>
 
@@ -732,7 +732,7 @@ watch(visibleBranchNames, (names) => {
               @contextmenu="openRefMenu(row, $event)"
             />
           </div>
-          <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
+          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
           <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
             No remote branches
           </InlineState>

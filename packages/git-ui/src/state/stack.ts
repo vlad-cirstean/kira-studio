@@ -6,9 +6,10 @@ import type {
   StackBranch,
   StackSummary,
 } from '@kira/git-ipc';
+import { createLatestRequest } from '@workbench/behaviour/latest';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { createLatestRequest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 import type { PrState } from './pr.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
@@ -58,7 +59,7 @@ export class StackState {
   readonly #unsubscribeProgress: () => void;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
-  readonly #reloadRequest = createLatestRequest<ResultOf<'stack.list'>>();
+  readonly #reloadRequest = createLatestRequest<ResultOf<'stack.list'>>(isCancelledTransport);
 
   constructor(bridge: BridgeClient, pr?: PrState) {
     this.#bridge = bridge;

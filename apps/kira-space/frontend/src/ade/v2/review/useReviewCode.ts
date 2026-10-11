@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, watch } from 'vue';
 import { type ReviewChoice, reviewChoice, reviewChoices } from '../board/reviewCode';
@@ -32,7 +33,7 @@ export function useReviewCode() {
       { branchId },
       {
         onError: (err) => {
-          const message = err instanceof Error ? err.message : String(err);
+          const message = errorText(err);
           if (opts?.onError) return opts.onError(message);
           if (ui.selectedTaskId !== taskId) ui.select(taskId);
           ui.actionError[taskId] = message;

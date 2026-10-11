@@ -1,4 +1,5 @@
 import type { MutationRowOp } from '@shared/domain/mutations';
+import { errorText } from '@workbench/bridge/codedError';
 import { data } from '../../bridge/data';
 import { reloadTabsForTarget } from '../../state/viewCommands';
 
@@ -38,17 +39,17 @@ export function createImmediateMutator<
     try {
       await opts.reload(tabId);
     } catch (err) {
-      failures.push(err instanceof Error ? err.message : String(err));
+      failures.push(errorText(err));
     }
     try {
       reloadTabsForTarget(tab.connectionId, tab.path, tabId);
     } catch (err) {
-      failures.push(err instanceof Error ? err.message : String(err));
+      failures.push(errorText(err));
     }
     try {
       await after?.(tab as T & { connectionId: string });
     } catch (err) {
-      failures.push(err instanceof Error ? err.message : String(err));
+      failures.push(errorText(err));
     }
     if (failures.length > 0) {
       throw new Error(`saved, but refresh failed: ${failures.join('; ')}`);

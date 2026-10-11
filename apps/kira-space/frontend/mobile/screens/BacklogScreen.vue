@@ -9,7 +9,8 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { useTimeAgo } from '@vueuse/core';
-import { useSortableReorder } from '@workbench/util/useSortableReorder';
+import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
+import { errorText } from '@workbench/bridge/codedError';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 import PermissionHint from '../components/PermissionHint.vue';
@@ -35,7 +36,7 @@ function facts(item: BacklogItem): string {
     .join(' · ');
 }
 const ago = (at: number) => useTimeAgo(at, adeAgoOptions);
-const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const message = (err: unknown) => (errorText(err));
 
 async function add(): Promise<void> {
   const value = text.value.trim();

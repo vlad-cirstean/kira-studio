@@ -5,7 +5,7 @@ import { Field, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
-import { formatBytes } from '@workbench/util/format';
+import { formatBytes } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
 import { data } from '../../bridge/data';
 import { useCacheStatsStore } from '../../state/cacheStats';

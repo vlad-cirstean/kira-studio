@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
 import type { RebaseAct } from '../board/rebaseActions';
@@ -157,7 +158,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
       await abortM.mutateAsync({ branchId: t.branchId });
       return null;
     } catch (err) {
-      return err instanceof Error ? err.message : String(err);
+      return errorText(err);
     }
   }
 

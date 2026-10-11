@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabsStore } from '../../state/tabs';
@@ -28,7 +29,7 @@ export interface LoadFailure {
 
 export function classifyLoadError(err: unknown): LoadFailure {
   const code = (err as { code?: string } | undefined)?.code ?? 'E_QUERY';
-  const message = err instanceof Error ? err.message : String(err);
+  const message = errorText(err);
   if (code === 'E_CANCELLED') return { kind: 'cancelled', code, message };
   if (DISCONNECTED_CODES.has(code)) return { kind: 'disconnected', code, message };
   return { kind: 'error', code, message };

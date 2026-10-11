@@ -9,8 +9,9 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Skeleton } from '@theme/components/ui/skeleton';
+import { copyText } from '@workbench/behaviour/clipboard';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { copyText } from '@workbench/util/clipboard';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { formatPercent, formatSize, publishedPorts, shortId, stateDotTone } from '../lib/format';
@@ -87,7 +88,7 @@ watch([running, c], () => {
 function openRegistry(url: string): void {
   linkError.value = null;
   docker.openExternal(url).catch((e: unknown) => {
-    linkError.value = e instanceof Error ? e.message : String(e);
+    linkError.value = errorText(e);
   });
 }
 

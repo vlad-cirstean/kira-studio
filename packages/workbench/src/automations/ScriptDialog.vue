@@ -28,6 +28,7 @@ import type { TextPart } from '@theme/varText';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, reactive, ref, toRaw, useTemplateRef, watch } from 'vue';
+import { errorText } from '../bridge/codedError';
 import type { ScriptsSeam } from './module';
 import ParamsEditor from './ParamsEditor.vue';
 import ScriptBodyField from './ScriptBodyField.vue';
@@ -150,7 +151,7 @@ async function chooseWorkingDir(): Promise<void> {
     workingDir.value = path;
     dirMode.value = 'fixed';
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 
@@ -176,7 +177,7 @@ async function save(): Promise<void> {
     else await props.scripts.create(fields);
     emit('close');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   } finally {
     saving.value = false;
   }

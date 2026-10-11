@@ -19,11 +19,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import { prBadgeClass, refBadgeClass } from './badgeClass.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
-import ShowMoreButton from './ShowMoreButton.vue';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
 const props = defineProps<{
@@ -170,7 +171,7 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <ShowMoreButton :hidden-count="stacks.hiddenCount + orphans.hiddenCount" @click="showMore" />
+    <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="stacks.hiddenCount + orphans.hiddenCount" @click="showMore" />
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"

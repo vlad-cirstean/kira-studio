@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 // P94 pass 3 §4.3: RepoFileView.vue's mount() read its file two different ways (worktree vs a
 // revision-pinned tab) with near-duplicate try/catch/error-message plumbing around each — lifted
 // out as one pure(ish) async call so mount() itself only branches on the result.
@@ -27,7 +28,7 @@ export async function loadFileContent(
         ? { kind: 'found', text: content.text }
         : { kind: content.kind };
     } catch (err) {
-      return { kind: 'error', message: err instanceof Error ? err.message : String(err) };
+      return { kind: 'error', message: errorText(err) };
     }
   }
 
@@ -40,7 +41,7 @@ export async function loadFileContent(
       ? { kind: 'found', text: result.content }
       : { kind: result.kind };
   } catch (err) {
-    return { kind: 'error', message: err instanceof Error ? err.message : String(err) };
+    return { kind: 'error', message: errorText(err) };
   } finally {
     transport.dispose();
   }

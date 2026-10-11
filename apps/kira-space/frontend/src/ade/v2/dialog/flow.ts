@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { isPreparing } from '../state/useSetupWait';
 import type {
   ArchiveRisk,
@@ -55,7 +56,7 @@ const BLOCKED_REASON: Record<string, string> = {
   locked: 'locked',
 };
 
-const errMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const errMessage = (err: unknown): string => errorText(err);
 
 /** A launch failure shown in the dialog; a worktree still being prepared holds it open instead. */
 function failInDialog(deps: FlowDeps, err: unknown): void {

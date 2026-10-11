@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { errorText } from '@workbench/bridge/codedError';
 import { ref, watch } from 'vue';
 
 // One yes/no prompt. `run` resolves with an error message to keep the dialog open and show it, or
@@ -40,7 +41,7 @@ async function onYes(): Promise<void> {
     if (msg === null) emit('close');
     else error.value = msg;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   } finally {
     busy.value = false;
   }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
-import { copyText } from '@workbench/util/clipboard';
+import { copyText } from '@workbench/behaviour/clipboard';
 import { ref } from 'vue';
 
 // Real-trackpad late-data capture (plan §8.3 step 5): Start, one hard two-finger flick, Stop. The

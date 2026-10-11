@@ -1,8 +1,10 @@
 import type { ResultOf, ReviewComment } from '@kira/git-ipc';
+import { createLatestRequest, runLatest } from '@workbench/behaviour/latest';
+import { errorText } from '@workbench/bridge/codedError';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { copyToClipboard } from './clipboardActions.ts';
-import { createLatestRequest, runLatest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 
 /** The `(repoId, branch)` pair `review.comment.*` is keyed on (G13 D14) — no `base`, since the
  *  session key has none: a comment is a fact about a branch's own review, not about a comparison. */
@@ -32,7 +34,8 @@ export class ReviewCommentsState {
   readonly #bridge: BridgeClient;
   readonly #unsubscribeChanged: () => void;
   #target: ReviewCommentsTarget | undefined;
-  readonly #loadRequest = createLatestRequest<ResultOf<'review.comment.list'>>();
+  readonly #loadRequest =
+    createLatestRequest<ResultOf<'review.comment.list'>>(isCancelledTransport);
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -103,7 +106,7 @@ export class ReviewCommentsState {
       this.comments.value = this.comments.value.filter((c) => c.id !== id);
     } catch (error) {
       if (this.#target === target) {
-        this.announcement.value = error instanceof Error ? error.message : String(error);
+        this.announcement.value = errorText(error);
       }
     } finally {
       if (this.#target === target) this.pending.value = false;
@@ -136,7 +139,7 @@ export class ReviewCommentsState {
       this.announcement.value = `Cleared ${result.removed} ${result.removed === 1 ? 'comment' : 'comments'}`;
     } catch (error) {
       if (this.#target === target) {
-        this.announcement.value = error instanceof Error ? error.message : String(error);
+        this.announcement.value = errorText(error);
       }
     } finally {
       this.confirmingClear.value = false;
@@ -157,7 +160,7 @@ export class ReviewCommentsState {
       const outcome = await copyToClipboard(this.#bridge, result.text, 'review comments');
       this.announcement.value = outcome.message;
     } catch (error) {
-      this.announcement.value = error instanceof Error ? error.message : String(error);
+      this.announcement.value = errorText(error);
     }
   }
 

@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import type { Ref } from 'vue';
 
 /** Retries a failed bootstrap() — clears the error ref first so a second failure replaces the
@@ -14,6 +15,6 @@ export function retryBootstrap(
   void bootstrap()
     .then(() => onSuccess?.())
     .catch((err: unknown) => {
-      bootError.value = err instanceof Error ? err.message : String(err);
+      bootError.value = errorText(err);
     });
 }

@@ -4,6 +4,7 @@ import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -47,7 +48,7 @@ function moveTo(stageId: string): void {
   delete ui.actionError[taskId];
   setStage.mutate(
     { taskId, stageId },
-    { onError: (err) => (ui.actionError[taskId] = err instanceof Error ? err.message : String(err)) },
+    { onError: (err) => (ui.actionError[taskId] = errorText(err)) },
   );
 }
 function onMenu(ev: MouseEvent): void {
@@ -113,7 +114,7 @@ async function run(fn: () => Promise<unknown>): Promise<void> {
   try {
     await fn();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 const onApprove = (stepId: string): Promise<void> =>

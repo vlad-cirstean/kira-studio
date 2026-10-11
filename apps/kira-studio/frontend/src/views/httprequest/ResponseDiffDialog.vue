@@ -7,9 +7,10 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { formatBytes, formatRelative } from '@workbench/behaviour/format';
+import { errorText } from '@workbench/bridge/codedError';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
 import { monacoLanguageIdFor } from '@workbench/editor/monacoLanguages';
-import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
@@ -57,7 +58,7 @@ async function loadSnapshots(): Promise<void> {
       snapB.value = s1;
     }
   } catch (err) {
-    loadError.value = err instanceof Error ? err.message : String(err);
+    loadError.value = errorText(err);
   } finally {
     loadingSnapshots.value = false;
   }

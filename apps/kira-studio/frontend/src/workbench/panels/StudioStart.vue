@@ -5,7 +5,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
-import { formatRelative } from '@workbench/util/format';
+import { formatRelative } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useDatagripImportStore } from '../../state/datagripImport';

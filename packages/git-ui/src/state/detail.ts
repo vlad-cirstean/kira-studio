@@ -1,8 +1,9 @@
 import type { ResultOf } from '@kira/git-ipc';
+import { createLatestRequest } from '@workbench/behaviour/latest';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { FileListCursor, type FileListMode } from './fileListCursor.ts';
-import { createLatestRequest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 import { createAnnouncementRef } from './liveAnnouncements.ts';
 
 export type CommitDetail = ResultOf<'commit.detail'>;
@@ -48,7 +49,7 @@ export class DetailState {
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
-  readonly #detailRequest = createLatestRequest<CommitDetail>();
+  readonly #detailRequest = createLatestRequest<CommitDetail>(isCancelledTransport);
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;

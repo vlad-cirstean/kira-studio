@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { control } from '../../../bridge/control';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useLaunchOpener } from './useLaunchOpener';
@@ -15,7 +16,7 @@ export function installMobileLaunch(): () => void {
         sessionId: event.launch.sessionId,
       });
     } catch (err) {
-      failure = err instanceof Error ? err.message : String(err);
+      failure = errorText(err);
     }
     await control.mobileLaunchOpened(event.launch.terminalId, failure).catch(() => undefined);
   });

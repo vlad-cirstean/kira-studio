@@ -7,7 +7,8 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
-import { formatBytes } from '@workbench/util/format';
+import { formatBytes } from '@workbench/behaviour/format';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useObjectStoreStore } from '../state/objectStore';
@@ -76,7 +77,7 @@ async function onUpload(): Promise<void> {
     objectStoreStore.closeUploadDialog();
     tabsStore.openKeyValueTab(connectionId, newPath, { newTab: true });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   } finally {
     saving.value = false;
   }

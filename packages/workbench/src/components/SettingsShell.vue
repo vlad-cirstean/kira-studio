@@ -10,6 +10,7 @@ import {
 } from '@theme/components/ui/dialog';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, reactive, ref } from 'vue';
+import { errorText } from '../bridge/codedError';
 
 // P103 Part 2 (§5.5): Kira Studio's own workbench/SettingsDialog.vue and Kira Space's, unified —
 // the frame (DialogFrame + its "Settings" header), the nav (`sections`/`activeSection`) and the
@@ -175,7 +176,7 @@ async function onSave(): Promise<void> {
     await props.save(patch);
     emit('close');
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err);
+    saveError.value = errorText(err);
   }
 }
 </script>

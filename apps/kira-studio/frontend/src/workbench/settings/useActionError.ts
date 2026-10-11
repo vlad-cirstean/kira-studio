@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { ref } from 'vue';
 
 /** Instant-action settings (bypassing draft/Save) report a rejected call here, so the checkbox
@@ -10,7 +11,7 @@ export function useActionError() {
       try {
         await action(...args);
       } catch (err) {
-        error.value = err instanceof Error ? err.message : String(err);
+        error.value = errorText(err);
       }
     };
   }

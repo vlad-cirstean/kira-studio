@@ -1,7 +1,8 @@
 import type { TreeNode } from '@shared/domain/tree';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyOrReportError } from '@workbench/util/clipboard';
 import { copyNameItems, openItems } from '../../project/menuItems';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
@@ -106,10 +107,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
           await useBrowseViewStore().reload(tabId);
           useBrowseViewStore().setActionError(tabId, null);
         } catch (err) {
-          useBrowseViewStore().setActionError(
-            tabId,
-            err instanceof Error ? err.message : String(err),
-          );
+          useBrowseViewStore().setActionError(tabId, errorText(err));
         }
       },
     });

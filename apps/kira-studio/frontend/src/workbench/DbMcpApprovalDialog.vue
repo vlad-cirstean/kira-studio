@@ -2,7 +2,7 @@
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { usePendingDecision } from '@workbench/util/usePendingDecision';
+import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
 

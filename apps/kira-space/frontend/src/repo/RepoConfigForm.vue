@@ -6,6 +6,7 @@ import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import SwatchRadio from '@theme/SwatchRadio.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import type { Environment, Repo, RepoPatch } from '../ade/v2/wire';
 import { control } from '../bridge/control';
@@ -80,7 +81,7 @@ function writeEnvs(build: (current: Environment[]) => Environment[]): Promise<vo
     try {
       await write({ environments: build(props.repo.environments) });
     } catch (err) {
-      envError.value = err instanceof Error ? err.message : String(err);
+      envError.value = errorText(err);
       throw err;
     }
   };
@@ -167,7 +168,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
   try {
     await codeRepos.setCodeRepoColor(props.repo.codeRepoId, next);
   } catch (err) {
-    colorError.value = err instanceof Error ? err.message : String(err);
+    colorError.value = errorText(err);
   }
 }
 </script>

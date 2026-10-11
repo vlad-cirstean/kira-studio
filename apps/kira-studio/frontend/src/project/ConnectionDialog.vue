@@ -36,6 +36,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { RadioGroupItem } from 'reka-ui';
@@ -450,7 +451,7 @@ async function onSave(): Promise<void> {
   try {
     await connectionDialogStore.saveDialog();
   } catch (err) {
-    connectionDialogStore.error = err instanceof Error ? err.message : String(err);
+    connectionDialogStore.error = errorText(err);
   } finally {
     saving.value = false;
   }
@@ -559,7 +560,7 @@ async function onAddMaskRule(): Promise<void> {
     newMaskColumn.value = '';
     newMaskKind.value = 'redact';
   } catch (err) {
-    maskRuleError.value = err instanceof Error ? err.message : String(err);
+    maskRuleError.value = errorText(err);
   }
 }
 

@@ -7,6 +7,7 @@ import type { SavedFilterQuery } from '@shared/domain/queries';
 import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { refDebounced } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { computed, reactive, shallowReactive, toRefs } from 'vue';
 import { control } from '../../bridge/control';
@@ -181,7 +182,7 @@ export const useTreeStore = defineStore('tree', () => {
       treeState.children[k] = result.nodes;
     } catch (err) {
       if (connectionEpochFor(connectionId) !== epoch || !isLatestLoadToken(k, token)) return;
-      treeState.errors[k] = err instanceof Error ? err.message : String(err);
+      treeState.errors[k] = errorText(err);
     } finally {
       if (isLatestLoadToken(k, token)) treeState.loading.delete(k);
     }
@@ -272,7 +273,7 @@ export const useTreeStore = defineStore('tree', () => {
   // A failed tree action (expand, menu item) shows on its row through the same ErrorPopover a
   // failed children load uses.
   function reportError(connectionId: string, path: string, err: unknown): void {
-    treeState.errors[rowKey(connectionId, path)] = err instanceof Error ? err.message : String(err);
+    treeState.errors[rowKey(connectionId, path)] = errorText(err);
   }
 
   function collapse(connectionId: string, path: string): void {

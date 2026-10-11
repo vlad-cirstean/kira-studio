@@ -3,6 +3,7 @@ import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-cor
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -128,7 +129,7 @@ async function onApply(): Promise<void> {
     );
     emit('close');
   } catch (err) {
-    applyError.value = err instanceof Error ? err.message : String(err);
+    applyError.value = errorText(err);
   } finally {
     applying.value = false;
   }

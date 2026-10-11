@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computeFloatPosition, pointReference } from '@kira/kira-ui';
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
@@ -7,7 +8,6 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { onClickOutside, useEventListener } from '@vueuse/core';
-import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { typeClassTextClass } from '../../theme/icons';
@@ -53,6 +53,7 @@ async function position(): Promise<void> {
   if (!el) return;
   const { left, top } = await computeFloatPosition(pointReference(props.x, props.y), el, {
     offset: 6,
+    maxVarPrefix: '--kira-float-max-',
     // flip stays at its own default (true), unlike ContextMenu.vue: this is a panel, not a menu —
     // "above the point" is a real, useful placement for a row near the bottom of the viewport, and
     // ContextMenu's own reason for disabling it ("a point has no other side to flip to") is a menu

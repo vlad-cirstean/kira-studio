@@ -1,5 +1,6 @@
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import { cellText, isNull, isTruncated, type TypeClass } from '@shared/protocol/page';
+import { errorText } from '@workbench/bridge/codedError';
 import { data } from '../../bridge/data';
 
 // P67 §4.1: the popover's own fetch + decode + state shape — no component logic here, this module
@@ -89,6 +90,6 @@ export async function fetchReferencedRow(
     return { status: 'ready', columns, rows, hasMore: page.rowCount > PREVIEW_ROW_LIMIT };
   } catch (err) {
     if (signal.cancelled) return { status: 'loading' };
-    return { status: 'error', message: err instanceof Error ? err.message : String(err) };
+    return { status: 'error', message: errorText(err) };
   }
 }

@@ -6,6 +6,7 @@ import { Alert } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { errorText } from '@workbench/bridge/codedError';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -52,7 +53,7 @@ async function confirmTakeOver(): Promise<void> {
     takingOver.value = null;
     void router.push({ name: 'terminal', params: { sessionId: launch.sessionId } });
   } catch (err) {
-    takeOverError.value = err instanceof Error ? err.message : String(err);
+    takeOverError.value = errorText(err);
   }
 }
 </script>

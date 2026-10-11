@@ -9,6 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -97,7 +98,7 @@ async function send(): Promise<void> {
     });
     close();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   } finally {
     busy.value = false;
   }

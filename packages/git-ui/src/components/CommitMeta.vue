@@ -27,6 +27,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
@@ -271,7 +272,7 @@ async function openPullRequest(number: number): Promise<void> {
     await props.actions.openPullRequest({ number });
   } catch (err) {
     props.actions.announce(
-      `Couldn't open the pull request — ${err instanceof Error ? err.message : String(err)}`,
+      `Couldn't open the pull request — ${errorText(err)}`,
     );
   }
 }
@@ -283,7 +284,7 @@ async function openLink(url: string): Promise<void> {
     await props.actions.openExternalLink(url);
   } catch (err) {
     props.actions.announce(
-      `Couldn't open the link — ${err instanceof Error ? err.message : String(err)}`,
+      `Couldn't open the link — ${errorText(err)}`,
     );
   }
 }

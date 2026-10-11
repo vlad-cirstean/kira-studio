@@ -4,8 +4,8 @@
 // own `pageVersion`. A `reactive()` tree here would put a Proxy around every node of every document
 // on the page, which is exactly the frame budget this phase exists to protect.
 
+import { formatBytes } from '@workbench/behaviour/format';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
-import { formatBytes } from '@workbench/util/format';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejson';

@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { remoteErrorText } from '../board/panelFacts';
 import { useGhSyncPlan, useGitHubSyncApply, useRefresh } from '../queries';
@@ -44,7 +45,7 @@ const prNumber = computed(() => data.value?.pr?.number ?? 0);
 const blockedMessage = computed(() => {
   if (loadFailed.value) {
     const e = plan.error.value;
-    return `Could not load the sync plan: ${e instanceof Error ? e.message : String(e)}`;
+    return `Could not load the sync plan: ${errorText(e)}`;
   }
   switch (status.value) {
     case 'prClosed':
@@ -75,7 +76,7 @@ async function confirm(): Promise<void> {
   try {
     result.value = await apply.mutateAsync({ branchId: props.target.branchId });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 
@@ -87,7 +88,7 @@ async function refreshRepo(): Promise<void> {
     if (failed) error.value = remoteErrorText(failed);
     await plan.refetch();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 

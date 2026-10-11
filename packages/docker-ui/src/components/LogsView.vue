@@ -5,7 +5,8 @@ import { FieldError } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useDebounceFn } from '@vueuse/core';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { useDocker } from '../context';
 import { parseAnsi, splitMatches } from '../lib/ansi';
@@ -123,7 +124,7 @@ async function open(): Promise<void> {
     });
     await opening;
   } catch (err) {
-    failure.value = err instanceof Error ? err.message : String(err);
+    failure.value = errorText(err);
   }
 }
 

@@ -10,6 +10,7 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -64,7 +65,7 @@ function act(row: BranchRowModel, a: BranchAction): void {
   } else if (a.kind === 'takeOver') {
     delete ui.actionError[row.branch.taskId];
     takeOver.request(a.sessionId ?? '').catch((err: unknown) => {
-      ui.actionError[row.branch.taskId] = err instanceof Error ? err.message : String(err);
+      ui.actionError[row.branch.taskId] = errorText(err);
       ui.select(row.branch.taskId);
     });
   } else if (a.kind === 'start') dialogs.start(row.id);

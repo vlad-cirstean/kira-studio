@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
 import { useLaunchOpener } from '../dialog/useLaunchOpener';
@@ -11,7 +12,7 @@ export interface TakeOverConfirm {
   text: string;
 }
 
-const errMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const errMessage = (err: unknown): string => errorText(err);
 
 // Take over: continue a session in an interactive Claude Code terminal. One store so every surface
 // (Sessions tab, step run lines, task action, Needs you, `!`) shares the confirm for a run that is

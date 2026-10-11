@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TabularPage } from '@shared/protocol/page';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { copyOrReportError } from '@workbench/util/clipboard';
 import { useRowHeight } from '@workbench/util/rowHeight';
 import type {
   Column,

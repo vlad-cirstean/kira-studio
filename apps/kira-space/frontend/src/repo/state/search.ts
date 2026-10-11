@@ -1,5 +1,6 @@
 import type { CodeSearchEvent, FileMatches, SearchStats } from '@shared/domain/repo';
 import { useLocalStorage } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
@@ -216,7 +217,7 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
       repoBySearchId.set(searchId, repoId);
     } catch (err) {
       state.running = false;
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     } finally {
       startsInFlight--;
       for (const held of earlyEvents.splice(0)) handleCodeSearchEvent(held);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { copyText } from '@workbench/util/clipboard';
+import { copyText } from '@workbench/behaviour/clipboard';
 
 // monaco.ts only exposes loadMonaco(), no read-only model helper — a plain <pre> keeps this a view.
 defineProps<{ raw: string }>();

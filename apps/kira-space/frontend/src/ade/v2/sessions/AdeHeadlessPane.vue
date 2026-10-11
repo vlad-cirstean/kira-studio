@@ -2,6 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { useTimeAgo } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import AdeTip from '../AdeTip.vue';
@@ -35,7 +36,7 @@ async function onStop(): Promise<void> {
   try {
     await stop.mutateAsync({ runId: props.view.session.runId });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 </script>

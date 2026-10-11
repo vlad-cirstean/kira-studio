@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="T extends { key: string }">
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { ref } from 'vue';
 
 const props = withDefaults(defineProps<{ rows: readonly T[]; rowHeight?: number; rowHeights?: readonly number[]; testid?: string }>(), {

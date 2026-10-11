@@ -4,6 +4,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { useDebounceFn } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useSaveWorkflowYaml, useValidateWorkflowYaml, useWorkflowYaml } from '../queries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
@@ -54,7 +55,7 @@ const runValidate = useDebounceFn(async () => {
     if (draft.value === text) checked.value = { error: res.error };
   } catch (err) {
     if (draft.value === text) {
-      checked.value = { error: { line: 0, message: err instanceof Error ? err.message : String(err) } };
+      checked.value = { error: { line: 0, message: errorText(err) } };
     }
   }
 }, 300);
@@ -77,7 +78,7 @@ async function saveNow(): Promise<void> {
     baseHash.value = entry.hash;
     if (draft.value === text) dirty.value = false;
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err);
+    saveError.value = errorText(err);
     conflict.value = (err as { code?: string }).code === 'E_CONFLICT';
   }
 }

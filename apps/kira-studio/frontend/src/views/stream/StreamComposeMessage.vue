@@ -7,6 +7,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
@@ -50,7 +51,7 @@ async function submit(): Promise<void> {
     }
     emit('close');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   } finally {
     submitting.value = false;
   }

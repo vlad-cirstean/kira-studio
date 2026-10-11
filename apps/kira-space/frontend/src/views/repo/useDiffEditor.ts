@@ -11,6 +11,7 @@
 // still owns; registering either once per expanded multi-diff section would mean the last section
 // mounted wins, silently shadowing the others'.
 import type { DiffSide } from '@shared/domain/repo';
+import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, ref, shallowRef } from 'vue';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
@@ -66,7 +67,7 @@ async function loadDiffSides(
       const diff = await control.codeWorkspaceReadDiff(repoId, path);
       return { diff, gitRepoId: undefined };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) };
+      return { error: errorText(err) };
     }
   }
 
@@ -93,7 +94,7 @@ async function loadDiffSides(
         : toDiffSide(leftResult);
     return { diff: { head, worktree: toDiffSide(rightResult) }, gitRepoId };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    return { error: errorText(err) };
   } finally {
     transport.dispose();
   }

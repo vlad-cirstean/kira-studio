@@ -14,6 +14,7 @@ import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { StashState } from '../state/stash.ts';
@@ -21,7 +22,7 @@ import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
-import ShowMoreButton from './ShowMoreButton.vue';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 
 export interface StashRowModel {
   /** `data-row-id`/roving-tabindex key — `stash:<sha>` or `global:<sha>`, distinguishing the two
@@ -123,7 +124,7 @@ function onMenuSelect(id: string): void {
       @contextmenu="openMenu(entry, $event)"
     />
   </div>
-  <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
+  <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
   <InlineState v-if="section.visible.length === 0" kind="empty">{{ emptyMessage }}</InlineState>
 
   <RowContextMenu

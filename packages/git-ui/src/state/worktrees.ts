@@ -4,9 +4,10 @@ import type {
   WorktreeEntry,
   WorktreeRemovePreflight,
 } from '@kira/git-ipc';
+import { createLatestRequest } from '@workbench/behaviour/latest';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { createLatestRequest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
 /** P76 §9.1: what a "Create worktree here…" row action pre-fills `WorktreeDialog.vue`'s create
@@ -33,7 +34,7 @@ export class WorktreeState {
   readonly #repo: RepoScopedReload;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
-  readonly #reloadRequest = createLatestRequest<ResultOf<'worktree.list'>>();
+  readonly #reloadRequest = createLatestRequest<ResultOf<'worktree.list'>>(isCancelledTransport);
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;

@@ -562,14 +562,14 @@ check_class_in_attrs_all 'tree-row' 'the shared literal utility string via cn() 
 check_class_in_attrs_all 'spin' 'animate-spin plus data-testid="tree-row-spinner"'
 
 # P110 I2-15: the 9(+3) file `.virtual-row`/`.sticky-row` scoped-copy duplicate, replaced by
-# VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts) bound directly
+# VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS (packages/workbench/src/behaviour/virtualRows.ts) bound directly
 # as each row's own class. Attribute-scoped: both names are heavy prose in this migration's own
 # comments (this file's own replacement messages above included) and `sticky-row` is also a
 # substring of real, ongoing `data-testid` values (`tree-sticky-row`, `collection-sticky-row`,
 # `repo-tree-sticky-row`) -- never `class`/`:class` attribute values, so the attribute scope
 # leaves them alone.
-check_class_in_attrs_all 'virtual-row' 'VIRTUAL_ROW_CLASS (packages/workbench/src/util/virtualRows.ts)'
-check_class_in_attrs_all 'sticky-row' 'STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts)'
+check_class_in_attrs_all 'virtual-row' 'VIRTUAL_ROW_CLASS (packages/workbench/src/behaviour/virtualRows.ts)'
+check_class_in_attrs_all 'sticky-row' 'STICKY_ROW_CLASS (packages/workbench/src/behaviour/virtualRows.ts)'
 
 # P110 I2-16: the definition-table `<table>` marker, only ever used to anchor its own scoped
 # `.definition-table td`/`td:last-child` column-divider rule, now folded into each file's own

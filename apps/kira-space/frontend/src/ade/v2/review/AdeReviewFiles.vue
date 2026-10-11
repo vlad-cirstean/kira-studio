@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MountHandle } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { errorText } from '@workbench/bridge/codedError';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../../repo/git/gitUiModule';
 import { gitTransportFor } from '../../../repo/git/transport';
@@ -38,7 +39,7 @@ onMounted(async () => {
       onReviewMarked: (path) => emit('marked', path),
     });
   } catch (err) {
-    errorMessage.value = err instanceof Error ? err.message : String(err);
+    errorMessage.value = errorText(err);
   }
 });
 

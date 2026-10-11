@@ -10,6 +10,7 @@ import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, watch } from 'vue';
+import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
 import ParamsForm from '../run/ParamsForm.vue';
 import RunPreview from '../run/RunPreview.vue';
@@ -69,7 +70,7 @@ const accept = useMutation(
       emit('close');
     },
     onError: (err) => {
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = errorText(err);
       void preview.refetch();
     },
   },
@@ -83,7 +84,7 @@ const decline = useMutation(
     },
     onSuccess: () => emit('close'),
     onError: (err) => {
-      error.value = err instanceof Error ? err.message : String(err);
+      error.value = errorText(err);
     },
   },
   queryClient,

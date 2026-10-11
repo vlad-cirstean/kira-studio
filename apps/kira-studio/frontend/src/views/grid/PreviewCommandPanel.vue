@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -40,7 +41,7 @@ const statements = computed(() => data.value ?? []);
 const errorMessage = computed(() => {
   const err = error.value;
   if (!err) return null;
-  return err instanceof Error ? err.message : String(err);
+  return errorText(err);
 });
 
 // P31 D40/F36: a blank line between statements — the trailing `;` on the last one is unchanged.

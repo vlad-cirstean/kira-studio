@@ -10,6 +10,7 @@ import type {
 import { defaultGrpcSavedRequest, defaultHttpSavedRequest } from '@shared/domain/collections';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRef, toRefs, watch } from 'vue';
@@ -323,7 +324,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.renamingKey = key;
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -359,7 +360,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.renamingKey = key;
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -387,7 +388,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.renamingKey = key;
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -414,7 +415,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       else if (row.kind === 'collection') renameVariableSetTabs('collection', row.id, name);
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -438,7 +439,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.error = null;
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return false;
     }
   }
@@ -450,7 +451,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       if (!(await moveRow(row, collection.id))) return;
       state.renamingKey = collectionKey(collection.id);
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -530,7 +531,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       if (state.selected === row.key) state.selected = null;
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -569,7 +570,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await afterTreeListChange();
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -587,7 +588,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         openCollectionRequestTab(row.id, row.name, saved);
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -661,7 +662,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.error = null;
       return null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return state.error;
     }
   }
@@ -680,7 +681,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await afterTreeListChange();
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -696,7 +697,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await afterTreeListChange();
       state.error = null;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
     }
   }
 
@@ -733,7 +734,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       // try's success path) never reloaded the tree on failure either — a partially-applied import
       // (Go's own import is not one transaction; some rows can land before a later one fails) left
       // the panel showing the pre-import tree until something else happened to reload it.
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return false;
     } finally {
       // Always reloads, success or failure (P108 F10), before clearing `busy` — a partial import's
@@ -786,7 +787,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.exportWarning = notes.length > 0 ? notes.join(' ') : null;
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
+      state.error = errorText(err);
       return false;
     } finally {
       state.busy = false;

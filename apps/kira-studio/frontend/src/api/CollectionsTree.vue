@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { useEventListener } from '@vueuse/core';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
+import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { copyOrReportError } from '@workbench/util/clipboard';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
-import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';

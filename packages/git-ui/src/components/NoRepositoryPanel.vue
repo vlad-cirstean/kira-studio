@@ -13,6 +13,7 @@ import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { errorText } from '@workbench/bridge/codedError';
 import { onMounted, ref } from 'vue';
 import { codiconName, STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
@@ -28,7 +29,7 @@ const refreshError = ref<string | undefined>(undefined);
 function refreshCandidates(): void {
   refreshError.value = undefined;
   void props.repoState.refreshList().catch((err: unknown) => {
-    refreshError.value = err instanceof Error ? err.message : String(err);
+    refreshError.value = errorText(err);
   });
 }
 
@@ -48,7 +49,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     // `transport-closed` (the host disconnecting mid-request) is ignored outright — this panel
     // is about to be replaced by the boot-error banner (F8) rather than needing its own copy of it.
     if (err instanceof TransportError && err.code === 'transport-closed') return;
-    pickError.value = err instanceof Error ? err.message : String(err);
+    pickError.value = errorText(err);
   }
 }
 </script>

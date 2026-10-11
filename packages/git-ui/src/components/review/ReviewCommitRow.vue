@@ -22,6 +22,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, ref, useTemplateRef } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
@@ -165,7 +166,7 @@ async function revealInGraph(): Promise<void> {
     // is ignored outright — nothing left to announce it to once the row is gone.
     if (err instanceof TransportError && err.code === 'transport-closed') return;
     props.actions.announce(
-      `Couldn't reveal this commit — ${err instanceof Error ? err.message : String(err)}`,
+      `Couldn't reveal this commit — ${errorText(err)}`,
     );
   }
 }
@@ -191,7 +192,7 @@ function onOpenFile(index: number, pinned: boolean): void {
     .catch((err: unknown) => {
       if (err instanceof TransportError && err.code === 'transport-closed') return;
       props.actions.announce(
-        `Couldn't open the file — ${err instanceof Error ? err.message : String(err)}`,
+        `Couldn't open the file — ${errorText(err)}`,
       );
     });
 }

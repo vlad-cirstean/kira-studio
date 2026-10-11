@@ -26,12 +26,13 @@ import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
@@ -544,7 +545,7 @@ async function onDeleteMessage(): Promise<void> {
     await deleteSqsMessage(props.tab.id, row.key);
     streamViewStore.setActionError(props.tab.id, null);
   } catch (err) {
-    streamViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    streamViewStore.setActionError(props.tab.id, errorText(err));
   }
 }
 

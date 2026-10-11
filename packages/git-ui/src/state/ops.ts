@@ -28,11 +28,13 @@ import type {
   UndoSlotSnapshot,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { createLatestRequest } from '@workbench/behaviour/latest';
+import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
 import { composeFailureNotice, type FailureNotice } from './failureNotice.ts';
-import { createLatestRequest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 import {
   type CherryPickPredictionMismatch,
   composeAutoDetachAnnouncement,
@@ -281,8 +283,8 @@ export class OpsState {
    *  quick succession (two `repo.changed` events back to back) can reply out of order — each its
    *  own tracker, so a stale status reply can never be mistaken for a stale undo reply or vice
    *  versa. */
-  readonly #statusRequest = createLatestRequest<StatusSummary>();
-  readonly #undoRequest = createLatestRequest<UndoSlotSnapshot | null>();
+  readonly #statusRequest = createLatestRequest<StatusSummary>(isCancelledTransport);
+  readonly #undoRequest = createLatestRequest<UndoSlotSnapshot | null>(isCancelledTransport);
 
   constructor(
     bridge: BridgeClient,
@@ -941,7 +943,7 @@ export class OpsState {
       return result;
     } catch (error) {
       this.#announceRejection('Stash', error);
-      return this.#failedResult(error instanceof Error ? error.message : String(error));
+      return this.#failedResult(errorText(error));
     } finally {
       this.busy.value = false;
     }
@@ -1785,7 +1787,7 @@ export class OpsState {
    *  fire-and-forget. Announce instead of rethrowing; a local cancel stays silent. */
   #announceRejection(action: string, error: unknown, suffix = ''): void {
     if (error instanceof TransportError && error.code === 'cancelled') return;
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     this.#fail(action, { kind: 'Unknown', message }, false, suffix);
   }
 
@@ -1835,7 +1837,7 @@ export class OpsState {
       return result;
     } catch (error) {
       this.#announceRejection(actionLabel, error);
-      return this.#failedResult(error instanceof Error ? error.message : String(error));
+      return this.#failedResult(errorText(error));
     } finally {
       this.busy.value = false;
     }

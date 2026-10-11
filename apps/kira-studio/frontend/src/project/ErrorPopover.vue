@@ -3,8 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { copyOrReportError } from '@workbench/util/clipboard';
 import { ref } from 'vue';
 
 // A "click for full text" replacement for truncated inline error text (unreadable in a native

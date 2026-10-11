@@ -5,6 +5,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { cn } from '@theme/lib/utils';
+import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -66,7 +67,7 @@ async function runImport(): Promise<void> {
     importPath.value = '';
     importOpen.value = false;
   } catch (err) {
-    listError.value = err instanceof Error ? err.message : String(err);
+    listError.value = errorText(err);
   }
 }
 
@@ -78,7 +79,7 @@ async function createNew(): Promise<void> {
     wfUi.workflowFile = entry.fileName;
     wfUi.workflowMode = 'graph';
   } catch (err) {
-    listError.value = err instanceof Error ? err.message : String(err);
+    listError.value = errorText(err);
   }
 }
 </script>

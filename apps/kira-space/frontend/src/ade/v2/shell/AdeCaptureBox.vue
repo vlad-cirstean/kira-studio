@@ -2,6 +2,7 @@
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { useTimeoutFn } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { ref } from 'vue';
 import { useAddBacklogItem } from '../queries';
 
@@ -25,7 +26,7 @@ async function onEnter(): Promise<void> {
     text.value = '';
     note.value = 'added to backlog';
   } catch (err) {
-    note.value = err instanceof Error ? err.message : String(err);
+    note.value = errorText(err);
   }
   hideNote();
 }

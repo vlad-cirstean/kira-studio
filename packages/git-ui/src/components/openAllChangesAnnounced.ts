@@ -1,3 +1,4 @@
+import { errorText } from '@workbench/bridge/codedError';
 import type { DetailActions } from '../state/detailActions.ts';
 
 /**
@@ -19,8 +20,6 @@ export async function openAllChangesAnnounced(
         : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
     );
   } catch (err) {
-    actions.announce(
-      `Couldn't open the changes — ${err instanceof Error ? err.message : String(err)}`,
-    );
+    actions.announce(`Couldn't open the changes — ${errorText(err)}`);
   }
 }

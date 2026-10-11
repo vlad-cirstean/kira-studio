@@ -7,7 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
-import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
+import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
@@ -141,7 +141,7 @@ function onKeydown(e: KeyboardEvent): void {
     <!-- D13: inline rename doubles as the naming step for all three creation paths, so there is
          one naming interaction instead of a prompt dialog this app does not have. It is also VS
          Code's explorer behaviour, which is the tree this panel is modelled on. -->
-    <InlineRenameInput
+    <InlineEditInput
       v-if="renaming"
       :name="row.name"
       data-testid="collection-rename-input"

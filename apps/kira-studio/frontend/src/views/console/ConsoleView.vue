@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from 
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -382,7 +383,7 @@ async function ensureConnectedForRun(): Promise<boolean> {
     connectError.value =
       (id ? connectionsStore.states[id]?.error : undefined) ?? 'Could not connect.';
   } catch (e) {
-    connectError.value = e instanceof Error ? e.message : String(e);
+    connectError.value = errorText(e);
   }
   return false;
 }

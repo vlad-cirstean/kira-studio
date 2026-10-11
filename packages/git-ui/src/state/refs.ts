@@ -1,7 +1,8 @@
 import type { HeadState, RefRow, ResultOf } from '@kira/git-ipc';
+import { createLatestRequest } from '@workbench/behaviour/latest';
 import { type ComputedRef, computed, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { createLatestRequest } from './latestRequest.ts';
+import { isCancelledTransport } from './isCancelled.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
 /**
@@ -34,7 +35,7 @@ export class RefsState {
   readonly #repo: RepoScopedReload;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
-  readonly #reloadRequest = createLatestRequest<ResultOf<'refs.list'>>();
+  readonly #reloadRequest = createLatestRequest<ResultOf<'refs.list'>>(isCancelledTransport);
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;

@@ -46,6 +46,7 @@ import {
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, reactive, ref, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 
@@ -181,7 +182,7 @@ async function save(): Promise<void> {
     try {
       await props.repoSettingsState.set(patch);
     } catch (err) {
-      saveError.value = err instanceof Error ? err.message : String(err);
+      saveError.value = errorText(err);
       return;
     }
   }

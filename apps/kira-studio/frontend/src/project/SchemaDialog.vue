@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../state/connections';
@@ -108,7 +109,7 @@ async function onSave(): Promise<void> {
     await saveDdl({ connectionId: id, ddl: draft.value });
     schemaDialogStore.closeSchemaDialog();
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err);
+    saveError.value = errorText(err);
   }
 }
 </script>

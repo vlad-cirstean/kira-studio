@@ -5,10 +5,10 @@ import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { computed, nextTick, ref, watch } from 'vue';
+import { copyText } from '../behaviour/clipboard';
+import { useSortableReorder } from '../behaviour/sortableReorder';
 import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import { copyText } from '../util/clipboard';
-import { useSortableReorder } from '../util/useSortableReorder';
 import { wheelToHorizontal } from '../util/wheelScroll';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.

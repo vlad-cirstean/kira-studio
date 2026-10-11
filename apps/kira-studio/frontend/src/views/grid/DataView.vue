@@ -10,6 +10,7 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -132,7 +133,7 @@ async function onCommit(): Promise<void> {
       },
     );
   } catch (err) {
-    gridViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    gridViewStore.setActionError(props.tab.id, errorText(err));
   }
 }
 

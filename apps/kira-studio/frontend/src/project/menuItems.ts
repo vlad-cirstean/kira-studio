@@ -1,6 +1,6 @@
 import { decodePath } from '@shared/domain/tree';
+import { copyText } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
 import { type CountableKind, countTab } from '../state/viewCommands';

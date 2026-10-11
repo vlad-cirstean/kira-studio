@@ -2,6 +2,7 @@ import type { CompiledQuery, LoadedScanResult, SearchField, SearchScope } from '
 import { compileQuery, matchRef, searchLoadedCommits } from '@kira/git-core';
 import type { RefRow, ResultOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { errorText } from '@workbench/bridge/codedError';
 import { type ComputedRef, computed, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import type { GraphViewState } from './graphView.ts';
@@ -495,7 +496,7 @@ export class SearchState {
         if (!stillCurrent()) return;
         // `search.run` answers a bad pattern as data, so a rejection is a transport or git
         // failure. The loaded half still stands; the notice says the rest was not searched.
-        this.tailError.value = error instanceof Error ? error.message : String(error);
+        this.tailError.value = errorText(error);
       })
       .finally(() => {
         if (this.#tailController === controller) {

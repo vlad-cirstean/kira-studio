@@ -1,5 +1,5 @@
+import { copyOrReportError, copyOrReportErrorLazy } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyOrReportError, copyOrReportErrorLazy } from '@workbench/util/clipboard';
 import {
   columnsToTsv,
   disambiguateNames,

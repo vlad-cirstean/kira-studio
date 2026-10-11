@@ -2,6 +2,7 @@
 import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { setupStatus } from '../board/setupStatus';
@@ -29,7 +30,7 @@ async function onRetry(): Promise<void> {
   try {
     await retry.mutateAsync({ branchId: props.branch.id });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 </script>

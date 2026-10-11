@@ -13,8 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
+import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
 import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';

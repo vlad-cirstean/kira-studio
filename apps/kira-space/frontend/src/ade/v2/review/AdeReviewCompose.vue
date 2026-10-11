@@ -4,6 +4,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { onKeyStroke, useTimeoutFn } from '@vueuse/core';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { activityKind } from '../activity';
 import { deliver } from '../dialog/deliver';
@@ -86,7 +87,7 @@ async function send(): Promise<void> {
     turn.current = null;
     stopHint();
     status.value = '';
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorText(err);
   }
 }
 

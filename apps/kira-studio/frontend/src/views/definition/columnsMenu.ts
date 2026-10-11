@@ -1,5 +1,5 @@
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyOrReportError } from '@workbench/util/clipboard';
 import { useModeStore } from '../../state/mode';
 import { useTabsStore } from '../../state/tabs';
 import { dataQueryCommands } from '../../state/viewCommands';

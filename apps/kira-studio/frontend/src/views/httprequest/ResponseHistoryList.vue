@@ -16,9 +16,9 @@ import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/componen
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
+import { formatBytes, formatRelative } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';

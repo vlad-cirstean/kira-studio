@@ -54,13 +54,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
+import { formatBytes } from '@workbench/behaviour/format';
+import { VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { formatBytes } from '@workbench/util/format';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
@@ -384,7 +385,7 @@ async function saveEdit(): Promise<void> {
     await saveValueEdit(props.viewKey, keyName.value, editDraft.value);
     editOpen.value = false;
   } catch (err) {
-    editError.value = err instanceof Error ? err.message : String(err);
+    editError.value = errorText(err);
   } finally {
     editSaving.value = false;
   }
@@ -418,7 +419,7 @@ async function saveObjectEdit(): Promise<void> {
     await saveValueEdit(props.viewKey, keyName.value, objectDraft.value);
     objectDraft.value = null;
   } catch (err) {
-    objectSaveError.value = err instanceof Error ? err.message : String(err);
+    objectSaveError.value = errorText(err);
   } finally {
     objectSaving.value = false;
   }
@@ -450,7 +451,7 @@ async function onDeleteKey(): Promise<void> {
     }
     keyValueViewStore.setActionError(props.viewKey, null);
   } catch (err) {
-    keyValueViewStore.setActionError(props.viewKey, err instanceof Error ? err.message : String(err));
+    keyValueViewStore.setActionError(props.viewKey, errorText(err));
   }
 }
 
@@ -502,7 +503,7 @@ async function submitAdd(): Promise<void> {
     await addKey(props.viewKey, name, addValue.value);
     addOpen.value = false;
   } catch (err) {
-    addError.value = err instanceof Error ? err.message : String(err);
+    addError.value = errorText(err);
   } finally {
     addSaving.value = false;
   }

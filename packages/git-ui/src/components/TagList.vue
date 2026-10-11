@@ -11,13 +11,14 @@ import type { InProgressOperation, RefRow } from '@kira/git-ipc';
 import { rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { cn } from '@theme/lib/utils';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import type { RefListSection } from './refListModel.ts';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildRefMenu } from './rowMenuModel.ts';
-import ShowMoreButton from './ShowMoreButton.vue';
 import { useRowMenu } from './useRowMenu.ts';
 
 const props = defineProps<{
@@ -122,7 +123,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
         @contextmenu="openRefMenu(row, $event)"
       />
     </div>
-    <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
+    <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No tags</div>
 
     <RowContextMenu
