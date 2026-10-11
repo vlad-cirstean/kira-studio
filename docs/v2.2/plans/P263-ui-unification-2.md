@@ -941,7 +941,7 @@ Findings fixed:
 - `WordWrapField` already `Switch` (Stream C).
 - Theme `RadioGroupItem` hit area `after:-inset-x-3 after:-inset-y-2` to `after:-inset-1`; `EnvironmentsView` override deleted, drag spec green.
 
-Legacy: no `destructive`/`err`/`note` variant, Alert `default` variant or alias left in code (grep 0; `note-text` is a colour token). Stale `destructive` text in ARCHITECTURE fixed. `scripts/ui-primitives-allowlist/` deleted; 16 permanent exemptions now named in `check-ui-primitives.sh` (EngineIcon, OriginIcon, MobileQr colours; log stderr colour; caret popups; radio-card tile; DOM-built grid cell; AppearancePane density preview; code/list boxes; Monaco view-zone DOM; markdown em scale; board card fill; shell row-resize cursor).
+Legacy: no `destructive`/`err`/`note` variant, Alert `default` variant or alias left in code (grep 0; `note-text` is a colour token). Stale `destructive` text in ARCHITECTURE fixed. `scripts/ui-primitives-allowlist/` deleted; 27 exemptions (8 from P262, 19 permanent from the stream lists) now named in `check-ui-primitives.sh` (EngineIcon, OriginIcon, MobileQr colours; log stderr colour; caret popups; radio-card tile; DOM-built grid cell; AppearancePane density preview; code/list boxes; Monaco view-zone DOM; markdown em scale; board card fill; shell row-resize cursor).
 
 Pixel check (shell, dock, ADE panel handle, Space ui spec, rest/hover/drag, screenshots viewed): thickness 2px, fill transparent then `rgb(0,120,212)` on hover and drag, hit area 4px, identical. One difference: cursor. Reka sets `ew-resize` globally on hover; the cva said `col-resize`. cva now `ew-resize`/`ns-resize` (SlickGrid resizer and shell dock cursor too); U31 regex covers all four names.
 

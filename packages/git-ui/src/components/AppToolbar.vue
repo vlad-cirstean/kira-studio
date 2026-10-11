@@ -173,8 +173,7 @@ async function onAutoFetchMarkerClick(): Promise<void> {
 
 const isForcePushMenuOpen = ref(false);
 
-// G34 D8: driving `MenuSections` — today, one item. `danger: true` is the same visual treatment
-// `variant="destructive"` gives the DropdownMenuItem row it replaces.
+// G34 D8: driving `MenuSections` — today, one item. `danger: true` renders the error tone.
 const pushMenuSections: readonly MenuSection[] = [
   {
     items: [
