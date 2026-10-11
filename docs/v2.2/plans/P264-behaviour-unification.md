@@ -1290,3 +1290,5 @@ Verify:
 - Studio visual automations-module: pass, no diff.
 - Space ui full: 445 pass; a varying set of repo-graph-* wall-clock specs (columns, lines, paging, refresh, badges, review-interaction, workspace) fail at 1s-class budgets under host load average ~30. `repo-graph-refresh:53` and `repo-graph-columns:217` fail identically with base `graphView.ts` restored, so not caused by this stream; left per ui-timing rule.
 - Space visual git-module: not run (host load; see handback).
+
+Note: per coordinator, stream-end testing moves to a separate serial run after landing. Results above ran before that call. Space visual `git-module` and a clean re-run of the load-flaky repo-graph specs were NOT run.
