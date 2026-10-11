@@ -25,7 +25,7 @@ test('branch row menu labels', async ({ relaunch }) => {
   await expect(tid(page, 'menu-item-deleteRef')).toHaveText('Delete');
 });
 
-test('commit row menu offers New branch…', async ({ relaunch }) => {
+test('commit row menu offers New branch', async ({ relaunch }) => {
   const page = await openPortGraph(relaunch, {
     chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),
     results: PICKER_RESULTS,
@@ -34,7 +34,7 @@ test('commit row menu offers New branch…', async ({ relaunch }) => {
   await expect(row).toBeVisible();
 
   await row.click({ button: 'right' });
-  await expect(tid(page, 'menu-item-createBranchHere')).toHaveText('New branch…');
+  await expect(tid(page, 'menu-item-createBranchHere')).toHaveText('New branch');
 });
 
 // The app has no delete branch dialog; an unmerged branch raises the force delete prompt.
