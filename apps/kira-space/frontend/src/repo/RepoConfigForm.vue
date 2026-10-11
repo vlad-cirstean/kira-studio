@@ -5,7 +5,8 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';

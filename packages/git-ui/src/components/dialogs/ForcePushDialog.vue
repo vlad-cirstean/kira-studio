@@ -34,7 +34,8 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 

@@ -2,7 +2,8 @@
 import type { ScriptRunPreview } from '@shared/domain/scriptRuns';
 import { Card } from '@theme/components/ui/card';
 import VarText from '@theme/components/VarText.vue';
-import { CatalogText, type MessageKey, t } from '@theme/i18n';
+import { type MessageKey, t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import type { TextPart } from '@theme/varText';
 import { computed } from 'vue';
 import { costText } from '../runs/runText';

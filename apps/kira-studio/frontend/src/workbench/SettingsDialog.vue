@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldError } from '@theme/components/ui/field';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
 import { computed } from 'vue';

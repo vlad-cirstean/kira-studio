@@ -11,7 +11,8 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, useId } from 'vue';
 
 const props = defineProps<{

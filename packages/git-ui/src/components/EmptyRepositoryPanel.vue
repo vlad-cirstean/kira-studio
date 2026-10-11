@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Empty, EmptyDescription, EmptyMedia } from '@theme/components/ui/empty';
-import { CatalogText } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 /**
  * §6.2's "repository with no commits" state — an unborn HEAD (P1 detects it; P2's store renders
  * it as zero rows). A one-line explanation, not an empty list with a scrollbar: showing the real

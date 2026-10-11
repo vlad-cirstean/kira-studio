@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed } from 'vue';
 import type { PendingChange } from '../lib/editDiff';
 

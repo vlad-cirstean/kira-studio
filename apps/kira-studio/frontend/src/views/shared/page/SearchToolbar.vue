@@ -1,7 +1,8 @@
 <script setup lang="ts" generic="M extends { row: number }">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { CatalogText, type MessageKey, t } from '@theme/i18n';
+import { type MessageKey, t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useFindBar } from '@workbench/behaviour/findBar';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { formatCount } from '@workbench/behaviour/format';

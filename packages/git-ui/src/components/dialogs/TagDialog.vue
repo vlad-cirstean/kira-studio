@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 /**
  * `docs/plans/P6.md` W15: "create tag here" (W14's row menu). Unlike `CheckoutDialog.vue`/
  * `RevertDialog.vue`, this one is not driven by an `OpsState` pending-ref (P6 has no

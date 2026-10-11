@@ -2,7 +2,8 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import type { PendingChange } from '../lib/editDiff';
 import type { DockerEditSpec } from '../wire';
 import EditPendingSummary from './EditPendingSummary.vue';

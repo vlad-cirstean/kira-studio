@@ -3,7 +3,8 @@ import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-cor
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';

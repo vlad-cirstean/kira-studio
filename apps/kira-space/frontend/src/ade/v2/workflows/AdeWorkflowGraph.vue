@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';

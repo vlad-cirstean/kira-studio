@@ -15,7 +15,8 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import VarText from '@theme/components/VarText.vue';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId } from 'vue';
 
 const props = defineProps<{ needs: ScriptRunPreview['needs']; ade: ScriptRunAde | null }>();

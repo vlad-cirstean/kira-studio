@@ -30,7 +30,8 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';

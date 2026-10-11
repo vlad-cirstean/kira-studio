@@ -36,7 +36,8 @@ import { Button } from '@theme/components/ui/button';
  */
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
-import { CatalogText, type MessageKey, t } from '@theme/i18n';
+import { type MessageKey, t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatCount } from '@workbench/behaviour/format';

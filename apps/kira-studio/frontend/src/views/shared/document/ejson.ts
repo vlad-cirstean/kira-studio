@@ -1,4 +1,4 @@
-import { t } from '@theme/i18n/core';
+import { t } from '@theme/i18n';
 // Parses one document body — canonical extended JSON, `read.ts`'s `EJSON.stringify(doc, {relaxed:
 // false})` — into a plain, frozen, non-reactive node tree, and formats values back out in Mongo
 // shell form. No `bson` import: every BSON wrapper is recognised by shape against the closed EJSON

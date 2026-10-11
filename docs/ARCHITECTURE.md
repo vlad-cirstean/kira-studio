@@ -2377,7 +2377,7 @@ All user-visible text lives in one catalog, `packages/theme/src/i18n/en.json`. v
 
 - `t(key, params?)`: global, typed. `MessageKey` is every leaf path of `en.json`; an unknown key fails `vue-tsc`/`tsgo` (`types.check.ts` proves it). `params.count` as a number formats with locale digit grouping and selects the plural branch.
 - Components: `import { t } from '@theme/i18n'`. Never `$t`, never `useI18n()` outside the folder (U68).
-- `CatalogText` (`<CatalogText k="key" :params>`, named slots) puts an element inside a sentence. A sentence never splits across literals. Needs `app.use(i18n)`.
+- `CatalogText` (`<CatalogText k="key" :params>`, named slots) puts an element inside a sentence. A sentence never splits across literals. Import from `@theme/i18n/CatalogText.vue`, not the `@theme/i18n` index: the index stays free of `.vue` so workers and Node test code can import it. Needs `app.use(i18n)`.
 - `app.use(i18n)` runs at every `createApp` site: Studio, Space, mobile, git-ui `mount()`, `bootstrapShell`, Monaco review zones.
 - `t()` runs at render or call time, never at module scope (U70). Hot paths (SlickGrid formatters, virtual rows, Monaco decorations) resolve once per setup or render pass, never per cell.
 - Values that drive logic (enum values, status ids, persisted strings, testids) are never translated; only the label shown for them.

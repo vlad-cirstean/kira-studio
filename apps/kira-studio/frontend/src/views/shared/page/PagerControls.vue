@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
-import { CatalogText, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, watch } from 'vue';
 
 // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
