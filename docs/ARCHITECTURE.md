@@ -2369,6 +2369,94 @@ all. The "both runtimes for one component" objection stands regardless.
 A future Vue 3.6 upgrade keeps VDOM mode — see the plan's §6 for the conditions under which this
 should be re-evaluated.
 
+### Copy and i18n (P265)
+
+All user-visible text lives in one catalog, `packages/theme/src/i18n/en.json`. vue-i18n 11 (Composition API, JIT compile, no `eval`) is the runtime. English ships; a locale is a second file next to `en.json`. Go reads the same file for native text.
+
+**Runtime** (`packages/theme/src/i18n/`):
+
+- `t(key, params?)`: global, typed. `MessageKey` is every leaf path of `en.json`; an unknown key fails `vue-tsc`/`tsgo` (`types.check.ts` proves it). `params.count` as a number formats with locale digit grouping and selects the plural branch.
+- Components: `import { t } from '@theme/i18n'`. Never `$t`, never `useI18n()` outside the folder (U68).
+- `CatalogText` (`<CatalogText k="key" :params>`, named slots) puts an element inside a sentence. A sentence never splits across literals. Needs `app.use(i18n)`.
+- `app.use(i18n)` runs at every `createApp` site: Studio, Space, mobile, git-ui `mount()`, `bootstrapShell`, Monaco review zones.
+- `t()` runs at render or call time, never at module scope (U70). Hot paths (SlickGrid formatters, virtual rows, Monaco decorations) resolve once per setup or render pass, never per cell.
+- Values that drive logic (enum values, status ids, persisted strings, testids) are never translated; only the label shown for them.
+- Test builds: `installCopyTestHook()` (under `__KIRA_DEBUG_HOOKS__`, Studio and Space) sets `window.__kiraSetLocale('en' | 'pseudo')`. `pseudo` wraps each message as `⟦…⟧`. `packages/workbench/src/testing/ui/copyCoverage.ts` (`setPseudoLocale`, `expectCatalogText`) fails on visible letters outside a marker. Mobile has no test hooks; the static guard covers it.
+
+**Keys.** `<namespace>.<area>.<surface>.<element>.<role>`, camelCase segments, depth 3-6, named for meaning, never for the English text. Namespaces: `automations`, `backend`, `common`, `docker`, `format`, `git`, `memory`, `mobile`, `shared`, `space`, `studio`, `theme`, `workbench`. Roles: `label`, `tooltip`, `aria`, `placeholder`, `title`, `option`, `status`, `announce`, `confirm`, `body`, `hint`, `description`, `emptyHint`, `error`, `empty`, `loading`, `example`. Confirm group: `<surface>.<x>Confirm.{title,body,confirm}`. Identical text is one key (C3). Shared vocabulary: `common.*`, or `<namespace>.common.*` inside a module. `format.*` holds `behaviour/format.ts` word templates.
+
+**Style.**
+
+1. Sentence case everywhere; capitals only for the first word, proper nouns and acronyms. Native macOS menu (`backend.menu.*`) is title case.
+2. `…` (one character) on an action only when it opens a dialog or picker needing more input. Loading text always ends `…`. Placeholders never do.
+3. No trailing period on labels, buttons, menu items, tooltips, titles, placeholders, options, status words, announcements. Sentences (`body`, `hint`, `description`, `emptyHint`, `error`) end with `.`. Confirm titles end with `?`.
+4. Typographic quotes `“ ”` around a named instance and `’` in contractions. No straight quotes.
+5. Contractions: `can’t`, `couldn’t`, `isn’t`. Banned: `cannot`, `could not`.
+6. British spelling (`colour`, `cancelled`, `behaviour`).
+7. No `&`, no `(s)`, no `e.g.`, no `Error:` prefix, no `OK`/`Yes`/`No` buttons (use the verb).
+8. ` — ` between clauses; `: ` before backend error detail.
+9. Counts with a noun are plural messages with `{count}`. Sizes, dates, durations come from `behaviour/format.ts`.
+10. Named placeholders in camelCase. A user-provided name in prose is `“{name}”`. Resolved script variables keep `VarText` inside a `CatalogText` slot. No string built by concatenating translated parts.
+11. Icon-button tooltip and `aria-label` are one key (`.tooltip`), the action as a label, no shortcut text.
+12. Confirm: title `<Verb> <object>?`; body names the instance in `“ ”` and states the consequence; irreversible adds `common.confirm.irreversible`; buttons `Cancel` plus the title’s verb.
+13. Empty: `No <items> yet` when the user can create one, else `No <items>`; filtered-empty is `No matches`.
+14. Errors: action failed is `Couldn’t <verb> <object>.` or `…: {error}`; precondition blocks is `Can’t <verb>: <reason>.`; load failure in `QueryState` is `Couldn’t load` plus `Retry`.
+15. Status words are short sentence-case phrases. Raw engine states (Docker `running`, plan node names) are data, shown as is.
+
+**Glossary (one word per concept).**
+
+| Concept | Use | Not |
+|---|---|---|
+| Destroy a stored item | `Delete` | |
+| Detach, item survives | `Remove` | |
+| Empty a list or field | `Clear` | |
+| Abandon a dialog | `Cancel` (also confirm cancel) | `Keep`, `Leave it` |
+| End a transient surface | `Close` | |
+| Toggle a persistent part | `Show <x>` / `Hide <x>` | |
+| Remove a notice | `Dismiss` | |
+| Drop unsaved changes | `Discard` / `Discard changes` | `Revert` (git word) |
+| Git revert, git reset | `Revert`, `Reset` | |
+| Settings to default | `Reset to default` | |
+| Persist | `Save` | |
+| Apply pending, stay open | `Apply` | `Confirm`, `OK` |
+| New thing (menu, toolbar) | `New <thing>…` | |
+| Creation dialog primary | `Create` | |
+| Append in an editor or list | `Add <thing>` (no `+` prefix) | |
+| Import | `Import <thing>…` | |
+| Re-fetch | `Refresh` | `Reload` |
+| Re-attempt | `Retry` | `Try again` |
+| Execute once | `Run` | |
+| Long-running process | `Start` / `Stop` | |
+| Undo an in-progress git operation | `Abort` | |
+| Take over an agent run | `Take over` | |
+| Choose in a picker | `Choose` | `Pick` |
+| Select in a list | `Select` | |
+| Edit | `Edit` (`Edit credentials…`) | `Update` (reserved for app update) |
+| Settings | `Settings`, `Open settings` | `Preferences` |
+| Copy | `Copy <thing>`, `Copy as <format>`, `Copy for agent` | |
+| Copy feedback | whole messages (`Copied name`), `Couldn’t copy: {error}` | noun fragments |
+| Git checkout | `Check out` (verb), `checkout` (noun) | `Checkout` as a verb |
+| Loading | `Loading…`, `Loading <noun>…` | |
+| Empty | `No <items> yet`, `No <items>`, `No matches` | `Nothing to show` |
+| Load or action failure | `Couldn’t <verb> <object>: {error}` | `Failed to`, `Could not` |
+| Precondition | `Can’t <verb>: <reason>.` | |
+| Irreversible | `This can’t be undone.` | |
+| Show more / load more | `Show more` (reveal capped items), `Load more` (fetch next page) | |
+| Terms | `repository` (not `repo`), `folder` (not `directory`, except `working directory`), `ID`, `for example` | |
+
+**Guards.**
+
+- Catalog checker `scripts/copy/check-catalog.ts` (`catalogRules.ts`), run by `bun run lint`: C1 message syntax parses with `@intlify/message-compiler`; C2 key shape and role; C3 identical text under two keys; C4 near-duplicates; C5 banned forms; C6 sentence case (title case under `backend.menu.*`); C7 punctuation by role; C8 plural shape and `backend.*` named placeholders only; C9 placeholder names and no HTML; C10 unused key (`--unused`, off in lint until close-out); C11 empty value. Exemptions: `ALLOWED_DUPLICATES`, each with a reason.
+- Source guard `scripts/copy/check-copy.ts` (Babel and `@vue/compiler-sfc` ASTs), run by `bun run lint`: U64 template text; U65 static text attribute; U66 string literal in a template expression; U67 string in a text property or announce call; U68 `vue-i18n` use outside the i18n folder; U69 concatenated or composed translation, `plural(`, `copyAnnounced(x, 'word')`; U70 `t(` at module scope; U71 `t` call params differ from the message placeholders.
+- Allowlists: `scripts/copy-allowlist/*.txt`, one path per line (file pending migration) or `permanent U<n> path # reason`. Lists only shrink; a stale line fails. Permanent lines cover font names, protocol tokens, SQL keywords, EJSON syntax, brand marks, dev traces and engine-rendered text only.
+- `bun scripts/copy/check-copy.ts --failing-files` lists files still owed a migration. `--all` prints every hit.
+
+**Go reader.** `packages/theme/src/i18n/catalog.go` embeds `en.json`. `i18n.T("backend.menu.quit.label", map[string]string{"appName": name})` replaces `{name}` placeholders and panics on an unknown key. `backend.*` holds native menu text, OS notification and prompt titles, native dialog titles, git undo labels, definition section titles and query plan roots; named placeholders only, no plural. Call sites must pass a literal key and `nil` or a map literal: `catalog_test.go` checks key existence and placeholders for every `i18n.T(` in the repo. Menu text duplicates `common.*` wording by design (Go reads `backend.*` only). Backend error messages stay Go literals (see Known open items).
+
+**Add a string.** Pick the key (namespace of the owning module, `common.*` if shared). Add it to `en.json`, sorted (`biome check --write` sorts and formats). Use `t('…')` in script or template, or `CatalogText` around elements. Run `bun run lint` and `bun run typecheck`. Specs keep literal expected strings: the wording is the contract.
+
+**Add a locale.** Copy `en.json` to `<locale>.json`, translate values keeping keys, placeholders and plural branches. Register it in `packages/theme/src/i18n/index.ts` `messages`, add it to `CopyLocale`, add a switch in settings. Monaco, SlickGrid and xterm need their own locale packs.
+
 ## Process model
 
 Two processes for the Studio and Api modules: the **webview** running the Vue renderer, and the
