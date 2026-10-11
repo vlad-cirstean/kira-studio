@@ -2,6 +2,7 @@
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import { colorMarkClass } from '@theme/connColor';
+import { displayValue } from '@workbench/behaviour/format';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -161,12 +162,12 @@ function menuFor(record: OpRecord): MenuItem[] {
           v-if="connectionFor(record)"
           :class="colorMarkClass('dot', connectionFor(record)?.color)"
         />
-        <span class="truncate min-w-0">{{ connectionFor(record)?.name ?? '—' }}</span>
+        <span class="truncate min-w-0">{{ displayValue(connectionFor(record)?.name) }}</span>
       </span>
       <span v-else-if="column.id === 'tab'" class="truncate min-w-0" data-testid="op-tab-cell">{{
         tabTitleFor(record)
       }}</span>
-      <span v-else-if="column.id === 'rows'">{{ record.rows ?? '—' }}</span>
+      <span v-else-if="column.id === 'rows'">{{ displayValue(record.rows) }}</span>
     </template>
     <template #detail="{ record, part }">
       <div class="ops-detail-cm h-full min-w-0">

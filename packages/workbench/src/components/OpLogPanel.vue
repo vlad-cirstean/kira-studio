@@ -249,7 +249,7 @@ function durationText(ms: number | null): string | null {
                   </Tooltip>
                   <Tooltip v-else>
                     <TooltipTrigger as-child>
-                      <span class="font-data truncate min-w-0 block">{{ listItems[vi.index].record.command ?? '—' }}</span>
+                      <span class="font-data truncate min-w-0 block">{{ displayValue(listItems[vi.index].record.command) }}</span>
                     </TooltipTrigger>
                     <TooltipContent>{{ listItems[vi.index].record.command ?? '' }}</TooltipContent>
                   </Tooltip>

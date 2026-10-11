@@ -5,7 +5,7 @@ import { Field, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
-import { formatBytes } from '@workbench/behaviour/format';
+import { displayValue, formatBytes } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
 import { data } from '../../bridge/data';
 import { useCacheStatsStore } from '../../state/cacheStats';
@@ -34,15 +34,15 @@ props.registerFieldError('cache.l2BudgetMb', cacheBudgetError);
 
 const hitRateLabel = computed(() => {
   const stats = cacheStatsStore.stats;
-  if (!stats) return '—';
+  if (!stats) return displayValue(null);
   const total = stats.l2Hits + stats.l2Misses;
-  if (total === 0) return '—';
+  if (total === 0) return displayValue(null);
   return `${Math.round((stats.l2Hits / total) * 100)}% (${stats.l2Hits}/${total})`;
 });
 
 const cacheSizeLabel = computed(() => {
   const stats = cacheStatsStore.stats;
-  if (!stats) return '—';
+  if (!stats) return displayValue(null);
   return `${formatBytes(stats.l2Bytes)} / ${formatBytes(stats.l2BudgetBytes)}`;
 });
 

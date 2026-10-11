@@ -7,7 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatBytes, formatRelative } from '@workbench/behaviour/format';
+import { displayValue, formatBytes, formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
 import { monacoLanguageIdFor } from '@workbench/editor/monacoLanguages';
@@ -298,8 +298,8 @@ onUnmounted(() => {
         >
           <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
           <span class="font-data text-muted-foreground">{{ row.name }}</span>
-          <span class="font-data wrap-anywhere">{{ row.a ?? '—' }}</span>
-          <span class="font-data wrap-anywhere">{{ row.b ?? '—' }}</span>
+          <span class="font-data wrap-anywhere">{{ displayValue(row.a) }}</span>
+          <span class="font-data wrap-anywhere">{{ displayValue(row.b) }}</span>
         </div>
         <details v-if="unchangedHeaderRows.length > 0" class="group">
           <summary

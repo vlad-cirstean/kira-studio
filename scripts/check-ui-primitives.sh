@@ -18,6 +18,9 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Byte-wise matching: same result under any locale (the U59 pattern holds a multibyte dash).
+export LC_ALL=C
+
 GNU_GREP=""
 for candidate in ggrep grep; do
   if command -v "$candidate" >/dev/null 2>&1 && echo x | "$candidate" -qP 'x' 2>/dev/null; then
@@ -185,7 +188,7 @@ U55@@vt@@/behaviour/|/testing/@@onMutate (use optimisticUpdate)@@onMutate:
 U56@@vt@@/behaviour/|/testing/@@localeCompare, Collator or lowercase includes (use matchesQuery, compareNatural)@@localeCompare\(|new Intl\.Collator|\.toLowerCase\(\)\.includes\(
 U57@@vt@@/behaviour/|/testing/@@manual scroll-to-end or scrollIntoView (use useFollowTail, revealElement)@@scrollTop\s*=\s*\w+(?:\.value)?\.scrollHeight|scrollIntoView\(
 U58@@vt@@/behaviour/|/testing/|floatingPosition.ts|/kira-ui/@@computeFloatPosition or pointReference (use PointPopover)@@computeFloatPosition|pointReference
-U59@@vt@@/behaviour/|/testing/@@placeholder dash literal (use displayValue)@@(?:\?\?|\|\|)\s*'[—-]'|return\s+'[—-]'
+U59@@vt@@/behaviour/|/testing/@@placeholder dash literal (use displayValue)@@(?:\?\?|\|\|)\s*'(?:—|-)'|return\s+'(?:—|-)'
 U60@@vt@@/behaviour/|/testing/@@vue-draggable-plus (use useSortableReorder)@@from 'vue-draggable-plus'
 U61@@vt@@/behaviour/|/testing/@@empty catch (give a reason comment or surface the error)@@catch\s*(?:\(\w*\))?\s*\{\s*\}|\.catch\(\(\)\s*=>\s*(?:\{\s*\}|undefined)\)
 U62@@vt@@/behaviour/|/testing/@@manual focus() (use useFocusOnMount, useFocusReturn, useListNavigation)@@\.focus\(\)|nextTick\([^)]*\.focus
