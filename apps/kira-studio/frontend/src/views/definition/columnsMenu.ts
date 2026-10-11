@@ -1,4 +1,5 @@
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { useModeStore } from '../../state/mode';
 import { useTabsStore } from '../../state/tabs';
@@ -51,7 +52,7 @@ export function columnsSectionMenu(
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
-      run: () => copyOrReportError(columnName, onCopyError),
+      run: () => copyOrReportError(columnName, onCopyError, () => announceApp('Copied name')),
     },
     {
       type: 'item',

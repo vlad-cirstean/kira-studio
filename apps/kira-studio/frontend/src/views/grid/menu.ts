@@ -1,7 +1,7 @@
 import type { MaskKind, MaskRule } from '@shared/domain/mask';
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
-import { copyText } from '@workbench/behaviour/clipboard';
+import { copyAnnounced } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { maskRulesFor, removeMaskRule, upsertMaskRule } from '../../state/maskRules';
 import { useTabsStore } from '../../state/tabs';
@@ -308,21 +308,22 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       // F5 (P108 Part 10): through tsvField, same as SlickGridHost.vue's own onCopy cell-kind
       // branch — the same "copy this one cell" action must produce the same clipboard text
       // regardless of which of the two paths (keyboard vs. this menu item) ran it.
-      run: () => copyText(ctx.isNull ? '' : tsvField(ctx.text)),
+      run: () => void copyAnnounced(ctx.isNull ? '' : tsvField(ctx.text), 'cell'),
     },
     {
       type: 'item',
       id: 'copy-with-header',
       label: 'Copy with header',
       icon: 'copy',
-      run: () => copyText(`${ctx.columnName}\n${ctx.isNull ? '' : ctx.text}`),
+      run: () =>
+        void copyAnnounced(`${ctx.columnName}\n${ctx.isNull ? '' : ctx.text}`, 'with header'),
     },
     {
       type: 'item',
       id: 'copy-as-json',
       label: 'Copy as JSON',
       icon: 'copy',
-      run: () => copyText(JSON.stringify(ctx.isNull ? null : ctx.text)),
+      run: () => void copyAnnounced(JSON.stringify(ctx.isNull ? null : ctx.text), 'as JSON'),
     },
     {
       type: 'item',
@@ -430,25 +431,29 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
           // Display-only (P21 D5) — the row-selection branch of DataGrid.vue's onCopy already
           // produces this exact TSV output on Cmd/Ctrl+C.
           shortcut: 'grid.copy',
-          run: () => copyText(rowsToTsv(snapshots())),
+          run: () => void copyAnnounced(rowsToTsv(snapshots()), 'as TSV'),
         },
         {
           type: 'item',
           id: 'copy-rows-csv',
           label: 'CSV',
-          run: () => copyText(rowsToCsv(snapshots())),
+          run: () => void copyAnnounced(rowsToCsv(snapshots()), 'as CSV'),
         },
         {
           type: 'item',
           id: 'copy-rows-json',
           label: 'JSON',
-          run: () => copyText(rowsToJson(snapshots())),
+          run: () => void copyAnnounced(rowsToJson(snapshots()), 'as JSON'),
         },
         {
           type: 'item',
           id: 'copy-rows-insert',
           label: 'INSERT',
-          run: () => copyText(rowsToInsert(ctx.qualifiedName, snapshots(), ctx.dialect)),
+          run: () =>
+            void copyAnnounced(
+              rowsToInsert(ctx.qualifiedName, snapshots(), ctx.dialect),
+              'as INSERT',
+            ),
         },
       ],
     },
@@ -637,7 +642,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       id: 'copy-column-name',
       label: 'Copy column name',
       icon: 'copy',
-      run: () => copyText(ctx.columnName),
+      run: () => void copyAnnounced(ctx.columnName, 'column name'),
     },
     {
       type: 'item',
@@ -648,7 +653,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       // opens, and onCopy's final branch already copies that column's loaded values on
       // Cmd/Ctrl+C — a binding that worked before this phase but was never shown anywhere.
       shortcut: 'grid.copy',
-      run: () => copyText(ctx.columnValues().join('\n')),
+      run: () => void copyAnnounced(ctx.columnValues().join('\n'), 'column values'),
     },
     { type: 'separator' },
     {

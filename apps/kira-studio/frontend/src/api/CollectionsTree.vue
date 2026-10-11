@@ -2,6 +2,7 @@
 import { useEventListener } from '@vueuse/core';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { shortcutFor } from '@workbench/shortcuts/keys';
@@ -77,9 +78,13 @@ const actions: CollectionMenuActions = {
   duplicate: (row) => void collectionsStore.duplicateRow(row),
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) =>
-    void copyOrReportError(row.url, (message) => {
-      collectionsStore.error = message;
-    }),
+    void copyOrReportError(
+      row.url,
+      (message) => {
+        collectionsStore.error = message;
+      },
+      () => announceApp('Copied URL'),
+    ),
   importCollection: () => void collectionsStore.importCollection(),
   importCurl: () => importCurlStore.openImportCurlDialog(),
   exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),

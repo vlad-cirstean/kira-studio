@@ -1,5 +1,5 @@
 import { decodePath } from '@shared/domain/tree';
-import { copyText } from '@workbench/behaviour/clipboard';
+import { copyAnnounced } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
@@ -98,7 +98,7 @@ export function copyNameItems(row: MenuRowLike, qualified = false): MenuItem[] {
       label: 'Copy name',
       icon: 'copy',
       shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
+      run: () => void copyAnnounced(row.name, 'name'),
     },
   ];
   if (qualified) {
@@ -107,7 +107,7 @@ export function copyNameItems(row: MenuRowLike, qualified = false): MenuItem[] {
       id: 'copy-qualified-name',
       label: 'Copy qualified name',
       icon: 'copy',
-      run: () => copyText(qualifiedNameFor(row)),
+      run: () => void copyAnnounced(qualifiedNameFor(row), 'qualified name'),
     });
   }
   return items;

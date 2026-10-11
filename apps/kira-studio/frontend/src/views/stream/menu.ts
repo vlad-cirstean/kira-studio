@@ -1,4 +1,5 @@
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import type { MenuItem } from '@workbench/state/contextMenu';
 
 // Read-only view (P10's D13) — copy-only per-row menu, no edit/delete rows anywhere. Mirrors
@@ -16,7 +17,7 @@ export function rowMenu(
       id: 'copy-key',
       label: 'Copy key',
       icon: 'copy',
-      run: () => copyOrReportError(key, onError),
+      run: () => copyOrReportError(key, onError, () => announceApp('Copied key')),
     });
   }
   if (body !== null) {
@@ -25,7 +26,7 @@ export function rowMenu(
       id: 'copy-body',
       label: 'Copy body',
       icon: 'copy',
-      run: () => copyOrReportError(body, onError),
+      run: () => copyOrReportError(body, onError, () => announceApp('Copied body')),
     });
   }
   return items;

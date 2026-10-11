@@ -1,4 +1,5 @@
 import { copyOrReportError as sharedCopyOrReportError } from '@workbench/behaviour/clipboard';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -19,11 +20,14 @@ function prettyJson(text: string): string {
 // way an unhandled promise rejection would — ContextMenu.vue's `onItemClick` is never awaited by
 // its own `@click` binding, so with nothing here to catch it, Copy would fail with zero visible
 // feedback (P43 F6/D7's own `actionError` exists for exactly this).
-function copyOrReportError(tabId: string, text: string): Promise<void> {
+function copyOrReportError(tabId: string, text: string, what: string): Promise<void> {
   return sharedCopyOrReportError(
     text,
     (message) => useDocumentViewStore().setActionError(tabId, message),
-    () => useDocumentViewStore().setActionError(tabId, null),
+    () => {
+      useDocumentViewStore().setActionError(tabId, null);
+      announceApp(`Copied ${what}`);
+    },
   );
 }
 
@@ -95,7 +99,7 @@ export function rowMenu(
           type: 'item',
           id: 'copy-plain-json',
           label: 'Plain JSON',
-          run: () => copyOrReportError(tabId, toPlainJson(body)),
+          run: () => copyOrReportError(tabId, toPlainJson(body), 'as plain JSON'),
         },
         {
           type: 'item',
@@ -103,7 +107,7 @@ export function rowMenu(
           label: 'Shell mode',
           // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already
           // shows, and what saveDocumentEdit/parseDocumentLiteral already accept back.
-          run: () => copyOrReportError(tabId, toShellText(body)),
+          run: () => copyOrReportError(tabId, toShellText(body), 'as shell mode'),
         },
         {
           type: 'item',
@@ -111,13 +115,13 @@ export function rowMenu(
           label: 'Canonical Extended JSON',
           // P19 D6: canonical extended JSON, not relaxed and not shell — it's what the app
           // already has in hand (no re-encode) and what mongoimport/mongosh accept.
-          run: () => copyOrReportError(tabId, prettyJson(body)),
+          run: () => copyOrReportError(tabId, prettyJson(body), 'as canonical extended JSON'),
         },
         {
           type: 'item',
           id: 'copy-relaxed-json',
           label: 'Relaxed Extended JSON',
-          run: () => copyOrReportError(tabId, toRelaxedText(body)),
+          run: () => copyOrReportError(tabId, toRelaxedText(body), 'as relaxed extended JSON'),
         },
       ],
     },
@@ -128,7 +132,7 @@ export function rowMenu(
       // The shell form is also what turns *Copy _id* into a working filter (F14, D12/D15): paste
       // it as `{ _id: ObjectId("...") }` and resolveEjsonWrappers/the shell constructor resolve it
       // to the same value either way.
-      run: () => copyOrReportError(tabId, parseIdLabel(id).text),
+      run: () => copyOrReportError(tabId, parseIdLabel(id).text, '_id'),
     },
     { type: 'separator' },
     {

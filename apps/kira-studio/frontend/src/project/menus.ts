@@ -1,7 +1,7 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { AWS_STYLE_KINDS, CONNECTION_COLOR_CHOICES, FILE_KINDS } from '@shared/domain/connection';
 import { formatConnectionUri } from '@shared/domain/uri';
-import { copyText } from '@workbench/behaviour/clipboard';
+import { copyAnnounced } from '@workbench/behaviour/clipboard';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { control } from '../bridge/control';
@@ -174,12 +174,15 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       run: async () => {
         if (!record) return;
         if (record.mode !== 'uri')
-          return copyText(formatConnectionUri({ ...record, password: null }));
+          return void copyAnnounced(
+            formatConnectionUri({ ...record, password: null }),
+            'connection URI',
+          );
         const result = await revealConnectionSecret(record.id, record.name, 'uri', () => true);
         if (!result) return;
         if (result.outcome === 'error') throw new Error(result.error);
         if (result.uri === null) throw new Error('This connection has no stored URI.');
-        return copyText(result.uri);
+        return void copyAnnounced(result.uri, 'connection URI');
       },
     },
     {

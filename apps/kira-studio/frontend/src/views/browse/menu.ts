@@ -1,5 +1,6 @@
 import type { TreeNode } from '@shared/domain/tree';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -31,7 +32,12 @@ function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): 
       label: 'Copy name',
       icon: 'copy',
       shortcut: 'tree.copyName',
-      run: () => copyOrReportError(node.name, (m) => useBrowseViewStore().setActionError(tabId, m)),
+      run: () =>
+        copyOrReportError(
+          node.name,
+          (m) => useBrowseViewStore().setActionError(tabId, m),
+          () => announceApp('Copied name'),
+        ),
     },
     // Gates itself on caps.fileTransfer/canInsert — a no-op list for redis's own 'namespace' rows
     // (P33 D3), the same as project/menus.ts's own namespaceMenu-vs-prefixMenu split used to be.

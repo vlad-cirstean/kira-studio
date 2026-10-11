@@ -1,5 +1,5 @@
 import type { KeyValuePage } from '@shared/protocol/page';
-import { copyText } from '@workbench/behaviour/clipboard';
+import { copyAnnounced } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 
 // Copy is always available; Download/Edit/Delete are appended only when the connection's caps say
@@ -29,14 +29,14 @@ export function rowMenu(opts: {
       id: 'copy-field',
       label: 'Copy field',
       icon: 'copy',
-      run: () => copyText(opts.field),
+      run: () => void copyAnnounced(opts.field, 'field'),
     },
     {
       type: 'item',
       id: 'copy-value',
       label: 'Copy value',
       icon: 'copy',
-      run: () => copyText(opts.value),
+      run: () => void copyAnnounced(opts.value, 'value'),
     },
   ];
 
