@@ -1038,9 +1038,6 @@
       "copiedValue": {
         "announce": "Copied value"
       },
-      "copiedWhat": {
-        "announce": "Copied {what}"
-      },
       "failed": {
         "error": "Couldn’t copy: {error}"
       }
@@ -1428,9 +1425,6 @@
       },
       "running": {
         "status": "Running"
-      },
-      "saving": {
-        "loading": "Saving…"
       },
       "unsavedChanges": {
         "status": "Unsaved changes"
@@ -10914,12 +10908,6 @@
       "move": {
         "label": "Move to collection"
       }
-    },
-    "confirmDialog": {
-      "title": "Confirm"
-    },
-    "module": {
-      "title": "Workbench"
     },
     "opLog": {
       "cancel": {

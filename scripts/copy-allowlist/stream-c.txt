@@ -1,3 +1,0 @@
-# Stream C (git-ui, docker-ui, workbench except memory/ and foundation files). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-permanent U64 packages/workbench/src/automations/run/RunPreview.vue # `--tools` and `--allowedTools` are claude CLI flag names, shown as the command line
-permanent U64 packages/workbench/src/automations/smart/ToolsField.vue # `--allowedTools` is a claude CLI flag name, shown as the command line

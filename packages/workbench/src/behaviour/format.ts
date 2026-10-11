@@ -33,12 +33,6 @@ export function formatCount(n: number): string {
   return COUNT_FORMAT.format(n);
 }
 
-/** '1 file' / '2 files'.
- *  @deprecated Use a plural catalog message with `{count}`. Removed at P265 close-out. */
-export function plural(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`;
-}
-
 /** A finished duration: '240 ms' / '3.4 s' / '2m 5s' / '1h 2m'. */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return t('format.duration.ms', { value: Math.round(ms) });

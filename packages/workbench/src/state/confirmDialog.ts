@@ -1,12 +1,11 @@
-import { t } from '@theme/i18n';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { errorText } from '../bridge/codedError';
 
 export interface ConfirmOptions {
   message: string;
-  /** Dialog title, a question naming the action. Required by convention; the fallback is transitional. */
-  title?: string;
+  /** Dialog title, a question naming the action. */
+  title: string;
   confirmLabel: string;
   /** `danger` discards or deletes (confirm button red, focus starts on Cancel). Always stated. */
   tone: 'danger' | 'primary';
@@ -36,7 +35,7 @@ export const useConfirmDialogStore = defineStore('confirmDialog', () => {
       // F9: a second call before the first settles would otherwise overwrite `state.resolve`,
       // leaving the first caller's promise pending forever. Settle it (as a decline) first.
       state.resolve?.(false);
-      state.title = options.title ?? t('workbench.confirmDialog.title');
+      state.title = options.title;
       state.message = options.message;
       state.tone = options.tone;
       state.confirmLabel = options.confirmLabel;

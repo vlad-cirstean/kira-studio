@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { applyAllowlist, failingFiles, parseAllowlist } from './allowlist';
 import { type MessageShape, type SourceRule, scanSource } from './sourceRules';
 
 const messages = new Map<string, MessageShape>([
@@ -194,46 +193,5 @@ describe('U71 call-site params', () => {
   test('works in template expressions', () => {
     expect(rules('a.vue', vue("<b>{{ t('a.greet.label') }}</b>"))).toEqual(['U71']);
     expect(rules('a.vue', vue("<b>{{ t('a.greet.label', { name }) }}</b>"))).toEqual([]);
-  });
-});
-
-describe('allowlist', () => {
-  const hits = [
-    { file: 'a.vue', line: 1, rule: 'U64' as const, message: '' },
-    { file: 'a.vue', line: 2, rule: 'U67' as const, message: '' },
-    { file: 'b.ts', line: 1, rule: 'U66' as const, message: '' },
-  ];
-  test('parses both forms, comments and blanks', () => {
-    const { entries, errors } = parseAllowlist(
-      '# header\n\na.vue\npermanent U66 b.ts # font names\n',
-      'x.txt',
-    );
-    expect(errors).toEqual([]);
-    expect(entries.map((e) => e.kind)).toEqual(['file', 'permanent']);
-  });
-  test('rejects a permanent line without reason, bad rule, extra words and duplicates', () => {
-    const { errors } = parseAllowlist(
-      'permanent U66 b.ts\npermanent U99 b.ts # x\na.vue b.ts\nc.ts\nc.ts\n',
-      'x.txt',
-    );
-    expect(errors).toHaveLength(4);
-  });
-  test('whole-file entry exempts every rule of the file', () => {
-    const { entries } = parseAllowlist('a.vue\n', 'x.txt');
-    const out = applyAllowlist(hits, entries);
-    expect(out.remaining.map((h) => h.file)).toEqual(['b.ts']);
-    expect(out.errors).toEqual([]);
-  });
-  test('permanent entry exempts one rule only', () => {
-    const { entries } = parseAllowlist('permanent U64 a.vue # engine text\n', 'x.txt');
-    expect(applyAllowlist(hits, entries).remaining.map((h) => h.rule)).toEqual(['U67', 'U66']);
-  });
-  test('an entry with no hit left is stale', () => {
-    const { entries } = parseAllowlist('gone.vue\npermanent U69 a.vue # x\n', 'x.txt');
-    expect(applyAllowlist(hits, entries).errors).toHaveLength(2);
-  });
-  test('failingFiles ignores whole-file entries', () => {
-    const { entries } = parseAllowlist('a.vue\npermanent U66 b.ts # x\n', 'x.txt');
-    expect(failingFiles(hits, entries)).toEqual(['a.vue']);
   });
 });

@@ -1,2 +1,0 @@
-# Stream B (Kira Space, mobile, memory). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-permanent U64 apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue # `z` is the waiting-on-monitor glyph, not text

@@ -2446,10 +2446,9 @@ All user-visible text lives in one catalog, `packages/theme/src/i18n/en.json`. v
 
 **Guards.**
 
-- Catalog checker `scripts/copy/check-catalog.ts` (`catalogRules.ts`), run by `bun run lint`: C1 message syntax parses with `@intlify/message-compiler`; C2 key shape and role; C3 identical text under two keys; C4 near-duplicates; C5 banned forms; C6 sentence case (title case under `backend.menu.*`); C7 punctuation by role; C8 plural shape and `backend.*` named placeholders only; C9 placeholder names and no HTML; C10 unused key (`--unused`, off in lint until close-out); C11 empty value. Exemptions: `ALLOWED_DUPLICATES`, each with a reason.
-- Source guard `scripts/copy/check-copy.ts` (Babel and `@vue/compiler-sfc` ASTs), run by `bun run lint`: U64 template text; U65 static text attribute; U66 string literal in a template expression; U67 string in a text property or announce call; U68 `vue-i18n` use outside the i18n folder; U69 concatenated or composed translation, `plural(`, `copyAnnounced(x, 'word')`; U70 `t(` at module scope; U71 `t` call params differ from the message placeholders.
-- Allowlists: `scripts/copy-allowlist/*.txt`, one path per line (file pending migration) or `permanent U<n> path # reason`. Lists only shrink; a stale line fails. Permanent lines cover font names, protocol tokens, SQL keywords, EJSON syntax, brand marks, dev traces and engine-rendered text only.
-- `bun scripts/copy/check-copy.ts --failing-files` lists files still owed a migration. `--all` prints every hit.
+- Catalog checker `scripts/copy/check-catalog.ts` (`catalogRules.ts`), run by `bun run lint`: C1 message syntax parses with `@intlify/message-compiler`; C2 key shape and role; C3 identical text under two keys; C4 near-duplicates; C5 banned forms; C6 sentence case (title case under `backend.menu.*`); C7 punctuation by role; C8 plural shape and `backend.*` named placeholders only; C9 placeholder names and no HTML; C10 unused key (`--unused`, on in lint; scans `internal/` Go callers for `backend.*`); C11 empty value. Exemptions: `ALLOWED_DUPLICATES` (empty), each with a reason.
+- Source guard `scripts/copy/check-copy.ts` (Babel and `@vue/compiler-sfc` ASTs), run by `bun run lint`: U64 template text; U65 static text attribute; U66 string literal in a template expression; U67 string in a text property or announce call; U68 `vue-i18n` use outside the i18n folder; U69 concatenated or composed translation, `copyAnnounced(x, 'word')`; U70 `t(` at module scope; U71 `t` call params differ from the message placeholders.
+- Exemptions: `scripts/copy/exemptions.ts`, one rule for one file with a reason. A stale exemption (no hit left) fails. Covers font names, protocol tokens, command syntax, EJSON syntax and CLI flag names only. `bun scripts/copy/check-copy.ts --all` prints every hit.
 
 **Go reader.** `packages/theme/src/i18n/catalog.go` embeds `en.json`. `i18n.T("backend.menu.quit.label", map[string]string{"appName": name})` replaces `{name}` placeholders and panics on an unknown key. `backend.*` holds native menu text, OS notification and prompt titles, native dialog titles, git undo labels, definition section titles and query plan roots; named placeholders only, no plural. Call sites must pass a literal key and `nil` or a map literal: `catalog_test.go` checks key existence and placeholders for every `i18n.T(` in the repo. Menu text duplicates `common.*` wording by design (Go reads `backend.*` only). Backend error messages stay Go literals (see Known open items).
 
@@ -5242,6 +5241,11 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Backend error messages stay Go literals (P265).** `ipcerr` and adapter messages are not in the
+  catalog. Owned by P266 item 2. Delete once they read from `backend.*`.
+- **Flow engine keyboard hints are English (P265).** `@vue-flow` hardcodes its `vue-flow__*` ARIA
+  description text; `copyCoverage` skips that subtree. Delete if the library exposes a localisable hint.
+- **git-core compact ages and preflight messages are English (P265).** They mirror Go output (P266).
 - **`ui-timing` budgets fail on slow hosts (P264).** Console keystroke p50 (53 ms vs 50 bound) and
   scroll frame p95 (81-134 ms vs 80) fail on a host about 2x slower than the budgets assume, and at
   the pre-P263 base `d381439d6`. Not a regression. Delete once the project passes on the CI runner.

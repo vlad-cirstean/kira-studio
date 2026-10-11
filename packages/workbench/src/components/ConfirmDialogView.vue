@@ -17,10 +17,9 @@ import { t } from '@theme/i18n';
 const props = withDefaults(
   defineProps<{
     open: boolean;
-    title?: string;
+    title: string;
     message: string;
     confirmLabel: string;
-    cancelLabel?: string;
     tone: 'danger' | 'primary';
     busy?: boolean;
     error?: string;
@@ -28,8 +27,6 @@ const props = withDefaults(
     testids?: Partial<Record<'root' | 'close' | 'message' | 'cancel' | 'confirm' | 'error', string>>;
   }>(),
   {
-    title: () => t('workbench.confirmDialog.title'),
-    cancelLabel: () => t('common.action.cancel.label'),
     busy: false,
     error: '',
     touch: false,
@@ -78,7 +75,7 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
           :data-testid="id('cancel')"
           @click="emit('cancel')"
         >
-          {{ cancelLabel }}
+          {{ t('common.action.cancel.label') }}
         </Button>
         <Button
           data-dialog-initial

@@ -1,5 +1,0 @@
-# Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-permanent U67 apps/kira-studio/frontend/src/fonts.ts # font family names (system and installed typefaces are proper names, not wording)
-permanent U67 apps/kira-studio/frontend/src/views/console/completion.ts # Redis command syntax hints (command grammar, not wording)
-permanent U67 apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue # HTTP auth scheme tokens inserted verbatim (protocol vocabulary, not wording)
-permanent U67 apps/kira-studio/frontend/src/views/shared/document/ejson.ts # EJSON shell-literal syntax (ObjectId(...), ISODate(...)), not wording
