@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '@ade/tones';
+import { TONE_TAG_CLASS } from '@ade/tones';
+import StatusDot from '@theme/components/StatusDot.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { storeToRefs } from 'pinia';
@@ -36,11 +37,11 @@ const stopFirst = computed(() => props.card.moves.live);
       :aria-expanded="open"
       @click="$emit('toggle')"
     >
-      <span class="mt-1.5 size-2.5 shrink-0 rounded-full" :style="{ background: card.color }" />
+      <StatusDot class="mt-1.5" :color="card.color" />
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <span class="rounded-kira-sm px-2 py-0.5" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ card.status }}</span>
+          <Badge variant="chip" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ card.status }}</Badge>
           <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{ card.progress.label }}</span>
           <Badge v-for="repo in card.repos" :key="repo" variant="chip" class="bg-field text-muted-foreground">{{ repo }}</Badge>
         </span>
@@ -69,7 +70,7 @@ const stopFirst = computed(() => props.card.moves.live);
         </span>
         <ul v-if="block.steps.length" class="m-0 flex list-none flex-col gap-0.5 p-0 pl-5">
           <li v-for="view in block.steps" :key="view.step.id" class="flex items-center gap-2 text-kira-sm">
-            <span class="size-1.5 shrink-0 rounded-full" :class="TONE_SOLID_CLASS[view.tone]" />
+            <StatusDot :color="`var(--color-tone-${view.tone}-solid)`" />
             <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ view.step.name }}</span>
             <span class="text-subtle">{{ view.statusText }}</span>
           </li>
@@ -109,15 +110,9 @@ const stopFirst = computed(() => props.card.moves.live);
     </div>
 
     <div v-if="open && permissions.agentInput && card.tuiSessions.length" class="flex flex-col gap-1 px-3 pb-3 pl-8">
-      <RouterLink
-        v-for="session in card.tuiSessions"
-        :key="session.id"
-        :to="{ name: 'terminal', params: { sessionId: session.id } }"
-        class="flex h-11 items-center rounded-kira border border-border-strong bg-field px-3 text-kira-md text-fg no-underline"
-        data-testid="plan-terminal"
-      >
-        Terminal
-      </RouterLink>
+      <Button v-for="session in card.tuiSessions" :key="session.id" as-child size="kira" variant="dialog" class="h-11 px-3 no-underline">
+        <RouterLink :to="{ name: 'terminal', params: { sessionId: session.id } }" data-testid="plan-terminal">Terminal</RouterLink>
+      </Button>
     </div>
     <ConfirmDialog
       :open="actions.intent.value !== null"

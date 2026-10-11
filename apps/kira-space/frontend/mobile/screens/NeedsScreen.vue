@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { shortAge } from '@ade/ago';
 import { TONE_TAG_CLASS } from '@ade/tones';
+import StatusDot from '@theme/components/StatusDot.vue';
 import { Alert } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { storeToRefs } from 'pinia';
@@ -58,7 +60,7 @@ async function confirmTakeOver(): Promise<void> {
 <template>
   <section class="flex flex-col" data-testid="needs-screen">
     <p v-if="boardQuery.isPending.value" class="m-0 p-4 text-muted-foreground">Loading</p>
-    <Alert v-else-if="boardQuery.isError.value" variant="error" class="m-3 w-auto" data-testid="needs-error">
+    <Alert v-else-if="boardQuery.isError.value" variant="error" strip data-testid="needs-error">
       Could not load the board.
     </Alert>
     <template v-else-if="model">
@@ -79,17 +81,10 @@ async function confirmTakeOver(): Promise<void> {
             :data-kind="item.kind"
           >
             <span class="flex items-center gap-2">
-              <span
-                class="rounded-kira-sm px-2 py-0.5 text-kira-sm"
-                :class="TONE_TAG_CLASS[item.tone]"
-                >{{ item.kind }}</span
-              >
+              <Badge variant="chip" :class="TONE_TAG_CLASS[item.tone]">{{ item.kind }}</Badge>
               <span class="text-kira-sm text-subtle">{{ shortAge(item.ageMs) }}</span>
               <span class="ml-auto flex min-w-0 items-center gap-1.5 text-kira-sm text-subtle">
-                <span
-                  class="size-2 shrink-0 rounded-full"
-                  :style="{ background: model.cards.get(item.taskId)?.color }"
-                />
+                <StatusDot :color="model.cards.get(item.taskId)?.color" />
                 <span class="truncate">{{ model.cards.get(item.taskId)?.title }}</span>
               </span>
             </span>
@@ -106,14 +101,11 @@ async function confirmTakeOver(): Promise<void> {
               >
                 Reply
               </Button>
-              <RouterLink
-                v-if="item.kind === 'question'"
-                :to="{ name: 'terminal', params: { sessionId: item.sessionId } }"
-                class="flex h-11 items-center rounded-kira border border-border-strong bg-field px-4 text-kira-md text-fg no-underline"
-                data-testid="needs-terminal"
-              >
-                Terminal
-              </RouterLink>
+              <Button v-if="item.kind === 'question'" as-child size="kira" variant="dialog" class="h-11 px-4 no-underline">
+                <RouterLink :to="{ name: 'terminal', params: { sessionId: item.sessionId } }" data-testid="needs-terminal">
+                  Terminal
+                </RouterLink>
+              </Button>
               <Button size="kira"
                 v-else-if="item.kind === 'stuck run'"
                 variant="dialog"

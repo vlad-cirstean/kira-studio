@@ -22,7 +22,7 @@ const KEYS = [
 </script>
 
 <template>
-  <div class="flex gap-1 overflow-x-auto px-2 py-1 [scrollbar-width:none]" data-testid="term-keybar">
+  <div class="flex gap-1 overflow-x-auto px-2 py-1 scrollbar-none" data-testid="term-keybar">
     <Button size="kira"
       variant="dialog"
       class="h-11 shrink-0 px-3"

@@ -79,7 +79,7 @@ test('every tab fits the screen width', async ({ page }) => {
 
 test('a board push refetches the board and the app never writes', async ({ page, server }) => {
   const boardReads = () => server.state.requests.filter((r) => r.path === '/api/ade/board').length;
-  await expect(page.locator(t('connection-dot'))).toHaveAttribute('title', 'live');
+  await expect(page.locator(t('connection-dot'))).toHaveAttribute('aria-label', 'Connection live');
   const before = boardReads();
   server.emit('kira:adetask:board', null);
   await expect.poll(boardReads).toBeGreaterThan(before);

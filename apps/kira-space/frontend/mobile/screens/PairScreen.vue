@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { storeToRefs } from 'pinia';
@@ -50,10 +51,10 @@ const notice = computed(() => {
     </p>
 
     <template v-if="waiting">
-      <div class="flex flex-col gap-1 rounded-kira border border-border bg-elevated p-3" data-testid="pair-waiting">
+      <Card class="flex flex-col gap-1" data-testid="pair-waiting">
         <span class="text-muted-foreground">Check this code in Kira Space on the computer</span>
         <span class="font-data text-kira-xl tracking-widest" data-testid="pair-code">{{ code }}</span>
-      </div>
+      </Card>
       <Button variant="dialog" size="kira-lg" data-testid="pair-cancel" @click="auth.cancelRequest()">Cancel</Button>
     </template>
 

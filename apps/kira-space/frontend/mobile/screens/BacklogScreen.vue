@@ -92,11 +92,11 @@ useSortableReorder(
         Add
       </Button>
     </form>
-    <Alert v-if="error" variant="error" class="m-3 w-auto" data-testid="backlog-write-error">
+    <Alert v-if="error" variant="error" strip data-testid="backlog-write-error">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
     <p v-if="backlog.isPending.value" class="m-0 p-4 text-muted-foreground">Loading</p>
-    <Alert v-else-if="backlog.isError.value" variant="error" class="m-3 w-auto" data-testid="backlog-error">
+    <Alert v-else-if="backlog.isError.value" variant="error" strip data-testid="backlog-error">
       Could not load the backlog.
     </Alert>
     <Empty v-else-if="!backlog.data.value?.items.length" class="py-10" data-testid="backlog-empty">

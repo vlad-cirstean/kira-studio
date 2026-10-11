@@ -13,7 +13,7 @@ const open = ref<string | null>(null);
 <template>
   <section class="flex flex-col" data-testid="plan-screen">
     <p v-if="boardQuery.isPending.value" class="m-0 p-4 text-muted-foreground">Loading</p>
-    <Alert v-else-if="boardQuery.isError.value" variant="error" class="m-3 w-auto" data-testid="plan-error">
+    <Alert v-else-if="boardQuery.isError.value" variant="error" strip data-testid="plan-error">
       Could not load the plan.
     </Alert>
     <Empty v-else-if="model && !model.plan.length" class="py-10" data-testid="plan-empty">

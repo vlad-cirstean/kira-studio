@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { useOnline } from '@vueuse/core';
 import { onMounted } from 'vue';
@@ -23,10 +25,10 @@ const { connection } = useServerEvents(() => {
 });
 onMounted(() => void agentSessions.initAgentSessions());
 
-const DOT: Record<typeof connection.value, string> = {
-  live: 'bg-ok',
-  reconnecting: 'bg-warn',
-  offline: 'bg-error',
+const DOT: Record<typeof connection.value, 'ok' | 'warn' | 'error'> = {
+  live: 'ok',
+  reconnecting: 'warn',
+  offline: 'error',
 };
 </script>
 
@@ -37,18 +39,11 @@ const DOT: Record<typeof connection.value, string> = {
       <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Refresh" data-testid="refresh" @click="refresh">
         <CodiconIcon name="refresh" :size="13" />
       </Button>
-      <span
-        class="size-2 rounded-full"
-        :class="DOT[connection]"
-        :title="connection"
-        role="status"
-        :aria-label="`Connection ${connection}`"
-        data-testid="connection-dot"
-      />
+      <StatusDot :tone="DOT[connection]" role="status" :label="`Connection ${connection}`" data-testid="connection-dot" />
     </header>
-    <p v-if="!online" class="m-0 bg-warn/16 px-3 py-1 text-warn" data-testid="offline-banner">
-      You are offline. Showing what was last loaded.
-    </p>
+    <Alert v-if="!online" variant="warn" strip data-testid="offline-banner">
+      <AlertDescription>You are offline. Showing what was last loaded.</AlertDescription>
+    </Alert>
     <main class="min-h-0 flex-1 overflow-auto">
       <RouterView />
     </main>

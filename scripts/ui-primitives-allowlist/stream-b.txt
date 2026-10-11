@@ -1,14 +1,4 @@
 # P263 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-space/frontend/mobile/AppShell.vue
-apps/kira-space/frontend/mobile/components/PermissionHint.vue
-apps/kira-space/frontend/mobile/components/ReplySheet.vue
-apps/kira-space/frontend/mobile/screens/BacklogScreen.vue
-apps/kira-space/frontend/mobile/screens/NeedsScreen.vue
-apps/kira-space/frontend/mobile/screens/PairScreen.vue
-apps/kira-space/frontend/mobile/screens/PlanScreen.vue
-apps/kira-space/frontend/mobile/screens/PlanTaskCard.vue
-apps/kira-space/frontend/mobile/screens/TerminalScreen.vue
-apps/kira-space/frontend/mobile/terminal/KeyBar.vue
 permanent U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-zone DOM built outside Vue cannot render Alert, banner tint matches Alert error
 permanent U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
 permanent U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-relative markdown heading scale tracks the Appearance font size, counted anchor in check-theme-classes
@@ -16,3 +6,5 @@ permanent U38 apps/kira-space/frontend/src/ade/v2/plan/AdeActionCell.vue # plan 
 permanent U38 apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue # plan board row geometry (40px) shared with AdeActionCell, P129 board visual
 permanent U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
 permanent U25 apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue # failed log line colours run output (stderr), not an error sentence
+permanent U38 apps/kira-space/frontend/mobile/components/ReplySheet.vue # 16px text-base input stops iOS focus zoom
+permanent U38 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # 16px text-base compose input stops iOS focus zoom
