@@ -51,8 +51,6 @@ Every file under `apps/kira-studio/frontend/src/` that renders text. `studio` na
 - `studio.api.curl.dynamicValues.hint` dropped the `{{$…}}` sample.
 - Font group `On this Mac` is now `Installed`. Mode label `Api` is now `API`; the visual settings spec section `Api` is a section id and is unchanged.
 - Stream C already committed `copy-wording-docker-automations.spec.ts` and `copy-coverage-docker-automations.spec.ts` under `apps/kira-studio/tests/ui/`. Stream A did not write them: a second copy would conflict on rebase.
-- Coverage spec skips surfaces needing heavy fixtures: saved queries menu, explain result, definition view, documents toolbar, key-value view, stream view, gRPC request view.
-- Collections panel menu is not covered; only the empty state is.
 
 ### Specs written, not run
 
@@ -60,4 +58,4 @@ Every file under `apps/kira-studio/frontend/src/` that renders text. `studio` na
 - `apps/kira-studio/tests/ui/copy-coverage.spec.ts`
 - Helper `apps/kira-studio/tests/ui/support/copyScenarios.ts`
 
-Both typecheck and lint clean. Expect tuning on first run: `allow` patterns for fixture data, QueryState trigger via Docker `Containers` error, context-menu label extraction via `.flex-1`.
+Coverage spec reuses fixtures of existing UI specs for saved queries, explain, definition, documents, key-value, stream, gRPC and collections menu. Both typecheck and lint clean. Expect tuning on first run: `allow` patterns for fixture data, QueryState trigger via Docker `Containers` error, context-menu label extraction via `.flex-1`.

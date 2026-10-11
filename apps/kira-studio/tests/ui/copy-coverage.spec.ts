@@ -3,29 +3,45 @@ import {
   expectCatalogText,
   setPseudoLocale,
 } from '../../../../packages/workbench/src/testing/ui/copyCoverage';
+import {
+  controlSnapshots as redisControl,
+  portSnapshots as redisPorts,
+} from '../ipc/redis/redis.fixture';
+import { controlSnapshots as sqsControl, portSnapshots as sqsPorts } from '../ipc/sqs/sqs.fixture';
 import { expect, test } from './fixtures';
-import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
+import { grpcTab, modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { contract } from './support/contract';
 import {
   connectPostgres,
+  ITEMS_ALLOW,
+  ITEMS_CONTROL,
+  ITEMS_PORT,
+  ITEMS_SQL,
   openCompositeTable,
   openContextMenu,
+  openItemsConsole,
   PG_ALLOW,
   PG_CONTROL,
   PG_PORT,
 } from './support/copyScenarios';
+import { typeInto } from './support/editor';
 import { cellText, gridCell, gutterCell, headerCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-import { COMPOSITE_PK_PATH } from './support/postgresFixture';
+import {
+  DB_PATH as MONGO_DB_PATH,
+  mongoConnectionSummary,
+  WIDGETS_PATH,
+  widgetsFixture,
+} from './support/mongoFixture';
+import { APP_PATH, COMPOSITE_PK_PATH } from './support/postgresFixture';
 import { emitPrompts, routed } from './support/prompts';
 import { openSettings } from './support/settings';
-import { openRowMenu } from './support/tree';
+import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // P265: with the pseudo-locale on, every catalog message shows wrapped in ⟦…⟧, so any letter
 // outside a marker is a literal that skipped t(). Fixture names and section ids that the shared
-// SettingsShell prints raw go through `allow`. Surfaces needing heavy fixtures (saved queries
-// menu, explain result, definition view, documents, key-value, stream, gRPC) are not covered here.
+// SettingsShell prints raw go through `allow`. Surfaces reuse the fixtures of the existing UI specs.
 
 const ALLOW: RegExp[] = [...PG_ALLOW, /^(Api|Database MCP)$/];
 const loc = (page: Page, testid: string) => page.locator(`[data-testid="${testid}"]`);
@@ -199,4 +215,183 @@ test('environments view', async ({ relaunch }) => {
   await page.click('[data-testid="api-environments"]');
   await expect(loc(page, 'environments-dialog')).toBeVisible();
   await expectCatalogText(loc(page, 'environments-dialog'), { allow: ALLOW });
+});
+
+test('saved queries menu', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
+  await pseudo(page);
+  await openItemsConsole(page);
+  await page.click('[data-testid="console-saved-toggle"]');
+  await expect(loc(page, 'console-saved-entry').first()).toBeVisible();
+  await expectCatalogText(loc(page, 'console-saved-menu'), { allow: ITEMS_ALLOW });
+});
+
+test('explain result', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
+  await pseudo(page);
+  await openItemsConsole(page);
+  const view = loc(page, 'console-view');
+  await typeInto(view, page, ITEMS_SQL);
+  await page.click('[data-testid="console-explain"]');
+  const result = view.locator('[data-testid="explain-result-view"]');
+  await expect(result).toBeVisible();
+  await expectCatalogText(result, { allow: ITEMS_ALLOW });
+});
+
+test('definition view, structure and source', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
+  await pseudo(page);
+  await connectPostgres(page);
+  await openRowMenu(page, `${APP_PATH}/table:order_items`);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  const view = loc(page, 'definition-view');
+  await expect(view).toHaveAttribute('data-origin', 'composed', { timeout: 15_000 });
+  await expectCatalogText(view, { allow: ITEMS_ALLOW });
+  await view.locator('[data-testid="definition-pane-source"]').click();
+  await expect(view.locator('.monaco-host')).toBeVisible();
+  await expectCatalogText(view, { allow: ITEMS_ALLOW });
+});
+
+test('documents toolbar', async ({ relaunch }) => {
+  const conn = mongoConnectionSummary('conn-copy-doc', 'Mongo DB', 'green');
+  const fixture = widgetsFixture(conn.id);
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [conn] }, ...fixture.control],
+    stream: fixture.port,
+  });
+  await pseudo(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await expandRow(page, MONGO_DB_PATH);
+  await (await findRow(page, WIDGETS_PATH)).dblclick();
+  await expect(loc(page, 'document-row').first()).toBeVisible({ timeout: 15_000 });
+  await expectCatalogText(loc(page, 'document-view'), {
+    allow: [...ALLOW, /Mongo DB|widget|kira_test|\d/i],
+  });
+});
+
+test('key-value view', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
+  await pseudo(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  const db0 = 'database:db0';
+  const ns = `${db0}/namespace:user`;
+  const ns1 = `${ns}/namespace:1`;
+  const key = `${ns1}/key:user%3A1%3Abighash`;
+  await (await findRow(page, db0)).dblclick();
+  const browse = loc(page, 'browse-view');
+  await expectCatalogText(browse, { allow: [...ALLOW, /user|db0|key|\d/i] });
+  await browse.locator(`[data-testid="browse-row"][data-path="${ns}"]`).dblclick();
+  await browse.locator(`[data-testid="browse-row"][data-path="${ns1}"]`).dblclick();
+  await browse.locator(`[data-testid="browse-row"][data-path="${key}"]`).dblclick();
+  const view = page.locator(`[data-testid="keyvalue-view"][data-path="${key}"]`);
+  await expect(view.locator('[data-testid="keyvalue-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expectCatalogText(view, { allow: [...ALLOW, /user|bighash|field|value|\d/i] });
+});
+
+test('stream view', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: sqsControl, stream: sqsPorts });
+  await pseudo(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await (await findRow(page, 'queue:orders-queue')).dblclick();
+  const view = page.locator('[data-testid="stream-view"][data-path="queue:orders-queue"]');
+  await view.locator('[data-testid="stream-poll"]').click();
+  await expect(view.locator('[data-testid="stream-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expectCatalogText(view, { allow: [...ALLOW, /orders|queue|sqs|message|\d/i] });
+});
+
+test('gRPC request view, every tab', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.tabsList, response: [grpcTab({})] },
+      {
+        channel: IPC.grpcHistoryList,
+        args: { itemId: '', tabId: 'tab-grpc-1' },
+        response: [],
+      },
+    ],
+  });
+  await pseudo(page);
+  const view = loc(page, 'grpc-request-view');
+  await expect(view).toBeVisible();
+  await expectCatalogText(view, { allow: ALLOW });
+  for (const pane of ['message', 'metadata', 'schema']) {
+    await loc(page, `grpc-request-pane-${pane}`).click();
+    await expectCatalogText(view, { allow: ALLOW });
+  }
+  for (const pane of ['messages', 'metadata', 'history']) {
+    await loc(page, `grpc-response-pane-${pane}`).click();
+    await expectCatalogText(view, { allow: ALLOW });
+  }
+});
+
+test('collections panel menu', async ({ relaunch }) => {
+  const now = '2026-01-01T00:00:00.000Z';
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.collectionsList,
+        response: {
+          collections: [
+            { id: 'col-1', name: 'Orders API', sortOrder: 0, createdAt: now, updatedAt: now },
+          ],
+          items: [
+            {
+              id: 'item-health',
+              collectionId: 'col-1',
+              parentId: null,
+              kind: 'request',
+              name: 'Health check',
+              sortOrder: 0,
+              method: 'GET',
+              url: 'https://api.example.com/healthz',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        },
+      },
+    ],
+  });
+  await pseudo(page);
+  await modeTab(page, 'api').click();
+  const fixtureNames = [...ALLOW, /Orders API|Health check|api\.example\.com|GET/];
+  await expectCatalogText(loc(page, 'project-panel'), { allow: fixtureNames });
+
+  await page.locator('[data-testid="collection-row"][data-id="col-1"]').click({ button: 'right' });
+  await expect(loc(page, 'context-menu')).toBeVisible();
+  await expectCatalogText(loc(page, 'context-menu'), { allow: fixtureNames });
+  await page.keyboard.press('Escape');
+
+  await page.locator('[data-testid="collection-row"]').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await page
+    .locator('[data-testid="collection-row"][data-id="item-health"]')
+    .click({ button: 'right' });
+  await expect(loc(page, 'context-menu')).toBeVisible();
+  await expectCatalogText(loc(page, 'context-menu'), { allow: fixtureNames });
 });
