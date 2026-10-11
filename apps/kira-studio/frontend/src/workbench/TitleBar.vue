@@ -95,7 +95,7 @@ function onToggleKeepAwake(): void {
          child here must explicitly override it (wails-no-drag, on ModeSwitcher's own mode-tab
          buttons and the action-row above), or clicking a mode tab would also start a window drag.
          P110 I2-18/P128 §2.3: the mode tab's hover lives in ModeSwitcher.vue's own `:class` ternary
-         (`hover:bg-hover` only in the inactive branch), replacing `.mode-tab:hover:not(.is-active)`
+         (hover fill only in the inactive branch), replacing `.mode-tab:hover:not(.is-active)`
          -- `is-active` itself stays a real class (terminal-module.spec.ts/mode-switch.spec.ts/etc.
          assert `toHaveClass(/is-active/)` on it), `mode-tab` was marker-only and dropped. -->
   </TitleBarBase>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import type { DocumentRowView } from './rows';
 
 // P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
@@ -42,8 +44,8 @@ function onHeadKeydown(e: KeyboardEvent): void {
     :data-id="view.id"
   >
     <div
-      class="doc-head flex shrink-0 items-center cursor-pointer gap-1.5 px-2 h-6.5"
-      :class="[expanded ? 'bg-elevated' : 'hover:bg-hover', selected ? 'shadow-[inset_2px_0_0_var(--primary)]' : '']"
+      class="doc-head"
+      :class="cn(rowVariants({ layout: 'tree', selected: expanded }), 'shrink-0 cursor-pointer gap-1.5 px-2', selected && 'shadow-[inset_2px_0_0_var(--primary)]')"
       role="option"
       tabindex="0"
       :aria-selected="selected"
@@ -72,15 +74,4 @@ function onHeadKeydown(e: KeyboardEvent): void {
     </div>
     <slot name="body" />
   </div>
-  <!-- P110 I2-16: `.doc-head:hover`/`.doc-row.open > .doc-head`/`.doc-row.selected > .doc-head`
-       moved onto doc-head's own ternary. Pre-phase precedence: `.doc-row.open > .doc-head` (3
-       classes, specificity 0,3,0) beat `.doc-head:hover` (class+pseudo-class, 0,2,0) whenever both
-       applied -- open always won over hover. `expanded ? 'bg-elevated' : 'hover:bg-hover'`
-       reproduces that exactly (hover: emits only in the non-open branch, so it can never contend
-       with bg-elevated). `.doc-row.selected > .doc-head`'s inset shadow is a separate property
-       (box-shadow, not background) -- kept as its own independent ternary, unaffected by either
-       branch above, matching pre-phase behaviour where open/hover and selected could layer freely.
-       `open`/`selected` dropped from `.doc-row`'s own class object -- no rule or test anchors them
-       there any more (`.search-match`/`.search-match-current` stay: DocumentView.vue's own
-       `in-[.search-match-current]:text-bg` still needs that literal ancestor class). -->
 </template>

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { Switch } from '@theme/components/ui/switch';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { computed, useId } from 'vue';
 import {
@@ -95,7 +94,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'httpVersion')"
           :disabled="isAtDefault('api', 'httpVersion')"
           @click="resetLeaf('api', 'httpVersion')"
-        />
+       />
       </div>
       <NativeSelect
         :id="httpVersionId"
@@ -120,7 +119,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'requestTimeoutMs')"
           :disabled="isAtDefault('api', 'requestTimeoutMs')"
           @click="resetLeaf('api', 'requestTimeoutMs')"
-        />
+       />
       </div>
       <NumberStepperInput
         :id="requestTimeoutMsId"
@@ -130,7 +129,7 @@ const disableCookieJarId = useId();
         data-testid="settings-api-requestTimeoutMs"
         :model-value="String(draft.api.requestTimeoutMs)"
         @input="onRequestTimeoutMsInput"
-      />
+     />
       <FieldError
         v-if="requestTimeoutMsError"
         data-testid="settings-api-requestTimeoutMs-error"
@@ -150,7 +149,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'maxResponseMb')"
           :disabled="isAtDefault('api', 'maxResponseMb')"
           @click="resetLeaf('api', 'maxResponseMb')"
-        />
+       />
       </div>
       <NumberStepperInput
         :id="maxResponseMbId"
@@ -160,7 +159,7 @@ const disableCookieJarId = useId();
         data-testid="settings-api-maxResponseMb"
         :model-value="String(draft.api.maxResponseMb)"
         @input="onMaxResponseMbInput"
-      />
+     />
       <FieldError
         v-if="maxResponseMbError"
         data-testid="settings-api-maxResponseMb-error"
@@ -172,15 +171,12 @@ const disableCookieJarId = useId();
 
     <FieldGroup>
       <Field orientation="horizontal">
-        <Checkbox
+        <Switch
           :id="sslVerifyId"
-          class="size-3.5"
           :model-value="draft.api.sslVerify"
           data-testid="settings-api-sslVerify"
           @update:model-value="(v) => onSslVerifyChange(v === true)"
-        >
-          <CodiconIcon name="check" :size="12" />
-        </Checkbox>
+        />
         <Label :for="sslVerifyId">Verify SSL certificates</Label>
       </Field>
       <TooltipIconButton
@@ -191,7 +187,7 @@ const disableCookieJarId = useId();
         :disabled-trigger="isAtDefault('api', 'sslVerify')"
         :disabled="isAtDefault('api', 'sslVerify')"
         @click="resetLeaf('api', 'sslVerify')"
-      />
+     />
     </FieldGroup>
     <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">
       Turning certificate verification off lets any server present any certificate.
@@ -202,15 +198,12 @@ const disableCookieJarId = useId();
 
     <FieldGroup>
       <Field orientation="horizontal">
-        <Checkbox
+        <Switch
           :id="followRedirectsId"
-          class="size-3.5"
           :model-value="draft.api.followRedirects"
           data-testid="settings-api-followRedirects"
           @update:model-value="(v) => onFollowRedirectsChange(v === true)"
-        >
-          <CodiconIcon name="check" :size="12" />
-        </Checkbox>
+        />
         <Label :for="followRedirectsId">Follow redirects</Label>
       </Field>
       <TooltipIconButton
@@ -221,7 +214,7 @@ const disableCookieJarId = useId();
         :disabled-trigger="isAtDefault('api', 'followRedirects')"
         :disabled="isAtDefault('api', 'followRedirects')"
         @click="resetLeaf('api', 'followRedirects')"
-      />
+     />
     </FieldGroup>
 
     <Field>
@@ -234,7 +227,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'maxRedirects')"
           :disabled="isAtDefault('api', 'maxRedirects')"
           @click="resetLeaf('api', 'maxRedirects')"
-        />
+       />
       </div>
       <NumberStepperInput
         :id="maxRedirectsId"
@@ -245,7 +238,7 @@ const disableCookieJarId = useId();
         data-testid="settings-api-maxRedirects"
         :model-value="String(draft.api.maxRedirects)"
         @input="onMaxRedirectsInput"
-      />
+     />
       <FieldError
         v-if="maxRedirectsError"
         data-testid="settings-api-maxRedirects-error"
@@ -259,15 +252,12 @@ const disableCookieJarId = useId();
 
     <FieldGroup>
       <Field orientation="horizontal" class="items-start">
-        <Checkbox
+        <Switch
           :id="disableCookieJarId"
-          class="size-3.5"
           :model-value="draft.api.disableCookieJar"
           data-testid="settings-api-disableCookieJar"
           @update:model-value="(v) => onDisableCookieJarChange(v === true)"
-        >
-          <CodiconIcon name="check" :size="12" />
-        </Checkbox>
+        />
         <FieldContent>
           <Label :for="disableCookieJarId">Disable cookie jar</Label>
           <FieldDescription
@@ -284,7 +274,7 @@ const disableCookieJarId = useId();
         :disabled-trigger="isAtDefault('api', 'disableCookieJar')"
         :disabled="isAtDefault('api', 'disableCookieJar')"
         @click="resetLeaf('api', 'disableCookieJar')"
-      />
+     />
     </FieldGroup>
   </div>
 </template>

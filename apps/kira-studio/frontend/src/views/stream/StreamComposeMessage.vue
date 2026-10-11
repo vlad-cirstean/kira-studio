@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -106,9 +107,7 @@ async function submit(): Promise<void> {
         />
       </Label>
 
-      <span v-if="error" class="text-kira-sm text-error" data-testid="stream-add-message-error">{{
-        error
-      }}</span>
+      <FieldError v-if="error" data-testid="stream-add-message-error">{{ error }}</FieldError>
     </div>
 
     <div class="flex justify-end gap-1.5 border-t border-border py-1.5 px-2">

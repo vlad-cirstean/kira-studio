@@ -38,29 +38,34 @@ import {
 } from '@shared/protocol/page';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
+import { useRowHeight } from '@workbench/util/rowHeight';
+import { VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
 import { useObjectStoreStore } from '../../../state/objectStore';
 import { useRunState } from '../../../state/runState';
-import { useSettingsStore } from '../../../state/settings';
 import type { KeyValueTabRecord } from '../../../state/tabDomain';
 import { browseInvalidate } from '../../../state/viewCommands';
 import EngineIcon from '../../../theme/EngineIcon.vue';
@@ -85,7 +90,6 @@ const contextMenuStore = useContextMenuStore();
 const objectStoreStore = useObjectStoreStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const connectionsStore = useConnectionsStore();
-const settingsStore = useSettingsStore();
 const keyValueViewStore = useKeyValueViewStore();
 
 const props = defineProps<{
@@ -187,7 +191,7 @@ function rowAt(i: number) {
 // P49 F7/D5: matches the density this row's own CSS (`--kira-row-height`) already resolves to —
 // the virtualizer needs the pixel value in JS for its offset math, the CSS var alone isn't
 // reachable from there.
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 
 // P104 §3.4: @tanstack/vue-virtual replaces VirtualList.vue directly at this call site — the
 // scroll container (below, in the template) is now this component's own, not a wrapper's.
@@ -869,9 +873,7 @@ onUnmounted(() => {
                   @keydown.enter="submitAdd"
                   @keydown.escape="closeAdd"
                 />
-                <div v-if="addError" class="text-kira-sm text-error" data-testid="keyvalue-add-error">
-                  {{ addError }}
-                </div>
+                <FieldError v-if="addError" data-testid="keyvalue-add-error">{{ addError }}</FieldError>
                 <div class="flex justify-end gap-1">
                   <Button variant="dialog" size="kira-lg" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
                   <Button
@@ -910,9 +912,7 @@ onUnmounted(() => {
                   @keydown.enter="saveEdit"
                   @keydown.escape="closeEdit"
                 />
-                <div v-if="editError" class="text-kira-sm text-error" data-testid="keyvalue-edit-error">
-                  {{ editError }}
-                </div>
+                <FieldError v-if="editError" data-testid="keyvalue-edit-error">{{ editError }}</FieldError>
                 <div class="flex justify-end gap-1">
                   <Button variant="dialog" size="kira-lg" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</Button>
                   <Button
@@ -956,13 +956,13 @@ onUnmounted(() => {
         </div>
       </ViewToolbar>
 
-      <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="keyvalue-error">
+      <Alert v-if="rt?.status === 'error' && rt.error" variant="error" strip data-testid="keyvalue-error">
         <AlertDescription>{{ rt.error.message }}</AlertDescription>
       </Alert>
       <!-- P43 F6/D7: a failed delete — the edit/add popovers already show their own failures
            inline (editError/objectSaveError/addError above); delete has no popover of its own
            to hold one, so it uses the shared per-tab field every other view's own strip does. -->
-      <Alert v-if="rt?.actionError" variant="error" data-testid="keyvalue-action-error">
+      <Alert v-if="rt?.actionError" variant="error" strip data-testid="keyvalue-action-error">
         <AlertDescription>{{ rt.actionError }}</AlertDescription>
       </Alert>
       <!-- P33 D4: an object over SINGLE_ROW_MAX_BYTES has no Body row at all — this is the
@@ -971,6 +971,7 @@ onUnmounted(() => {
       <Alert
         v-if="isSingleObjectPage && page && objectBodyRow === null && page.memoryBytes !== null"
         variant="warn"
+        strip
         data-testid="keyvalue-object-too-large"
       >
         <AlertDescription>
@@ -981,24 +982,25 @@ onUnmounted(() => {
       <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
            onEdit stages into objectDraft, never writing to S3 directly) — this strip is the
            explicit Save/Discard step that turns the staged draft into a real PutObject. -->
-      <Alert v-if="objectDraft !== null" variant="warn" data-testid="keyvalue-object-edit-pending">
-        <AlertDescription class="flex items-start gap-1.5">
+      <Alert v-if="objectDraft !== null" variant="warn" strip data-testid="keyvalue-object-edit-pending">
+        <AlertDescription>
           <span data-testid="keyvalue-object-edit-note"
             >Unsaved changes to this object's body<template v-if="objectSaveError">
               — {{ objectSaveError }}</template
             ></span
           >
+        </AlertDescription>
+        <AlertAction>
           <Button
             variant="toolbar-primary"
             size="kira"
-            class="ml-auto shrink-0"
             data-testid="keyvalue-object-edit-save"
             :disabled="objectSaving"
             @click="saveObjectEdit"
           >
             Save
           </Button>
-        </AlertDescription>
+        </AlertAction>
       </Alert>
 
       <SearchToolbar
@@ -1028,7 +1030,7 @@ onUnmounted(() => {
              above never needed to scroll either. -->
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
           <Empty v-if="!rt || rt.rowCount === 0">
-            <EmptyMedia><CodiconIcon :name="rt ? 'database' : 'loading'" :size="24" /></EmptyMedia>
+            <EmptyMedia><CodiconIcon v-if="rt" name="database" :size="24" /><Spinner v-else :size="24" /></EmptyMedia>
             <EmptyTitle>{{ rt ? 'No data' : 'Loading…' }}</EmptyTitle>
           </Empty>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
@@ -1061,7 +1063,7 @@ onUnmounted(() => {
             <div class="relative w-full" :style="{ height: `${totalSize}px` }">
               <template v-for="entry in visibleRows" :key="entry.row.index">
                 <div
-                  class="flex cursor-pointer h-row absolute top-0 left-0 w-full hover:bg-hover"
+                  :class="cn(rowVariants({ layout: 'tree' }), 'cursor-pointer gap-0 h-row px-0', VIRTUAL_ROW_CLASS)"
                   data-testid="keyvalue-row"
                   :data-row="entry.i"
                   :style="{ transform: `translateY(${entry.row.start}px)` }"
@@ -1071,7 +1073,7 @@ onUnmounted(() => {
                   @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"
                 >
-                  <div class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-xs text-subtle truncate relative w-10 shrink-0">{{ entry.i + 1 }}</div>
+                  <div class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10 shrink-0">{{ entry.i + 1 }}</div>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
@@ -1137,8 +1139,6 @@ onUnmounted(() => {
          P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own here --
          kept as bare marker classes (the shared vocabulary name cellClass.ts/DocumentRow.vue/
          ConsoleResultGrid.vue also use). The actual tint/text-colour is
-         `bg-search-match[-current] text-bg` alongside on the same element.
-         P110 I2-17: `.kv-row:hover` moved onto the row's own `hover:bg-hover` -- no test locates
-         by `.kv-row` (checked). -->
+         `bg-search-match[-current] text-bg` alongside on the same element. -->
   </div>
 </template>

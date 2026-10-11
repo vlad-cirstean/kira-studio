@@ -175,8 +175,8 @@ watch(
 // of this table (F18's own trade, accepted deliberately), and this handler is small enough that
 // duplicating it costs less than the coupling a shared module would create.
 //
-// Column identity is positional among a row's *text* inputs — `input:not([type="checkbox"])`
-// excludes the enabled-checkbox column (a real `<input type="checkbox">`, Checkbox.vue) from the
+// Column identity is positional among a row's *text* inputs — `input:not([type=checkbox])`
+// excludes the enabled-checkbox column (a real checkbox input, Checkbox.vue) from the
 // count, so form-data's own extra content-type field in the trailing slot does not shift the
 // mapping for rows that lack it (it simply has no target there, and navigation into it does
 // nothing rather than landing on the wrong field). P71 §8.3: `, textarea` covers a `grow` cell's
@@ -185,7 +185,7 @@ watch(
 function textInputsIn(row: Element): (HTMLInputElement | HTMLTextAreaElement)[] {
   return Array.from(
     row.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-      'input:not([type="checkbox"]), textarea',
+      'input:not([type=checkbox]), textarea',
     ),
   );
 }

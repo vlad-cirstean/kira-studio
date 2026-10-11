@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { useQuery } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { Switch } from '@theme/components/ui/switch';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed, useId } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -87,16 +86,13 @@ const dbMcpEnabledId = useId();
          never mixed with it. Toggle, then command, then button, strictly in that DOM order
          (§11.4/SPEC's own "enabling is never a silent action"). -->
     <Field orientation="horizontal" class="items-start">
-      <Checkbox
+      <Switch
         :id="dbMcpEnabledId"
-        class="size-3.5"
         :model-value="settingsStore.dbMcp.serverEnabled"
         :disabled="dbMcpToggling"
         data-testid="settings-db-mcp-enabled"
         @update:model-value="(v) => onToggleDbMcpEnabled(v === true)"
-      >
-        <CodiconIcon name="check" :size="12" />
-      </Checkbox>
+      />
       <FieldContent>
         <Label :for="dbMcpEnabledId">Enable the database MCP server</Label>
         <FieldDescription
@@ -208,14 +204,11 @@ const dbMcpEnabledId = useId();
             }}</FieldDescription
           >
         </div>
-        <Checkbox
-          class="size-3.5"
+        <Switch
           :model-value="conn.mcpEnabled"
           :data-testid="`db-mcp-connection-${conn.id}`"
           @update:model-value="(v) => onToggleConnectionMcpEnabled(conn.id, v === true)"
-        >
-          <CodiconIcon name="check" :size="12" />
-        </Checkbox>
+        />
       </li>
     </ul>
     <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-connections-empty">

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/util/format';
 import { computed } from 'vue';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
@@ -108,7 +110,7 @@ function openRecent(entry: RecentTableEntry): void {
             v-for="entry in recentEntries"
             :key="`${entry.kind}:${entry.connectionId}:${entry.path}`"
             type="button"
-            class="w-full flex items-center cursor-pointer text-left rounded-kira-sm h-6.5 gap-1.5 px-1.5 text-fg text-kira-md hover:bg-hover"
+            :class="cn(rowVariants(), 'w-full text-left')"
             @click="openRecent(entry)"
           >
             <span :class="colorMarkClass('bar', connectionFor(entry)?.color)" />

@@ -2,12 +2,14 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -604,7 +606,7 @@ const statusLine = computed(() => {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full border-0 bg-transparent text-left font-ui"
+                      :class="cn(rowVariants(), 'w-full border-0 bg-transparent text-left font-ui')"
                       :data-testid="`cell-editor-generate-${gen.id}`"
                       @click="applyGenerator(gen)"
                     >

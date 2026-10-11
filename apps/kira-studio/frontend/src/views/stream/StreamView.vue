@@ -7,6 +7,8 @@ import {
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -14,25 +16,27 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
 import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { useRunState } from '../../state/runState';
-import { useSettingsStore } from '../../state/settings';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import EngineIcon from '../../theme/EngineIcon.vue';
@@ -60,7 +64,6 @@ const pageSearchFilterStore = usePageSearchFilterStore();
 const streamSearchStore = useStreamSearchStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
-const settingsStore = useSettingsStore();
 const streamViewStore = useStreamViewStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
@@ -182,7 +185,7 @@ function rowAt(i: number) {
 // `.stream-row`'s CSS rule below carries none — VirtualList needs one fixed pixel value for its
 // offset math, so this adopts the same density-driven height ConsoleResultGrid.vue/KeyValueView.vue
 // (and the deleted DataGrid.vue) already use rather than inventing a fourth number.
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 
 function onRowContextMenu(e: MouseEvent, key: string | null, body: string | null): void {
   e.preventDefault();
@@ -247,7 +250,7 @@ function onRowClickFromEvent(e: MouseEvent): void {
   if (i !== null) onRowClick(i);
 }
 // P105 §5.2(c): Enter/Space on the gutter cell mirror clicking it — role="grid"/"row"/"gridcell"
-// all want real <table>/<tr>/<td> per Biome's useSemanticElements, so each column (gutter
+// all want real table markup per Biome's useSemanticElements, so each column (gutter
 // included) is its own role="option" instead, verified clean; the row div itself carries no
 // role or keyboard handler of its own now.
 function onRowKeydownFromEvent(e: KeyboardEvent): void {
@@ -563,10 +566,14 @@ const currentMatchRow = computed(() => {
 // specificity -- 2 classes/class+pseudo each -- so the last one in source order won whenever more
 // than one applied): current beats match beats selected beats hover.
 function streamRowClass(i: number): string {
-  if (currentMatchRow.value === i) return 'bg-search-match-current text-bg';
-  if (matchSet.value.has(i)) return 'bg-search-match';
-  if (rt.value?.selectedRow === i) return 'bg-hover';
-  return 'hover:bg-hover';
+  const current = currentMatchRow.value === i;
+  const match = matchSet.value.has(i);
+  return cn(
+    rowVariants({ layout: 'tree', selected: current || match || rt.value?.selectedRow === i }),
+    'cursor-pointer gap-0 border-b border-border px-0 h-row',
+    VIRTUAL_ROW_CLASS,
+    current ? 'bg-search-match-current text-bg' : match && 'bg-search-match',
+  );
 }
 
 // P49 F7/D5: rowIndices is the *filtered* array when the filter toggle is on, so a match's page-row
@@ -623,7 +630,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
 // P21 round 2 performance finding 10(c): onResizeMove used to call patchStreamTabState on every
 // single pointermove — patchStreamTabState's own skipUnchanged: false means every one of those
 // calls allocates a fresh columnWidths object (`{...columnWidths, [col]: width}` is a new object
-// reference every time regardless of whether the rounded width actually differs, so skipUnchanged
+// reference every time regardless of whether the integer width actually differs, so skipUnchanged
 // wouldn't have helped even if it were true here — patchChanged compares by Object.is per key),
 // mutates the reactive tab state (re-rendering the header on every pixel of drag), and re-arms the
 // 1s debounced save, which serializes *every* tab via JSON.stringify(tabsState.tabs). A resize
@@ -785,18 +792,15 @@ onUnmounted(() => {
               <span class="shrink-0 text-kira-sm text-muted-foreground">s</span>
             </InputGroup>
           </TooltipTrigger>
-          <TooltipContent class="max-w-72">
+          <TooltipContent>
             How long each received message stays hidden from other consumers. Longer avoids
             receiving a message twice in one poll; shorter keeps messages available to consumers.
             1 s minimum: the AWS SDK cannot send 0. Stop does not unhide messages early.
           </TooltipContent>
         </Tooltip>
-        <span
-          v-if="isReadOnlyBatch && !visibilityValid"
-          class="text-kira-sm text-error"
-          data-testid="stream-poll-visibility-error"
-          >{{ VISIBILITY_RANGE_HINT }}</span
-        >
+        <FieldError v-if="isReadOnlyBatch && !visibilityValid" data-testid="stream-poll-visibility-error">{{
+          VISIBILITY_RANGE_HINT
+        }}</FieldError>
         <Tooltip v-if="isBatch">
           <TooltipTrigger as-child>
             <Button
@@ -943,19 +947,12 @@ onUnmounted(() => {
               <!-- Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-
                    PopoverPanel shape. -->
               <div class="flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1">
-                <div v-if="partitionOptionsLoading" class="text-kira-sm text-muted-foreground p-1">
-                  Loading…
-                </div>
-                <div
-                  v-else-if="partitionOptions.length === 0"
-                  class="text-kira-sm text-muted-foreground p-1"
-                >
-                  No partitions
-                </div>
+                <InlineState v-if="partitionOptionsLoading" kind="loading">Loading…</InlineState>
+                <InlineState v-else-if="partitionOptions.length === 0" kind="empty">No partitions</InlineState>
                 <Label
                   v-for="p in partitionOptions"
                   :key="p"
-                  class="partition-option flex items-center gap-1 rounded-kira cursor-pointer py-0.5 px-1 hover:bg-hover"
+                  class="partition-option" :class="rowVariants()"
                   :data-testid="`stream-filter-partition-option-${p}`"
                 >
                   <Checkbox
@@ -1021,12 +1018,9 @@ onUnmounted(() => {
               </Popover>
             </span>
           </div>
-          <span
-            v-if="timestampError"
-            class="whitespace-nowrap text-error text-kira-sm"
-            data-testid="stream-filter-timestamp-error"
-            >{{ timestampError }}</span
-          >
+          <FieldError v-if="timestampError" class="whitespace-nowrap" data-testid="stream-filter-timestamp-error">{{
+            timestampError
+          }}</FieldError>
         </div>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -1039,8 +1033,7 @@ onUnmounted(() => {
     </ViewToolbar>
 
     <!-- The one destructive truth of this view, stated once at the top. -->
-    <Alert v-if="isBatch" variant="warn" data-testid="stream-poll-warning">
-      <CodiconIcon name="warning" :size="13" class="text-warn-text" />
+    <Alert v-if="isBatch" variant="warn" strip data-testid="stream-poll-warning">
       <AlertDescription v-if="isReadOnlyBatch">
         Each poll hides received messages from other consumers for {{ hideDuration }} and raises
         their receive count. A longer hide avoids receiving the same message twice in one poll but
@@ -1057,14 +1050,12 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="stream-error">
-      <CodiconIcon name="error" :size="13" />
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" strip data-testid="stream-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
     <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
-    <Alert v-if="rt?.actionError" variant="error" data-testid="stream-action-error">
-      <CodiconIcon name="error" :size="13" />
+    <Alert v-if="rt?.actionError" variant="error" strip data-testid="stream-action-error">
       <AlertDescription>{{ rt.actionError }}</AlertDescription>
     </Alert>
 
@@ -1199,14 +1190,13 @@ onUnmounted(() => {
               <div
                 v-for="vi in virtualItems"
                 :key="String(vi.key)"
-                class="flex border-b border-border cursor-pointer h-row"
                 data-testid="stream-row"
                 :data-row-index="rowIndices[vi.index]"
                 :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-                :class="[VIRTUAL_ROW_CLASS, streamRowClass(rowIndices[vi.index])]"
+                :class="streamRowClass(rowIndices[vi.index])"
               >
                 <div
-                  class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-xs text-subtle truncate relative w-10"
+                  class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10"
                   role="option"
                   tabindex="0"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
@@ -1275,20 +1265,19 @@ onUnmounted(() => {
                   @click="onBodyCellClickFromEvent"
                   @keydown="onCellKeydownFromEvent($event, 'body')"
                 >
-                  <span
-                    v-if="rowAt(rowIndices[vi.index])?.body === null"
-                    class="text-subtle italic"
-                    title="null (tombstone)"
-                    data-testid="stream-body-null"
-                    >NULL</span
-                  >
+                  <Tooltip v-if="rowAt(rowIndices[vi.index])?.body === null">
+                    <TooltipTrigger as-child>
+                      <span class="text-subtle italic" data-testid="stream-body-null">NULL</span>
+                    </TooltipTrigger>
+                    <TooltipContent>null (tombstone)</TooltipContent>
+                  </Tooltip>
                   <template v-else>
                     <Badge v-if="rowAt(rowIndices[vi.index])?.bodyBinary" class="mr-1" data-testid="stream-body-binary">base64</Badge>
                     {{ rowAt(rowIndices[vi.index])?.body }}
                   </template>
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
-                      <span class="text-kira-xs text-muted-foreground">(truncated)</span>
+                      <span class="text-kira-sm text-muted-foreground">(truncated)</span>
                     </TooltipTrigger>
                     <TooltipContent>body truncated</TooltipContent>
                   </Tooltip>
@@ -1313,8 +1302,7 @@ onUnmounted(() => {
          element directly; `.list-body` itself dropped (its only other job, `position: relative` for
          `.no-rows`'s own inset:0 rule, was already a plain Tailwind utility on the same div).
          `.no-rows` stays a bare marker -- polled directly by interaction.spec.ts/
-         sqs.frontend.spec.ts/kafka.frontend.spec.ts. `.partition-option:hover` -> `hover:bg-hover`
-         directly on the Label -- `.partition-option` itself stays (kafka.frontend.spec.ts).
+         sqs.frontend.spec.ts/kafka.frontend.spec.ts. `.partition-option` stays (kafka.frontend.spec.ts).
          P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
          virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. -->
   </div>

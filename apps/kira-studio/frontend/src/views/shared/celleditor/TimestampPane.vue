@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -93,9 +92,9 @@ watch(calendarOpen, (open) => {
 
 <template>
   <div class="flex flex-col h-full min-h-0" data-testid="cell-editor-timestamp-pane">
-    <Alert class="shrink-0" variant="info" data-testid="cell-editor-timestamp">
-      <AlertDescription class="flex items-center gap-1">
-        <CodiconIcon name="clock" :size="13" />
+    <Alert class="shrink-0" variant="info" icon="clock" data-testid="cell-editor-timestamp">
+      <AlertDescription>
+        <div class="flex items-center gap-1">
         <template v-if="reading">
           <TimestampReading :subtle="zone !== 'local'" data-testid="cell-editor-timestamp-local"
             >{{ reading.local }}</TimestampReading
@@ -112,6 +111,7 @@ watch(calendarOpen, (open) => {
         <TimestampReading v-else subtle data-testid="cell-editor-timestamp-unparseable"
           >Not a recognizable {{ format }} value</TimestampReading
         >
+        </div>
       </AlertDescription>
     </Alert>
 

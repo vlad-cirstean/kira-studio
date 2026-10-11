@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
@@ -68,7 +69,7 @@ defineSlots<{
         <div
           v-for="entry in saved"
           :key="entry.id"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover"
+          :class="rowVariants()"
           :data-testid="savedEntryTestId"
           role="option"
           tabindex="0"
@@ -108,7 +109,7 @@ defineSlots<{
           <div
             v-for="entry in recent"
             :key="entry.id"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover"
+            :class="rowVariants()"
             :data-testid="recentEntryTestId"
             role="option"
             tabindex="0"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -291,20 +292,17 @@ function onSequenceStartChange(index: number, start: number): void {
       </div>
 
       <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
-        <CodiconIcon name="warning" :size="13" class="text-warn-text" />
         <AlertDescription>
           No column information available yet. Close this dialog, let the page load, then try again.
         </AlertDescription>
       </Alert>
       <Alert v-else-if="allColumnsSkipped" variant="warn" data-testid="generate-data-no-columns">
-        <CodiconIcon name="warning" :size="13" class="text-warn-text" />
         <AlertDescription>
           Every column is set to Skip — pick a recipe for at least one column to generate rows.
         </AlertDescription>
       </Alert>
 
       <Alert v-if="warnings.length" variant="warn" data-testid="generate-data-warnings">
-        <CodiconIcon name="warning" :size="13" class="text-warn-text" />
         <AlertDescription>
           <ul class="m-0 pl-2">
             <li v-for="w in warnings" :key="w">{{ w }}</li>
@@ -325,10 +323,8 @@ function onSequenceStartChange(index: number, start: number): void {
           {{ previewOpen ? 'Hide preview' : 'Preview SQL' }}
         </Button>
         <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">
-          <div v-if="previewLoading" class="text-muted-foreground text-kira-sm">Loading…</div>
-          <div v-else-if="previewError" class="text-kira-sm" data-testid="generate-data-preview-error">
-            {{ previewError }}
-          </div>
+          <InlineState v-if="previewLoading" kind="loading">Loading…</InlineState>
+          <InlineState v-else-if="previewError" kind="error" data-testid="generate-data-preview-error">{{ previewError }}</InlineState>
           <MonacoHost
             v-else
             :doc="previewDoc"
@@ -340,7 +336,6 @@ function onSequenceStartChange(index: number, start: number): void {
       </div>
 
       <Alert v-if="runError" variant="error" data-testid="generate-data-error">
-        <CodiconIcon name="warning" :size="13" />
         <AlertDescription>{{ runError }}</AlertDescription>
       </Alert>
       </DialogBody>
@@ -352,9 +347,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <TooltipTrigger as-child>
             <span class="inline-flex items-center gap-1 font-data text-kira-sm text-info">
               <span class="min-w-[7ch] text-right">—</span>
-              <span
-                class="h-3 w-3 shrink-0 rounded-full border-2 border-t-primary border-r-transparent border-b-primary border-l-primary animate-spin"
-              />
+              <Spinner :size="12" label="" />
             </span>
           </TooltipTrigger>
           <TooltipContent>{{ `${committedRows} / ${rowCount} rows committed` }}</TooltipContent>

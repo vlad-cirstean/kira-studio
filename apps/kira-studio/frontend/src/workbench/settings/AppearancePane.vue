@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { Switch } from '@theme/components/ui/switch';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
@@ -63,7 +62,7 @@ const rowColoringId = useId();
           :disabled-trigger="isAtDefault('appearance', 'fontFamily')"
           :disabled="isAtDefault('appearance', 'fontFamily')"
           @click="resetLeaf('appearance', 'fontFamily')"
-        />
+       />
       </div>
       <NativeSelect
         :id="fontFamilyId"
@@ -117,7 +116,7 @@ const rowColoringId = useId();
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
       :register-field-error="registerFieldError"
-    />
+   />
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
       <FieldDescription>Applies to the tree, the grid and every list.</FieldDescription>
@@ -135,7 +134,7 @@ const rowColoringId = useId();
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-muted-foreground text-kira-sm bg-elevated"
             :style="{ height: `${rowPreviewHeight}px` }"
-          />
+         />
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
@@ -148,7 +147,7 @@ const rowColoringId = useId();
           >
         </div>
         <div class="flex" :style="{ height: `${rowPreviewHeight}px` }">
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-xs bg-elevated font-data"
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
             >1</span
           >
           <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
@@ -159,7 +158,7 @@ const rowColoringId = useId();
           >
         </div>
         <div class="flex border-t border-border" :style="{ height: `${rowPreviewHeight}px` }">
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-xs bg-elevated font-data"
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
             >2</span
           >
           <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
@@ -181,15 +180,12 @@ const rowColoringId = useId();
 
     <FieldGroup>
       <Field orientation="horizontal" class="items-start">
-        <Checkbox
+        <Switch
           :id="rowColoringId"
-          class="size-3.5"
           :model-value="draft.appearance.rowColoring"
           data-testid="settings-row-coloring"
           @update:model-value="(v) => onRowColoringChange(v === true)"
-        >
-          <CodiconIcon name="check" :size="12" />
-        </Checkbox>
+        />
         <FieldContent>
           <Label :for="rowColoringId">Row colouring</Label>
           <FieldDescription
@@ -206,7 +202,7 @@ const rowColoringId = useId();
         :disabled-trigger="isAtDefault('appearance', 'rowColoring')"
         :disabled="isAtDefault('appearance', 'rowColoring')"
         @click="resetLeaf('appearance', 'rowColoring')"
-      />
+     />
     </FieldGroup>
   </div>
 </template>

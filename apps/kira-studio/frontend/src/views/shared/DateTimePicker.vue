@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
@@ -247,14 +248,16 @@ const secondText = computed<string>({
         <TooltipTrigger as-child>
           <!-- P42 D33a: a plain <button> now, so the label itself is the mode-cycling control --
                reset to look like the <span> it replaces rather than a bordered control. -->
-          <button
+          <Button
             type="button"
-            class="border-0 bg-none rounded-kira-sm text-kira-md text-fg cursor-pointer py-0.5 px-1 hover:bg-hover"
+            variant="toolbar"
+            size="kira"
+            class="h-auto px-1 py-0.5 text-fg"
             data-testid="datetime-picker-month"
             @click="cycleMode"
           >
             {{ labelText }}
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Jump by month or year</TooltipContent>
       </Tooltip>
@@ -272,57 +275,57 @@ const secondText = computed<string>({
           <span v-for="w in WEEKDAY_LABELS" :key="w" class="flex items-center justify-center text-subtle text-kira-sm h-4.5">{{ w }}</span>
         </div>
         <div class="grid grid-cols-7 gap-0.5">
-          <button
+          <Button
             v-for="cell in days"
             :key="`${cell.year}-${cell.month}-${cell.day}`"
             type="button"
-            class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer w-full p-0 justify-center border bg-none h-5.5"
+            :variant="cell.isSelected ? 'toolbar-primary' : 'toolbar'"
+            size="kira"
+            class="h-5.5 w-full p-0 font-normal"
             data-testid="datetime-picker-day"
             :data-in-month="cell.inMonth"
             :data-selected="cell.isSelected"
             :class="[
-              cell.isSelected
-                ? 'bg-primary text-primary-foreground'
-                : cell.inMonth
-                  ? 'text-fg hover:bg-hover'
-                  : 'text-subtle hover:bg-hover',
-              cell.isToday ? 'border-border-strong' : 'border-transparent',
+              cell.isSelected ? '' : cell.inMonth ? 'text-fg' : 'text-subtle',
+              cell.isToday ? 'border-border-strong' : '',
             ]"
             @click="pickDay(cell)"
           >
             {{ cell.day }}
-          </button>
+          </Button>
         </div>
       </template>
       <!-- The month grid (3x4) and year-block grid (4x4, item 19's "16-year block") share this
            layout — same day-cell chip, just a 4-column grid instead of a 7-column one (D33a). -->
       <div v-else-if="mode === 'months'" class="grid grid-cols-4 gap-0.5">
-        <button
+        <Button
           v-for="(name, i) in MONTH_NAMES"
           :key="name"
           type="button"
-          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer w-full p-0 justify-center border border-transparent bg-none h-5.5"
+          :variant="i === viewMonth ? 'toolbar-primary' : 'toolbar'"
+          size="kira"
+          class="h-5.5 w-full p-0 font-normal"
           data-testid="datetime-picker-month-cell"
           :data-selected="i === viewMonth"
-          :class="i === viewMonth ? 'bg-primary text-primary-foreground' : 'text-fg hover:bg-hover'"
           @click="pickMonth(i)"
         >
           {{ name.slice(0, 3) }}
-        </button>
+        </Button>
       </div>
       <div v-else class="grid grid-cols-4 gap-0.5">
-        <button
+        <Button
           v-for="y in yearBlock"
           :key="y"
           type="button"
-          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer w-full p-0 justify-center border border-transparent bg-none h-5.5"
+          :variant="y === viewYear ? 'toolbar-primary' : 'toolbar'"
+          size="kira"
+          class="h-5.5 w-full p-0 font-normal"
           data-testid="datetime-picker-year-cell"
           :data-selected="y === viewYear"
-          :class="y === viewYear ? 'bg-primary text-primary-foreground' : 'text-fg hover:bg-hover'"
           @click="pickYear(y)"
         >
           {{ y }}
-        </button>
+        </Button>
       </div>
     </div>
     <div class="flex items-center border-t border-border gap-0.5 pt-1">
@@ -362,9 +365,5 @@ const secondText = computed<string>({
         @click="pickNow"
       />
     </div>
-    <!-- P110 I2-18: `.dtp-month-label`/`.dtp-day` compound rules moved to conditional classes above.
-         bg-primary/text-primary-foreground, never bg-hover: hover reads --kira-hover (grey), same
-         workaround as api/CollectionRow.vue's rename-input. P110 I2-37 retired the shadcn accent
-         alias this comment used to warn against; hover is its I2-37 replacement name. -->
   </div>
 </template>
