@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { ref } from 'vue';
 
 // P128 §2.3: hoisted from Kira Studio's own WorkbenchShell.vue (the automations module's own "+") and
 // Kira Space's own WorkbenchShell.vue (the git module's own "+") — the wrapper/Tooltip/button
@@ -16,10 +16,8 @@ defineProps<{
 
 const emit = defineEmits<{ click: [button: HTMLButtonElement] }>();
 
-const btn = ref<HTMLButtonElement | null>(null);
-
-function onClick(): void {
-  if (btn.value) emit('click', btn.value);
+function onClick(e: MouseEvent): void {
+  emit('click', e.currentTarget as HTMLButtonElement);
 }
 </script>
 
@@ -27,17 +25,16 @@ function onClick(): void {
   <div class="h-full flex items-center shrink-0 pr-1 pl-0.5" data-testid="tab-strip-actions">
     <Tooltip>
       <TooltipTrigger as-child>
-        <button
-          ref="btn"
-          type="button"
-          class="flex items-center justify-center size-5.5 bg-transparent border-0 cursor-pointer rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg"
+        <Button
+          variant="toolbar"
+          size="title"
           :aria-label="label"
           :aria-haspopup="hasPopup ? 'menu' : undefined"
           data-testid="tab-strip-new"
           @click="onClick"
         >
           <CodiconIcon name="add" :size="13" />
-        </button>
+        </Button>
       </TooltipTrigger>
       <TooltipContent>{{ tooltip }}</TooltipContent>
     </Tooltip>

@@ -3,6 +3,8 @@ import type { ScriptKind, ScriptParam, ScriptSchedule } from '@shared/domain/scr
 import { keepPreviousData, useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Command,
   CommandEmpty,
@@ -17,7 +19,6 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
-import { Switch } from '@theme/components/ui/switch';
 import { refDebounced } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId, watch } from 'vue';
@@ -126,7 +127,7 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 rounded-kira-sm border border-border p-3" data-testid="schedule-fields">
+  <Card class="gap-3" data-testid="schedule-fields">
     <Field>
       <FieldLabel :for="`${idBase}-cron`">Repeat</FieldLabel>
       <div class="flex items-center gap-1.5">
@@ -186,7 +187,7 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
     </Field>
 
     <Field orientation="horizontal">
-      <Switch
+      <Checkbox
         :id="`${idBase}-enabled`"
         :model-value="schedule.enabled"
         data-testid="schedule-enabled"
@@ -197,7 +198,7 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
 
     <Field>
       <div class="flex items-center gap-2">
-        <Switch
+        <Checkbox
           :id="`${idBase}-quiet`"
           :model-value="!schedule.confirm"
           :disabled="askLocked"
@@ -266,5 +267,5 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
       Runs only while {{ appName }} is open. Missed runs are skipped. A run still going, or still
       waiting for your answer, makes the next one skip.
     </FieldDescription>
-  </div>
+  </Card>
 </template>

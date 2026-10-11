@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -302,17 +303,18 @@ if (moveTab) {
             <TooltipContent>{{ badgeFor(tab)!.tooltip }}</TooltipContent>
           </Tooltip>
         </button>
-        <button
+        <Button
           v-if="host.tabs.closeTab"
-          type="button"
-          class="tab-close shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 rounded-kira-sm hover:bg-hover"
+          variant="toolbar"
+          size="title"
+          class="tab-close size-4 p-0"
           :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100'"
           :aria-label="`Close ${titleFor(tab)}`"
           data-testid="tab-close"
           @click="onClose($event, tab)"
         >
           <CodiconIcon name="close" :size="13" />
-        </button>
+        </Button>
       </div>
     </div>
     <!-- P83 §9.1/P91 §8: a third fixed child, after the scrolling tab row, mirroring the pinned

@@ -3,8 +3,9 @@ import type { ScriptRunArgs } from '@shared/domain/scriptRuns';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
 import type { TextPart } from '@theme/varText';
@@ -140,7 +141,7 @@ function run(): void {
       </DialogHeader>
 
       <DialogBody>
-        <Alert v-if="!script" variant="error" class="w-auto">
+        <Alert v-if="!script" variant="error">
           <AlertDescription>This script no longer exists.</AlertDescription>
         </Alert>
         <template v-else>
@@ -149,9 +150,9 @@ function run(): void {
           <Field v-if="isSmart && pv" data-testid="run-prompt">
             <FieldLabel>Prompt</FieldLabel>
             <template v-if="oneOff === null">
-              <div class="rounded-kira-sm border border-border p-2 font-data text-kira-sm" data-testid="run-prompt-text">
+              <Card class="font-data text-kira-sm" data-testid="run-prompt-text">
                 <VarText :parts="promptParts" />
-              </div>
+              </Card>
               <Button variant="dialog" size="kira-lg" class="self-start" data-testid="run-prompt-edit" @click="editPrompt">
                 Edit for this run
               </Button>
@@ -183,14 +184,14 @@ function run(): void {
           />
 
           <RunPreview v-if="pv" :preview="pv" />
-          <Alert v-if="preview.isError.value" variant="error" class="w-auto" data-testid="run-preview-error">
+          <Alert v-if="preview.isError.value" variant="error" data-testid="run-preview-error">
             <AlertDescription>{{ preview.error.value?.message }}</AlertDescription>
           </Alert>
-          <span v-if="pv && pv.missing.length > 0" class="text-kira-sm text-error" data-testid="run-missing">
+          <FieldError v-if="pv && pv.missing.length > 0" data-testid="run-missing">
             Fill in: {{ pv.missing.join(', ') }}
-          </span>
-          <span v-if="pv?.blocker" class="text-kira-sm text-error" data-testid="run-blocker">{{ pv.blocker }}</span>
-          <Alert v-if="startError" variant="error" class="w-auto" data-testid="run-error">
+          </FieldError>
+          <FieldError v-if="pv?.blocker" data-testid="run-blocker">{{ pv.blocker }}</FieldError>
+          <Alert v-if="startError" variant="error" data-testid="run-error">
             <AlertDescription>{{ startError }}</AlertDescription>
           </Alert>
         </template>

@@ -4,9 +4,12 @@ import type { OpLogRecord } from '@shared/domain/ops';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { computed, nextTick, ref } from 'vue';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../util/virtualRows';
@@ -190,7 +193,7 @@ defineSlots<{
     </Empty>
     <template v-else>
       <div
-        class="grid items-center gap-2 px-2 shrink-0 uppercase tracking-wider h-4.5 text-muted-foreground border-b border-border"
+        :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-2 px-2 shrink-0 h-4.5')"
         :style="{ gridTemplateColumns }"
       >
         <span v-for="column in columns" :key="column.id">{{ column.label }}</span>
@@ -212,9 +215,8 @@ defineSlots<{
           <template v-for="vi in virtualItems" :key="String(vi.key)">
             <li
               v-if="listItems[vi.index].kind === 'op'"
-              class="grid items-center gap-2 px-2 cursor-pointer select-text h-4.5 hover:bg-hover"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px`, gridTemplateColumns }"
-              :class="[VIRTUAL_ROW_CLASS, { 'text-error': listItems[vi.index].record.status === 'error' }]"
+              :class="cn(VIRTUAL_ROW_CLASS, tableRowClass, 'grid items-center gap-2 px-2 cursor-pointer select-text h-4.5', listItems[vi.index].record.status === 'error' && 'text-error')"
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
               :data-op-id="listItems[vi.index].record.id"
@@ -230,12 +232,7 @@ defineSlots<{
                 }}</span>
                 <span v-else-if="column.id === 'kind'">{{ listItems[vi.index].record.kind }}</span>
                 <span v-else-if="column.id === 'status'" class="flex items-center gap-1">
-                  <CodiconIcon
-                    v-if="listItems[vi.index].record.status === 'running'"
-                    name="loading"
-                    class="animate-spin"
-                    :size="13"
-                  />
+                  <Spinner v-if="listItems[vi.index].record.status === 'running'" label="" />
                   {{ listItems[vi.index].record.status }}
                   <button
                     v-if="listItems[vi.index].record.status === 'running' && canCancelRecord(listItems[vi.index].record)"

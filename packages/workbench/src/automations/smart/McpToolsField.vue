@@ -2,9 +2,9 @@
 import type { SmartSettings } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { Switch } from '@theme/components/ui/switch';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -54,12 +54,12 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
     <span v-if="servers.data.value?.length === 0" class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">
       No MCP servers.
     </span>
-    <Alert v-if="servers.isError.value" variant="error" class="w-auto">
+    <Alert v-if="servers.isError.value" variant="error">
       <AlertDescription>{{ servers.error.value?.message }}</AlertDescription>
     </Alert>
     <div v-for="s in servers.data.value ?? []" :key="s.name" class="flex flex-col gap-1" data-testid="smart-mcp-server" :data-server="s.name">
       <div class="flex items-center gap-2">
-        <Switch
+        <Checkbox
           :id="`${idBase}-${s.name}`"
           :model-value="enabled.includes(s.name)"
           :data-testid="`smart-mcp-switch-${s.name}`"

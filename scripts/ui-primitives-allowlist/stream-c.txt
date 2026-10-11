@@ -1,26 +1,6 @@
 # P263 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-packages/workbench/src/automations/AutomationsPanel.vue
-packages/workbench/src/automations/ParamsEditor.vue
-packages/workbench/src/automations/ScriptBodyField.vue
-packages/workbench/src/automations/ScriptDialog.vue
-packages/workbench/src/automations/run/RunPreview.vue
-packages/workbench/src/automations/run/RunScriptDialog.vue
-packages/workbench/src/automations/runs/RunLog.vue
-packages/workbench/src/automations/runs/RunsSection.vue
-packages/workbench/src/automations/runs/RunsStatusItem.vue
-packages/workbench/src/automations/schedule/ScheduleConfirmDialog.vue
-packages/workbench/src/automations/schedule/ScheduleFields.vue
-packages/workbench/src/automations/smart/McpServerTools.vue
-packages/workbench/src/automations/smart/McpToolsField.vue
-packages/workbench/src/components/AppMetricsItem.vue
-packages/workbench/src/components/AutocompleteField.vue
-packages/workbench/src/components/InlineRenameInput.vue
-packages/workbench/src/components/OpLogPanel.vue
-packages/workbench/src/components/TabStrip.vue
-packages/workbench/src/components/TabStripNewButton.vue
-packages/workbench/src/components/UpdateAvailableItem.vue
-packages/workbench/src/components/UpdateDialog.vue
-packages/workbench/src/settings/fields/WordWrapField.vue
-packages/workbench/src/terminal/TerminalHostView.vue
 permanent U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
 permanent U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
+permanent U25 packages/workbench/src/automations/runs/RunLog.vue # stderr line colour is log data, not chrome
+permanent U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
+permanent U36 packages/workbench/src/components/InlineRenameInput.vue # bare rename input, not a card

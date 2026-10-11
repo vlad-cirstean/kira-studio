@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { useLocalStorage } from '@vueuse/core';
 import { computed } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -18,14 +19,15 @@ function show(): void {
 </script>
 
 <template>
-  <button
+  <Button
     v-if="running > 0"
-    type="button"
-    class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover"
+    variant="toolbar"
+    size="kira"
+    class="h-control-sm gap-1 px-1.5 text-fg text-kira-sm font-normal"
     data-testid="status-runs"
     @click="show"
   >
     <CodiconIcon name="play" :size="13" />
     {{ running }} running
-  </button>
+  </Button>
 </template>

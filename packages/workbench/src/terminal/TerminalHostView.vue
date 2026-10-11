@@ -8,6 +8,7 @@
 // P128 §2.4: TerminalHostTabState/TerminalHostDeps moved to terminalHost.ts (a plain .ts file
 // module.ts, also non-.vue, can import types from) — re-exported here so existing `.vue`
 // consumers of `./TerminalHostView.vue` keep working unchanged.
+import { FieldError } from '@theme/components/ui/field';
 import { ref } from 'vue';
 import type { TerminalHostDeps, TerminalHostTabState } from './terminalHost';
 import { useTerminalMount } from './useTerminalMount';
@@ -38,10 +39,16 @@ const { session, footerText } = useTerminalMount({
     <slot />
     <div ref="container" class="flex-1 min-h-0" data-testid="repo-terminal-host" />
     <slot name="outcome" />
+    <FieldError
+      v-if="!hideFooter && session?.status === 'failed'"
+      class="shrink-0 bg-chrome px-1 py-0.5"
+      data-testid="repo-terminal-footer"
+    >
+      {{ footerText }}
+    </FieldError>
     <div
-      v-if="!hideFooter && session && (session.status === 'exited' || session.status === 'failed')"
-      class="shrink-0 text-kira-sm bg-chrome py-0.5 px-1"
-      :class="session.status === 'failed' ? 'text-error' : 'text-muted-foreground'"
+      v-else-if="!hideFooter && session?.status === 'exited'"
+      class="shrink-0 text-kira-sm bg-chrome py-0.5 px-1 text-muted-foreground"
       data-testid="repo-terminal-footer"
     >
       {{ footerText }}

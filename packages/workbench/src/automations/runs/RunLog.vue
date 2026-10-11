@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import InlineState from '@theme/components/InlineState.vue';
+import { cardVariants } from '@theme/components/ui/card';
+import { FieldError } from '@theme/components/ui/field';
+import { cn } from '@theme/lib/utils';
 import { useScroll } from '@vueuse/core';
 import { nextTick, ref, watch } from 'vue';
 import { useRunLog } from './runsQueries';
@@ -24,13 +28,13 @@ watch(
 <template>
   <div
     ref="el"
-    class="min-h-0 flex-1 overflow-auto rounded-kira border border-border bg-bg px-2.5 py-2 font-data text-kira-sm leading-relaxed"
+:class="cn(cardVariants(), 'min-h-0 flex-1 gap-0 overflow-auto font-data text-kira-sm leading-relaxed')"
     data-testid="run-log"
   >
-    <div v-if="log.isPending.value" class="text-subtle">Loading…</div>
-    <div v-else-if="log.isError.value" class="text-error" data-testid="run-log-error">
+    <InlineState v-if="log.isPending.value" kind="loading">Loading…</InlineState>
+    <FieldError v-else-if="log.isError.value" data-testid="run-log-error">
       {{ log.error.value instanceof Error ? log.error.value.message : String(log.error.value) }}
-    </div>
+    </FieldError>
     <template v-else-if="log.data.value">
       <div v-if="log.data.value.truncated" class="text-subtle">… earlier output dropped</div>
       <div v-if="log.data.value.chunks.length === 0" class="text-subtle">No output yet.</div>

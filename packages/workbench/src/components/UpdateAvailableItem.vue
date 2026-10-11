@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 
@@ -19,15 +20,16 @@ const tooltip = computed(
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <button
-        type="button"
-        class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm cursor-pointer border-0 bg-none text-info hover:bg-hover hover:text-fg"
+      <Button
+        variant="toolbar"
+        size="kira"
+        class="h-control-sm gap-1 px-1.5 text-kira-sm font-normal text-info"
         data-testid="update-available"
         @click="emit('open')"
       >
         <CodiconIcon name="cloud-download" :size="13" />
         Update {{ latestVersion }}
-      </button>
+      </Button>
     </TooltipTrigger>
     <TooltipContent>{{ tooltip }}</TooltipContent>
   </Tooltip>

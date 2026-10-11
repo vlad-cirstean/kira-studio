@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldError } from '@theme/components/ui/field';
 import { computed } from 'vue';
 import type { AppUpdateStore } from '../state/createAppUpdateStore';
 
@@ -66,9 +67,9 @@ function onEscapeOrOutside(e: Event): void {
             Updating quits {{ store.appName }}, installs the new version into /Applications, then
             reopens it. If it doesn't reopen within a few minutes, see {{ store.installLogPath }}.
           </p>
-          <p v-if="state === 'error'" class="m-0 text-error" data-testid="update-dialog-error">
+          <FieldError v-if="state === 'error'" data-testid="update-dialog-error">
             {{ store.installError }} Details: {{ store.installLogPath }}.
-          </p>
+          </FieldError>
         </template>
       </DialogBody>
 

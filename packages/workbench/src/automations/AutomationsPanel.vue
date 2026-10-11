@@ -2,10 +2,14 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import { useEventListener, useLocalStorage } from '@vueuse/core';
@@ -363,15 +367,15 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
       </PanelBar>
       <div ref="bodyEl" class="flex min-h-0 flex-1 flex-col" data-testid="automations-body">
         <div v-if="!empty" class="flex h-full flex-col overflow-y-auto">
-          <span v-if="actionError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="script-error">{{ actionError }}</span>
+          <InlineState v-if="actionError" kind="error" data-testid="script-error">{{ actionError }}</InlineState>
           <div class="flex flex-col" data-testid="script-list">
             <template v-for="script in view.ungrouped" :key="script.id">
-              <button
+              <Tooltip>
+                <TooltipTrigger as-child>
+                <button
                 type="button"
-                                
                 :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
                 :style="rowIndent(0)"
-                :title="script.command"
                 :data-testid="`script-${script.id}`"
                 @click="runScript(script)"
                 @contextmenu.prevent.stop="onContextMenu($event, script)"
@@ -391,14 +395,17 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   class="shrink-0 text-kira-sm text-muted-foreground"
                 />
                 <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
-                  <span
+                  <Spinner
                     v-if="liveRunByScript.get(script.id)"
-                    class="h-3 w-3 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                    label=""
                     data-testid="script-running"
                   />
                   <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
                 </span>
               </button>
+                </TooltipTrigger>
+                <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
+              </Tooltip>
             </template>
             <template v-for="group in view.groups" :key="group.collection.id">
               <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
@@ -434,14 +441,12 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
               </div>
               <div v-if="isOpen(group.collection.id)" class="flex flex-col">
-                <button
-                  v-for="script in group.rows"
-                  :key="script.id"
+                <Tooltip v-for="script in group.rows" :key="script.id">
+                  <TooltipTrigger as-child>
+                  <button
                   type="button"
-                                    
                   :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
                   :style="rowIndent(1)"
-                  :title="script.command"
                   :data-testid="`script-${script.id}`"
                   @click="runScript(script)"
                   @contextmenu.prevent.stop="onContextMenu($event, script)"
@@ -461,20 +466,23 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                     class="shrink-0 text-kira-sm text-muted-foreground"
                   />
                   <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
-                    <span
+                    <Spinner
                       v-if="liveRunByScript.get(script.id)"
-                      class="h-3 w-3 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                      label=""
                       data-testid="script-running"
                     />
                     <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
                   </span>
                 </button>
+                  </TooltipTrigger>
+                  <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
+                </Tooltip>
               </div>
             </template>
           </div>
         </div>
         <Empty v-else class="h-full">
-          <span v-if="actionError" class="text-error text-kira-sm leading-normal" data-testid="script-error">{{ actionError }}</span>
+          <FieldError v-if="actionError" data-testid="script-error">{{ actionError }}</FieldError>
           <EmptyHeader>
             <EmptyMedia><CodiconIcon name="terminal-bash" :size="24" /></EmptyMedia>
             <EmptyTitle>No scripts</EmptyTitle>

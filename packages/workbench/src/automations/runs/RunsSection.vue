@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
+import { cn } from '@theme/lib/utils';
 import { useLocalStorage } from '@vueuse/core';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import { computed, ref } from 'vue';
@@ -64,11 +67,11 @@ function toggle(run: ScriptRun): void {
           @update:model-value="(v) => (filter = v as Filter)"
         />
       </PanelBar>
-      <span v-if="rows.length === 0" class="px-1.5 py-2 text-kira-sm text-muted-foreground" data-testid="runs-empty">
+      <InlineState v-if="rows.length === 0" kind="empty" data-testid="runs-empty">
         No runs.
-      </span>
+      </InlineState>
       <div v-for="run in rows" :key="run.id" class="flex flex-col" data-testid="run-row" :data-state="run.state">
-        <div class="flex items-center gap-1 px-1.5 py-1 hover:bg-hover">
+        <div :class="cn(rowVariants({ layout: 'tree' }), 'py-1 pl-1.5')">
           <button
             type="button"
             class="flex min-w-0 flex-1 items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit"

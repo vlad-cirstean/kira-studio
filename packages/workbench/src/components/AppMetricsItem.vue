@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppMetricsSample } from '@shared/protocol/events';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
@@ -41,7 +42,7 @@ const metricsTooltip = computed(() => {
 <template>
   <Tooltip v-if="sample">
     <TooltipTrigger as-child>
-      <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="app-metrics">
+      <Button as="span" variant="toolbar" size="kira" class="h-control-sm gap-1 px-1.5 text-fg text-kira-sm font-normal" data-testid="app-metrics">
         <CodiconIcon name="pulse" :size="13" />
         <!-- "100%" -->
         <span class="inline-block text-right min-w-[4ch] font-data" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
@@ -50,7 +51,7 @@ const metricsTooltip = computed(() => {
         <span class="inline-block text-right min-w-[9ch] font-data" data-testid="app-metrics-mem">{{
           memLabel
         }}</span>
-      </span>
+      </Button>
     </TooltipTrigger>
     <TooltipContent>{{ metricsTooltip }}</TooltipContent>
   </Tooltip>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
+import { FieldError } from '@theme/components/ui/field';
 import { computed, ref } from 'vue';
 import { useAutomationsModule } from '../automations/module';
 import { useRerun } from '../automations/runScript';
@@ -49,7 +50,7 @@ async function tail(): Promise<string> {
           :tail="tail"
           @rerun="rerun(scriptRun)"
         />
-        <span v-if="rerunError" class="text-kira-sm text-error" data-testid="script-run-error">{{ rerunError }}</span>
+        <FieldError v-if="rerunError" data-testid="script-run-error">{{ rerunError }}</FieldError>
       </div>
     </template>
   </TerminalHostView>

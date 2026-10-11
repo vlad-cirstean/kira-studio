@@ -13,13 +13,13 @@ import { useQuery } from '@tanstack/vue-query';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
-import { Switch } from '@theme/components/ui/switch';
 import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
@@ -326,7 +326,7 @@ function onOpenAutoFocus(e: Event): void {
 
 
             <Field v-if="ade" orientation="horizontal">
-              <Switch id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
+              <Checkbox id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
               <Label for="script-use-ade-dir">Run in the task's worktree when started from ADE</Label>
             </Field>
 
@@ -338,7 +338,7 @@ function onOpenAutoFocus(e: Event): void {
 
           <TabsContent value="schedule" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
             <Field orientation="horizontal">
-              <Switch id="script-schedule" v-model="scheduleOn" data-testid="script-schedule" />
+              <Checkbox id="script-schedule" v-model="scheduleOn" data-testid="script-schedule" />
               <Label for="script-schedule">Run on a schedule</Label>
             </Field>
             <ScheduleFields

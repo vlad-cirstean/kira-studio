@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import { InputGroup } from '@theme/components/ui/input-group';
 import { autoClosePairsOnType, wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
@@ -98,7 +99,7 @@ const props = withDefaults(
      *  default: every existing call site renders byte-identically. */
     grow?: boolean;
     /** A resizable, `rows`-tall `<textarea>` where Enter inserts a newline (unless a suggestion was
-     *  arrowed onto) and Cmd/Ctrl+Enter bubbles, unlike `grow`, which never inserts one. */
+     *  arrowed onto) and Mod+Enter bubbles, unlike `grow`, which never inserts one. */
     multiline?: boolean;
     rows?: number;
     /** Off for prose/shell bodies, where auto-closing `'` and `"` gets in the way. */
@@ -365,7 +366,7 @@ function onKeydown(e: KeyboardEvent): void {
   }
   if (e.key === 'Enter') {
     open.value = false;
-    // Multiline: a plain Enter is a newline, Cmd/Ctrl+Enter bubbles to the host (dialog save).
+    // Multiline: a plain Enter is a newline, Mod+Enter bubbles to the host (dialog save).
     if (props.multiline) return;
     // No newline is ever inserted under `grow` — growth comes from soft wrapping alone.
     if (props.grow) e.preventDefault();
@@ -629,8 +630,7 @@ const fieldAttrs = computed(
             :key="c.label"
             as="li"
             :value="i"
-            class="flex items-center gap-1 py-1 px-1.5 rounded-kira-sm text-kira-md cursor-pointer whitespace-nowrap"
-            :class="i === activeIndex ? 'bg-select text-fg' : ''"
+:class="rowVariants({ layout: 'menu', selected: i === activeIndex })"
             @mouseenter="activeIndex = i"
             @mousedown.prevent="accept(c)"
           >

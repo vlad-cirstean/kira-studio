@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ScriptRunPreview } from '@shared/domain/scriptRuns';
+import { Card } from '@theme/components/ui/card';
 import VarText from '@theme/components/VarText.vue';
 import type { TextPart } from '@theme/varText';
 import { computed } from 'vue';
@@ -26,7 +27,7 @@ function envParts(e: ScriptRunPreview['env'][number]): TextPart[] {
 </script>
 
 <template>
-  <div class="flex flex-col gap-1.5 rounded-kira-sm border border-border p-2 text-kira-sm" data-testid="run-preview">
+  <Card class="text-kira-sm" data-testid="run-preview">
     <div data-testid="run-folder"><VarText :parts="folderParts" /></div>
     <template v-if="preview.kind === 'smart'">
       <div class="text-muted-foreground" data-testid="run-limits">
@@ -43,5 +44,5 @@ function envParts(e: ScriptRunPreview['env'][number]): TextPart[] {
     <div v-if="preview.kind === 'smart'" class="text-muted-foreground" data-testid="run-isolated">
       Your Claude settings files are not loaded.
     </div>
-  </div>
+  </Card>
 </template>

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { AppearanceSettings } from '@shared/domain/settings';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { Switch } from '@theme/components/ui/switch';
 import { useId } from 'vue';
 
 // I2-18: the word-wrap checkbox row (checkbox, reset button) was byte-identical between
@@ -28,15 +27,12 @@ const wordWrapId = useId();
 <template>
   <FieldGroup>
     <Field orientation="horizontal" class="items-start">
-      <Checkbox
+      <Switch
         :id="wordWrapId"
-        class="size-3.5"
         :model-value="appearance.wordWrap"
         data-testid="settings-word-wrap"
         @update:model-value="(v) => onWordWrapChange(v === true)"
-      >
-        <CodiconIcon name="check" :size="12" />
-      </Checkbox>
+      />
       <FieldContent>
         <Label :for="wordWrapId">Word wrap</Label>
         <slot />

@@ -3,6 +3,7 @@ import type { ScriptKind, ScriptParam, ScriptParamType } from '@shared/domain/sc
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
@@ -82,10 +83,9 @@ function toggleDefault(i: number, option: string, on: boolean): void {
     <FieldDescription v-else>
       Use {name} in the prompt. A secret reaches the run as $KIRA_PARAM_&lt;NAME&gt; only, never in the prompt.
     </FieldDescription>
-    <div
+    <Card
       v-for="(p, i) in params"
       :key="i"
-      class="flex flex-col gap-1.5 rounded-kira-sm border border-border p-2"
       data-testid="param-row"
     >
       <div class="flex items-center gap-1.5">
@@ -174,6 +174,6 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           <Label :for="`${idBase}-sec-${i}`">Secret</Label>
         </div>
       </div>
-    </div>
+    </Card>
   </FieldSet>
 </template>
