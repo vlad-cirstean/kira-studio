@@ -6,7 +6,6 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
-import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
@@ -54,7 +53,7 @@ import {
   resolveColumnOrder,
   tooltipAttrs,
 } from '../shared/page/columns';
-import { usePageSearchFilterStore } from '../shared/page/searchFilter';
+import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import {
   computeCellFillHash,
@@ -122,7 +121,6 @@ import { type Selection, useGridViewStore } from './state';
 
 const contextMenuStore = useContextMenuStore();
 const cellSelectionStore = useCellSelectionStore();
-const pageSearchFilterStore = usePageSearchFilterStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
@@ -600,7 +598,6 @@ const maskRulesQuery = useQuery(() => ({
   queryKey: maskRulesQueryKey(tab()?.connectionId ?? ''),
   queryFn: () => loadMaskRules(tab()?.connectionId ?? ''),
   enabled: !!tab()?.connectionId,
-  staleTime: Number.POSITIVE_INFINITY,
 }));
 
 // Re-resolves maskRulesByColumn from this tab's own connection — cheap (state/maskRules.ts's own
@@ -803,7 +800,8 @@ function onViewportScroll(): void {
 }
 
 // SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted replaces the
-// clearTimeout below.
+// clearTimeout below. 300 ms, not TIMING.persist (150): the patch lands mid-scroll at 150 and
+// breaks cell-editor.spec's column scan.
 const persistScroll = useDebounceFn(() => {
   const el = viewportEl;
   if (!el) return;
@@ -2714,20 +2712,13 @@ defineExpose({
         <EmptyTitle>No rows</EmptyTitle>
       </EmptyHeader>
     </Empty>
-    <Empty v-else-if="showNoMatchingRows" class="no-rows absolute inset-0" data-testid="grid-no-matching-rows">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>No matching rows</EmptyTitle>
-      </EmptyHeader>
-      <Button
-        variant="toolbar"
-        size="kira"
-        data-testid="grid-show-all-rows"
-        @click="pageSearchFilterStore.setSearchFiltering(props.tabId, false)"
-      >
-        Show all rows
-      </Button>
-    </Empty>
+    <SearchFilterNotice
+      v-else-if="showNoMatchingRows"
+      class="no-rows absolute inset-0"
+      data-testid="grid-no-matching-rows"
+      :filter-key="props.tabId"
+      show-all-testid="grid-show-all-rows"
+    />
     <FkPreviewPopover
       v-if="fkPreview"
       :x="fkPreview.x"

@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
-import { errorText } from '@workbench/bridge/codedError';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
 import { onMounted, ref } from 'vue';
@@ -34,14 +34,10 @@ const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: canc
 
 // Every action runs through `attempt`: a storage failure shows in the footer, never as an
 // unhandled rejection with nothing on screen.
-const error = ref<string | null>(null);
+const run = useAsyncAction((action: () => Promise<void>) => action());
+const error = run.error;
 async function attempt(action: () => Promise<void>): Promise<void> {
-  error.value = null;
-  try {
-    await action();
-  } catch (e) {
-    error.value = errorText(e);
-  }
+  await run.run(action);
 }
 
 async function load(): Promise<void> {
@@ -54,8 +50,9 @@ onMounted(reload);
 
 function apply(entry: SavedConsoleQuery): void {
   setText(props.tabId, entry.body.text);
-  // Recency only: a failed touch changes nothing the user sees.
-  control.queriesTouch(entry.id).catch(() => undefined);
+  control.queriesTouch(entry.id).catch(() => {
+    // Recency only: a failed touch changes nothing the user sees.
+  });
   emit('close');
 }
 
@@ -101,6 +98,7 @@ const saveCurrent = (): Promise<void> =>
     panel-test-id="console-saved-menu"
     saved-entry-test-id="console-saved-entry"
     empty-saved-text="No saved queries"
+    :entry-text="(entry) => entry.name"
     @apply="apply"
     @toggle-pin="togglePin"
     @delete="remove"
@@ -139,7 +137,7 @@ const saveCurrent = (): Promise<void> =>
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
            (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own
-           imperative .focus() on mount would otherwise move focus outside reka's Popover content
+           imperative focus call on mount would otherwise move focus outside reka's Popover content
            boundary, which its own dismiss layer reads as an outside interaction and closes the
            whole menu before the prompt is ever seen (console.spec.ts's saved-queries scenario
            caught it; see that file's own header comment for why it isn't shadcn's Dialog). -->

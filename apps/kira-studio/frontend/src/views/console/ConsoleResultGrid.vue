@@ -3,6 +3,7 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { cn } from '@theme/lib/utils';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useRowHeight } from '@workbench/util/rowHeight';
@@ -119,6 +120,45 @@ const kvVirtual = useVirtualRows({
   count: () => rowIndices.value.length,
   rowHeight: () => rowHeight.value,
   scrollElement: kvScrollEl,
+});
+
+const selectedKey = computed(() => (selected.value ? String(selected.value.row) : null));
+const docNav = useListNavigation<DocumentRowView>({
+  container: docScrollEl,
+  items: () => documentRows.value,
+  key: (view) => String(view.index),
+  activeKey: computed({
+    get: () => selectedKey.value,
+    set: (key) => {
+      if (key !== null) selectDocumentRow(Number(key));
+    },
+  }),
+  onOpen: (view) => onToggleDocExpanded(view.id),
+  onSelect: (view) => selectDocumentRow(view.index),
+  onMenu: (view, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, documentRowMenu(view.index), {
+      onRestoreFocus: () => void docNav.focusKey(String(view.index)),
+    }),
+  scrollToIndex: (index) => docVirtual.scrollToIndex(index),
+  rendered: () => docVirtual.virtualItems.value,
+});
+const kvNav = useListNavigation<number>({
+  container: kvScrollEl,
+  items: () => rowIndices.value,
+  key: (row) => String(row),
+  activeKey: computed({
+    get: () => selectedKey.value,
+    set: (key) => {
+      if (key !== null) selectKeyValueRow(Number(key));
+    },
+  }),
+  onSelect: selectKeyValueRow,
+  onMenu: (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, keyValueRowMenu(row), {
+      onRestoreFocus: () => void kvNav.focusKey(String(row)),
+    }),
+  scrollToIndex: (index) => kvVirtual.scrollToIndex(index),
+  rendered: () => kvVirtual.virtualItems.value,
 });
 
 // P42 D39: search state here is keyed by tabId (D9), same as every watcher below — the
@@ -276,9 +316,9 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
   if (r !== null) selectKeyValueRow(r);
 }
 
-// P105 §5.2(c): Enter/Space both mirror a single click — this row has one action, selection.
+// The list navigation claims Enter and the arrows; Space mirrors a single click.
 function selectKeyValueRowFromKeydown(e: KeyboardEvent): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ') return;
   e.preventDefault();
   const r = datasetNumber(e.currentTarget, 'row');
   if (r !== null) selectKeyValueRow(r);
@@ -301,8 +341,7 @@ function onCopyError(message: string): void {
 // JSON.stringify(..., null, 2) per row) on a click that should cost ~0 ms, and one that re-
 // populates the decode/view caches for every row, undoing the visible-window pruning until the
 // next scroll. Both are thunks now, invoked only inside "Copy all as JSON"'s own run().
-function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
-  e.preventDefault();
+function documentRowMenu(index: number) {
   const body = documentRow(props.pageKey, index)?.body ?? '';
   const allBodies = () =>
     documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
@@ -315,11 +354,17 @@ function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
       ? Promise.resolve(parseInline('ejson.copyAll', { format, bodies }))
       : parse.run('ejson.copyAll', { format, bodies });
   };
-  contextMenuStore.openContextMenu(e, mongoDocumentRowMenu({ body, allText, onError: onCopyError }));
+  return mongoDocumentRowMenu({ body, allText, onError: onCopyError });
 }
 
-function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
+function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
   e.preventDefault();
+  contextMenuStore.openContextMenu(e, documentRowMenu(index), {
+    onRestoreFocus: () => void docNav.focusKey(String(index)),
+  });
+}
+
+function keyValueRowMenu(row: number) {
   const kv = kvRowAt(row);
   const json = JSON.stringify({ [kv.field]: kv.value }, null, 2);
   const allJson = () =>
@@ -327,7 +372,14 @@ function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
       const entry = kvRowAt(r);
       return JSON.stringify({ [entry.field]: entry.value }, null, 2);
     });
-  contextMenuStore.openContextMenu(e, rowAsJsonMenu({ json, allJson, onError: onCopyError }));
+  return rowAsJsonMenu({ json, allJson, onError: onCopyError });
+}
+
+function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
+  e.preventDefault();
+  contextMenuStore.openContextMenu(e, keyValueRowMenu(row), {
+    onRestoreFocus: () => void kvNav.focusKey(String(row)),
+  });
 }
 
 function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
@@ -378,6 +430,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           :data-row="documentRows[vi.index]?.index"
           :view="documentRows[vi.index]!"
           :row-scope="pageKey"
+          :nav-props="docNav.rowProps(String(documentRows[vi.index]!.index))"
           :expanded="consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)"
           :selected="isSelected(documentRows[vi.index]!.index, 0)"
           :search-match="isSearchMatch(documentRows[vi.index]!.index, 0)"
@@ -424,7 +477,8 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           :class="VIRTUAL_ROW_CLASS"
           :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
           role="option"
-          tabindex="0"
+          v-bind="kvNav.rowProps(String(rowIndices[vi.index]))"
+:tabindex="kvNav.tabindexFor(String(rowIndices[vi.index]))"
           :aria-selected="isSelected(rowIndices[vi.index]!, 0)"
           @click="selectKeyValueRowFromEvent"
           @keydown="selectKeyValueRowFromKeydown"

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
+import { useFindBar } from '@workbench/behaviour/findBar';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
+import { formatCount } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import { useStreamSearchStore } from './search';
@@ -35,24 +37,15 @@ function toggleFilter(): void {
 const query = ref('');
 const entry = computed(() => streamSearchStore.searchState[props.tabId]);
 
-
-// Debounced like views/shared/page/SearchToolbar.vue: the scan decodes every cell of the page
-// synchronously, so one per keystroke would stall typing on a large page. Clearing is immediate.
-const SEARCH_DEBOUNCE_MS = 150;
+// The scan decodes every cell of the page synchronously, so useFindBar debounces it per keystroke.
+// `closed` drops a debounced run that lands after the bar closed.
+let closed = false;
 function searchNow(q: string): void {
+  if (closed) return;
   streamSearchStore.runSearch(props.tabId, q);
   const e = streamSearchStore.searchState[props.tabId];
   if (e && e.matches.length > 0) emit('goToMatch', e.matches[0]);
 }
-const searchDebounced = useDebounceFn(searchNow, SEARCH_DEBOUNCE_MS);
-watch(query, (q) => {
-  if (q === '') {
-    searchDebounced.cancel();
-    searchNow(q);
-  } else {
-    void searchDebounced(q);
-  }
-});
 
 // P31 D22/D23/F23: a Fetch more/poll/page change calls setPage and bumps pageVersion.n —
 // re-scan against the new page (runSearch already resets index to the first match, or -1,
@@ -74,32 +67,19 @@ function prev(): void {
 }
 
 function close(): void {
-  searchDebounced.cancel();
+  closed = true;
   streamSearchStore.clearSearchState(props.tabId);
   // P24 D7/P31 D18: a closed toolbar must never leave rows hidden with no visible cause.
   pageSearchFilterStore.setSearchFiltering(props.tabId, false);
   emit('close');
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') close();
-  else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (e.shiftKey) prev();
-    else next();
-  }
-}
-
-// P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
+// P105 §5.1: the toolbar div is not interactive -- useFindBar binds the keys on it.
 const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
-useEventListener(
-  computed(() => unrefElement(rootEl)),
-  'keydown',
-  onKeydown,
-);
+useFindBar({ root: rootEl, query, onQuery: searchNow, next, prev, close });
 
 onUnmounted(() => {
-  searchDebounced.cancel();
+  closed = true;
   streamSearchStore.clearSearchState(props.tabId);
   // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).
@@ -107,17 +87,15 @@ onUnmounted(() => {
 });
 
 // Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
-const searchField = useTemplateRef<{ focus: () => void }>('searchField');
-onMounted(() => {
-  searchField.value?.focus();
-});
+const fieldWrap = useTemplateRef<HTMLElement>('fieldWrap');
+useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
 </script>
 
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="stream-search-toolbar">
-    <div class="w-52 shrink-0">
-      <SearchField ref="searchField" v-model="query" @keydown.escape.stop="close" placeholder="Find" data-testid="stream-search-input" />
+    <div ref="fieldWrap" class="w-52 shrink-0">
+      <SearchField v-model="query" @keydown.escape.stop="close" placeholder="Find" data-testid="stream-search-input" />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">
@@ -153,9 +131,9 @@ onMounted(() => {
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
       <template v-if="filtering && filteredRowCount !== null">
-        showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
+        showing {{ formatCount(filteredRowCount) }} of {{ formatCount(loadedRowCount) }} loaded rows
       </template>
-      <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
+      <template v-else>in the {{ formatCount(loadedRowCount) }} loaded rows</template>
     </span>
     <TooltipIconButton
       icon="close"

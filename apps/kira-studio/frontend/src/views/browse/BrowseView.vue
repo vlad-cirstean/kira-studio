@@ -16,6 +16,9 @@ import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { matchesQuery } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -117,9 +120,7 @@ function toggleFilter(): void {
 
 const filteredNodes = computed<TreeNode[]>(() => {
   const nodes = rt.value?.nodes ?? [];
-  const q = filterText.value.trim().toLowerCase();
-  if (!q) return nodes;
-  return nodes.filter((n) => n.name.toLowerCase().includes(q));
+  return nodes.filter((n) => matchesQuery(n.name, filterText.value));
 });
 
 const countText = computed(() => {
@@ -201,7 +202,6 @@ function keyType(path: string): string | undefined {
 // path-level dedup (ensureKeyTypes' own pending/keyTypes checks) only prevents REPEATING work, not
 // the round trip itself. Debounced by the same 150ms already used elsewhere, so a fling settles on
 // one ensureKeyTypes call for its final window instead of one per frame.
-const KEY_TYPES_DEBOUNCE_MS = 150;
 const ensureKeyTypesDebounced = useDebounceFn((range: { start: number; end: number }) => {
   const nodes = filteredNodes.value;
   const paths: string[] = [];
@@ -210,7 +210,7 @@ const ensureKeyTypesDebounced = useDebounceFn((range: { start: number; end: numb
     if (node && node.kind === 'key') paths.push(node.path);
   }
   if (paths.length > 0) browseViewStore.ensureKeyTypes(props.tab.id, paths);
-}, KEY_TYPES_DEBOUNCE_MS);
+}, TIMING.search);
 onBeforeUnmount(() => ensureKeyTypesDebounced.cancel());
 
 // D12: a container descends; a leaf opens the existing keyvalue tab — the same tab kind the tree
@@ -224,12 +224,9 @@ function onRowOpen(node: TreeNode): void {
   tabsStore.openKeyValueTab(props.tab.connectionId, node.path);
 }
 
-// P105 §5.2(c): Enter opens (matching double-click); Space mirrors a single click.
+// The list navigation claims Enter and the arrows; Space mirrors a single click.
 function onRowKeydown(e: KeyboardEvent, node: TreeNode): void {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    onRowOpen(node);
-  } else if (e.key === ' ') {
+  if (e.key === ' ') {
     e.preventDefault();
     onRowClick(node);
   }
@@ -240,7 +237,9 @@ function onRowKeydown(e: KeyboardEvent, node: TreeNode): void {
 function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
   if (!props.tab.connectionId) return;
   browseViewStore.selectRow(props.tab.id, node.path);
-  contextMenuStore.openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node));
+  contextMenuStore.openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node), {
+    onRestoreFocus: () => void nav.focusKey(node.path),
+  });
 }
 
 // P33 D3: the same caps.fileTransfer + canInsert + not-read-only gate uploadMenuItem applies,
@@ -261,10 +260,37 @@ const rowHeight = 28;
 // P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
 // useVirtualRows composable.
 const scrollEl = ref<HTMLElement | null>(null);
-const { virtualItems, totalSize, onScroll } = useVirtualRows({
+const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => filteredNodes.value.length,
   rowHeight: () => rowHeight,
   scrollElement: scrollEl,
+});
+
+const activeKey = computed({
+  get: () => rt.value?.selected ?? null,
+  set: (path) => {
+    if (path !== null) browseViewStore.selectRow(props.tab.id, path);
+  },
+});
+const nav = useListNavigation<TreeNode>({
+  container: scrollEl,
+  items: () => filteredNodes.value,
+  key: (node) => node.path,
+  activeKey,
+  onOpen: onRowOpen,
+  onSelect: onRowClick,
+  onMenu: (node, rect) => {
+    const connectionId = props.tab.connectionId;
+    if (!connectionId) return;
+    contextMenuStore.openContextMenuAt(
+      rect.left,
+      rect.bottom,
+      menuForNode(props.tab.id, connectionId, node),
+      { onRestoreFocus: () => void nav.focusKey(node.path) },
+    );
+  },
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualItems.value,
 });
 
 // VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
@@ -444,7 +470,8 @@ onMounted(() => {
                   "
                   :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
                   role="option"
-                  tabindex="0"
+                  v-bind="nav.rowProps(filteredNodes[vi.index]!.path)"
+:tabindex="nav.tabindexFor(filteredNodes[vi.index]!.path)"
                   :aria-selected="rt?.selected === filteredNodes[vi.index]?.path"
                   @click="onRowClick(filteredNodes[vi.index]!)"
                   @dblclick="onRowOpen(filteredNodes[vi.index]!)"

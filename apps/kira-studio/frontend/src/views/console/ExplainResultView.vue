@@ -4,6 +4,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
+import { formatCount } from '@workbench/behaviour/format';
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useSettingsStore } from '../../state/settings';
@@ -29,7 +30,7 @@ const nativeCostLabel = computed(() => {
   const cost = plan.value?.nativeCost;
   if (!cost) return null;
   const label = NATIVE_COST_LABEL[cost.unit] ?? 'cost';
-  return `${label} ${cost.value.toLocaleString()}`;
+  return `${label} ${formatCount(cost.value)}`;
 });
 
 // D14: the threshold is an estimated-rows-read number, never a cost unit (F17) — sqlite reports
@@ -42,9 +43,9 @@ const verdict = computed(() => {
       ? "SQLite's query planner reports no row estimates, so the expensive-query threshold does not apply here."
       : 'No row estimate available for this plan.';
   }
-  const rows = p.estimatedRowsRead.toLocaleString();
+  const rows = formatCount(p.estimatedRowsRead);
   return p.overThreshold
-    ? `Estimated to read ${rows} rows — at or above the ${settingsStore.advanced.expensiveQueryRows.toLocaleString()}-row threshold`
+    ? `Estimated to read ${rows} rows — at or above the ${formatCount(settingsStore.advanced.expensiveQueryRows)}-row threshold`
     : `Estimated to read ${rows} rows`;
 });
 
@@ -151,9 +152,9 @@ const rawLanguage = computed(() =>
           <span v-else class="inline-flex items-center w-3 shrink-0 cursor-pointer"></span>
           <span class="font-data">{{ row.node.label }}</span>
           <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-sm"
-            >~{{ row.node.estimatedRows.toLocaleString() }} rows</span
+            >~{{ formatCount(row.node.estimatedRows) }} rows</span
           >
-          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">cost {{ row.node.cost.total.toLocaleString() }}</span>
+          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">cost {{ formatCount(row.node.cost.total) }}</span>
           <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{ row.node.detail }}</span>
           <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-sm">{{ metricsLine(row.node) }}</span>
         </div>

@@ -25,6 +25,9 @@ import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
+import { formatCount, plural } from '@workbench/behaviour/format';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -43,7 +46,7 @@ import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { datasetNumber } from '../shared/eventCoords';
-import { usePageSearchFilterStore } from '../shared/page/searchFilter';
+import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -59,7 +62,6 @@ import { useStreamViewStore } from './state';
 const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
-const pageSearchFilterStore = usePageSearchFilterStore();
 const streamSearchStore = useStreamSearchStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
@@ -117,34 +119,30 @@ function redriveSentence(limit: number | 'none' | null): string {
   return `This queue moves a message to its dead-letter queue after ${limit} receives`;
 }
 
-function plural(n: number, unit: string): string {
-  return `${n} ${unit}${n === 1 ? '' : 's'}`;
-}
-function formatDuration(seconds: number): string {
+function visibilityLabel(seconds: number): string {
   if (seconds % 3600 === 0) return plural(seconds / 3600, 'hour');
   if (seconds % 60 === 0) return plural(seconds / 60, 'minute');
   return plural(seconds, 'second');
 }
-const hideDuration = computed(() => formatDuration(props.tab.state.sqsVisibilityTimeoutSeconds));
+const hideDuration = computed(() => visibilityLabel(props.tab.state.sqsVisibilityTimeoutSeconds));
 
 const VISIBILITY_RANGE_HINT = `Whole seconds from ${SQS_MIN_VISIBILITY_TIMEOUT_SECONDS} to ${SQS_MAX_VISIBILITY_TIMEOUT_SECONDS} (12 h)`;
-const visibilityText = ref(String(props.tab.state.sqsVisibilityTimeoutSeconds));
-const visibilityValid = computed(() => {
-  const text = visibilityText.value.trim();
-  const n = Number(text);
+function validVisibility(text: string): boolean {
+  const n = Number(text.trim());
   return (
-    /^\d+$/.test(text) &&
+    /^\d+$/.test(text.trim()) &&
     n >= SQS_MIN_VISIBILITY_TIMEOUT_SECONDS &&
     n <= SQS_MAX_VISIBILITY_TIMEOUT_SECONDS
   );
-});
-function commitVisibility(): void {
-  if (!visibilityValid.value) return;
-  const n = Number(visibilityText.value.trim());
-  if (n !== props.tab.state.sqsVisibilityTimeoutSeconds) {
-    streamViewStore.setPollVisibilityTimeout(props.tab.id, n);
-  }
 }
+const visibility = useInlineEdit({
+  source: () => String(props.tab.state.sqsVisibilityTimeoutSeconds),
+  commit: (text) => {
+    if (!validVisibility(text)) throw new Error(VISIBILITY_RANGE_HINT);
+    streamViewStore.setPollVisibilityTimeout(props.tab.id, Number(text));
+  },
+});
+const visibilityValid = computed(() => validVisibility(visibility.text.value));
 
 // D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
 // since every poll consumes from the queue rather than merely browsing it.
@@ -186,12 +184,17 @@ function rowAt(i: number) {
 // (and the deleted DataGrid.vue) already use rather than inventing a fourth number.
 const { single: rowHeight } = useRowHeight();
 
-function onRowContextMenu(e: MouseEvent, key: string | null, body: string | null): void {
-  e.preventDefault();
-  contextMenuStore.openContextMenu(
-    e,
-    rowMenu(key, body, (m) => streamViewStore.setActionError(props.tab.id, m)),
+function rowMenuFor(row: number) {
+  return rowMenu(rowAt(row)?.key ?? null, rowAt(row)?.body ?? null, (m) =>
+    streamViewStore.setActionError(props.tab.id, m),
   );
+}
+
+function onRowContextMenu(e: MouseEvent, row: number): void {
+  e.preventDefault();
+  contextMenuStore.openContextMenu(e, rowMenuFor(row), {
+    onRestoreFocus: () => void nav.focusKey(String(row)),
+  });
 }
 
 // Row click alone (gutter, empty row background) just selects the row for highlighting/delete-
@@ -248,12 +251,11 @@ function onRowClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i !== null) onRowClick(i);
 }
-// P105 §5.2(c): Enter/Space on the gutter cell mirror clicking it — role="grid"/"row"/"gridcell"
-// all want real table markup per Biome's useSemanticElements, so each column (gutter
-// included) is its own role="option" instead, verified clean; the row div itself carries no
-// role or keyboard handler of its own now.
+// role="grid"/"row"/"gridcell" all want real table markup per Biome's useSemanticElements, so each
+// column (gutter included) is its own role="option" instead; the gutter cell is the row's
+// navigation stop. The list navigation claims Enter and the arrows; Space mirrors a click.
 function onRowKeydownFromEvent(e: KeyboardEvent): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ') return;
   e.preventDefault();
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i !== null) onRowClick(i);
@@ -264,7 +266,7 @@ function onRowKeydownFromEvent(e: KeyboardEvent): void {
 function onRowContextMenuFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.target, 'rowIndex');
   if (i === null) return;
-  onRowContextMenu(e, rowAt(i)?.key ?? null, rowAt(i)?.body ?? null);
+  onRowContextMenu(e, i);
 }
 function onKeyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
@@ -344,7 +346,7 @@ const statusLine = computed(() => {
   const parts: string[] = [];
   parts.push(`${r.rowCount} row${r.rowCount === 1 ? '' : 's'} on this page`);
   if (r.count) {
-    parts.push(`${r.count.exact ? '' : '~'}${r.count.value.toLocaleString()} total`);
+    parts.push(`${r.count.exact ? '' : '~'}${formatCount(r.count.value)} total`);
   }
   return parts.join(' · ');
 });
@@ -382,12 +384,22 @@ watch(
 // initializer (no watcher) already covers "just opened" and "tab changed" — same reasoning
 // FilterToolbar.vue's own comment gives for needing `immediate: true` where it does have a watch
 // (that component isn't remounted per tab; this one is).
-const offsetText = ref(props.tab.state.offsetFilter ?? '');
+const offsetEdit = useInlineEdit({
+  source: () => props.tab.state.offsetFilter ?? '',
+  allowEmpty: true,
+  commit: onApplyFilter,
+});
+const offsetText = offsetEdit.text;
 // Item 1 (task #61): the partition filter widened from a single free-text field to a multiselect
 // — a plain array buffer, same "just opened"/"tab changed" reasoning as offsetText/timestampText
 // above (no watcher needed, MainView.vue keys this whole component by tab.id).
 const selectedPartitions = ref<number[]>([...props.tab.state.partitions]);
-const timestampText = ref(props.tab.state.timestampFilter ?? '');
+const timestampEdit = useInlineEdit({
+  source: () => props.tab.state.timestampFilter ?? '',
+  allowEmpty: true,
+  commit: onApplyFilter,
+});
+const timestampText = timestampEdit.text;
 
 function currentFilterInput(): {
   offset: string | null;
@@ -587,6 +599,25 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
 });
 useEventListener(scrollEl, 'contextmenu', onRowContextMenuFromEvent);
 
+const nav = useListNavigation<number>({
+  container: scrollEl,
+  items: () => rowIndices.value,
+  key: (row) => String(row),
+  activeKey: computed({
+    get: () => (rt.value?.selectedRow == null ? null : String(rt.value.selectedRow)),
+    set: (key) => {
+      if (key !== null) onRowClick(Number(key));
+    },
+  }),
+  onSelect: onRowClick,
+  onMenu: (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, rowMenuFor(row), {
+      onRestoreFocus: () => void nav.focusKey(String(row)),
+    }),
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualItems.value,
+});
+
 function onGoToMatch(row: number): void {
   const index = rowIndices.value.indexOf(row);
   if (index >= 0) scrollToIndex(index);
@@ -771,7 +802,7 @@ onUnmounted(() => {
             <InputGroup variant="kira" class="flex w-24 shrink-0 font-data" :aria-invalid="!visibilityValid">
               <span class="shrink-0 text-kira-sm text-muted-foreground">hide</span>
               <InputGroupInput
-                :model-value="visibilityText"
+                :model-value="visibility.text.value"
                 type="number"
                 inputmode="numeric"
                 :min="SQS_MIN_VISIBILITY_TIMEOUT_SECONDS"
@@ -779,9 +810,9 @@ onUnmounted(() => {
                 step="1"
                 class="h-full p-0 font-data"
                 data-testid="stream-poll-visibility"
-                @update:model-value="(v: string | number) => (visibilityText = String(v))"
-                @keydown.enter="commitVisibility"
-                @blur="commitVisibility"
+                @update:model-value="visibility.onInput"
+                @keydown="visibility.onKeydown"
+                @blur="visibility.onCommit"
               />
               <span class="shrink-0 text-kira-sm text-muted-foreground">s</span>
             </InputGroup>
@@ -912,9 +943,9 @@ onUnmounted(() => {
               placeholder="e.g. 1000"
               class="h-full p-0 font-data"
               data-testid="stream-filter-offset"
-              @update:model-value="(v: string | number) => (offsetText = String(v))"
-              @keydown.enter="onApplyFilter"
-              @blur="onApplyFilter"
+              @update:model-value="offsetEdit.onInput"
+              @keydown="offsetEdit.onKeydown"
+              @blur="offsetEdit.onCommit"
             />
           </InputGroup>
         </div>
@@ -984,9 +1015,9 @@ onUnmounted(() => {
                     placeholder="ISO timestamp"
                     class="h-full p-0 font-data"
                     data-testid="stream-filter-timestamp"
-                    @update:model-value="(v: string | number) => (timestampText = String(v))"
-                    @keydown.enter="onApplyFilter"
-                    @blur="onApplyFilter"
+                    @update:model-value="timestampEdit.onInput"
+                    @keydown="timestampEdit.onKeydown"
+                    @blur="timestampEdit.onCommit"
                   />
                 </InputGroup>
               </TooltipTrigger>
@@ -1093,20 +1124,13 @@ onUnmounted(() => {
       </Empty>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no messages loaded". -->
-      <Empty v-else-if="displayRows && displayRows.length === 0" class="no-rows absolute inset-0" data-testid="stream-no-matching-rows">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-          <EmptyTitle>No matching rows</EmptyTitle>
-        </EmptyHeader>
-        <Button
-          variant="toolbar"
-          size="kira"
-          data-testid="stream-show-all-rows"
-          @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
-        >
-          Show all rows
-        </Button>
-      </Empty>
+      <SearchFilterNotice
+        v-else-if="displayRows && displayRows.length === 0"
+        class="no-rows absolute inset-0"
+        data-testid="stream-no-matching-rows"
+        :filter-key="tab.id"
+        show-all-testid="stream-show-all-rows"
+      />
       <template v-else>
           <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative w-10" />
@@ -1192,7 +1216,8 @@ onUnmounted(() => {
                 <div
                   class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10"
                   role="option"
-                  tabindex="0"
+                  v-bind="nav.rowProps(String(rowIndices[vi.index]))"
+:tabindex="nav.tabindexFor(String(rowIndices[vi.index]))"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
                   @click="onRowClickFromEvent"
                   @keydown="onRowKeydownFromEvent"

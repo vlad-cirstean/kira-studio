@@ -7,7 +7,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
-import { errorText } from '@workbench/bridge/codedError';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref } from 'vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
@@ -25,36 +25,25 @@ const emit = defineEmits<{ close: [] }>();
 const key = ref('');
 const body = ref('');
 const headers = ref('');
-const submitting = ref(false);
-const error = ref<string | null>(null);
 
 const isKafka = computed(() => props.kind === 'kafka');
-const canSubmit = computed(() => body.value.trim() !== '' && !submitting.value);
+const canSubmit = computed(() => body.value.trim() !== '' && !send.pending.value);
+
+const send = useAsyncAction(() => {
+  const headersValue = headers.value.trim() === '' ? null : headers.value;
+  return isKafka.value
+    ? produceKafkaMessage(props.tabId, {
+        key: key.value.trim() === '' ? null : key.value,
+        body: body.value,
+        headers: headersValue,
+      })
+    : sendSqsMessage(props.tabId, body.value, headersValue);
+});
+const error = send.error;
 
 async function submit(): Promise<void> {
   if (!canSubmit.value) return;
-  submitting.value = true;
-  error.value = null;
-  try {
-    if (isKafka.value) {
-      await produceKafkaMessage(props.tabId, {
-        key: key.value.trim() === '' ? null : key.value,
-        body: body.value,
-        headers: headers.value.trim() === '' ? null : headers.value,
-      });
-    } else {
-      await sendSqsMessage(
-        props.tabId,
-        body.value,
-        headers.value.trim() === '' ? null : headers.value,
-      );
-    }
-    emit('close');
-  } catch (err) {
-    error.value = errorText(err);
-  } finally {
-    submitting.value = false;
-  }
+  if (await send.run()) emit('close');
 }
 </script>
 

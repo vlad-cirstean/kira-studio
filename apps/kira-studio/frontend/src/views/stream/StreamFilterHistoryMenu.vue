@@ -74,6 +74,7 @@ function remove(entry: StreamFilterHistoryEntry): void {
     backdrop-test-id="stream-filter-history-backdrop"
     saved-entry-test-id="stream-filter-history-entry"
     empty-saved-text="No filter history yet"
+    :entry-text="summarize"
     @apply="apply"
     @toggle-pin="togglePin"
     @delete="remove"

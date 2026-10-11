@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from 
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
+import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -290,7 +291,7 @@ const autoExplainMessage = computed(() => {
   if (!worst) return '';
   const parts: string[] = [];
   if (worst.estimatedRowsRead !== undefined) {
-    parts.push(`Estimated to read ${worst.estimatedRowsRead.toLocaleString()} rows`);
+    parts.push(`Estimated to read ${formatCount(worst.estimatedRowsRead)} rows`);
   }
   const firstWarning = worst.issues.find((i) => i.severity === 'warn');
   if (firstWarning) parts.push(firstWarning.message);
@@ -987,7 +988,7 @@ const statusLine = computed(() => {
         />
         <Alert strip v-if="activeResultTruncated?.truncated" variant="warn" data-testid="console-result-truncated">
           <AlertDescription>
-            Result stopped at {{ activeResultTruncated.rows.toLocaleString() }} rows (console limit). Narrow the query to see the rest.
+            Result stopped at {{ formatCount(activeResultTruncated.rows) }} rows (console limit). Narrow the query to see the rest.
           </AlertDescription>
         </Alert>
         <div class="flex-1 min-h-0">

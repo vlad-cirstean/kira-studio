@@ -1,4 +1,5 @@
 import { cellText, isNull, type StreamPage } from '@shared/protocol/page';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
@@ -39,43 +40,37 @@ export const useStreamSearchStore = defineStore('streamSearch', () => {
   // tabularRowScanner/keyValueRowScanner do for every other paged view's search — nothing here is
   // retained past this one call.
   //
-  // Each column is checked (and case-folded) independently rather than concatenated into one
+  // Each column is checked independently rather than concatenated into one
   // haystack string first: a hit in an early, typically-short column (key/headers) skips decoding
-  // and lowering the row's own body at all, and a miss allocates only that one column's own
-  // lowercase copy rather than the whole row's five fields joined together.
+  // and lowering the row's own body at all, and a miss lowercases only that one column's own
+  // text rather than the whole row's five fields joined together.
   function rowMatches(
     page: StreamPage,
     row: number,
     needle: string,
     decoder: TextDecoder,
   ): boolean {
-    if (
-      !isNull(page.keys, row) &&
-      cellText(page.keys, row, decoder).toLowerCase().includes(needle)
-    ) {
+    if (!isNull(page.keys, row) && matchesQuery(cellText(page.keys, row, decoder), needle)) {
       return true;
     }
-    if (cellText(page.headers, row, decoder).toLowerCase().includes(needle)) return true;
-    if (cellText(page.attrs, row, decoder).toLowerCase().includes(needle)) return true;
+    if (matchesQuery(cellText(page.headers, row, decoder), needle)) return true;
+    if (matchesQuery(cellText(page.attrs, row, decoder), needle)) return true;
     if (
       !isNull(page.timestamps, row) &&
-      cellText(page.timestamps, row, decoder).toLowerCase().includes(needle)
+      matchesQuery(cellText(page.timestamps, row, decoder), needle)
     ) {
       return true;
     }
-    return (
-      !isNull(page.bodies, row) &&
-      cellText(page.bodies, row, decoder).toLowerCase().includes(needle)
-    );
+    return !isNull(page.bodies, row) && matchesQuery(cellText(page.bodies, row, decoder), needle);
   }
 
   function runSearch(tabId: string, query: string): void {
-    if (query === '') {
+    if (query.trim() === '') {
       clearSearchState(tabId);
       return;
     }
     const page = getPage(tabId);
-    const needle = query.toLowerCase();
+    const needle = query;
     const matches: number[] = [];
     if (page) {
       const decoder = new TextDecoder();

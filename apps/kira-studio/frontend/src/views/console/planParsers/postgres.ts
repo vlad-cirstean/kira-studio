@@ -1,3 +1,4 @@
+import { formatCount } from '@workbench/behaviour/format';
 import {
   isOverThreshold,
   maxEstimatedRows,
@@ -104,7 +105,7 @@ function buildNode(raw: RawNode, thresholdRows: number, scans: ScanEstimate[]): 
       node.issues.push({
         severity: 'warn',
         code: 'nested-loop-wide-inner',
-        message: `nested loop repeats a scan estimated at ${wideInner.estimatedRows?.toLocaleString()} rows for every outer row`,
+        message: `nested loop repeats a scan estimated at ${wideInner.estimatedRows === undefined ? '' : formatCount(wideInner.estimatedRows)} rows for every outer row`,
       });
     }
   }

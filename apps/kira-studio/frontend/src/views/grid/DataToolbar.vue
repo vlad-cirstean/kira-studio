@@ -8,6 +8,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { formatCount } from '@workbench/behaviour/format';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -72,7 +73,6 @@ const isWritable = computed(
 const maskRuleCountsQuery = useQuery({
   queryKey: maskRuleCountsQueryKey,
   queryFn: loadMaskRuleCounts,
-  staleTime: Number.POSITIVE_INFINITY,
 });
 const hasMaskRules = computed(
   () => (maskRuleCountsQuery.data.value?.[props.tab.connectionId ?? ''] ?? 0) > 0,
@@ -284,7 +284,7 @@ function onDeleteRow(): void {
           // a failed *refresh* of an existing count keeps that count on screen (unchanged) with
           // the error appended, rather than losing it.
           rt?.count
-            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}${rt?.countError ? ` — refresh failed: ${rt.countError}` : ''}`
+            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${formatCount(rt.count.value)}${rt.count.stale ? ' (stale, click to refresh)' : ''}${rt?.countError ? ` — refresh failed: ${rt.countError}` : ''}`
             : rt?.countError
               ? `Count failed: ${rt.countError}`
               : 'Count all rows'

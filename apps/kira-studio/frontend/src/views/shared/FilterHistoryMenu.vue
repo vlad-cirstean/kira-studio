@@ -129,6 +129,7 @@ async function saveCurrent(): Promise<void> {
     recent-entry-test-id="history-entry"
     empty-saved-text="No saved filters"
     empty-recent-text="No history yet"
+    :entry-text="(entry) => (isSaved(entry) ? entry.name : summarize(entry.where, entry.orderBy))"
     @apply="applyEntry"
     @toggle-pin="togglePin"
     @delete="remove"
@@ -172,7 +173,7 @@ async function saveCurrent(): Promise<void> {
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
            (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own
-           imperative .focus() on mount would otherwise move focus outside reka's Popover content
+           imperative focus call on mount would otherwise move focus outside reka's Popover content
            boundary, which its own dismiss layer reads as an outside interaction and closes the
            whole menu before the prompt is ever seen (data-view.spec.ts's save-current-filter
            scenario caught it; see that file's own header comment for why it isn't shadcn's Dialog). -->

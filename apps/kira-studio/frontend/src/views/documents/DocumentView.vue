@@ -15,6 +15,8 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
@@ -41,8 +43,8 @@ import {
   useMongoFieldSampleStore,
 } from '../shared/mongoFieldSample';
 import PagerControls from '../shared/page/PagerControls.vue';
+import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { ancestorPathPrefix } from '../shared/targetPath';
@@ -67,7 +69,6 @@ const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const documentRowsStore = useDocumentRowsStore();
 const mongoFieldSampleStore = useMongoFieldSampleStore();
-const pageSearchFilterStore = usePageSearchFilterStore();
 const connectionsStore = useConnectionsStore();
 const documentViewStore = useDocumentViewStore();
 
@@ -332,20 +333,20 @@ function cancelCreate(): void {
 }
 
 // A second Save while the first awaits the server would insert a second document (no `_id` yet).
-const saving = ref(false);
+const createAction = useAsyncAction(() => saveNewDocument(props.tab.id, newBuffer.doc.value));
+const editAction = useAsyncAction((id: string) =>
+  saveDocumentEdit(props.tab.id, id, editBuffer.doc.value),
+);
+const saving = computed(() => createAction.pending.value || editAction.pending.value);
 
 async function commitCreate(): Promise<void> {
   if (saving.value) return;
-  saving.value = true;
-  try {
-    await saveNewDocument(props.tab.id, newBuffer.doc.value);
+  if (await createAction.run()) {
     documentViewStore.setActionError(props.tab.id, null);
     creatingNew.value = false;
     newBuffer.reseed();
-  } catch (err) {
-    documentViewStore.setActionError(props.tab.id, errorText(err));
-  } finally {
-    saving.value = false;
+  } else {
+    documentViewStore.setActionError(props.tab.id, createAction.error.value);
   }
 }
 
@@ -523,6 +524,37 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   overscan: () => overscanRows.value,
 });
 
+const nav = useListNavigation<number>({
+  container: scrollEl,
+  items: () => rows.value,
+  key: (row) => String(row),
+  activeKey: computed({
+    get: () => {
+      const position = rt.value?.selectedRow;
+      const row = position === null || position === undefined ? undefined : rows.value[position];
+      return row === undefined ? null : String(row);
+    },
+    set: (key) => {
+      if (key !== null) onRowClick(rows.value.indexOf(Number(key)));
+    },
+  }),
+  onOpen: (row) => {
+    const entry = rowAt(row);
+    if (entry) documentViewStore.toggleExpanded(props.tab.id, entry.view.id);
+  },
+  onSelect: (row) => onRowClick(rows.value.indexOf(row)),
+  onMenu: (row, rect) => {
+    const items = rowMenuFor(row);
+    if (items) {
+      contextMenuStore.openContextMenuAt(rect.left, rect.bottom, items, {
+        onRestoreFocus: () => void nav.focusKey(String(row)),
+      });
+    }
+  },
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualItems.value,
+});
+
 // One tooltip for every row's Edit/Delete (RowActionButton.vue): anchored to a fixed, invisible span
 // moved over the hovered or focused button, driven by delegated listeners on the list.
 interface RowTip {
@@ -633,35 +665,37 @@ watch(currentPage, (page) => {
 async function commitEdit(): Promise<void> {
   const id = editingId.value;
   if (id === null || saving.value) return;
-  saving.value = true;
-  try {
-    await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
+  if (await editAction.run(id)) {
     documentViewStore.setActionError(props.tab.id, null);
     editingRow.value = null;
     editingId.value = null;
-  } catch (err) {
-    documentViewStore.setActionError(props.tab.id, errorText(err));
-  } finally {
-    saving.value = false;
+  } else {
+    documentViewStore.setActionError(props.tab.id, editAction.error.value);
   }
+}
+
+function rowMenuFor(row: number) {
+  const entry = rowAt(row);
+  if (!entry) return null;
+  return rowMenu(
+    props.tab.id,
+    entry.view.id,
+    entry.body,
+    () => idsOf(rows.value),
+    () => startEdit(row, entry.view.id, entry.body),
+    editGateFor(row),
+    { deletable: canDelete.value, label: deleteTitle.value },
+  );
 }
 
 function onRowContextMenu(e: MouseEvent, row: number): void {
   e.preventDefault();
-  const entry = rowAt(row);
-  if (!entry) return;
-  contextMenuStore.openContextMenu(
-    e,
-    rowMenu(
-      props.tab.id,
-      entry.view.id,
-      entry.body,
-      () => idsOf(rows.value),
-      () => startEdit(row, entry.view.id, entry.body),
-      editGateFor(row),
-      { deletable: canDelete.value, label: deleteTitle.value },
-    ),
-  );
+  const items = rowMenuFor(row);
+  if (items) {
+    contextMenuStore.openContextMenu(e, items, {
+      onRestoreFocus: () => void nav.focusKey(String(row)),
+    });
+  }
 }
 
 // D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
@@ -1026,19 +1060,13 @@ onUnmounted(() => {
       </Empty>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no documents loaded". -->
-      <Empty v-else-if="displayRows && displayRows.length === 0" class="h-full" data-testid="document-no-matching-rows">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-          <EmptyTitle>No matching rows</EmptyTitle>
-        </EmptyHeader>
-        <Button
-          variant="toolbar"
-          size="kira"
-          data-testid="document-show-all-rows"
-          @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
-          >Show all rows</Button
-        >
-      </Empty>
+      <SearchFilterNotice
+        v-else-if="displayRows && displayRows.length === 0"
+        class="h-full"
+        data-testid="document-no-matching-rows"
+        :filter-key="tab.id"
+        show-all-testid="document-show-all-rows"
+      />
       <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
            the body — until expanded; an expanded document renders through DocumentTree.vue's
            flat line list, never a per-row CodeMirror instance, which is what makes "every
@@ -1083,6 +1111,7 @@ onUnmounted(() => {
               :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
               @contextmenu="onRowContextMenu($event, rows[vi.index])"
+              :nav-props="nav.rowProps(String(rows[vi.index]))"
               :view="rowAt(rows[vi.index])!.view"
               :row-scope="tab.id"
               :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"

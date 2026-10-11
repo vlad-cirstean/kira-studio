@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -143,25 +144,23 @@ const structureFilterQuery = ref('');
 const structureFilterActive = computed(
   () => searchOpen.value && pane.value === 'structure' && structureFilterQuery.value.trim() !== '',
 );
-const structureQuery = computed(() => structureFilterQuery.value.trim().toLowerCase());
 const filteredColumns = computed(() => {
   if (!structureFilterActive.value) return meta.value?.columns ?? [];
-  const q = structureQuery.value;
-  return (meta.value?.columns ?? []).filter((c) => c.name.toLowerCase().includes(q));
+  const q = structureFilterQuery.value;
+  return (meta.value?.columns ?? []).filter((c) => matchesQuery(c.name, q));
 });
 const filteredIndexes = computed(() => {
   if (!structureFilterActive.value) return meta.value?.indexes ?? [];
-  const q = structureQuery.value;
+  const q = structureFilterQuery.value;
   return (meta.value?.indexes ?? []).filter(
     (i) =>
-      i.name.toLowerCase().includes(q) ||
-      (i.columns ?? []).some((c) => c.toLowerCase().includes(q)),
+      matchesQuery(i.name, q) || (i.columns ?? []).some((c) => matchesQuery(c, q)),
   );
 });
 const filteredConstraintRows = computed(() => {
   if (!structureFilterActive.value) return constraintRows.value;
-  const q = structureQuery.value;
-  return constraintRows.value.filter((r) => r.name.toLowerCase().includes(q));
+  const q = structureFilterQuery.value;
+  return constraintRows.value.filter((r) => matchesQuery(r.name, q));
 });
 
 // Source's own search is the same find-in-document ResponseFindBar every other big document in

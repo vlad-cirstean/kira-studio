@@ -15,6 +15,7 @@ import type { DocumentRowView } from './rows';
 // P105 §13: named `rowScope`, not `scope` — the HTML global `scope` attribute name collides with
 // Biome's `noHeaderScope`, which reads the attribute name off every call site that binds it.
 defineProps<{
+  navProps?: { 'data-nav-key': string; tabindex: number; onFocus: () => void };
   view: DocumentRowView;
   rowScope: string;
   expanded: boolean;
@@ -25,10 +26,10 @@ defineProps<{
 
 const emit = defineEmits<{ toggle: []; select: [] }>();
 
-// P105 §5.2(c): Enter/Space mirror a single click — the expand-toggle button and the #actions
-// slot's own controls stay their own tab stops, so this handler never claims either key from them.
+// The container's list navigation claims Enter and the arrows; Space mirrors a single click. The
+// expand-toggle button and the #actions slot's controls stay their own tab stops.
 function onHeadKeydown(e: KeyboardEvent): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ') return;
   e.preventDefault();
   emit('select');
 }
@@ -47,7 +48,8 @@ function onHeadKeydown(e: KeyboardEvent): void {
       class="doc-head"
       :class="cn(rowVariants({ layout: 'tree', selected: expanded }), 'shrink-0 cursor-pointer gap-1.5 px-2', selected && 'shadow-[inset_2px_0_0_var(--primary)]')"
       role="option"
-      tabindex="0"
+      v-bind="navProps"
+      :tabindex="navProps?.tabindex ?? 0"
       :aria-selected="selected"
       @click="$emit('select')"
       @keydown="onHeadKeydown"

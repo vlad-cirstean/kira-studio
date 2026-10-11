@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computeFloatPosition, pointReference } from '@kira/kira-ui';
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
@@ -7,25 +6,18 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
-import { onClickOutside, useEventListener } from '@vueuse/core';
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import PointPopover from '@workbench/components/PointPopover.vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { typeClassTextClass } from '../../theme/icons';
 import { type FkPreviewState, fetchReferencedRow, type PreviewSignal } from './fkPreview';
 import { type FkNavContext, foreignKeyValueFilter, qualifiedNameForPath } from './menu';
 
-// P67 §4.3: anchored the same way ContextMenu.vue's own top-level menu is — a virtual point
-// reference (theme/floatingPosition.ts's pointReference), NOT the nav button element. §1.1: that
+// P67 §4.3: anchored to the click point through PointPopover, NOT the nav button element. §1.1: that
 // button is imperative DOM, destroyed by SlickGrid's own `invalidateRow` on the next scroll frame,
 // so a detached reference is exactly what this component would hold if it anchored to it instead.
-//
-// Not PopoverPanel.vue: every one of its consumers renders as a DOM sibling of its own trigger
-// (its `reposition()` reads `backdropEl.value?.parentElement`) — the nav button has no such Vue
-// parent to render a sibling into. §4.3's own "why not extend PopoverPanel" note explains why that
-// chain is not widened for this one caller; the ~40 lines of backdrop/Escape chrome below are
-// ContextMenu.vue's own duplication, deliberately, for the same reason.
 const props = defineProps<{
-  /** The click point, in viewport coordinates — pointReference's own input. */
+  /** The click point, in viewport coordinates. */
   x: number;
   y: number;
   entry: ForeignKeyMeta;
@@ -40,27 +32,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
-const panelEl = ref<HTMLElement | null>(null);
-const style = ref({ left: '0px', top: '0px' });
 const state = ref<FkPreviewState>({ status: 'loading' });
 const signal: PreviewSignal = { cancelled: false, opId: null };
 
 const tableLabel = qualifiedNameForPath(props.ctx.connectionId, props.entry.referencedPath);
-
-async function position(): Promise<void> {
-  await nextTick();
-  const el = panelEl.value;
-  if (!el) return;
-  const { left, top } = await computeFloatPosition(pointReference(props.x, props.y), el, {
-    offset: 6,
-    maxVarPrefix: '--kira-float-max-',
-    // flip stays at its own default (true), unlike ContextMenu.vue: this is a panel, not a menu —
-    // "above the point" is a real, useful placement for a row near the bottom of the viewport, and
-    // ContextMenu's own reason for disabling it ("a point has no other side to flip to") is a menu
-    // convention, not a constraint pointReference itself imposes (§4.3).
-  });
-  style.value = { left: `${left}px`, top: `${top}px` };
-}
 
 async function load(): Promise<void> {
   const filter = foreignKeyValueFilter(
@@ -88,24 +63,8 @@ async function load(): Promise<void> {
   state.value = result;
 }
 
-// The loading state renders one fixed-height spinner row (§4.2) so the very first paint doesn't
-// jump; once real content lands (a row, an error, "no matching row") the panel's height changes
-// with it, so it's repositioned again here rather than staying wherever the loading-sized panel
-// first landed.
-watch(state, () => void position());
-
-// P105 §5.2(b): the backdrop itself has no interactive role — VueUse's onClickOutside on the
-// panel replaces both the backdrop's own click handler and the panel's @click.stop that used to
-// keep an inside click from reaching it.
-onClickOutside(panelEl, () => emit('close'));
-
-function onKeydown(e: KeyboardEvent): void {
-  // Capture phase, not bubble — PopoverPanel.vue's own onKeydown carries the identical reasoning:
-  // the grid root has its own keydown handler, and this popover owns Escape while it's open.
-  if (e.key === 'Escape') {
-    e.stopPropagation();
-    emit('close');
-  }
+function onOpenChange(open: boolean): void {
+  if (!open) emit('close');
 }
 
 function onOpenClick(): void {
@@ -113,11 +72,7 @@ function onOpenClick(): void {
   props.openInNewTab();
 }
 
-// PopoverPanel.vue's own precedent: useEventListener disposes itself on unmount.
-useEventListener(document, 'keydown', onKeydown, true);
-
 onMounted(() => {
-  void position();
   void load();
 });
 
@@ -133,8 +88,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-(--kira-z-popover)" data-testid="fk-preview-backdrop">
-    <div ref="panelEl" class="fixed w-80 flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)] bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden" data-testid="fk-preview" :style="style">
+  <PointPopover
+    :x="x"
+    :y="y"
+    :open="true"
+    class="w-80 gap-0 overflow-hidden p-0 max-h-(--reka-popover-content-available-height)"
+    @update:open="onOpenChange"
+  >
+    <div class="flex min-h-0 flex-col" data-testid="fk-preview">
       <div class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5">
         <span class="font-medium overflow-hidden text-ellipsis whitespace-nowrap">{{ tableLabel }}</span>
         <Badge
@@ -187,5 +148,5 @@ onUnmounted(() => {
         </Table>
       </div>
     </div>
-  </div>
+  </PointPopover>
 </template>

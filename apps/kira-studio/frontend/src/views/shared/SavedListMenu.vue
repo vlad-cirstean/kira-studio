@@ -5,6 +5,8 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { ref } from 'vue';
 
 // Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
 // a "Saved" list (pin/rename/delete an entry, click to apply it) with an optional "Recent" list
@@ -17,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 // its own saved/recent shape — SavedFilterQuery + FilterHistoryEntry for the grid, SavedConsoleQuery
 // alone for the console. Because a "recent" entry doesn't necessarily carry a `pinned` field,
 // pin state is derived by duck-typing rather than requiring it on Entry.
-defineProps<{
+const props = defineProps<{
   /** Label for the saved section, e.g. "Saved" or "Saved queries". */
   title: string;
   saved: readonly Entry[];
@@ -28,6 +30,8 @@ defineProps<{
   recentEntryTestId?: string;
   emptySavedText: string;
   emptyRecentText?: string;
+  /** Row text for first-letter type-ahead. */
+  entryText: (entry: Entry) => string;
 }>();
 
 const emit = defineEmits<{
@@ -36,13 +40,37 @@ const emit = defineEmits<{
   delete: [entry: Entry];
 }>();
 
-// P105 §5.2(c): Enter/Space mirror a single click — the pin/delete buttons nested inside a saved
-// row stay their own tab stops, so this handler never claims either key from them.
+// The list navigation claims Enter and the arrows; Space mirrors a click. The pin/delete buttons
+// nested inside a saved row stay their own tab stops.
 function onRowKeydown(e: KeyboardEvent, entry: Entry): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ' || e.target !== e.currentTarget) return;
   e.preventDefault();
   emit('apply', entry);
 }
+
+const savedEl = ref<HTMLElement | null>(null);
+const savedActive = ref<string | null>(null);
+const savedNav = useListNavigation<Entry>({
+  container: savedEl,
+  items: () => props.saved,
+  key: (entry) => entry.id,
+  activeKey: savedActive,
+  onOpen: (entry) => emit('apply', entry),
+  onSelect: (entry) => emit('apply', entry),
+  typeahead: (entry) => props.entryText(entry),
+});
+
+const recentEl = ref<HTMLElement | null>(null);
+const recentActive = ref<string | null>(null);
+const recentNav = useListNavigation<Entry>({
+  container: recentEl,
+  items: () => props.recent ?? [],
+  key: (entry) => entry.id,
+  activeKey: recentActive,
+  onOpen: (entry) => emit('apply', entry),
+  onSelect: (entry) => emit('apply', entry),
+  typeahead: (entry) => props.entryText(entry),
+});
 
 function isPinned(entry: Entry): boolean {
   return (
@@ -65,14 +93,15 @@ defineSlots<{
     <div class="max-h-100 overflow-y-auto">
       <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">{{ title }}</div>
       <div v-if="saved.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptySavedText }}</div>
-      <div v-else role="listbox" :aria-label="title">
+      <div v-else ref="savedEl" role="listbox" :aria-label="title">
         <div
           v-for="entry in saved"
           :key="entry.id"
           :class="rowVariants()"
           :data-testid="savedEntryTestId"
           role="option"
-          tabindex="0"
+          v-bind="savedNav.rowProps(entry.id)"
+:tabindex="savedNav.tabindexFor(entry.id)"
           @click="emit('apply', entry)"
           @keydown="onRowKeydown($event, entry)"
         >
@@ -105,14 +134,15 @@ defineSlots<{
         <Separator class="my-1" />
         <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">Recent</div>
         <div v-if="recent.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptyRecentText }}</div>
-        <div v-else role="listbox" aria-label="Recent">
+        <div v-else ref="recentEl" role="listbox" aria-label="Recent">
           <div
             v-for="entry in recent"
             :key="entry.id"
             :class="rowVariants()"
             :data-testid="recentEntryTestId"
             role="option"
-            tabindex="0"
+            v-bind="recentNav.rowProps(entry.id)"
+:tabindex="recentNav.tabindexFor(entry.id)"
             @click="emit('apply', entry)"
             @keydown="onRowKeydown($event, entry)"
           >

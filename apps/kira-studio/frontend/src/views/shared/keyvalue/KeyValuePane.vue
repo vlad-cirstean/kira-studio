@@ -1,12 +1,4 @@
 <script setup lang="ts">
-// P63 §2.2: the body KeyValueView.vue used to own outright, now shared with the browse split's
-// preview pane (BrowseView.vue). One component renders both, addressed through host.ts's seam
-// (`viewKey`) rather than a real KeyValueTabRecord everywhere.
-//
-// Lives under views/shared/keyvalue/, not views/keyvalue/ (a deviation from the plan's own §6
-// wording, taken during implementation, not guessed at in advance): BrowseView.vue is a different
-// "kind" than KeyValueView.vue, and biome.json's own SPEC §11 rule ("views/<kind>/* must not
-// import another views/<kind>/* — use views/shared/ instead") rejects a views/browse/* file
 // importing views/keyvalue/* directly, checked and confirmed by running `bun run lint` against
 // the straightforward layout — not assumed. This component's own transitive dependencies
 // (state.ts/mutations.ts/page.ts/search.ts/menu.ts/host.ts) moved alongside it for the same
@@ -71,9 +63,17 @@ import { browseInvalidate } from '../../../state/viewCommands';
 import EngineIcon from '../../../theme/EngineIcon.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { datasetNumber } from '../eventCoords';
+// P63 §2.2: the body KeyValueView.vue used to own outright, now shared with the browse split's
+// preview pane (BrowseView.vue). One component renders both, addressed through host.ts's seam
+// (`viewKey`) rather than a real KeyValueTabRecord everywhere.
+//
+// Lives under views/shared/keyvalue/, not views/keyvalue/ (a deviation from the plan's own §6
+// wording, taken during implementation, not guessed at in advance): BrowseView.vue is a different
+// "kind" than KeyValueView.vue, and biome.json's own SPEC §11 rule ("views/<kind>/* must not
+// import another views/<kind>/* — use views/shared/ instead") rejects a views/browse/* file
+import SearchFilterNotice from '../page/SearchFilterNotice.vue';
 import SearchToolbar from '../page/SearchToolbar.vue';
 import { createMatchIndex } from '../page/search';
-import { usePageSearchFilterStore } from '../page/searchFilter';
 import { pageSizeOptions } from '../page/sizes';
 import { setVisibleRows } from '../page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../useConnectionGate';
@@ -88,7 +88,6 @@ const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const objectStoreStore = useObjectStoreStore();
-const pageSearchFilterStore = usePageSearchFilterStore();
 const connectionsStore = useConnectionsStore();
 const keyValueViewStore = useKeyValueViewStore();
 
@@ -1025,21 +1024,12 @@ onUnmounted(() => {
           </Empty>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
-          <Empty
+          <SearchFilterNotice
             v-else-if="displayRows && displayRows.length === 0"
             data-testid="keyvalue-no-matching-rows"
-          >
-            <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-            <EmptyTitle>No matching rows</EmptyTitle>
-            <Button
-              variant="toolbar"
-              size="kira"
-              data-testid="keyvalue-show-all-rows"
-              @click="pageSearchFilterStore.setSearchFiltering(viewKey, false)"
-            >
-              Show all rows
-            </Button>
-          </Empty>
+            :filter-key="viewKey"
+            show-all-testid="keyvalue-show-all-rows"
+          />
           <!-- P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against
                — this component owns it directly now, VirtualList.vue no longer wraps it. -->
           <div

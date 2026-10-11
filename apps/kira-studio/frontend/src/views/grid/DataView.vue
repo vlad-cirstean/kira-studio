@@ -9,6 +9,7 @@ import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -204,7 +205,7 @@ function onCloseSearch(): void {
         effectivelyWritable ? 'read-write' : 'read-only'
       }}</Badge>
       <Badge v-if="rt?.count" data-testid="grid-row-count-badge"
-        >Σ {{ rt.count.value.toLocaleString() }} rows</Badge
+        >Σ {{ formatCount(rt.count.value) }} rows</Badge
       >
       <span class="ml-auto flex items-center gap-1">
         <Badge data v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>

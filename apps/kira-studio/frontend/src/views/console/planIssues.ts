@@ -1,3 +1,4 @@
+import { formatCount } from '@workbench/behaviour/format';
 import type { PlanIssue, PlanNode, ScanEstimate } from './planModel';
 
 // P18 (v1.1) D15/D16: the pieces every per-dialect parser (planParsers/*.ts) shares once its own
@@ -15,7 +16,7 @@ export function pushWideScanIssue(node: PlanNode, rows: number, thresholdRows: n
   node.issues.push({
     severity: 'warn',
     code: 'wide-scan',
-    message: `${node.label} is estimated to read ${rows.toLocaleString()} rows`,
+    message: `${node.label} is estimated to read ${formatCount(rows)} rows`,
   });
 }
 

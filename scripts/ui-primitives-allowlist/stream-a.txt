@@ -13,19 +13,8 @@ permanent U42 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # 
 permanent U61 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
 permanent U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Down row reorder chord, not list navigation
 permanent U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
-apps/kira-studio/frontend/src/views/browse/BrowseView.vue
-apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue
-apps/kira-studio/frontend/src/views/console/ConsoleSavedMenu.vue
-apps/kira-studio/frontend/src/views/console/ConsoleView.vue
-apps/kira-studio/frontend/src/views/console/ExplainResultView.vue
-apps/kira-studio/frontend/src/views/console/planIssues.ts
-apps/kira-studio/frontend/src/views/console/planParsers/postgres.ts
-apps/kira-studio/frontend/src/views/definition/DefinitionView.vue
-apps/kira-studio/frontend/src/views/documents/DocumentView.vue
-apps/kira-studio/frontend/src/views/grid/DataToolbar.vue
-apps/kira-studio/frontend/src/views/grid/DataView.vue
-apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue
-apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue
+permanent U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host exposes focus(); not a DOM element focus
+permanent U46 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # scroll persist stays 300 ms: TIMING.persist (150) fires mid-scroll and breaks cell-editor.spec
 apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue
 apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue
 apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
@@ -35,14 +24,8 @@ apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue
 apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue
 apps/kira-studio/frontend/src/views/httprequest/TimelinePane.vue
 apps/kira-studio/frontend/src/views/httprequest/cookies.ts
-apps/kira-studio/frontend/src/views/shared/FilterHistoryMenu.vue
 apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
-apps/kira-studio/frontend/src/views/shared/SavedListMenu.vue
 apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue
 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue
 apps/kira-studio/frontend/src/views/shared/keyvalue/KeyValuePane.vue
 apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
-apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
-apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
-apps/kira-studio/frontend/src/views/stream/StreamView.vue
-apps/kira-studio/frontend/src/views/stream/search.ts
