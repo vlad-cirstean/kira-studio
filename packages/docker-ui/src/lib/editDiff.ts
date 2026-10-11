@@ -1,3 +1,4 @@
+import { type MessageKey, t } from '@theme/i18n';
 import { formatBytes } from '@workbench/behaviour/format';
 import type {
   DockerEditNetwork,
@@ -89,26 +90,29 @@ export function resourceMode(
   return switched || (hadCpu && cleared) ? 'recreate' : 'now';
 }
 
-const RES_LABEL: Record<keyof DockerResources, string> = {
-  cpuShares: 'CPU shares',
-  nanoCpus: 'CPUs',
-  cpuQuota: 'CPU quota',
-  cpuPeriod: 'CPU period',
-  cpusetCpus: 'Cpuset CPUs',
-  cpusetMems: 'Cpuset memory nodes',
-  memory: 'Memory',
-  memorySwap: 'Swap',
-  memoryReservation: 'Memory reservation',
-  blkioWeight: 'Block IO weight',
-  pidsLimit: 'PIDs limit',
+const RES_LABEL: Record<keyof DockerResources, MessageKey> = {
+  cpuShares: 'docker.edit.cpuShares.label',
+  nanoCpus: 'docker.edit.cpus.label',
+  cpuQuota: 'docker.edit.cpuQuota.label',
+  cpuPeriod: 'docker.edit.cpuPeriod.label',
+  cpusetCpus: 'docker.edit.cpuset.label',
+  cpusetMems: 'docker.edit.cpusetMems.label',
+  memory: 'common.module.memory.label',
+  memorySwap: 'docker.edit.swap.label',
+  memoryReservation: 'docker.edit.memoryReservation.label',
+  blkioWeight: 'docker.edit.blkio.label',
+  pidsLimit: 'docker.edit.pids.label',
 };
 
 const SIZE_KEYS = new Set<keyof DockerResources>(['memory', 'memorySwap', 'memoryReservation']);
 
 function showResource(key: keyof DockerResources, v: number | string): string {
-  if (v === 0 || v === '') return key === 'memorySwap' ? 'engine default' : 'none';
+  if (v === 0 || v === '')
+    return key === 'memorySwap'
+      ? t('docker.edit.engineDefault.status')
+      : t('common.state.none.option');
   if (typeof v === 'string') return v;
-  if (key === 'memorySwap' && v === -1) return 'unlimited';
+  if (key === 'memorySwap' && v === -1) return t('docker.edit.unlimited.label');
   if (SIZE_KEYS.has(key)) return formatBytes(v);
   if (key === 'nanoCpus') return `${v / 1e9}`;
   return String(v);
@@ -122,14 +126,14 @@ function networkChanges(base: DockerEditNetwork[], draft: DockerEditNetwork[]): 
   const b = new Map(base.map((n) => [n.name, n]));
   const d = new Map(draft.map((n) => [n.name, n]));
   const text = (n?: DockerEditNetwork): string =>
-    n ? n.aliases.join(', ') || 'attached' : 'detached';
+    n ? n.aliases.join(', ') || t('docker.edit.attached.status') : t('docker.edit.detached.status');
   for (const name of new Set([...b.keys(), ...d.keys()])) {
     const from = b.get(name);
     const to = d.get(name);
     if (!deepEqual(from?.aliases, to?.aliases) || !from !== !to) {
       out.push({
         field: `networks.${name}`,
-        label: `Network ${name}`,
+        label: t('docker.edit.network.label', { name }),
         from: text(from),
         to: text(to),
         mode: 'now',
@@ -141,7 +145,7 @@ function networkChanges(base: DockerEditNetwork[], draft: DockerEditNetwork[]): 
 
 function mapChanges(
   prefix: string,
-  noun: string,
+  label: (key: string) => string,
   base: Record<string, string>,
   draft: Record<string, string>,
 ): Unsectioned[] {
@@ -150,9 +154,9 @@ function mapChanges(
     if (base[k] !== draft[k]) {
       out.push({
         field: `${prefix}.${k}`,
-        label: `${noun} ${k}`,
-        from: base[k] ?? '(unset)',
-        to: draft[k] ?? '(removed)',
+        label: label(k),
+        from: base[k] ?? t('docker.edit.unset.status'),
+        to: draft[k] ?? t('docker.edit.removed.status'),
         mode: 'recreate',
       });
     }
@@ -170,18 +174,20 @@ function envMap(env: string[]): Record<string, string> {
 }
 
 const portText = (p: DockerRecreateSpec['ports'][number]): string =>
-  `${p.hostIp ? `${p.hostIp}:` : ''}${p.hostPort || 'auto'} -> ${p.containerPort}/${p.proto}`;
+  `${p.hostIp ? `${p.hostIp}:` : ''}${p.hostPort || t('docker.endpoint.automatic.option')} -> ${p.containerPort}/${p.proto}`;
 
 const mountText = (m: DockerRecreateSpec['mounts'][number]): string =>
-  `${m.source} -> ${m.target}${m.readOnly ? ' (ro)' : ''}`;
+  `${m.source} -> ${m.target}${m.readOnly ? ` (${t('docker.edit.readOnlyShort.example')})` : ''}`;
 
 function setChanges(field: string, label: string, base: string[], draft: string[]): Unsectioned[] {
   const out: Unsectioned[] = [];
   for (const x of base) {
-    if (!draft.includes(x)) out.push({ field, label, from: x, to: '(removed)', mode: 'recreate' });
+    if (!draft.includes(x))
+      out.push({ field, label, from: x, to: t('docker.edit.removed.status'), mode: 'recreate' });
   }
   for (const x of draft) {
-    if (!base.includes(x)) out.push({ field, label, from: '(none)', to: x, mode: 'recreate' });
+    if (!base.includes(x))
+      out.push({ field, label, from: t('common.state.none.option'), to: x, mode: 'recreate' });
   }
   return out;
 }
@@ -196,9 +202,9 @@ function mountChanges(
     if (!kept.has(m.key))
       out.push({
         field: 'mounts',
-        label: 'Mount',
+        label: t('docker.edit.mount.label'),
         from: mountText(m),
-        to: '(removed)',
+        to: t('docker.edit.removed.status'),
         mode: 'recreate',
       });
   }
@@ -207,15 +213,15 @@ function mountChanges(
     if (!m.key)
       out.push({
         field: 'mounts',
-        label: 'Mount',
-        from: '(none)',
+        label: t('docker.edit.mount.label'),
+        from: t('common.state.none.option'),
         to: mountText(m),
         mode: 'recreate',
       });
     else if (was && !deepEqual(was, m)) {
       out.push({
         field: 'mounts',
-        label: 'Mount',
+        label: t('docker.edit.mount.label'),
         from: mountText(was),
         to: mountText(m),
         mode: 'recreate',
@@ -228,13 +234,19 @@ function mountChanges(
 function inPlaceChanges(base: DockerInPlaceSpec, draft: DockerInPlaceSpec): Unsectioned[] {
   const out: Unsectioned[] = [];
   if (base.name !== draft.name) {
-    out.push({ field: 'name', label: 'Name', from: base.name, to: draft.name, mode: 'now' });
+    out.push({
+      field: 'name',
+      label: t('common.field.name.label'),
+      from: base.name,
+      to: draft.name,
+      mode: 'now',
+    });
   }
   for (const key of Object.keys(RES_LABEL) as Array<keyof DockerResources>) {
     if (base.resources[key] !== draft.resources[key]) {
       out.push({
         field: `resources.${key}`,
-        label: RES_LABEL[key],
+        label: t(RES_LABEL[key]),
         from: showResource(key, base.resources[key]),
         to: showResource(key, draft.resources[key]),
         mode: resourceMode(base.resources, draft.resources, key),
@@ -244,7 +256,7 @@ function inPlaceChanges(base: DockerInPlaceSpec, draft: DockerInPlaceSpec): Unse
   if (!deepEqual(base.restart, draft.restart)) {
     out.push({
       field: 'restart',
-      label: 'Restart policy',
+      label: t('docker.field.restartPolicy.label'),
       from: restartText(base.restart),
       to: restartText(draft.restart),
       mode: 'now',
@@ -257,19 +269,51 @@ function recreateChanges(base: DockerRecreateSpec, draft: DockerRecreateSpec): U
   const out: Unsectioned[] = [];
   const scalar = (field: string, label: string, from: string, to: string): void => {
     if (from !== to)
-      out.push({ field, label, from: from || '(none)', to: to || '(none)', mode: 'recreate' });
+      out.push({
+        field,
+        label,
+        from: from || t('common.state.none.option'),
+        to: to || t('common.state.none.option'),
+        mode: 'recreate',
+      });
   };
-  scalar('image', 'Image', base.image, draft.image);
-  scalar('entrypoint', 'Entrypoint', base.entrypoint.join(' '), draft.entrypoint.join(' '));
-  scalar('cmd', 'Command', base.cmd.join(' '), draft.cmd.join(' '));
-  scalar('user', 'User', base.user, draft.user);
-  scalar('hostname', 'Hostname', base.hostname, draft.hostname);
-  out.push(...mapChanges('env', 'Env', envMap(base.env), envMap(draft.env)));
-  out.push(...mapChanges('labels', 'Label', base.labels, draft.labels));
-  out.push(...setChanges('ports', 'Port', base.ports.map(portText), draft.ports.map(portText)));
+  scalar('image', t('docker.field.image.label'), base.image, draft.image);
+  scalar(
+    'entrypoint',
+    t('docker.field.entrypoint.label'),
+    base.entrypoint.join(' '),
+    draft.entrypoint.join(' '),
+  );
+  scalar('cmd', t('common.field.command.label'), base.cmd.join(' '), draft.cmd.join(' '));
+  scalar('user', t('docker.field.user.label'), base.user, draft.user);
+  scalar('hostname', t('docker.edit.hostname.label'), base.hostname, draft.hostname);
+  out.push(
+    ...mapChanges(
+      'env',
+      (k) => t('docker.edit.variable.label', { key: k }),
+      envMap(base.env),
+      envMap(draft.env),
+    ),
+  );
+  out.push(
+    ...mapChanges(
+      'labels',
+      (k) => t('docker.resource.labelKey.label', { key: k }),
+      base.labels,
+      draft.labels,
+    ),
+  );
+  out.push(
+    ...setChanges(
+      'ports',
+      t('docker.edit.port.label'),
+      base.ports.map(portText),
+      draft.ports.map(portText),
+    ),
+  );
   out.push(...mountChanges(base.mounts, draft.mounts));
-  out.push(...setChanges('capAdd', 'Add capability', base.capAdd, draft.capAdd));
-  out.push(...setChanges('capDrop', 'Drop capability', base.capDrop, draft.capDrop));
+  out.push(...setChanges('capAdd', t('docker.edit.addCap.label'), base.capAdd, draft.capAdd));
+  out.push(...setChanges('capDrop', t('docker.edit.dropCap.label'), base.capDrop, draft.capDrop));
   return out;
 }
 
@@ -305,32 +349,37 @@ export function hasNowChanges(base: EditValues, draft: EditValues): boolean {
 type Errors = Record<string, string>;
 
 function resourceErrors(r: DockerResources, e: Errors): void {
-  if (r.memory !== 0 && r.memory < MIN_MEMORY) e['resources.memory'] = 'Minimum is 6 MiB';
+  if (r.memory !== 0 && r.memory < MIN_MEMORY)
+    e['resources.memory'] = t('docker.edit.error.memoryMin.error', {
+      min: `6 ${t('docker.unit.mib.option')}`,
+    });
   if (r.memory !== 0 && r.memoryReservation > r.memory) {
-    e['resources.memoryReservation'] = 'Must not exceed memory';
+    e['resources.memoryReservation'] = t('docker.edit.error.reservationMax.error');
   }
   if (r.memorySwap < -1 || (r.memorySwap > 0 && r.memorySwap < r.memory)) {
-    e['resources.memorySwap'] = 'Must be unlimited or at least memory';
+    e['resources.memorySwap'] = t('docker.edit.error.swapMin.error');
   }
-  if (r.cpuShares !== 0 && r.cpuShares < 2) e['resources.cpuShares'] = 'Use 0 or at least 2';
+  if (r.cpuShares !== 0 && r.cpuShares < 2)
+    e['resources.cpuShares'] = t('docker.edit.error.atLeast.error', { min: 2 });
   if (r.blkioWeight !== 0 && (r.blkioWeight < 10 || r.blkioWeight > 1000)) {
-    e['resources.blkioWeight'] = 'Use 0 or 10 to 1000';
+    e['resources.blkioWeight'] = t('docker.edit.error.range.error', { min: 10, max: 1000 });
   }
-  if (r.pidsLimit < 0) e['resources.pidsLimit'] = 'Must not be negative';
+  if (r.pidsLimit < 0) e['resources.pidsLimit'] = t('docker.edit.error.negative.error');
 }
 
 function cpuErrors(r: DockerResources, e: Errors): void {
-  if (r.nanoCpus < 0) e['resources.nanoCpus'] = 'Must not be negative';
+  if (r.nanoCpus < 0) e['resources.nanoCpus'] = t('docker.edit.error.negative.error');
   if (r.nanoCpus !== 0 && hasCpuQuota(r))
-    e['resources.nanoCpus'] = 'CPUs and quota cannot both be set';
-  if (r.cpuQuota !== 0 && r.cpuQuota < 1000) e['resources.cpuQuota'] = 'Use 0 or at least 1000';
+    e['resources.nanoCpus'] = t('docker.edit.error.cpusQuota.error');
+  if (r.cpuQuota !== 0 && r.cpuQuota < 1000)
+    e['resources.cpuQuota'] = t('docker.edit.error.atLeast.error', { min: 1000 });
   if (r.cpuPeriod !== 0 && (r.cpuPeriod < 1000 || r.cpuPeriod > 1_000_000)) {
-    e['resources.cpuPeriod'] = 'Use 0 or 1000 to 1000000';
+    e['resources.cpuPeriod'] = t('docker.edit.error.range.error', { min: 1000, max: 1_000_000 });
   }
   if (r.cpusetCpus !== '' && !CPUSET_RE.test(r.cpusetCpus))
-    e['resources.cpusetCpus'] = 'Use a form like 0-2 or 0,1';
+    e['resources.cpusetCpus'] = t('docker.edit.error.cpusetForm.error');
   if (r.cpusetMems !== '' && !CPUSET_RE.test(r.cpusetMems))
-    e['resources.cpusetMems'] = 'Use a form like 0-2 or 0,1';
+    e['resources.cpusetMems'] = t('docker.edit.error.cpusetForm.error');
 }
 
 function portErrors(ports: DockerRecreateSpec['ports'], e: Errors): void {
@@ -338,10 +387,11 @@ function portErrors(ports: DockerRecreateSpec['ports'], e: Errors): void {
   for (const p of ports) {
     const key = portText(p);
     if (p.containerPort < 1 || p.containerPort > 65535)
-      e['recreate.ports'] = 'Container port must be 1 to 65535';
+      e['recreate.ports'] = t('docker.edit.error.containerPort.error');
     else if (p.hostPort !== '' && !/^\d{1,5}$/.test(p.hostPort))
-      e['recreate.ports'] = 'Host port must be a number';
-    else if (seen.has(key)) e['recreate.ports'] = `Duplicate port ${key}`;
+      e['recreate.ports'] = t('docker.edit.error.hostPort.error');
+    else if (seen.has(key))
+      e['recreate.ports'] = t('docker.edit.error.duplicatePort.error', { port: key });
     seen.add(key);
   }
 }
@@ -349,9 +399,11 @@ function portErrors(ports: DockerRecreateSpec['ports'], e: Errors): void {
 function mountErrors(mounts: DockerRecreateSpec['mounts'], e: Errors): void {
   const targets = new Set<string>();
   for (const m of mounts) {
-    if (!m.target.startsWith('/')) e['recreate.mounts'] = 'Target must be an absolute path';
-    else if (targets.has(m.target)) e['recreate.mounts'] = `Duplicate target ${m.target}`;
-    else if (m.source === '') e['recreate.mounts'] = 'Source is required';
+    if (!m.target.startsWith('/'))
+      e['recreate.mounts'] = t('docker.edit.error.targetAbsolute.error');
+    else if (targets.has(m.target))
+      e['recreate.mounts'] = t('docker.edit.error.duplicateTarget.error', { target: m.target });
+    else if (m.source === '') e['recreate.mounts'] = t('docker.edit.error.sourceRequired.error');
     targets.add(m.target);
   }
 }
@@ -360,20 +412,20 @@ function mountErrors(mounts: DockerRecreateSpec['mounts'], e: Errors): void {
 export function fieldErrors(draft: EditValues): Record<string, string> {
   const e: Errors = {};
   const { inPlace: ip, recreate: rc } = draft;
-  if (!NAME_RE.test(ip.name)) e.name = 'Use letters, digits, _ . - (at least 2 characters)';
+  if (!NAME_RE.test(ip.name)) e.name = t('docker.edit.error.nameForm.error');
   resourceErrors(ip.resources, e);
   cpuErrors(ip.resources, e);
   if (
     ip.restart.maxRetries < 0 ||
     (ip.restart.name !== 'on-failure' && ip.restart.maxRetries !== 0)
   ) {
-    e.restart = 'Max retries only applies to on-failure';
+    e.restart = t('docker.edit.error.maxRetries.error');
   }
-  if (rc.image.trim() === '') e['recreate.image'] = 'Image is required';
+  if (rc.image.trim() === '') e['recreate.image'] = t('docker.edit.error.imageRequired.error');
   portErrors(rc.ports, e);
   mountErrors(rc.mounts, e);
   if (rc.env.some((x) => x.indexOf('=') < 1))
-    e['recreate.env'] = 'Each entry needs a key: KEY=value';
+    e['recreate.env'] = t('docker.edit.error.envKey.error');
   return e;
 }
 

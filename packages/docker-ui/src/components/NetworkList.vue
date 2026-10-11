@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import QueryState from '@workbench/components/QueryState.vue';
@@ -31,8 +32,8 @@ function open(row: { network: { id: string } }): void {
     <template #empty>
       <ListState
         icon="globe"
-        :title="ui.search.trim() ? 'No matches' : 'No networks'"
-        :hint="ui.search.trim() ? 'No network matches the search.' : undefined"
+        :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.network.none.empty')"
+        :hint="ui.search.trim() ? t('docker.network.noMatches.emptyHint') : undefined"
       />
     </template>
   <VirtualList :rows="rows" testid="docker-network-list" :open="open">

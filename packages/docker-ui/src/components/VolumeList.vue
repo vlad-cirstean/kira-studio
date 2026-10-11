@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import QueryState from '@workbench/components/QueryState.vue';
@@ -31,8 +32,8 @@ function open(row: { volume: { name: string } }): void {
     <template #empty>
       <ListState
         icon="database"
-        :title="ui.search.trim() ? 'No matches' : 'No volumes'"
-        :hint="ui.search.trim() ? 'No volume matches the search.' : 'Containers create volumes for persistent data.'"
+        :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.volume.none.empty')"
+        :hint="ui.search.trim() ? t('docker.volume.noMatches.emptyHint') : t('docker.volume.none.emptyHint')"
       />
     </template>
   <VirtualList :rows="rows" testid="docker-volume-list" :open="open">

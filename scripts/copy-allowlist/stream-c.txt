@@ -1,17 +1,4 @@
 # Stream C (git-ui, docker-ui, workbench except memory/ and foundation files). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-packages/docker-ui/src/components/EngineOverview.vue
-packages/docker-ui/src/components/ExecView.vue
-packages/docker-ui/src/components/ImageList.vue
-packages/docker-ui/src/components/InspectView.vue
-packages/docker-ui/src/components/LogsView.vue
-packages/docker-ui/src/components/NetworkList.vue
-packages/docker-ui/src/components/RecreateConfirmDialog.vue
-packages/docker-ui/src/components/ResourceDetail.vue
-packages/docker-ui/src/components/StatsView.vue
-packages/docker-ui/src/components/UnavailableState.vue
-packages/docker-ui/src/components/VolumeList.vue
-packages/docker-ui/src/lib/editDiff.ts
-packages/docker-ui/src/state/dockerExec.ts
 packages/workbench/src/automations/AutomationsNewTab.vue
 packages/workbench/src/automations/AutomationsPanel.vue
 packages/workbench/src/automations/AutomationsStart.vue

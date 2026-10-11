@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
@@ -22,7 +23,7 @@ export const useDockerExecSessionsStore = defineStore('dockerExecSessions', () =
     const session: DockerExecSession = {
       id: `docker-exec:${crypto.randomUUID()}`,
       containerId,
-      title: `Shell ${n}`,
+      title: t('docker.exec.session.title', { n }),
       n,
     };
     ctx.execContainers.set(session.id, containerId);

@@ -200,7 +200,7 @@ test('daemon down shows the unavailable state; Retry refetches and renders the l
 
   await expect(page.locator('[data-testid="docker-unavailable"]')).toBeVisible();
   await expect(page.locator('[data-testid="docker-unavailable-title"]')).toContainText(
-    "isn't running",
+    'isn’t running',
   );
 
   state.status = OK_STATUS;

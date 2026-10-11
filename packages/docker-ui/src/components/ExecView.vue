@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { tabChipVariants } from '@theme/components/ui/tabs';
+import { t } from '@theme/i18n';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
@@ -44,12 +45,12 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
     <Empty v-if="sessions.length === 0" class="h-full" data-testid="docker-exec-empty">
       <EmptyHeader>
         <EmptyMedia><CodiconIcon name="terminal" :size="24" /></EmptyMedia>
-        <EmptyTitle>No terminal session</EmptyTitle>
-        <EmptyDescription>Start a shell inside this container.</EmptyDescription>
+        <EmptyTitle>{{ t('docker.exec.none.empty') }}</EmptyTitle>
+        <EmptyDescription>{{ t('docker.exec.none.emptyHint') }}</EmptyDescription>
       </EmptyHeader>
       <Button size="kira" variant="toolbar" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
-        New session
+        {{ t('docker.exec.new.label') }}
       </Button>
     </Empty>
     <template v-else>
@@ -64,14 +65,14 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
         <TooltipIconButton
           icon="close"
           :icon-size="12"
-          :label="`Close ${s.title}`"
+          :label="t('docker.exec.close.tooltip', { title: s.title })"
           data-testid="docker-exec-close"
           @click="closeSession(s.id)"
         />
       </span>
       <Button variant="toolbar" size="kira" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
-        New session
+        {{ t('docker.exec.new.label') }}
       </Button>
     </div>
     <div class="relative min-h-0 flex-1">

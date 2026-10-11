@@ -711,6 +711,49 @@
         "aria": "Container sections"
       }
     },
+    "dialog": {
+      "recreateConfirm": {
+        "body": "The engine can’t change these settings on an existing container. A new container replaces this one.",
+        "compose": {
+          "body": "Part of {tool} project {name}. {tool} will see a different container."
+        },
+        "confirm": "Recreate now",
+        "dependents": {
+          "body": "Containers sharing this network lose it until restarted. Affected: {names}."
+        },
+        "kept": {
+          "title": "What is kept"
+        },
+        "keptBase": {
+          "body": "Name, networks and aliases, named and bind mounts."
+        },
+        "keptMore": {
+          "body": "Also kept: {items}."
+        },
+        "lost": {
+          "title": "What is lost"
+        },
+        "lostId": {
+          "body": "The container ID changes. Open terminals and log views close."
+        },
+        "lostLayer": {
+          "body": "Files changed inside the container outside volumes, in the writable layer."
+        },
+        "lostLogs": {
+          "body": "The old container’s logs."
+        },
+        "lostVolume": {
+          "body": "Anonymous volume {name} at {destination} is detached and kept as an unused volume."
+        },
+        "restarts": {
+          "body": "The container stops, then the new one starts."
+        },
+        "staysStopped": {
+          "body": "The new container stays stopped."
+        },
+        "title": "Recreate container?"
+      }
+    },
     "disk": {
       "buildCache": {
         "label": "Build cache"
@@ -766,6 +809,9 @@
       "attach": {
         "label": "Attach"
       },
+      "attached": {
+        "status": "Attached"
+      },
       "attachNetwork": {
         "option": "Attach to network…"
       },
@@ -820,6 +866,9 @@
       "detach": {
         "tooltip": "Detach"
       },
+      "detached": {
+        "status": "Detached"
+      },
       "dropCap": {
         "label": "Drop capability"
       },
@@ -829,11 +878,70 @@
       "engineCpuset": {
         "hint": "The engine has {count} CPU core (0-{last}). | The engine has {count} CPU cores (0-{last})."
       },
+      "engineDefault": {
+        "status": "Engine default"
+      },
       "entrypoint": {
         "label": "Entrypoint (one argument per line)"
       },
       "envKey": {
         "example": "NODE_ENV"
+      },
+      "error": {
+        "atLeast": {
+          "error": "Use 0 or at least {min}."
+        },
+        "containerPort": {
+          "error": "Container port must be 1 to 65535."
+        },
+        "cpusetForm": {
+          "error": "Use a form like 0-2 or 0,1."
+        },
+        "cpusQuota": {
+          "error": "CPUs and quota can’t both be set."
+        },
+        "duplicatePort": {
+          "error": "Duplicate port {port}."
+        },
+        "duplicateTarget": {
+          "error": "Duplicate target {target}."
+        },
+        "envKey": {
+          "error": "Each entry needs a key before the equals sign."
+        },
+        "hostPort": {
+          "error": "Host port must be a number."
+        },
+        "imageRequired": {
+          "error": "Image is required."
+        },
+        "maxRetries": {
+          "error": "Max retries only applies to on-failure."
+        },
+        "memoryMin": {
+          "error": "Minimum is {min}."
+        },
+        "nameForm": {
+          "error": "Use letters, digits, underscores, dots and hyphens, at least 2 characters."
+        },
+        "negative": {
+          "error": "Must not be negative."
+        },
+        "range": {
+          "error": "Use 0 or {min} to {max}."
+        },
+        "reservationMax": {
+          "error": "Must not exceed memory."
+        },
+        "sourceRequired": {
+          "error": "Source is required."
+        },
+        "swapMin": {
+          "error": "Must be unlimited or at least memory."
+        },
+        "targetAbsolute": {
+          "error": "Target must be an absolute path."
+        }
       },
       "hostIp": {
         "placeholder": "Host IP"
@@ -860,6 +968,9 @@
       "mode": {
         "aria": "Edit mode"
       },
+      "mount": {
+        "label": "Mount"
+      },
       "mountSource": {
         "placeholder": "Volume name or host path"
       },
@@ -868,6 +979,9 @@
       },
       "needsRecreate": {
         "hint": "This change needs a recreate."
+      },
+      "network": {
+        "label": "Network {name}"
       },
       "networkLocked": {
         "hint": "Networks can’t change in this network mode."
@@ -898,6 +1012,9 @@
       "pids": {
         "label": "PIDs limit"
       },
+      "port": {
+        "label": "Port"
+      },
       "preserved": {
         "label": "Kept as is"
       },
@@ -909,6 +1026,9 @@
       },
       "recreates": {
         "title": "Recreates container"
+      },
+      "removed": {
+        "status": "Removed"
       },
       "restored": {
         "body": "The original container was restored."
@@ -936,6 +1056,12 @@
       },
       "unlimited": {
         "label": "Unlimited"
+      },
+      "unset": {
+        "status": "Not set"
+      },
+      "variable": {
+        "label": "Variable {key}"
       }
     },
     "endpoint": {
@@ -949,12 +1075,62 @@
         "tooltip": "Unencrypted connection"
       }
     },
+    "engine": {
+      "counts": {
+        "label": "{stopped} stopped · {paused} paused"
+      },
+      "endpoint": {
+        "label": "Endpoint"
+      },
+      "engine": {
+        "title": "Engine"
+      },
+      "kernel": {
+        "label": "Kernel"
+      },
+      "of": {
+        "label": "Of {total}"
+      },
+      "osArch": {
+        "label": "OS / arch"
+      },
+      "resources": {
+        "title": "Resources"
+      },
+      "startStopped": {
+        "label": "Start stopped"
+      },
+      "title": {
+        "title": "Docker engine"
+      },
+      "version": {
+        "label": "Version"
+      },
+      "versionApi": {
+        "label": "{version} (API {api})"
+      }
+    },
     "env": {
       "hideValue": {
         "tooltip": "Hide value"
       },
       "revealValue": {
         "tooltip": "Reveal value"
+      }
+    },
+    "exec": {
+      "close": {
+        "tooltip": "Close {title}"
+      },
+      "new": {
+        "label": "New session"
+      },
+      "none": {
+        "empty": "No terminal session",
+        "emptyHint": "Start a shell inside this container."
+      },
+      "session": {
+        "title": "Shell {n}"
       }
     },
     "field": {
@@ -1007,6 +1183,45 @@
         "label": "Working folder"
       }
     },
+    "image": {
+      "noMatches": {
+        "emptyHint": "No image matches the search."
+      },
+      "none": {
+        "empty": "No images",
+        "emptyHint": "Pull one with docker pull."
+      }
+    },
+    "logs": {
+      "follow": {
+        "label": "Follow"
+      },
+      "jumpToLatest": {
+        "label": "Jump to latest"
+      },
+      "noMatches": {
+        "emptyHint": "No lines match the filter."
+      },
+      "none": {
+        "emptyHint": "No log output."
+      },
+      "stopped": {
+        "status": "Container stopped"
+      },
+      "tail": {
+        "aria": "Lines to show",
+        "option": "{count} line | {count} lines"
+      },
+      "timestamps": {
+        "label": "Timestamps"
+      },
+      "waiting": {
+        "loading": "Waiting for output…"
+      },
+      "wrap": {
+        "label": "Wrap"
+      }
+    },
     "measure": {
       "label": "Measure"
     },
@@ -1027,6 +1242,37 @@
     "mount": {
       "readOnly": {
         "label": "{type}, read-only"
+      }
+    },
+    "network": {
+      "noMatches": {
+        "emptyHint": "No network matches the search."
+      },
+      "none": {
+        "empty": "No networks"
+      }
+    },
+    "origin": {
+      "buildx": {
+        "tooltip": "{tool} builder {name}"
+      },
+      "compose": {
+        "tooltip": "{tool} project"
+      },
+      "devcontainer": {
+        "tooltip": "Dev container"
+      },
+      "devcontainerNamed": {
+        "tooltip": "Dev container ({name})"
+      },
+      "kind": {
+        "tooltip": "Kind cluster {name}"
+      },
+      "kubernetes": {
+        "tooltip": "{tool} pod {name}"
+      },
+      "swarm": {
+        "tooltip": "{tool} service {name}"
       }
     },
     "overview": {
@@ -1058,6 +1304,53 @@
         "title": "Docker unavailable"
       }
     },
+    "resource": {
+      "driver": {
+        "label": "Driver"
+      },
+      "id": {
+        "label": "ID"
+      },
+      "internal": {
+        "label": "Internal"
+      },
+      "labelKey": {
+        "label": "Label {key}"
+      },
+      "mountPoint": {
+        "label": "Mount point"
+      },
+      "network": {
+        "label": "Network"
+      },
+      "no": {
+        "option": "No"
+      },
+      "noContainers": {
+        "emptyHint": "No containers."
+      },
+      "raw": {
+        "title": "Raw"
+      },
+      "scope": {
+        "label": "Driver scope"
+      },
+      "subnets": {
+        "label": "Subnets"
+      },
+      "tags": {
+        "label": "Image tags"
+      },
+      "usedBy": {
+        "title": "Used by"
+      },
+      "volume": {
+        "label": "Volume"
+      },
+      "yes": {
+        "option": "Yes"
+      }
+    },
     "section": {
       "containers": {
         "label": "Containers"
@@ -1086,6 +1379,32 @@
         "label": "Writable layer"
       }
     },
+    "stats": {
+      "block": {
+        "label": "Block read / write"
+      },
+      "io": {
+        "title": "Input/output"
+      },
+      "memOf": {
+        "label": "Of {limit} ({percent})"
+      },
+      "network": {
+        "label": "Network rx / tx"
+      },
+      "pids": {
+        "label": "PIDs"
+      },
+      "samples": {
+        "label": "Last {count} sample | Last {count} samples"
+      },
+      "stopped": {
+        "emptyHint": "Live stats need a running container."
+      },
+      "waiting": {
+        "loading": "Waiting for stats…"
+      }
+    },
     "tab": {
       "inspect": {
         "label": "Inspect"
@@ -1100,12 +1419,50 @@
         "label": "Stats"
       }
     },
+    "unavailable": {
+      "daemonDown": {
+        "hint": "Start Docker Desktop, or run `colima start`, then retry.",
+        "title": "Docker isn’t running"
+      },
+      "error": {
+        "hint": "The engine returned an unexpected error.",
+        "title": "Docker error"
+      },
+      "notInstalled": {
+        "hint": "Install {engines}, then retry.",
+        "title": "Docker isn’t installed"
+      },
+      "permissionDenied": {
+        "hint": "Your user can’t reach the Docker socket. Add it to the docker group or check the socket permissions.",
+        "title": "Permission denied"
+      },
+      "recheck": {
+        "hint": "Checking again every 5 seconds."
+      },
+      "tls": {
+        "hint": "Check the context certificates or {env}.",
+        "title": "TLS handshake failed"
+      },
+      "unreachable": {
+        "hint": "Check {env}, the selected context and your network.",
+        "title": "Can’t reach the Docker engine"
+      }
+    },
     "unit": {
       "gib": {
         "option": "GiB"
       },
       "mib": {
         "option": "MiB"
+      }
+    },
+    "volume": {
+      "noMatches": {
+        "emptyHint": "No volume matches the search."
+      },
+      "none": {
+        "empty": "No volumes",
+        "emptyHint": "Containers create volumes for persistent data."
       }
     }
   },

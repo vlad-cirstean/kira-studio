@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed } from 'vue';
@@ -79,22 +80,22 @@ const split = computed(() => {
   };
 });
 
-const links = computed<Array<{ section: DockerSection; label: string; icon: string; count: number }>>(() => [
-  { section: 'images', label: 'Images', icon: 'package', count: images.data.value?.length ?? engine.value?.images ?? 0 },
-  { section: 'volumes', label: 'Volumes', icon: 'database', count: volumes.data.value?.length ?? 0 },
-  { section: 'networks', label: 'Networks', icon: 'globe', count: networks.data.value?.length ?? 0 },
+const links = computed<Array<{ section: DockerSection; label: MessageKey; icon: string; count: number }>>(() => [
+  { section: 'images', label: 'docker.section.images.label', icon: 'package', count: images.data.value?.length ?? engine.value?.images ?? 0 },
+  { section: 'volumes', label: 'docker.section.volumes.label', icon: 'database', count: volumes.data.value?.length ?? 0 },
+  { section: 'networks', label: 'docker.field.networks.label', icon: 'globe', count: networks.data.value?.length ?? 0 },
 ]);
 
 const facts = computed<Array<[string, string]>>(() => {
   const e = engine.value;
   if (!e) return [];
   return [
-    ['Version', `${e.version} (API ${e.apiVersion})`],
-    ['OS / arch', `${e.operatingSystem || e.os} / ${e.arch}`],
-    ['Kernel', e.kernelVersion],
-    ['CPUs', String(e.cpus)],
-    ['Memory', formatBytes(e.memTotal)],
-    ['Endpoint', status.data.value?.endpoint.host ?? ''],
+    [t('docker.engine.version.label'), t('docker.engine.versionApi.label', { version: e.version, api: e.apiVersion })],
+    [t('docker.engine.osArch.label'), `${e.operatingSystem || e.os} / ${e.arch}`],
+    [t('docker.engine.kernel.label'), e.kernelVersion],
+    [t('docker.edit.cpus.label'), String(e.cpus)],
+    [t('common.module.memory.label'), formatBytes(e.memTotal)],
+    [t('docker.engine.endpoint.label'), status.data.value?.endpoint.host ?? ''],
   ];
 });
 
@@ -122,7 +123,7 @@ function refresh(): Promise<void> {
   <div class="flex h-full flex-col gap-3 overflow-auto p-3" data-testid="docker-engine-overview">
     <template v-if="engine">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 class="text-kira-lg font-medium">Docker Engine</h2>
+        <h2 class="text-kira-lg font-medium">{{ t('docker.engine.title.title') }}</h2>
         <Badge variant="info">{{ engine.version }}</Badge>
         <span class="inline-flex items-center gap-1 text-kira-sm text-muted-foreground"><EndpointChip /></span>
         <span class="ml-auto flex items-center gap-1">
@@ -133,7 +134,7 @@ function refresh(): Promise<void> {
             data-testid="docker-start-stopped"
             @click="runAll(stoppedIds, 'start')"
           >
-            <CodiconIcon name="play" :size="12" class="text-ok" />Start stopped
+            <CodiconIcon name="play" :size="12" class="text-ok" />{{ t('docker.engine.startStopped.label') }}
           </Button>
           <Button
             size="kira"
@@ -142,20 +143,20 @@ function refresh(): Promise<void> {
             data-testid="docker-stop-all"
             @click="runAll(runningIds, 'stop')"
           >
-            <CodiconIcon name="debug-stop" :size="12" class="text-error" />Stop all
+            <CodiconIcon name="debug-stop" :size="12" class="text-error" />{{ t('common.action.stopAll.label') }}
           </Button>
           <Button size="kira" variant="toolbar" data-testid="docker-overview-refresh" @click="refresh">
-            <CodiconIcon name="refresh" :size="12" />Refresh
+            <CodiconIcon name="refresh" :size="12" />{{ t('common.action.refresh.label') }}
           </Button>
         </span>
       </div>
 
       <div class="@container shrink-0">
         <div class="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-4">
-          <DetailSection title="Status">
+          <DetailSection :title="t('common.field.status.label')">
             <div class="flex items-baseline gap-1.5">
               <span class="text-kira-xl font-medium" data-testid="docker-engine-count">{{ engine.running }}</span>
-              <span class="text-muted-foreground">running</span>
+              <span class="text-muted-foreground">{{ t('common.state.running.status') }}</span>
             </div>
             <div class="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-field">
               <div class="bg-ok" :style="{ width: `${split.running}%` }" />
@@ -163,26 +164,26 @@ function refresh(): Promise<void> {
               <div class="bg-subtle" :style="{ width: `${split.stopped}%` }" />
             </div>
             <div class="mt-2 text-kira-sm text-muted-foreground" data-testid="docker-engine-counts">
-              {{ engine.stopped }} stopped · {{ engine.paused }} paused
+              {{ t('docker.engine.counts.label', { stopped: engine.stopped, paused: engine.paused }) }}
             </div>
           </DetailSection>
-          <DetailSection title="CPU">
+          <DetailSection :title="t('docker.metric.cpu.label')">
             <div class="flex items-baseline gap-1.5">
               <span class="text-kira-xl font-medium" data-testid="docker-engine-cpu">{{ formatPercent(totals.cpu) }}</span>
-              <span class="text-muted-foreground">of {{ engine.cpus * 100 }}%</span>
+              <span class="text-muted-foreground">{{ t('docker.engine.of.label', { total: `${engine.cpus * 100}%` }) }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="cpuPercentOfCapacity" /></div>
             <div class="mt-2"><StatsSparkline :values="cpuSeries" :max="cpuCapacity" height-class="h-[2rem]" /></div>
           </DetailSection>
-          <DetailSection title="Memory">
+          <DetailSection :title="t('common.module.memory.label')">
             <div class="flex items-baseline gap-1.5">
               <span class="text-kira-xl font-medium" data-testid="docker-engine-mem">{{ formatBytes(totals.mem) }}</span>
-              <span class="text-muted-foreground">of {{ formatBytes(engine.memTotal) }}</span>
+              <span class="text-muted-foreground">{{ t('docker.engine.of.label', { total: formatBytes(engine.memTotal) }) }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="memPercentOfTotal" /></div>
             <div class="mt-2"><StatsSparkline :values="memSeries" :max="engine.memTotal" height-class="h-[2rem]" /></div>
           </DetailSection>
-          <DetailSection title="Resources" flush>
+          <DetailSection :title="t('docker.engine.resources.title')" flush>
             <button
               v-for="l in links"
               :key="l.section"
@@ -192,7 +193,7 @@ function refresh(): Promise<void> {
               @click="openSection(l.section)"
             >
               <CodiconIcon :name="l.icon" :size="13" class="text-muted-foreground" />
-              <span class="flex-1">{{ l.label }}</span>
+              <span class="flex-1">{{ t(l.label) }}</span>
               <Badge variant="count">{{ l.count }}</Badge>
               <CodiconIcon name="chevron-right" :size="12" class="text-muted-foreground" />
             </button>
@@ -202,11 +203,11 @@ function refresh(): Promise<void> {
 
       <EngineDiskSection />
 
-      <DetailSection title="Containers" flush class="shrink-0">
+      <DetailSection :title="t('docker.section.containers.label')" flush class="shrink-0">
         <ContainerTable />
       </DetailSection>
 
-      <DetailSection title="Engine" class="shrink-0">
+      <DetailSection :title="t('docker.engine.engine.title')" class="shrink-0">
         <dl class="@container">
           <div class="grid grid-cols-1 gap-x-6 gap-y-2 @xl:grid-cols-2 @4xl:grid-cols-3">
             <div v-for="[k, v] in facts" :key="k" class="min-w-0">

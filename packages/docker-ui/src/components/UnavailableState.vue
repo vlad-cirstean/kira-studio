@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useRetryStatus } from '../queries';
 import type { DockerStatus, UnavailableReason } from '../wire';
@@ -12,31 +13,37 @@ const props = defineProps<{ status: DockerStatus }>();
 
 const { retrying, retry } = useRetryStatus();
 
-const COPY: Record<UnavailableReason, { title: string; hint: string }> = {
+const COPY: Record<UnavailableReason, { title: () => string; hint: () => string }> = {
   'not-installed': {
-    title: "Docker isn't installed",
-    hint: 'Install Docker Desktop, Colima or Podman, then retry.',
+    title: () => t('docker.unavailable.notInstalled.title'),
+    hint: () => t('docker.unavailable.notInstalled.hint', { engines: 'Docker Desktop, Colima or Podman' }),
   },
   'daemon-down': {
-    title: "Docker isn't running",
-    hint: 'Start Docker Desktop, or run `colima start`, then retry.',
+    title: () => t('docker.unavailable.daemonDown.title'),
+    hint: () => t('docker.unavailable.daemonDown.hint'),
   },
   'permission-denied': {
-    title: 'Permission denied',
-    hint: 'Your user cannot reach the Docker socket. Add it to the docker group or check the socket permissions.',
+    title: () => t('docker.unavailable.permissionDenied.title'),
+    hint: () => t('docker.unavailable.permissionDenied.hint'),
   },
   unreachable: {
-    title: "Can't reach the Docker engine",
-    hint: 'Check DOCKER_HOST, the selected context and your network.',
+    title: () => t('docker.unavailable.unreachable.title'),
+    hint: () => t('docker.unavailable.unreachable.hint', { env: 'DOCKER_HOST' }),
   },
   tls: {
-    title: 'TLS handshake failed',
-    hint: 'Check the context certificates or DOCKER_CERT_PATH.',
+    title: () => t('docker.unavailable.tls.title'),
+    hint: () => t('docker.unavailable.tls.hint', { env: 'DOCKER_CERT_PATH' }),
   },
-  error: { title: 'Docker error', hint: 'The engine returned an unexpected error.' },
+  error: {
+    title: () => t('docker.unavailable.error.title'),
+    hint: () => t('docker.unavailable.error.hint'),
+  },
 };
 
-const copy = computed(() => COPY[props.status.reason ?? 'error']);
+const copy = computed(() => {
+  const c = COPY[props.status.reason ?? 'error'];
+  return { title: c.title(), hint: c.hint() };
+});
 </script>
 
 <template>
@@ -51,11 +58,11 @@ const copy = computed(() => COPY[props.status.reason ?? 'error']);
       <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{ status.message }}</p>
       <div class="flex items-center gap-2">
         <Button size="kira" variant="toolbar" :disabled="retrying" data-testid="docker-retry" @click="retry">
-          <Spinner v-if="retrying" label="" /><CodiconIcon v-else name="refresh" :size="12" />Retry
+          <Spinner v-if="retrying" label="" /><CodiconIcon v-else name="refresh" :size="12" />{{ t('common.action.retry.label') }}
         </Button>
         <EndpointChip />
       </div>
-      <p class="text-kira-sm text-muted-foreground">Checking again every 5 seconds.</p>
+      <p class="text-kira-sm text-muted-foreground">{{ t('docker.unavailable.recheck.hint') }}</p>
     </EmptyContent>
   </Empty>
 </template>

@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
@@ -42,8 +43,8 @@ function openRegistry(url: string): void {
     <template #empty>
       <ListState
         icon="package"
-        :title="ui.search.trim() ? 'No matches' : 'No images'"
-        :hint="ui.search.trim() ? 'No image matches the search.' : 'Pull one with docker pull.'"
+        :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.image.none.empty')"
+        :hint="ui.search.trim() ? t('docker.image.noMatches.emptyHint') : t('docker.image.none.emptyHint')"
       />
     </template>
   <VirtualList :rows="rows" testid="docker-image-list" :open="open">
@@ -77,7 +78,7 @@ function openRegistry(url: string): void {
           <TooltipIconButton
             v-if="row.image.registryUrl"
             icon="link-external"
-            label="Open in registry"
+            :label="t('docker.detail.openRegistry.tooltip')"
             class="hidden group-hover/row:flex group-focus-within/row:flex"
             data-testid="docker-image-registry"
             @click.stop="openRegistry(row.image.registryUrl)"

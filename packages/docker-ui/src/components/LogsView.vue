@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
+import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { useFollowTail } from '@workbench/behaviour/followTail';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -20,12 +21,9 @@ const props = defineProps<{ containerId: string }>();
 const MAX_LINES = 20_000;
 const WRAP_RENDER_LINES = 2_000;
 const ROW_HEIGHT = 18;
-const TAILS = [
-  { label: '100 lines', value: 100 },
-  { label: '1000 lines', value: 1000 },
-  { label: '5000 lines', value: 5000 },
-  { label: 'All', value: -1 },
-] as const;
+const TAILS = [100, 1000, 5000, -1] as const;
+
+const tailLabel = (n: number): string => (n === -1 ? t('common.state.all.option') : t('docker.logs.tail.option', { count: n }));
 
 interface Line extends DockerLogLine {
   n: number;
@@ -126,6 +124,11 @@ onBeforeUnmount(() => {
   void close();
 });
 
+const emptyText = computed(() => {
+  if (needle.value) return t('docker.logs.noMatches.emptyHint');
+  return ended.value ? t('docker.logs.none.emptyHint') : t('docker.logs.waiting.loading');
+});
+
 function clear(): void {
   lines.value = [];
 }
@@ -134,17 +137,17 @@ function clear(): void {
 <template>
   <div class="flex h-full flex-col" data-testid="docker-logs">
     <div class="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-1.5 py-1">
-      <Toggle v-model="follow" size="kira" data-testid="docker-logs-follow" aria-label="Follow">Follow</Toggle>
-      <Toggle v-model="timestamps" size="kira" data-testid="docker-logs-timestamps" aria-label="Timestamps">Timestamps</Toggle>
-      <Toggle v-model="wrap" size="kira" data-testid="docker-logs-wrap" aria-label="Wrap">Wrap</Toggle>
-      <NativeSelect v-model="tail" aria-label="Tail" data-testid="docker-logs-tail">
-        <option v-for="t in TAILS" :key="t.value" :value="t.value">{{ t.label }}</option>
+      <Toggle v-model="follow" size="kira" data-testid="docker-logs-follow" :aria-label="t('docker.logs.follow.label')">{{ t('docker.logs.follow.label') }}</Toggle>
+      <Toggle v-model="timestamps" size="kira" data-testid="docker-logs-timestamps" :aria-label="t('docker.logs.timestamps.label')">{{ t('docker.logs.timestamps.label') }}</Toggle>
+      <Toggle v-model="wrap" size="kira" data-testid="docker-logs-wrap" :aria-label="t('docker.logs.wrap.label')">{{ t('docker.logs.wrap.label') }}</Toggle>
+      <NativeSelect v-model="tail" :aria-label="t('docker.logs.tail.aria')" data-testid="docker-logs-tail">
+        <option v-for="n in TAILS" :key="n" :value="n">{{ tailLabel(n) }}</option>
       </NativeSelect>
       <div class="w-56">
-        <SearchField v-model="filter" placeholder="Filter" data-testid="docker-logs-filter" />
+        <SearchField v-model="filter" :placeholder="t('common.action.filter.label')" data-testid="docker-logs-filter" />
       </div>
       <span v-if="needle" class="text-kira-sm text-muted-foreground" data-testid="docker-logs-count">{{ visible.length }}</span>
-      <Button variant="ghost" size="kira" class="ml-auto" data-testid="docker-logs-clear" @click="clear">Clear</Button>
+      <Button variant="ghost" size="kira" class="ml-auto" data-testid="docker-logs-clear" @click="clear">{{ t('common.action.clear.label') }}</Button>
     </div>
     <div class="relative min-h-0 flex-1">
       <div
@@ -194,7 +197,7 @@ function clear(): void {
         class="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"
         data-testid="docker-logs-empty"
       >
-        {{ needle ? 'No lines match the filter.' : ended ? 'No log output.' : 'Waiting for output…' }}
+        {{ emptyText }}
       </p>
       <Button
         v-if="!atBottom() && !follow"
@@ -204,7 +207,7 @@ function clear(): void {
         data-testid="docker-logs-jump"
         @click="jumpToLatest"
       >
-        Jump to latest
+        {{ t('docker.logs.jumpToLatest.label') }}
       </Button>
     </div>
     <FieldError
@@ -219,7 +222,7 @@ function clear(): void {
       class="shrink-0 border-t border-border bg-chrome px-2 py-0.5 text-kira-sm text-muted-foreground"
       data-testid="docker-logs-ended"
     >
-      Container stopped
+      {{ t('docker.logs.stopped.status') }}
     </div>
   </div>
 </template>

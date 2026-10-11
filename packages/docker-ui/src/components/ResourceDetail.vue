@@ -4,6 +4,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { displayValue, formatBytes, formatDateTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
@@ -16,6 +17,12 @@ import DetailSection from './DetailSection.vue';
 import InspectView from './InspectView.vue';
 
 const props = defineProps<{ kind: InspectKind; id: string }>();
+
+const KIND_LABELS: Record<InspectKind, MessageKey> = {
+  image: 'docker.field.image.label',
+  volume: 'docker.resource.volume.label',
+  network: 'docker.resource.network.label',
+};
 
 const ICONS: Record<InspectKind, string> = { image: 'package', volume: 'database', network: 'globe' };
 
@@ -52,29 +59,29 @@ const facts = computed<Array<[string, string]>>(() => {
   if (props.kind === 'image' && image.value) {
     const i = image.value;
     return [
-      ['Tags', i.tags.join(', ') || '<none>'],
-      ['ID', i.id],
-      ['Size', formatBytes(i.size)],
-      ['Created', formatDateTime(i.created)],
+      [t('docker.resource.tags.label'), i.tags.join(', ') || '<none>'],
+      [t('docker.resource.id.label'), i.id],
+      [t('docker.field.size.label'), formatBytes(i.size)],
+      [t('docker.field.created.label'), formatDateTime(i.created)],
     ];
   }
   if (props.kind === 'volume' && volume.value) {
     const v = volume.value;
     return [
-      ['Driver', v.driver],
-      ['Mountpoint', v.mountpoint],
-      ['Scope', v.scope],
-      ['Created', displayValue(v.created)],
-      ...Object.entries(v.labels).map(([k, val]): [string, string] => [`Label ${k}`, val]),
+      [t('docker.resource.driver.label'), v.driver],
+      [t('docker.resource.mountPoint.label'), v.mountpoint],
+      [t('docker.resource.scope.label'), v.scope],
+      [t('docker.field.created.label'), displayValue(v.created)],
+      ...Object.entries(v.labels).map(([k, val]): [string, string] => [t('docker.resource.labelKey.label', { key: k }), val]),
     ];
   }
   if (props.kind === 'network' && network.value) {
     const n = network.value;
     return [
-      ['Driver', n.driver],
-      ['Scope', n.scope],
-      ['Subnets', displayValue(n.subnets.join(', '))],
-      ['Internal', n.internal ? 'yes' : 'no'],
+      [t('docker.resource.driver.label'), n.driver],
+      [t('docker.resource.scope.label'), n.scope],
+      [t('docker.resource.subnets.label'), displayValue(n.subnets.join(', '))],
+      [t('docker.resource.internal.label'), n.internal ? t('docker.resource.yes.option') : t('docker.resource.no.option')],
     ];
   }
   return [];
@@ -103,15 +110,15 @@ const usedByRows = computed(() =>
       <TooltipIconButton
         v-if="registryUrl"
         icon="link-external"
-        label="Open in registry"
+        :label="t('docker.detail.openRegistry.tooltip')"
         data-testid="docker-resource-registry"
         @click="openRegistry"
       />
-      <Badge>{{ kind }}</Badge>
+      <Badge>{{ t(KIND_LABELS[kind]) }}</Badge>
     </div>
     <div class="@container p-3">
       <div class="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2">
-        <DetailSection title="Details">
+        <DetailSection :title="t('docker.section.details.title')">
           <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
             <template v-for="[k, v] in facts" :key="k">
               <dt class="text-muted-foreground">{{ k }}</dt>
@@ -119,8 +126,8 @@ const usedByRows = computed(() =>
             </template>
           </dl>
         </DetailSection>
-        <DetailSection title="Used by" flush>
-          <p v-if="usedByRows.length === 0" class="px-3 py-2 text-muted-foreground" data-testid="docker-used-by-empty">No containers.</p>
+        <DetailSection :title="t('docker.resource.usedBy.title')" flush>
+          <p v-if="usedByRows.length === 0" class="px-3 py-2 text-muted-foreground" data-testid="docker-used-by-empty">{{ t('docker.resource.noContainers.emptyHint') }}</p>
           <button
             v-for="row in usedByRows"
             :key="row.id"
@@ -133,7 +140,7 @@ const usedByRows = computed(() =>
             {{ row.name }}
           </button>
         </DetailSection>
-        <DetailSection title="Raw" class="@3xl:col-span-2">
+        <DetailSection :title="t('docker.resource.raw.title')" class="@3xl:col-span-2">
           <div class="h-80">
             <InspectView v-if="inspect.data.value" :raw="inspect.data.value.raw" />
           </div>

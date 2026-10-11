@@ -2,6 +2,7 @@
 import { BoxesIcon, HammerIcon, NetworkIcon } from '@lucide/vue';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { siKubernetes } from 'simple-icons';
 import { computed } from 'vue';
 import type { ContainerOrigin } from '../wire';
@@ -17,19 +18,19 @@ const label = computed(() => {
   const n = props.name;
   switch (props.origin) {
     case 'compose':
-      return 'Compose project';
+      return t('docker.origin.compose.tooltip', { tool: 'Compose' });
     case 'devcontainer':
-      return n ? `Dev container (${n})` : 'Dev container';
+      return n ? t('docker.origin.devcontainerNamed.tooltip', { name: n }) : t('docker.origin.devcontainer.tooltip');
     case 'testcontainers':
       return 'Testcontainers';
     case 'kind':
-      return `kind cluster ${n}`;
+      return t('docker.origin.kind.tooltip', { name: n });
     case 'kubernetes':
-      return `Kubernetes pod ${n}`;
+      return t('docker.origin.kubernetes.tooltip', { tool: 'Kubernetes', name: n });
     case 'swarm':
-      return `Swarm service ${n}`;
+      return t('docker.origin.swarm.tooltip', { tool: 'Swarm', name: n });
     case 'buildx':
-      return `Buildx builder ${n}`;
+      return t('docker.origin.buildx.tooltip', { tool: 'Buildx', name: n });
     default:
       return '';
   }
