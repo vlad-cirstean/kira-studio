@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
+import InlineState from '@theme/components/InlineState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -231,7 +232,7 @@ onUnmounted(() => {
         <DialogTitle>Compare responses</DialogTitle>
       </DialogHeader>
       <DialogBody flush>
-    <div v-if="loadingSnapshots" class="p-2 text-kira-sm text-subtle">Loading…</div>
+    <InlineState v-if="loadingSnapshots" kind="loading">Loading…</InlineState>
     <Alert v-else-if="loadError" variant="error"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="flex h-full min-h-0 flex-col">
       <div class="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5" data-testid="http-diff-summary">
@@ -328,7 +329,7 @@ onUnmounted(() => {
         <div v-if="!commonFormat" class="text-kira-sm text-subtle shrink-0 px-2 py-1">
           Comparing raw bytes — the two bodies aren't both JSON or both XML.
         </div>
-        <div v-if="mergeLoading" class="p-2 text-kira-sm text-subtle">Loading the compare view…</div>
+        <InlineState v-if="mergeLoading" kind="loading">Loading the compare view…</InlineState>
         <div ref="mergeHostRef" class="diff-merge-host flex-1 min-h-0 overflow-auto" data-testid="http-diff-merge"></div>
       </template>
     </div>

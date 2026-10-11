@@ -5,6 +5,7 @@ import {
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -12,6 +13,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
@@ -133,8 +135,7 @@ async function onClear(): Promise<void> {
       <div
         v-for="entry in filteredEntries"
         :key="entry.id"
-        class="flex cursor-pointer items-center gap-1 border-b border-border px-1.5 py-1"
-        :class="entry.id === viewingId ? 'bg-hover' : 'hover:bg-hover'"
+        :class="cn(rowVariants({ layout: 'tree', selected: entry.id === viewingId }), 'cursor-pointer border-b border-border py-1')"
         data-testid="grpc-history-row"
         role="option"
         tabindex="0"

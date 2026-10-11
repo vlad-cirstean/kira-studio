@@ -203,7 +203,7 @@ const BODY_MODE_ITEMS = BODY_MODE_OPTIONS.map((opt) => ({
       {{ caption }}
     </div>
 
-    <Alert v-if="beautifyError" variant="error" data-testid="http-body-beautify-error">
+    <Alert strip v-if="beautifyError" variant="error" data-testid="http-body-beautify-error">
       <AlertDescription>{{ beautifyError }}</AlertDescription>
     </Alert>
 

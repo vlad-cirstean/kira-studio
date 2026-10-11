@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -10,6 +11,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -144,7 +146,7 @@ function selectMethod(service: string, method: string): void {
       <!-- D14: a real cap + scroll, so a large .proto tree's import list can never push the
            source row and the whole service browser off the pane. -->
       <div class="flex max-h-32 flex-col overflow-auto">
-        <div v-for="(p, i) in tab.state.importPaths" :key="i" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
+        <div v-for="(p, i) in tab.state.importPaths" :key="i" :class="rowVariants()">
           <Tooltip>
             <TooltipTrigger as-child>
               <span class="text-kira-sm font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ p }}</span>
@@ -176,7 +178,7 @@ function selectMethod(service: string, method: string): void {
       </div>
     </div>
 
-    <Alert v-if="error" variant="error" data-testid="grpc-schema-error">
+    <Alert strip v-if="error" variant="error" data-testid="grpc-schema-error">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
@@ -192,8 +194,7 @@ function selectMethod(service: string, method: string): void {
             v-for="m in svc.methods"
             :key="m.name"
             type="button"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer w-full justify-between border-0 bg-none text-left"
-            :class="(tab.state.service === svc.fullName && tab.state.method === m.name) ? 'bg-select' : 'hover:bg-hover'"
+            :class="cn(rowVariants({ selected: tab.state.service === svc.fullName && tab.state.method === m.name }), 'w-full justify-between border-0 bg-none text-left')"
             data-testid="grpc-method-row"
             @click="selectMethod(svc.fullName, m.name)"
           >

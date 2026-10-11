@@ -5,6 +5,7 @@ import {
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -13,6 +14,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -174,8 +176,7 @@ async function onClear(): Promise<void> {
       <div
         v-for="(entry, i) in filteredEntries"
         :key="entry.id"
-        class="flex cursor-pointer gap-1 border-b border-border px-1.5 py-1"
-        :class="entry.id === viewingId ? 'bg-hover' : 'hover:bg-hover'"
+        :class="cn(rowVariants({ layout: 'double', selected: entry.id === viewingId }), 'cursor-pointer border-b border-border')"
         data-testid="http-history-row"
         role="option"
         tabindex="0"

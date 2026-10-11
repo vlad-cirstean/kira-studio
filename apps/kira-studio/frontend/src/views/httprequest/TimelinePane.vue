@@ -4,6 +4,7 @@ import { statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
+import { Card } from '@theme/components/ui/card';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
@@ -226,10 +227,10 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <div
+        <Card
           v-for="hop in activeTimeline.hops"
           :key="hop.index"
-          class="flex flex-col gap-0.5 rounded-kira border border-border p-1"
+          class="gap-0.5"
           data-testid="http-timeline-hop"
         >
           <div class="flex items-center gap-1 text-kira-sm font-data" data-testid="http-timeline-hop-caption">
@@ -305,7 +306,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
               <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
           </details>
-        </div>
+        </Card>
       </div>
     </template>
 

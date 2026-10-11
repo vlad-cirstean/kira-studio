@@ -7,13 +7,15 @@ import {
 } from '@shared/domain/grpc';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -263,7 +265,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="grpc-response-pane">
-    <Alert
+    <Alert strip
       v-if="rt?.status === 'error' && rt.error"
       variant="error"
       data-testid="grpc-call-error"
@@ -312,9 +314,9 @@ onUnmounted(() => {
          restatement of the code, so it stays on its own line free to wrap. -->
     <div v-if="statusMessage" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
-    <Alert v-if="viewing" variant="info" data-testid="grpc-history-band">
-      <AlertDescription class="flex items-center gap-3">
-        Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
+    <Alert strip v-if="viewing" variant="info" data-testid="grpc-history-band">
+      <AlertDescription>Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}</AlertDescription>
+      <AlertAction>
         <Button
           variant="toolbar"
           size="kira"
@@ -323,13 +325,13 @@ onUnmounted(() => {
         >
           {{ rt?.result ? 'Back to latest' : 'Close' }}
         </Button>
-      </AlertDescription>
+      </AlertAction>
     </Alert>
 
     <!-- D11: a streaming call's history entry stores only the first maxGrpcStoredMessages
          (finding 8) — this is the one place that ever becomes visible now that ServerStream
          actually fills Messages/MessageCount in. -->
-    <Alert
+    <Alert strip
       v-if="viewing?.snapshot.messagesElided"
       variant="info"
       data-testid="grpc-history-messages-elided"
@@ -342,7 +344,7 @@ onUnmounted(() => {
     <!-- P108 F18: the stored request message was cut at the 256 KiB per-entry cap; this pane does
          not render the request body itself (see the computed above), so the note is the only
          surface for requestMessageTruncated. -->
-    <Alert
+    <Alert strip
       v-if="requestMessageTruncated"
       variant="info"
       data-testid="grpc-request-message-truncated"
@@ -352,20 +354,20 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="metadataElided" variant="info" data-testid="grpc-history-metadata-elided">
+    <Alert strip v-if="metadataElided" variant="info" data-testid="grpc-history-metadata-elided">
       <AlertDescription>
         Metadata, headers and trailers were not stored — too large for history.
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="rt?.status === 'cancelled'" variant="warn" data-testid="grpc-stopped-strip">
+    <Alert strip v-if="rt?.status === 'cancelled'" variant="warn" data-testid="grpc-stopped-strip">
       <AlertDescription>
         Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
       </AlertDescription>
     </Alert>
 
     <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
-    <Alert v-if="liveMessagesElided" variant="info" data-testid="grpc-live-messages-elided">
+    <Alert strip v-if="liveMessagesElided" variant="info" data-testid="grpc-live-messages-elided">
       <AlertDescription>
         Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
       </AlertDescription>
@@ -411,7 +413,7 @@ onUnmounted(() => {
                  MESSAGE_ROW_HEIGHT (22px, the script's own numeric constant, kept equal to
                  --kira-h-sm here) — VirtualList positions every row assuming that exact height,
                  border included via box-sizing. -->
-            <button type="button" class="box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 text-fg h-5.5 cursor-pointer hover:bg-hover" @click="toggleExpanded(entry.m.seq)">
+            <button type="button" :class="cn(rowVariants(), 'box-border h-5.5 w-full rounded-none border-0 border-b border-border bg-none px-1.5')" @click="toggleExpanded(entry.m.seq)">
               <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
               <span class="text-kira-sm text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
@@ -465,7 +467,7 @@ onUnmounted(() => {
       :targets="findTargets"
       @close="closeFind"
     />
-    <!-- P110 I2-17: `.message-header:hover` moved onto the button's own `hover:bg-hover` -- no
+    <!-- P110 I2-17: `.message-header:hover` moved onto the button's own the row recipe -- no
          test locates by that class, so the marker drops. -->
   </div>
 </template>

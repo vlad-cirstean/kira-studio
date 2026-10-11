@@ -4,7 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
@@ -254,7 +254,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="http-response-pane">
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="http-send-error">
+    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="http-send-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
@@ -320,34 +320,34 @@ onUnmounted(() => {
       @close="closeFind"
     />
 
-    <Alert v-if="viewing" variant="info" data-testid="http-history-band">
-      <AlertDescription class="flex items-start gap-1.5">
-        <span>
-          Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
-          {{ viewing?.snapshot.entry.url }}
-        </span>
-        <Button variant="toolbar" size="kira" class="ml-auto shrink-0" data-testid="http-history-back" @click="onBackToLatest">
+    <Alert strip v-if="viewing" variant="info" data-testid="http-history-band">
+      <AlertDescription>
+        Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
+        {{ viewing?.snapshot.entry.url }}
+      </AlertDescription>
+      <AlertAction>
+        <Button variant="toolbar" size="kira" data-testid="http-history-back" @click="onBackToLatest">
           {{ rt?.response ? 'Back to latest' : 'Close' }}
         </Button>
-      </AlertDescription>
+      </AlertAction>
     </Alert>
 
-    <Alert v-if="response?.bodyTruncated" variant="warn" data-testid="http-body-truncated">
+    <Alert strip v-if="response?.bodyTruncated" variant="warn" data-testid="http-body-truncated">
       <AlertDescription>
         Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
       </AlertDescription>
     </Alert>
-    <Alert v-if="bodyStorageTruncated" variant="info" data-testid="http-history-truncated">
+    <Alert strip v-if="bodyStorageTruncated" variant="info" data-testid="http-history-truncated">
       <AlertDescription>
         Only the first 256 KB of this response was kept in history.
       </AlertDescription>
     </Alert>
-    <Alert v-if="requestFieldsElided" variant="info" data-testid="http-history-fields-elided">
+    <Alert strip v-if="requestFieldsElided" variant="info" data-testid="http-history-fields-elided">
       <AlertDescription>
         Request field values were not stored — too large for history.
       </AlertDescription>
     </Alert>
-    <Alert v-if="bodyNotStored" variant="info" data-testid="http-history-binary-note">
+    <Alert strip v-if="bodyNotStored" variant="info" data-testid="http-history-binary-note">
       <AlertDescription>
         This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
       </AlertDescription>

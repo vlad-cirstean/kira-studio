@@ -1,10 +1,4 @@
 # P263 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue
-apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/httprequest/TimelinePane.vue
 apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue
 apps/kira-studio/frontend/src/views/shared/FilterHistoryMenu.vue
 apps/kira-studio/frontend/src/views/shared/SavedListMenu.vue
