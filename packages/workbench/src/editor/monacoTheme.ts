@@ -222,8 +222,8 @@ export function defineKiraTheme(mod: MonacoModule): void {
       // rgba()-to-#RRGGBBAA branch in `monaco.ts`'s `normalizeColor`; without that branch this would
       // silently paint the scrollbar thumb bright red (`Color.fromHex`'s own failure mode).
       'scrollbarSlider.background': cssVar('--kira-scrollbar', '#79797966'),
-      'scrollbarSlider.hoverBackground': cssVar('--kira-scrollbar', '#79797966'),
-      'scrollbarSlider.activeBackground': cssVar('--kira-scrollbar', '#79797966'),
+      'scrollbarSlider.hoverBackground': cssVar('--kira-scrollbar-hover', '#646464b3'),
+      'scrollbarSlider.activeBackground': cssVar('--kira-scrollbar-active', '#bfbfbf66'),
 
       'peekViewEditor.background': cssVar('--kira-bg', '#1f1f1f'),
       'peekViewResult.background': cssVar('--kira-bg-elevated', '#202020'),

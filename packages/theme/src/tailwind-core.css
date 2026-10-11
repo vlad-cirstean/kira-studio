@@ -33,6 +33,7 @@
   --color-hover: var(--kira-hover);
   --color-badge: var(--kira-badge);
   --color-error: var(--kira-error);
+  --color-scrim: var(--kira-scrim);
   --color-warn: var(--kira-warn);
   --color-ok: var(--kira-ok);
   --color-info: var(--kira-info);
@@ -85,6 +86,7 @@
   --spacing-control-lg: var(--kira-control-h-lg);
   --spacing-control-sm: var(--kira-control-h-sm);
   --spacing-row: var(--kira-row-height);
+  --spacing-control-inline: var(--kira-control-inline-h);
   --spacing-bar: var(--kira-bar-h);
   /* P110 B6: deliberate per-bar seams (tokens.css:94-105) -- a plain h-bar would collapse them onto
      one measurement and lose the ability for a single bar to diverge later. */

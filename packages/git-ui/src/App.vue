@@ -1846,7 +1846,7 @@ onBeforeUnmount(() => {
 
         <div
           v-if="detailOpen && breakpoint === 'overlay'"
-          class="absolute inset-0 flex justify-end bg-black/10 z-20"
+          class="absolute inset-0 flex justify-end bg-scrim z-20"
         >
           <aside
             ref="overlayDetailRegionEl"

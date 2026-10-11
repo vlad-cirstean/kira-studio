@@ -43,7 +43,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
        var-based z-index allowlist entry. -->
   <div
     ref="scrimEl"
-    class="fixed inset-0 flex items-center justify-center bg-black/50 z-(--kira-z-dialog)"
+    class="fixed inset-0 flex items-center justify-center bg-scrim z-(--kira-z-dialog)"
     data-testid="text-prompt"
   >
     <FocusScope as-child trapped loop>

@@ -24,6 +24,7 @@ const twMerge = extendTailwindMerge({
         'control',
         'control-lg',
         'control-sm',
+        'control-inline',
         'row',
         'bar',
         'graph-row',

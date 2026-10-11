@@ -44,25 +44,38 @@ textarea,
   user-select: text;
 }
 
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
+/* Touch devices (mobile, iPad) keep native overlay scrollbars. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: var(--kira-scrollbar);
-  border-radius: var(--kira-radius);
-  border: 3px solid transparent;
-  background-clip: padding-box;
-}
+  ::-webkit-scrollbar-thumb {
+    background: var(--kira-scrollbar);
+    border-radius: var(--kira-radius);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--kira-scrollbar-hover);
+    background-clip: padding-box;
+  }
 
-/* Chromium's own unstyled defaults for these two are opaque white, which survives every theme —
-   most visible where a scroll container shows both scrollbars at once (P42). */
-::-webkit-scrollbar-corner,
-::-webkit-resizer {
-  background: transparent;
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--kira-scrollbar-active);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Chromium's own unstyled defaults for these two are opaque white, which survives every theme —
+     most visible where a scroll container shows both scrollbars at once (P42). */
+  ::-webkit-scrollbar-corner,
+  ::-webkit-resizer {
+    background: transparent;
+  }
 }

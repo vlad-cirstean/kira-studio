@@ -20,6 +20,9 @@
   --kira-hover: #2a2d2e; /* list.hoverBackground */
   --kira-badge: #616161;
   --kira-scrollbar: #79797966;
+  --kira-scrollbar-hover: #646464b3;
+  --kira-scrollbar-active: #bfbfbf66;
+  --kira-scrim: rgb(0 0 0 / 0.3);
   --kira-error: #f14c4c;
   --kira-warn: #cca700;
   --kira-ok: #23d18b;
