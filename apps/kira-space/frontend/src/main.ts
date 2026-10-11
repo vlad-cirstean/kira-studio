@@ -121,7 +121,6 @@ async function mountShell(): Promise<void> {
   const reviewTarget = await queryClient.fetchQuery({
     queryKey: reviewTargetKey(windowKey),
     queryFn: () => control.adeTaskReviewWindowTarget({ windowKey }),
-    staleTime: Number.POSITIVE_INFINITY,
   });
   if (reviewTarget) {
     reviewWindowStore.target = reviewTarget;

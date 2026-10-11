@@ -173,7 +173,7 @@ test('a device row shows its expiry and an expired device is hidden', async ({ r
   });
   await openPane(window);
   await expect(window.locator('[data-testid="mobile-device-expires-dev-1"]')).toContainText(
-    'Access expires in 5 days',
+    'Access expires in 5d',
   );
   await expect(window.locator('[data-testid="mobile-device-row-dev-2"]')).toHaveCount(0);
 });

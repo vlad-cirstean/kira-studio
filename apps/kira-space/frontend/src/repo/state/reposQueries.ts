@@ -9,7 +9,6 @@ export function useRepos() {
   return useQuery({
     queryKey: reposKey,
     queryFn: () => control.adeTaskRepos(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 

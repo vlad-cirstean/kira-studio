@@ -57,23 +57,11 @@ function onDblClick(): void {
   if (props.row.kind === 'file') return;
   emit('open', props.row, false);
 }
-
-// P105 §5.2(c): Enter activates (toggle for a file row, permanent open for a match — matching
-// double-click); Space mirrors a single click.
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    emit('select', props.row);
-    if (props.row.kind === 'file') emit('toggleCollapse', props.row);
-    else emit('open', props.row, false);
-  } else if (e.key === ' ') {
-    e.preventDefault();
-    onClick();
-  }
-}
 </script>
 
 <template>
+  <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
+  <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
   <div
     v-if="row.kind === 'file'"
     :class="
@@ -87,10 +75,8 @@ function onKeydown(e: KeyboardEvent): void {
     data-testid="repo-search-file-row"
     :data-path="row.path"
     role="option"
-    tabindex="0"
     :aria-selected="selected"
     @click="onClick"
-    @keydown="onKeydown"
   >
     <!-- P110 I2-13: shares TreeTwisty with the tree rows, but deliberately keeps no cursor-pointer
          (base.css's own retired comment: "a real, deliberate difference") -- the whole row is
@@ -123,6 +109,8 @@ function onKeydown(e: KeyboardEvent): void {
       <TooltipContent>This file hit the per-file match cap — not every match is shown</TooltipContent>
     </Tooltip>
   </div>
+  <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
+  <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
   <div
     v-else
     :class="
@@ -137,11 +125,9 @@ function onKeydown(e: KeyboardEvent): void {
     :data-path="row.path"
     :data-line="row.line"
     role="option"
-    tabindex="0"
     :aria-selected="selected"
     @click="onClick"
     @dblclick="onDblClick"
-    @keydown="onKeydown"
   >
     <span class="text-kira-sm text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
     <span class="overflow-hidden text-ellipsis"

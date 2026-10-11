@@ -1,5 +1,6 @@
 import { worktreeLabel } from '@kira/git-core';
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
+import { useTimeoutFn } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { watch } from 'vue';
@@ -126,7 +127,7 @@ export const useWorktreesStore = defineStore('worktrees', () => {
     const offEvicted = onTransportEvicted(codeRepoId, () => {
       leases.delete(codeRepoId);
       offEvicted();
-      setTimeout(() => {
+      useTimeoutFn(() => {
         if (!isWorktreesExpanded(codeRepoId) || leases.has(codeRepoId)) return;
         lease(codeRepoId);
         void refresh(codeRepoId);

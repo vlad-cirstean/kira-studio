@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed, onScopeDispose } from 'vue';
 import { type ClaudeUsageSnapshot, control } from '../bridge/index';
 import { useModeStore } from './mode';
@@ -23,7 +24,7 @@ export function useClaudeUsage() {
     queryKey: claudeUsageKey,
     queryFn: () => control.claudeUsageGet(),
     enabled,
-    refetchInterval: 60_000,
+    refetchInterval: TIMING.pollSlow,
     staleTime: 0,
     refetchOnWindowFocus: true,
   });

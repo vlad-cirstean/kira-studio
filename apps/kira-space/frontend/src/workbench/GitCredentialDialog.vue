@@ -3,7 +3,8 @@ import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
+import { type ComponentPublicInstance, computed, ref, useTemplateRef } from 'vue';
 import { useGitCredentialStore } from '../state/gitCredential';
 
 // P67e D10 / P246: git's own askpass prompt, mounted by PromptHost for the routed
@@ -16,10 +17,9 @@ const store = useGitCredentialStore();
 const prompt = computed(() => store.prompts.find((p) => p.requestId === props.entry.ref) ?? null);
 
 const value = ref('');
-const inputField = ref<InstanceType<typeof Input> | null>(null);
+const inputField = useTemplateRef<ComponentPublicInstance>('inputField');
 
-// Input.vue's own root IS the <input> element, so $el already is the real input.
-onMounted(() => void nextTick(() => (inputField.value?.$el as HTMLInputElement | undefined)?.focus()));
+useFocusOnMount(inputField);
 
 function onSubmit(): void {
   if (!prompt.value) return;

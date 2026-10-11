@@ -6,6 +6,7 @@ import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import SwatchRadio from '@theme/SwatchRadio.vue';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import type { Environment, Repo, RepoPatch } from '../ade/v2/wire';
@@ -13,7 +14,6 @@ import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import RepoEnvRow from './RepoEnvRow.vue';
 import { useUpdateRepo } from './state/reposQueries';
-import { useCommitField } from './useCommitField';
 
 // Settings of one repo. Each field commits alone: the patch carries only its leaf.
 const props = defineProps<{ repo: Repo }>();
@@ -34,32 +34,37 @@ async function write(p: Partial<RepoPatch>): Promise<void> {
   });
 }
 
-const nick = useCommitField(
-  () => props.repo.nickname,
-  (v) => write({ nickname: v.trim() }),
-);
-const prepare = useCommitField(
-  () => props.repo.prepareScript,
-  (v) => write({ prepareScript: v }),
-);
-const timeout = useCommitField(
-  () => props.repo.prepareTimeout,
-  (v) => write({ prepareTimeout: v.trim() }),
-);
-const basePath = useCommitField(
-  () => props.repo.worktreeBasePath,
-  (v) => write({ worktreeBasePath: v.trim() }),
-);
-const targets = useCommitField(
-  () => props.repo.integrationBranches.join(', '),
-  (v) =>
+const nick = useInlineEdit({
+  source: () => props.repo.nickname,
+  commit: (v) => write({ nickname: v.trim() }),
+  allowEmpty: true,
+});
+const prepare = useInlineEdit({
+  source: () => props.repo.prepareScript,
+  commit: (v) => write({ prepareScript: v }),
+  allowEmpty: true,
+});
+const timeout = useInlineEdit({
+  source: () => props.repo.prepareTimeout,
+  commit: (v) => write({ prepareTimeout: v.trim() }),
+  allowEmpty: true,
+});
+const basePath = useInlineEdit({
+  source: () => props.repo.worktreeBasePath,
+  commit: (v) => write({ worktreeBasePath: v.trim() }),
+  allowEmpty: true,
+});
+const targets = useInlineEdit({
+  source: () => props.repo.integrationBranches.join(', '),
+  commit: (v) =>
     write({
       integrationBranches: v
         .split(',')
         .map((t) => t.trim())
         .filter(Boolean),
     }),
-);
+  allowEmpty: true,
+});
 
 async function chooseBasePath(): Promise<void> {
   const chosen = await control.filesChooseFolder('Worktree base path…');
@@ -86,7 +91,9 @@ function writeEnvs(build: (current: Environment[]) => Environment[]): Promise<vo
     }
   };
   const result = envWrite.then(run);
-  envWrite = result.catch(() => {});
+  envWrite = result.catch(() => {
+    // Already shown through envError; the chain only needs to stay alive for the next write.
+  });
   return result;
 }
 function saveEnv(i: number, env: Environment): Promise<void> {
@@ -186,7 +193,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           data-testid="repo-nick"
           @update:model-value="nick.onInput"
           @blur="nick.onCommit"
-          @keydown.enter="nick.onCommit"
+          @keydown="nick.onKeydown"
         />
         <FieldDescription>Shown everywhere instead of the repo name.</FieldDescription>
         <FieldError v-if="nick.error.value" data-testid="repo-nick-error">{{ nick.error.value }}</FieldError>
@@ -267,7 +274,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           data-testid="repo-timeout"
           @update:model-value="timeout.onInput"
           @blur="timeout.onCommit"
-          @keydown.enter="timeout.onCommit"
+          @keydown="timeout.onKeydown"
         />
         <FieldError v-if="timeout.error.value" data-testid="repo-timeout-error">{{ timeout.error.value }}</FieldError>
       </Field>
@@ -283,7 +290,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             data-testid="repo-base-path"
             @update:model-value="basePath.onInput"
             @blur="basePath.onCommit"
-            @keydown.enter="basePath.onCommit"
+            @keydown="basePath.onKeydown"
           />
           <Button variant="dialog" size="kira-lg" data-testid="repo-base-path-choose" @click="chooseBasePath">
             Choose…
@@ -306,7 +313,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           data-testid="repo-targets"
           @update:model-value="targets.onInput"
           @blur="targets.onCommit"
-          @keydown.enter="targets.onCommit"
+          @keydown="targets.onKeydown"
         />
         <FieldError v-if="targets.error.value" data-testid="repo-targets-error">{{ targets.error.value }}</FieldError>
       </Field>

@@ -3,6 +3,9 @@ import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { useEventListener } from '@vueuse/core';
+import { formatCount } from '@workbench/behaviour/format';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
@@ -32,7 +35,7 @@ const error = computed(() => repoSearchStore.repoSearchError(props.repoId));
 const rows = computed(() => repoSearchStore.repoSearchRows(props.repoId));
 
 const scrollEl = ref<HTMLElement | null>(null);
-const { virtualItems, totalSize, onScroll } = useVirtualRows({
+const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => rows.value.length,
   rowHeight: () => rowHeight.value,
   scrollElement: scrollEl,
@@ -47,11 +50,11 @@ const statusLine = computed(() => {
   if (!s) return '';
   const resultWord = s.matches === 1 ? 'result' : 'results';
   const fileWord = s.filesMatched === 1 ? 'file' : 'files';
-  let line = `${s.matches.toLocaleString()} ${resultWord} in ${s.filesMatched.toLocaleString()} ${fileWord}`;
+  let line = `${formatCount(s.matches)} ${resultWord} in ${formatCount(s.filesMatched)} ${fileWord}`;
   if (s.truncated) line += ' (stopped at 10,000)';
   if (s.filesSkipped > 0) {
     const skipWord = s.filesSkipped === 1 ? 'file' : 'files';
-    line += ` — ${s.filesSkipped.toLocaleString()} ${skipWord} skipped`;
+    line += ` — ${formatCount(s.filesSkipped)} ${skipWord} skipped`;
   }
   return line;
 });
@@ -83,6 +86,17 @@ function onSelect(row: RepoSearchRowVm): void {
   selected.value = row.key;
 }
 
+// Type-to-search: a printable key on the results lands in the query field.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+usePanelHeaderSearch(rootEl, {
+  searchable: () => true,
+  getSearch: () => query.value,
+  setSearch: (v) => {
+    query.value = v;
+  },
+  searchTestid: 'repo-search-query',
+});
+
 function onToggleCollapse(row: RepoSearchRowVm): void {
   repoSearchStore.toggleRepoSearchCollapse(props.repoId, row.path);
 }
@@ -97,10 +111,30 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     reveal: { line: row.line, column: row.column, endColumn: row.endColumn },
   });
 }
+
+// Enter: permanent open for a match, collapse toggle for a file header. Space: the single click.
+const nav = useListNavigation<RepoSearchRowVm>({
+  container: scrollEl,
+  items: () => rows.value,
+  key: (row) => row.key,
+  activeKey: selected,
+  onOpen: (row) => {
+    onSelect(row);
+    if (row.kind === 'file') onToggleCollapse(row);
+    else onOpen(row, false);
+  },
+  onSelect: (row) => {
+    onSelect(row);
+    if (row.kind === 'file') onToggleCollapse(row);
+    else onOpen(row, true);
+  },
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualItems.value,
+});
 </script>
 
 <template>
-  <div class="h-full flex flex-col min-h-0">
+  <div ref="rootEl" class="h-full flex flex-col min-h-0">
     <PanelBar ref="toolbar" class="flex-row items-center">
       <div class="flex-1 min-w-0">
         <SearchField
@@ -163,6 +197,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
           <RepoSearchRow
             :class="VIRTUAL_ROW_CLASS"
             :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+            v-bind="nav.rowProps(rows[item.index].key)"
             :row="rows[item.index]"
             :selected="selected === rows[item.index].key"
             @select="onSelect"

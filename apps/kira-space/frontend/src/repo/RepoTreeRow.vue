@@ -68,23 +68,10 @@ function onDblClick(): void {
 function onContextMenu(e: MouseEvent): void {
   emit('contextmenu', props.row, e);
 }
-
-// P105 §5.2(c): Enter opens (permanent, matching double-click); Space mirrors a single click
-// (select + toggle-or-preview-open) — the two keys the roving tabindex above already implies.
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    emit('select', props.row);
-    if (props.row.isDir) emit('toggle', props.row);
-    else emit('open', props.row, false);
-  } else if (e.key === ' ') {
-    e.preventDefault();
-    onClick();
-  }
-}
 </script>
 
 <template>
+  <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
   <div
     :class="
       cn(
@@ -104,7 +91,6 @@ function onKeydown(e: KeyboardEvent): void {
     :tabindex="sticky ? -1 : selected ? 0 : -1"
     @click="onClick"
     @dblclick="onDblClick"
-    @keydown="onKeydown"
     @contextmenu.prevent.stop="onContextMenu"
   >
     <TreeTwisty

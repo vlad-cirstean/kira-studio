@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { useEventListener } from '@vueuse/core';
 import RunScriptDialogHost from '@workbench/automations/run/RunScriptDialogHost.vue';
 import ScheduleConfirmHost from '@workbench/automations/schedule/ScheduleConfirmHost.vue';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
-import { shortcutFor } from '@workbench/shortcuts/keys';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed } from 'vue';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
@@ -27,12 +26,7 @@ const modeStore = useModeStore();
 
 // 'view.find' is the one id with no Go menu item, so it binds through a local keydown here.
 // Menu-backed shortcuts (Cmd+J included) reach the renderer only as menu channels (App.vue).
-useEventListener(window, 'keydown', (e: KeyboardEvent) => {
-  const id = shortcutFor(e, ['view.find']);
-  if (!id) return;
-  e.preventDefault();
-  runCommand(id);
-});
+useShortcut(window, ['view.find'], (id) => runCommand(id));
 
 // P129 Part 3 §0.12/§0.13/§2.1: a `layout: 'full'` module (`ade`) has no panel/start/newTab at all
 // — `def`'s own `layout` discriminant is what every computed below narrows on, so a `FullModeDef`

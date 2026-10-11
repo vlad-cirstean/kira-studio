@@ -3,9 +3,10 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
-import { onMounted, useTemplateRef } from 'vue';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
+import { type ComponentPublicInstance, useTemplateRef } from 'vue';
 import type { Environment } from '../ade/v2/wire';
-import { useCommitField } from './useCommitField';
 
 // One environment of a repo: its name and the script that prints the deployed SHA.
 const props = defineProps<{
@@ -15,20 +16,20 @@ const props = defineProps<{
   focusOnMount?: boolean;
   save: (env: Environment) => Promise<void>;
 }>();
-const nameInput = useTemplateRef<{ $el: HTMLInputElement }>('nameInput');
-onMounted(() => {
-  if (props.focusOnMount) nameInput.value?.$el.focus();
-});
+const nameInput = useTemplateRef<ComponentPublicInstance>('nameInput');
+if (props.focusOnMount) useFocusOnMount(nameInput);
 const emit = defineEmits<{ remove: [] }>();
 
-const name = useCommitField(
-  () => props.env.name,
-  (v) => props.save({ ...props.env, name: v }),
-);
-const script = useCommitField(
-  () => props.env.deployedShaScript,
-  (v) => props.save({ ...props.env, deployedShaScript: v }),
-);
+const name = useInlineEdit({
+  source: () => props.env.name,
+  commit: (v) => props.save({ ...props.env, name: v }),
+  allowEmpty: true,
+});
+const script = useInlineEdit({
+  source: () => props.env.deployedShaScript,
+  commit: (v) => props.save({ ...props.env, deployedShaScript: v }),
+  allowEmpty: true,
+});
 </script>
 
 <template>
@@ -44,7 +45,7 @@ const script = useCommitField(
         data-testid="repo-env-name"
         @update:model-value="name.onInput"
         @blur="name.onCommit"
-        @keydown.enter="name.onCommit"
+        @keydown="name.onKeydown"
       />
       <Label :for="`repo-env-script-${index}`" class="sr-only">Deployed SHA script</Label>
       <Input
@@ -55,7 +56,7 @@ const script = useCommitField(
         data-testid="repo-env-script"
         @update:model-value="script.onInput"
         @blur="script.onCommit"
-        @keydown.enter="script.onCommit"
+        @keydown="script.onKeydown"
       />
       <TooltipIconButton
         icon="close"

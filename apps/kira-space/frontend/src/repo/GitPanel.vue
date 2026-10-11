@@ -14,8 +14,12 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
-import { copyText } from '@workbench/behaviour/clipboard';
+import { promiseTimeout, until } from '@vueuse/core';
+import { copyAnnounced } from '@workbench/behaviour/clipboard';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
+import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
@@ -23,7 +27,7 @@ import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed, onMounted, onUnmounted, reactive, useTemplateRef, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
@@ -111,19 +115,34 @@ function worktreeRecordId(path: string): string {
 // (`local.repoSearch`), not the Studio tree's own `treeState.search`.
 const filteredRepos = computed<RepoSummary[]>(() => {
   const topLevel = visibility.listed;
-  const query = local.repoSearch.trim().toLowerCase();
-  if (!query) return topLevel;
-  return topLevel.filter((r) => r.name.toLowerCase().includes(query));
+  return topLevel.filter((r) => matchesQuery(r.name, local.repoSearch));
 });
 
 // P107 T2-19: shared in-app substitute for window.prompt() (Electron's renderer doesn't implement
 // it) — see packages/workbench/src/prompt/useTextPrompt.ts.
 const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
 
-async function onRenameRepo(id: string, currentName: string): Promise<void> {
+// A repo row renames inline; a worktree's record name is not shown in its row, so that rename keeps
+// the prompt.
+const renamingRepoId = ref<string | null>(null);
+
+// The menu returns focus to the row in a timer queued when it unmounts; start the rename after
+// that, or the new field loses focus to the row.
+async function startRepoRename(id: string): Promise<void> {
+  await until(() => contextMenuStore.open).toBe(false);
+  await promiseTimeout(0);
+  renamingRepoId.value = id;
+}
+
+async function onRenameWorktreeRecord(id: string, currentName: string): Promise<void> {
   const name = await promptText('Rename repository', currentName);
   if (!name || name.trim() === '') return;
   await codeReposStore.renameCodeRepo(id, name.trim());
+}
+
+async function commitRepoRename(id: string, name: string): Promise<void> {
+  renamingRepoId.value = null;
+  await codeReposStore.renameCodeRepo(id, name);
 }
 
 async function onRemoveRepo(id: string, name: string): Promise<void> {
@@ -171,8 +190,8 @@ function repoIconClass(repo: RepoSummary): string {
   return isOpen(repo.id) ? 'text-fg' : 'text-muted-foreground';
 }
 
-function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
-  const items: MenuItem[] = [
+function repoMenuItems(repo: RepoSummary): MenuItem[] {
+  return [
     {
       type: 'item' as const,
       id: 'open',
@@ -185,7 +204,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       id: 'copy-path',
       label: 'Copy path',
       icon: 'copy',
-      run: () => void copyText(repo.root),
+      run: () => void copyAnnounced(repo.root, 'path'),
     },
     {
       type: 'item' as const,
@@ -232,7 +251,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
         },
     { type: 'separator' as const },
     ...recordMenuItems(repo, {
-      rename: () => onRenameRepo(repo.id, repo.name),
+      rename: () => startRepoRename(repo.id),
       // P82 §8.3: collapse first, so the lease release is synchronous with the close instead of a
       // watch flush later — the same reason quickOpen.ts:178 exposes dropQuickOpen alongside its
       // own watch. The §6.6 watch would collapse it anyway.
@@ -240,7 +259,6 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       remove: () => onRemoveRepo(repo.id, repo.name),
     }),
   ];
-  contextMenuStore.openContextMenu(e, items);
 }
 
 // P83 §11.2: the indicator's own tooltip text — terminalCountAtPath is §11's whole signal (the
@@ -254,7 +272,7 @@ function terminalTooltip(n: number): string {
 // needed now since without it a terminal could never be opened at a worktree that isn't the active
 // workspace. "Copy path" rides along since the menu must exist anyway and a one-item menu reads
 // like an accident — the same item the repo row already offers above.
-function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEntry): void {
+function worktreeMenuItems(repo: RepoSummary, wt: WorktreeEntry): MenuItem[] {
   const items: MenuItem[] = [
     {
       type: 'item' as const,
@@ -268,7 +286,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
       id: 'copy-path',
       label: 'Copy path',
       icon: 'copy',
-      run: () => void copyText(wt.path),
+      run: () => void copyAnnounced(wt.path, 'path'),
     },
   ];
   // P84 §6.2: once the flat top-level row is gone, Rename/Close/Remove for this record are
@@ -280,7 +298,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
     items.push({ type: 'separator' as const });
     items.push(
       ...recordMenuItems(record, {
-        rename: () => onRenameRepo(record.id, record.name),
+        rename: () => onRenameWorktreeRecord(record.id, record.name),
         close: () => closeRepo(record.id),
         // Removes the code_repos record, never the worktree on disk — the nested row survives it,
         // since it comes from `git worktree list`, not from codeReposState.
@@ -288,8 +306,70 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
       }),
     );
   }
-  contextMenuStore.openContextMenu(e, items);
+  return items;
 }
+
+// Flat row list for keyboard navigation: each repo followed by its worktrees while expanded.
+type NavRow =
+  | { key: string; kind: 'repo'; repo: RepoSummary }
+  | { key: string; kind: 'worktree'; repo: RepoSummary; wt: WorktreeEntry };
+const wtKey = (wt: WorktreeEntry): string => `wt:${wt.path}`;
+const navRows = computed<NavRow[]>(() =>
+  filteredRepos.value.flatMap((repo): NavRow[] => [
+    { key: repo.id, kind: 'repo', repo },
+    ...(worktreesStore.isWorktreesExpanded(repo.id)
+      ? worktreesStore.worktreeEntries(repo.id).map((wt): NavRow => ({ key: wtKey(wt), kind: 'worktree', repo, wt }))
+      : []),
+  ]),
+);
+const listEl = useTemplateRef<HTMLElement>('listEl');
+const activeNavKey = ref<string | null>(null);
+// The roving stop follows the active workspace when it changes from elsewhere.
+watch(
+  () => workspaceStore.active,
+  () => {
+    const row = navRows.value.find((r) => r.kind === 'repo' && isActive(r.repo.id));
+    if (row) activeNavKey.value = row.key;
+  },
+  { immediate: true },
+);
+
+function menuFor(row: NavRow): MenuItem[] {
+  return row.kind === 'repo' ? repoMenuItems(row.repo) : worktreeMenuItems(row.repo, row.wt);
+}
+function activateRow(row: NavRow): void {
+  if (row.kind === 'repo') onRowClick(row.repo.id);
+  else void worktreesStore.switchToWorktree(row.repo.id, row.wt);
+}
+function onRowContextMenu(e: MouseEvent, row: NavRow): void {
+  // Right-click focuses the row without opening anything.
+  activeNavKey.value = row.key;
+  contextMenuStore.openContextMenu(e, menuFor(row), {
+    onRestoreFocus: () => void nav.focusKey(row.key),
+  });
+}
+
+// Arrows, Home/End, Right/Left (worktrees), Enter and Space (open or switch), Shift+F10 come from
+// the shared list navigation. No type-ahead: the panel's own type-to-search redirect owns printable keys.
+const nav = useListNavigation<NavRow>({
+  container: listEl,
+  items: () => navRows.value,
+  key: (row) => row.key,
+  activeKey: activeNavKey,
+  tree: {
+    depth: (row) => (row.kind === 'repo' ? 0 : 1),
+    isExpanded: (row) => row.kind === 'repo' && worktreesStore.isWorktreesExpanded(row.repo.id),
+    hasChildren: (row) => row.kind === 'repo',
+    expand: (row) => worktreesStore.toggleRepoWorktrees(row.repo.id),
+    collapse: (row) => worktreesStore.toggleRepoWorktrees(row.repo.id),
+  },
+  onOpen: activateRow,
+  onSelect: activateRow,
+  onMenu: (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, menuFor(row), {
+      onRestoreFocus: () => void nav.focusKey(row.key),
+    }),
+});
 
 // C7 D9: lives in repo/state/search.ts, not component state, so switching workspaces and back
 // does not reset it. P92 item 6: 'review' moved out to its own top-level `tab`, so this segment is
@@ -445,8 +525,10 @@ onUnmounted(() => {
               </Button>
             </EmptyContent>
           </Empty>
-          <div v-else class="flex flex-col" role="listbox" aria-label="Repositories">
+          <div v-else ref="listEl" class="flex flex-col" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
+              <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
+              <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
               <div
                 :class="[
                   cn(rowVariants({ layout: 'tree', selected: isActive(repo.id), muted: repo.hidden }), 'h-row'),
@@ -456,12 +538,10 @@ onUnmounted(() => {
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
                 role="option"
-                tabindex="0"
+                v-bind="nav.rowProps(repo.id)"
                 :aria-selected="isActive(repo.id)"
                 @click="onRowClick(repo.id)"
-                @keydown.enter.prevent="onRowClick(repo.id)"
-                @keydown.space.prevent="onRowClick(repo.id)"
-                @contextmenu.prevent="onRepoContextMenu($event, repo)"
+                @contextmenu.prevent="onRowContextMenu($event, { key: repo.id, kind: 'repo', repo })"
               >
                 <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-rail" aria-hidden="true" />
                 <!-- P110 I2-13: RepoTreeRow.vue's own twisty, shared via TreeTwisty. -->
@@ -478,7 +558,14 @@ onUnmounted(() => {
                   class="shrink-0"
                   :class="repoIconClass(repo)"
                 />
-                <Tooltip>
+                <InlineEditInput
+                  v-if="renamingRepoId === repo.id"
+                  :name="repo.name"
+                  data-testid="repo-rename-input"
+                  @commit="(name) => commitRepoRename(repo.id, name)"
+                  @cancel="renamingRepoId = null"
+                />
+                <Tooltip v-else>
                   <TooltipTrigger as-child>
                     <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ repo.name }}</span>
                   </TooltipTrigger>
@@ -529,6 +616,8 @@ onUnmounted(() => {
                 aria-label="Worktrees"
               >
                 <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
+                <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
+                <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
@@ -547,12 +636,10 @@ onUnmounted(() => {
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
                   role="option"
-                  tabindex="0"
+                  v-bind="nav.rowProps(wtKey(wt))"
                   :aria-selected="isActive(worktreeRecordId(wt.path))"
                   @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
-                  @keydown.enter.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
-                  @keydown.space.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
-                  @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
+                  @contextmenu.prevent.stop="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
                 >
                   <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-worktree-rail" aria-hidden="true" />
                   <CodiconIcon name="git-branch" :size="13" class="shrink-0" />

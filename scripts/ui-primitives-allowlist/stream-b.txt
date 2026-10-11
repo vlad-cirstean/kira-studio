@@ -50,27 +50,6 @@ apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowEditor.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowYaml.vue
 apps/kira-space/frontend/src/ade/v2/workflows/useSaveShortcut.ts
-apps/kira-space/frontend/src/main.ts
-apps/kira-space/frontend/src/repo/GitPanel.vue
-apps/kira-space/frontend/src/repo/RepoConfigForm.vue
-apps/kira-space/frontend/src/repo/RepoEnvRow.vue
-apps/kira-space/frontend/src/repo/RepoFileTree.vue
-apps/kira-space/frontend/src/repo/RepoSearchView.vue
-apps/kira-space/frontend/src/repo/ReposDialog.vue
-apps/kira-space/frontend/src/repo/state/fileTree.ts
-apps/kira-space/frontend/src/repo/state/repoHeads.ts
-apps/kira-space/frontend/src/repo/state/reposQueries.ts
-apps/kira-space/frontend/src/repo/state/worktrees.ts
-apps/kira-space/frontend/src/repo/useCommitField.ts
-apps/kira-space/frontend/src/state/claudeUsage.ts
-apps/kira-space/frontend/src/state/coderepos.ts
-apps/kira-space/frontend/src/state/workspace.ts
-apps/kira-space/frontend/src/views/repo/RepoDiffView.vue
-apps/kira-space/frontend/src/views/repo/RepoFileView.vue
-apps/kira-space/frontend/src/views/repo/ReviewThread.vue
-apps/kira-space/frontend/src/workbench/ClaudeUsageItem.vue
-apps/kira-space/frontend/src/workbench/GitCredentialDialog.vue
-apps/kira-space/frontend/src/workbench/settings/MobileAccessPane.vue
 packages/workbench/src/memory/AddMemoryDialog.vue
 packages/workbench/src/memory/MemoryPanel.vue
 packages/workbench/src/memory/MemoryStart.vue
@@ -79,3 +58,6 @@ packages/workbench/src/memory/import/ImportJobDetail.vue
 packages/workbench/src/memory/import/importFormat.ts
 packages/workbench/src/memory/settings/ClaudeCodeMcpSection.vue
 packages/workbench/src/memory/settings/SemanticModelSection.vue
+permanent U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge
+permanent U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
+permanent U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus

@@ -8,13 +8,15 @@ import { Switch } from '@theme/components/ui/switch';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useIntervalFn, useNow } from '@vueuse/core';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
-import { formatRelative } from '@workbench/behaviour/format';
+import { formatDateTime, formatRelative } from '@workbench/behaviour/format';
+import { TIMING } from '@workbench/behaviour/timing';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref, useId, watch } from 'vue';
 import { useMobileAccessStore } from '../../state/mobileAccess';
 import { useMobileTerminalsStore } from '../../state/mobileTerminals';
 import { MOBILE_PORT_RANGE } from '../../state/settingsDomain';
 import MobileQr from './MobileQr.vue';
+import RelativeTime from './RelativeTime.vue';
 import type { SettingsPaneProps } from './types';
 
 // Bypasses draft/Save like ConnectedEditorsPane: enabling, trusting a network, port changes and
@@ -27,13 +29,7 @@ function parseIntField(raw: string): number {
   return text === '' ? Number.NaN : Number(text);
 }
 
-const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 60_000) });
-const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-function expiresIn(at: number): string {
-  const hours = Math.round((at - now.value.getTime()) / 3_600_000);
-  if (Math.abs(hours) < 24) return relativeTime.format(hours, 'hour');
-  return relativeTime.format(Math.round(hours / 24), 'day');
-}
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, TIMING.pollSlow) });
 
 const store = useMobileAccessStore();
 const phones = useMobileTerminalsStore();
@@ -146,7 +142,7 @@ const activeDevices = computed(() =>
         {{ trusted.subnet }}, router {{ trusted.routerIp }} ({{ trusted.routerMac }}), trusted on
         {{ trusted.interface }}
         <template v-if="store.status.trustedAt">
-          on {{ new Date(store.status.trustedAt).toLocaleDateString() }}
+          on {{ formatDateTime(store.status.trustedAt) }}
         </template>
       </p>
       <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-trusted">
@@ -258,7 +254,7 @@ const activeDevices = computed(() =>
               class="text-subtle text-kira-sm leading-normal"
               :data-testid="`mobile-device-expires-${device.id}`"
             >
-              Access expires {{ expiresIn(device.expiresAt) }}
+              Access expires <RelativeTime :at="device.expiresAt" />
             </span>
             <span
               v-if="phones.countFor(device.id) > 0"

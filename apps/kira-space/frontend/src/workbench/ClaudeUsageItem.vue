@@ -3,6 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useIntervalFn, useNow } from '@vueuse/core';
+import { formatDateTime, formatDuration, formatRelative } from '@workbench/behaviour/format';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed } from 'vue';
 import type { ClaudeUsageWindow } from '../bridge/index';
 import { useClaudeUsage } from '../state/claudeUsage';
@@ -12,7 +14,7 @@ const WARN_AT = 80;
 const ERROR_AT = 95;
 
 const { data, isError } = useClaudeUsage();
-const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 30_000) });
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, TIMING.clockTickSlow) });
 
 const windows = computed(() => {
   const d = data.value;
@@ -36,21 +38,11 @@ const tone = computed(() => {
   return 'text-fg';
 });
 
-function span(ms: number): string {
-  const minutes = Math.max(0, Math.round(ms / 60_000));
-  const d = Math.floor(minutes / 1440);
-  const h = Math.floor((minutes % 1440) / 60);
-  const m = minutes % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
 const lines = computed(() =>
   windows.value.map((w) => {
-    const at = new Date(w.window.resetsAt);
-    const when = at.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-    return `${w.long}: ${Math.round(w.window.usedPercent)}% used · resets ${when} (in ${span(w.window.resetsAt - now.value.getTime())})`;
+    const when = formatDateTime(w.window.resetsAt);
+    const left = formatDuration(Math.max(0, Math.round((w.window.resetsAt - now.value.getTime()) / 60_000)) * 60_000);
+    return `${w.long}: ${Math.round(w.window.usedPercent)}% used · resets ${when} (in ${left})`;
   }),
 );
 
@@ -58,7 +50,7 @@ const sourceLine = computed(() => {
   const d = data.value;
   if (d?.state !== 'ok') return '';
   const from = d.source === 'run' ? 'a background ADE run' : 'a Claude Code session';
-  return `From ${from}, ${span(now.value.getTime() - d.updatedAt)} ago`;
+  return `From ${from}, ${formatRelative(d.updatedAt, now.value.getTime())}`;
 });
 
 const detail = computed(() => {

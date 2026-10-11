@@ -121,7 +121,6 @@ export const useCodeReposStore = defineStore('coderepos', () => {
       const { repos } = await queryClient.fetchQuery({
         queryKey: reposKey,
         queryFn: () => control.adeTaskRepos(),
-        staleTime: Number.POSITIVE_INFINITY,
       });
       const source = repos.find((r) => r.codeRepoId === id)?.source;
       return source && source !== 'added' ? source : undefined;

@@ -19,9 +19,10 @@ import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import RepoConfigForm from './RepoConfigForm.vue';
@@ -53,6 +54,24 @@ function pickRepo(id: string): void {
   dialog.selectedRepoId = id;
   dialog.tab = 'repos';
 }
+const listEl = useTemplateRef<HTMLElement>('listEl');
+const activeRepoKey = ref<string | null>(null);
+watch(
+  () => selected.value?.id ?? null,
+  (id) => {
+    activeRepoKey.value = id;
+  },
+  { immediate: true },
+);
+// The selection follows the arrows (master-detail): each stop shows that repo's settings.
+const nav = useListNavigation({
+  container: listEl,
+  items: () => codeRepos.records,
+  key: (r) => r.id,
+  activeKey: activeRepoKey,
+  selectOnMove: true,
+  onSelect: (r) => pickRepo(r.id),
+});
 const showRepos = computed(() => dialog.tab === 'repos');
 const error = ref('');
 const note = ref('');
@@ -121,13 +140,14 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
 
       <DialogBody flush class="flex-row overflow-hidden">
         <nav class="flex w-44 shrink-0 flex-col border-r border-border">
-          <div class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" aria-label="Repositories" data-testid="repos-dialog-repos">
+          <div ref="listEl" class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" aria-label="Repositories" data-testid="repos-dialog-repos">
             <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">No repositories imported.</p>
             <Tooltip v-for="r in codeRepos.records" :key="r.id">
               <TooltipTrigger as-child>
                 <button
                   type="button"
                   role="option"
+                  v-bind="nav.rowProps(r.id)"
                   class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
                   :class="repoRowClass(r)"
                   :aria-selected="showRepos && selected?.id === r.id"

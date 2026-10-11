@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useEventListener } from '@vueuse/core';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { TIMING } from '@workbench/behaviour/timing';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -30,13 +32,12 @@ watch(
 // typing to settle. 150ms matches that precedent. Measured (200k files, the cap): 538ms per
 // keystroke reactive vs 200ms plain filter cost — debouncing turns "every keystroke pays this"
 // into "one pause pays this", which is what actually fixes the perceived lag.
-const SEARCH_DEBOUNCE_MS = 150;
 const debouncedSearch = ref(props.search);
 // SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted/the repoId
 // watch replaces the clearTimeout below.
 const applySearchDebounced = useDebounceFn((value: string) => {
   debouncedSearch.value = value;
-}, SEARCH_DEBOUNCE_MS);
+}, TIMING.search);
 watch(
   () => props.search,
   (value) => {
@@ -57,7 +58,7 @@ onUnmounted(() => applySearchDebounced.cancel());
 const rows = computed(() => fileTreeStore.visibleRepoRows(props.repoId, debouncedSearch.value));
 
 const scrollEl = ref<HTMLElement | null>(null);
-const { virtualItems, totalSize, band, onScroll } = useTreeVirtualRows({
+const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRows({
   rows: () => rows.value,
   rowHeight: () => rowHeight.value,
   scrollElement: scrollEl,
@@ -78,9 +79,45 @@ function onOpen(row: RepoTreeRowVm, preview: boolean): void {
   void openRepoFileTab(props.repoId, row.path, { preview });
 }
 
+// Right-click selects the row (without opening anything) before its menu opens.
 function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
-  contextMenuStore.openContextMenu(event, menuForRepoRow(props.repoId, row));
+  selected.value = row.key;
+  contextMenuStore.openContextMenu(event, menuForRepoRow(props.repoId, row), {
+    onRestoreFocus: () => void nav.focusKey(row.key),
+  });
 }
+
+// Arrows, Home/End, Right/Left expand and parent, Enter (permanent open), Space (select, toggle or
+// preview) and Shift+F10 come from the shared list navigation; the selection is the roving stop.
+const nav = useListNavigation<RepoTreeRowVm>({
+  container: scrollEl,
+  items: () => rows.value,
+  key: (row) => row.key,
+  activeKey: selected,
+  tree: {
+    depth: (row) => row.depth,
+    isExpanded: (row) => row.expanded,
+    hasChildren: (row) => row.hasChildren,
+    expand: onToggle,
+    collapse: onToggle,
+  },
+  onOpen: (row) => {
+    if (row.isDir) onToggle(row);
+    else onOpen(row, false);
+  },
+  onSelect: (row) => {
+    onSelect(row);
+    if (row.isDir) onToggle(row);
+    else onOpen(row, true);
+  },
+  onMenu: (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, menuForRepoRow(props.repoId, row), {
+      onRestoreFocus: () => void nav.focusKey(row.key),
+    }),
+  scrollToIndex: (_index, key) => revealKey(key),
+  rendered: () => virtualItems.value,
+  rowSelector: () => '[role="treeitem"][tabindex="0"]',
+});
 
 // P105 §5.1: suppresses the browser context menu over the empty tree background (rows stop
 // propagation on their own contextmenu handler) -- the tree background has no interactive role.

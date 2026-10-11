@@ -1,5 +1,6 @@
 import type { FileStatusCode } from '@shared/domain/repo';
 import type { StickyRowLike } from '@theme/stickyBand';
+import { compareNatural } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
@@ -60,17 +61,11 @@ function buildTree(paths: readonly string[]): FileNode[] {
   return markRaw(root.children);
 }
 
-// C13-4: one shared collator instead of a fresh `localeCompare(..., { sensitivity: 'base' })` call
-// per comparison — same options, so identical ordering, but measured 20x faster at scale (200k
-// files, the MaxListedFiles cap: 3,760ms -> 322ms for one buildTree call), since Intl.Collator's
-// constructor is the expensive part `localeCompare` redoes on every single comparison otherwise.
-const nameCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
-
 // Directories before files, each collator-sorted case-insensitive (§7.2).
 function sortChildren(node: FileNode): void {
   node.children.sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-    return nameCollator.compare(a.name, b.name);
+    return compareNatural(a.name, b.name);
   });
   for (const child of node.children) if (child.isDir) sortChildren(child);
 }

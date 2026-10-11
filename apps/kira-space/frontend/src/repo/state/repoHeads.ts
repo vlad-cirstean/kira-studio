@@ -1,4 +1,5 @@
 import type { HeadState, Transport } from '@kira/git-ipc';
+import { useTimeoutFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -85,7 +86,7 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
     const offEvicted = onTransportEvicted(id, () => {
       leases.delete(id);
       offEvicted();
-      setTimeout(() => {
+      useTimeoutFn(() => {
         if (!workspaceStore.openRepos.includes(id) || leases.has(id)) return;
         lease(id);
         void refreshRepoHeads([id]);

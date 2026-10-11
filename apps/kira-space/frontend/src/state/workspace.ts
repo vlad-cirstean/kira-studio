@@ -80,7 +80,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       state.openRepos = [...state.openRepos, repoId];
     }
     ensureWorkspaceShell(repoId);
-    void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
+    void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {
+      // Bookkeeping for the next launch; the workspace state here is already authoritative.
+    });
     activateWorkspace(repoId);
     useModeStore().setMode('git');
   }
@@ -90,7 +92,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     if (!state.openRepos.includes(repoId)) {
       state.openRepos = [...state.openRepos, repoId];
     }
-    void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
+    void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {
+      // Bookkeeping for the next launch; the workspace state here is already authoritative.
+    });
     activateWorkspace(repoId);
   }
 
@@ -105,7 +109,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   function closeRepoWorkspace(repoId: string): void {
     closeWorkspaceTabs(repoId);
     state.openRepos = state.openRepos.filter((id) => id !== repoId);
-    void control.codeWorkspaceCloseWorkspace(repoId).catch(() => {});
+    void control.codeWorkspaceCloseWorkspace(repoId).catch(() => {
+      // Bookkeeping for the next launch; the workspace state here is already authoritative.
+    });
     // The pinned graph tab's own transport is cached per repo workspace, independent of the tab's
     // own mount/unmount (a tab switch alone must not tear it down) — closing the workspace itself
     // is the one event that actually ends it. A no-op when the graph tab was never mounted.

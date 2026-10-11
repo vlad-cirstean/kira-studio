@@ -11,7 +11,8 @@ import type { ReviewComment } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Textarea } from '@theme/components/ui/textarea';
-import { computed, ref } from 'vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { computed, ref, useTemplateRef } from 'vue';
 
 const props = defineProps<{
   mode: 'view' | 'compose';
@@ -48,6 +49,8 @@ const anchorLabel = computed<string | undefined>(() => {
 });
 
 const draft = ref('');
+const input = useTemplateRef<{ $el: HTMLElement }>('input');
+useShortcut(() => input.value?.$el, ['form.submit'], () => submit());
 
 function submit(): void {
   const body = draft.value.trim();
@@ -75,13 +78,12 @@ function submit(): void {
     </template>
     <template v-else>
       <Textarea
+        ref="input"
         v-model="draft"
         class="resize-y"
         placeholder="Leave a review comment…"
         rows="3"
         data-testid="review-thread-input"
-        @keydown.meta.enter="submit"
-        @keydown.ctrl.enter="submit"
       />
       <div class="flex justify-end gap-1.5">
         <Button variant="toolbar" size="kira" @click="emit('cancel')">Cancel</Button>
