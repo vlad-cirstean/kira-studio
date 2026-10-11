@@ -1,7 +1,557 @@
 {
   "automations": {
-    "module": {
-      "title": "Automations"
+    "collection": {
+      "deleteConfirm": {
+        "body": "Delete “{name}” and everything inside it.",
+        "title": "Delete collection?"
+      },
+      "new": {
+        "label": "New collection"
+      }
+    },
+    "dialog": {
+      "run": {
+        "editPrompt": {
+          "label": "Edit for this run"
+        },
+        "notSaved": {
+          "hint": "Not saved to the script."
+        },
+        "suffix": {
+          "label": "Added by Kira"
+        },
+        "title": "Run {name}",
+        "untitled": {
+          "title": "Run script"
+        }
+      },
+      "scheduleConfirm": {
+        "more": {
+          "status": "{count} more waiting"
+        },
+        "title": "Run {name}?",
+        "untitledConfirm": {
+          "title": "Run script?"
+        }
+      },
+      "script": {
+        "choose": {
+          "label": "Choose…"
+        },
+        "chooseFolder": {
+          "label": "Choose folder…",
+          "title": "Choose a run folder"
+        },
+        "collection": {
+          "label": "Collection"
+        },
+        "edit": {
+          "title": "Edit script"
+        },
+        "editSmart": {
+          "title": "Edit smart script"
+        },
+        "homeNotice": {
+          "description": "Runs in your home folder {home}, the old default. New scripts use the Kira automations folder."
+        },
+        "kiraHome": {
+          "label": "Kira home"
+        },
+        "nameExample": {
+          "example": "Build"
+        },
+        "noCollection": {
+          "option": "No collection"
+        },
+        "noFolder": {
+          "status": "No folder chosen"
+        },
+        "runFolder": {
+          "label": "Run folder"
+        },
+        "scriptId": {
+          "label": "Script ID"
+        },
+        "setOnSave": {
+          "status": "Set on save"
+        },
+        "tabs": {
+          "aria": "Script editor tabs"
+        },
+        "useAdeDir": {
+          "label": "Run in the task’s worktree when started from ADE"
+        },
+        "useKira": {
+          "label": "Use automations folder"
+        }
+      }
+    },
+    "dir": {
+      "chosen": {
+        "label": "Chosen folder"
+      },
+      "home": {
+        "label": "Home folder"
+      },
+      "kira": {
+        "label": "Kira automations folder"
+      }
+    },
+    "error": {
+      "budget": {
+        "error": "Budget must be above 0."
+      },
+      "commandRequired": {
+        "error": "Command is required."
+      },
+      "folderRequired": {
+        "error": "Choose a folder."
+      },
+      "nameRequired": {
+        "error": "Name is required."
+      },
+      "nothingToRun": {
+        "error": "Nothing to run yet."
+      },
+      "paramName": {
+        "error": "Use lowercase letters, digits and underscores, starting with a letter, 32 characters at most."
+      },
+      "paramOption": {
+        "error": "Add at least one option."
+      },
+      "paramReserved": {
+        "error": "“{name}” is reserved."
+      },
+      "paramTwice": {
+        "error": "“{name}” is listed twice."
+      },
+      "promptRequired": {
+        "error": "Prompt is required."
+      },
+      "repeatRequired": {
+        "error": "Repeat is required."
+      }
+    },
+    "panel": {
+      "add": {
+        "tooltip": "New…"
+      },
+      "none": {
+        "empty": "No scripts",
+        "emptyHint": "Add one with the plus button above."
+      }
+    },
+    "params": {
+      "add": {
+        "label": "Add parameter"
+      },
+      "addOption": {
+        "label": "Add option"
+      },
+      "default": {
+        "aria": "Default {option}"
+      },
+      "moveDown": {
+        "tooltip": "Move down"
+      },
+      "moveUp": {
+        "tooltip": "Move up"
+      },
+      "multiselect": {
+        "option": "Multiselect"
+      },
+      "option": {
+        "placeholder": "Option"
+      },
+      "remove": {
+        "tooltip": "Remove parameter {name}"
+      },
+      "removeOption": {
+        "tooltip": "Remove option"
+      },
+      "required": {
+        "label": "Required"
+      },
+      "scriptHint": {
+        "description": "Parameters reach the command as {variable}."
+      },
+      "secret": {
+        "label": "Secret"
+      },
+      "smartHint": {
+        "description": "Use {token} in the prompt. A secret reaches the run as {variable} only, never in the prompt."
+      },
+      "title": {
+        "label": "Parameters"
+      }
+    },
+    "run": {
+      "again": {
+        "label": "Run again"
+      },
+      "chooseTask": {
+        "placeholder": "Choose a task"
+      },
+      "continue": {
+        "label": "Continue in terminal"
+      },
+      "copyForAgent": {
+        "label": "Copy for agent"
+      },
+      "decline": {
+        "label": "Decline"
+      },
+      "fillIn": {
+        "error": "Fill in: {names}"
+      },
+      "findTask": {
+        "placeholder": "Find a task"
+      },
+      "folder": {
+        "label": "{mode} at {folder}"
+      },
+      "isolated": {
+        "body": "Your Claude settings files are not loaded."
+      },
+      "limits": {
+        "label": "Model {model}, budget {budget}, timeout {timeout}"
+      },
+      "log": {
+        "none": {
+          "emptyHint": "No output yet."
+        },
+        "truncated": {
+          "status": "Earlier output dropped"
+        }
+      },
+      "mcpServers": {
+        "label": "MCP servers: {servers}"
+      },
+      "missing": {
+        "emptyHint": "This run is no longer in the list."
+      },
+      "noTasks": {
+        "empty": "No tasks"
+      },
+      "outcome": {
+        "cost": {
+          "label": "Cost {cost}"
+        },
+        "denied": {
+          "label": "Denied: {tools}"
+        },
+        "exitCode": {
+          "label": "Exit code {code}"
+        },
+        "none": {
+          "emptyHint": "No result yet."
+        }
+      },
+      "promptSent": {
+        "label": "Prompt sent"
+      },
+      "report": {
+        "command": {
+          "label": "Command: {value}"
+        },
+        "cost": {
+          "label": "Cost: {value}"
+        },
+        "deniedTools": {
+          "label": "Denied tools: {value}"
+        },
+        "exitCode": {
+          "label": "Exit code: {value}"
+        },
+        "folder": {
+          "label": "Folder: {value}"
+        },
+        "lastError": {
+          "label": "Last error: {value}"
+        },
+        "lastOutput": {
+          "label": "Last output:"
+        },
+        "model": {
+          "label": "Model: {value}"
+        },
+        "result": {
+          "label": "Result: {state}"
+        },
+        "resultReason": {
+          "label": "Result: {state}, {reason}"
+        },
+        "script": {
+          "label": "Script: {value}"
+        },
+        "summary": {
+          "label": "Summary: {value}"
+        }
+      },
+      "reportCopied": {
+        "announce": "Copied report"
+      },
+      "review": {
+        "label": "Review and run"
+      },
+      "state": {
+        "blocked": {
+          "status": "Needs you"
+        },
+        "cancelled": {
+          "status": "Cancelled"
+        },
+        "done": {
+          "status": "Succeeded"
+        },
+        "waiting": {
+          "status": "Waiting for you"
+        }
+      },
+      "task": {
+        "label": "Task"
+      },
+      "taskOnBranch": {
+        "label": "Task {task} on {branch}"
+      },
+      "taskOnly": {
+        "label": "Task {task}"
+      },
+      "triggerAde": {
+        "label": "ADE · {task}"
+      },
+      "triggerScheduled": {
+        "label": "Scheduled"
+      },
+      "worktree": {
+        "label": "Worktree of {branch}: {folder}"
+      },
+      "worktreePending": {
+        "label": "Worktree of {branch}: {folder} (created on run)"
+      }
+    },
+    "runs": {
+      "none": {
+        "emptyHint": "No runs."
+      },
+      "running": {
+        "label": "Running: {count}"
+      },
+      "title": {
+        "label": "Runs"
+      }
+    },
+    "schedule": {
+      "askEach": {
+        "hint": "A popup asks before each run."
+      },
+      "askLocked": {
+        "hint": "Needs your answer each time. This script has a secret parameter, and a schedule never stores one."
+      },
+      "cronExample": {
+        "example": "0 9 * * 1-5"
+      },
+      "cronHint": {
+        "hint": "Minute hour day month weekday."
+      },
+      "due": {
+        "status": "Due {time}"
+      },
+      "enable": {
+        "label": "Run on a schedule"
+      },
+      "enabled": {
+        "label": "Enabled"
+      },
+      "everyDay": {
+        "option": "Every day {time}"
+      },
+      "everyHour": {
+        "option": "Every hour"
+      },
+      "everyMinutes": {
+        "option": "Every {count} minute | Every {count} minutes"
+      },
+      "findTimezone": {
+        "placeholder": "Find a timezone"
+      },
+      "mondays": {
+        "option": "Mondays {time}"
+      },
+      "next": {
+        "label": "Next: {times}"
+      },
+      "noTimezone": {
+        "empty": "No timezone"
+      },
+      "note": {
+        "hint": "Runs only while {app} is open. Missed runs are skipped. A run still going, or still waiting for your answer, makes the next one skip."
+      },
+      "now": {
+        "status": "Now"
+      },
+      "off": {
+        "status": "Off"
+      },
+      "presets": {
+        "aria": "Presets",
+        "option": "Choose preset…"
+      },
+      "quiet": {
+        "label": "Run without asking"
+      },
+      "quietWhy": {
+        "hint": "Runs as soon as it is due, with no popup."
+      },
+      "repeat": {
+        "label": "Repeat"
+      },
+      "saveFirst": {
+        "hint": "Save the script, then edit it to choose a task."
+      },
+      "timeoutExample": {
+        "example": "30m"
+      },
+      "timeoutRange": {
+        "hint": "Between 1m and 24h. A run still going at the limit is stopped."
+      },
+      "timezone": {
+        "label": "Timezone"
+      },
+      "title": {
+        "label": "Schedule"
+      },
+      "weekdays": {
+        "option": "Weekdays {time}"
+      },
+      "where": {
+        "label": "Where"
+      },
+      "whereFolder": {
+        "label": "Script folder"
+      },
+      "whereTask": {
+        "label": "An ADE task"
+      }
+    },
+    "script": {
+      "adeSet": {
+        "tooltip": "Set from the ADE task at run time"
+      },
+      "askedAtRun": {
+        "status": "Asked at run"
+      },
+      "commandExample": {
+        "example": "npm run build"
+      },
+      "defaultValue": {
+        "label": "Default: {value}"
+      },
+      "editSchedule": {
+        "label": "Edit schedule…"
+      },
+      "fallback": {
+        "label": "Script"
+      },
+      "fromTask": {
+        "status": "From the task"
+      },
+      "gone": {
+        "error": "This script no longer exists."
+      },
+      "insertHint": {
+        "hint": "Use {token} to insert a parameter. Press {chord} to save."
+      },
+      "new": {
+        "label": "New script"
+      },
+      "newSmart": {
+        "label": "New smart script"
+      },
+      "paramNamed": {
+        "label": "Parameter {name}"
+      },
+      "prompt": {
+        "label": "Prompt"
+      },
+      "promptExample": {
+        "example": "Summarize the open TODOs in this folder"
+      },
+      "removeConfirm": {
+        "body": "“{name}” will no longer appear in {module}.",
+        "title": "Remove script?"
+      },
+      "runNow": {
+        "label": "Run now"
+      },
+      "secretInPrompt": {
+        "error": "A secret can’t be used in the prompt."
+      },
+      "shellHint": {
+        "hint": "Runs in your login shell; lines run in order. Press {chord} to save."
+      },
+      "unknownParam": {
+        "tooltip": "Unknown parameter"
+      },
+      "uses": {
+        "label": "Uses:"
+      }
+    },
+    "smart": {
+      "addPattern": {
+        "aria": "Add pattern"
+      },
+      "addTool": {
+        "placeholder": "Add tool by name"
+      },
+      "badge": {
+        "tooltip": "Smart script that runs Claude headless"
+      },
+      "bashExample": {
+        "example": "git status:*"
+      },
+      "bashHint": {
+        "hint": "Bash commands the script may run, such as {example}. Empty allows any."
+      },
+      "budget": {
+        "label": "Budget in dollars"
+      },
+      "defaultTools": {
+        "label": "Default tools"
+      },
+      "mcp": {
+        "label": "MCP tools"
+      },
+      "mcpHint": {
+        "hint": "Only servers from your user Claude config are listed."
+      },
+      "mcpNone": {
+        "emptyHint": "No MCP servers."
+      },
+      "model": {
+        "label": "Model"
+      },
+      "remove": {
+        "tooltip": "Remove {name}"
+      },
+      "timeoutExample": {
+        "example": "15m"
+      },
+      "tools": {
+        "label": "Tools"
+      }
+    },
+    "start": {
+      "homeUnavailable": {
+        "tooltip": "Home folder unavailable"
+      },
+      "newTerminal": {
+        "label": "New terminal"
+      },
+      "none": {
+        "empty": "No terminal open",
+        "emptyHint": "Run a script from the panel, or open a terminal."
+      }
     }
   },
   "backend": {
@@ -3508,6 +4058,11 @@
     "showMore": {
       "remaining": {
         "label": "Show more ({count} remaining)"
+      }
+    },
+    "tabStrip": {
+      "newTab": {
+        "label": "New tab"
       }
     }
   }

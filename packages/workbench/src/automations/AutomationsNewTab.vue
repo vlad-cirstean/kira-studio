@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import TabStripNewButton from '@workbench/components/TabStripNewButton.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useAutomationsModule } from './module';
@@ -16,7 +17,7 @@ function menuItems(): MenuItem[] {
     {
       type: 'item',
       id: 'new-terminal',
-      label: 'Terminal',
+      label: t('common.module.terminal.label'),
       icon: 'terminal-bash',
       disabled: ctx.defaultCwd() === '',
       run: () => {
@@ -34,5 +35,5 @@ function onClick(button: HTMLButtonElement): void {
 </script>
 
 <template>
-  <TabStripNewButton label="New tab" tooltip="New tab" has-popup @click="onClick" />
+  <TabStripNewButton :label="t('workbench.tabStrip.newTab.label')" :tooltip="t('workbench.tabStrip.newTab.label')" has-popup @click="onClick" />
 </template>

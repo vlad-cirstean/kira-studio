@@ -8,6 +8,7 @@ import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHea
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -74,7 +75,7 @@ const start = useMutation(
     mutationKey: ['scriptRuns', 'start'],
     mutationFn: async () => {
       const current = pv.value;
-      if (!current) throw new Error('Nothing to run yet.');
+      if (!current) throw new Error(t('automations.error.nothingToRun.error'));
       return ctx.runs.start(args.value, current.hash);
     },
     onSuccess: (started) => {
@@ -136,25 +137,27 @@ useShortcut(window, ['form.submit'], run);
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="lg" data-testid="run-dialog">
       <DialogHeader>
-        <DialogTitle>Run {{ script?.name ?? 'script' }}</DialogTitle>
+        <DialogTitle>{{
+          script ? t('automations.dialog.run.title', { name: script.name }) : t('automations.dialog.run.untitled.title')
+        }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
       </DialogHeader>
 
       <DialogBody>
         <Alert v-if="!script" variant="error">
-          <AlertDescription>This script no longer exists.</AlertDescription>
+          <AlertDescription>{{ t('automations.script.gone.error') }}</AlertDescription>
         </Alert>
         <template v-else>
           <ParamsForm v-if="script.params.length > 0" v-model="values" :params="script.params" />
 
           <Field v-if="isSmart && pv" data-testid="run-prompt">
-            <FieldLabel>Prompt</FieldLabel>
+            <FieldLabel>{{ t('automations.script.prompt.label') }}</FieldLabel>
             <template v-if="oneOff === null">
               <Card class="font-data text-kira-sm" data-testid="run-prompt-text">
                 <VarText :parts="promptParts" />
               </Card>
               <Button variant="dialog" size="kira-lg" class="self-start" data-testid="run-prompt-edit" @click="editPrompt">
-                Edit for this run
+                {{ t('automations.dialog.run.editPrompt.label') }}
               </Button>
             </template>
             <template v-else>
@@ -167,11 +170,11 @@ useShortcut(window, ['form.submit'], run);
                 @update:model-value="(v) => (oneOff = String(v))"
               />
               <div class="flex items-center gap-2">
-                <Button variant="dialog" size="kira-lg" data-testid="run-prompt-reset" @click="oneOff = null">Reset</Button>
-                <FieldDescription>Not saved to the script</FieldDescription>
+                <Button variant="dialog" size="kira-lg" data-testid="run-prompt-reset" @click="oneOff = null">{{ t('common.action.reset.label') }}</Button>
+                <FieldDescription>{{ t('automations.dialog.run.notSaved.hint') }}</FieldDescription>
               </div>
             </template>
-            <FieldLabel class="mt-1 text-muted-foreground">Added by Kira</FieldLabel>
+            <FieldLabel class="mt-1 text-muted-foreground">{{ t('automations.dialog.run.suffix.label') }}</FieldLabel>
             <div class="font-data text-kira-sm text-muted-foreground" data-testid="run-suffix">{{ pv.suffix }}</div>
           </Field>
 
@@ -195,7 +198,7 @@ useShortcut(window, ['form.submit'], run);
             </template>
           </QueryState>
           <FieldError v-if="pv && pv.missing.length > 0" data-testid="run-missing">
-            Fill in: {{ pv.missing.join(', ') }}
+            {{ t('automations.run.fillIn.error', { names: pv.missing.join(', ') }) }}
           </FieldError>
           <FieldError v-if="pv?.blocker" data-testid="run-blocker">{{ pv.blocker }}</FieldError>
           <Alert v-if="startError" variant="error" data-testid="run-error">
@@ -206,10 +209,10 @@ useShortcut(window, ['form.submit'], run);
 
       <DialogFooter>
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" data-testid="run-cancel">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="run-cancel">{{ t('common.action.cancel.label') }}</Button>
         </DialogClose>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canRun" data-testid="run-start" @click="run">
-          Run
+          {{ t('common.action.run.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

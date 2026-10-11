@@ -19,6 +19,7 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import QueryState from '@workbench/components/QueryState.vue';
@@ -29,7 +30,7 @@ import { useAutomationsModule } from '../module';
 import AdeContextFields from '../run/AdeContextFields.vue';
 import ParamsForm from '../run/ParamsForm.vue';
 import { useNextFires } from './scheduleQueries';
-import { fireText, SCHEDULE_PRESETS, timezones } from './scheduleText';
+import { fireText, schedulePresets, timezones } from './scheduleText';
 
 // The recurring-script part of the script editor: when, where and how a scheduled run starts.
 // `scriptId` is null for a script not saved yet; the ADE task picker needs a saved script.
@@ -62,6 +63,7 @@ const cronError = computed(() => {
 
 watch(cronError, (e) => emit('valid', e === null), { immediate: true });
 
+const presets = schedulePresets();
 const zoneOpen = ref(false);
 const zones = timezones();
 function pickZone(zone: string): void {
@@ -125,20 +127,20 @@ const branchId = computed({
   get: () => schedule.value.branchId,
   set: (v: string) => patch({ branchId: v }),
 });
-const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
+const appName = computed(() => (ctx.ade ? t('common.product.kiraSpace.label') : t('common.product.kiraStudio.label')));
 </script>
 
 <template>
   <Card class="gap-3" data-testid="schedule-fields">
     <Field>
-      <FieldLabel :for="`${idBase}-cron`">Repeat</FieldLabel>
+      <FieldLabel :for="`${idBase}-cron`">{{ t('automations.schedule.repeat.label') }}</FieldLabel>
       <div class="flex items-center gap-1.5">
         <Input
           :id="`${idBase}-cron`"
           :model-value="schedule.cron"
           spellcheck="false"
           class="font-data"
-          placeholder="0 9 * * 1-5"
+          :placeholder="t('automations.schedule.cronExample.example')"
           data-testid="schedule-cron"
           @update:model-value="(v) => patch({ cron: String(v) })"
         />
@@ -146,21 +148,21 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
           model-value=""
           variant="bordered"
           size="kira-lg"
-          aria-label="Presets"
+          :aria-label="t('automations.schedule.presets.aria')"
           data-testid="schedule-preset"
           @update:model-value="(v) => v !== '' && patch({ cron: String(v) })"
         >
-          <option value="">Presets…</option>
-          <option v-for="p in SCHEDULE_PRESETS" :key="p.cron" :value="p.cron">{{ p.label }}</option>
+          <option value="">{{ t('automations.schedule.presets.option') }}</option>
+          <option v-for="p in presets" :key="p.cron" :value="p.cron">{{ p.label }}</option>
         </NativeSelect>
       </div>
       <FieldError v-if="cronError" data-testid="schedule-cron-error">{{ cronError }}</FieldError>
-      <FieldDescription v-else-if="nextText" data-testid="schedule-next">Next: {{ nextText }}</FieldDescription>
-      <FieldDescription v-else>Minute hour day month weekday.</FieldDescription>
+      <FieldDescription v-else-if="nextText" data-testid="schedule-next">{{ t('automations.schedule.next.label', { times: nextText }) }}</FieldDescription>
+      <FieldDescription v-else>{{ t('automations.schedule.cronHint.hint') }}</FieldDescription>
     </Field>
 
     <Field>
-      <FieldLabel :for="`${idBase}-zone`">Timezone</FieldLabel>
+      <FieldLabel :for="`${idBase}-zone`">{{ t('automations.schedule.timezone.label') }}</FieldLabel>
       <Popover v-model:open="zoneOpen">
         <PopoverTrigger as-child>
           <Button
@@ -176,9 +178,9 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
         </PopoverTrigger>
         <PopoverContent class="w-96 max-w-[80vw] p-0">
           <Command :model-value="schedule.timezone" @update:model-value="(v) => pickZone(String(v))">
-            <CommandInput placeholder="Find a timezone…" />
+            <CommandInput :placeholder="t('automations.schedule.findTimezone.placeholder')" />
             <CommandList>
-              <CommandEmpty>No timezone.</CommandEmpty>
+              <CommandEmpty>{{ t('automations.schedule.noTimezone.empty') }}</CommandEmpty>
               <CommandGroup>
                 <CommandItem v-for="z in zones" :key="z" :value="z" :data-testid="`schedule-zone-${z}`">{{ z }}</CommandItem>
               </CommandGroup>
@@ -195,7 +197,7 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
         data-testid="schedule-enabled"
         @update:model-value="(v) => patch({ enabled: Boolean(v) })"
       />
-      <Label :for="`${idBase}-enabled`">Enabled</Label>
+      <Label :for="`${idBase}-enabled`">{{ t('automations.schedule.enabled.label') }}</Label>
     </Field>
 
     <Field>
@@ -207,32 +209,32 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
           data-testid="schedule-quiet"
           @update:model-value="(v) => patch({ confirm: !v })"
         />
-        <Label :for="`${idBase}-quiet`">Run without asking</Label>
+        <Label :for="`${idBase}-quiet`">{{ t('automations.schedule.quiet.label') }}</Label>
       </div>
       <FieldDescription v-if="askLocked" data-testid="schedule-quiet-why">
-        Needs your answer each time: this script has a secret parameter, and a schedule never stores one.
+        {{ t('automations.schedule.askLocked.hint') }}
       </FieldDescription>
-      <FieldDescription v-else-if="schedule.confirm">A popup asks before each run.</FieldDescription>
-      <FieldDescription v-else>Runs as soon as it is due, with no popup.</FieldDescription>
+      <FieldDescription v-else-if="schedule.confirm">{{ t('automations.schedule.askEach.hint') }}</FieldDescription>
+      <FieldDescription v-else>{{ t('automations.schedule.quietWhy.hint') }}</FieldDescription>
     </Field>
 
     <Field v-if="kind === 'script'">
-      <FieldLabel :for="`${idBase}-timeout`">Timeout</FieldLabel>
+      <FieldLabel :for="`${idBase}-timeout`">{{ t('common.field.timeout.label') }}</FieldLabel>
       <Input
         :id="`${idBase}-timeout`"
         :model-value="schedule.timeout"
-        placeholder="30m"
+        :placeholder="t('automations.schedule.timeoutExample.example')"
         class="w-32 font-data"
         data-testid="schedule-timeout"
         @update:model-value="(v) => patch({ timeout: String(v) })"
       />
-      <FieldDescription>Between 1m and 24h. A run still going at the limit is stopped.</FieldDescription>
+      <FieldDescription>{{ t('automations.schedule.timeoutRange.hint') }}</FieldDescription>
     </Field>
 
     <ParamsForm v-if="plain.length > 0" v-model="values" :params="plain" />
 
     <Field v-if="ctx.ade">
-      <FieldLabel>Where</FieldLabel>
+      <FieldLabel>{{ t('automations.schedule.where.label') }}</FieldLabel>
       <RadioGroup
         :model-value="where"
         class="gap-1.5"
@@ -241,16 +243,16 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
       >
         <div class="flex items-center gap-2">
           <RadioGroupItem :id="`${idBase}-folder`" value="folder" data-testid="schedule-where-folder" />
-          <Label :for="`${idBase}-folder`">Script folder</Label>
+          <Label :for="`${idBase}-folder`">{{ t('automations.schedule.whereFolder.label') }}</Label>
         </div>
         <div class="flex items-center gap-2">
           <RadioGroupItem :id="`${idBase}-task`" value="task" data-testid="schedule-where-task" />
-          <Label :for="`${idBase}-task`">An ADE task</Label>
+          <Label :for="`${idBase}-task`">{{ t('automations.schedule.whereTask.label') }}</Label>
         </div>
       </RadioGroup>
       <template v-if="where === 'task'">
         <FieldDescription v-if="scriptId === null" data-testid="schedule-task-save">
-          Save the script, then edit it to pick a task.
+          {{ t('automations.schedule.saveFirst.hint') }}
         </FieldDescription>
         <QueryState v-else :query="tasks" variant="inline" :is-empty="() => false">
           <template #loading />
@@ -270,8 +272,7 @@ const appName = computed(() => (ctx.ade ? 'Kira Space' : 'Kira Studio'));
     </Field>
 
     <FieldDescription data-testid="schedule-note">
-      Runs only while {{ appName }} is open. Missed runs are skipped. A run still going, or still
-      waiting for your answer, makes the next one skip.
+      {{ t('automations.schedule.note.hint', { app: appName }) }}
     </FieldDescription>
   </Card>
 </template>

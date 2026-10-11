@@ -6,6 +6,7 @@ import { Card } from '@theme/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
+import { CatalogText, t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -53,7 +54,7 @@ const waitingRun = computed(() => runs.value?.find((r) => r.id === props.runId) 
 const due = computed(() => {
   const at = waitingRun.value?.createdAt;
   const tz = script.value?.schedule?.timezone ?? 'UTC';
-  return at === undefined ? 'Now' : `Due ${clockText(at, tz)}`;
+  return at === undefined ? t('automations.schedule.now.status') : t('automations.schedule.due.status', { time: clockText(at, tz) });
 });
 
 const error = ref<string | null>(null);
@@ -62,13 +63,13 @@ const accept = useMutation(
     mutationKey: ['scriptRuns', 'confirmAccept'],
     mutationFn: async () => {
       const current = pv.value;
-      if (!current) throw new Error('Nothing to run yet.');
+      if (!current) throw new Error(t('automations.error.nothingToRun.error'));
       return props.runId
         ? ctx.runs.confirmAccept(props.runId, current.hash, secrets.value)
         : ctx.runs.runScheduleNow(props.scriptId, current.hash, secrets.value);
     },
     onSuccess: (started) => {
-      ctx.openRunTab(started.runId, script.value?.name ?? 'Script');
+      ctx.openRunTab(started.runId, script.value?.name ?? t('automations.script.fallback.label'));
       emit('close');
     },
     onError: (err) => {
@@ -104,12 +105,9 @@ const canRun = computed(
 const promptParts = computed<TextPart[]>(() =>
   (pv.value?.prompt ?? []).map((p) => (p.var === '' ? p.text : { name: p.var, value: p.value })),
 );
-const adeParts = computed<TextPart[]>(() => {
+const ade = computed(() => {
   const a = pv.value?.ade;
-  if (!a || a.taskId === '') return [];
-  const parts: TextPart[] = ['Task ', { name: 'task', value: a.taskTitle }];
-  if (a.branchLabel) parts.push(' on ', { name: 'branch', value: a.branchLabel });
-  return parts;
+  return a && a.taskId !== '' ? a : null;
 });
 
 function run(): void {
@@ -125,21 +123,28 @@ useShortcut(window, ['form.submit'], run);
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="lg" data-testid="schedule-confirm">
       <DialogHeader close-testid="schedule-confirm-close">
-        <DialogTitle>Run {{ script?.name ?? 'script' }}?</DialogTitle>
+        <DialogTitle>{{
+          script
+            ? t('automations.dialog.scheduleConfirm.title', { name: script.name })
+            : t('automations.dialog.scheduleConfirm.untitledConfirm.title')
+        }}</DialogTitle>
         <SmartBadge v-if="script?.kind === 'smart'" />
         <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-due">{{ due }}</span>
       </DialogHeader>
 
       <DialogBody>
         <Alert v-if="!script" variant="error">
-          <AlertDescription>This script no longer exists.</AlertDescription>
+          <AlertDescription>{{ t('automations.script.gone.error') }}</AlertDescription>
         </Alert>
         <template v-else>
-          <div v-if="adeParts.length > 0" class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-ade">
-            <VarText :parts="adeParts" />
+          <div v-if="ade" class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-ade">
+            <CatalogText :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'">
+              <template #task><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template>
+              <template #branch><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template>
+            </CatalogText>
           </div>
           <Field v-if="script.kind === 'smart' && pv" data-testid="schedule-confirm-prompt">
-            <FieldLabel>Prompt</FieldLabel>
+            <FieldLabel>{{ t('automations.script.prompt.label') }}</FieldLabel>
             <Card class="font-data text-kira-sm">
               <VarText :parts="promptParts" />
             </Card>
@@ -158,7 +163,7 @@ useShortcut(window, ['form.submit'], run);
             </template>
           </QueryState>
           <FieldError v-if="pv && pv.missing.length > 0" data-testid="schedule-confirm-missing">
-            Fill in: {{ pv.missing.join(', ') }}
+            {{ t('automations.run.fillIn.error', { names: pv.missing.join(', ') }) }}
           </FieldError>
           <FieldError v-if="pv?.blocker" data-testid="schedule-confirm-blocker">{{ pv.blocker }}</FieldError>
           <Alert v-if="error" variant="error" data-testid="schedule-confirm-error">
@@ -169,7 +174,7 @@ useShortcut(window, ['form.submit'], run);
 
       <DialogFooter>
         <template v-if="more > 0" #start>
-          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{ more }} more waiting</span>
+          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{ t('automations.dialog.scheduleConfirm.more.status', { count: more }) }}</span>
         </template>
         <Button
           variant="dialog"
@@ -178,10 +183,10 @@ useShortcut(window, ['form.submit'], run);
           data-testid="schedule-confirm-decline"
           @click="runId ? decline.mutate() : emit('close')"
         >
-          Not now
+          {{ t('git.dialog.postCheckoutPullConfirm.notNow.label') }}
         </Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canRun" data-testid="schedule-confirm-run" @click="run">
-          Run
+          {{ t('common.action.run.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

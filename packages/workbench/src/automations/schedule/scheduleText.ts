@@ -1,12 +1,16 @@
 import type { ScriptSchedule } from '@shared/domain/scripts';
+import { t } from '@theme/i18n';
 
-export const SCHEDULE_PRESETS: readonly { label: string; cron: string }[] = [
-  { label: 'Every 15 minutes', cron: '*/15 * * * *' },
-  { label: 'Every hour', cron: '0 * * * *' },
-  { label: 'Every day 09:00', cron: '0 9 * * *' },
-  { label: 'Weekdays 09:00', cron: '0 9 * * 1-5' },
-  { label: 'Mondays 09:00', cron: '0 9 * * 1' },
-];
+export function schedulePresets(): readonly { label: string; cron: string }[] {
+  const time = '09:00';
+  return [
+    { label: t('automations.schedule.everyMinutes.option', { count: 15 }), cron: '*/15 * * * *' },
+    { label: t('automations.schedule.everyHour.option'), cron: '0 * * * *' },
+    { label: t('automations.schedule.everyDay.option', { time }), cron: '0 9 * * *' },
+    { label: t('automations.schedule.weekdays.option', { time }), cron: '0 9 * * 1-5' },
+    { label: t('automations.schedule.mondays.option', { time }), cron: '0 9 * * 1' },
+  ];
+}
 
 /** The window's own IANA zone; "UTC" when the runtime cannot tell. */
 export function localTimezone(): string {

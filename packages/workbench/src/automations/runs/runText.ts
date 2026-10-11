@@ -1,17 +1,18 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
+import { type MessageKey, t } from '@theme/i18n';
 
-const STATE_LABEL: Record<ScriptRun['state'], string> = {
-  running: 'Running',
-  done: 'Succeeded',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-  blocked: 'Needs you',
-  waiting: 'Waiting for you',
-  skipped: 'Skipped',
+const STATE_LABEL: Record<ScriptRun['state'], MessageKey> = {
+  running: 'common.state.running.status',
+  done: 'automations.run.state.done.status',
+  failed: 'common.state.failed.status',
+  cancelled: 'automations.run.state.cancelled.status',
+  blocked: 'automations.run.state.blocked.status',
+  waiting: 'automations.run.state.waiting.status',
+  skipped: 'git.op.skipped.announce',
 };
 
 export function stateLabel(state: ScriptRun['state']): string {
-  return STATE_LABEL[state];
+  return t(STATE_LABEL[state]);
 }
 
 /** "0.12 USD". */
@@ -30,18 +31,28 @@ export function runElapsedMs(run: ScriptRun, now: number): number | null {
 export function runReportText(run: ScriptRun, tail: string): string {
   const out = run.outcome;
   const smart = run.kind === 'smart';
+  const state = stateLabel(run.state);
   const lines = [
-    `Script: ${run.scriptName}`,
-    smart ? `Model: ${run.model}` : `Command: ${run.command}`,
-    `Folder: ${run.cwd}`,
-    `Result: ${stateLabel(run.state)}${out?.reason ? ` - ${out.reason}` : ''}`,
+    t('automations.run.report.script.label', { value: run.scriptName }),
+    smart
+      ? t('automations.run.report.model.label', { value: run.model })
+      : t('automations.run.report.command.label', { value: run.command }),
+    t('automations.run.report.folder.label', { value: run.cwd }),
+    out?.reason
+      ? t('automations.run.report.resultReason.label', { state, reason: out.reason })
+      : t('automations.run.report.result.label', { state }),
   ];
-  if (out?.summary) lines.push(`Summary: ${out.summary}`);
-  if (out?.costUsd !== undefined) lines.push(`Cost: ${costText(out.costUsd)}`);
+  if (out?.summary) lines.push(t('automations.run.report.summary.label', { value: out.summary }));
+  if (out?.costUsd !== undefined)
+    lines.push(t('automations.run.report.cost.label', { value: costText(out.costUsd) }));
   if (out?.permissionDenials?.length)
-    lines.push(`Denied tools: ${out.permissionDenials.join(', ')}`);
-  if (out?.exitCode !== undefined) lines.push(`Exit code: ${out.exitCode}`);
-  if (out?.lastError) lines.push(`Last error: ${out.lastError}`);
-  if (tail !== '') lines.push('', 'Last output:', tail);
+    lines.push(
+      t('automations.run.report.deniedTools.label', { value: out.permissionDenials.join(', ') }),
+    );
+  if (out?.exitCode !== undefined)
+    lines.push(t('automations.run.report.exitCode.label', { value: out.exitCode }));
+  if (out?.lastError)
+    lines.push(t('automations.run.report.lastError.label', { value: out.lastError }));
+  if (tail !== '') lines.push('', t('automations.run.report.lastOutput.label'), tail);
   return lines.join('\n');
 }

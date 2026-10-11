@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { cardVariants } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useFollowTail } from '@workbench/behaviour/followTail';
 import QueryState from '@workbench/components/QueryState.vue';
@@ -27,8 +28,8 @@ useFollowTail(el, () => log.data.value?.chunks.length);
         <FieldError data-testid="run-log-error">{{ message }}</FieldError>
       </template>
       <template #default="{ data }">
-        <div v-if="data.truncated" class="text-subtle">… earlier output dropped</div>
-        <div v-if="data.chunks.length === 0" class="text-subtle">No output yet.</div>
+        <div v-if="data.truncated" class="text-subtle">{{ t('automations.run.log.truncated.status') }}</div>
+        <div v-if="data.chunks.length === 0" class="text-subtle">{{ t('automations.run.log.none.emptyHint') }}</div>
         <div
           v-for="c in data.chunks"
           :key="c.seq"

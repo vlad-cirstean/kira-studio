@@ -8,6 +8,7 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useNewTerminal } from './module';
 
 // P91 §12: MainView.vue's own fallback when the Automations module has no active tab — the state a
@@ -24,8 +25,8 @@ const { canOpen, open } = useNewTerminal();
       <Empty>
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="terminal-bash" :size="24" /></EmptyMedia>
-          <EmptyTitle>No terminal open</EmptyTitle>
-          <EmptyDescription>Run a script from the panel, or open a terminal.</EmptyDescription>
+          <EmptyTitle>{{ t('automations.start.none.empty') }}</EmptyTitle>
+          <EmptyDescription>{{ t('automations.start.none.emptyHint') }}</EmptyDescription>
         </EmptyHeader>
           <Tooltip :disabled="canOpen">
             <TooltipTrigger as-child>
@@ -38,11 +39,11 @@ const { canOpen, open } = useNewTerminal();
                   @click="open"
                 >
                   <CodiconIcon name="terminal-bash" :size="13" />
-                  New terminal
+                  {{ t('automations.start.newTerminal.label') }}
                 </Button>
               </TooltipDisabledTrigger>
             </TooltipTrigger>
-            <TooltipContent>Home directory unavailable</TooltipContent>
+            <TooltipContent>{{ t('automations.start.homeUnavailable.tooltip') }}</TooltipContent>
           </Tooltip>
       </Empty>
     </div>

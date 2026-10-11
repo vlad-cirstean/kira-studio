@@ -403,7 +403,7 @@ test('the collection menu Delete confirms and deletes it', async ({ relaunch }) 
   await page.locator('[data-testid="script-group"][data-id="c-be"]').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-delete"]').click();
   await expect(page.locator('[data-testid="confirm-dialog-message"]')).toHaveText(
-    'Delete collection "Backend" and everything inside it?',
+    'Delete “Backend” and everything inside it.',
   );
   await page.locator('[data-testid="confirm-dialog-confirm"]').click();
   await expect
@@ -500,7 +500,7 @@ test('Choose… fills the folder from the folder dialog', async ({ relaunch }) =
   );
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.filesChooseFolder)?.args)
-    .toEqual({ title: 'Working directory…' });
+    .toEqual({ title: 'Choose a run folder' });
 });
 
 test('a cancelled folder dialog leaves the folder unchanged', async ({ relaunch }) => {

@@ -11,6 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@t
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -125,7 +126,7 @@ async function guarded(fn: () => Promise<void>): Promise<void> {
 async function newCollection(): Promise<string | null> {
   let id: string | null = null;
   await guarded(async () => {
-    const created = await scripts.createCollection('New collection');
+    const created = await scripts.createCollection(t('automations.collection.new.label'));
     openGroup(created.id);
     renamingId.value = created.id;
     id = created.id;
@@ -135,7 +136,7 @@ async function newCollection(): Promise<string | null> {
 
 async function moveToNewCollection(script: CustomScript): Promise<void> {
   await guarded(async () => {
-    const created = await scripts.createCollection('New collection');
+    const created = await scripts.createCollection(t('automations.collection.new.label'));
     await scripts.move(script.id, created.id);
     openGroup(created.id);
     renamingId.value = created.id;
@@ -148,7 +149,12 @@ function commitRename(collection: ScriptCollection, name: string): void {
 }
 
 async function confirmDeleteCollection(collection: ScriptCollection): Promise<void> {
-  const ok = await confirmDialogStore.confirm({ message: `Delete collection "${collection.name}" and everything inside it?`, confirmLabel: 'Delete', tone: 'danger' });
+  const ok = await confirmDialogStore.confirm({
+    title: t('automations.collection.deleteConfirm.title'),
+    message: t('automations.collection.deleteConfirm.body', { name: collection.name }),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
   if (!ok) return;
   await guarded(() => scripts.removeCollection(collection.id));
 }
@@ -170,7 +176,7 @@ function newScriptItems(collectionId: string | null): MenuItem[] {
     {
       type: 'item',
       id: 'new-script',
-      label: 'New script',
+      label: t('automations.script.new.label'),
       icon: 'add',
       run: () => {
         editor.value = { script: null, kind: 'script', collectionId };
@@ -179,7 +185,7 @@ function newScriptItems(collectionId: string | null): MenuItem[] {
     {
       type: 'item',
       id: 'new-smart-script',
-      label: 'New smart script',
+      label: t('automations.script.newSmart.label'),
       icon: 'sparkle',
       run: () => {
         editor.value = { script: null, kind: 'smart', collectionId };
@@ -229,7 +235,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
     {
       type: 'item',
       id: 'run',
-      label: 'Run',
+      label: t('common.action.run.label'),
       icon: 'play',
       run: () => runScript(script),
     },
@@ -238,14 +244,14 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           {
             type: 'item',
             id: 'run-now',
-            label: 'Run now',
+            label: t('automations.script.runNow.label'),
             icon: 'debug-start',
             run: () => confirmStore.openNow(script.id),
           },
           {
             type: 'item',
             id: 'edit-schedule',
-            label: 'Edit schedule…',
+            label: t('automations.script.editSchedule.label'),
             icon: 'watch',
             run: () => {
               editor.value = { script, kind: script.kind, collectionId: null, initialTab: 'schedule' };
@@ -256,7 +262,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
     {
       type: 'item',
       id: 'edit',
-      label: 'Edit…',
+      label: t('common.action.edit.label'),
       icon: 'edit',
       run: () => {
         editor.value = { script, kind: script.kind, collectionId: null };
@@ -273,7 +279,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
     {
       type: 'item',
       id: 'remove',
-      label: 'Remove',
+      label: t('common.action.remove.label'),
       icon: 'trash',
       danger: true,
       run: () => onRemove(script),
@@ -288,7 +294,7 @@ function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): v
     {
       type: 'item',
       id: 'rename',
-      label: 'Rename',
+      label: t('common.action.rename.label'),
       icon: 'edit',
       run: () =>
         contextMenuStore.afterClose(() => {
@@ -299,7 +305,7 @@ function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): v
     {
       type: 'item',
       id: 'delete',
-      label: 'Delete',
+      label: t('common.action.delete.label'),
       icon: 'trash',
       danger: true,
       run: () => confirmDeleteCollection(collection),
@@ -316,7 +322,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
     {
       type: 'item',
       id: 'new-collection',
-      label: 'New collection',
+      label: t('automations.collection.new.label'),
       icon: 'new-folder',
       run: async () => {
         await newCollection();
@@ -330,25 +336,25 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
   <div data-testid="automations-panel">
     <div ref="rootEl" class="flex h-full flex-col">
       <PanelHeader>
-        Automations
+        {{ t('common.module.automations.label') }}
         <template #actions>
           <TooltipIconButton
             icon="search"
-            :label="showSearch ? 'Hide search' : 'Search'"
+            :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
             :pressed="showSearch"
             data-testid="toggle-search"
             @click="toggleSearch"
           />
           <TooltipIconButton
             icon="add"
-            label="New…"
-            aria-label="New script"
+            :label="t('automations.panel.add.tooltip')"
+            :aria-label="t('automations.script.new.label')"
             data-testid="automations-add"
             @click="onAddClick"
           />
           <TooltipIconButton
             icon="new-folder"
-            label="New collection"
+            :label="t('automations.collection.new.label')"
             data-testid="automations-new-collection"
             @click="newCollection"
           />
@@ -477,8 +483,8 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           <FieldError v-if="actionError" data-testid="script-error">{{ actionError }}</FieldError>
           <EmptyHeader>
             <EmptyMedia><CodiconIcon name="terminal-bash" :size="24" /></EmptyMedia>
-            <EmptyTitle>No scripts</EmptyTitle>
-            <EmptyDescription>Add one with + above.</EmptyDescription>
+            <EmptyTitle>{{ t('automations.panel.none.empty') }}</EmptyTitle>
+            <EmptyDescription>{{ t('automations.panel.none.emptyHint') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </div>

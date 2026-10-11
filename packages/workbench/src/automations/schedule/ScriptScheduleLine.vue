@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CustomScript } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import RunStatusBadge from '../runs/RunStatusBadge.vue';
 import { useScriptRuns } from '../runs/runsQueries';
@@ -24,9 +25,9 @@ const last = computed(
 );
 const text = computed(() => {
   const s = schedule.value;
-  if (!s?.enabled) return 'off';
+  if (!s?.enabled) return t('automations.schedule.off.status');
   const at = next.data.value?.[0];
-  return at === undefined ? '' : `next ${clockText(at, s.timezone)}`;
+  return at === undefined ? '' : t('automations.schedule.next.label', { times: clockText(at, s.timezone) });
 });
 </script>
 

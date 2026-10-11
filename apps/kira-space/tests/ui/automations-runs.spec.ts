@@ -121,7 +121,7 @@ test('a run shows a spinner, a tab badge and the status bar count, then its resu
   await expect(
     page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-running"]`),
   ).toBeVisible();
-  await expect(page.locator('[data-testid="status-runs"]')).toContainText('1 running');
+  await expect(page.locator('[data-testid="status-runs"]')).toContainText('Running: 1');
   await expect(page.locator('[data-testid="run-row"][data-state="running"]')).toHaveCount(1);
   await expect(
     page.locator('[data-testid="script-run-strip"] [data-testid="run-status"]'),
@@ -300,7 +300,7 @@ for (const outcome of CONTRACT_OUTCOMES) {
       outcome: null,
       finishedAt: null,
     });
-    await expect(page.locator('[data-testid="status-runs"]')).toContainText('1 running');
+    await expect(page.locator('[data-testid="status-runs"]')).toContainText('Running: 1');
     await emitWailsEvent(page, IPC.scriptRunsChanged, {
       ...finished,
       ...times,

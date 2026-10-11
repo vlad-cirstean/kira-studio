@@ -1,4 +1,5 @@
 import type { CustomScript } from '@shared/domain/scripts';
+import { t } from '@theme/i18n';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { ScriptsSeam } from './module';
 
@@ -12,8 +13,12 @@ export function useRemoveScript(): (
 
   return async (scripts, script) => {
     const ok = await confirmDialogStore.confirm({
-      message: `Remove "${script.name}"? It will no longer appear in Automations.`,
-      confirmLabel: 'Remove',
+      title: t('automations.script.removeConfirm.title'),
+      message: t('automations.script.removeConfirm.body', {
+        name: script.name,
+        module: t('common.module.automations.label'),
+      }),
+      confirmLabel: t('common.action.remove.label'),
       tone: 'danger',
     });
     if (!ok) return false;

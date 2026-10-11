@@ -9,11 +9,14 @@ import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@theme/comp
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { useId } from 'vue';
 
 const params = defineModel<ScriptParam[]>({ required: true });
 defineProps<{ kind: ScriptKind; errors?: readonly (readonly string[])[] }>();
 const idBase = useId();
+// A literal env var name, not copy; a catalog message can't hold `<>`.
+const PARAM_VAR = '$KIRA_PARAM_<NAME>';
 
 function add(): void {
   params.value = [
@@ -76,12 +79,14 @@ function toggleDefault(i: number, option: string, on: boolean): void {
 <template>
   <FieldSet data-testid="params-editor">
     <div class="flex items-center gap-2">
-      <FieldLegend class="mb-0">Parameters</FieldLegend>
-      <Button variant="dialog" size="kira-lg" class="ml-auto" data-testid="param-add" @click="add">Add parameter</Button>
+      <FieldLegend class="mb-0">{{ t('automations.params.title.label') }}</FieldLegend>
+      <Button variant="dialog" size="kira-lg" class="ml-auto" data-testid="param-add" @click="add">{{ t('automations.params.add.label') }}</Button>
     </div>
-    <FieldDescription v-if="kind === 'script'">Params reach the command as $KIRA_PARAM_&lt;NAME&gt;</FieldDescription>
+    <FieldDescription v-if="kind === 'script'">
+      {{ t('automations.params.scriptHint.description', { variable: PARAM_VAR }) }}
+    </FieldDescription>
     <FieldDescription v-else>
-      Use {name} in the prompt. A secret reaches the run as $KIRA_PARAM_&lt;NAME&gt; only, never in the prompt.
+      {{ t('automations.params.smartHint.description', { token: '{name}', variable: PARAM_VAR }) }}
     </FieldDescription>
     <Card
       v-for="(p, i) in params"
@@ -91,14 +96,14 @@ function toggleDefault(i: number, option: string, on: boolean): void {
       <div class="flex items-center gap-1.5">
         <Input
           :model-value="p.name"
-          placeholder="name"
+          :placeholder="t('common.field.name.label')"
           class="w-32 font-data"
           :data-testid="`param-name-${i}`"
           @update:model-value="(v) => patch(i, { name: String(v) })"
         />
         <Input
           :model-value="p.label"
-          placeholder="Label"
+          :placeholder="t('git.dialog.stash.saveLabel.label')"
           class="min-w-0 flex-1"
           :data-testid="`param-label-${i}`"
           @update:model-value="(v) => patch(i, { label: String(v) })"
@@ -110,17 +115,17 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           :data-testid="`param-type-${i}`"
           @update:model-value="(v) => setType(i, v as ScriptParamType)"
         >
-          <option value="text">Text</option>
-          <option value="select">Select</option>
-          <option value="multiselect">Multiselect</option>
+          <option value="text">{{ t('common.field.text.label') }}</option>
+          <option value="select">{{ t('common.action.select.label') }}</option>
+          <option value="multiselect">{{ t('automations.params.multiselect.option') }}</option>
         </NativeSelect>
-        <TooltipIconButton icon="trash" :label="`Remove parameter ${p.name}`" @click="remove(i)" />
+        <TooltipIconButton icon="trash" :label="t('automations.params.remove.tooltip', { name: p.name })" @click="remove(i)" />
       </div>
       <FieldError v-for="m in errors?.[i] ?? []" :key="m" :data-testid="`param-error-${i}`">{{ m }}</FieldError>
       <Input
         v-if="p.type === 'text'"
         :model-value="p.default[0] ?? ''"
-        placeholder="Default"
+        :placeholder="t('common.state.default.option')"
         :data-testid="`param-default-${i}`"
         @update:model-value="(v) => patch(i, { default: String(v) === '' ? [] : [String(v)] })"
       />
@@ -129,24 +134,24 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           <Checkbox
             class="size-3.5"
             :model-value="p.default.includes(o)"
-            :aria-label="`Default ${o}`"
+            :aria-label="t('automations.params.default.aria', { option: o })"
             @update:model-value="(v) => toggleDefault(i, o, v === true)"
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
           <Input
             :model-value="o"
-            placeholder="Option"
+            :placeholder="t('automations.params.option.placeholder')"
             class="min-w-0 flex-1"
             :data-testid="`param-option-${i}-${k}`"
             @update:model-value="(v) => setOption(i, k, String(v))"
           />
-          <TooltipIconButton icon="arrow-up" label="Move up" @click="moveOption(i, k, -1)" />
-          <TooltipIconButton icon="arrow-down" label="Move down" @click="moveOption(i, k, 1)" />
-          <TooltipIconButton icon="close" label="Remove option" @click="removeOption(i, k)" />
+          <TooltipIconButton icon="arrow-up" :label="t('automations.params.moveUp.tooltip')" @click="moveOption(i, k, -1)" />
+          <TooltipIconButton icon="arrow-down" :label="t('automations.params.moveDown.tooltip')" @click="moveOption(i, k, 1)" />
+          <TooltipIconButton icon="close" :label="t('automations.params.removeOption.tooltip')" @click="removeOption(i, k)" />
         </div>
         <Button variant="dialog" size="kira-lg" class="self-start" :data-testid="`param-option-add-${i}`" @click="addOption(i)">
-          Add option
+          {{ t('automations.params.addOption.label') }}
         </Button>
       </div>
       <div class="flex items-center gap-4">
@@ -159,7 +164,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          <Label :for="`${idBase}-req-${i}`">Required</Label>
+          <Label :for="`${idBase}-req-${i}`">{{ t('automations.params.required.label') }}</Label>
         </div>
         <div v-if="p.type === 'text'" class="flex items-center gap-1.5">
           <Checkbox
@@ -171,7 +176,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          <Label :for="`${idBase}-sec-${i}`">Secret</Label>
+          <Label :for="`${idBase}-sec-${i}`">{{ t('automations.params.secret.label') }}</Label>
         </div>
       </div>
     </Card>

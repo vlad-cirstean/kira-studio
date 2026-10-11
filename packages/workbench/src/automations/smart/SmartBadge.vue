@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 </script>
 
 <template>
@@ -10,6 +11,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
         <CodiconIcon name="sparkle" :size="13" />
       </span>
     </TooltipTrigger>
-    <TooltipContent>Smart script: runs Claude headless</TooltipContent>
+    <TooltipContent>{{ t('automations.smart.badge.tooltip') }}</TooltipContent>
   </Tooltip>
 </template>

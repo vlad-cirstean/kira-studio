@@ -7,6 +7,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { computed, ref, useId } from 'vue';
 import { allowedToolsOf } from './smartSettings';
 
@@ -18,7 +19,7 @@ const bashOn = computed(() => smart.value.tools.includes('Bash'));
 const allowedLine = computed(() => allowedToolsOf(smart.value).join(' '));
 
 function toggle(tool: string, on: boolean): void {
-  const rest = smart.value.tools.filter((t) => t !== tool);
+  const rest = smart.value.tools.filter((x) => x !== tool);
   smart.value.tools = on ? [...rest, tool] : rest;
   if (tool === 'Bash' && !on) smart.value.bashPatterns = [];
 }
@@ -43,9 +44,9 @@ function resetTools(): void {
 <template>
   <FieldSet data-testid="smart-tools">
     <div class="flex items-center gap-2">
-      <FieldLegend class="mb-0">Tools</FieldLegend>
+      <FieldLegend class="mb-0">{{ t('automations.smart.tools.label') }}</FieldLegend>
       <Button variant="dialog" size="kira-lg" class="ml-auto" data-testid="smart-tools-default" @click="resetTools">
-        Default tools
+        {{ t('automations.smart.defaultTools.label') }}
       </Button>
     </div>
     <div class="flex flex-wrap gap-x-4 gap-y-1">
@@ -63,26 +64,26 @@ function resetTools(): void {
       </div>
     </div>
     <div v-if="bashOn" class="flex flex-col gap-1" data-testid="smart-bash-patterns">
-      <FieldDescription>Bash commands the script may run, such as git status:*. Empty allows any.</FieldDescription>
+      <FieldDescription>{{ t('automations.smart.bashHint.hint', { example: t('automations.smart.bashExample.example') }) }}</FieldDescription>
       <div v-for="p in smart.bashPatterns" :key="p" class="flex items-center gap-1" data-testid="smart-bash-pattern">
         <span class="min-w-0 flex-1 truncate font-data">{{ p }}</span>
-        <TooltipIconButton icon="close" :label="`Remove ${p}`" @click="removePattern(p)" />
+        <TooltipIconButton icon="close" :label="t('automations.smart.remove.tooltip', { name: p })" @click="removePattern(p)" />
       </div>
       <InputGroup>
         <InputGroupInput
           v-model="draft"
-          placeholder="git status:*"
+          :placeholder="t('automations.smart.bashExample.example')"
           class="font-data"
           data-testid="smart-bash-input"
           @keydown.enter.prevent="addPattern"
         />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton aria-label="Add pattern" data-testid="smart-bash-add" @click="addPattern">
+          <InputGroupButton :aria-label="t('automations.smart.addPattern.aria')" data-testid="smart-bash-add" @click="addPattern">
             <CodiconIcon name="add" :size="12" />
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
     </div>
-    <FieldDescription class="font-data" data-testid="smart-allowed-line">--allowedTools {{ allowedLine || '(none)' }}</FieldDescription>
+    <FieldDescription class="font-data" data-testid="smart-allowed-line">--allowedTools {{ allowedLine || t('common.state.none.option') }}</FieldDescription>
   </FieldSet>
 </template>

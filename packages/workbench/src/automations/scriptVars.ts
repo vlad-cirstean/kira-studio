@@ -1,5 +1,6 @@
 import type { ScriptKind, ScriptParam } from '@shared/domain/scripts';
 import { BUILTIN_VARS } from '@shared/domain/scripts';
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { Completion } from '../editor/fieldCompletion';
 import type { RangeHighlight } from '../editor/ranges';
@@ -50,7 +51,12 @@ export function scriptCandidates(
           icon: 'symbol-variable',
         }));
       for (const b of builtins(src))
-        out.push({ label: b, insert: b + close, detail: 'from the task', icon: 'symbol-variable' });
+        out.push({
+          label: b,
+          insert: b + close,
+          detail: t('automations.script.fromTask.status'),
+          icon: 'symbol-variable',
+        });
       return out;
     }
     const braced = text.slice(from - 2, from) === '${' && text[from + word.length] !== '}';
@@ -60,14 +66,14 @@ export function scriptCandidates(
       .map((p) => ({
         label: paramEnvName(p.name),
         insert: paramEnvName(p.name) + close,
-        detail: p.secret ? 'secret' : paramDetail(p),
+        detail: p.secret ? t('automations.params.secret.label') : paramDetail(p),
         icon: 'symbol-variable',
       }));
     for (const b of builtins(src))
       out.push({
         label: builtinEnvName(b),
         insert: builtinEnvName(b) + close,
-        detail: 'from the task',
+        detail: t('automations.script.fromTask.status'),
         icon: 'symbol-variable',
       });
     return out;
@@ -132,14 +138,17 @@ export function scriptHover(
   return (text, offset) => {
     const ref = refsIn(text, src).find((r) => offset >= r.from && offset <= r.to);
     if (!ref) return null;
-    if (ref.builtin) return ['Set from the ADE task at run time'];
-    if (!ref.param) return ['Unknown parameter'];
-    const lines = [`Parameter ${ref.param.name}`];
+    if (ref.builtin) return [t('automations.script.adeSet.tooltip')];
+    if (!ref.param) return [t('automations.script.unknownParam.tooltip')];
+    const lines = [t('automations.script.paramNamed.label', { name: ref.param.name })];
     if (ref.param.label) lines.push(ref.param.label);
     if (src.kind === 'smart' && ref.param.secret)
-      lines.push('A secret cannot be used in the prompt');
-    else if (ref.param.secret) lines.push('Secret');
-    else if (ref.param.default.length > 0) lines.push(`Default: ${ref.param.default.join(', ')}`);
+      lines.push(t('automations.script.secretInPrompt.error'));
+    else if (ref.param.secret) lines.push(t('automations.params.secret.label'));
+    else if (ref.param.default.length > 0)
+      lines.push(
+        t('automations.script.defaultValue.label', { value: ref.param.default.join(', ') }),
+      );
     return lines;
   };
 }
@@ -164,8 +173,10 @@ function promptVarsUsed(prompt: string, params: readonly ScriptParam[], ade: boo
 
 function usesValue(name: string, params: readonly ScriptParam[]): string {
   const p = params.find((x) => x.name === name);
-  if (!p) return 'from the task';
-  return p.default.length > 0 && !p.secret ? p.default.join(', ') : 'asked at run';
+  if (!p) return t('automations.script.fromTask.status');
+  return p.default.length > 0 && !p.secret
+    ? p.default.join(', ')
+    : t('automations.script.askedAtRun.status');
 }
 
 /** The "Uses:" line: each used var with what the run gets without any input. */
@@ -174,7 +185,7 @@ export function usesParts(src: ScriptVarSource, body: string): TextPart[] {
     src.kind === 'smart'
       ? promptVarsUsed(body, src.params, src.ade)
       : envVarsUsed(body, src.params, src.ade);
-  const parts: TextPart[] = ['Uses: '];
+  const parts: TextPart[] = [`${t('automations.script.uses.label')} `];
   names.forEach((n, i) => {
     if (i > 0) parts.push(', ');
     parts.push({ name: n, value: usesValue(n, src.params) });

@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import QueryState from '@workbench/components/QueryState.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId } from 'vue';
@@ -33,7 +34,7 @@ function setServer(server: string, on: boolean): void {
 
 function setTool(server: string, tool: string, on: boolean): void {
   const cur = chosen(server) ?? [];
-  const next = on ? [...cur.filter((t) => t !== tool), tool] : cur.filter((t) => t !== tool);
+  const next = on ? [...cur.filter((x) => x !== tool), tool] : cur.filter((x) => x !== tool);
   smart.value.mcp = withMcp(smart.value.mcp, server, next);
 }
 
@@ -50,12 +51,12 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
 
 <template>
   <FieldSet data-testid="smart-mcp">
-    <FieldLegend>MCP tools</FieldLegend>
-    <FieldDescription>Only servers from your user Claude config are listed.</FieldDescription>
+    <FieldLegend>{{ t('automations.smart.mcp.label') }}</FieldLegend>
+    <FieldDescription>{{ t('automations.smart.mcpHint.hint') }}</FieldDescription>
     <QueryState :query="servers" variant="inline">
       <template #loading />
       <template #empty>
-        <span class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">No MCP servers.</span>
+        <span class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">{{ t('automations.smart.mcpNone.emptyHint') }}</span>
       </template>
       <template #error="{ message }">
         <Alert variant="error">

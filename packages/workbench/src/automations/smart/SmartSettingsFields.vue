@@ -3,6 +3,7 @@ import { SMART_MODELS, type SmartSettings } from '@shared/domain/scripts';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 
 const smart = defineModel<SmartSettings>({ required: true });
 </script>
@@ -10,13 +11,13 @@ const smart = defineModel<SmartSettings>({ required: true });
 <template>
   <div class="flex items-end gap-3" data-testid="smart-settings">
     <Field class="min-w-0 flex-1">
-      <FieldLabel for="smart-model">Model</FieldLabel>
+      <FieldLabel for="smart-model">{{ t('automations.smart.model.label') }}</FieldLabel>
       <NativeSelect id="smart-model" v-model="smart.model" variant="bordered" size="kira-lg" data-testid="smart-model">
         <option v-for="m in SMART_MODELS" :key="m" :value="m">{{ m }}</option>
       </NativeSelect>
     </Field>
     <Field class="w-32">
-      <FieldLabel for="smart-budget">Budget (USD)</FieldLabel>
+      <FieldLabel for="smart-budget">{{ t('automations.smart.budget.label') }}</FieldLabel>
       <Input
         id="smart-budget"
         v-model.number="smart.maxBudgetUsd"
@@ -27,8 +28,8 @@ const smart = defineModel<SmartSettings>({ required: true });
       />
     </Field>
     <Field class="w-28">
-      <FieldLabel for="smart-timeout">Timeout</FieldLabel>
-      <Input id="smart-timeout" v-model="smart.timeout" placeholder="15m" class="font-data" data-testid="smart-timeout" />
+      <FieldLabel for="smart-timeout">{{ t('common.field.timeout.label') }}</FieldLabel>
+      <Input id="smart-timeout" v-model="smart.timeout" :placeholder="t('automations.smart.timeoutExample.example')" class="font-data" data-testid="smart-timeout" />
     </Field>
   </div>
 </template>

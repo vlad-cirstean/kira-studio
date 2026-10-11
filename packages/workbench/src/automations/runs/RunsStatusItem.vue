@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import { computed } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -28,6 +29,6 @@ function show(): void {
     @click="show"
   >
     <CodiconIcon name="play" :size="13" />
-    {{ running }} running
+    {{ t('automations.runs.running.label', { count: running }) }}
   </Button>
 </template>

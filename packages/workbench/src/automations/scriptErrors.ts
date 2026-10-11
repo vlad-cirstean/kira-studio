@@ -5,6 +5,7 @@ import {
   type ScriptParam,
   type ScriptSchedule,
 } from '@shared/domain/scripts';
+import { t } from '@theme/i18n';
 import { varsUsed } from './smart/smartSettings';
 
 export type EditorTab = 'script' | 'params' | 'schedule';
@@ -49,13 +50,14 @@ function paramErrors(d: EditorDraft): string[][] {
   return d.params.map((p, i) => {
     const out: string[] = [];
     const name = p.name.trim();
-    if (!NAME_RE.test(name))
-      out.push('Use lowercase letters, digits and _, starting with a letter (max 32).');
-    else if ((BUILTIN_VARS as readonly string[]).includes(name)) out.push(`"${name}" is reserved.`);
+    if (!NAME_RE.test(name)) out.push(t('automations.error.paramName.error'));
+    else if ((BUILTIN_VARS as readonly string[]).includes(name))
+      out.push(t('automations.error.paramReserved.error', { name }));
     else if (d.params.findIndex((o) => o.name.trim() === name) !== i)
-      out.push(`"${name}" is listed twice.`);
-    if (p.type !== 'text' && p.options.length === 0) out.push('Add at least one option.');
-    if (p.secret && used.includes(name)) out.push('A secret cannot be used in the prompt.');
+      out.push(t('automations.error.paramTwice.error', { name }));
+    if (p.type !== 'text' && p.options.length === 0)
+      out.push(t('automations.error.paramOption.error'));
+    if (p.secret && used.includes(name)) out.push(t('automations.script.secretInPrompt.error'));
     return out;
   });
 }
@@ -63,14 +65,18 @@ function paramErrors(d: EditorDraft): string[][] {
 /** Client-side mirror of the Go checks, to flag a tab before Save. Go stays the authority. */
 export function editorErrors(d: EditorDraft, shown: Shown): EditorErrors {
   const out: EditorErrors = { params: paramErrors(d), scheduleInvalid: false };
-  if (shown.name && d.name.trim() === '') out.name = 'Name is required.';
+  if (shown.name && d.name.trim() === '') out.name = t('automations.error.nameRequired.error');
   if (shown.body && d.body.trim() === '')
-    out.body = d.kind === 'smart' ? 'Prompt is required.' : 'Command is required.';
+    out.body = t(
+      d.kind === 'smart'
+        ? 'automations.error.promptRequired.error'
+        : 'automations.error.commandRequired.error',
+    );
   if (shown.folder && d.dirMode === 'fixed' && d.workingDir.trim() === '')
-    out.folder = 'Choose a folder.';
-  if (d.kind === 'smart' && !(d.maxBudgetUsd > 0)) out.budget = 'Budget must be above 0.';
+    out.folder = t('automations.error.folderRequired.error');
+  if (d.kind === 'smart' && !(d.maxBudgetUsd > 0)) out.budget = t('automations.error.budget.error');
   if (d.schedule) {
-    if (d.schedule.cron.trim() === '') out.cron = 'Repeat is required.';
+    if (d.schedule.cron.trim() === '') out.cron = t('automations.error.repeatRequired.error');
     else out.scheduleInvalid = !d.scheduleOk;
   }
   return out;

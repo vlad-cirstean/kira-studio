@@ -7,6 +7,7 @@ import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { t } from '@theme/i18n';
 import { useId } from 'vue';
 
 const values = defineModel<Record<string, string[]>>({ required: true });
@@ -19,7 +20,7 @@ function set(name: string, next: string[]): void {
 
 function summary(p: ScriptParam): string {
   const v = values.value[p.name] ?? [];
-  return v.length === 0 ? 'Choose…' : v.join(', ');
+  return v.length === 0 ? t('automations.dialog.script.choose.label') : v.join(', ');
 }
 </script>
 
@@ -27,7 +28,7 @@ function summary(p: ScriptParam): string {
   <div class="flex flex-col gap-3" data-testid="run-params">
     <Field v-for="p in params" :key="p.name" :data-testid="`run-param-${p.name}`">
       <FieldLabel :for="`${idBase}-${p.name}`">
-        {{ p.label || p.name }}<span v-if="p.required" class="text-error"> *<span class="sr-only"> required</span></span>
+        {{ p.label || p.name }}<span v-if="p.required" class="text-error"> *<span class="sr-only"> {{ t('automations.params.required.label') }}</span></span>
       </FieldLabel>
       <Input
         v-if="p.type === 'text'"
@@ -47,7 +48,7 @@ function summary(p: ScriptParam): string {
         :data-testid="`run-param-input-${p.name}`"
         @update:model-value="(v) => set(p.name, v === '' ? [] : [String(v)])"
       >
-        <option value="">Choose…</option>
+        <option value="">{{ t('automations.dialog.script.choose.label') }}</option>
         <option v-for="o in p.options" :key="o" :value="o">{{ o }}</option>
       </NativeSelect>
       <Popover v-else>

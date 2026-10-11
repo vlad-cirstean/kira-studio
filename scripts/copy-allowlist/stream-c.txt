@@ -1,29 +1,4 @@
 # Stream C (git-ui, docker-ui, workbench except memory/ and foundation files). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-packages/workbench/src/automations/AutomationsNewTab.vue
-packages/workbench/src/automations/AutomationsPanel.vue
-packages/workbench/src/automations/AutomationsStart.vue
-packages/workbench/src/automations/ParamsEditor.vue
-packages/workbench/src/automations/ScriptBodyField.vue
-packages/workbench/src/automations/ScriptDialog.vue
-packages/workbench/src/automations/run/AdeContextFields.vue
-packages/workbench/src/automations/run/ParamsForm.vue
-packages/workbench/src/automations/run/RunPreview.vue
-packages/workbench/src/automations/run/RunScriptDialog.vue
-packages/workbench/src/automations/runs/RunLog.vue
-packages/workbench/src/automations/runs/RunOutcomeBlock.vue
-packages/workbench/src/automations/runs/RunsSection.vue
-packages/workbench/src/automations/runs/RunsStatusItem.vue
-packages/workbench/src/automations/runs/ScriptRunView.vue
-packages/workbench/src/automations/schedule/ScheduleConfirmDialog.vue
-packages/workbench/src/automations/schedule/ScheduleFields.vue
-packages/workbench/src/automations/schedule/scheduleText.ts
-packages/workbench/src/automations/scriptActions.ts
-packages/workbench/src/automations/scriptVars.ts
-packages/workbench/src/automations/smart/McpServerTools.vue
-packages/workbench/src/automations/smart/McpToolsField.vue
-packages/workbench/src/automations/smart/SmartBadge.vue
-packages/workbench/src/automations/smart/SmartSettingsFields.vue
-packages/workbench/src/automations/smart/ToolsField.vue
 packages/workbench/src/components/OpLogPanel.vue
 packages/workbench/src/components/SearchOptionToggles.vue
 packages/workbench/src/components/SettingsShell.vue
@@ -42,3 +17,5 @@ packages/workbench/src/settings/fields/WordWrapField.vue
 packages/workbench/src/tabs/scriptRunTabKind.ts
 packages/workbench/src/tabs/terminalTabKind.ts
 packages/workbench/src/util/collectionMenu.ts
+permanent U64 packages/workbench/src/automations/run/RunPreview.vue # `--tools` and `--allowedTools` are claude CLI flag names, shown as the command line
+permanent U64 packages/workbench/src/automations/smart/ToolsField.vue # `--allowedTools` is a claude CLI flag name, shown as the command line

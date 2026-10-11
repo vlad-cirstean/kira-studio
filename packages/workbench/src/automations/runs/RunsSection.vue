@@ -5,6 +5,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import PanelBar from '@workbench/components/PanelBar.vue';
@@ -23,9 +24,9 @@ type Filter = 'all' | 'running' | 'failed';
 const open = usePersistedState('kira.automations.runsOpen', true);
 const filter = ref<Filter>('all');
 const FILTER_ITEMS = [
-  { value: 'all', label: 'All', testid: 'runs-filter-all' },
-  { value: 'running', label: 'Running', testid: 'runs-filter-running' },
-  { value: 'failed', label: 'Failed', testid: 'runs-filter-failed' },
+  { value: 'all', label: t('common.state.all.option'), testid: 'runs-filter-all' },
+  { value: 'running', label: t('common.state.running.status'), testid: 'runs-filter-running' },
+  { value: 'failed', label: t('common.state.failed.status'), testid: 'runs-filter-failed' },
 ];
 const expanded = ref<string | null>(null);
 const { data } = useScriptRuns();
@@ -51,7 +52,7 @@ function toggle(run: ScriptRun): void {
 <template>
   <section class="flex min-h-0 shrink-0 flex-col border-t border-border" data-testid="runs-section">
     <SectionHeading
-      label="Runs"
+      :label="t('automations.runs.title.label')"
       collapsible
       :expanded="open"
       :count="data?.length ?? 0"
@@ -68,7 +69,7 @@ function toggle(run: ScriptRun): void {
         />
       </PanelBar>
       <InlineState v-if="rows.length === 0" kind="empty" data-testid="runs-empty">
-        No runs.
+        {{ t('automations.runs.none.emptyHint') }}
       </InlineState>
       <div v-for="run in rows" :key="run.id" class="flex flex-col" data-testid="run-row" :data-state="run.state">
         <div :class="cn(rowVariants({ layout: 'tree' }), 'py-1 pl-1.5')">
@@ -83,10 +84,10 @@ function toggle(run: ScriptRun): void {
             <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
               {{ run.scriptName }}
               <span v-if="run.trigger === 'ade'" class="text-muted-foreground" data-testid="run-trigger">
-                · ADE · {{ run.taskTitle }}
+                · {{ t('automations.run.triggerAde.label', { task: run.taskTitle }) }}
               </span>
               <span v-else-if="run.trigger === 'scheduled'" class="text-muted-foreground" data-testid="run-trigger">
-                · scheduled
+                · {{ t('automations.run.triggerScheduled.label') }}
               </span>
             </span>
             <RunElapsed :run="run" class="text-kira-sm text-muted-foreground" />
@@ -98,7 +99,7 @@ function toggle(run: ScriptRun): void {
             data-testid="run-stop"
             @click="stop.mutate(run.id)"
           >
-            Stop
+            {{ t('common.action.stop.label') }}
           </Button>
         </div>
         <div v-if="expanded === run.id" class="px-1.5 pb-1.5">

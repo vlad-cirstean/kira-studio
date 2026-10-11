@@ -3,6 +3,7 @@ import type { ScriptKind, ScriptParam } from '@shared/domain/scripts';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
+import { CatalogText, t } from '@theme/i18n';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import { braceToken, envToken } from '@workbench/editor/fieldCompletion';
 import { computed } from 'vue';
@@ -32,7 +33,7 @@ const used = computed(() => parts.value.length > 1);
 
 <template>
   <Field>
-    <FieldLabel for="script-command">{{ isSmart ? 'Prompt' : 'Command' }}</FieldLabel>
+    <FieldLabel for="script-command">{{ isSmart ? t('automations.script.prompt.label') : t('common.field.command.label') }}</FieldLabel>
     <AutocompleteField
       id="script-command"
       v-model="body"
@@ -45,15 +46,21 @@ const used = computed(() => parts.value.length > 1);
       :range-highlights="highlights"
       :hover-at="hover"
       :invalid="!!error"
-      :placeholder="isSmart ? 'Summarize the open TODOs in this folder' : 'npm run build'"
+      :placeholder="isSmart ? t('automations.script.promptExample.example') : t('automations.script.commandExample.example')"
       class="w-full"
       data-testid="script-dialog-command"
     />
     <FieldError v-if="error" data-testid="script-dialog-command-error">{{ error }}</FieldError>
     <FieldDescription v-if="used" data-testid="script-dialog-uses"><VarText :parts="parts" /></FieldDescription>
     <FieldDescription v-else-if="isSmart" data-testid="script-dialog-uses">
-      Use {name} to insert a parameter. Press <Kbd>{{ saveChord }}</Kbd> to save.
+      <CatalogText k="automations.script.insertHint.hint" :params="{ token: '{name}' }">
+        <template #chord><Kbd>{{ saveChord }}</Kbd></template>
+      </CatalogText>
     </FieldDescription>
-    <FieldDescription v-else>Runs in your login shell; lines run in order. Press <Kbd>{{ saveChord }}</Kbd> to save.</FieldDescription>
+    <FieldDescription v-else>
+      <CatalogText k="automations.script.shellHint.hint">
+        <template #chord><Kbd>{{ saveChord }}</Kbd></template>
+      </CatalogText>
+    </FieldDescription>
   </Field>
 </template>

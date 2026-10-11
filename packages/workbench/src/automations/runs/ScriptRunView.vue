@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useClaimPrompt } from '@workbench/prompts/promptsQueries';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, onMounted, ref } from 'vue';
@@ -49,7 +50,7 @@ function continueInTerminal(): void {
     cwd: r.cwd,
     launch: {
       command: `claude --resume ${shellQuote(r.sessionId)}`,
-      label: 'Claude Code',
+      label: t('common.product.claudeCode.label'),
       color: 'none',
       kind: 'claude-code',
     },
@@ -64,7 +65,7 @@ async function rerun(): Promise<void> {
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-2 p-3" data-testid="script-run-view">
     <div v-if="!run" class="text-kira-sm text-muted-foreground" data-testid="script-run-missing">
-      {{ query.isPending.value ? 'Loading…' : 'This run is no longer in the list.' }}
+      {{ query.isPending.value ? t('common.state.loading.loading') : t('automations.run.missing.emptyHint') }}
     </div>
     <template v-else>
       <div class="flex items-center gap-2" data-testid="script-run-header">
@@ -81,7 +82,7 @@ async function rerun(): Promise<void> {
           data-testid="run-review"
           @click="claim.mutate(`schedule:${run.id}`)"
         >
-          Review and run
+          {{ t('automations.run.review.label') }}
         </Button>
         <Button
           v-if="run.state === 'waiting'"
@@ -90,7 +91,7 @@ async function rerun(): Promise<void> {
           data-testid="run-decline"
           @click="decline.mutate(run.id)"
         >
-          Decline
+          {{ t('automations.run.decline.label') }}
         </Button>
         <Button
           v-if="run.state === 'running'"
@@ -100,7 +101,7 @@ async function rerun(): Promise<void> {
           data-testid="run-stop"
           @click="stop.mutate(run.id)"
         >
-          Stop
+          {{ t('common.action.stop.label') }}
         </Button>
       </div>
       <div v-if="ended" class="flex flex-col gap-1.5" data-testid="script-run-result">
@@ -113,7 +114,7 @@ async function rerun(): Promise<void> {
           data-testid="run-continue"
           @click="continueInTerminal"
         >
-          Continue in terminal
+          {{ t('automations.run.continue.label') }}
         </Button>
         <span v-if="error" class="text-kira-sm text-error">{{ error }}</span>
       </div>
@@ -121,7 +122,7 @@ async function rerun(): Promise<void> {
         {{ run.command }}
       </div>
       <details v-if="isSmart" class="text-kira-sm" data-testid="script-run-prompt">
-        <summary class="cursor-default text-muted-foreground">Prompt sent</summary>
+        <summary class="cursor-default text-muted-foreground">{{ t('automations.run.promptSent.label') }}</summary>
         <pre class="mt-1 whitespace-pre-wrap break-words font-data">{{ run.prompt }}</pre>
       </details>
       <RunLog v-if="run.state !== 'waiting' && run.state !== 'skipped'" :run-id="run.id" />

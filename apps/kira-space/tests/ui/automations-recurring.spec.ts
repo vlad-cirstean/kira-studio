@@ -223,7 +223,7 @@ test('a recurring row shows the clock and next fire; Edit schedule opens the Sch
   await openPanel(page);
   const row = page.locator(`[data-testid="script-${SCRIPT.id}"]`);
   await expect(row.locator('[data-testid="script-schedule-line"]')).toBeVisible();
-  await expect(row.locator('[data-testid="script-next"]')).toContainText('next');
+  await expect(row.locator('[data-testid="script-next"]')).toContainText('Next');
 
   await row.click({ button: 'right' });
   await page.locator('[data-testid="menu-item-edit-schedule"]').click();
@@ -310,7 +310,7 @@ test('contract: the runs list shows Skipped with its reason; a headless run open
   );
   const skipped = page.locator('[data-testid="run-row"][data-state="skipped"]');
   await expect(skipped.locator('[data-testid="run-status"]')).toHaveText('Skipped');
-  await expect(skipped.locator('[data-testid="run-trigger"]')).toContainText('scheduled');
+  await expect(skipped.locator('[data-testid="run-trigger"]')).toContainText('Scheduled');
   await skipped.locator('button').first().click();
   await expect(skipped.locator('[data-testid="run-outcome-reason"]')).toContainText(
     overlap.outcome.reason,

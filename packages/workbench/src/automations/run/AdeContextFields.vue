@@ -15,7 +15,7 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import VarText from '@theme/components/VarText.vue';
-import type { TextPart } from '@theme/varText';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId } from 'vue';
 
 const props = defineProps<{ needs: ScriptRunPreview['needs']; ade: ScriptRunAde | null }>();
@@ -25,16 +25,8 @@ const idBase = useId();
 const taskOpen = ref(false);
 
 const taskTitle = computed(
-  () => props.needs.tasks.find((t) => t.id === taskId.value)?.title ?? props.ade?.taskTitle ?? '',
+  () => props.needs.tasks.find((task) => task.id === taskId.value)?.title ?? props.ade?.taskTitle ?? '',
 );
-
-const contextParts = computed<TextPart[]>(() => {
-  const a = props.ade;
-  if (!a) return [];
-  const parts: TextPart[] = ['Task ', { name: 'task', value: a.taskTitle }];
-  if (a.branchLabel) parts.push(' on ', { name: 'branch', value: a.branchLabel });
-  return parts;
-});
 
 function pickTask(id: string): void {
   if (id !== taskId.value) branchId.value = '';
@@ -46,28 +38,28 @@ function pickTask(id: string): void {
 <template>
   <div class="flex flex-col gap-3" data-testid="run-ade">
     <Field v-if="needs.tasks.length > 0">
-      <FieldLabel :for="`${idBase}-task`">Task <span class="text-error">*</span></FieldLabel>
+      <FieldLabel :for="`${idBase}-task`">{{ t('automations.run.task.label') }} <span class="text-error">*</span></FieldLabel>
       <Popover v-model:open="taskOpen">
         <PopoverTrigger as-child>
           <Button :id="`${idBase}-task`" variant="dialog" size="kira-lg" class="justify-between" data-testid="run-task">
-            <span class="truncate">{{ taskTitle || 'Choose a task…' }}</span>
+            <span class="truncate">{{ taskTitle || t('automations.run.chooseTask.placeholder') }}</span>
             <CodiconIcon name="chevron-down" :size="12" />
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-96 max-w-[80vw] p-0">
           <Command :model-value="taskId" @update:model-value="(v) => pickTask(String(v))">
-            <CommandInput placeholder="Find a task…" />
+            <CommandInput :placeholder="t('automations.run.findTask.placeholder')" />
             <CommandList>
-              <CommandEmpty>No tasks.</CommandEmpty>
+              <CommandEmpty>{{ t('automations.run.noTasks.empty') }}</CommandEmpty>
               <CommandGroup>
                 <CommandItem
-                  v-for="t in needs.tasks"
-                  :key="t.id"
-                  :value="t.id"
-                  :keywords="[t.title]"
-                  :data-testid="`run-task-option-${t.id}`"
+                  v-for="task in needs.tasks"
+                  :key="task.id"
+                  :value="task.id"
+                  :keywords="[task.title]"
+                  :data-testid="`run-task-option-${task.id}`"
                 >
-                  {{ t.title }}
+                  {{ task.title }}
                 </CommandItem>
               </CommandGroup>
             </CommandList>
@@ -77,7 +69,7 @@ function pickTask(id: string): void {
     </Field>
 
     <Field v-if="needs.branches.length > 0">
-      <FieldLabel>Branch <span class="text-error">*</span></FieldLabel>
+      <FieldLabel>{{ t('common.field.branch.label') }} <span class="text-error">*</span></FieldLabel>
       <RadioGroup
         :model-value="branchId"
         class="gap-1.5"
@@ -100,7 +92,10 @@ function pickTask(id: string): void {
     </Field>
 
     <div v-if="ade" class="text-kira-sm text-muted-foreground" data-testid="run-ade-context">
-      <VarText :parts="contextParts" />
+      <CatalogText :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'">
+        <template #task><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template>
+        <template #branch><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template>
+      </CatalogText>
     </div>
   </div>
 </template>

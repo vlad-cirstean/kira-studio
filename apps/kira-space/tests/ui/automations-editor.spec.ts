@@ -322,7 +322,7 @@ test('contract: Edit schedule turns the schedule off on Save', async ({ relaunch
   });
   await openPanel(page);
   const row = page.locator(`[data-testid="script-${script.id}"]`);
-  await expect(row.locator('[data-testid="script-next"]')).toContainText('next');
+  await expect(row.locator('[data-testid="script-next"]')).toContainText('Next');
 
   await row.click({ button: 'right' });
   await page.locator('[data-testid="menu-item-edit-schedule"]').click();
@@ -333,5 +333,5 @@ test('contract: Edit schedule turns the schedule off on Save', async ({ relaunch
     .poll(() => control.log().find((e) => e.channel === IPC.customScriptsUpdate)?.args)
     .toMatchObject({ id: script.id, fields: { schedule: sent.fields.schedule } });
   await emitWailsEvent(page, IPC.customScriptsChanged, { collections: [], scripts: [updated] });
-  await expect(row.locator('[data-testid="script-next"]')).toHaveText('off');
+  await expect(row.locator('[data-testid="script-next"]')).toHaveText('Off');
 });
