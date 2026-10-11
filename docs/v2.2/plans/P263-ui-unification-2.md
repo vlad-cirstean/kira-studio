@@ -921,3 +921,35 @@ Deviations:
 - Reka renders tooltip text twice (visually hidden a11y copy), so the assert uses `toContainText`.
 - `WordWrapField` is a Switch (live setting), `EditRecreateSection`/`EditSize` and automations form toggles are Checkbox.
 - `createSettingsStore.ts` and `NotifyPromptsField` unchanged by design.
+
+## Close-out result
+
+Base `b43269636`. Commits (none pushed, hooks green, no `--no-verify`):
+
+- `b9eb9cdbc` tokens, folded guard exemptions, radio hit area, Card docs
+- `acca70f78` one resize cursor
+- `f654db821` de-flake `data-view`, `slick-grid`, `mutations` specs
+- `5eb92288d` de-flake studio visuals, re-record 4 baselines
+- docs and result (this commit)
+
+Findings fixed:
+
+- Card: `inset` holds text only (`bg-field` hides controls), `section` holds controls; stated in `cardVariants` comment and ARCHITECTURE.
+- Status-bar items: `AppMetricsItem`, `UpdateAvailableItem`, `RunsStatusItem` already `Button variant="toolbar" size="kira" class="h-control-sm gap-1 px-1.5"`; `ClaudeUsageItem` gained `font-normal`.
+- 16px token `text-kira-touch` (`--kira-t-touch`, fixed, not tied to Appearance font size): `ReplySheet`, `TerminalScreen`. Exemptions removed.
+- Board tokens `h-board-row` (40px), `h-board-row-tall` (68px): `AdeActionCell`, `AdeBranchRow`. Exemptions removed. `AdeTaskCard` U37 stays (selected fill on a card, not a row).
+- `WordWrapField` already `Switch` (Stream C).
+- Theme `RadioGroupItem` hit area `after:-inset-x-3 after:-inset-y-2` to `after:-inset-1`; `EnvironmentsView` override deleted, drag spec green.
+
+Legacy: no `destructive`/`err`/`note` variant, Alert `default` variant or alias left in code (grep 0; `note-text` is a colour token). Stale `destructive` text in ARCHITECTURE fixed. `scripts/ui-primitives-allowlist/` deleted; 16 permanent exemptions now named in `check-ui-primitives.sh` (EngineIcon, OriginIcon, MobileQr colours; log stderr colour; caret popups; radio-card tile; DOM-built grid cell; AppearancePane density preview; code/list boxes; Monaco view-zone DOM; markdown em scale; board card fill; shell row-resize cursor).
+
+Pixel check (shell, dock, ADE panel handle, Space ui spec, rest/hover/drag, screenshots viewed): thickness 2px, fill transparent then `rgb(0,120,212)` on hover and drag, hit area 4px, identical. One difference: cursor. Reka sets `ew-resize` globally on hover; the cva said `col-resize`. cva now `ew-resize`/`ns-resize` (SlickGrid resizer and shell dock cursor too); U31 regex covers all four names.
+
+Flakes, root causes (each reproduced under 6 CPU burners and 8 workers on 4 cores, then 32/32 clean):
+
+- `slick-grid` pacing: 60s default budget against ~33s unloaded and a p95 bound a single starved fling can break. Budget 240s; the gate takes up to three flings and passes on the first clean one (a real regression fails all). `slick-grid` resize drag: handle grabbed while column widths still autosize; now waits for settled width first. (Playwright summaries show test declaration lines 1233/1634, so the exact assertion was not recoverable.)
+- `data-view` pagination (new this run): `firstGutterNumber`/`lastGutterNumber` read the first/last DOM node; SlickGrid recycles row nodes, so a stale far row (`80`) read before the post-scroll render. Now page row 0 and highest `data-row`.
+- `mutations`: single 7-scenario test at 60s default, ~13s unloaded; budget 180s.
+- Visuals: `console` caret blink and scrollbar fade (JS-driven, no stable pair); `data-grid`/`console` codicon font painting late (`settleFonts`); `schema-dialog` captured before the lazy Monaco chunk mounted (no editor, mask target missing). Also `connection-dialog`, `console`, `data-grid`, `schema-dialog` baselines had drifted inside the 0.2 pixel threshold (scrim 0.3 vs old 0.1, alert `/20` border vs old grey), leaving no margin for jitter; re-recorded and viewed.
+
+Deviations: none from §5.5. Space `ui`, `ui-timing` and Go untouched.
