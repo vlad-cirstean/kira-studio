@@ -4,9 +4,6 @@
  * `BranchPicker.vue`'s row list. Framework-agnostic so they test on their own.
  */
 
-import type { MenuItem as ContextMenuItem } from '@workbench/state/contextMenu';
-import { codiconName } from '../icons/index.ts';
-
 export interface MenuItem {
   readonly id: string;
   readonly label: string;
@@ -56,31 +53,4 @@ export function enabledNeighbour(
 /** The first enabled item overall — what a freshly-opened menu focuses. */
 export function firstEnabled(items: readonly MenuItem[]): string | undefined {
   return items.find((item) => !item.disabled)?.id;
-}
-
-/** A git `MenuSection[]` as the workbench context-menu store's item list: sections joined by
- *  separators, `onSelect` called with the chosen item's id. A disabled item's reason becomes its
- *  hover hint. */
-export function sectionsToMenuItems(
-  sections: readonly MenuSection[],
-  onSelect: (id: string) => void | Promise<void>,
-): ContextMenuItem[] {
-  const out: ContextMenuItem[] = [];
-  for (const section of sections) {
-    if (section.items.length === 0) continue;
-    if (out.length > 0) out.push({ type: 'separator' });
-    for (const item of section.items) {
-      out.push({
-        type: 'item',
-        id: item.id,
-        label: item.label,
-        ...(item.icon ? { icon: codiconName(item.icon) } : {}),
-        ...(item.danger ? { danger: true } : {}),
-        disabled: item.disabled,
-        ...(item.disabled && item.disabledReason ? { hint: item.disabledReason } : {}),
-        run: () => onSelect(item.id),
-      });
-    }
-  }
-  return out;
 }

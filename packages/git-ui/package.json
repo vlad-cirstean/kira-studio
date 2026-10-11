@@ -12,7 +12,6 @@
   "dependencies": {
     "@kira/git-core": "workspace:*",
     "@kira/git-ipc": "workspace:*",
-    "@kira/kira-ui": "workspace:*",
     "@vscode/codicons": "0.0.46-24",
     "@vueuse/core": "15.0.0",
     "seti-icons": "0.0.4",
