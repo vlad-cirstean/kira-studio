@@ -589,7 +589,7 @@ function onBulkClose(): void {
         <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
              call site rather than kept as a shared primitive component. -->
         <!-- P105 §7: `role="radio"` on a Button wants a real radio input (`useSemanticElements`)
-             — a visually-hidden native `<input type="radio">` per swatch keeps the circle's own
+             — a visually-hidden native radio input per swatch keeps the circle's own
              styling exactly (an actual `ToggleGroupItem` would swap in `toggleVariants`' own
              rectangular look), with native Tab/Arrow-key/checked behaviour for free. `opacity-0`
              over the swatch's full area rather than `sr-only`'s 1px-clip technique — Playwright's

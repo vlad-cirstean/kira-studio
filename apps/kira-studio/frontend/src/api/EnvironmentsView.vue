@@ -3,10 +3,11 @@ import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -167,11 +168,11 @@ function onEditVariables(id: string, name: string): void {
   openVariableSetTab('environment', id, name);
 }
 
-// A failed activation leaves the clicked native radio checked while the store's active row is
-// unchanged; bumping the epoch re-keys the radios so they redraw from `isActive`.
-const radioEpoch = ref(0);
+// The group is controlled by the store's active row, so a failed activation leaves the radio on
+// the previous environment.
+const activeEnvironmentId = computed(() => variablesStore.environments.find((e) => e.isActive)?.id ?? '');
 async function onSetActive(id: string): Promise<void> {
-  if (!(await variablesStore.setActiveEnvironment(id))) radioEpoch.value++;
+  await variablesStore.setActiveEnvironment(id);
 }
 
 async function onDelete(id: string, name: string): Promise<void> {
@@ -245,23 +246,28 @@ useEventListener(listEl, 'keydown', (e) => {
       </div>
     </ViewToolbar>
 
-    <Alert v-if="variablesStore.error" variant="error" data-testid="environments-error">
-      <AlertDescription class="flex items-start gap-1.5">
-        <div class="flex-1">{{ variablesStore.error }}</div>
+    <Alert v-if="variablesStore.error" variant="error" strip data-testid="environments-error">
+      <AlertDescription>{{ variablesStore.error }}</AlertDescription>
+      <AlertAction>
         <Button
           variant="toolbar"
           size="kira-icon"
-          class="shrink-0"
           aria-label="Dismiss"
           data-testid="environments-error-dismiss"
           @click="variablesStore.dismissError"
         >
           <CodiconIcon name="close" :size="13" />
         </Button>
-      </AlertDescription>
+      </AlertAction>
     </Alert>
 
     <div ref="listEl" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
+      <RadioGroup
+        class="contents"
+        aria-label="Active environment"
+        :model-value="activeEnvironmentId"
+        @update:model-value="(id) => onSetActive(String(id))"
+      >
         <div
           v-for="env in displayEnvironments"
           :key="env.id"
@@ -286,14 +292,10 @@ useEventListener(listEl, 'keydown', (e) => {
           </span>
           <Tooltip>
             <TooltipTrigger as-child>
-              <input
-                :key="radioEpoch"
-                type="radio"
-                name="active-environment"
+              <RadioGroupItem
+                :value="env.id"
                 :aria-label="`Active environment: ${env.name}`"
-                :checked="env.isActive"
                 data-testid="environment-active"
-                @change="onSetActive(env.id)"
               />
             </TooltipTrigger>
             <TooltipContent>Active</TooltipContent>
@@ -349,6 +351,7 @@ useEventListener(listEl, 'keydown', (e) => {
           <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
           <EmptyTitle>No matches</EmptyTitle>
         </Empty>
+      </RadioGroup>
     </div>
   </div>
 </template>

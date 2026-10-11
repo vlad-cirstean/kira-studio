@@ -24,11 +24,12 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { Field, FieldLabel } from '@theme/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { RadioGroup } from '@theme/components/ui/radio-group';
 import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -37,6 +38,7 @@ import SwatchRadio from '@theme/SwatchRadio.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { RadioGroupItem } from 'reka-ui';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
@@ -677,26 +679,25 @@ const preconnectText = computed({
           data-testid="connection-engine-search"
         />
 
-        <fieldset class="grid grid-cols-3 gap-1.5 content-start m-0 border-0 p-0" aria-label="Connection kind" data-testid="connection-kind">
+        <RadioGroup
+          class="grid-cols-3 gap-1.5 content-start"
+          aria-label="Connection kind"
+          :model-value="draft.kind"
+          data-testid="connection-kind"
+          @update:model-value="(v) => pickKind(String(v) as ConnectionKind)"
+        >
           <Tooltip v-for="kind in filteredKinds" :key="kind">
             <TooltipTrigger as-child>
-              <div
-                class="relative flex flex-col items-start gap-1 py-3 px-2 border rounded-kira bg-bg cursor-pointer text-left text-inherit not-data-[off]:hover:bg-hover not-data-[off]:hover:border-border-strong focus-within:border-focus data-[off]:opacity-40 data-[off]:cursor-default"
+              <!-- reka's own item: the theme RadioGroupItem is the 14px radio dot, this is a card. -->
+              <RadioGroupItem
+                :value="kind"
+                :disabled="!SUPPORTED_KINDS.has(kind)"
+                :aria-label="KIND_LABEL[kind]"
+                :data-testid="`connection-kind-${kind}`"
+                class="relative flex cursor-pointer flex-col items-start gap-1 rounded-kira border bg-bg px-2 py-3 text-left text-inherit not-data-[disabled]:hover:border-border-strong not-data-[disabled]:hover:bg-hover data-[disabled]:cursor-default data-[disabled]:opacity-50"
                 :class="draft.kind === kind ? 'border-focus' : 'border-border'"
-                :data-off="SUPPORTED_KINDS.has(kind) ? undefined : ''"
+                @click="pickKind(kind)"
               >
-                <input
-                  type="radio"
-                  name="connection-kind"
-                  class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  :value="kind"
-                  :checked="draft.kind === kind"
-                  :disabled="!SUPPORTED_KINDS.has(kind)"
-                  :aria-label="KIND_LABEL[kind]"
-                  :data-testid="`connection-kind-${kind}`"
-                  @click="pickKind(kind)"
-                  @change="pickKind(kind)"
-                />
                 <span
                   class="flex mb-1"
                   :class="SUPPORTED_KINDS.has(kind) ? KIND_ACCENT_CLASS[kind] : 'text-muted-foreground'"
@@ -704,11 +705,11 @@ const preconnectText = computed({
                   <EngineIcon :kind="kind" :size="22" />
                 </span>
                 <span class="text-kira-md text-fg">{{ KIND_LABEL[kind] }}</span>
-              </div>
+              </RadioGroupItem>
             </TooltipTrigger>
             <TooltipContent>{{ KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported') }}</TooltipContent>
           </Tooltip>
-        </fieldset>
+        </RadioGroup>
       </div>
     </template>
     <template v-else>
@@ -749,7 +750,7 @@ const preconnectText = computed({
               </fieldset>
             </Field>
           </div>
-          <span v-if="fieldErrors.name" class="text-error text-kira-sm leading-normal">{{ fieldErrors.name }}</span>
+          <FieldError v-if="fieldErrors.name">{{ fieldErrors.name }}</FieldError>
 
           <p v-if="minVersionNote" class="m-0 text-muted-foreground text-kira-sm" data-testid="connection-min-version">
             {{ minVersionNote }}
@@ -801,7 +802,7 @@ const preconnectText = computed({
                 </Button>
               </div>
             </Field>
-            <span v-if="fieldErrors.database" class="text-error text-kira-sm leading-normal">{{ fieldErrors.database }}</span>
+            <FieldError v-if="fieldErrors.database">{{ fieldErrors.database }}</FieldError>
           </template>
           <template v-else-if="draft.mode === 'fields'">
             <div v-if="!isAwsStyle" class="flex gap-2 items-start">
@@ -823,7 +824,7 @@ const preconnectText = computed({
                 />
               </Field>
             </div>
-            <span v-if="fieldErrors.host" class="text-error text-kira-sm leading-normal">{{ fieldErrors.host }}</span>
+            <FieldError v-if="fieldErrors.host">{{ fieldErrors.host }}</FieldError>
             <div v-if="isAwsStyle" class="flex gap-2 items-start">
               <Field class="flex-1">
                 <FieldLabel>Region</FieldLabel>
@@ -957,9 +958,9 @@ const preconnectText = computed({
                 @update:model-value="(v: string | number) => setThrottlePerSec(String(v))"
               />
             </div>
-            <span v-if="throttlePerSecError" class="text-error text-kira-sm leading-normal" data-testid="connection-throttle-error">
+            <FieldError v-if="throttlePerSecError" data-testid="connection-throttle-error">
               {{ throttlePerSecError }}
-            </span>
+            </FieldError>
             <span v-else class="text-subtle text-kira-sm leading-normal w-full">
               0 disables the limit. Reads served from cache are never throttled, and connecting is
               never throttled. Applies immediately to a connected connection.
@@ -986,7 +987,7 @@ const preconnectText = computed({
               connects.
             </span>
           </Field>
-          <span v-if="fieldErrors.preconnect" class="text-error text-kira-sm leading-normal">{{ fieldErrors.preconnect }}</span>
+          <FieldError v-if="fieldErrors.preconnect">{{ fieldErrors.preconnect }}</FieldError>
 
           <Label v-if="preconnectText" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
@@ -1036,7 +1037,7 @@ const preconnectText = computed({
               data-testid="connection-mcp-description"
               @keydown="wrapSelectionOnType"
             />
-            <span v-if="fieldErrors.mcpDescription" class="text-error text-kira-sm leading-normal">{{ fieldErrors.mcpDescription }}</span>
+            <FieldError v-if="fieldErrors.mcpDescription">{{ fieldErrors.mcpDescription }}</FieldError>
           </Field>
 
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
@@ -1107,9 +1108,14 @@ const preconnectText = computed({
           <template v-else>
             <div v-if="maskRules.length" class="flex flex-col gap-1 max-h-55 overflow-y-auto" data-testid="mask-rule-list">
               <div v-for="rule in maskRules" :key="rule.id" class="flex items-center gap-1.5 py-1 border-b border-border" :data-testid="`mask-rule-${rule.id}`">
-                <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-fg font-data" :title="`${rule.tableName}.${rule.columnName}`"
-                  >{{ rule.tableName }}.{{ rule.columnName }}</span
-                >
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-fg font-data"
+                      >{{ rule.tableName }}.{{ rule.columnName }}</span
+                    >
+                  </TooltipTrigger>
+                  <TooltipContent>{{ rule.tableName }}.{{ rule.columnName }}</TooltipContent>
+                </Tooltip>
                 <NativeSelect
                   variant="bordered"
                   :model-value="rule.kind"
@@ -1172,7 +1178,7 @@ const preconnectText = computed({
               <Button variant="dialog" size="kira-lg" data-testid="mask-rule-add" @click="onAddMaskRule">Add</Button>
             </div>
             <p class="text-subtle text-kira-sm leading-normal w-full">{{ MASK_KIND_EXPLANATION[newMaskKind] }}</p>
-            <span v-if="maskRuleError" class="text-error text-kira-sm leading-normal" data-testid="mask-rule-error">{{ maskRuleError }}</span>
+            <FieldError v-if="maskRuleError" data-testid="mask-rule-error">{{ maskRuleError }}</FieldError>
 
             <Button variant="dialog" size="kira-lg" class="self-start" data-testid="mask-regenerate-key" @click="onRegenerateMaskKey">
               Regenerate correlation key
@@ -1195,12 +1201,7 @@ const preconnectText = computed({
           </TabsContent>
 
           <div class="flex flex-col gap-3 px-3 pb-3 empty:hidden">
-          <span
-            v-if="connectionDialogStore.error"
-            class="text-error text-kira-sm leading-normal"
-            data-testid="connection-save-error"
-            >{{ connectionDialogStore.error }}</span
-          >
+          <FieldError v-if="connectionDialogStore.error" data-testid="connection-save-error">{{ connectionDialogStore.error }}</FieldError>
 
           <!-- P25 D8: three states driven by connectionsStore.secretStorage, replacing the old
                unconditional plaintext warning — a null secretStatus (not hydrated yet) renders
@@ -1286,11 +1287,5 @@ const preconnectText = computed({
         </Button>
       </DialogFooter>
     </DialogContent>
-    <!-- P110 I2-18: the `.kind` hover/selected/focus-within/off compound rules (previously kept as
-         scoped CSS -- see this file's own P110 B35/B37 history) folded into the tile's own classes
-         above: `not-data-[off]:hover:` and `data-[off]:` variants off a `data-off` attribute
-         (compile-verified), `focus-within:border-focus`, and a `draft.kind === kind` ternary for the
-         selected/default border color (kept out of the static class list, alongside the hover/
-         focus-within variants, to avoid a same-group static-vs-conditional fight). -->
   </Dialog>
 </template>

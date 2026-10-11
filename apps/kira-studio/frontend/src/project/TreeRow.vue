@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -45,6 +47,8 @@ const icon = computed(() => {
   if (props.row.kind === 'column' && props.row.detail) return columnTypeIcon(props.row.detail);
   return nodeIcon(props.row.kind === 'connection' ? 'connection' : props.row.kind);
 });
+
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'error'> = { connected: 'ok', connecting: 'warn', error: 'error' };
 
 const statusTitle = computed(() => {
   if (props.row.kind !== 'connection') return undefined;
@@ -150,21 +154,17 @@ function onKeydown(e: KeyboardEvent): void {
          own explicit aria-label by hand (no more directive mirroring it in automatically), so
          dropping it here would leave this button nameless. -->
     <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick">
-      <CodiconIcon
-        v-if="row.loading"
-        name="loading"
-        class="animate-spin"
-        data-testid="tree-row-spinner"
-        :size="13"
-      />
+      <Spinner v-if="row.loading" label="" data-testid="tree-row-spinner" />
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </TreeTwisty>
 
     <span v-if="row.kind === 'connection'" class="size-4 flex items-center justify-center shrink-0">
       <Tooltip :disabled="!statusTitle">
         <TooltipTrigger as-child>
-          <span
-            class="status-dot shrink-0 w-2 h-2 rounded-full bg-disabled data-[status=connected]:bg-ok data-[status=connecting]:bg-warn data-[status=connecting]:animate-pulse data-[status=error]:bg-error"
+          <StatusDot
+            class="status-dot"
+            :tone="STATUS_TONE[row.status ?? 'disconnected'] ?? 'muted'"
+            :pulse="row.status === 'connecting'"
             :data-status="row.status"
           />
         </TooltipTrigger>

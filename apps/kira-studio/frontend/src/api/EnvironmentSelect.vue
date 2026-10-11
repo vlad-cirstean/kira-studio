@@ -91,11 +91,10 @@ function manage(): void {
         </button>
       </DropdownMenuTrigger>
     </div>
-    <DropdownMenuContent align="end" class="w-52" data-testid="api-environment-menu">
+    <DropdownMenuContent align="end" data-testid="api-environment-menu">
       <DropdownMenuRadioGroup :model-value="radioValue" @update:model-value="onSelect">
         <DropdownMenuRadioItem
           :value="NONE"
-          class="h-control"
           data-testid="api-environment-option-none"
           data-value=""
         >
@@ -107,7 +106,6 @@ function manage(): void {
           v-for="env in variablesStore.environments"
           :key="env.id"
           :value="env.id"
-          class="h-control"
           data-testid="api-environment-option"
           :data-value="env.id"
         >
@@ -120,7 +118,7 @@ function manage(): void {
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuItem class="h-control" data-testid="api-environment-manage" @select="manage">
+      <DropdownMenuItem data-testid="api-environment-manage" @select="manage">
         <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Manage environments…</span>
       </DropdownMenuItem>
     </DropdownMenuContent>

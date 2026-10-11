@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { computed } from 'vue';
 import { useCollectionsStore } from './state/collections';
 
@@ -35,63 +35,55 @@ function plural(n: number, noun: string): string {
 </script>
 
 <template>
-  <Alert v-if="report" :variant="tone" data-testid="import-report">
-    <AlertDescription class="flex items-start gap-1.5">
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <div data-testid="import-report-summary">{{ summary }}</div>
-        <ul v-if="report.warnings.length > 0" class="m-0 flex flex-col gap-0.5 pl-2">
-          <li v-for="warning in report.warnings" :key="warning.kind" :data-kind="warning.kind">
-            {{ warning.detail }}
-          </li>
-        </ul>
-      </div>
+  <Alert v-if="report" :variant="tone" strip data-testid="import-report">
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <div data-testid="import-report-summary">{{ summary }}</div>
+      <ul v-if="report.warnings.length > 0" class="m-0 flex flex-col gap-0.5 pl-2">
+        <li v-for="warning in report.warnings" :key="warning.kind" :data-kind="warning.kind">
+          {{ warning.detail }}
+        </li>
+      </ul>
+    </div>
+    <AlertAction>
       <TooltipIconButton
         icon="close"
         label="Dismiss"
-        class="ml-auto shrink-0"
         data-testid="import-report-dismiss"
         @click="collectionsStore.dismissReport"
       />
-    </AlertDescription>
+    </AlertAction>
   </Alert>
   <!-- P5 D16: the export path's own strip, independent of the import one above (a session can
        export without ever having imported). -->
-  <Alert v-if="collectionsStore.exportWarning" variant="warn" data-testid="export-warning">
-    <AlertDescription class="flex items-start gap-1.5">
-      <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.exportWarning }}</div>
+  <Alert v-if="collectionsStore.exportWarning" variant="warn" strip data-testid="export-warning">
+    <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.exportWarning }}</div>
+    <AlertAction>
       <TooltipIconButton
         icon="close"
         label="Dismiss"
-        class="ml-auto shrink-0"
         data-testid="export-warning-dismiss"
         @click="collectionsStore.dismissExportWarning"
       />
-    </AlertDescription>
+    </AlertAction>
   </Alert>
   <!-- P108 F10: every tree mutation (create/rename/delete/duplicate/save/import/export) used to
        let its own failure throw uncaught from a fire-and-forget `void` call — nothing told the
-       user why a row didn't change. `variant="destructive"` mirrors the existing pattern
-       VariableSetView.vue/BulkVariablesEditor.vue already use for their own store-level errors. -->
-  <Alert v-if="collectionsStore.error" variant="error" data-testid="collections-error">
-    <AlertDescription class="flex items-start gap-1.5">
-      <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.error }}</div>
+       user why a row didn't change. -->
+  <Alert v-if="collectionsStore.error" variant="error" strip data-testid="collections-error">
+    <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.error }}</div>
+    <AlertAction>
       <TooltipIconButton
         icon="close"
         label="Dismiss"
-        class="ml-auto shrink-0"
         data-testid="collections-error-dismiss"
         @click="collectionsStore.dismissError"
       />
-    </AlertDescription>
+    </AlertAction>
   </Alert>
   <!-- P112 §4.3: a failed tree List used to reject into a void'd promise with nothing shown — this
        is the read side's own strip, alongside the mutation-failure one above. No dismiss: it
        clears itself once the query's own retry/next refetch succeeds. -->
-  <Alert
-    v-if="collectionsStore.treeLoadError"
-    variant="error"
-    data-testid="collections-tree-load-error"
-  >
+  <Alert v-if="collectionsStore.treeLoadError" variant="error" strip data-testid="collections-tree-load-error">
     <AlertDescription>{{ collectionsStore.treeLoadError }}</AlertDescription>
   </Alert>
 </template>

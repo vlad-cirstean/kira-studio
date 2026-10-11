@@ -209,7 +209,7 @@ const TREE_SHORTCUTS = [
 
 // P21 D6/D9: fires only while a tree row holds real DOM focus (the roving tabindex TreeRow.vue
 // already sets) — this is a descendant of ProjectPanel's own type-ahead keydown handler, so it
-// runs first on the bubble path, and every key it claims (Enter, a Cmd/Ctrl combo, F2, Delete) is
+// runs first on the bubble path, and every key it claims (Enter, a Cmd or Ctrl combo, F2, Delete) is
 // one the type-ahead handler already ignores (its own single-printable-character guard).
 function onTreeKeydown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.isComposing) return;

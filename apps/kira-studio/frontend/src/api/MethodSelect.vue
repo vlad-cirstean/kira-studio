@@ -49,13 +49,13 @@ function select(method: unknown): void {
         </button>
       </DropdownMenuTrigger>
     </div>
-    <DropdownMenuContent align="start" class="w-36" data-testid="method-menu">
+    <DropdownMenuContent align="start" data-testid="method-menu">
       <DropdownMenuRadioGroup :model-value="props.modelValue" @update:model-value="select">
         <DropdownMenuRadioItem
           v-for="m in HTTP_METHODS"
           :key="m"
           :value="m"
-          :class="cn('h-control font-medium', methodTextClass(httpMethodToken(m)))"
+          :class="cn('font-medium', methodTextClass(httpMethodToken(m)))"
           :data-testid="`method-menu-item-${m}`"
           :data-value="m"
         >

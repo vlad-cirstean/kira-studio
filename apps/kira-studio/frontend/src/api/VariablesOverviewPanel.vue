@@ -6,6 +6,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
+import { tableCellClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { copyOrReportError } from '@workbench/util/clipboard';
@@ -128,8 +129,8 @@ function editEnvironmentVariables(): void {
         <div
           v-for="row in filteredRows"
           :key="`${row.scope}:${row.id}`"
-          class="grid min-w-0 items-center gap-1 rounded-kira-sm px-1 py-0.5 grid-cols-[1.2fr_2fr_auto_1.5fr]"
-          :class="{ 'opacity-50': row.shadowed }"
+          class="grid min-w-0 grid-cols-[1.2fr_2fr_auto_1.5fr] items-center gap-1"
+          :class="[tableRowClass, tableCellClass, { 'opacity-50': row.shadowed }]"
           data-testid="variables-overview-row"
           :data-scope="row.scope"
           :data-shadowed="row.shadowed"
@@ -176,7 +177,7 @@ function editEnvironmentVariables(): void {
         <Button
           v-if="canEdit"
           variant="link" size="kira"
-          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle disabled:opacity-60"
+          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
           @click="editCollectionVariables"
@@ -186,7 +187,7 @@ function editEnvironmentVariables(): void {
         <Button
           v-if="canEdit"
           variant="link" size="kira"
-          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle disabled:opacity-60"
+          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"
           @click="editEnvironmentVariables"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -83,20 +83,18 @@ function close(): void {
         :variant="stripTone"
         data-testid="copy-as-curl-strip"
       >
-        <AlertDescription class="flex items-start gap-1.5">
-          <span>{{ stripText }}</span>
+        <AlertDescription>{{ stripText }}</AlertDescription>
+        <AlertAction v-if="maskedNames.length > 0">
           <Button
-            v-if="maskedNames.length > 0"
             variant="dialog"
             size="kira"
-            class="ml-auto shrink-0"
             :disabled="copyAsCurlStore.revealing"
             data-testid="copy-as-curl-reveal"
             @click="onReveal"
           >
             Show secret values
           </Button>
-        </AlertDescription>
+        </AlertAction>
       </Alert>
 
       <div v-if="hasDynamicValue" class="text-kira-sm text-muted-foreground" data-testid="copy-as-curl-dynamic-note">

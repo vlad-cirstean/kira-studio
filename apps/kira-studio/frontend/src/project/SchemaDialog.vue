@@ -144,7 +144,7 @@ async function onSave(): Promise<void> {
           @update:doc="onDocChange"
         />
       </div>
-      <Alert variant="info" class="self-stretch rounded-kira-sm border border-border" data-testid="schema-parse-summary">
+      <Alert variant="info" data-testid="schema-parse-summary">
         <AlertDescription>
           <span v-if="parseSummary">{{ parseSummary }}</span>
           <span v-else class="text-subtle text-kira-sm">
@@ -158,9 +158,7 @@ async function onSave(): Promise<void> {
 
       <DialogFooter>
         <template #start>
-          <span v-if="saveError" class="text-kira-sm leading-normal text-error" data-testid="schema-save-error">{{
-            saveError
-          }}</span>
+          <FieldError v-if="saveError" data-testid="schema-save-error">{{ saveError }}</FieldError>
           <span v-else class="help text-subtle text-kira-sm leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         </template>
         <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>

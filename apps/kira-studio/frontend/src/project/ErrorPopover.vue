@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { copyOrReportError } from '@workbench/util/clipboard';
@@ -41,10 +42,10 @@ function onCopy(): void {
         class="border border-border-strong shadow-kira-dialog overflow-hidden w-80 max-h-60 gap-0 p-0 z-(--kira-z-menu) max-w-[calc(100vw-8px)]"
         data-testid="error-popover"
       >
-        <div class="overflow-auto whitespace-pre-wrap break-words p-2 text-error font-data">{{ props.message }}</div>
-        <div v-if="copyError" class="px-2 pb-1 text-kira-sm text-error" data-testid="error-popover-copy-error">
+        <FieldError class="overflow-auto whitespace-pre-wrap break-words p-2 font-data text-kira-md">{{ props.message }}</FieldError>
+        <FieldError v-if="copyError" class="px-2 pb-1" data-testid="error-popover-copy-error">
           Copy failed: {{ copyError }}
-        </div>
+        </FieldError>
         <!-- Footer is the same 28px band used everywhere a toolbar sits at the edge of a floating
              surface, with the border on top since this one closes the popover. -->
         <ViewToolbar border="top">

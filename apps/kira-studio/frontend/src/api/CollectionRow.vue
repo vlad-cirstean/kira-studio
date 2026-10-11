@@ -131,6 +131,7 @@ function onKeydown(e: KeyboardEvent): void {
     <Badge
       v-else-if="row.kind === 'request'"
       variant="chip"
+      data
       class="method w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-sm"
       :class="methodTextClass(httpMethodToken(row.method))"
       >{{ row.method }}</Badge
@@ -152,7 +153,7 @@ function onKeydown(e: KeyboardEvent): void {
         <span class="min-w-0 overflow-hidden text-ellipsis">
           <template v-for="(part, i) in parts" :key="i">
             <!-- The same yellow search-match tint every other search-capable view in the app uses. -->
-            <mark v-if="part.hit" class="rounded-kira-sm text-inherit bg-warn/25">{{ part.text }}</mark>
+            <mark v-if="part.hit" class="rounded-kira-sm text-inherit bg-search-match">{{ part.text }}</mark>
             <template v-else>{{ part.text }}</template>
           </template>
         </span>
