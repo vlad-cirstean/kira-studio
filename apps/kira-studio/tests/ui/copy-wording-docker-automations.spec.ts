@@ -132,7 +132,7 @@ test('container context menu labels and order', async ({ relaunch }) => {
 test('empty container list says what to do next', async ({ relaunch }) => {
   const page = await setupDocker(relaunch, []);
 
-  const empty = tid(page, 'docker-list-empty');
+  const empty = tid(page, 'docker-panel').locator('[data-testid="docker-list-empty"]');
   await expect(empty).toContainText('No containers yet');
   await expect(empty).toContainText('Start one with docker run or docker compose up.');
 });

@@ -42,7 +42,20 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // P265: with the pseudo-locale on, every catalog message shows wrapped in ⟦…⟧, so any letter
 // outside a marker is a literal that skipped t(). Fixture names go through `allow`. Surfaces reuse the fixtures of the existing UI specs.
 
-const ALLOW: RegExp[] = [...PG_ALLOW];
+// Product and typeface names are proper nouns; `1k`/`10k` are page-size numerals.
+const NAMES =
+  /^(PostgreSQL|MariaDB|MySQL|SQLite|ClickHouse|MongoDB|Redis|Kafka|SQS|S3|Courier New|Menlo|SF Mono|Monaco|Andale Mono|PT Mono|JetBrains Mono|Fira Code|Source Code Pro|IBM Plex Mono|Cascadia Code|Hack|Inconsolata|Roboto Mono|\d+k)$/;
+// Column, table and key names from the fixtures: data, not chrome.
+const SCHEMA = /^(id|email|name|text|integer|order_id|product_id|quantity|orders|products)$/;
+const REDIS = /^(Test Redis \/|events|queue|session|tags|counter|leaderboard)$/;
+
+// Palette ids are raw by decision (Stream A); byte sizes are formatted data; the definition scope
+// note is Go-originated (backend text, P266).
+const PALETTE = /^(red|amber|green|cyan|blue|magenta|grey)$/;
+const BYTES = /^[\d.,]+ (B|KB|MB|GB)$/;
+const BACKEND_NOTE = /^Composed from catalog metadata:/;
+
+const ALLOW: RegExp[] = [...PG_ALLOW, NAMES, BYTES];
 const loc = (page: Page, testid: string) => page.locator(`[data-testid="${testid}"]`);
 
 async function pseudo(page: Page): Promise<void> {
@@ -82,11 +95,11 @@ test('connection dialog, every tab', async ({ relaunch }) => {
   await page.click('[data-testid="add-connection"]');
   const dialog = loc(page, 'connection-dialog');
   await expect(dialog).toBeVisible();
-  await expectCatalogText(dialog, { allow: ALLOW });
+  await expectCatalogText(dialog, { allow: [...ALLOW, PALETTE] });
   await page.click('[data-testid="connection-kind-postgres"]');
   for (const tab of ['general', 'advanced', 'preconnect', 'mcp']) {
     await loc(page, `connection-tab-${tab}`).click();
-    await expectCatalogText(dialog, { allow: ALLOW });
+    await expectCatalogText(dialog, { allow: [...ALLOW, PALETTE] });
   }
 });
 
@@ -96,7 +109,7 @@ test('settings dialog, every pane', async ({ relaunch }) => {
   await openSettings(page);
   for (const section of ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced']) {
     await loc(page, `settings-section-${section}`).click();
-    await expectCatalogText(loc(page, 'settings-dialog'), { allow: ALLOW });
+    await expectCatalogText(loc(page, 'settings-dialog'), { allow: [...ALLOW, SCHEMA] });
   }
 });
 
@@ -130,7 +143,7 @@ test('generate data dialog', async ({ relaunch }) => {
   await page.click('[data-testid="toolbar-generate-data"]');
   const dialog = loc(page, 'generate-data-dialog');
   await expect(dialog).toBeVisible();
-  await expectCatalogText(dialog, { allow: ALLOW });
+  await expectCatalogText(dialog, { allow: [...ALLOW, SCHEMA] });
 });
 
 test('console toolbar', async ({ relaunch }) => {
@@ -222,7 +235,9 @@ test('saved queries menu', async ({ relaunch }) => {
   await openItemsConsole(page);
   await page.click('[data-testid="console-saved-toggle"]');
   await expect(loc(page, 'console-saved-entry').first()).toBeVisible();
-  await expectCatalogText(loc(page, 'console-saved-menu'), { allow: ITEMS_ALLOW });
+  await expectCatalogText(loc(page, 'console-saved-menu'), {
+    allow: [...ITEMS_ALLOW, NAMES, SCHEMA],
+  });
 });
 
 test('explain result', async ({ relaunch }) => {
@@ -234,7 +249,7 @@ test('explain result', async ({ relaunch }) => {
   await page.click('[data-testid="console-explain"]');
   const result = view.locator('[data-testid="explain-result-view"]');
   await expect(result).toBeVisible();
-  await expectCatalogText(result, { allow: ITEMS_ALLOW });
+  await expectCatalogText(result, { allow: [...ITEMS_ALLOW, NAMES, SCHEMA] });
 });
 
 test('definition view, structure and source', async ({ relaunch }) => {
@@ -245,10 +260,10 @@ test('definition view, structure and source', async ({ relaunch }) => {
   await page.click('[data-testid="menu-item-open-definition"]');
   const view = loc(page, 'definition-view');
   await expect(view).toHaveAttribute('data-origin', 'composed', { timeout: 15_000 });
-  await expectCatalogText(view, { allow: ITEMS_ALLOW });
+  await expectCatalogText(view, { allow: [...ITEMS_ALLOW, NAMES, SCHEMA, BACKEND_NOTE] });
   await view.locator('[data-testid="definition-pane-source"]').click();
   await expect(view.locator('.monaco-host')).toBeVisible();
-  await expectCatalogText(view, { allow: ITEMS_ALLOW });
+  await expectCatalogText(view, { allow: [...ITEMS_ALLOW, NAMES, SCHEMA, BACKEND_NOTE] });
 });
 
 test('documents toolbar', async ({ relaunch }) => {
@@ -292,7 +307,7 @@ test('key-value view', async ({ relaunch }) => {
   const key = `${ns1}/key:user%3A1%3Abighash`;
   await (await findRow(page, db0)).dblclick();
   const browse = loc(page, 'browse-view');
-  await expectCatalogText(browse, { allow: [...ALLOW, /user|db0|key|\d/i] });
+  await expectCatalogText(browse, { allow: [...ALLOW, REDIS, /user|db0|key|\d/i] });
   await browse.locator(`[data-testid="browse-row"][data-path="${ns}"]`).dblclick();
   await browse.locator(`[data-testid="browse-row"][data-path="${ns1}"]`).dblclick();
   await browse.locator(`[data-testid="browse-row"][data-path="${key}"]`).dblclick();

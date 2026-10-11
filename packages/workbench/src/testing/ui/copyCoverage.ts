@@ -5,7 +5,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
 // `window.__kiraSetLocale` is installed under __KIRA_DEBUG_HOOKS__ (packages/theme/src/i18n).
 
 /** Subtrees whose text is data, not chrome: code, grid cells, editors, terminals, variable chips. */
-const SKIP_SUBTREE = 'pre, code, .font-data, [data-var], .monaco-editor, .xterm, .slick-cell';
+const SKIP_SUBTREE =
+  'pre, code, .font-data, [data-var], .monaco-editor, .xterm, .slick-cell, [data-testid$="-shortcut"]';
 const SKIP_TAGS = 'script, style, noscript, template';
 const TEXT_ATTRIBUTES = ['aria-label', 'title', 'placeholder'] as const;
 
@@ -46,13 +47,32 @@ export async function expectCatalogText(
     (roots, args): Offender[] => {
       const allowed = args.allow.map((a) => new RegExp(a.source, a.flags));
       const found: Offender[] = [];
+      // Marker depth runs across text nodes in document order: a message with element slots or text
+      // params renders as sibling nodes (`⟦`, param, ` at `, slot, `⟧`), and a param can itself be a
+      // marked message, so one node may open or close several levels.
+      let depth = 0;
       const hasBareLetter = (value: string): boolean => {
-        if (allowed.some((re) => re.test(value))) return false;
-        return /\p{L}/u.test(value.replace(/⟦[^⟧]*⟧/g, ''));
+        let bare = false;
+        for (const ch of value) {
+          if (ch === '⟦') depth++;
+          else if (ch === '⟧') depth = Math.max(0, depth - 1);
+          else if (depth === 0 && /\p{L}/u.test(ch)) bare = true;
+        }
+        return bare && !allowed.some((re) => re.test(value));
       };
       const describe = (el: Element): string => {
         const id = el.getAttribute('data-testid');
         return id ? `${el.tagName.toLowerCase()}[data-testid=${id}]` : el.tagName.toLowerCase();
+      };
+      const scanAttributes = (el: Element): void => {
+        for (const name of args.attributes) {
+          const value = el.getAttribute(name)?.trim();
+          if (!value) continue;
+          const saved = depth;
+          depth = 0;
+          if (hasBareLetter(value)) found.push({ where: `${name} of ${describe(el)}`, value });
+          depth = saved;
+        }
       };
       const visit = (node: Node): void => {
         if (node.nodeType === Node.TEXT_NODE) {
@@ -66,17 +86,15 @@ export async function expectCatalogText(
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const el = node as Element;
         if (el.matches(args.skipTags) || el.matches(args.skipSubtree)) return;
-        for (const name of args.attributes) {
-          const value = el.getAttribute(name)?.trim();
-          if (value && hasBareLetter(value)) {
-            found.push({ where: `${name} of ${describe(el)}`, value });
-          }
-        }
+        scanAttributes(el);
         // A textarea's child text is its value, not chrome.
         if (el.tagName === 'TEXTAREA') return;
         for (const child of Array.from(el.childNodes)) visit(child);
       };
-      for (const root of roots) visit(root);
+      for (const root of roots) {
+        depth = 0;
+        visit(root);
+      }
       return found;
     },
     {

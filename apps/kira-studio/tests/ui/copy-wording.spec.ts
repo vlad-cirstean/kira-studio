@@ -187,8 +187,9 @@ test('QueryState failure shows Couldn’t load and Retry', async ({ relaunch }) 
   });
   await modeTab(page, 'docker').click();
 
-  await expect(page.locator('[data-testid="query-error"]')).toContainText('Couldn’t load');
-  await expect(page.locator('[data-testid="query-retry"]')).toHaveText('Retry');
+  const panel = page.locator('[data-testid="docker-panel"]');
+  await expect(panel.locator('[data-testid="query-error"]')).toContainText('Couldn’t load');
+  await expect(panel.locator('[data-testid="query-retry"]')).toHaveText('Retry');
 });
 
 test('command palette placeholder and title', async ({ relaunch }) => {

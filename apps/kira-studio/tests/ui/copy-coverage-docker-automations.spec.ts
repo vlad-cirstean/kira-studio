@@ -130,7 +130,9 @@ function detail(c: Json): Json {
 // timestamps and the status text the engine reports.
 const DOCKER_DATA = [
   /solo|old-job|alpine|sha256|pgdata|shop_default|bridge|unix:|docker\.sock|hub\.docker/,
-  /^(Up|Exited)\b|^(Debian|linux|amd64|local)$/,
+  /^(Up|Exited)\b|^(Debian|linux|amd64|local|default)$/,
+  /^(running|exited|paused|restarting|created|dead|no|always|on-failure|unless-stopped|tcp|udp|sctp|volume|bind)$/,
+  /^workdir\b/,
   /^\s*[\d.,]+\s*(B|KB|MB|GB|kB|%|ms|s)?\s*$/,
   /\b\d+(\.\d+)?\s?(B|KB|MB|GB|kB)\b/,
   /\bago\b|\bUTC\b|\d{4}-\d{2}-\d{2}/,
@@ -206,7 +208,7 @@ test('container detail tabs and the container menu use catalog text', async ({ r
 test('container edit view and the recreate confirm use catalog text', async ({ relaunch }) => {
   const page = await setupDocker(relaunch);
 
-  await tid(page, 'docker-row').first().click();
+  await page.locator('[data-testid="docker-row"][data-name="solo"]').click();
   await tid(page, 'docker-tab-edit').click();
   const edit = tid(page, 'docker-edit');
   await expect(tid(page, 'docker-edit-inplace')).toBeVisible();
@@ -336,7 +338,7 @@ const AUTOMATIONS: ControlSnapshot[] = [
 
 // Script, run and folder names and the times the schedule derives from the clock.
 const AUTOMATIONS_DATA = [
-  /Nightly build|make build|\/kira\/|\/home\/test|^\s*UTC\s*$|0 9 \* \* 1-5/,
+  /Nightly build|make build|\/kira\/|\/home\/test|^\s*UTC\s*$|0 9 \* \* 1-5|^Topic$|^(red|amber|green|cyan|blue|magenta|grey)$|^\/automations\/$/,
   /\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}|\b\d+\s?(ms|s|m|h)\b/,
 ];
 
