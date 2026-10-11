@@ -134,18 +134,18 @@ duplicated here; this file only points at them.
   reports findings, never fixes. It writes them to a file under the current chapter's `plans/` and
   commits it before any fixer starts. Then one sequential Sonnet subagent fixes every finding (parallel
   only for a batch genuinely isolated from each other). Repeat the whole cycle for as many rounds as
-  asked — a round finding nothing real should say so, not manufacture a finding. No findings document
+  asked, each round over the full diff since the base — a round finding nothing real should say so, not manufacture a finding. No findings document
   survives a round once fixed. The fixer commits per logical group of related findings (same file,
   module or root cause), not one commit per finding, so the commit log stays short and still durable. Carry forward only a genuinely still-open item (see "Known open items"),
   never a running narrative of what each round found. **A review has no separate planner step.**
   The reviewer scopes its own area at the start of its run (owned files, one-hop callers, what
-  earlier rounds already fixed or parked) and goes straight to findings. It treats commits other
+  earlier rounds parked) and goes straight to findings. It treats commits other
   fixers made in its files since the base as unreviewed code. Implementation phases keep their
   Opus plan.
 - **A review's scope is everything changed since the last review session**, not the whole repo and not
   just the latest chapter. Find that session in git (the last commit of a prior review's findings or
   fixes, e.g. P108's close-out `771512bc`) and diff from there. State the base commit in the review's
-  findings file. Later rounds scope to what the previous round's fixes left.
+  findings file. Consecutive rounds each cover the full diff since that same base; a round-1 fixer's commits are unreviewed code in round 2.
 - No per-phase PRs. One feature branch per chapter.
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
   per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
