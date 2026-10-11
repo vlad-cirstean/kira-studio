@@ -869,3 +869,51 @@ On the landed `v2.0`, in order:
 - `git diff --stat 48558ea9b..HEAD -- '*.go'` touches only the §1.2 cataloged files and
   `packages/theme/src/i18n/*.go`.
 - Every suite of §5.5 step 4 green; every changed baseline listed in "Test and fix result".
+
+## Foundation result
+
+F0-F3 base: `8274838bd` (F0), `b45b48e26`, `e54d21f3b` (F3), `aa23a6fa8` (F1), `12576f8cd` (F2), `9f8ac0373` (fixes).
+
+F4 commits:
+
+- `fb530f5b2` refactor(theme,workbench): foundation text through the catalog
+- `b41610447` refactor: native menus, notifications and dialogs read the catalog
+- `46665ea6d` refactor: install i18n in every Vue app
+- `88fa3558b` test: catalog coverage helper
+- `5441c194a` chore(lint): per-stream copy allowlists
+- `feb72a8a3` docs: copy and i18n rules
+- this section (step 8)
+
+Step 5 (seed stream namespaces): F0 seeds kept, no commit.
+
+Typecheck wall time, `bun run typecheck` cold (tsbuildinfo cache removed), same machine:
+
+| Tree | Cold |
+|---|---|
+| F0 tip `8274838bd` | 69 s |
+| F1-F3 landed `9f8ac0373` | 62 s |
+| F4 tip | 80 s |
+
+F4 tip vs F0: +16 percent (under the 30 percent stop line). Warm run at F4 tip: 29 s. Run-to-run noise is about 10 s.
+
+Allowlists after step 6 (whole-file entries, files owed a migration): stream-a 142, stream-b 144, stream-c 129, total 415. `foundation.txt` holds 2 permanent U67 lines. `pending.txt` deleted. Foundation-owned files have zero other hits.
+
+Verified at the F4 tip: `bun run typecheck`, `bun run lint`, `bun run lint:dead`, `bun run test:unit` (1890 pass), `go build ./...`, `go vet ./...`, full `go test ./...`, `bun run lint:go` (0 issues), `build:test:studio`, `build:test:space`, `build:space-mobile`. No UI suite run. Test bundles carry `__kiraSetLocale`.
+
+Deviations:
+
+- `common.state.*` keys keep role leaves (`common.state.loading.loading`); `common.state.copied` omitted, callers use `common.copy.copied.announce`. Theme strings reuse `common.*` keys (`Spinner`, `SearchField`, `DialogHeader`, `SwatchRadio`, `RunState`, `ScriptProgress`) instead of new `theme.*` keys.
+- Added `common.copy.copiedWhat.announce` (`Copied {what}`) for the `copyAnnounced` shim and `useCopy({ what })`.
+- `useCopy().copy` takes `{ message }` as well as `{ what }`.
+- `ShowMoreButton` renders `workbench.showMore.remaining.label` (`Show more (N remaining)`); the `step` prop stays for callers and no longer shows in the text.
+- `TextPromptDialog` confirm button uses `common.action.save.label` (`OK` is banned; every caller names or renames something).
+- `ConfirmOptions.title` stays optional; the fallback is `workbench.confirmDialog.title`. The store state default is `''`.
+- `MIN_SERVER_VERSION` (shared) became an object of getters, so text resolves at read time and `ConnectionDialog` stays unchanged. `grpcStreamingLabel` now returns `Stream`/`Unary`.
+- `packages/shared/tsconfig.json` is new and `packages/workbench/tsconfig.json` gains `@theme/*`, so `bun test` resolves `@theme/i18n`. `packages/api-core/tsconfig.json` gains `@theme/*` and `../workbench/env.d.ts` (shared reaches the i18n index, which re-exports a `.vue` file).
+- `useRelativeTime` builds its VueUse options per call (`justNow` is a plain string there).
+- Spec wording updated in foundation scope: `tests/unit/sql-lint.spec.ts` (lint messages are catalog sentences now), `tests/ui/connections.spec.ts` (SQLite hint), contract fixtures `prompts-route.json` (both apps) and `dbmcp-route.json` (prompt titles lose the trailing `?`, per the catalog).
+- Space `main.ts` had no `__KIRA_DEBUG_HOOKS__` block; F4 added a one-line `if (__KIRA_DEBUG_HOOKS__) installCopyTestHook();` there.
+- `app.use(i18n)` not added to `apps/kira-studio/frontend/proto` (dev prototype, no `CatalogText`; `t()` needs no plugin).
+- Permanent lines in `scripts/copy-allowlist/foundation.txt`: `packages/shared/protocol/frame.ts` (protocol decode diagnostic, same class as backend errors, P266) and `packages/theme/src/components/ui/button/index.ts` (`title` is a variant name). Close-out folds them into `check-copy.ts`.
+- Catalog duplicates (C3) from F0 seeds still covered by `ALLOWED_DUPLICATES`; not tightened (carry to close-out).
+- Not pushed (caller instruction).
