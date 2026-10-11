@@ -36,7 +36,7 @@ describe('document byteLabel (P2 R2 #99)', () => {
 
     try {
       const view = documentRowsStore.rowView(tabId, 0);
-      expect(view?.byteLabel).toBe(`${expectedBytes} bytes`);
+      expect(view?.byteLabel).toBe(`${expectedBytes} B`);
     } finally {
       documentRowsStore.unregisterDocumentRows(tabId);
       documentRowsStore.resetRows(tabId);
@@ -54,7 +54,7 @@ describe('document byteLabel (P2 R2 #99)', () => {
 
     try {
       const view = documentRowsStore.rowView(tabId, 0);
-      expect(view?.byteLabel).toBe(`${body.length} bytes`);
+      expect(view?.byteLabel).toBe(`${body.length} B`);
     } finally {
       documentRowsStore.unregisterDocumentRows(tabId);
       documentRowsStore.resetRows(tabId);
