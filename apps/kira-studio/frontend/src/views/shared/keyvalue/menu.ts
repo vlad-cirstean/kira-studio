@@ -1,5 +1,6 @@
 import type { KeyValuePage } from '@shared/protocol/page';
-import { copyAnnounced } from '@workbench/behaviour/clipboard';
+import { t } from '@theme/i18n';
+import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 
 // Copy is always available; Download/Edit/Delete are appended only when the connection's caps say
@@ -27,16 +28,16 @@ export function rowMenu(opts: {
     {
       type: 'item',
       id: 'copy-field',
-      label: 'Copy field',
+      label: t('studio.keyValue.copyField.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(opts.field, 'field'),
+      run: () => void copyAndAnnounce(opts.field, t('studio.keyValue.copiedField.announce')),
     },
     {
       type: 'item',
       id: 'copy-value',
-      label: 'Copy value',
+      label: t('common.action.copyValue.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(opts.value, 'value'),
+      run: () => void copyAndAnnounce(opts.value, t('common.copy.copiedValue.announce')),
     },
   ];
 
@@ -45,7 +46,7 @@ export function rowMenu(opts: {
     items.push({
       type: 'item',
       id: 'download-object',
-      label: 'Download…',
+      label: t('common.action.download.label'),
       icon: 'cloud-download',
       run: opts.onDownload,
     });
@@ -58,7 +59,7 @@ export function rowMenu(opts: {
     items.push({
       type: 'item',
       id: 'edit-value',
-      label: opts.editable ? 'Edit value' : opts.editUnavailableLabel,
+      label: opts.editable ? t('studio.keyValue.editValue.label') : opts.editUnavailableLabel,
       icon: 'edit',
       disabled: !opts.editable,
       run: opts.onEdit,
@@ -72,7 +73,7 @@ export function rowMenu(opts: {
     items.push({
       type: 'item',
       id: 'delete-key',
-      label: isObject ? 'Delete object' : 'Delete key',
+      label: t(isObject ? 'studio.keyValue.deleteObject.label' : 'studio.keyValue.deleteKey.label'),
       icon: 'trash',
       danger: true,
       run: opts.onDelete,

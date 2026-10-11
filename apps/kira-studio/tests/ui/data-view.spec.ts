@@ -1339,7 +1339,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   const searchToolbar = page.locator('[data-testid="search-toolbar"]');
   await expect(searchToolbar).toBeVisible();
   await page.fill('[data-testid="search-input"]', '1');
-  await expect(page.locator('[data-testid="search-count"]')).not.toContainText('0 of 0');
+  await expect(page.locator('[data-testid="search-count"]')).not.toContainText('No matches');
   await page.click('[data-testid="search-match-case"]');
   await page.click('[data-testid="search-whole-word"]');
   await page.click('[data-testid="search-regex"]');
@@ -1368,7 +1368,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // The match counter is unaffected by filtering (D6) — every match is inside a visible row.
   await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3');
   await expect(page.locator('[data-testid="search-scope"]')).toContainText(
-    'showing 3 of 10 loaded rows',
+    'Showing 3 of 10 loaded rows',
   );
 
   // Prev/next and the current-match highlight still work while filtering (D6).

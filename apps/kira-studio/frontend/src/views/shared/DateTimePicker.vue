@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 
 // P24 D18: the app-owned month grid + clock steppers that replace the bare
@@ -93,21 +94,33 @@ function pickYear(y: number): void {
   mode.value = 'months';
 }
 
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MONTH_KEYS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+] as const;
+const monthNames = computed(() =>
+  MONTH_KEYS.map((m) => t(`studio.dateTimePicker.month.${m}.label`)),
+);
+const monthShortNames = computed(() =>
+  MONTH_KEYS.map((m) =>
+    m === 'may' ? t('studio.dateTimePicker.month.may.label') : t(`studio.dateTimePicker.monthShort.${m}.label`),
+  ),
+);
+const weekdayLabels = computed(() =>
+  (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map(
+    (d) => t(`studio.dateTimePicker.weekday.${d}.label`),
+  ),
+);
 
 function prevMonth(): void {
   if (viewMonth.value === 0) {
@@ -188,17 +201,21 @@ function pickNow(): void {
 const labelText = computed(() => {
   if (mode.value === 'months') return String(viewYear.value);
   if (mode.value === 'years') return `${yearBlockStart.value}–${yearBlockStart.value + 15}`;
-  return `${MONTH_NAMES[viewMonth.value]} ${viewYear.value}`;
+  return `${monthNames.value[viewMonth.value]} ${viewYear.value}`;
 });
 const pagePrevTitle = computed(() =>
   mode.value === 'days'
-    ? 'Previous month'
+    ? t('studio.dateTimePicker.previousMonth.tooltip')
     : mode.value === 'months'
-      ? 'Previous year'
-      : 'Previous 16 years',
+      ? t('studio.dateTimePicker.previousYear.tooltip')
+      : t('studio.dateTimePicker.previousYears.tooltip'),
 );
 const pageNextTitle = computed(() =>
-  mode.value === 'days' ? 'Next month' : mode.value === 'months' ? 'Next year' : 'Next 16 years',
+  mode.value === 'days'
+    ? t('studio.dateTimePicker.nextMonth.tooltip')
+    : mode.value === 'months'
+      ? t('studio.dateTimePicker.nextYear.tooltip')
+      : t('studio.dateTimePicker.nextYears.tooltip'),
 );
 
 // The three clock steppers, each a writable computed so <Input type="number"> can v-model
@@ -240,7 +257,7 @@ const secondText = computed<string>({
       <TooltipIconButton
         icon="chevron-left"
         :label="pagePrevTitle"
-        aria-label="Previous"
+        :aria-label="t('common.action.previous.label')"
         data-testid="datetime-picker-prev-month"
         @click="pagePrev"
       />
@@ -259,12 +276,12 @@ const secondText = computed<string>({
             {{ labelText }}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Jump by month or year</TooltipContent>
+        <TooltipContent>{{ t('studio.dateTimePicker.cycleView.tooltip') }}</TooltipContent>
       </Tooltip>
       <TooltipIconButton
         icon="chevron-right"
         :label="pageNextTitle"
-        aria-label="Next"
+        :aria-label="t('common.action.next.label')"
         data-testid="datetime-picker-next-month"
         @click="pageNext"
       />
@@ -272,7 +289,7 @@ const secondText = computed<string>({
     <div data-testid="datetime-picker-mode" :data-mode="mode">
       <template v-if="mode === 'days'">
         <div class="grid grid-cols-7 gap-0.5">
-          <span v-for="w in WEEKDAY_LABELS" :key="w" class="flex items-center justify-center text-subtle text-kira-sm h-4.5">{{ w }}</span>
+          <span v-for="w in weekdayLabels" :key="w" class="flex items-center justify-center text-subtle text-kira-sm h-4.5">{{ w }}</span>
         </div>
         <div class="grid grid-cols-7 gap-0.5">
           <Button
@@ -299,8 +316,8 @@ const secondText = computed<string>({
            layout — same day-cell chip, just a 4-column grid instead of a 7-column one (D33a). -->
       <div v-else-if="mode === 'months'" class="grid grid-cols-4 gap-0.5">
         <Button
-          v-for="(name, i) in MONTH_NAMES"
-          :key="name"
+          v-for="(_name, i) in monthNames"
+          :key="i"
           type="button"
           :variant="i === viewMonth ? 'toolbar-primary' : 'toolbar'"
           size="kira"
@@ -309,7 +326,7 @@ const secondText = computed<string>({
           :data-selected="i === viewMonth"
           @click="pickMonth(i)"
         >
-          {{ name.slice(0, 3) }}
+          {{ monthShortNames[i] }}
         </Button>
       </div>
       <div v-else class="grid grid-cols-4 gap-0.5">
@@ -360,7 +377,7 @@ const secondText = computed<string>({
       />
       <TooltipIconButton
         icon="clock"
-        label="Now"
+        :label="t('studio.dateTimePicker.now.label')"
         data-testid="datetime-picker-now"
         @click="pickNow"
       />

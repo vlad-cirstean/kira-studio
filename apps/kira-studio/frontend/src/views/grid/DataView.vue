@@ -300,7 +300,7 @@ function onCloseSearch(): void {
       v-if="rt?.searchOpen"
       :tab-id="tab.id"
       testid-prefix=""
-      row-noun="rows"
+      kind="rows"
       :api="pageSearchApi"
       :mask-preview-on="!!rt?.maskPreview"
       @go-to-match="onGoToMatch"

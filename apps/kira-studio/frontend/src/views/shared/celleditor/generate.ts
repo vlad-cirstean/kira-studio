@@ -1,4 +1,5 @@
 import { CROCKFORD_ALPHABET, crockfordBase32 } from '@shared/domain/mask';
+import type { MessageKey } from '@theme/i18n';
 import type { CellFormat } from './formats';
 
 // P42 D29: four values a developer routinely needs to type into a column by hand — pure and
@@ -56,34 +57,34 @@ function generateNow(format: CellFormat): string {
 
 export interface Generator {
   id: string;
-  label: string;
-  hint: string;
+  labelKey: MessageKey;
+  hintKey: MessageKey;
   run(format: CellFormat): string;
 }
 
 export const GENERATORS: readonly Generator[] = [
   {
     id: 'uuid',
-    label: 'UUID (v4)',
-    hint: 'A random 36-character dashed UUID.',
+    labelKey: 'studio.cellEditor.generate.uuid.label',
+    hintKey: 'studio.cellEditor.generate.uuid.description',
     run: () => crypto.randomUUID(),
   },
   {
     id: 'ulid',
-    label: 'ULID',
-    hint: 'A 26-character id that sorts by creation time.',
+    labelKey: 'studio.cellEditor.generate.ulid.label',
+    hintKey: 'studio.cellEditor.generate.ulid.description',
     run: generateUlid,
   },
   {
     id: 'token',
-    label: 'Random token',
-    hint: '32 random hex characters (128 bits).',
+    labelKey: 'studio.cellEditor.generate.token.label',
+    hintKey: 'studio.cellEditor.generate.token.description',
     run: generateToken,
   },
   {
     id: 'now',
-    label: 'Now',
-    hint: 'The current moment, spelled for the effective format.',
+    labelKey: 'studio.dateTimePicker.now.label',
+    hintKey: 'studio.cellEditor.generate.now.description',
     run: generateNow,
   },
 ];

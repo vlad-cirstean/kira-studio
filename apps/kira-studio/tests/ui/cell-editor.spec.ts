@@ -550,7 +550,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(invalidChip).toBeVisible();
   await invalidChip.hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    /broken JSON, invalid at offset \d+/,
+    /Broken JSON, invalid at offset \d+/,
   );
 
   await page.click('[data-testid="cell-editor-beautify-reset"]');
@@ -564,7 +564,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(invalidChip).toBeVisible();
   await invalidChip.hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    'not a valid timestamp for this format',
+    'Not a valid timestamp for this format.',
   );
 
   // Every row in the picker explains itself on hover (D28), reading from the same FORMAT_HELP
@@ -575,11 +575,11 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.click('[data-testid="cell-editor-format"]');
   await page.locator('[data-testid="menu-item-format-iso8601"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    'A calendar date and time, spelled as an ISO-8601 timestamp.',
+    'ISO 8601 date and time.',
   );
   await page.locator('[data-testid="menu-item-format-json"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    'A JSON document — objects and arrays get syntax highlighting and Beautify.',
+    'A JSON document. Objects and arrays get syntax highlighting and can be beautified.',
   );
   // The open tooltip's own popper content can still overlap the next menu item and intercept its
   // click — move off both trigger and content and let it close before clicking Auto.
@@ -1064,8 +1064,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(panel).toHaveAttribute('data-detected', 'hex');
   await expect(page.locator('[data-testid="cell-editor-decoded"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toContainText(
-    'not valid UTF-8',
-    { ignoreCase: true },
+    'aren’t valid text',
   );
 
   // No decoded pane for a non-binary format.

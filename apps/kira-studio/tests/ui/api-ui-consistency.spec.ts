@@ -746,9 +746,9 @@ test('the response find bar counts and steps through matches, and Escape clears 
   expect(findBarBox.y).toBeLessThan(bodyBox.y);
 
   await page.fill('[data-testid="http-find-input"]', 'Ada');
-  await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('1 of 2');
+  await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('Match 1 of 2');
   await page.click('[data-testid="http-find-next"]');
-  await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('2 of 2');
+  await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('Match 2 of 2');
   await expect(page.locator('.kira-ed-find-match-current')).toHaveCount(1);
 
   await page.keyboard.press('Escape');

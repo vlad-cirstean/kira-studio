@@ -5,6 +5,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
@@ -64,7 +65,7 @@ function summarize(where: string | null, orderBy: SortSpec | null): string {
   if (where) parts.push(`WHERE ${where}`);
   const orderText = sortLabel(orderBy);
   if (orderText) parts.push(`ORDER BY ${orderText}`);
-  return parts.length > 0 ? parts.join(' / ') : '(no filter)';
+  return parts.length > 0 ? parts.join(' / ') : t('studio.filterHistory.noFilter.label');
 }
 
 // SavedListMenu's `apply` fires for both saved and recent rows (its Entry type parameter, here
@@ -93,7 +94,7 @@ async function togglePin(entry: SavedFilterQuery | FilterHistoryEntry): Promise<
   await reload();
 }
 async function rename(entry: SavedFilterQuery): Promise<void> {
-  const name = await promptText('Rename saved filter', entry.name);
+  const name = await promptText(t('studio.filterHistory.renamePrompt.title'), entry.name);
   if (!name || name.trim() === '') return;
   await control.queriesUpdate(entry.id, { name: name.trim() });
   await reload();
@@ -106,7 +107,7 @@ async function remove(entry: SavedFilterQuery | FilterHistoryEntry): Promise<voi
 
 async function saveCurrent(): Promise<void> {
   if (!props.connectionId) return;
-  const name = await promptText('Name this filter', '');
+  const name = await promptText(t('studio.filterHistory.namePrompt.title'), '');
   if (!name || name.trim() === '') return;
   await control.queriesSave({
     connectionId: props.connectionId,
@@ -121,14 +122,14 @@ async function saveCurrent(): Promise<void> {
 
 <template>
   <SavedListMenu
-    title="Saved"
+    :title="t('studio.filterHistory.saved.title')"
     :saved="savedEntries"
     :recent="historyEntries"
     panel-test-id="filter-history"
     saved-entry-test-id="saved-entry"
     recent-entry-test-id="history-entry"
-    empty-saved-text="No saved filters"
-    empty-recent-text="No history yet"
+    :empty-saved-text="t('studio.project.menu.savedFilters.empty')"
+    :empty-recent-text="t('studio.filterHistory.emptyRecent.empty')"
     :entry-text="(entry) => (isSaved(entry) ? entry.name : summarize(entry.where, entry.orderBy))"
     @apply="applyEntry"
     @toggle-pin="togglePin"
@@ -161,7 +162,7 @@ async function saveCurrent(): Promise<void> {
       <TooltipIconButton
         v-if="isSaved(entry)"
         icon="edit"
-        label="Rename"
+        :label="t('common.action.rename.label')"
         @click.stop="rename(entry)"
       />
     </template>
@@ -169,7 +170,7 @@ async function saveCurrent(): Promise<void> {
       <Separator class="my-1" />
       <button type="button" :class="cn(rowVariants(), 'w-full text-primary')" data-testid="save-current-filter" @click="saveCurrent">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
-        Save current filter…
+        {{ t('studio.filterHistory.saveCurrent.label') }}
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
            (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own

@@ -42,6 +42,7 @@ import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { formatBytes, formatCount } from '@workbench/behaviour/format';
@@ -208,15 +209,15 @@ const visibleRows = computed(() =>
 );
 
 function ttlText(ttlMs: number | null): string {
-  if (ttlMs === null) return 'no expiry';
+  if (ttlMs === null) return t('studio.keyValue.noExpiry.status');
   const seconds = Math.ceil(ttlMs / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`;
-  return `${Math.ceil(seconds / 3600)}h`;
+  if (seconds < 60) return t('format.duration.secondsCompact', { seconds });
+  if (seconds < 3600) return t('format.relative.unitMinute', { count: Math.ceil(seconds / 60) });
+  return t('format.relative.unitHour', { count: Math.ceil(seconds / 3600) });
 }
 
 function memoryText(bytes: number | null): string {
-  return bytes === null ? 'unknown' : formatBytes(bytes);
+  return bytes === null ? t('studio.keyValue.memoryUnknown.status') : formatBytes(bytes);
 }
 
 // --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -
@@ -247,13 +248,17 @@ const editableType = computed(() => page.value?.redisType === 'string');
 // readOnly toggle is the reason — an adapter that structurally can't write at all (S3, this
 // phase) would show the same tooltip on a control that toggle could never turn back on.
 function writeDisabledReason(capFlag: boolean | undefined): string {
-  return capFlag === false ? 'Not supported for this connection type' : 'Connection is read-only';
+  return t(
+    capFlag === false
+      ? 'studio.common.writeUnsupported.tooltip'
+      : 'studio.common.connectionReadOnly.tooltip',
+  );
 }
 const editTitle = computed(() => {
   if (page.value?.redisType === 'object') return objectEditGate.value.reason;
   if (!canUpdate.value) return writeDisabledReason(caps.value?.canUpdate);
-  if (!editableType.value) return 'Only string values are editable in this version';
-  return 'Edit value';
+  if (!editableType.value) return t('studio.keyValue.editTypeUnsupported.tooltip');
+  return t('studio.keyValue.editValue.label');
 });
 const editDisabled = computed(() =>
   page.value?.redisType === 'object'
@@ -262,18 +267,28 @@ const editDisabled = computed(() =>
 );
 const addTitle = computed(() => {
   if (page.value?.redisType === 'object') {
-    return canInsert.value ? 'Upload a file' : writeDisabledReason(caps.value?.canInsert);
+    return canInsert.value
+      ? t('studio.keyValue.upload.tooltip')
+      : writeDisabledReason(caps.value?.canInsert);
   }
-  return canInsert.value ? 'Add a new key' : writeDisabledReason(caps.value?.canInsert);
+  return canInsert.value
+    ? t('studio.keyValue.add.tooltip')
+    : writeDisabledReason(caps.value?.canInsert);
 });
 const deleteTitle = computed(() => {
   if (page.value?.redisType === 'object') {
-    return canDelete.value ? 'Delete this object' : writeDisabledReason(caps.value?.canDelete);
+    return canDelete.value
+      ? t('studio.keyValue.deleteObject.tooltip')
+      : writeDisabledReason(caps.value?.canDelete);
   }
-  return canDelete.value ? 'Delete this key' : writeDisabledReason(caps.value?.canDelete);
+  return canDelete.value
+    ? t('studio.keyValue.deleteKey.tooltip')
+    : writeDisabledReason(caps.value?.canDelete);
 });
 const downloadTitle = computed(() =>
-  canDownload.value ? 'Download this object' : 'Not supported for this connection type',
+  canDownload.value
+    ? t('studio.keyValue.downloadObject.tooltip')
+    : t('studio.common.writeUnsupported.tooltip'),
 );
 
 // The S3 object page's field/value listing is always exactly and only what read.ts pushed —
@@ -307,28 +322,31 @@ const objectEditGate = computed<ObjectEditGate>(() => {
     return { editable: false, reason: writeDisabledReason(caps.value?.canUpdate) };
   const bodyRow = objectBodyRow.value;
   if (bodyRow === null) {
-    return { editable: false, reason: 'Too large to edit — download it to open it locally' };
+    return { editable: false, reason: t('studio.keyValue.objectGate.tooLarge.hint') };
   }
   if (bodyRow.isTruncated) {
     return {
       editable: false,
-      reason: 'Only part of this object was fetched — editing it would overwrite the rest',
+      reason: t('studio.keyValue.objectGate.partial.hint'),
     };
   }
   if (bodyRow.value.includes('�')) {
     return {
       editable: false,
-      reason: "This object isn't valid UTF-8 text — download it to edit it locally",
+      reason: t('studio.keyValue.objectGate.invalidText.hint'),
     };
   }
   const size = page.value?.memoryBytes ?? null;
   if (size !== null && size > OBJECT_BODY_EDIT_BYTES) {
     return {
       editable: false,
-      reason: `Too large to edit (${formatBytes(size)} — the limit is ${formatBytes(OBJECT_BODY_EDIT_BYTES)})`,
+      reason: t('studio.keyValue.objectGate.sizeLimit.hint', {
+          size: formatBytes(size),
+          limit: formatBytes(OBJECT_BODY_EDIT_BYTES),
+        }),
     };
   }
-  return { editable: true, reason: 'Edit value' };
+  return { editable: true, reason: t('studio.keyValue.editValue.label') };
 });
 
 // --- edit popover: a single TextField pre-filled with the current string value, mutating
@@ -424,12 +442,18 @@ async function saveObjectEdit(): Promise<void> {
 // bucket-rooted MutationPlan.path. ----------------------------------------------------------
 async function onDeleteKey(): Promise<void> {
   if (!canDelete.value || !keyName.value) return;
-  const label = isSingleObjectPage.value ? 'object' : 'key';
-  if (
-    !(await confirmDialogStore.confirm({ message: `Delete ${label} "${keyName.value}"? This removes the entire ${label}.`, confirmLabel: 'Delete', tone: 'danger' }))
-  ) {
-    return;
-  }
+  const isObject = isSingleObjectPage.value;
+  const name = keyName.value;
+  const confirmed = await confirmDialogStore.confirm({
+    title: t(isObject ? 'studio.browse.deleteObjectConfirm.title' : 'studio.keyValue.deleteKeyConfirm.title'),
+    message: [
+      t(isObject ? 'studio.browse.deleteObjectConfirm.body' : 'studio.keyValue.deleteKeyConfirm.body', { name }),
+      t('common.confirm.irreversible.body'),
+    ].join(' '),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   const h = host.value;
   if (!h?.connectionId) return;
   try {
@@ -486,7 +510,7 @@ function closeAdd(): void {
 async function submitAdd(): Promise<void> {
   const name = addName.value.trim();
   if (!name) {
-    addError.value = 'Key name is required';
+    addError.value = t('studio.keyValue.add.nameRequired.error');
     return;
   }
   addSaving.value = true;
@@ -515,7 +539,7 @@ function rowMenuFor(field: string, value: string) {
       editable: isObject ? objectEditGate.value.editable : p.redisType === 'string',
       editUnavailableLabel: isObject
         ? objectEditGate.value.reason
-        : 'Edit value (string keys only)',
+        : t('studio.keyValue.editStringOnly.tooltip'),
       onEdit: () => {
         if (isObject) {
           openEdit();
@@ -758,13 +782,13 @@ onUnmounted(() => {
         <div class="flex items-center gap-1.5 min-w-0">
           <TooltipIconButton
             icon="refresh"
-            label="Refresh"
+            :label="t('common.action.refresh.label')"
             data-testid="keyvalue-refresh"
             @click="onRefresh"
           />
           <TooltipIconButton
             icon="debug-stop"
-            label="Stop"
+            :label="t('common.action.stop.label')"
             disabled-trigger
             :class="{ 'is-live': !!running }"
             data-testid="keyvalue-stop"
@@ -785,7 +809,7 @@ onUnmounted(() => {
          P104 §3: ReconnectGate inlined (no library counterpart). -->
     <Empty v-if="needsReconnect" data-testid="keyvalue-reconnect">
       <Button variant="dialog-primary" size="kira-lg" data-testid="keyvalue-reconnect-load" @click="onReconnectAndLoad">
-        Reconnect &amp; load
+        {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
     </Empty>
     <template v-else>
@@ -800,11 +824,11 @@ onUnmounted(() => {
                vanish should look like one (see the mockup's KeyValue.html). -->
           <Badge data :variant="page.ttlMs !== null ? 'warn' : 'chip'" data-testid="keyvalue-ttl">
             <CodiconIcon name="history" :size="13" />
-            {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
+            {{ page.ttlMs !== null ? t('studio.keyValue.expires.status', { time: ttlText(page.ttlMs) }) : t('studio.keyValue.noExpiry.status') }}
           </Badge>
         </template>
         <Badge data data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
-        <Badge v-if="connRecord">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</Badge>
+        <Badge v-if="connRecord">{{ connRecord.readOnly ? t('common.state.readOnly.status') : t('studio.grid.writable.status') }}</Badge>
       </ViewToolbar>
 
       <ViewToolbar border="none" data-testid="keyvalue-toolbar">
@@ -816,7 +840,7 @@ onUnmounted(() => {
           <TooltipIconButton
             v-if="!isSingleObjectPage"
             icon="arrow-left"
-            label="Previous page"
+            :label="t('common.action.previousPage.label')"
             disabled-trigger
             data-testid="keyvalue-prev"
             :disabled="prevDisabled"
@@ -826,7 +850,7 @@ onUnmounted(() => {
           <TooltipIconButton
             v-if="!isSingleObjectPage"
             icon="arrow-right"
-            label="Next page"
+            :label="t('common.action.nextPage.label')"
             disabled-trigger
             data-testid="keyvalue-next"
             :disabled="!rt?.hasMore"
@@ -849,7 +873,7 @@ onUnmounted(() => {
         <div class="flex items-center gap-1.5 min-w-0">
           <TooltipIconButton
             icon="symbol-number"
-            label="Exact count"
+            :label="t('studio.documents.count.run.aria')"
             data-testid="keyvalue-count"
             @click="keyValueViewStore.runCount(viewKey)"
           />
@@ -865,7 +889,7 @@ onUnmounted(() => {
               <TooltipIconButton
                 icon="add"
                 :label="addTitle"
-                aria-label="Add"
+                :aria-label="t('common.action.add.label')"
                 disabled-trigger
                 :disabled="!canInsert"
                 data-testid="keyvalue-add"
@@ -875,12 +899,12 @@ onUnmounted(() => {
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
               <div class="flex flex-col gap-1.5 p-1.5">
-                <div class="p-0 text-kira-sm text-muted-foreground">Add key (string value)</div>
-                <Input v-model="addName" size="kira-lg" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
+                <div class="p-0 text-kira-sm text-muted-foreground">{{ t('studio.keyValue.add.title') }}</div>
+                <Input v-model="addName" size="kira-lg" :placeholder="t('studio.keyValue.add.namePlaceholder.placeholder')" class="w-full" data-testid="keyvalue-add-name" />
                 <Input
                   v-model="addValue"
                   size="kira-lg"
-                  placeholder="Initial value"
+                  :placeholder="t('studio.keyValue.add.valuePlaceholder.placeholder')"
                   class="w-full"
                   data-testid="keyvalue-add-value"
                   @keydown.enter="submitAdd"
@@ -888,14 +912,14 @@ onUnmounted(() => {
                 />
                 <FieldError v-if="addError" data-testid="keyvalue-add-error">{{ addError }}</FieldError>
                 <div class="flex justify-end gap-1">
-                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
+                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-add-cancel" @click="closeAdd">{{ t('common.action.cancel.label') }}</Button>
                   <Button
                     variant="dialog-primary"
                     size="kira-lg"
                     data-testid="keyvalue-add-save"
                     :disabled="addSaving"
                     @click="submitAdd"
-                  >Save</Button>
+                  >{{ t('common.action.save.label') }}</Button>
                 </div>
               </div>
             </PopoverContent>
@@ -906,7 +930,7 @@ onUnmounted(() => {
               <TooltipIconButton
                 icon="edit"
                 :label="editTitle"
-                aria-label="Edit"
+                :aria-label="t('common.action.edit.label')"
                 disabled-trigger
                 :disabled="editDisabled"
                 data-testid="keyvalue-edit"
@@ -916,7 +940,7 @@ onUnmounted(() => {
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
               <div class="flex flex-col gap-1.5 p-1.5">
-                <div class="p-0 text-kira-sm text-muted-foreground">Edit value</div>
+                <div class="p-0 text-kira-sm text-muted-foreground">{{ t('studio.keyValue.editValue.label') }}</div>
                 <Input
                   v-model="editDraft"
                   size="kira-lg"
@@ -927,14 +951,14 @@ onUnmounted(() => {
                 />
                 <FieldError v-if="editError" data-testid="keyvalue-edit-error">{{ editError }}</FieldError>
                 <div class="flex justify-end gap-1">
-                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</Button>
+                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-edit-cancel" @click="closeEdit">{{ t('common.action.cancel.label') }}</Button>
                   <Button
                     variant="dialog-primary"
                     size="kira-lg"
                     data-testid="keyvalue-edit-save"
                     :disabled="editSaving"
                     @click="saveEdit"
-                  >Save</Button>
+                  >{{ t('common.action.save.label') }}</Button>
                 </div>
               </div>
             </PopoverContent>
@@ -943,7 +967,7 @@ onUnmounted(() => {
           <TooltipIconButton
             icon="trash"
             :label="deleteTitle"
-            aria-label="Delete"
+            :aria-label="t('common.action.delete.label')"
             disabled-trigger
             :disabled="!canDelete"
             data-testid="keyvalue-delete"
@@ -954,14 +978,14 @@ onUnmounted(() => {
             v-if="canDownload"
             icon="cloud-download"
             :label="downloadTitle"
-            aria-label="Download"
+            :aria-label="t('common.action.download.label')"
             data-testid="keyvalue-download"
             @click="onDownload"
           />
 
           <TooltipIconButton
             icon="search"
-            label="Search this page"
+            :label="t('studio.common.searchPage.label')"
             :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
             data-testid="keyvalue-search"
             @click="onToggleSearch"
@@ -988,8 +1012,7 @@ onUnmounted(() => {
         data-testid="keyvalue-object-too-large"
       >
         <AlertDescription>
-          Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
-          {{ formatBytes(SINGLE_ROW_MAX_BYTES) }} limit) — use Download to save it locally.
+          {{ t('studio.keyValue.tooLarge.description', { size: formatBytes(page.memoryBytes), limit: formatBytes(SINGLE_ROW_MAX_BYTES) }) }}
         </AlertDescription>
       </Alert>
       <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
@@ -997,11 +1020,11 @@ onUnmounted(() => {
            explicit Save/Discard step that turns the staged draft into a real PutObject. -->
       <Alert v-if="objectDraft !== null" variant="warn" strip data-testid="keyvalue-object-edit-pending">
         <AlertDescription>
-          <span data-testid="keyvalue-object-edit-note"
-            >Unsaved changes to this object's body<template v-if="objectSaveError">
-              — {{ objectSaveError }}</template
-            ></span
-          >
+          <span data-testid="keyvalue-object-edit-note">{{
+            objectSaveError
+              ? t('studio.keyValue.objectEdit.pendingError.status', { error: objectSaveError })
+              : t('studio.keyValue.objectEdit.pending.status')
+          }}</span>
         </AlertDescription>
         <AlertAction>
           <Button
@@ -1011,7 +1034,7 @@ onUnmounted(() => {
             :disabled="objectSaving"
             @click="saveObjectEdit"
           >
-            Save
+            {{ t('common.action.save.label') }}
           </Button>
         </AlertAction>
       </Alert>
@@ -1020,7 +1043,7 @@ onUnmounted(() => {
         v-if="rt?.searchOpen"
         :tab-id="viewKey"
         testid-prefix="keyvalue-"
-        row-noun="rows"
+        kind="rows"
         :api="pageSearchApi"
         @go-to-match="onGoToMatch"
         @close="onCloseSearch"
@@ -1044,7 +1067,7 @@ onUnmounted(() => {
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
           <Empty v-if="!rt || rt.rowCount === 0">
             <EmptyMedia><CodiconIcon v-if="rt" name="database" :size="24" /><Spinner v-else :size="24" /></EmptyMedia>
-            <EmptyTitle>{{ rt ? 'No data' : 'Loading…' }}</EmptyTitle>
+            <EmptyTitle>{{ rt ? t('studio.keyValue.noData.empty') : t('common.state.loading.loading') }}</EmptyTitle>
           </Empty>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
@@ -1062,7 +1085,7 @@ onUnmounted(() => {
             class="flex-1 min-h-0 overflow-auto"
             data-testid="virtual-list"
             role="listbox"
-            aria-label="Rows"
+            :aria-label="t('studio.keyValue.rows.aria')"
           >
             <div class="relative w-full" :style="{ height: `${totalSize}px` }">
               <template v-for="entry in visibleRows" :key="entry.row.index">
@@ -1119,9 +1142,9 @@ onUnmounted(() => {
                         {{ rowAt(entry.i)?.value }}
                         <Tooltip v-if="rowAt(entry.i)?.isTruncated">
                           <TooltipTrigger as-child>
-                            <Badge variant="chip" class="bg-field text-subtle ml-1.5 shrink-0">truncated</Badge>
+                            <Badge variant="chip" class="bg-field text-subtle ml-1.5 shrink-0">{{ t('studio.common.truncated.status') }}</Badge>
                           </TooltipTrigger>
-                          <TooltipContent>value truncated</TooltipContent>
+                          <TooltipContent>{{ t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
                         </Tooltip>
                       </div>
                     </TooltipTrigger>

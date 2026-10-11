@@ -9,6 +9,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatBytes } from '@workbench/behaviour/format';
@@ -33,9 +34,10 @@ import {
   type CellFormat,
   canBeautify,
   FORMAT_GROUPS,
-  FORMAT_HELP,
-  FORMAT_LABEL,
   FORMAT_LANGUAGE,
+  formatAutoLabel,
+  formatHelp,
+  formatLabel,
 } from './formats';
 import { GENERATORS, type Generator } from './generate';
 import { useCellEditorFormatStore } from './state';
@@ -122,17 +124,17 @@ const isEditable = computed(
 const readOnlyChipText = computed(() => {
   switch (readOnlyReason.value) {
     case 'masked':
-      return 'Masked preview';
+      return t('studio.cellEditor.readOnly.masked.label');
     case 'connection-read-only':
-      return 'Connection is read-only';
+      return t('studio.common.connectionReadOnly.tooltip');
     case 'value-truncated':
-      return 'truncated — not editable';
+      return t('studio.cellEditor.readOnly.truncated.label');
     case 'generated-column':
-      return 'Generated column';
+      return t('studio.cellEditor.readOnly.generated.label');
     case 'pending-delete':
-      return 'Row pending delete';
+      return t('studio.cellEditor.readOnly.pendingDelete.label');
     case 'no-primary-key':
-      return 'No primary key';
+      return t('studio.cellEditor.readOnly.noPrimaryKey.label');
     default:
       return '';
   }
@@ -141,19 +143,19 @@ const readOnlyChipTitle = computed(() => {
   switch (readOnlyReason.value) {
     case 'masked':
       // M5 §6.5: the one reason here the user can fix immediately, unlike the other three.
-      return 'Values are masked for this tab — turn the preview off in the toolbar to see and edit the stored value.';
+      return t('studio.cellEditor.readOnly.masked.hint');
     case 'connection-read-only':
       return undefined;
     case 'value-truncated':
       // P24 D27: the value stays fully readable and copyable — only writing it back is refused,
       // since the buffer only ever holds the first 64 KB (§0 note 9).
-      return 'Only the first 64 KB was fetched — committing it would overwrite the full value.';
+      return t('studio.cellEditor.readOnly.truncated.hint', { size: formatBytes(64 * 1024) });
     case 'generated-column':
-      return "The server computes this column's value — an edit here would be refused at commit.";
+      return t('studio.cellEditor.readOnly.generated.hint');
     case 'pending-delete':
-      return 'This row is staged for delete — revert the delete before editing it.';
+      return t('studio.cellEditor.readOnly.pendingDelete.hint');
     case 'no-primary-key':
-      return "This table has no primary key, so a row can't be identified to write.";
+      return t('studio.grid.noPrimaryKey.tooltip');
     default:
       return undefined;
   }
@@ -411,8 +413,8 @@ function cellLintSource(): ConsoleDiagnostic[] {
 }
 
 // P42 D28: the trigger's own tooltip explains the effective format, the same map the picker's
-// own rows read (FORMAT_HELP) — one source, two surfaces, no way to drift.
-const formatHint = computed(() => FORMAT_HELP[effectiveFormat.value]);
+// own rows read (formatHelp) — one source, two surfaces, no way to drift.
+const formatHint = computed(() => formatHelp(effectiveFormat.value));
 
 function setFormat(format: CellFormat | null): void {
   cellEditorFormatStore.setOverride(selectedCell.value, format);
@@ -428,7 +430,7 @@ function openFormatMenu(e: MouseEvent): void {
     {
       type: 'item',
       id: 'format-auto',
-      label: `Auto — ${FORMAT_LABEL[detectedFormat.value]}`,
+      label: formatAutoLabel(detectedFormat.value),
       checked: override.value === null,
       hint: detectedReason.value || undefined,
       run: () => setFormat(null),
@@ -440,9 +442,9 @@ function openFormatMenu(e: MouseEvent): void {
       rows.push({
         type: 'item',
         id: `format-${f}`,
-        label: FORMAT_LABEL[f],
+        label: formatLabel(f),
         checked: override.value === f,
-        hint: FORMAT_HELP[f],
+        hint: formatHelp(f),
         run: () => setFormat(f),
       });
     }
@@ -492,13 +494,13 @@ const dataTypeClass = computed(() => typeClassTextClass(selectedCell.value.colum
 // P24 D23/F7e: reads the buffer, not the stored value — the timestamp reading beside it already
 // read the buffer, so the two disagreeing the moment you typed was the bug.
 const statusLine = computed(() => {
-  if (isNullValue.value) return 'NULL';
+  if (isNullValue.value) return t('studio.common.nullValue.label');
   const value = doc.value;
   const parts: string[] = [];
   parts.push(formatBytes(statusEncoder.encode(value).length));
   const reading = describeValue(effectiveFormat.value, value);
   if (reading) parts.push(reading);
-  if (isTruncatedValue.value) parts.push('showing the first 64 KB');
+  if (isTruncatedValue.value) parts.push(t('studio.cellEditor.truncatedPrefix.status', { size: formatBytes(64 * 1024) }));
   if (beautifyFailure.value) parts.push(beautifyFailure.value);
   return parts.join(' · ');
 });
@@ -527,7 +529,7 @@ const statusLine = computed(() => {
         <CodiconIcon name="symbol-string" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="cell-editor-target"
-        >{{ `${targetLabel} · row ${selectedCell.row + 1}` }}</span
+        >{{ t('studio.cellEditor.target.label', { target: targetLabel, row: selectedCell.row + 1 }) }}</span
       >
       <Tooltip v-if="dataTypeHint">
         <TooltipTrigger as-child>
@@ -536,9 +538,9 @@ const statusLine = computed(() => {
         <TooltipContent>{{ dataTypeHint }}</TooltipContent>
       </Tooltip>
       <Badge data v-else :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
-      <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">NULL</Badge>
-      <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">empty</Badge>
-      <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">truncated</Badge>
+      <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">{{ t('studio.common.nullValue.label') }}</Badge>
+      <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">{{ t('studio.cellEditor.empty.status') }}</Badge>
+      <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">{{ t('studio.common.truncated.status') }}</Badge>
       <Tooltip>
         <TooltipTrigger as-child>
           <Badge class="max-w-56 overflow-hidden text-ellipsis" data-testid="cell-editor-status">{{ statusLine }}</Badge>
@@ -574,7 +576,7 @@ const statusLine = computed(() => {
                 @click="openFormatMenu"
               >
                 <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
-                  override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
+                  override ? formatLabel(override) : formatAutoLabel(detectedFormat)
                 }}</span>
                 <CodiconIcon name="chevron-down" :size="12" />
               </button>
@@ -592,7 +594,7 @@ const statusLine = computed(() => {
             <span ref="generateAnchorRef" class="relative shrink-0">
               <TooltipIconButton
                 icon="sparkle"
-                label="Generate a value"
+                :label="t('studio.cellEditor.generate.tooltip')"
                 disabled-trigger
                 :disabled="!isEditable"
                 data-testid="cell-editor-generate"
@@ -610,10 +612,10 @@ const statusLine = computed(() => {
                       :data-testid="`cell-editor-generate-${gen.id}`"
                       @click="applyGenerator(gen)"
                     >
-                      {{ gen.label }}
+                      {{ t(gen.labelKey) }}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ gen.hint }}</TooltipContent>
+                  <TooltipContent>{{ t(gen.hintKey) }}</TooltipContent>
                 </Tooltip>
               </div>
             </PopoverContent>
@@ -638,14 +640,14 @@ const statusLine = computed(() => {
         </Badge>
         <TooltipIconButton
           icon="search"
-          label="Find in value"
+          :label="t('studio.cellEditor.find.tooltip')"
           :class="{ 'bg-field text-fg': findOpen }"
           data-testid="cell-editor-search-toggle"
           @click="toggleFind"
         />
         <TooltipIconButton
           icon="close"
-          label="Close"
+          :label="t('common.action.close.label')"
           data-testid="cell-editor-close"
           @click="closePanel"
         />
@@ -684,7 +686,7 @@ const statusLine = computed(() => {
       <template v-if="showDecodedPane">
         <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2">
           <CodiconIcon name="symbol-string" :size="13" />
-          <span>Decoded text</span>
+          <span>{{ t('studio.cellEditor.decoded.label') }}</span>
         </div>
         <div v-if="decodedDoc !== null" class="flex-1 basis-5/12 min-h-0" data-testid="cell-editor-decoded">
           <MonacoHost
@@ -701,7 +703,7 @@ const statusLine = computed(() => {
           data-testid="cell-editor-decoded-empty"
         >
           <AlertDescription>
-            Not valid UTF-8 text — showing the raw {{ FORMAT_LABEL[effectiveFormat] }} value only.
+            {{ t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) }) }}
           </AlertDescription>
         </Alert>
       </template>
@@ -711,7 +713,7 @@ const statusLine = computed(() => {
       <template v-else-if="isTimestampFormat">
         <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2">
           <CodiconIcon name="calendar" :size="13" />
-          <span>Date &amp; time</span>
+          <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
         </div>
         <TimestampPane
           class="flex-1 basis-5/12 min-h-0"

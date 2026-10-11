@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { t } from '@theme/i18n';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
 import { computed, ref } from 'vue';
 import { useDocumentRowsStore } from './rows';
@@ -64,7 +65,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
         type="button"
         class="flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground"
         data-testid="document-tree-twisty"
-        :aria-label="line.expanded ? 'Collapse' : 'Expand'"
+        :aria-label="t(line.expanded ? 'common.action.collapse.label' : 'common.action.expand.label')"
         @click="emit('toggle-path', line.node.path)"
       >
         <CodiconIcon :name="line.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />

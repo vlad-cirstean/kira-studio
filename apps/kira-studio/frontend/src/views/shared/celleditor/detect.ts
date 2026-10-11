@@ -1,4 +1,5 @@
 import type { TypeClass } from '@shared/protocol/page';
+import { t } from '@theme/i18n';
 import { scanJson, scanXml } from '../../../beautify';
 import { CELL_FORMATS, type CellFormat } from './formats';
 
@@ -51,44 +52,52 @@ function trimmed(input: DetectInput): string {
 }
 
 function detectJson(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (t.length === 0) return null;
+  const value = trimmed(input);
+  if (value.length === 0) return null;
   // Gated on the opening character only, not a matching close: a value truncated at
   // MAX_CELL_BYTES (§0 note 9) will almost never coincidentally end on the right bracket, and
   // §6a's truncated-JSON case must still land in the 0.35 bucket below, not fall through to
   // plain text. The scanner is what actually decides valid vs merely JSON-shaped.
-  const isObject = t[0] === '{';
-  const isArray = t[0] === '[';
+  const isObject = value[0] === '{';
+  const isArray = value[0] === '[';
   if (!isObject && !isArray) return null;
-  const scan = scanJson(t);
+  const scan = scanJson(value);
   if (scan.ok) {
     return {
       format: 'json',
       score: input.typeClass === 'json' ? 1.0 : 0.95,
-      reason: `valid JSON ${isObject ? 'object' : 'array'}`,
+      reason: t(
+        isObject
+          ? 'studio.cellEditor.detect.validJsonObject.status'
+          : 'studio.cellEditor.detect.validJsonArray.status',
+      ),
     };
   }
   return {
     format: 'json',
     score: 0.35,
-    reason: `looks like JSON, invalid at offset ${scan.offset}`,
+    reason: t('studio.cellEditor.detect.invalidJson.status', { offset: scan.offset ?? 0 }),
   };
 }
 
 function detectXml(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (t.length === 0) return null;
-  if (t[0] !== '<' || t[t.length - 1] !== '>') return null;
-  const hasDeclPrefix = /^<\?xml/i.test(t) || /^<!doctype/i.test(t);
-  const scan = scanXml(t);
+  const value = trimmed(input);
+  if (value.length === 0) return null;
+  if (value[0] !== '<' || value[value.length - 1] !== '>') return null;
+  const hasDeclPrefix = /^<\?xml/i.test(value) || /^<!doctype/i.test(value);
+  const scan = scanXml(value);
   if (scan.ok) {
     return {
       format: 'xml',
       score: hasDeclPrefix ? 0.95 : 0.9,
-      reason: hasDeclPrefix ? 'XML document with a declaration' : 'balanced XML/HTML tags',
+      reason: t(
+        hasDeclPrefix
+          ? 'studio.cellEditor.detect.xmlDeclaration.status'
+          : 'studio.cellEditor.detect.balancedXml.status',
+      ),
     };
   }
-  return { format: 'xml', score: 0.3, reason: 'looks like XML/HTML, tags do not balance' };
+  return { format: 'xml', score: 0.3, reason: t('studio.cellEditor.detect.unbalancedXml.status') };
 }
 
 const SQL_LEADING = new Set([
@@ -128,17 +137,17 @@ const SQL_SECONDARY = new Set([
 const WORD_RE = /[a-zA-Z_][a-zA-Z0-9_]*/g;
 
 function detectSql(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  const firstMatch = /^[a-zA-Z_][a-zA-Z0-9_]*/.exec(t);
+  const value = trimmed(input);
+  const firstMatch = /^[a-zA-Z_][a-zA-Z0-9_]*/.exec(value);
   const first = firstMatch?.[0].toLowerCase();
   if (!first || !SQL_LEADING.has(first)) return null;
   WORD_RE.lastIndex = 0;
   const words: string[] = [];
-  for (let m = WORD_RE.exec(t); m; m = WORD_RE.exec(t)) words.push(m[0].toLowerCase());
+  for (let m = WORD_RE.exec(value); m; m = WORD_RE.exec(value)) words.push(m[0].toLowerCase());
   const hasSecondary = words.slice(1).some((w) => SQL_SECONDARY.has(w));
   return hasSecondary
-    ? { format: 'sql', score: 0.7, reason: 'multiple SQL clauses' }
-    : { format: 'sql', score: 0.45, reason: 'leading SQL keyword' };
+    ? { format: 'sql', score: 0.7, reason: t('studio.cellEditor.detect.sqlClauses.status') }
+    : { format: 'sql', score: 0.45, reason: t('studio.cellEditor.detect.sqlKeyword.status') };
 }
 
 // P42 D23/D24: uuid and url are gone as formats (F19 — both inert on selection), but this regex
@@ -153,15 +162,15 @@ const UUID_RE = /^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/;
 const HEX_RE = /^(0x)?([0-9a-fA-F]{2})+$/;
 
 function detectHex(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (t.length === 0 || !HEX_RE.test(t)) return null;
-  const hasPrefix = t.startsWith('0x');
-  const digits = hasPrefix ? t.slice(2) : t;
+  const value = trimmed(input);
+  if (value.length === 0 || !HEX_RE.test(value)) return null;
+  const hasPrefix = value.startsWith('0x');
+  const digits = hasPrefix ? value.slice(2) : value;
   if (digits.length < 16) return null;
   const hasLetter = /[a-fA-F]/.test(digits);
   if (!hasPrefix && !hasLetter && input.typeClass !== 'binary') return null;
   const score = hasPrefix || input.typeClass === 'binary' ? 1.0 : 0.6;
-  return { format: 'hex', score, reason: 'hex-encoded bytes' };
+  return { format: 'hex', score, reason: t('studio.cellEditor.detect.hex.status') };
 }
 
 export const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -172,30 +181,30 @@ export const BASE64_URL_RE = /^[A-Za-z0-9_-]+={0,2}$/;
 // authoritative over the prose figure; 20 is the reconciled floor.
 const BASE64_MIN_LENGTH = 20;
 
-export function base64ToStd(t: string, isUrlSafe: boolean): string {
-  return isUrlSafe ? t.replace(/-/g, '+').replace(/_/g, '/') : t;
+export function base64ToStd(value: string, isUrlSafe: boolean): string {
+  return isUrlSafe ? value.replace(/-/g, '+').replace(/_/g, '/') : value;
 }
 
 function detectBase64(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  const isStd = BASE64_STD_RE.test(t);
-  const isUrlSafe = !isStd && BASE64_URL_RE.test(t);
+  const value = trimmed(input);
+  const isStd = BASE64_STD_RE.test(value);
+  const isUrlSafe = !isStd && BASE64_URL_RE.test(value);
   if (!isStd && !isUrlSafe) return null;
-  if (t.length % 4 !== 0 || t.length < BASE64_MIN_LENGTH) return null;
-  if (!/[^0-9a-fA-F]/.test(t)) return null; // purely hex-shaped — let hex win the overlap
-  if (UUID_RE.test(t)) return null; // a dashed UUID is base64-shaped too (P42 D24) — let it stay text
-  const hasSpecial = /[+/=_-]/.test(t);
-  const hasMixedCase = /[A-Z]/.test(t) && /[a-z]/.test(t) && /[0-9]/.test(t);
+  if (value.length % 4 !== 0 || value.length < BASE64_MIN_LENGTH) return null;
+  if (!/[^0-9a-fA-F]/.test(value)) return null; // purely hex-shaped — let hex win the overlap
+  if (UUID_RE.test(value)) return null; // a dashed UUID is base64-shaped too (P42 D24) — let it stay text
+  const hasSpecial = /[+/=_-]/.test(value);
+  const hasMixedCase = /[A-Z]/.test(value) && /[a-z]/.test(value) && /[0-9]/.test(value);
   if (!hasSpecial && !hasMixedCase) return null;
   try {
-    atob(base64ToStd(t, isUrlSafe));
+    atob(base64ToStd(value, isUrlSafe));
   } catch {
     return null;
   }
-  const padded = t.endsWith('=');
-  const hasPlusSlash = /[+/]/.test(t);
+  const padded = value.endsWith('=');
+  const hasPlusSlash = /[+/]/.test(value);
   const score = padded || hasPlusSlash ? 0.85 : 0.75;
-  return { format: 'base64', score, reason: 'base64-shaped' };
+  return { format: 'base64', score, reason: t('studio.cellEditor.detect.base64.status') };
 }
 
 const EPOCH_SECONDS_RE = /^-?\d{9,11}$/;
@@ -203,28 +212,28 @@ const EPOCH_MILLIS_RE = /^-?\d{12,14}$/;
 const TIME_COLUMN_RE = /(_at|_time|_ts|timestamp|date)$/i;
 
 function detectEpochSeconds(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (!EPOCH_SECONDS_RE.test(t)) return null;
-  const n = Number(t);
+  const value = trimmed(input);
+  if (!EPOCH_SECONDS_RE.test(value)) return null;
+  const n = Number(value);
   if (!Number.isFinite(n) || n < 1e8 || n > 4.1e9) return null;
   const bonus = TIME_COLUMN_RE.test(input.columnName) ? 0.1 : 0;
   return {
     format: 'epochSeconds',
     score: Math.min(0.8, 0.7 + bonus),
-    reason: 'epoch-seconds range',
+    reason: t('studio.cellEditor.detect.epochSeconds.status'),
   };
 }
 
 function detectEpochMillis(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (!EPOCH_MILLIS_RE.test(t)) return null;
-  const n = Number(t);
+  const value = trimmed(input);
+  if (!EPOCH_MILLIS_RE.test(value)) return null;
+  const n = Number(value);
   if (!Number.isFinite(n) || n < 1e11 || n > 4.1e12) return null;
   const bonus = TIME_COLUMN_RE.test(input.columnName) ? 0.1 : 0;
   return {
     format: 'epochMillis',
     score: Math.min(0.8, 0.7 + bonus),
-    reason: 'epoch-milliseconds range',
+    reason: t('studio.cellEditor.detect.epochMillis.status'),
   };
 }
 
@@ -235,10 +244,10 @@ const ISO8601_RE =
   /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
 
 function detectIso8601(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (!ISO8601_RE.test(t)) return null;
+  const value = trimmed(input);
+  if (!ISO8601_RE.test(value)) return null;
   const score = input.typeClass === 'temporal' ? 0.95 : 0.85;
-  return { format: 'iso8601', score, reason: 'ISO-8601 timestamp' };
+  return { format: 'iso8601', score, reason: t('studio.cellEditor.detect.iso8601.status') };
 }
 
 // A `"` opens a field that ends at the next unescaped `"`; `""` inside a quoted field is a
@@ -308,11 +317,18 @@ function detectCsv(input: DetectInput): FormatGuess | null {
   const shape = pickCsvShape(lines);
   if (!shape) return null;
   const score = lines.length >= 3 ? 0.75 : 0.6;
-  return { format: 'csv', score, reason: `${lines.length} rows × ${shape.fieldCount} columns` };
+  return {
+    format: 'csv',
+    score,
+    reason: t('studio.cellEditor.detect.csvShape.status', {
+      count: lines.length,
+      columns: shape.fieldCount,
+    }),
+  };
 }
 
 function detectText(): FormatGuess {
-  return { format: 'text', score: 0.1, reason: 'no distinguishing shape' };
+  return { format: 'text', score: 0.1, reason: t('studio.cellEditor.detect.noShape.status') };
 }
 
 const DETECTORS: Record<CellFormat, (input: DetectInput) => FormatGuess | null> = {
@@ -334,7 +350,8 @@ const DETECTORS: Record<CellFormat, (input: DetectInput) => FormatGuess | null> 
  * eligible and its detector always matches.
  */
 export function detectFormat(input: DetectInput): FormatGuess[] {
-  if (input.text === '') return [{ format: 'text', score: 1.0, reason: 'empty value' }];
+  if (input.text === '')
+    return [{ format: 'text', score: 1.0, reason: t('studio.cellEditor.detect.empty.status') }];
 
   const eligible = ELIGIBLE_BY_TYPE_CLASS[input.typeClass];
   const guesses: FormatGuess[] = [];
@@ -351,22 +368,27 @@ export function detectFormat(input: DetectInput): FormatGuess[] {
 
 /** D15's one-line reading, or null when the format implies no decoding. Must never throw. */
 export function describeValue(format: CellFormat, text: string): string | null {
-  const t = text.trim();
+  const value = text.trim();
   try {
     if (format === 'base64') {
-      const isUrlSafe = !BASE64_STD_RE.test(t) && BASE64_URL_RE.test(t);
-      const bytes = atob(base64ToStd(t, isUrlSafe)).length;
-      return bytes > 0 ? `${bytes} bytes decoded` : null;
+      const isUrlSafe = !BASE64_STD_RE.test(value) && BASE64_URL_RE.test(value);
+      const bytes = atob(base64ToStd(value, isUrlSafe)).length;
+      return bytes > 0 ? t('studio.cellEditor.detect.base64Bytes.status', { count: bytes }) : null;
     }
     if (format === 'hex') {
-      const digits = t.startsWith('0x') ? t.slice(2) : t;
+      const digits = value.startsWith('0x') ? value.slice(2) : value;
       const bytes = Math.floor(digits.length / 2);
-      return bytes > 0 ? `${bytes} bytes` : null;
+      return bytes > 0 ? t('studio.cellEditor.detect.hexBytes.status', { count: bytes }) : null;
     }
     if (format === 'csv') {
       const lines = nonEmptyLines(text);
       const shape = pickCsvShape(lines);
-      return shape ? `${lines.length} rows × ${shape.fieldCount} columns` : null;
+      return shape
+        ? t('studio.cellEditor.detect.csvShape.status', {
+            count: lines.length,
+            columns: shape.fieldCount,
+          })
+        : null;
     }
     return null;
   } catch {

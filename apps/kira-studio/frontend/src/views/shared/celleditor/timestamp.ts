@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { CellFormat } from './formats';
 
 // P24 D17: everything timestamp-shaped moved out of detect.ts, which is about *detection* and
@@ -280,7 +281,7 @@ const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'aut
 /** "3 days ago" / "in 2 hours" / "just now" — Intl.RelativeTimeFormat, no dependency (D18). */
 function relativeTime(date: Date, now: Date): string {
   const diffMs = date.getTime() - now.getTime();
-  if (Math.abs(diffMs) < 45_000) return 'just now';
+  if (Math.abs(diffMs) < 45_000) return t('format.relative.justNow');
   for (const { unit, ms } of RELATIVE_STEPS) {
     if (Math.abs(diffMs) >= ms || unit === 'minute') {
       return relativeFormatter.format(Math.round(diffMs / ms), unit);

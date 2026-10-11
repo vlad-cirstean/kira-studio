@@ -7594,6 +7594,208 @@
         "label": "Upload file…"
       }
     },
+    "cellEditor": {
+      "decoded": {
+        "invalid": {
+          "hint": "The decoded bytes aren’t valid text. Showing the raw {format} value only."
+        },
+        "label": "Decoded text"
+      },
+      "detect": {
+        "balancedXml": {
+          "status": "Balanced XML or HTML tags"
+        },
+        "base64": {
+          "status": "Base64-shaped"
+        },
+        "base64Bytes": {
+          "status": "{count} byte decoded | {count} bytes decoded"
+        },
+        "csvShape": {
+          "status": "{count} row × {columns} columns | {count} rows × {columns} columns"
+        },
+        "empty": {
+          "status": "Empty value"
+        },
+        "epochMillis": {
+          "status": "Epoch-milliseconds range"
+        },
+        "epochSeconds": {
+          "status": "Epoch-seconds range"
+        },
+        "hex": {
+          "status": "Hex-encoded bytes"
+        },
+        "hexBytes": {
+          "status": "{count} byte | {count} bytes"
+        },
+        "invalidJson": {
+          "status": "Looks like JSON, invalid at offset {offset}"
+        },
+        "iso8601": {
+          "status": "ISO 8601 timestamp"
+        },
+        "noShape": {
+          "status": "No distinguishing shape"
+        },
+        "sqlClauses": {
+          "status": "Multiple SQL clauses"
+        },
+        "sqlKeyword": {
+          "status": "Leading SQL keyword"
+        },
+        "unbalancedXml": {
+          "status": "Looks like XML or HTML, tags don’t balance"
+        },
+        "validJsonArray": {
+          "status": "Valid JSON array"
+        },
+        "validJsonObject": {
+          "status": "Valid JSON object"
+        },
+        "xmlDeclaration": {
+          "status": "XML document with a declaration"
+        }
+      },
+      "empty": {
+        "status": "Empty"
+      },
+      "find": {
+        "tooltip": "Find in value"
+      },
+      "format": {
+        "auto": {
+          "label": "Auto: {format}"
+        },
+        "base64": {
+          "description": "Bytes encoded as base64. A decoded-text pane opens below the value.",
+          "label": "Base64"
+        },
+        "csv": {
+          "description": "Rows separated by comma, tab or semicolon, all with the same column count."
+        },
+        "epochMillis": {
+          "description": "Milliseconds since 1970-01-01 UTC.",
+          "label": "Epoch (milliseconds)"
+        },
+        "epochSeconds": {
+          "description": "Whole seconds since 1970-01-01 UTC.",
+          "label": "Epoch (seconds)"
+        },
+        "hex": {
+          "description": "Bytes encoded as hexadecimal. A decoded-text pane opens below the value.",
+          "label": "Hex"
+        },
+        "iso8601": {
+          "description": "ISO 8601 date and time.",
+          "label": "ISO 8601 time"
+        },
+        "json": {
+          "description": "A JSON document. Objects and arrays get syntax highlighting and can be beautified."
+        },
+        "sql": {
+          "description": "A SQL statement or fragment, with SQL syntax highlighting.",
+          "label": "SQL"
+        },
+        "text": {
+          "description": "No decoding. The value shows exactly as stored.",
+          "label": "Plain text"
+        },
+        "xml": {
+          "description": "XML or HTML markup. Tags get syntax highlighting and can be beautified.",
+          "label": "XML / HTML"
+        }
+      },
+      "generate": {
+        "now": {
+          "description": "The current moment, spelled for the effective format."
+        },
+        "token": {
+          "description": "A random 32-character hex string (128 bits).",
+          "label": "Random token"
+        },
+        "tooltip": "Generate a value",
+        "ulid": {
+          "description": "A 26-character ID that sorts by creation time.",
+          "label": "ULID"
+        },
+        "uuid": {
+          "description": "A random 36-character dashed UUID.",
+          "label": "UUID (v4)"
+        }
+      },
+      "readOnly": {
+        "generated": {
+          "hint": "The server computes this column’s value. An edit here would be refused at commit.",
+          "label": "Generated column"
+        },
+        "masked": {
+          "hint": "Values are masked for this tab. Turn the preview off in the toolbar to see and edit the stored value.",
+          "label": "Masked preview"
+        },
+        "noPrimaryKey": {
+          "label": "No primary key"
+        },
+        "pendingDelete": {
+          "hint": "This row is staged for delete. Revert the delete before editing it.",
+          "label": "Row pending delete"
+        },
+        "truncated": {
+          "hint": "Only the first {size} was fetched. Committing it would overwrite the full value.",
+          "label": "Truncated, not editable"
+        }
+      },
+      "resize": {
+        "aria": "Resize cell editor"
+      },
+      "target": {
+        "label": "{target} · row {row}"
+      },
+      "timestamp": {
+        "field": {
+          "tooltip": "{format}, in the zone selected above"
+        },
+        "pick": {
+          "tooltip": "Choose a date and time"
+        },
+        "title": "Date and time",
+        "unparseable": {
+          "status": "Not a recognizable {format} value"
+        },
+        "zoneLocal": {
+          "label": "Local"
+        },
+        "zoneUtc": {
+          "label": "UTC"
+        }
+      },
+      "truncatedPrefix": {
+        "status": "Showing the first {size}"
+      },
+      "validate": {
+        "base64": {
+          "error": "Not a valid base64 value."
+        },
+        "csvColumns": {
+          "error": "Rows have inconsistent column counts."
+        },
+        "csvSingleLine": {
+          "error": "A single line is never CSV."
+        },
+        "hex": {
+          "error": "Not a valid hex value."
+        },
+        "json": {
+          "error": "Broken JSON, invalid at offset {offset}."
+        },
+        "timestamp": {
+          "error": "Not a valid timestamp for this format."
+        },
+        "xml": {
+          "error": "Tags don’t balance."
+        }
+      }
+    },
     "common": {
       "allFiles": {
         "label": "All files"
@@ -7683,6 +7885,9 @@
         "topic": {
           "label": "Topic"
         }
+      },
+      "noMatchingRows": {
+        "empty": "No matching rows"
       },
       "noRows": {
         "empty": "No rows"
@@ -7950,9 +8155,6 @@
         "close": {
           "aria": "Close result"
         },
-        "noMatchingRows": {
-          "empty": "No matching rows"
-        },
         "rows": {
           "aria": "Result rows"
         },
@@ -8060,6 +8262,128 @@
       "withHeader": {
         "announce": "Copied with header",
         "label": "Copy with header"
+      }
+    },
+    "dateTimePicker": {
+      "cycleView": {
+        "tooltip": "Jump by month or year"
+      },
+      "month": {
+        "april": {
+          "label": "April"
+        },
+        "august": {
+          "label": "August"
+        },
+        "december": {
+          "label": "December"
+        },
+        "february": {
+          "label": "February"
+        },
+        "january": {
+          "label": "January"
+        },
+        "july": {
+          "label": "July"
+        },
+        "june": {
+          "label": "June"
+        },
+        "march": {
+          "label": "March"
+        },
+        "may": {
+          "label": "May"
+        },
+        "november": {
+          "label": "November"
+        },
+        "october": {
+          "label": "October"
+        },
+        "september": {
+          "label": "September"
+        }
+      },
+      "monthShort": {
+        "april": {
+          "label": "Apr"
+        },
+        "august": {
+          "label": "Aug"
+        },
+        "december": {
+          "label": "Dec"
+        },
+        "february": {
+          "label": "Feb"
+        },
+        "january": {
+          "label": "Jan"
+        },
+        "july": {
+          "label": "Jul"
+        },
+        "june": {
+          "label": "Jun"
+        },
+        "march": {
+          "label": "Mar"
+        },
+        "november": {
+          "label": "Nov"
+        },
+        "october": {
+          "label": "Oct"
+        },
+        "september": {
+          "label": "Sep"
+        }
+      },
+      "nextMonth": {
+        "tooltip": "Next month"
+      },
+      "nextYear": {
+        "tooltip": "Next year"
+      },
+      "nextYears": {
+        "tooltip": "Next 16 years"
+      },
+      "now": {
+        "label": "Now"
+      },
+      "previousMonth": {
+        "tooltip": "Previous month"
+      },
+      "previousYear": {
+        "tooltip": "Previous year"
+      },
+      "previousYears": {
+        "tooltip": "Previous 16 years"
+      },
+      "weekday": {
+        "friday": {
+          "label": "Fr"
+        },
+        "monday": {
+          "label": "Mo"
+        },
+        "saturday": {
+          "label": "Sa"
+        },
+        "sunday": {
+          "label": "Su"
+        },
+        "thursday": {
+          "label": "Th"
+        },
+        "tuesday": {
+          "label": "Tu"
+        },
+        "wednesday": {
+          "label": "We"
+        }
       }
     },
     "definition": {
@@ -8230,8 +8554,55 @@
           "tooltip": "Showing {shown} of {total} fields"
         }
       },
+      "row": {
+        "fieldCount": {
+          "status": "{count} field | {count} fields"
+        }
+      },
       "sort": {
         "tooltip": "Sort document: 1 is ascending, -1 is descending"
+      }
+    },
+    "editBuffer": {
+      "beautify": {
+        "tooltip": "Beautify with indentation"
+      },
+      "formatUnsupported": {
+        "tooltip": "Indented and compact formatting apply to JSON and XML/HTML"
+      },
+      "minify": {
+        "label": "Minify",
+        "tooltip": "Minify by removing all whitespace"
+      },
+      "modified": {
+        "status": "Modified"
+      },
+      "revert": {
+        "label": "Revert",
+        "tooltip": "Revert to the stored value"
+      },
+      "reverted": {
+        "tooltip": "Already showing the stored value"
+      }
+    },
+    "filterHistory": {
+      "emptyRecent": {
+        "empty": "No history yet"
+      },
+      "namePrompt": {
+        "title": "Name this filter"
+      },
+      "noFilter": {
+        "label": "No filter"
+      },
+      "renamePrompt": {
+        "title": "Rename saved filter"
+      },
+      "saveCurrent": {
+        "label": "Save current filter…"
+      },
+      "saved": {
+        "title": "Saved"
       }
     },
     "generateData": {
@@ -9028,8 +9399,110 @@
         }
       }
     },
+    "keyValue": {
+      "add": {
+        "namePlaceholder": {
+          "placeholder": "Key name"
+        },
+        "nameRequired": {
+          "error": "Key name is required."
+        },
+        "title": "Add key (string value)",
+        "tooltip": "Add a new key",
+        "valuePlaceholder": {
+          "placeholder": "Initial value"
+        }
+      },
+      "copiedField": {
+        "announce": "Copied field"
+      },
+      "copyField": {
+        "label": "Copy field"
+      },
+      "deleteKey": {
+        "label": "Delete key",
+        "tooltip": "Delete this key"
+      },
+      "deleteKeyConfirm": {
+        "body": "This removes the key “{name}” and its whole value.",
+        "title": "Delete key?"
+      },
+      "deleteObject": {
+        "label": "Delete object",
+        "tooltip": "Delete this object"
+      },
+      "downloadObject": {
+        "tooltip": "Download this object"
+      },
+      "editStringOnly": {
+        "tooltip": "Edit value (string keys only)"
+      },
+      "editTypeUnsupported": {
+        "tooltip": "Only string values can be edited"
+      },
+      "editValue": {
+        "label": "Edit value"
+      },
+      "expires": {
+        "status": "Expires in {time}"
+      },
+      "memoryUnknown": {
+        "status": "Size unknown"
+      },
+      "noData": {
+        "empty": "No data"
+      },
+      "noExpiry": {
+        "status": "No expiry"
+      },
+      "objectEdit": {
+        "pending": {
+          "status": "Unsaved changes to this object’s body"
+        },
+        "pendingError": {
+          "status": "Unsaved changes to this object’s body: {error}"
+        }
+      },
+      "objectGate": {
+        "invalidText": {
+          "hint": "This object isn’t valid text. Download it to edit it locally."
+        },
+        "partial": {
+          "hint": "Only part of this object was fetched. Editing it would overwrite the rest."
+        },
+        "sizeLimit": {
+          "hint": "Too large to edit. It is {size} and the limit is {limit}."
+        },
+        "tooLarge": {
+          "hint": "Too large to edit. Download it to open it locally."
+        }
+      },
+      "rows": {
+        "aria": "Rows"
+      },
+      "tooLarge": {
+        "description": "This object is too large to preview ({size}, over the {limit} limit). Download it to open it locally."
+      },
+      "upload": {
+        "tooltip": "Upload a file"
+      }
+    },
     "module": {
       "title": "Kira Studio"
+    },
+    "pager": {
+      "firstPage": {
+        "label": "First page"
+      },
+      "lastPage": {
+        "label": "Last page"
+      },
+      "position": {
+        "label": "Page {input}"
+      },
+      "positionOf": {
+        "label": "Page {input} of {total}"
+      }
     },
     "project": {
       "connectionDialog": {
@@ -9638,6 +10111,49 @@
         "error": "Couldn’t reveal the saved URI."
       }
     },
+    "savedList": {
+      "pin": {
+        "tooltip": "Pin"
+      },
+      "recent": {
+        "label": "Recent"
+      }
+    },
+    "search": {
+      "capped": {
+        "status": "First {count} shown"
+      },
+      "count": {
+        "status": "Match {index} of {total}"
+      },
+      "filteringRows": {
+        "tooltip": "Showing only matching rows. Click to show all"
+      },
+      "filterRows": {
+        "tooltip": "Show only matching rows"
+      },
+      "maskNote": {
+        "status": "Search matches stored values, not displayed ones"
+      },
+      "scanning": {
+        "loading": "{count} found…"
+      },
+      "scopeDocuments": {
+        "status": "In the {count} loaded document | In the {count} loaded documents"
+      },
+      "scopeFilteredDocuments": {
+        "status": "Showing {shown} of {count} loaded document | Showing {shown} of {count} loaded documents"
+      },
+      "scopeFilteredRows": {
+        "status": "Showing {shown} of {count} loaded row | Showing {shown} of {count} loaded rows"
+      },
+      "scopeRows": {
+        "status": "In the {count} loaded row | In the {count} loaded rows"
+      },
+      "showAllRows": {
+        "label": "Show all rows"
+      }
+    },
     "shortcuts": {
       "palette": {
         "closeTab": {
@@ -9683,6 +10199,281 @@
       },
       "revealInProject": {
         "label": "Reveal in project panel"
+      }
+    },
+    "typeGlossary": {
+      "aggState": {
+        "description": "An intermediate aggregation state, produced by an aggregate function."
+      },
+      "any": {
+        "description": "A SQLite strict-table type that accepts a value of any storage class, with no affinity applied."
+      },
+      "array": {
+        "description": "A variable-length list of values of one element type."
+      },
+      "arrayOf": {
+        "description": "An array of {element} values."
+      },
+      "arrayOfWith": {
+        "description": "An array of {element} values. Element type: {description}."
+      },
+      "bigint": {
+        "description": "A 64-bit integer."
+      },
+      "bigserial": {
+        "description": "A 64-bit integer that auto-increments from a sequence. The column itself is a plain bigint."
+      },
+      "binary": {
+        "description": "Fixed-length raw binary data (MariaDB)."
+      },
+      "bit": {
+        "description": "A fixed- or variable-length bit string."
+      },
+      "blob": {
+        "description": "Raw binary data. The MariaDB and MySQL blob type caps it at 64 kilobytes. The SQLite blob type has no declared size limit."
+      },
+      "bool": {
+        "description": "A true/false value."
+      },
+      "boolUnsigned": {
+        "description": "A true/false value, stored as an unsigned 8-bit integer under the hood."
+      },
+      "bytea": {
+        "description": "Raw binary data."
+      },
+      "char": {
+        "description": "Fixed-length text, padded with spaces out to its declared length."
+      },
+      "cidr": {
+        "description": "A network specification (version 4 or 6) made of an address and a subnet, with host bits zero."
+      },
+      "date": {
+        "description": "A calendar date, with no time of day or time zone."
+      },
+      "date32": {
+        "description": "A calendar date with a wider range, back to 1900."
+      },
+      "dateFrom1970": {
+        "description": "A calendar date (from 1970), with no time of day or time zone."
+      },
+      "daterange": {
+        "description": "A range of dates."
+      },
+      "dateTime": {
+        "description": "A date and time with second precision, in a fixed named time zone."
+      },
+      "dateTime64": {
+        "description": "A date and time with sub-second precision, in a fixed named time zone."
+      },
+      "decimal": {
+        "description": "An exact, arbitrary-precision number with no binary rounding, unlike float or double."
+      },
+      "enum": {
+        "description": "A fixed set of named values defined by this database."
+      },
+      "enumInt": {
+        "description": "A fixed set of named string values, each backed by a small integer."
+      },
+      "fixedDecimal": {
+        "description": "An exact, fixed-precision decimal number with no binary rounding."
+      },
+      "fixedString": {
+        "description": "A fixed-length byte string, padded with zero bytes out to its declared length."
+      },
+      "float32": {
+        "description": "A 32-bit (single-precision) floating-point number."
+      },
+      "float64": {
+        "description": "A 64-bit (double-precision) floating-point number."
+      },
+      "geometric": {
+        "description": "A two-dimensional geometric shape."
+      },
+      "geoShape": {
+        "description": "A geometric shape, built from arrays or tuples of coordinates."
+      },
+      "inet": {
+        "description": "A host address (version 4 or 6), optionally with a subnet."
+      },
+      "int4range": {
+        "description": "A range of 32-bit integers."
+      },
+      "int8": {
+        "description": "An 8-bit signed integer (-128 to 127)."
+      },
+      "int8range": {
+        "description": "A range of 64-bit integers."
+      },
+      "int16": {
+        "description": "A 16-bit signed integer."
+      },
+      "int32": {
+        "description": "A 32-bit signed integer."
+      },
+      "int64": {
+        "description": "A 64-bit signed integer."
+      },
+      "int128": {
+        "description": "A 128- or 256-bit signed integer."
+      },
+      "integer": {
+        "description": "A 32-bit integer."
+      },
+      "interval": {
+        "description": "A span of time, such as 3 days 04:00:00. It is not a point in time."
+      },
+      "ipv4": {
+        "description": "A 32-bit host address (version 4)."
+      },
+      "ipv6": {
+        "description": "A 128-bit host address (version 6)."
+      },
+      "json": {
+        "description": "A JSON document. The jsonb type stores it in a parsed binary form. The plain json type stores the exact text."
+      },
+      "jsonDynamic": {
+        "description": "A semi-structured document with a dynamically inferred sub-schema."
+      },
+      "longblob": {
+        "description": "Raw binary data, up to about 4 gigabytes (MariaDB)."
+      },
+      "longtext": {
+        "description": "Variable-length text, up to about 4 gigabytes (MariaDB)."
+      },
+      "macaddr": {
+        "description": "A hardware address."
+      },
+      "map": {
+        "description": "A key/value mapping of one key type to one value type."
+      },
+      "maxkey": {
+        "description": "The always-highest comparison value. It is a sentinel, not real data."
+      },
+      "mediumblob": {
+        "description": "Raw binary data, up to about 16 megabytes (MariaDB)."
+      },
+      "mediumint": {
+        "description": "A 24-bit integer (MariaDB)."
+      },
+      "mediumtext": {
+        "description": "Variable-length text, up to about 16 megabytes (MariaDB)."
+      },
+      "minkey": {
+        "description": "The always-lowest comparison value. It is a sentinel, not real data."
+      },
+      "money": {
+        "description": "A fixed-precision currency amount."
+      },
+      "nested": {
+        "description": "A table-like group of same-length array columns."
+      },
+      "numrange": {
+        "description": "A range of arbitrary-precision numbers."
+      },
+      "objectid": {
+        "description": "A MongoDB 12-byte document identifier type."
+      },
+      "oid": {
+        "description": "An internal object identifier, not usually meaningful as application data."
+      },
+      "regex": {
+        "description": "A regular expression pattern."
+      },
+      "script": {
+        "description": "A stored script function, rarely used in modern schemas."
+      },
+      "serial": {
+        "description": "A 32-bit integer that auto-increments from a sequence. The column itself is a plain integer."
+      },
+      "set": {
+        "description": "The MariaDB and MySQL set type. It holds any combination of a fixed list of string values, stored as one field."
+      },
+      "smallint": {
+        "description": "A 16-bit integer."
+      },
+      "smallserial": {
+        "description": "A 16-bit integer that auto-increments from a sequence. The column itself is a plain smallint."
+      },
+      "spatial": {
+        "description": "A spatial value."
+      },
+      "string": {
+        "description": "Variable-length text or binary data, with no declared maximum."
+      },
+      "text": {
+        "description": "Variable-length text with no declared maximum."
+      },
+      "time": {
+        "description": "A time of day, with no date or time zone."
+      },
+      "time64": {
+        "description": "A time of day with sub-second precision, no date."
+      },
+      "timeNoDate": {
+        "description": "A time of day, with no date."
+      },
+      "timestamp": {
+        "description": "A date and time with no time zone. It is stored and compared as the literal wall-clock value written."
+      },
+      "timestamptz": {
+        "description": "A date and time normalized to UTC on write and converted to the session’s time zone on read."
+      },
+      "timetz": {
+        "description": "A time of day with a UTC offset, no date."
+      },
+      "tinyblob": {
+        "description": "Raw binary data, up to 255 bytes (MariaDB)."
+      },
+      "tinyint": {
+        "description": "An 8-bit integer (MariaDB)."
+      },
+      "tinytext": {
+        "description": "Variable-length text, up to 255 bytes (MariaDB)."
+      },
+      "tsquery": {
+        "description": "A parsed full-text search query."
+      },
+      "tsrange": {
+        "description": "A range of timestamps without time zone, such as 2024-01-01 to 2024-02-01."
+      },
+      "tstzrange": {
+        "description": "A range of timestamps with time zone."
+      },
+      "tsvector": {
+        "description": "Preprocessed text, indexed for full-text search."
+      },
+      "tuple": {
+        "description": "A fixed-length, ordered group of values, possibly of mixed types."
+      },
+      "uint8": {
+        "description": "An 8-bit unsigned integer (0 to 255)."
+      },
+      "uint16": {
+        "description": "A 16-bit unsigned integer."
+      },
+      "uint32": {
+        "description": "A 32-bit unsigned integer."
+      },
+      "uint64": {
+        "description": "A 64-bit unsigned integer."
+      },
+      "uint128": {
+        "description": "A 128- or 256-bit unsigned integer."
+      },
+      "uuid": {
+        "description": "A 128-bit universally unique identifier."
+      },
+      "varbinary": {
+        "description": "Variable-length raw binary data, up to a declared maximum (MariaDB)."
+      },
+      "varchar": {
+        "description": "Variable-length text, up to a declared maximum length."
+      },
+      "xml": {
+        "description": "An XML document."
+      },
+      "year": {
+        "description": "A calendar year, stored as a 2- or 4-digit value (MariaDB)."
       }
     }
   },

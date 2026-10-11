@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { EditBuffer } from './useEditBuffer';
 
@@ -25,21 +26,26 @@ const props = withDefaults(
   { revertTitle: undefined, showCompact: true, showBytes: true },
 );
 
-const beautifyDisabledTitle = 'Indented and compact formatting apply to JSON and XML/HTML.';
 const beautifyIndentedTitle = computed<string>(() =>
-  props.buffer.canBeautify.value
-    ? 'Beautify — pretty-print with indentation'
-    : beautifyDisabledTitle,
+  t(
+    props.buffer.canBeautify.value
+      ? 'studio.editBuffer.beautify.tooltip'
+      : 'studio.editBuffer.formatUnsupported.tooltip',
+  ),
 );
 const beautifyCompactTitle = computed<string>(() =>
-  props.buffer.canBeautify.value ? 'Minify — remove all whitespace' : beautifyDisabledTitle,
+  t(
+    props.buffer.canBeautify.value
+      ? 'studio.editBuffer.minify.tooltip'
+      : 'studio.editBuffer.formatUnsupported.tooltip',
+  ),
 );
 const resetTitle = computed<string>(
   () =>
     props.revertTitle ??
     (props.buffer.isDirty.value
-      ? 'Revert to the stored value'
-      : 'Already showing the stored value.'),
+      ? t('studio.editBuffer.revert.tooltip')
+      : t('studio.editBuffer.reverted.tooltip')),
 );
 </script>
 
@@ -50,7 +56,7 @@ const resetTitle = computed<string>(
       variant="warn"
       :data-testid="`${testidPrefix}-modified`"
     >
-      modified
+      {{ t('studio.editBuffer.modified.status') }}
     </Badge>
     <Badge data v-if="showBytes" :data-testid="`${testidPrefix}-byte-badge`">{{
       buffer.byteLabel.value
@@ -58,7 +64,7 @@ const resetTitle = computed<string>(
     <TooltipIconButton
       icon="expand-all"
       :label="beautifyIndentedTitle"
-      aria-label="Beautify"
+      :aria-label="t('studio.api.common.beautify.label')"
       disabled-trigger
       :class="{ 'bg-field text-fg': buffer.formatted.value === 'indented' }"
       :data-testid="`${testidPrefix}-beautify-indented`"
@@ -69,7 +75,7 @@ const resetTitle = computed<string>(
       v-if="showCompact"
       icon="collapse-all"
       :label="beautifyCompactTitle"
-      aria-label="Minify"
+      :aria-label="t('studio.editBuffer.minify.label')"
       disabled-trigger
       :class="{ 'bg-field text-fg': buffer.formatted.value === 'compact' }"
       :data-testid="`${testidPrefix}-beautify-compact`"
@@ -79,7 +85,7 @@ const resetTitle = computed<string>(
     <TooltipIconButton
       icon="discard"
       :label="resetTitle"
-      aria-label="Revert"
+      :aria-label="t('studio.editBuffer.revert.label')"
       disabled-trigger
       :data-testid="`${testidPrefix}-beautify-reset`"
       :disabled="!buffer.isDirty.value"

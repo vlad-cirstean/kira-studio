@@ -3,7 +3,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import { formatBytes } from '@workbench/behaviour/format';
 import type { DocumentRowView } from './rows';
 
 // P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
@@ -58,19 +60,19 @@ function onHeadKeydown(e: KeyboardEvent): void {
         type="button"
         class="flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground"
         data-testid="document-toggle-expand"
-        :aria-label="expanded ? 'Collapse' : 'Expand'"
+        :aria-label="t(expanded ? 'common.action.collapse.label' : 'common.action.expand.label')"
         @click.stop="$emit('toggle')"
       >
         <CodiconIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
       </button>
       <span class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-data" data-testid="document-id">{{ view.idLabel }}</span>
-      <Badge data-testid="document-field-count">{{ view.fieldCount }} fields</Badge>
+      <Badge data-testid="document-field-count">{{ t('studio.documents.row.fieldCount.status', { count: view.fieldCount }) }}</Badge>
       <Badge data data-testid="document-byte-badge">{{ view.byteLabel }}</Badge>
       <Tooltip v-if="view.isTruncated">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="document-truncated">truncated</Badge>
+          <Badge variant="warn" data-testid="document-truncated">{{ t('studio.common.truncated.status') }}</Badge>
         </TooltipTrigger>
-        <TooltipContent>value truncated</TooltipContent>
+        <TooltipContent>{{ t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
       </Tooltip>
       <slot name="actions" />
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { t } from '@theme/i18n';
 import { useFindBar } from '@workbench/behaviour/findBar';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
@@ -133,7 +134,7 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
     <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField v-model="query" @keydown.escape.stop="close" placeholder="Find" :aria-invalid="invalid" data-testid="http-find-input" />
+      <SearchField v-model="query" @keydown.escape.stop="close" :placeholder="t('common.action.find.label')" :aria-invalid="invalid" data-testid="http-find-input" />
     </div>
     <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
@@ -147,23 +148,23 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
       />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="http-find-count">
-      {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}
+      {{ totalMatches === 0 ? t('common.state.noMatches.empty') : t('studio.search.count.status', { index: displayIndex, total: totalMatches }) }}
     </span>
     <TooltipIconButton
       icon="chevron-up"
-      label="Previous match"
+      :label="t('common.action.previousMatch.label')"
       data-testid="http-find-prev"
       @click="goPrev"
     />
     <TooltipIconButton
       icon="chevron-down"
-      label="Next match"
+      :label="t('common.action.nextMatch.label')"
       data-testid="http-find-next"
       @click="goNext"
     />
     <TooltipIconButton
       icon="close"
-      label="Close"
+      :label="t('common.action.close.label')"
       class="ml-auto"
       data-testid="http-find-close"
       @click="close"

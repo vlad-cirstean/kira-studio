@@ -5,10 +5,11 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useFocus } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
-import type { CellFormat } from './formats';
+import { type CellFormat, formatLabel } from './formats';
 import TimestampReading from './TimestampReading.vue';
 import {
   defaultShapeFor,
@@ -32,10 +33,19 @@ const zone = ref<'local' | 'utc'>('local');
 function setZone(v: string): void {
   zone.value = v as 'local' | 'utc';
 }
-const ZONE_OPTIONS = [
-  { value: 'local' as const, label: 'Local', testid: 'cell-editor-timestamp-zone-local' },
-  { value: 'utc' as const, label: 'UTC', testid: 'cell-editor-timestamp-zone-utc' },
-];
+const FIELD_PATTERN = 'YYYY-MM-DD HH:mm:ss';
+const zoneOptions = computed(() => [
+  {
+    value: 'local' as const,
+    label: t('studio.cellEditor.timestamp.zoneLocal.label'),
+    testid: 'cell-editor-timestamp-zone-local',
+  },
+  {
+    value: 'utc' as const,
+    label: t('studio.cellEditor.timestamp.zoneUtc.label'),
+    testid: 'cell-editor-timestamp-zone-utc',
+  },
+]);
 
 const parsed = computed(() => parseTimestamp(props.format, props.doc));
 const reading = computed(() => describeTimestamp(props.format, props.doc));
@@ -111,14 +121,14 @@ watch(calendarOpen, (open) => {
           }}</TimestampReading>
         </template>
         <TimestampReading v-else subtle data-testid="cell-editor-timestamp-unparseable"
-          >Not a recognizable {{ format }} value</TimestampReading
+          >{{ t('studio.cellEditor.timestamp.unparseable.status', { format: formatLabel(format) }) }}</TimestampReading
         >
         </div>
       </AlertDescription>
     </Alert>
 
     <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
-      <SecondaryTabs variant="segmented" :model-value="zone" :items="ZONE_OPTIONS" data-testid="cell-editor-timestamp-zone" @update:model-value="(v) => setZone(v)" />
+      <SecondaryTabs variant="segmented" :model-value="zone" :items="zoneOptions" data-testid="cell-editor-timestamp-zone" @update:model-value="(v) => setZone(v)" />
       <div class="flex-1 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -133,14 +143,14 @@ watch(calendarOpen, (open) => {
               />
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>YYYY-MM-DD HH:mm:ss, in the zone selected above</TooltipContent>
+          <TooltipContent>{{ t('studio.cellEditor.timestamp.field.tooltip', { format: FIELD_PATTERN }) }}</TooltipContent>
         </Tooltip>
       </div>
       <Popover :open="calendarOpen" @update:open="calendarOpen = $event">
         <span ref="calendarAnchorRef" class="relative shrink-0">
           <TooltipIconButton
             icon="calendar"
-            label="Pick a date and time"
+            :label="t('studio.cellEditor.timestamp.pick.tooltip')"
             disabled-trigger
             ref="calendarTriggerEl"
             :disabled="readOnly"

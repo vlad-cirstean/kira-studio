@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 
 // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
@@ -66,7 +67,7 @@ function onJump(e: Event): void {
   <div class="group gap-0.5" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
     <TooltipIconButton
       icon="chevron-left"
-      label="First page"
+      :label="t('studio.pager.firstPage.label')"
       disabled-trigger
       :data-testid="`${testidPrefix}pager-first`"
       :disabled="pageIndex === 0"
@@ -74,31 +75,37 @@ function onJump(e: Event): void {
     />
     <TooltipIconButton
       icon="arrow-left"
-      label="Previous page"
+      :label="t('common.action.previousPage.label')"
       disabled-trigger
       :data-testid="`${testidPrefix}pager-prev`"
       :disabled="pageIndex === 0"
       @click="emit('prev')"
     />
     <span class="inline-flex items-center whitespace-nowrap gap-0.5 text-kira-sm text-muted-foreground">
-      page
-      <div class="w-14">
-        <Input
-          v-model="pageInputValue"
-          type="number"
-          min="1"
-          step="1"
-          size="kira"
-          class="w-full text-center"
-          :data-testid="`${testidPrefix}pager-page-input`"
-          @change="onJump"
-        />
-      </div>
-      <template v-if="pageCount"> of {{ pageCount }}</template>
+      <CatalogText
+        :k="pageCount ? 'studio.pager.positionOf.label' : 'studio.pager.position.label'"
+        :params="{ total: pageCount ?? 0 }"
+        class="inline-flex items-center gap-0.5"
+      >
+        <template #input>
+          <div class="w-14">
+            <Input
+              v-model="pageInputValue"
+              type="number"
+              min="1"
+              step="1"
+              size="kira"
+              class="w-full text-center"
+              :data-testid="`${testidPrefix}pager-page-input`"
+              @change="onJump"
+            />
+          </div>
+        </template>
+      </CatalogText>
     </span>
     <TooltipIconButton
       icon="arrow-right"
-      label="Next page"
+      :label="t('common.action.nextPage.label')"
       disabled-trigger
       :data-testid="`${testidPrefix}pager-next`"
       :disabled="!hasMore"
@@ -106,8 +113,8 @@ function onJump(e: Event): void {
     />
     <TooltipIconButton
       icon="chevron-right"
-      :label="pageCount ? 'Last page' : lastTooltip"
-      aria-label="Last page"
+      :label="pageCount ? t('studio.pager.lastPage.label') : lastTooltip"
+      :aria-label="t('studio.pager.lastPage.label')"
       disabled-trigger
       :data-testid="`${testidPrefix}pager-last`"
       :disabled="!pageCount"

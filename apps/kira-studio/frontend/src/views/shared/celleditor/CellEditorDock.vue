@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useCellSelectionStore } from '../../../state/cellSelection';
 import { useLayoutStore } from '../../../state/layout';
@@ -31,7 +32,7 @@ const pane = useLiveSize(
   <template v-if="cell">
     <ResizeHandle
       class="cell-splitter"
-      label="Resize cell editor"
+      :label="t('studio.cellEditor.resize.aria')"
       axis="y"
       direction="reverse"
       line

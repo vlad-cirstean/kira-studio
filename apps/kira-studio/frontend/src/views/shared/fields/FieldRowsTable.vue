@@ -7,6 +7,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { revealElement } from '@workbench/behaviour/focus';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -359,7 +360,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
         <InputGroup>
           <InputGroupTextarea
             :model-value="entry.row.description ?? ''"
-            placeholder="description"
+            :placeholder="t('common.field.description.label')"
             :data-testid="`${testidPrefix}-description`"
             rows="1"
             @update:model-value="updateField(entry.index, 'description', String($event))"
@@ -375,7 +376,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
       </div>
       <TooltipIconButton
         icon="close"
-        label="Remove"
+        :label="t('common.action.remove.label')"
         :data-testid="`${testidPrefix}-remove`"
         :disabled-trigger="entry.index >= rows.length"
         :disabled="entry.index >= rows.length"

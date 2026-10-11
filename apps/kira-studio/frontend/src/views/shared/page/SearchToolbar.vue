@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="M extends { row: number }">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { CatalogText, type MessageKey, t } from '@theme/i18n';
 import { useFindBar } from '@workbench/behaviour/findBar';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { formatCount } from '@workbench/behaviour/format';
@@ -19,7 +20,7 @@ import { usePageSearchFilterStore } from './searchFilter';
 const props = defineProps<{
   tabId: string;
   testidPrefix: string;
-  rowNoun: string;
+  kind: 'rows' | 'documents';
   api: PageSearchApi<M>;
   /** M5 §6.6: the grid's own mask preview state — this component is shared with documents/
    *  keyvalue, neither of which has a masking concept, so this stays `undefined` (falsy) there.
@@ -43,6 +44,17 @@ const loadedRowCount = computed(() => {
 // is on and a scan has completed.
 const filtering = computed(() => pageSearchFilterStore.isSearchFiltering(props.tabId));
 const filteredRowCount = computed(() => props.api.matchedRows(props.tabId)?.length ?? null);
+
+const scopeKey = computed<MessageKey>(() =>
+  props.kind === 'documents'
+    ? 'studio.search.scopeDocuments.status'
+    : 'studio.search.scopeRows.status',
+);
+const scopeFilteredKey = computed<MessageKey>(() =>
+  props.kind === 'documents'
+    ? 'studio.search.scopeFilteredDocuments.status'
+    : 'studio.search.scopeFilteredRows.status',
+);
 
 function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
@@ -239,7 +251,7 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     :data-testid="`${testidPrefix}search-toolbar`"
   >
     <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField v-model="query" @keydown.escape.stop="close" placeholder="Find" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
+      <SearchField v-model="query" @keydown.escape.stop="close" :placeholder="t('common.action.find.label')" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
          single-value picker, so each is its own icon button rather than a <SegmentedControl> (which
@@ -262,8 +274,8 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     <div class="flex items-center gap-1.5 min-w-0">
       <TooltipIconButton
         icon="filter"
-        :label="filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'"
-        aria-label="Show only matching rows"
+        :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
+        :aria-label="t('studio.search.filterRows.tooltip')"
         :class="{ 'bg-field text-fg is-active': filtering }"
         :data-testid="`${testidPrefix}search-filter-rows`"
         @click="toggleFilter"
@@ -288,10 +300,12 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
            through to this same branch with a partial `index: -1` entry underneath it; that path is
            closed by `startSearch`'s own handle-identity check, not by this template. -->
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap" :data-testid="`${testidPrefix}search-count`">
-        <template v-if="scanning">{{ foundSoFar }}…</template>
+        <template v-if="scanning">{{ t('studio.search.scanning.loading', { count: foundSoFar }) }}</template>
         <template v-else-if="entry && entry.matches.length > 0">
-          <b class="font-data">{{ entry.index + 1 }}</b> of
-          <b class="font-data">{{ formatCount(entry.found ?? entry.matches.length) }}</b>
+          <CatalogText k="studio.search.count.status">
+            <template #index><b class="font-data">{{ entry.index + 1 }}</b></template>
+            <template #total><b class="font-data">{{ formatCount(entry.found ?? entry.matches.length) }}</b></template>
+          </CatalogText>
           <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —
                a user cannot act on the un-shown remainder, so this says plainly that only the
                first N are on offer for Prev/Next/highlight. -->
@@ -299,41 +313,40 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
             v-if="entry.found !== undefined && entry.found > entry.matches.length"
             :data-testid="`${testidPrefix}search-capped`"
           >
-            (first {{ formatCount(entry.matches.length) }} shown)
+            {{ t('studio.search.capped.status', { count: entry.matches.length }) }}
           </span>
         </template>
-        <template v-else>0 of 0</template>
+        <template v-else>{{ t('common.state.noMatches.empty') }}</template>
       </span>
       <TooltipIconButton
         icon="chevron-up"
-        label="Previous match"
+        :label="t('common.action.previousMatch.label')"
         :data-testid="`${testidPrefix}search-prev`"
         @click="goPrev"
       />
       <TooltipIconButton
         icon="chevron-down"
-        label="Next match"
+        :label="t('common.action.nextMatch.label')"
         :data-testid="`${testidPrefix}search-next`"
         @click="goNext"
       />
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <span class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
-          showing {{ formatCount(filteredRowCount) }} of {{ formatCount(loadedRowCount) }}
-          loaded {{ rowNoun }}
+          {{ t(scopeFilteredKey, { shown: formatCount(filteredRowCount), count: loadedRowCount }) }}
         </template>
-        <template v-else>in the {{ formatCount(loadedRowCount) }} loaded {{ rowNoun }}</template>
+        <template v-else>{{ t(scopeKey, { count: loadedRowCount }) }}</template>
       </span>
       <!-- M5 §6.6: search stays over raw stored values even while the grid's own preview shows
            masked ones — a surprising mismatch otherwise ("why did my search for a real name match
            a row showing buckets"), named here rather than left implicit. -->
       <span v-if="maskPreviewOn" class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-mask-note`">
-        search matches stored values, not displayed ones
+        {{ t('studio.search.maskNote.status') }}
       </span>
     </template>
     <TooltipIconButton
       icon="close"
-      label="Close"
+      :label="t('common.action.close.label')"
       class="ml-auto"
       :data-testid="`${testidPrefix}search-close`"
       @click="close"

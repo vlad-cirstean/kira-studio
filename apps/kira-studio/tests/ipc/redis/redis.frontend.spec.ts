@@ -177,7 +177,7 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
   await expect(ttlKeyRow).toBeVisible();
   await ttlKeyRow.dblclick();
   await expect(page.locator('[data-testid="keyvalue-type"]').last()).toHaveText('string');
-  await expect(page.locator('[data-testid="keyvalue-ttl"]').last()).not.toContainText('no expiry');
+  await expect(page.locator('[data-testid="keyvalue-ttl"]').last()).not.toContainText('No expiry');
   await expect(page.locator('[data-testid="keyvalue-memory"]').last()).not.toContainText('unknown');
 
   await page.locator('[data-testid="keyvalue-delete"]').last().click();

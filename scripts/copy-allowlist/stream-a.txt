@@ -1,26 +1,4 @@
 # Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue
-apps/kira-studio/frontend/src/views/shared/EditBufferActions.vue
-apps/kira-studio/frontend/src/views/shared/FilterHistoryMenu.vue
-apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
-apps/kira-studio/frontend/src/views/shared/SavedListMenu.vue
-apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorDock.vue
-apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue
-apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue
-apps/kira-studio/frontend/src/views/shared/celleditor/detect.ts
-apps/kira-studio/frontend/src/views/shared/celleditor/formats.ts
-apps/kira-studio/frontend/src/views/shared/celleditor/generate.ts
-apps/kira-studio/frontend/src/views/shared/celleditor/validate.ts
-apps/kira-studio/frontend/src/views/shared/document/DocumentRow.vue
-apps/kira-studio/frontend/src/views/shared/document/DocumentTree.vue
-apps/kira-studio/frontend/src/views/shared/document/ejson.ts
-apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue
-apps/kira-studio/frontend/src/views/shared/keyvalue/KeyValuePane.vue
-apps/kira-studio/frontend/src/views/shared/keyvalue/menu.ts
-apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue
-apps/kira-studio/frontend/src/views/shared/page/SearchFilterNotice.vue
-apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
-apps/kira-studio/frontend/src/views/shared/typeGlossary.ts
 apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
 apps/kira-studio/frontend/src/views/stream/StreamFilterHistoryMenu.vue
 apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
@@ -45,3 +23,4 @@ apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue
 permanent U67 apps/kira-studio/frontend/src/fonts.ts # font family names (system and installed typefaces are proper names, not wording)
 permanent U67 apps/kira-studio/frontend/src/views/console/completion.ts # Redis command syntax hints (command grammar, not wording)
 permanent U67 apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue # HTTP auth scheme tokens inserted verbatim (protocol vocabulary, not wording)
+permanent U67 apps/kira-studio/frontend/src/views/shared/document/ejson.ts # EJSON shell-literal syntax (ObjectId(...), ISODate(...)), not wording

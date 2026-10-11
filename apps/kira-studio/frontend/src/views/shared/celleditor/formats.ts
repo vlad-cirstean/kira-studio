@@ -1,4 +1,5 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
+import { type MessageKey, t } from '@theme/i18n';
 import {
   type BeautifyMode,
   type BeautifyResult,
@@ -24,38 +25,33 @@ export const CELL_FORMATS = [
 ] as const;
 export type CellFormat = (typeof CELL_FORMATS)[number];
 
-/** P42 D25: only the label changed — 'Time (ISO 8601)' reads more plainly than the wire format's
- *  own name. The key stays `iso8601` (a stored override value and a Playwright attribute);
- *  renaming it would be a migration for a label change. */
-export const FORMAT_LABEL: Record<CellFormat, string> = {
-  text: 'Plain text',
-  json: 'JSON',
-  xml: 'XML / HTML',
-  csv: 'CSV',
-  sql: 'SQL',
-  iso8601: 'Time (ISO 8601)',
-  epochSeconds: 'Epoch (seconds)',
-  epochMillis: 'Epoch (milliseconds)',
-  base64: 'Base64',
-  hex: 'Hex',
+const FORMAT_LABEL_KEY: Record<CellFormat, MessageKey> = {
+  text: 'studio.cellEditor.format.text.label',
+  json: 'studio.copy.format.json.label',
+  xml: 'studio.cellEditor.format.xml.label',
+  csv: 'studio.copy.format.csv.label',
+  sql: 'studio.cellEditor.format.sql.label',
+  iso8601: 'studio.cellEditor.format.iso8601.label',
+  epochSeconds: 'studio.cellEditor.format.epochSeconds.label',
+  epochMillis: 'studio.cellEditor.format.epochMillis.label',
+  base64: 'studio.cellEditor.format.base64.label',
+  hex: 'studio.cellEditor.format.hex.label',
 };
 
-/** P42 D28: one sentence per format — the single source both the picker's rows (hover) and its
- *  trigger's own tooltip (the effective format) read, so the two surfaces can't drift. Distinct
- *  from typeGlossary.ts's own per-*column-type* descriptions (`int4`, `timestamptz`): this is
- *  about a *cell format*, a different vocabulary over a different thing. */
-export const FORMAT_HELP: Record<CellFormat, string> = {
-  text: 'No decoding — the value is shown exactly as stored.',
-  json: 'A JSON document — objects and arrays get syntax highlighting and Beautify.',
-  xml: 'XML or HTML markup — tags get syntax highlighting and Beautify.',
-  csv: 'Comma/tab/semicolon-separated rows, all with the same column count.',
-  sql: 'A SQL statement or fragment — gets SQL syntax highlighting.',
-  iso8601: 'A calendar date and time, spelled as an ISO-8601 timestamp.',
-  epochSeconds: 'A Unix timestamp counted in whole seconds since 1970-01-01 UTC.',
-  epochMillis: 'A Unix timestamp counted in milliseconds since 1970-01-01 UTC.',
-  base64: 'Bytes encoded as base64 — a decoded-text pane opens below the value.',
-  hex: 'Bytes encoded as hexadecimal — a decoded-text pane opens below the value.',
-};
+/** The key stays `iso8601` (a stored override value and a Playwright attribute); only the label is wording. */
+export function formatLabel(format: CellFormat): string {
+  return t(FORMAT_LABEL_KEY[format]);
+}
+
+export function formatAutoLabel(format: CellFormat): string {
+  return t('studio.cellEditor.format.auto.label', { format: formatLabel(format) });
+}
+
+/** One sentence per format: the picker's rows (hover) and its trigger's tooltip read the same
+ *  text. Distinct from typeGlossary.ts, which describes column types. */
+export function formatHelp(format: CellFormat): string {
+  return t(`studio.cellEditor.format.${format}.description`);
+}
 
 /** P42 D27: where one group ends and the next begins in the picker — read-it-directly formats,
  *  then time, then binary encodings that open a decoded-text pane. */

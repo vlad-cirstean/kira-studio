@@ -987,7 +987,7 @@ const statusLine = computed(() => {
           v-if="rt.searchOpen && !activeResultIsPlan"
           :tab-id="tab.id"
           testid-prefix="console-"
-          row-noun="rows"
+          kind="rows"
           :api="pageSearchApi"
           @go-to-match="onGoToMatch"
           @close="onCloseSearch"

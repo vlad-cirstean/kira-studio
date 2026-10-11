@@ -5,6 +5,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { ref } from 'vue';
 
@@ -116,14 +117,14 @@ defineSlots<{
                 <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Pin</TooltipContent>
+            <TooltipContent>{{ t('studio.savedList.pin.tooltip') }}</TooltipContent>
           </Tooltip>
           <slot name="entry" :entry="entry" />
           <span class="flex shrink-0 gap-0.5">
             <slot name="entry-actions" :entry="entry" />
             <TooltipIconButton
               icon="trash"
-              label="Delete"
+              :label="t('common.action.delete.label')"
               @click.stop="emit('delete', entry)"
             />
           </span>
@@ -132,9 +133,9 @@ defineSlots<{
 
       <template v-if="recent">
         <Separator class="my-1" />
-        <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">Recent</div>
+        <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">{{ t('studio.savedList.recent.label') }}</div>
         <div v-if="recent.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptyRecentText }}</div>
-        <div v-else ref="recentEl" role="listbox" aria-label="Recent">
+        <div v-else ref="recentEl" role="listbox" :aria-label="t('studio.savedList.recent.label')">
           <div
             v-for="entry in recent"
             :key="entry.id"
