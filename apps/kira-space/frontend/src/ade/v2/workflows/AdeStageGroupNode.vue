@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { Handle, Position } from '@vue-flow/core';
 import { computed } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import type { Tone } from '../board/actions';
+import { failureLabel, kindLabel } from '../board/workflowForm';
 import type { StageNodeData } from '../board/workflowGraph';
 import type { StageKind } from '../wire';
 
@@ -14,8 +16,13 @@ const agent = computed(() => stage.value.kind === 'agent');
 const handleStyle = computed(() => (props.data.spineX === undefined ? {} : { left: `${props.data.spineX}px` }));
 const detail = computed(() => {
   const s = stage.value;
-  if (s.kind === 'script') return `${s.command || 'no command'}${s.onFailure.startsWith('retry') ? ` · ${s.onFailure}` : ''}`;
-  return s.session ? 'interactive Claude Code session' : 'your own work';
+  if (s.kind === 'script') {
+    const command = s.command || t('space.ade.workflows.stageNode.noCommand.label');
+    return s.onFailure.startsWith('retry')
+      ? t('space.common.dotPair.label', { first: command, second: failureLabel(s.onFailure) })
+      : command;
+  }
+  return s.session ? t('space.ade.workflows.stageNode.session.label') : t('space.ade.workflows.stageNode.manual.label');
 });
 </script>
 
@@ -43,7 +50,7 @@ const detail = computed(() => {
     <div class="flex items-center gap-1.5 px-3" :class="agent ? 'h-row' : 'pt-2'">
       <span class="font-medium">{{ data.index + 1 }}.</span>
       <span class="min-w-0 flex-1 truncate font-medium" :class="stage.skip ? 'line-through' : ''">{{ stage.name }}</span>
-      <AdeChip :label="stage.kind" :tone="KIND_TONE[stage.kind]" />
+      <AdeChip :label="kindLabel(stage.kind)" :tone="KIND_TONE[stage.kind]" />
     </div>
     <div v-if="!agent" class="truncate px-3 text-kira-sm text-subtle" data-testid="ade-wf-stage-node-detail">{{ detail }}</div>
     <Handle

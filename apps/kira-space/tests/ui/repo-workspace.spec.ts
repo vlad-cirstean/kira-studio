@@ -350,7 +350,7 @@ test('a repo workspace: the panel has three top-level tabs (Repos/Files/Review),
   );
   await expect(topTabs).toHaveCount(3);
   const labels = await topTabs.allTextContents();
-  expect(labels.map((l) => l.trim())).toEqual(['Repos', 'Files', 'Review']);
+  expect(labels.map((l) => l.trim())).toEqual(['Repositories', 'Files', 'Review']);
 
   // Files tab: its own inner strip is Files/Search only — Review is no longer one of its values.
   await page.locator('[data-testid="git-panel-tab-files"]').click();
@@ -940,7 +940,7 @@ test('every repo row shows its checked-out branch, main worktree first', async (
   const worktreeRows = page.locator('[data-testid="repo-worktree-row"]');
   await expect(worktreeRows).toHaveCount(2);
   await expect(worktreeRows.first()).toHaveAttribute('data-worktree-path', REPO.repoId);
-  await expect(worktreeRows.first().locator('.worktree-badge')).toHaveText('main');
+  await expect(worktreeRows.first().locator('.worktree-badge')).toHaveText('Main');
 });
 
 // P92 item 5: "Open all changes" (CommitMeta.vue) on a multi-file commit opens exactly one

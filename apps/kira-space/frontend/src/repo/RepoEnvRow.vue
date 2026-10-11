@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { type ComponentPublicInstance, useTemplateRef } from 'vue';
@@ -35,11 +36,11 @@ const script = useInlineEdit({
 <template>
   <div class="flex flex-col gap-1" data-testid="repo-env">
     <div class="flex items-center gap-1.5">
-      <Label :for="`repo-env-name-${index}`" class="sr-only">Environment name</Label>
+      <Label :for="`repo-env-name-${index}`" class="sr-only">{{ t('space.repo.env.name.aria') }}</Label>
       <Input
         :id="`repo-env-name-${index}`"
         ref="nameInput"
-        placeholder="staging"
+        :placeholder="t('space.repo.env.name.example')"
         :model-value="name.text.value"
         class="w-32 shrink-0 font-data font-medium"
         data-testid="repo-env-name"
@@ -47,11 +48,11 @@ const script = useInlineEdit({
         @blur="name.onCommit"
         @keydown="name.onKeydown"
       />
-      <Label :for="`repo-env-script-${index}`" class="sr-only">Deployed SHA script</Label>
+      <Label :for="`repo-env-script-${index}`" class="sr-only">{{ t('space.repo.env.script.aria') }}</Label>
       <Input
         :id="`repo-env-script-${index}`"
         :model-value="script.text.value"
-        placeholder="curl -s https://…/version"
+        :placeholder="t('space.repo.env.script.example')"
         class="min-w-0 flex-1 font-data"
         data-testid="repo-env-script"
         @update:model-value="script.onInput"
@@ -60,7 +61,7 @@ const script = useInlineEdit({
       />
       <TooltipIconButton
         icon="close"
-        label="Remove environment"
+        :label="t('space.repo.env.remove.tooltip')"
         :disabled="busy"
         data-testid="repo-env-remove"
         @click="emit('remove')"

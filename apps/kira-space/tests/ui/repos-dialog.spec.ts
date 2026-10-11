@@ -205,7 +205,7 @@ test('contract: a folder row counts its hidden repos', async ({ relaunch }) => {
   await page.locator(t('manage-repos')).click();
   await page.locator(t('repos-dialog-tab-folders')).click();
   await expect(page.locator(t('repos-dialog-folder-count')).first()).toHaveText(
-    `${folder.repoCount} repos · ${folder.hiddenCount} hidden`,
+    `${folder.repoCount} repositories · ${folder.hiddenCount} hidden`,
   );
   await expect(page.locator(t('repos-dialog-folder-hide')).first()).toHaveAttribute(
     'aria-pressed',

@@ -8,6 +8,7 @@
 // TabViewStateStore the way the graph needs one.
 import type { MountHandle } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { t } from '@theme/i18n';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { loadGitUi } from './git/gitUiModule';
@@ -23,7 +24,7 @@ let handle: MountHandle | null = null;
 
 async function mountReview(): Promise<void> {
   if (!props.repoId) {
-    errorMessage.value = 'This panel has no repository.';
+    errorMessage.value = t('space.repo.review.noRepo.error');
     return;
   }
   if (!container.value) return; // unmounted (workspace closed) before this ran.

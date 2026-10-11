@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { useDebounceFn, useEventListener } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -132,7 +133,7 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
       class="virtual-list h-full overflow-auto"
       data-testid="virtual-list"
       role="tree"
-      aria-label="Repository files"
+      :aria-label="t('space.repo.tree.files.aria')"
       @scroll="onScroll"
     >
       <div class="sticky top-0 z-2 h-0" data-testid="tree-sticky-band">

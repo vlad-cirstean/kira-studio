@@ -13,8 +13,9 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
-import { copyAnnounced } from '@workbench/behaviour/clipboard';
+import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
@@ -132,7 +133,7 @@ function startRepoRename(id: string): void {
 }
 
 async function onRenameWorktreeRecord(id: string, currentName: string): Promise<void> {
-  const name = await promptText('Rename repository', currentName);
+  const name = await promptText(t('space.repo.panel.rename.title'), currentName);
   if (!name || name.trim() === '') return;
   await codeReposStore.renameCodeRepo(id, name.trim());
 }
@@ -167,15 +168,15 @@ function recordMenuItems(
   handlers: { rename: () => void; close: () => void; remove: () => void },
 ): MenuItem[] {
   const items: MenuItem[] = [
-    { type: 'item' as const, id: 'rename', label: 'Rename…', icon: 'edit', run: handlers.rename },
+    { type: 'item' as const, id: 'rename', label: t('common.action.rename.label'), icon: 'edit', run: handlers.rename },
   ];
   if (isOpen(record.id)) {
-    items.push({ type: 'item' as const, id: 'close', label: 'Close', icon: 'close', run: handlers.close });
+    items.push({ type: 'item' as const, id: 'close', label: t('common.action.close.label'), icon: 'close', run: handlers.close });
   }
   items.push({
     type: 'item' as const,
     id: 'remove',
-    label: 'Remove',
+    label: t('common.action.remove.label'),
     icon: 'trash',
     danger: true,
     run: handlers.remove,
@@ -192,40 +193,40 @@ function repoMenuItems(repo: RepoSummary): MenuItem[] {
     {
       type: 'item' as const,
       id: 'open',
-      label: 'Open',
+      label: t('common.action.open.label'),
       icon: 'folder-opened',
       run: () => onRowClick(repo.id),
     },
     {
       type: 'item' as const,
       id: 'copy-path',
-      label: 'Copy path',
+      label: t('common.action.copyPath.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(repo.root, 'path'),
+      run: () => void copyAndAnnounce(repo.root, t('common.copy.copiedPath.announce')),
     },
     {
       type: 'item' as const,
       id: 'open-terminal',
-      label: 'Open terminal',
+      label: t('common.action.openTerminal.label'),
       icon: 'terminal-bash',
       run: () => void openRepoTerminalTab(repo.id, repo.root),
     },
     {
       type: 'item' as const,
       id: 'configure',
-      label: 'Configure repository…',
+      label: t('space.repo.panel.configure.label'),
       icon: 'settings-gear',
       run: () => reposDialog.show({ repoId: repo.id }),
     },
     {
       type: 'submenu' as const,
       id: 'color',
-      label: 'Colour',
+      label: t('common.field.colour.label'),
       icon: 'symbol-color',
       items: PALETTE_COLOR_CHOICES.map((color) => ({
         type: 'item' as const,
         id: `color-${color}`,
-        label: color,
+        label: color === 'none' ? t('common.field.noColour.label') : color,
         swatch: color,
         checked: repo.color === color,
         run: () => codeReposStore.setCodeRepoColor(repo.id, color),
@@ -235,14 +236,14 @@ function repoMenuItems(repo: RepoSummary): MenuItem[] {
       ? {
           type: 'item' as const,
           id: 'show',
-          label: 'Show',
+          label: t('common.action.show.label'),
           icon: 'eye',
           run: () => codeReposStore.setCodeRepoHidden(repo.id, false),
         }
       : {
           type: 'item' as const,
           id: 'hide',
-          label: 'Hide',
+          label: t('common.action.hide.label'),
           icon: 'eye-closed',
           run: () => onHideRepo(repo.id),
         },
@@ -262,7 +263,7 @@ function repoMenuItems(repo: RepoSummary): MenuItem[] {
 // terminal registry, already keyed by canonical cwd), so opening or exiting a terminal repaints
 // the row with no event plumbing of this panel's own.
 function terminalTooltip(n: number): string {
-  return n === 1 ? 'A terminal is open here' : `${n} terminals are open here`;
+  return t('space.repo.panel.terminalOpen.tooltip', { count: n });
 }
 
 // P83 §10.2: a worktree row's own context menu — out of scope for P82 (nothing needed one yet),
@@ -274,16 +275,16 @@ function worktreeMenuItems(repo: RepoSummary, wt: WorktreeEntry): MenuItem[] {
     {
       type: 'item' as const,
       id: 'open-terminal',
-      label: 'Open terminal',
+      label: t('common.action.openTerminal.label'),
       icon: 'terminal-bash',
       run: () => void openRepoTerminalTab(repo.id, wt.path),
     },
     {
       type: 'item' as const,
       id: 'copy-path',
-      label: 'Copy path',
+      label: t('common.action.copyPath.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(wt.path, 'path'),
+      run: () => void copyAndAnnounce(wt.path, t('common.copy.copiedPath.announce')),
     },
   ];
   // P84 §6.2: once the flat top-level row is gone, Rename/Close/Remove for this record are
@@ -375,15 +376,15 @@ const view = computed({
   get: () => repoSearchStore.repoSearchView(repoId.value),
   set: (v: 'files' | 'search') => repoSearchStore.setRepoSearchView(repoId.value, v),
 });
-const panelTabItems = [
-  { value: 'repos', label: 'Repos', testid: 'git-panel-tab-repos' },
-  { value: 'files', label: 'Files', testid: 'git-panel-tab-files' },
-  { value: 'review', label: 'Review', testid: 'git-panel-tab-review' },
-];
-const viewOptions = [
-  { value: 'files' as const, label: 'Files', testid: 'repo-view-files' },
-  { value: 'search' as const, label: 'Search', testid: 'repo-view-search' },
-];
+const panelTabItems = computed(() => [
+  { value: 'repos', label: t('common.module.repositories.label'), testid: 'git-panel-tab-repos' },
+  { value: 'files', label: t('common.module.files.label'), testid: 'git-panel-tab-files' },
+  { value: 'review', label: t('space.ade.board.branchTag.review.label'), testid: 'git-panel-tab-review' },
+]);
+const viewOptions = computed(() => [
+  { value: 'files' as const, label: t('common.module.files.label'), testid: 'repo-view-files' },
+  { value: 'search' as const, label: t('common.action.search.label'), testid: 'repo-view-search' },
+]);
 
 // C11 §8.4/§5.3: this panel is one persistent component instance across every repo workspace
 // (WorkbenchShell.vue's `<component :is="activeModePanel" />` carries no per-repo key, unlike a
@@ -471,7 +472,7 @@ onUnmounted(() => {
       <template #actions>
         <TooltipIconButton
           icon="search"
-          :label="showSearch ? 'Hide search' : 'Search'"
+          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
           :pressed="showSearch"
           data-testid="toggle-search"
           @click="toggleSearch"
@@ -479,7 +480,7 @@ onUnmounted(() => {
         <TooltipIconButton
           v-if="tab === 'repos' && (visibility.hasHidden || visibility.showHidden)"
           :icon="visibility.showHidden ? 'eye' : 'eye-closed'"
-          :label="visibility.showHidden ? 'Hide hidden repositories' : 'Show hidden repositories'"
+          :label="visibility.showHidden ? t('space.repo.panel.hideHidden.tooltip') : t('space.repo.panel.showHidden.tooltip')"
           :pressed="visibility.showHidden"
           data-testid="repos-show-hidden"
           @click="visibility.showHidden = !visibility.showHidden"
@@ -487,7 +488,7 @@ onUnmounted(() => {
         <TooltipIconButton
           v-if="tab === 'repos'"
           icon="repo"
-          label="Manage repositories…"
+          :label="t('space.repo.manage.label')"
           data-testid="manage-repos"
           @click="reposDialog.show()"
         />
@@ -496,8 +497,8 @@ onUnmounted(() => {
         <TooltipIconButton
           v-if="tab === 'files' && view === 'files'"
           icon="refresh"
-          label="Refresh file tree"
-          aria-label="Refresh"
+          :label="t('space.repo.panel.refreshTree.tooltip')"
+          :aria-label="t('common.action.refresh.label')"
           data-testid="repo-refresh"
           @click="onRefresh"
         />
@@ -513,16 +514,16 @@ onUnmounted(() => {
           <Empty v-if="allHidden" class="h-full" data-testid="repos-all-hidden">
             <EmptyHeader>
               <EmptyMedia><CodiconIcon name="eye-closed" :size="24" /></EmptyMedia>
-              <EmptyTitle>All repositories are hidden</EmptyTitle>
-              <EmptyDescription>They stay imported and usable.</EmptyDescription>
+              <EmptyTitle>{{ t('space.repo.panel.allHidden.title') }}</EmptyTitle>
+              <EmptyDescription>{{ t('space.repo.panel.allHidden.description') }}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
               <Button variant="dialog" size="kira-lg" data-testid="repos-show-hidden-empty" @click="visibility.showHidden = true">
-                Show hidden
+                {{ t('space.repo.panel.showHidden.label') }}
               </Button>
             </EmptyContent>
           </Empty>
-          <div v-else ref="listEl" class="flex flex-col" role="listbox" aria-label="Repositories">
+          <div v-else ref="listEl" class="flex flex-col" role="listbox" :aria-label="t('common.module.repositories.label')">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
               <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
@@ -582,7 +583,7 @@ onUnmounted(() => {
                       data-testid="repo-hidden-mark"
                     />
                   </TooltipTrigger>
-                  <TooltipContent>Hidden</TooltipContent>
+                  <TooltipContent>{{ t('space.common.hidden.status') }}</TooltipContent>
                 </Tooltip>
                 <Tooltip v-if="repoHeadsStore.repoHeadLabel(repo.id)">
                   <TooltipTrigger as-child>
@@ -610,7 +611,7 @@ onUnmounted(() => {
                 v-if="worktreesStore.isWorktreesExpanded(repo.id)"
                 class="flex flex-col"
                 data-testid="repo-worktrees"
-                aria-label="Worktrees"
+                :aria-label="t('common.module.worktrees.label')"
               >
                 <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
                 <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
@@ -648,9 +649,9 @@ onUnmounted(() => {
                   </Tooltip>
                   <Tooltip v-if="wt.isMain">
                     <TooltipTrigger as-child>
-                      <span class="worktree-badge shrink-0 text-kira-sm text-subtle">main</span>
+                      <span class="worktree-badge shrink-0 text-kira-sm text-subtle">{{ t('space.ade.basePicker.main.label') }}</span>
                     </TooltipTrigger>
-                    <TooltipContent>Main worktree</TooltipContent>
+                    <TooltipContent>{{ t('space.repo.panel.mainWorktree.tooltip') }}</TooltipContent>
                   </Tooltip>
                   <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
                     <TooltipTrigger as-child>
@@ -686,10 +687,10 @@ onUnmounted(() => {
                   kind="loading"
                   :style="rowIndent(1)"
                 >
-                  Loading…
+                  {{ t('common.state.loading.loading') }}
                 </InlineState>
                 <InlineState v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" kind="empty" :style="rowIndent(1)">
-                  No worktrees
+                  {{ t('space.repo.panel.noWorktrees.empty') }}
                 </InlineState>
               </section>
             </div>
@@ -718,7 +719,7 @@ onUnmounted(() => {
                   variant="info"
                   data-testid="repo-tree-truncated"
                 >
-                  <AlertDescription>Showing the first 200,000 files.</AlertDescription>
+                  <AlertDescription>{{ t('space.repo.panel.treeTruncated.hint') }}</AlertDescription>
                 </Alert>
                 <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted
                      is what calls ensureRepoTreeLoaded in the first place; gating on the state it
@@ -743,7 +744,7 @@ onUnmounted(() => {
           <Empty v-else class="h-full">
             <EmptyHeader>
               <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
-              <EmptyTitle>No repository open</EmptyTitle>
+              <EmptyTitle>{{ t('space.repo.noRepoOpen.empty') }}</EmptyTitle>
             </EmptyHeader>
           </Empty>
         </template>
@@ -753,7 +754,7 @@ onUnmounted(() => {
     <Empty v-else class="h-full">
       <EmptyHeader>
         <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
-        <EmptyTitle>Import a repository to get started.</EmptyTitle>
+        <EmptyTitle>{{ t('space.repo.panel.importPrompt.emptyHint') }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
   </div>

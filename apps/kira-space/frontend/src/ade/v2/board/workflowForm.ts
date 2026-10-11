@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { OnFailure, PipelineStep, Stage, StageKind, Workflow } from '../wire';
 import { implicitResults } from './stepResults';
 
@@ -11,6 +12,33 @@ export const STATUS_OPTIONS: readonly Stage['status'][] = [
   'Done',
 ];
 export const FAILURE_OPTIONS: readonly OnFailure[] = ['stop', 'retry 1', 'retry 2'];
+
+/** Labels for the stored `runsOn`, `onFailure` and stage kind values; the stored text stays as is. */
+export function runsOnLabel(value: string): string {
+  if (value === 'once') return t('space.ade.workflows.runsOn.once.label');
+  if (value === 'each repo') return t('space.ade.workflows.runsOn.each.label');
+  if (value.startsWith('only '))
+    return t('space.ade.workflows.runsOn.only.label', { name: value.slice(5) });
+  return value;
+}
+
+export const PLACEHOLDER_TOKENS = '{task} {jira} {repo} {branch} {worktree}';
+
+export function failureLabel(value: OnFailure | ''): string {
+  if (value === 'stop') return t('common.action.stop.label');
+  if (value === 'retry 1') return t('space.ade.workflows.onFailure.retryOnce.label');
+  return value === 'retry 2' ? t('space.ade.workflows.onFailure.retryTwice.label') : value;
+}
+
+export function kindLabel(kind: StageKind, background = false): string {
+  if (kind === 'user') return t('memory.common.author.user.label');
+  if (kind === 'script') return t('space.ade.stage.modeScript.label');
+  return t(
+    background
+      ? 'space.ade.workflows.kind.agentBackground.option'
+      : 'memory.common.author.agent.label',
+  );
+}
 
 /** `prefix-<8 hex>`, never in `taken`. Runs are keyed by these ids, so a removed id must not come
  *  back: the lowest free `prefix-N` would hand a new stage or step the old one's runs. */
@@ -30,7 +58,7 @@ export function newStep(steps: readonly PipelineStep[]): PipelineStep {
   return {
     id,
     results: implicitResults(id, 'stop'),
-    name: 'New step',
+    name: t('space.ade.workflows.step.defaultName.label'),
     runsOn: 'each repo',
     before: 'auto',
     onFailure: 'stop',
@@ -65,7 +93,7 @@ export function newStage(stages: readonly Stage[]): Stage {
       'stage',
       stages.map((s) => s.id),
     ),
-    name: 'New stage',
+    name: t('space.ade.workflows.stage.defaultName.label'),
     kind: 'user',
     status: 'In progress',
     skip: false,

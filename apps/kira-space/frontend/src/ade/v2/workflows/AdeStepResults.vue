@@ -6,6 +6,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { MAX_LOOP_MAX } from '../board/stepResults';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
@@ -20,7 +21,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
 <template>
   <div class="flex flex-col gap-1.5" data-testid="ade-wf-results">
     <div class="text-kira-sm text-muted-foreground">
-      Results: the agent picks one when the step ends; each one sets where the stage goes next.
+      {{ t('space.ade.workflows.results.intro.hint') }}
     </div>
     <Card
       v-for="r in step.results"
@@ -31,7 +32,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
       :data-result="r.id"
     >
       <div class="flex items-center gap-2">
-        <Label :for="id('id', r.id)" class="sr-only">Result id</Label>
+        <Label :for="id('id', r.id)" class="sr-only">{{ t('space.ade.workflows.results.id.aria') }}</Label>
         <Input
           :id="id('id', r.id)"
           :model-value="r.id"
@@ -40,7 +41,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           data-testid="ade-wf-result-id"
           @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { id: String(v) })"
         />
-        <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">ok</Label>
+        <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">{{ t('space.ade.workflows.results.ok.label') }}</Label>
         <Checkbox
           :id="id('ok', r.id)"
           :model-value="r.ok"
@@ -49,25 +50,25 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
         />
         <TooltipIconButton
           icon="close"
-          label="Remove result"
+          :label="t('space.ade.workflows.results.remove.tooltip')"
           class="text-error"
           :disabled="step.results.length < 2"
           data-testid="ade-wf-result-remove"
           @click="draft.deleteResult(stageId, step.id, r.id)"
         />
       </div>
-      <Label :for="id('desc', r.id)" class="sr-only">Result description</Label>
+      <Label :for="id('desc', r.id)" class="sr-only">{{ t('space.ade.workflows.results.description.aria') }}</Label>
       <Input
         :id="id('desc', r.id)"
         :model-value="r.description"
-        placeholder="When to pick it (shown to the agent)"
+        :placeholder="t('space.ade.workflows.results.description.placeholder')"
         size="kira"
         maxlength="200"
         data-testid="ade-wf-result-description"
         @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { description: String(v) })"
       />
       <div class="flex flex-wrap items-center gap-2 text-kira-sm text-muted-foreground">
-        <Label :for="id('route', r.id)">Goes to</Label>
+        <Label :for="id('route', r.id)">{{ t('space.ade.workflows.results.route.label') }}</Label>
         <NativeSelect
           :id="id('route', r.id)"
           variant="bordered"
@@ -75,13 +76,13 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           data-testid="ade-wf-result-route"
           @update:model-value="(v) => draft.route(stageId, step.id, r.id, String(v))"
         >
-          <option value="next">next step</option>
-          <option v-for="s in steps" :key="s.id" :value="s.id">{{ s.id === step.id ? '↩ this step' : s.name }}</option>
-          <option value="end">end of stage</option>
-          <option v-if="!r.ok" value="stop">stop</option>
+          <option value="next">{{ t('space.ade.workflows.route.next.option') }}</option>
+          <option v-for="s in steps" :key="s.id" :value="s.id">{{ s.id === step.id ? t('space.ade.workflows.route.thisStep.option') : s.name }}</option>
+          <option value="end">{{ t('space.ade.workflows.route.end.option') }}</option>
+          <option v-if="!r.ok" value="stop">{{ t('common.action.stop.label') }}</option>
         </NativeSelect>
         <template v-if="r.max > 0">
-          <Label :for="id('max', r.id)">at most</Label>
+          <Label :for="id('max', r.id)">{{ t('space.ade.workflows.results.max.label') }}</Label>
           <Input
             :id="id('max', r.id)"
             type="number"
@@ -93,7 +94,6 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
             data-testid="ade-wf-result-max"
             @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { max: Number(v) })"
           />
-          <span>times</span>
         </template>
       </div>
     </Card>
@@ -105,7 +105,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
       data-testid="ade-wf-add-result"
       @click="draft.createResult(stageId, step.id)"
     >
-      + Add result
+      {{ t('space.ade.workflows.results.add.label') }}
     </Button>
   </div>
 </template>

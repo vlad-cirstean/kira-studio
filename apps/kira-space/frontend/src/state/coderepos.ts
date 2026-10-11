@@ -2,6 +2,7 @@ import type { PaletteColor } from '@shared/domain/color';
 import { canonicalPath } from '@shared/domain/path';
 import type { RepoSummary } from '@shared/domain/repo';
 import { connColorVar } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { moveId } from '@workbench/behaviour/sortableReorder';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { queryClient } from '@workbench/state/queryClient';
@@ -133,12 +134,12 @@ export const useCodeReposStore = defineStore('coderepos', () => {
    *  message points at Hide. Resolves true when removed. */
   async function confirmRemoveCodeRepo(id: string, name: string): Promise<boolean> {
     const folder = await importFolderOf(id);
-    const rescan = folder
-      ? ` A rescan of ${folder} imports it again; hide it to keep it out of the list.`
-      : '';
     const ok = await confirmDialogStore.confirm({
-      message: `Remove repository "${name}" from Kira Space? Files on disk stay.${rescan}`,
-      confirmLabel: 'Remove',
+      title: t('space.repo.removeConfirm.title'),
+      message: folder
+        ? t('space.repo.removeConfirm.folderBody.body', { name, folder })
+        : t('space.repo.removeConfirm.body', { name }),
+      confirmLabel: t('common.action.remove.label'),
       tone: 'danger',
     });
     if (ok) await removeCodeRepo(id);

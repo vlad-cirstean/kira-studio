@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyContent, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { useReposDialogStore } from './state/reposDialog';
 
 const reposDialog = useReposDialogStore();
@@ -12,11 +13,11 @@ const reposDialog = useReposDialogStore();
     <div class="w-105 max-w-full">
       <Empty class="w-full">
         <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
-        <EmptyTitle>No repository open</EmptyTitle>
+        <EmptyTitle>{{ t('space.repo.noRepoOpen.empty') }}</EmptyTitle>
         <EmptyContent>
           <Button variant="dialog-primary" size="kira-lg" data-testid="git-start-import" @click="reposDialog.show()">
             <CodiconIcon name="repo" :size="13" />
-            Manage repositories…
+            {{ t('space.repo.manage.label') }}
           </Button>
         </EmptyContent>
       </Empty>

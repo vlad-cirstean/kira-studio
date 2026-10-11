@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { copyText } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { openRepoDiffTab, openRepoFileTab } from '../state/repoTabs';
@@ -12,13 +13,13 @@ export function menuForRepoRow(repoId: string, row: RepoTreeRowVm): MenuItem[] {
       {
         type: 'item',
         id: 'toggle',
-        label: row.expanded ? 'Collapse' : 'Expand',
+        label: row.expanded ? t('common.action.collapse.label') : t('common.action.expand.label'),
         run: () => fileTreeStore.toggleRepoDir(repoId, row.path),
       },
       {
         type: 'item',
         id: 'copy-path',
-        label: 'Copy path',
+        label: t('common.action.copyPath.label'),
         icon: 'copy',
         run: () => copyText(row.path),
       },
@@ -28,7 +29,7 @@ export function menuForRepoRow(repoId: string, row: RepoTreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'open',
-      label: 'Open',
+      label: t('common.action.open.label'),
       run: () => void openRepoFileTab(repoId, row.path, { preview: false }),
     },
     // C6 §8.4: gated on the same status map C5's tree already colors from — an unchanged file has
@@ -40,7 +41,7 @@ export function menuForRepoRow(repoId: string, row: RepoTreeRowVm): MenuItem[] {
           {
             type: 'item' as const,
             id: 'open-changes',
-            label: 'Open changes',
+            label: t('space.repo.menu.openChanges.label'),
             icon: 'git-compare',
             run: () => void openRepoDiffTab(repoId, row.path),
           },
@@ -49,7 +50,7 @@ export function menuForRepoRow(repoId: string, row: RepoTreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'copy-path',
-      label: 'Copy path',
+      label: t('common.action.copyPath.label'),
       icon: 'copy',
       run: () => copyText(row.path),
     },

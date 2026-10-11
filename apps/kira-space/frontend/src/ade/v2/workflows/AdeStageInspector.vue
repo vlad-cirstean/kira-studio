@@ -12,7 +12,9 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
-import { FAILURE_OPTIONS, STATUS_OPTIONS, withKind } from '../board/workflowForm';
+import { CatalogText, t } from '@theme/i18n';
+import { statusLabel } from '../board/actions';
+import { FAILURE_OPTIONS, failureLabel, kindLabel, PLACEHOLDER_TOKENS, runsOnLabel, STATUS_OPTIONS, withKind } from '../board/workflowForm';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { OnFailure, Stage, StageKind } from '../wire';
 
@@ -26,7 +28,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
 <template>
   <div class="flex flex-col gap-2.5" data-testid="ade-wf-stage" :data-stage-id="stage.id" :data-skipped="stage.skip">
     <div class="flex items-center gap-2">
-      <Label :for="n('name')" class="sr-only">Stage name</Label>
+      <Label :for="n('name')" class="sr-only">{{ t('space.ade.workflows.stageInspector.name.aria') }}</Label>
       <Input
         :id="n('name')"
         :model-value="stage.name"
@@ -37,7 +39,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
       />
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" aria-label="Stage actions" data-testid="ade-wf-stage-menu">
+          <Button variant="toolbar" size="kira-icon" :aria-label="t('space.ade.workflows.stageInspector.actions.aria')" data-testid="ade-wf-stage-menu">
             <CodiconIcon name="kebab-vertical" :size="13" />
           </Button>
         </DropdownMenuTrigger>
@@ -47,16 +49,16 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
             data-testid="ade-wf-stage-skip"
             @select="patch({ skip: !stage.skip })"
           >
-            {{ stage.skip ? "Don't skip stage" : 'Skip stage' }}
+            {{ stage.skip ? t('space.ade.workflows.stageInspector.unskip.label') : t('space.ade.workflows.stageInspector.skip.label') }}
           </DropdownMenuItem>
           <DropdownMenuItem class="text-error" data-testid="ade-wf-stage-remove" @select="draft.removeStage(stage.id)">
-            Remove stage
+            {{ t('space.ade.workflows.stageInspector.remove.label') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-      <Label :for="n('kind')">Type</Label>
+      <Label :for="n('kind')">{{ t('common.field.type.label') }}</Label>
       <NativeSelect
         :id="n('kind')"
         variant="bordered"
@@ -65,20 +67,20 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         data-testid="ade-wf-stage-kind"
         @update:model-value="(v) => draft.replaceStage(withKind(stage, String(v) as StageKind))"
       >
-        <option value="user">user</option>
-        <option value="agent">agent (background)</option>
-        <option value="script">script</option>
+        <option value="user">{{ kindLabel('user') }}</option>
+        <option value="agent">{{ kindLabel('agent', true) }}</option>
+        <option value="script">{{ kindLabel('script') }}</option>
       </NativeSelect>
-      <Label :for="n('status')">Task status</Label>
+      <Label :for="n('status')">{{ t('space.ade.board.taskStatus.tooltip') }}</Label>
       <NativeSelect
         :id="n('status')"
         variant="bordered"
-        title="Task status while in this stage"
+        :title="t('space.ade.workflows.stageInspector.status.tooltip')"
         :model-value="stage.status"
         data-testid="ade-wf-stage-status"
         @update:model-value="(v) => patch({ status: String(v) as Stage['status'] })"
       >
-        <option v-for="o in STATUS_OPTIONS" :key="o" :value="o">{{ o }}</option>
+        <option v-for="o in STATUS_OPTIONS" :key="o" :value="o">{{ statusLabel(o) }}</option>
       </NativeSelect>
     </div>
 
@@ -91,14 +93,14 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
           data-testid="ade-wf-stage-session"
           @update:model-value="(v) => patch({ session: v === true, prompt: v === true ? stage.prompt : '' })"
         />
-        <Label :for="n('session')">Opens an interactive Claude Code session</Label>
+        <Label :for="n('session')">{{ t('space.ade.workflows.stageInspector.session.label') }}</Label>
       </div>
       <template v-if="stage.session">
-        <Label :for="n('prompt')" class="sr-only">Session prompt</Label>
+        <Label :for="n('prompt')" class="sr-only">{{ t('space.ade.workflows.stageInspector.prompt.aria') }}</Label>
         <Textarea
           :id="n('prompt')"
           :model-value="stage.prompt"
-          placeholder="First message for the session (optional)"
+          :placeholder="t('space.ade.workflows.stageInspector.prompt.placeholder')"
           class="min-h-12 w-auto resize-y leading-normal"
           data-testid="ade-wf-stage-prompt"
           @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
@@ -108,22 +110,23 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
 
     <div v-else-if="stage.kind === 'script'" class="flex flex-col gap-1.5">
       <Label :for="n('command')" class="text-kira-sm text-muted-foreground"
-        >Command
-        <span class="text-subtle"
-          >(runs in each branch's worktree; non-zero exit = failed; {task} {jira} {repo} {branch} {worktree} are
-          shell-quoted when needed)</span
-        ></Label
+        >{{ t('common.field.command.label') }}
+        <span class="text-subtle">
+          <CatalogText k="space.ade.workflows.stageInspector.command.hint">
+            <template #tokens><span class="font-data">{{ PLACEHOLDER_TOKENS }}</span></template>
+          </CatalogText>
+        </span></Label
       >
       <Textarea
         :id="n('command')"
         :model-value="stage.command"
-        placeholder="./scripts/release.sh --branch {branch}"
+        :placeholder="t('space.ade.workflows.stageInspector.command.example', { branch: '{branch}' })"
         class="min-h-12 w-auto resize-y font-data leading-normal"
         data-testid="ade-wf-stage-command"
         @update:model-value="(v: string | number) => patch({ command: String(v) })"
       />
       <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-        <Label :for="n('scope')">Runs on</Label>
+        <Label :for="n('scope')">{{ t('space.ade.workflows.field.runsOn.label') }}</Label>
         <NativeSelect
           :id="n('scope')"
           variant="bordered"
@@ -131,9 +134,9 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
           data-testid="ade-wf-stage-scope"
           @update:model-value="(v) => patch({ runsOn: String(v) as Stage['runsOn'] })"
         >
-          <option v-for="s in scopes" :key="s" :value="s">{{ s }}</option>
+          <option v-for="s in scopes" :key="s" :value="s">{{ runsOnLabel(s) }}</option>
         </NativeSelect>
-        <Label :for="n('fail')">On failure</Label>
+        <Label :for="n('fail')">{{ t('space.ade.workflows.field.onFailure.label') }}</Label>
         <NativeSelect
           :id="n('fail')"
           variant="bordered"
@@ -141,9 +144,9 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
           data-testid="ade-wf-stage-fail"
           @update:model-value="(v) => patch({ onFailure: String(v) as OnFailure })"
         >
-          <option v-for="o in FAILURE_OPTIONS" :key="o" :value="o">{{ o }}</option>
+          <option v-for="o in FAILURE_OPTIONS" :key="o" :value="o">{{ failureLabel(o) }}</option>
         </NativeSelect>
-        <Label :for="n('timeout')">Timeout</Label>
+        <Label :for="n('timeout')">{{ t('common.field.timeout.label') }}</Label>
         <Input
           :id="n('timeout')"
           :model-value="stage.timeout"
@@ -163,7 +166,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
       data-testid="ade-wf-add-step"
       @click="draft.createStep(stage.id)"
     >
-      + Add step
+      {{ t('space.ade.workflows.stageInspector.addStep.label') }}
     </Button>
   </div>
 </template>

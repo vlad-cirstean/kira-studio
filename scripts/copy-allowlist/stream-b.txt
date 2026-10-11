@@ -1,28 +1,5 @@
 # Stream B (Kira Space, mobile, memory). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
 permanent U64 apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue # `z` is the waiting-on-monitor glyph, not text
-apps/kira-space/frontend/src/ade/v2/workflows/AdeEndNode.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeStageInspector.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeStepInspector.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeStepNode.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeStepResults.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowEditor.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowSaveBar.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowYaml.vue
-apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowsPage.vue
-apps/kira-space/frontend/src/repo/GitNewTab.vue
-apps/kira-space/frontend/src/repo/GitPanel.vue
-apps/kira-space/frontend/src/repo/GitStart.vue
-apps/kira-space/frontend/src/repo/RepoConfigForm.vue
-apps/kira-space/frontend/src/repo/RepoEnvRow.vue
-apps/kira-space/frontend/src/repo/RepoFileTree.vue
-apps/kira-space/frontend/src/repo/RepoReviewView.vue
-apps/kira-space/frontend/src/repo/RepoSearchRow.vue
-apps/kira-space/frontend/src/repo/RepoSearchView.vue
-apps/kira-space/frontend/src/repo/ReposDialog.vue
-apps/kira-space/frontend/src/repo/menus.ts
-apps/kira-space/frontend/src/state/coderepos.ts
-apps/kira-space/frontend/src/state/settingsDomain.ts
 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue
 apps/kira-space/frontend/src/views/repo/RepoFileView.vue
 apps/kira-space/frontend/src/views/repo/RepoMultiDiffView.vue

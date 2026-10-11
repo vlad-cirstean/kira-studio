@@ -78,7 +78,7 @@ test('the list shows each file with its stages and flags a broken one', async ({
   const first = page.locator(t('ade-wf-row')).first();
   await expect(first.locator(t('ade-wf-row-name'))).toContainText('Standard feature');
   await expect(first.locator(t('ade-wf-row-stages'))).toContainText('Spec › Implement › Review');
-  await expect(first.locator(t('ade-wf-row-used'))).toContainText('used by');
+  await expect(first.locator(t('ade-wf-row-used'))).toContainText('Used by');
   await expect(page.locator(t('ade-wf-row-error'))).toHaveCount(1);
   await page.locator(t('ade-wf-row')).last().click();
   await expect(page.locator(t('ade-wf-yaml'))).toBeVisible();
@@ -280,7 +280,7 @@ test('YAML mode validates while typing and saves the text on Save', async ({ rel
   const area = page.locator(t('ade-wf-yaml'));
   await area.fill(`${await area.inputValue()}\n# note\n`);
   await expect(page.locator(t('ade-wf-yaml-msg'))).toContainText(
-    '✓ valid · the form and the plan use this file',
+    '✓ Valid, the form and the plan use this file',
   );
   expect(calls(control, IPC.adeTaskSaveWorkflowYaml)).toHaveLength(0);
   await page.locator(t('ade-wf-save')).click();
@@ -329,7 +329,7 @@ test('an invalid YAML shows its line and keeps the last valid version', async ({
   await openYaml(page);
   await page.locator(t('ade-wf-yaml')).fill('id: x\n');
   await expect(page.locator(t('ade-wf-yaml-msg'))).toContainText(
-    '✕ line 7: kind must be user, agent or script (the last valid version stays in use)',
+    '✕ Line 7: kind must be user, agent or script (the last valid version stays in use)',
   );
 });
 

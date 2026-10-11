@@ -93,9 +93,7 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
   panelWidth: z
     .number()
     .int()
-    .refine((v) => v === 0 || (v >= ADE_PANEL_WIDTH_RANGE.min && v <= ADE_PANEL_WIDTH_RANGE.max), {
-      message: 'expected 0 or 340..4000',
-    })
+    .refine((v) => v === 0 || (v >= ADE_PANEL_WIDTH_RANGE.min && v <= ADE_PANEL_WIDTH_RANGE.max))
     .default(0),
   horizonDays: z
     .number()

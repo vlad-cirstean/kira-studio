@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { CatalogText, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -15,6 +16,7 @@ import type { WorkflowEntry } from '../wire';
 import AdeWorkflowEditor from './AdeWorkflowEditor.vue';
 
 // Workflows page (SPEC2 section 5.1): the list of workflow files beside the editor for the picked one.
+const CLAUDE_CMD = 'claude -p';
 const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
 const importWf = useImportWorkflow();
@@ -75,7 +77,7 @@ async function createNew(): Promise<void> {
   if (!(await wfUi.leave())) return;
   listError.value = '';
   try {
-    const entry = await newWf.mutateAsync({ name: 'New workflow' });
+    const entry = await newWf.mutateAsync({ name: t('space.ade.workflows.page.new.label') });
     wfUi.workflowFile = entry.fileName;
     wfUi.workflowMode = 'graph';
   } catch (err) {
@@ -91,7 +93,7 @@ async function createNew(): Promise<void> {
       data-testid="ade-wf-list"
     >
       <PanelHeader>
-        Workflows
+        {{ t('space.common.workflows.label') }}
         <template #actions>
         <Button
           variant="dialog"
@@ -99,21 +101,21 @@ async function createNew(): Promise<void> {
           data-testid="ade-wf-import"
           @click="importOpen = !importOpen"
         >
-          Import YAML
+          {{ t('space.ade.workflows.page.import.label') }}
         </Button>
         <Button variant="dialog" size="kira-lg" data-testid="ade-wf-new" @click="createNew">
-          + New
+          {{ t('space.ade.workflows.page.new.label') }}
         </Button>
         </template>
       </PanelHeader>
       <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto p-2">
       <div v-if="importOpen" class="flex flex-col gap-1 pb-2" data-testid="ade-wf-import-row">
         <div class="flex gap-1.5">
-          <Label for="ade-wf-import-path" class="sr-only">Workflow YAML path</Label>
+          <Label for="ade-wf-import-path" class="sr-only">{{ t('space.ade.workflows.page.importPath.aria') }}</Label>
           <Input
             id="ade-wf-import-path"
             v-model="importPath"
-            placeholder="~/…/workflow.yaml"
+            :placeholder="t('space.ade.workflows.page.importPath.example')"
             size="kira-lg"
             class="min-w-0 flex-1 font-data"
             data-testid="ade-wf-import-path"
@@ -126,7 +128,7 @@ async function createNew(): Promise<void> {
             data-testid="ade-wf-import-go"
             @click="runImport"
           >
-            Import
+            {{ t('memory.start.event.source.import.label') }}
           </Button>
         </div>
       </div>
@@ -136,7 +138,7 @@ async function createNew(): Promise<void> {
         class="m-0 px-1 py-2 text-kira-sm text-subtle"
         data-testid="ade-wf-empty"
       >
-        No workflows yet. Workflows are YAML files in {{ dir }}.
+        {{ t('space.ade.workflows.page.empty.emptyHint', { dir }) }}
       </p>
       <button
         v-for="e in entries"
@@ -156,18 +158,17 @@ async function createNew(): Promise<void> {
           </AdeTip>
         </span>
         <span class="max-w-full truncate text-kira-sm text-muted-foreground" data-testid="ade-wf-row-stages">{{ stages(e) }}</span>
-        <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">used by {{ e.usedBy }}</span>
+        <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">{{ t('space.ade.workflows.page.usedBy.label', { count: e.usedBy }) }}</span>
       </button>
       <div class="px-1 pt-3 text-kira-sm leading-normal text-subtle">
-        A workflow is the list of stages a task goes through. User stages are yours (optionally with an
-        interactive Claude Code session). Agent stages run AI steps in the background with
-        <span class="font-data">claude -p</span>. Script stages run a command. Each stage sets the task
-        status.
+        <CatalogText k="space.ade.workflows.page.intro.body">
+          <template #command><span class="font-data">{{ CLAUDE_CMD }}</span></template>
+        </CatalogText>
       </div>
       </div>
     </div>
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg">
-      <PanelHeader>{{ current?.workflow?.name ?? current?.fileName ?? 'Workflow' }}</PanelHeader>
+      <PanelHeader>{{ current?.workflow?.name ?? current?.fileName ?? t('space.common.workflow.label') }}</PanelHeader>
       <div class="min-h-0 flex-1 overflow-auto p-4">
         <AdeWorkflowEditor v-if="current" :key="current.fileName" :entry="current" />
       </div>

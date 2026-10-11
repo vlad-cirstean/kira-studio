@@ -2,8 +2,8 @@
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
-import { formatCount } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
@@ -45,16 +45,19 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
 // appended when the whole run hit the cap, "K files skipped" appended when non-zero — the skip
 // count is surfaced, never silent (D4).
 const statusLine = computed(() => {
-  if (running.value) return 'Searching…';
+  if (running.value) return t('space.repo.search.searching.loading');
   const s = stats.value;
   if (!s) return '';
-  const resultWord = s.matches === 1 ? 'result' : 'results';
-  const fileWord = s.filesMatched === 1 ? 'file' : 'files';
-  let line = `${formatCount(s.matches)} ${resultWord} in ${formatCount(s.filesMatched)} ${fileWord}`;
-  if (s.truncated) line += ' (stopped at 10,000)';
+  let line = t('space.repo.search.summary.status', {
+    count: s.matches,
+    files: t('memory.import.confirm.files.label', { count: s.filesMatched }),
+  });
+  if (s.truncated) line = t('space.repo.search.stopped.status', { summary: line });
   if (s.filesSkipped > 0) {
-    const skipWord = s.filesSkipped === 1 ? 'file' : 'files';
-    line += ` — ${formatCount(s.filesSkipped)} ${skipWord} skipped`;
+    line = t('space.common.dashPair.label', {
+      first: line,
+      second: t('memory.import.confirm.skipped.label', { count: s.filesSkipped }),
+    });
   }
   return line;
 });
@@ -162,14 +165,14 @@ const nav = useListNavigation<RepoSearchRowVm>({
       <TooltipIconButton
         v-if="running"
         icon="debug-stop"
-        label="Stop"
+        :label="t('common.action.stop.label')"
         data-testid="repo-search-stop"
         @click="repoSearchStore.cancelRepoSearch(repoId)"
       />
       <TooltipIconButton
         v-else
         icon="search"
-        label="Search"
+        :label="t('common.action.search.label')"
         data-testid="repo-search-run"
         @click="runSearch"
       />
@@ -189,7 +192,7 @@ const nav = useListNavigation<RepoSearchRowVm>({
       class="flex-1 min-h-0 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
-      aria-label="Search results"
+      :aria-label="t('space.repo.search.results.aria')"
       @scroll="onScroll"
     >
       <div class="relative" :style="{ height: `${totalSize}px` }">

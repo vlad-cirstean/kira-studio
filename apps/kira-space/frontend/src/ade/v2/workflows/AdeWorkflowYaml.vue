@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
@@ -46,7 +47,9 @@ const message = computed(() => {
   const e = error.value;
   if (!e) return '';
   const text = e.message.replace(/^✕\s*/, '');
-  return `✕ ${e.line > 0 ? `line ${e.line}: ` : ''}${text} (the last valid version stays in use)`;
+  return e.line > 0
+    ? t('space.ade.workflows.yaml.lineError.error', { line: e.line, text })
+    : t('space.ade.workflows.yaml.fileError.error', { text });
 });
 
 const runValidate = useDebounceFn(async () => {
@@ -130,7 +133,7 @@ onBeforeUnmount(() => {
     data-testid="ade-wf-yaml-pane"
   >
     <AdeWorkflowSaveBar :dirty="dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
-    <Label for="ade-wf-yaml" class="sr-only">Workflow YAML</Label>
+    <Label for="ade-wf-yaml" class="sr-only">{{ t('space.ade.workflows.yaml.field.aria') }}</Label>
     <Textarea
       id="ade-wf-yaml"
       :model-value="draft"
@@ -140,17 +143,17 @@ onBeforeUnmount(() => {
       @update:model-value="onInput"
     />
     <div v-if="!error" class="text-kira-sm text-ok" data-testid="ade-wf-yaml-msg">
-      ✓ valid · the form and the plan use this file
+      {{ t('space.ade.workflows.yaml.valid.status') }}
     </div>
     <FieldError v-else class="font-data" data-testid="ade-wf-yaml-msg">{{ message }}</FieldError>
     <FieldError v-if="saveError" data-testid="ade-wf-save-error">
       {{ saveError }}
       <template v-if="conflict">
         <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="reload">
-          Reload
+          {{ t('common.action.refresh.label') }}
         </Button>
         <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-overwrite" @click="overwrite">
-          Overwrite
+          {{ t('space.ade.workflows.conflict.overwrite.label') }}
         </Button>
       </template>
     </FieldError>

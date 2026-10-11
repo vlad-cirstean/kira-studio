@@ -7,20 +7,21 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import ParamsForm from '@workbench/automations/run/ParamsForm.vue';
 import { computed, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import { promptParts, smartBodyParts } from '../automation/smartStepBody';
 import { finishStepParts } from '../board/runMessage';
-import { formatTools, parseTools } from '../board/workflowForm';
+import { formatTools, parseTools, runsOnLabel } from '../board/workflowForm';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
 import AdeStepResults from './AdeStepResults.vue';
 
-const MODE_ITEMS = [
-  { value: 'prompt', label: 'Prompt', testid: 'ade-wf-step-mode-prompt' },
-  { value: 'smart', label: 'Smart script', testid: 'ade-wf-step-mode-smart' },
-];
+const modeItems = computed(() => [
+  { value: 'prompt', label: t('space.ade.workflows.mode.prompt.label'), testid: 'ade-wf-step-mode-prompt' },
+  { value: 'smart', label: t('space.ade.workflows.mode.smart.label'), testid: 'ade-wf-step-mode-smart' },
+]);
 
 // The selected step: name, run scope, approval gate, timeout, tools, prompt or smart script, results.
 const props = defineProps<{ stageId: string; step: PipelineStep; steps: PipelineStep[]; scopes: string[] }>();
@@ -62,7 +63,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
 <template>
   <div class="flex flex-col gap-2.5" data-testid="ade-wf-step" :data-step-id="step.id">
     <div class="flex items-center gap-2">
-      <Label :for="id('name')" class="sr-only">Step name</Label>
+      <Label :for="id('name')" class="sr-only">{{ t('space.ade.workflows.stepInspector.name.aria') }}</Label>
       <Input
         :id="id('name')"
         :model-value="step.name"
@@ -78,7 +79,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-start"
         @click="draft.makeStart(stageId, step.id)"
       >
-        {{ isStart ? 'Start step' : 'Make start' }}
+        {{ isStart ? t('space.ade.workflows.stepInspector.startStep.label') : t('space.ade.workflows.stepInspector.makeStart.label') }}
       </Button>
       <Button
         variant="dialog"
@@ -87,11 +88,11 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-remove"
         @click="draft.deleteStep(stageId, step.id)"
       >
-        Remove
+        {{ t('common.action.remove.label') }}
       </Button>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-      <Label :for="id('scope')">Runs on</Label>
+      <Label :for="id('scope')">{{ t('space.ade.workflows.field.runsOn.label') }}</Label>
       <NativeSelect
         :id="id('scope')"
         variant="bordered"
@@ -99,9 +100,9 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-scope"
         @update:model-value="(v) => patch({ runsOn: String(v) as PipelineStep['runsOn'] })"
       >
-        <option v-for="s in scopes" :key="s" :value="s">{{ s }}</option>
+        <option v-for="s in scopes" :key="s" :value="s">{{ runsOnLabel(s) }}</option>
       </NativeSelect>
-      <Label :for="id('gate')">Before it</Label>
+      <Label :for="id('gate')">{{ t('space.ade.workflows.stepInspector.before.label') }}</Label>
       <NativeSelect
         :id="id('gate')"
         variant="bordered"
@@ -109,10 +110,10 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-gate"
         @update:model-value="(v) => patch({ before: v === 'approval' ? 'approval' : 'auto' })"
       >
-        <option value="auto">start automatically</option>
-        <option value="approval">wait for my approval</option>
+        <option value="auto">{{ t('space.ade.workflows.gate.auto.option') }}</option>
+        <option value="approval">{{ t('space.ade.workflows.gate.approval.option') }}</option>
       </NativeSelect>
-      <Label :for="id('timeout')">Timeout</Label>
+      <Label :for="id('timeout')">{{ t('common.field.timeout.label') }}</Label>
       <Input
         :id="id('timeout')"
         :model-value="step.timeout"
@@ -124,12 +125,12 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
     </div>
     <SecondaryTabs
       :model-value="mode"
-      :items="MODE_ITEMS"
+      :items="modeItems"
       data-testid="ade-wf-step-mode"
       @update:model-value="setMode"
     />
     <div v-if="smart" class="flex flex-col gap-2" data-testid="ade-wf-step-smart">
-      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">Smart script</Label>
+      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">{{ t('space.ade.workflows.mode.smart.label') }}</Label>
       <NativeSelect
         :id="id('script')"
         variant="bordered"
@@ -141,7 +142,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         <option v-for="r in smartScripts" :key="r.id" :value="r.name">✦ {{ r.name }}</option>
       </NativeSelect>
       <span v-if="step.smartScript && !script" class="text-kira-sm text-error" data-testid="ade-wf-step-script-missing">
-        not found
+        {{ t('space.ade.workflows.stepInspector.scriptMissing.error') }}
       </span>
       <ParamsForm
         v-if="script && script.params.length > 0"
@@ -156,23 +157,24 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
     <template v-else>
       <div class="flex flex-col gap-1">
         <Label :for="id('tools')" class="text-kira-sm text-muted-foreground"
-          >Allowed tools <span class="text-subtle">Passed as --allowedTools; deny rules still win.</span></Label
+          >{{ t('space.ade.workflows.stepInspector.tools.label') }}
+          <span class="text-subtle">{{ t('space.ade.workflows.stepInspector.tools.hint') }}</span></Label
         >
         <Input
           :id="id('tools')"
           :model-value="toolsText"
-          placeholder="Bash(git *), Edit"
+          :placeholder="t('space.ade.workflows.stepInspector.tools.example')"
           size="kira"
           class="font-data"
           data-testid="ade-wf-step-tools"
           @update:model-value="onTools"
         />
       </div>
-      <Label :for="id('prompt')" class="sr-only">Prompt</Label>
+      <Label :for="id('prompt')" class="sr-only">{{ t('space.ade.workflows.mode.prompt.label') }}</Label>
       <Textarea
         :id="id('prompt')"
         :model-value="step.prompt"
-        placeholder="Prompt"
+        :placeholder="t('space.ade.workflows.mode.prompt.label')"
         class="min-h-24 w-auto resize-y leading-normal"
         data-testid="ade-wf-step-prompt"
         @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
@@ -183,7 +185,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
     </template>
     <AdeStepResults :stage-id="stageId" :step="step" :steps="steps" />
     <Card class="text-kira-sm text-subtle" data-testid="ade-wf-finish-note">
-      <span class="text-info">+ finish_step instruction</span> is added to this prompt automatically:
+      {{ t('space.ade.workflows.stepInspector.finishNote.hint') }}
       <span class="block pt-1"><VarText :parts="finish" /></span>
     </Card>
   </div>

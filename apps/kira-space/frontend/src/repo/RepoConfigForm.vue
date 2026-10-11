@@ -5,6 +5,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { CatalogText, t } from '@theme/i18n';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
@@ -67,15 +68,23 @@ const targets = useInlineEdit({
 });
 
 async function chooseBasePath(): Promise<void> {
-  const chosen = await control.filesChooseFolder('Worktree base path…');
+  const chosen = await control.filesChooseFolder(t('space.repo.config.basePath.chooseTitle.title'));
   if (chosen.canceled || !chosen.path) return;
   basePath.onInput(chosen.path);
   await basePath.onCommit();
 }
 
 const source = computed(() =>
-  props.repo.source === 'added' ? 'added individually' : `imported from ${props.repo.source}`,
+  t('space.common.dotPair.label', {
+    first:
+      props.repo.source === 'added'
+        ? t('space.repo.config.source.added.status')
+        : t('space.repo.config.source.imported.status', { source: props.repo.source }),
+    second: props.repo.usedByTasks ? t('space.repo.config.source.usedOnPlan.status') : t('space.repo.config.source.notOnPlan.status'),
+  }),
 );
+const SETUP_EXAMPLE = 'pnpm install';
+const VERSION_EXAMPLE = 'curl -s https://staging.example.com/version';
 const envError = ref('');
 // Environment writes send the whole list, so they run one at a time and build it when they run,
 // after the previous write updated props.repo.
@@ -183,9 +192,9 @@ async function chooseColor(next: PaletteColor): Promise<void> {
 <template>
   <div class="flex flex-col gap-4" data-testid="repo-config">
     <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">Repository</h3>
+      <h3 class="m-0 text-kira-lg">{{ t('space.repo.config.repository.label') }}</h3>
       <Field>
-        <FieldLabel for="repo-nick">Nickname</FieldLabel>
+        <FieldLabel for="repo-nick">{{ t('space.repo.config.nickname.label') }}</FieldLabel>
         <Input
           id="repo-nick"
           :model-value="nick.text.value"
@@ -195,14 +204,14 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           @blur="nick.onCommit"
           @keydown="nick.onKeydown"
         />
-        <FieldDescription>Shown everywhere instead of the repo name.</FieldDescription>
+        <FieldDescription>{{ t('space.repo.config.nickname.description') }}</FieldDescription>
         <FieldError v-if="nick.error.value" data-testid="repo-nick-error">{{ nick.error.value }}</FieldError>
       </Field>
       <Field>
-        <span class="text-muted-foreground">Colour</span>
+        <span class="text-muted-foreground">{{ t('common.field.colour.label') }}</span>
         <fieldset
           class="m-0 flex h-control flex-wrap items-center gap-1 border-0 p-0"
-          aria-label="Colour"
+          :aria-label="t('common.field.colour.label')"
           data-testid="repo-color"
         >
           <Tooltip v-for="swatch in PALETTE_COLOR_CHOICES" :key="swatch">
@@ -215,13 +224,13 @@ async function chooseColor(next: PaletteColor): Promise<void> {
                 @change="chooseColor(swatch)"
               />
             </TooltipTrigger>
-            <TooltipContent>{{ swatch === 'none' ? 'No colour' : swatch }}</TooltipContent>
+            <TooltipContent>{{ swatch === 'none' ? t('common.field.noColour.label') : swatch }}</TooltipContent>
           </Tooltip>
         </fieldset>
         <FieldError v-if="colorError" data-testid="repo-color-error">{{ colorError }}</FieldError>
       </Field>
       <dl class="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-kira-md">
-        <dt class="text-muted-foreground">Repo</dt>
+        <dt class="text-muted-foreground">{{ t('space.repo.config.repository.label') }}</dt>
         <dd class="m-0 min-w-0">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -230,7 +239,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             <TooltipContent>{{ repo.name }}</TooltipContent>
           </Tooltip>
         </dd>
-        <dt class="text-muted-foreground">Path</dt>
+        <dt class="text-muted-foreground">{{ t('space.repo.config.path.label') }}</dt>
         <dd class="m-0 min-w-0">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -239,20 +248,21 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             <TooltipContent>{{ repo.path }}</TooltipContent>
           </Tooltip>
         </dd>
-        <dt class="text-muted-foreground">Source</dt>
+        <dt class="text-muted-foreground">{{ t('common.field.source.label') }}</dt>
         <dd class="m-0" data-testid="repo-source">
-          {{ source }} · {{ repo.usedByTasks ? 'used by tasks on the plan' : 'not on the plan' }}
+          {{ source }}
         </dd>
       </dl>
     </section>
 
     <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">Worktrees</h3>
+      <h3 class="m-0 text-kira-lg">{{ t('common.module.worktrees.label') }}</h3>
       <Field>
-        <FieldLabel for="repo-prepare">Prepare worktree</FieldLabel>
+        <FieldLabel for="repo-prepare">{{ t('space.repo.config.prepare.label') }}</FieldLabel>
         <FieldDescription>
-          Setup script. Runs in the root of every new worktree of this repo, before any agent starts; for example
-          <code class="font-data">pnpm install</code>. A non-zero exit marks setup as failed.
+          <CatalogText k="space.repo.config.prepare.description">
+            <template #command><code class="font-data">{{ SETUP_EXAMPLE }}</code></template>
+          </CatalogText>
         </FieldDescription>
         <Textarea
           id="repo-prepare"
@@ -266,7 +276,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
         <FieldError v-if="prepare.error.value" data-testid="repo-prepare-error">{{ prepare.error.value }}</FieldError>
       </Field>
       <Field orientation="horizontal">
-        <FieldLabel for="repo-timeout">Timeout</FieldLabel>
+        <FieldLabel for="repo-timeout">{{ t('common.field.timeout.label') }}</FieldLabel>
         <Input
           id="repo-timeout"
           :model-value="timeout.text.value"
@@ -279,13 +289,13 @@ async function chooseColor(next: PaletteColor): Promise<void> {
         <FieldError v-if="timeout.error.value" data-testid="repo-timeout-error">{{ timeout.error.value }}</FieldError>
       </Field>
       <Field>
-        <FieldLabel for="repo-base-path">Worktree base path</FieldLabel>
-        <FieldDescription>Pre-fills the path of new worktrees. Empty uses the default.</FieldDescription>
+        <FieldLabel for="repo-base-path">{{ t('space.repo.config.basePath.label') }}</FieldLabel>
+        <FieldDescription>{{ t('space.repo.config.basePath.description') }}</FieldDescription>
         <div class="flex items-center gap-1.5">
           <Input
             id="repo-base-path"
             :model-value="basePath.text.value"
-            placeholder="Default location"
+            :placeholder="t('space.repo.config.basePath.placeholder')"
             class="min-w-0 flex-1 font-data"
             data-testid="repo-base-path"
             @update:model-value="basePath.onInput"
@@ -293,7 +303,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             @keydown="basePath.onKeydown"
           />
           <Button variant="dialog" size="kira-lg" data-testid="repo-base-path-choose" @click="chooseBasePath">
-            Choose…
+            {{ t('space.repo.config.basePath.choose.label') }}
           </Button>
         </div>
         <FieldError v-if="basePath.error.value" data-testid="repo-base-path-error">{{ basePath.error.value }}</FieldError>
@@ -301,14 +311,14 @@ async function chooseColor(next: PaletteColor): Promise<void> {
     </section>
 
     <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">Branches</h3>
+      <h3 class="m-0 text-kira-lg">{{ t('common.module.branches.label') }}</h3>
       <Field>
-        <FieldLabel for="repo-targets">Integration branches</FieldLabel>
-        <FieldDescription>Besides main. Branches are checked for being merged / stale in these.</FieldDescription>
+        <FieldLabel for="repo-targets">{{ t('space.repo.config.targets.label') }}</FieldLabel>
+        <FieldDescription>{{ t('space.repo.config.targets.description') }}</FieldDescription>
         <Input
           id="repo-targets"
           :model-value="targets.text.value"
-          placeholder="develop, staging"
+          :placeholder="t('space.repo.config.targets.example')"
           class="font-data"
           data-testid="repo-targets"
           @update:model-value="targets.onInput"
@@ -320,19 +330,19 @@ async function chooseColor(next: PaletteColor): Promise<void> {
     </section>
 
     <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">Deployment environments</h3>
+      <h3 class="m-0 text-kira-lg">{{ t('space.repo.config.environments.title') }}</h3>
       <p class="m-0 text-kira-md text-muted-foreground">
-        Track which commit each environment runs. For each one, give a command that prints the deployed commit SHA, for
-        example <code class="font-data">curl -s https://staging.example.com/version</code>. Kira runs it in the repo root
-        when the board refreshes and marks branches deployed there.
+        <CatalogText k="space.repo.config.environments.intro.hint">
+          <template #command><code class="font-data">{{ VERSION_EXAMPLE }}</code></template>
+        </CatalogText>
       </p>
       <p v-if="envRows.length === 0" class="m-0 text-kira-md text-muted-foreground" data-testid="repo-env-empty">
-        No environments yet.
+        {{ t('space.repo.env.empty.empty') }}
       </p>
       <div v-else class="flex flex-col gap-1.5">
         <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground" aria-hidden="true">
-          <span class="w-32 shrink-0">Name</span>
-          <span class="min-w-0 flex-1">Command that prints the deployed SHA</span>
+          <span class="w-32 shrink-0">{{ t('common.field.name.label') }}</span>
+          <span class="min-w-0 flex-1">{{ t('space.repo.env.command.label') }}</span>
           <span class="size-6 shrink-0" />
         </div>
         <RepoEnvRow
@@ -355,7 +365,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
         data-testid="repo-add-env"
         @click="addEnv"
       >
-        Add environment
+        {{ t('space.repo.env.add.label') }}
       </Button>
     </section>
   </div>

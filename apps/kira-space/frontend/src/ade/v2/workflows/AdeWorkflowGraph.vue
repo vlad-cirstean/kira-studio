@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { CatalogText, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
@@ -18,6 +19,7 @@ import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
+import { kindLabel, PLACEHOLDER_TOKENS } from '../board/workflowForm';
 import {
   type EdgeData,
   type GraphEdge,
@@ -228,7 +230,12 @@ onKeyStroke(
       draft.clear(edge.stageId, edge.stepId, edge.results);
       edgeSel.value = '';
     } else if (sel?.kind === 'step') {
-      const ok = await confirm.confirm({ message: 'Remove this step?', confirmLabel: 'Remove', tone: 'danger' });
+      const ok = await confirm.confirm({
+        title: t('space.ade.workflows.graph.removeStepConfirm.title'),
+        message: t('space.ade.workflows.graph.removeStepConfirm.body', { name: draft.step?.name ?? '' }),
+        confirmLabel: t('common.action.remove.label'),
+        tone: 'danger',
+      });
       if (ok) draft.deleteStep(sel.stageId, sel.stepId);
     }
   },
@@ -256,7 +263,7 @@ onBeforeUnmount(() => {
   <div v-if="draft.draft" ref="root" class="flex h-full min-h-0 flex-col gap-3" data-testid="ade-wf-form">
     <AdeWorkflowSaveBar :dirty="draft.dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">Name</Label>
+      <Label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">{{ t('common.field.name.label') }}</Label>
       <Input
         id="ade-wf-form-name"
         :model-value="draft.draft.name"
@@ -272,8 +279,8 @@ onBeforeUnmount(() => {
           data-testid="ade-wf-form-space"
           @update:model-value="(v) => draft.patchWorkflow({ kiraSpaceMcp: v === true })"
         />
-        <AdeTip text="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">
-          <Label for="ade-wf-form-space">Kira Space tools for agents</Label>
+        <AdeTip :text="t('space.ade.workflows.graph.spaceTools.tooltip')">
+          <Label for="ade-wf-form-space">{{ t('space.ade.workflows.graph.spaceTools.label') }}</Label>
         </AdeTip>
       </div>
     </div>
@@ -297,7 +304,7 @@ onBeforeUnmount(() => {
         >
           <span class="font-medium">{{ i + 1 }}.</span>
           <span :class="s.skip ? 'line-through' : ''">{{ s.name }}</span>
-          <AdeChip :label="s.kind" :tone="KIND_TONE[s.kind]" />
+          <AdeChip :label="kindLabel(s.kind)" :tone="KIND_TONE[s.kind]" />
         </Button>
       </div>
       <Button
@@ -307,7 +314,7 @@ onBeforeUnmount(() => {
         data-testid="ade-wf-add-stage"
         @click="draft.createStage()"
       >
-        + Add stage
+        {{ t('space.ade.workflows.graph.addStage.label') }}
       </Button>
     </div>
     <div ref="split" class="flex min-h-96 flex-1 rounded-kira border border-border bg-bg">
@@ -368,7 +375,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <ResizeHandle
-        label="Resize inspector"
+        :label="t('space.ade.workflows.graph.resize.aria')"
         line
         unit="percent"
         :container="split"
@@ -388,8 +395,9 @@ onBeforeUnmount(() => {
           />
           <AdeStageInspector v-else-if="draft.stage" :key="draft.stage.id" :stage="draft.stage" :scopes="scopes" />
           <p v-else class="m-0 text-kira-sm text-subtle" data-testid="ade-wf-inspector-empty">
-            Select a stage or a step to edit it. Drag from a result dot to another step to set where it goes.
-            <span class="font-data">{task} {jira} {repo} {branch} {worktree}</span> are filled in per run.
+            <CatalogText k="space.ade.workflows.graph.inspectorEmpty.emptyHint">
+              <template #tokens><span class="font-data">{{ PLACEHOLDER_TOKENS }}</span></template>
+            </CatalogText>
           </p>
         </div>
       </div>
@@ -398,10 +406,10 @@ onBeforeUnmount(() => {
       {{ draft.error }}
       <template v-if="draft.conflict">
         <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="discard">
-          Reload
+          {{ t('common.action.refresh.label') }}
         </Button>
         <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-overwrite" @click="overwrite">
-          Overwrite
+          {{ t('space.ade.workflows.conflict.overwrite.label') }}
         </Button>
       </template>
       <Button
@@ -412,19 +420,19 @@ onBeforeUnmount(() => {
         data-testid="ade-wf-switch-yaml"
         @click="wfUi.workflowMode = 'yaml'"
       >
-        Switch to YAML
+        {{ t('space.ade.workflows.graph.switchYaml.label') }}
       </Button>
     </FieldError>
   </div>
   <p v-else class="m-0 text-kira-md text-muted-foreground" data-testid="ade-wf-no-valid">
-    This file has no valid version yet.
+    {{ t('space.ade.workflows.graph.noValid.body') }}
     <Button
       variant="link"
       size="kira"
       class="px-1 text-kira-md text-info"
       @click="wfUi.workflowMode = 'yaml'"
     >
-      Fix it in YAML
+      {{ t('space.ade.workflows.graph.fixInYaml.label') }}
     </Button>
   </p>
 </template>

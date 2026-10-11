@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
@@ -106,7 +107,7 @@ function onDblClick(): void {
       <TooltipTrigger as-child>
         <span class="text-kira-sm text-subtle">+</span>
       </TooltipTrigger>
-      <TooltipContent>This file hit the per-file match cap — not every match is shown</TooltipContent>
+      <TooltipContent>{{ t('space.repo.search.truncated.tooltip') }}</TooltipContent>
     </Tooltip>
   </div>
   <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->

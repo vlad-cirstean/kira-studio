@@ -10,6 +10,7 @@ import {
   type StepState,
 } from './progress';
 import { defaultRoute } from './stepResults';
+import { runsOnLabel } from './workflowForm';
 
 // Task panel Workflow block (SPEC2 section 7, mockup `phaseBlocks`): one block per stage, steps with
 // their per-repo run lines. Pure, so the card model carries it ready to render.
@@ -173,7 +174,7 @@ export function buildStageBlocks(
           step: s,
           statusText: stepStatusText(s),
           tone: STEP_TONE[s.state],
-          scope: script ? stage.command : s.runsOn,
+          scope: script ? stage.command : runsOnLabel(s.runsOn),
           gated: s.before === 'approval',
           routeText: routeText(s, stage),
           runs: showRuns(s, script) ? s.runs.map((r) => runLine(r, backMax(steps, s.id))) : [],

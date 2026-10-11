@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 
 // Save and Discard for the open workflow editor; both are off while nothing is edited.
 defineProps<{ dirty: boolean; saving: boolean }>();
@@ -8,12 +9,12 @@ const emit = defineEmits<{ save: []; discard: [] }>();
 
 <template>
   <div class="flex flex-wrap items-center gap-2" data-testid="ade-wf-savebar">
-    <span class="min-w-0 flex-1 text-kira-sm text-subtle">Saved edits apply to work not yet started.</span>
+    <span class="min-w-0 flex-1 text-kira-sm text-subtle">{{ t('space.ade.workflows.saveBar.applies.hint') }}</span>
     <Button variant="dialog" size="kira-lg" :disabled="!dirty || saving" data-testid="ade-wf-discard" @click="emit('discard')">
-      Discard
+      {{ t('common.action.discard.label') }}
     </Button>
     <Button variant="dialog-primary" size="kira-lg" :disabled="!dirty || saving" data-testid="ade-wf-save" @click="emit('save')">
-      Save
+      {{ t('common.action.save.label') }}
     </Button>
   </div>
 </template>

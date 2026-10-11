@@ -19,6 +19,7 @@ import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -94,10 +95,10 @@ const onImport = () => run(async () => void (await codeRepos.importRepoViaDialog
 
 const onAddFolder = () =>
   run(async () => {
-    const chosen = await control.filesChooseFolder('Add scan folder…');
+    const chosen = await control.filesChooseFolder(t('space.repo.dialog.addFolder.title'));
     if (chosen.canceled || !chosen.path) return;
     const res = await addFolder.mutateAsync({ path: chosen.path, watch: true });
-    note.value = `Imported ${res.imported.length}`;
+    note.value = t('space.repo.dialog.imported.announce', { count: res.imported.length });
   });
 
 const onWatch = (path: string, watch: boolean) =>
@@ -134,14 +135,14 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
   <Dialog v-model:open="dialog.open">
     <DialogContent size="xl" fixed-height data-testid="repos-dialog">
       <DialogHeader icon="repo" close-testid="repos-dialog-close">
-        <DialogTitle>Repositories</DialogTitle>
-        <DialogDescription class="sr-only">Import repositories, configure them and manage scan folders.</DialogDescription>
+        <DialogTitle>{{ t('common.module.repositories.label') }}</DialogTitle>
+        <DialogDescription class="sr-only">{{ t('space.repo.dialog.description.description') }}</DialogDescription>
       </DialogHeader>
 
       <DialogBody flush class="flex-row overflow-hidden">
         <nav class="flex w-44 shrink-0 flex-col border-r border-border">
-          <div ref="listEl" class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" aria-label="Repositories" data-testid="repos-dialog-repos">
-            <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">No repositories imported.</p>
+          <div ref="listEl" class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" :aria-label="t('common.module.repositories.label')" data-testid="repos-dialog-repos">
+            <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">{{ t('space.repo.dialog.empty.empty') }}</p>
             <Tooltip v-for="r in codeRepos.records" :key="r.id">
               <TooltipTrigger as-child>
                 <button
@@ -174,12 +175,12 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               @click="dialog.tab = 'folders'"
             >
               <CodiconIcon name="folder" :size="13" />
-              Scan folders
+              {{ t('space.repo.dialog.scanFolders.label') }}
             </button>
           </div>
           <Button variant="dialog" size="kira-lg" class="m-1.5" data-testid="repos-dialog-import" @click="onImport">
             <CodiconIcon name="repo" :size="13" />
-            Import repository…
+            {{ t('space.repo.dialog.import.label') }}
           </Button>
         </nav>
 
@@ -206,23 +207,23 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 <Tooltip v-if="selectedConfig" :disabled="selectedConfig.source === 'added'">
                   <TooltipTrigger as-child>
                     <Badge class="shrink-0" data-testid="repos-dialog-repo-source">{{
-                      selectedConfig.source === 'added' ? 'Added' : baseName(selectedConfig.source)
+                      selectedConfig.source === 'added' ? t('memory.add.outcome.added.status') : baseName(selectedConfig.source)
                     }}</Badge>
                   </TooltipTrigger>
                   <TooltipContent>{{ selectedConfig.source }}</TooltipContent>
                 </Tooltip>
-                <Badge v-if="selected.hidden" variant="warn" class="shrink-0" data-testid="repos-dialog-repo-hidden-badge">Hidden</Badge>
+                <Badge v-if="selected.hidden" variant="warn" class="shrink-0" data-testid="repos-dialog-repo-hidden-badge">{{ t('space.common.hidden.status') }}</Badge>
                 <div class="ml-auto flex shrink-0 items-center gap-1">
                   <TooltipIconButton
                     :icon="selected.hidden ? 'eye' : 'eye-closed'"
-                    :label="selected.hidden ? 'Show in Git panel' : 'Hide from Git panel'"
+                    :label="selected.hidden ? t('space.repo.dialog.show.tooltip') : t('space.repo.dialog.hide.tooltip')"
                     :aria-pressed="selected.hidden"
                     data-testid="repos-dialog-repo-hide"
                     @click="onHideRepo(selected.id, !selected.hidden)"
                   />
                   <TooltipIconButton
                     icon="trash"
-                    label="Remove repository…"
+                    :label="t('space.repo.dialog.remove.tooltip')"
                     data-testid="repos-dialog-repo-remove"
                     @click="onRemoveRepo(selected.id, selected.name)"
                   />
@@ -231,11 +232,11 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               <div :class="colorMarkClass('band', selected.color)" />
               <RepoConfigForm v-if="selectedConfig" :key="selectedConfig.codeRepoId" class="m-3" :repo="selectedConfig" />
             </template>
-            <p v-else class="m-3 text-muted-foreground">Import a repository to configure it.</p>
+            <p v-else class="m-3 text-muted-foreground">{{ t('space.repo.dialog.configureHint.emptyHint') }}</p>
           </template>
           <div v-else class="flex flex-col gap-2 p-3" data-testid="repos-dialog-folders">
             <div class="flex items-center gap-2">
-              <p class="m-0 flex-1 text-muted-foreground">Every git repository inside a scan folder is imported.</p>
+              <p class="m-0 flex-1 text-muted-foreground">{{ t('space.repo.dialog.foldersHint.hint') }}</p>
               <Button
                 variant="dialog"
                 size="kira-lg"
@@ -244,10 +245,10 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 @click="onAddFolder"
               >
                 <CodiconIcon name="folder" :size="13" />
-                Add folder…
+                {{ t('space.repo.dialog.addFolder.label') }}
               </Button>
             </div>
-            <p v-if="folders.length === 0" class="m-0 text-muted-foreground">No scan folders.</p>
+            <p v-if="folders.length === 0" class="m-0 text-muted-foreground">{{ t('space.repo.dialog.noFolders.empty') }}</p>
             <div
               v-for="(f, i) in folders"
               :key="f.path"
@@ -262,7 +263,12 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 <TooltipContent>{{ f.path }}</TooltipContent>
               </Tooltip>
               <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-folder-count">{{
-                f.hiddenCount > 0 ? `${f.repoCount} repos · ${f.hiddenCount} hidden` : `${f.repoCount} repos`
+                f.hiddenCount > 0
+                  ? t('space.common.dotPair.label', {
+                      first: t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount }),
+                      second: t('space.repo.dialog.folder.hiddenCount.label', { count: f.hiddenCount }),
+                    })
+                  : t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount })
               }}</span>
               <Tooltip>
                 <TooltipTrigger as-child>
@@ -273,21 +279,21 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                       data-testid="repos-dialog-folder-watch"
                       @update:model-value="(v: boolean) => onWatch(f.path, v)"
                     />
-                    <Label :for="`repos-dialog-watch-${i}`" class="text-kira-sm text-muted-foreground">watch</Label>
+                    <Label :for="`repos-dialog-watch-${i}`" class="text-kira-sm text-muted-foreground">{{ t('space.repo.dialog.folder.watch.label') }}</Label>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>Import new repositories that appear in this folder</TooltipContent>
+                <TooltipContent>{{ t('space.repo.dialog.folder.watch.tooltip') }}</TooltipContent>
               </Tooltip>
               <TooltipIconButton
                 :icon="f.hidden ? 'eye' : 'eye-closed'"
-                :label="f.hidden ? 'Show all' : 'Hide all'"
+                :label="f.hidden ? t('common.action.showAll.label') : t('space.repo.dialog.folder.hideAll.label')"
                 :aria-pressed="f.hidden"
                 data-testid="repos-dialog-folder-hide"
                 @click="onHideFolder(f.path, !f.hidden)"
               />
               <TooltipIconButton
                 icon="close"
-                label="Remove folder"
+                :label="t('space.repo.dialog.folder.remove.tooltip')"
                 data-testid="repos-dialog-folder-remove"
                 @click="onRemoveFolder(f.path)"
               />
@@ -301,7 +307,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
           <p class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
         </template>
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-footer-close">Close</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-footer-close">{{ t('common.action.close.label') }}</Button>
         </DialogClose>
       </DialogFooter>
     </DialogContent>

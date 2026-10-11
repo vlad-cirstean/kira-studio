@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import TabStripNewButton from '@workbench/components/TabStripNewButton.vue';
 import { computed } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
@@ -27,8 +28,8 @@ function onClick(): void {
 <template>
   <TabStripNewButton
     v-if="visible"
-    label="New terminal"
-    tooltip="New terminal at repository root"
+    :label="t('space.repo.newTerminal.label')"
+    :tooltip="t('space.repo.newTerminal.tooltip')"
     @click="onClick"
   />
 </template>

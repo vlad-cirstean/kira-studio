@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { defineAsyncComponent } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -12,9 +13,9 @@ import AdeWorkflowYaml from './AdeWorkflowYaml.vue';
 // One workflow: mode toggle, file path, Copy YAML, then the Graph or YAML pane. The graph editor (Vue Flow)
 // loads on first use so the board bundle does not carry it.
 const AdeWorkflowGraph = defineAsyncComponent(() => import('./AdeWorkflowGraph.vue'));
-const MODE_ITEMS = [
-  { value: 'graph', label: 'Graph', testid: 'ade-wf-mode-graph' },
-  { value: 'yaml', label: 'YAML', testid: 'ade-wf-mode-yaml' },
+const modeItems = [
+  { value: 'graph', label: t('space.ade.workflows.editor.graph.label'), testid: 'ade-wf-mode-graph' },
+  { value: 'yaml', label: t('space.ade.workflows.editor.yaml.label'), testid: 'ade-wf-mode-yaml' },
 ];
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
@@ -38,8 +39,8 @@ async function setMode(v: unknown): Promise<void> {
         variant="segmented"
         size="kira-lg"
         :model-value="wfUi.workflowMode"
-        :items="MODE_ITEMS"
-        aria-label="Editor mode"
+        :items="modeItems"
+        :aria-label="t('space.ade.workflows.editor.mode.aria')"
         data-testid="ade-wf-mode"
         @update:model-value="setMode"
       />
@@ -55,7 +56,7 @@ async function setMode(v: unknown): Promise<void> {
         data-testid="ade-wf-copy"
         @click="yaml.data.value && copy(yaml.data.value.yaml)"
       >
-        {{ copied ? 'Copied' : 'Copy YAML' }}
+        {{ copied ? t('common.copy.copied.announce') : t('space.ade.workflows.editor.copyYaml.label') }}
       </Button>
     </div>
     <AdeWorkflowYaml v-if="wfUi.workflowMode === 'yaml'" :entry="entry" />

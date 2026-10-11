@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import StatusDot from '@theme/components/StatusDot.vue';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import { Handle, Position } from '@vue-flow/core';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { promptParts } from '../automation/smartStepBody';
+import { runsOnLabel } from '../board/workflowForm';
 import { resultHandleId, type StepNodeData } from '../board/workflowGraph';
 
 // One agent step on the canvas: name, what it runs, and one connector per result. Fixed size; full
@@ -15,8 +17,12 @@ const body = computed(() => (step.value.smartScript ? `✦ ${step.value.smartScr
 const parts = computed(() => promptParts(body.value));
 const LABEL_MAX = 4;
 const labelled = computed(() => step.value.results.length <= LABEL_MAX);
-const tip = (r: StepNodeData['step']['results'][number]): string =>
-  `${r.id} (${r.ok ? 'ok' : 'not ok'}) ${r.next === 'stop' ? 'stops the run' : `goes to ${r.next}`}`;
+const tip = (r: StepNodeData['step']['results'][number]): string => {
+  const outcome = t(r.ok ? 'space.ade.workflows.results.ok.label' : 'space.ade.workflows.results.notOk.label');
+  return r.next === 'stop'
+    ? t('space.ade.workflows.stepNode.resultStops.tooltip', { id: r.id, outcome })
+    : t('space.ade.workflows.stepNode.resultGoes.tooltip', { id: r.id, outcome, next: r.next });
+};
 </script>
 
 <template>
@@ -32,12 +38,12 @@ const tip = (r: StepNodeData['step']['results'][number]): string =>
     <Handle id="in" type="target" :position="Position.Top" class="!size-2.5 !border-0 !bg-muted-foreground" />
     <Handle id="loop-in" type="target" :position="Position.Top" class="!size-2 !border-0 !bg-muted-foreground !left-5" />
     <div class="flex items-center gap-1.5 px-2.5 pt-2">
-      <AdeTip v-if="data.start" text="Start"><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip>
+      <AdeTip v-if="data.start" :text="t('common.action.start.label')"><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip>
       <span class="min-w-0 flex-1 truncate text-kira-md font-medium" data-testid="ade-wf-node-name">{{ step.name }}</span>
-      <span v-if="step.before === 'approval'" class="shrink-0 text-warn-text" data-testid="ade-wf-node-gate">approval</span>
-      <span v-if="step.smartScript" class="shrink-0 text-info">smart</span>
+      <span v-if="step.before === 'approval'" class="shrink-0 text-warn-text" data-testid="ade-wf-node-gate">{{ t('space.ade.needs.kind.approval.label') }}</span>
+      <span v-if="step.smartScript" class="shrink-0 text-info">{{ t('space.ade.workflows.stepNode.smart.label') }}</span>
     </div>
-    <div class="truncate px-2.5 text-subtle">{{ step.runsOn }}</div>
+    <div class="truncate px-2.5 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
     <div class="truncate px-2.5 text-muted-foreground [&>span]:whitespace-nowrap" data-testid="ade-wf-node-prompt">
       <VarText :parts="parts" />
     </div>
