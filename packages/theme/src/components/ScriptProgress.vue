@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Spinner from '@theme/components/Spinner.vue';
+import { Card } from '@theme/components/ui/card';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 
@@ -43,22 +45,12 @@ const elapsed = computed(() => {
 </script>
 
 <template>
-  <div
-    class="flex min-w-0 flex-col gap-1.5 rounded-kira-sm border bg-field px-2.5 py-2"
-    :class="state === 'failed' ? 'border-error' : 'border-border-strong'"
-    :data-state="state"
-    data-testid="script-progress"
-  >
+  <Card :class="state === 'failed' && 'border-error'" :data-state="state" data-testid="script-progress">
     <div class="flex min-w-0 items-center gap-2 text-kira-md">
-      <span
-        v-if="state === 'running'"
-        class="size-3 shrink-0 animate-spin rounded-full border-2 border-info border-r-transparent"
-        role="status"
-        aria-label="Running"
-      />
+      <Spinner v-if="state === 'running'" :size="12" class="text-info" label="Running" />
       <i v-else-if="state === 'ready'" class="codicon codicon-check shrink-0 text-ok" aria-hidden="true" />
       <i v-else class="codicon codicon-error shrink-0 text-error" aria-hidden="true" />
-      <span class="min-w-0 truncate font-semibold" data-testid="script-progress-title">{{ title }}</span>
+      <span class="min-w-0 truncate font-medium" data-testid="script-progress-title">{{ title }}</span>
       <span v-if="elapsed" class="shrink-0 font-data text-kira-sm text-muted-foreground" data-testid="script-progress-elapsed">
         {{ elapsed }}<template v-if="state === 'running' && timeout"> of {{ timeout }}</template>
       </span>
@@ -73,5 +65,5 @@ const elapsed = computed(() => {
       {{ note }}
     </p>
     <slot />
-  </div>
+  </Card>
 </template>

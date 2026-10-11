@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import type { ButtonVariants } from '@theme/components/ui/button';
 import { Button } from '@theme/components/ui/button';
+import { Kbd } from '@theme/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, useTemplateRef } from 'vue';
 
@@ -26,6 +27,8 @@ const props = withDefaults(
     variant?: ButtonVariants['variant'];
     size?: ButtonVariants['size'];
     pressed?: boolean;
+    /** Shortcut text (callers format it), shown as a `Kbd` after the label. */
+    kbd?: string;
   }>(),
   {
     ariaLabel: undefined,
@@ -34,6 +37,7 @@ const props = withDefaults(
     variant: 'toolbar',
     size: 'kira-icon',
     pressed: undefined,
+    kbd: undefined,
   },
 );
 
@@ -62,6 +66,6 @@ defineExpose({ $el: computed(() => buttonRef.value?.$el) });
         <CodiconIcon :name="icon" :size="iconSize" />
       </Button>
     </TooltipTrigger>
-    <TooltipContent><slot>{{ label }}</slot></TooltipContent>
+    <TooltipContent><slot>{{ label }}</slot><Kbd v-if="kbd">{{ kbd }}</Kbd></TooltipContent>
   </Tooltip>
 </template>
