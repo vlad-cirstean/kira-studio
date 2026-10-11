@@ -9,6 +9,7 @@ import {
   orderItemsFixture,
 } from '../ui/support/mariadbFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../ui/support/tree';
+import { settleFonts } from './support/settle';
 
 // v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.2): the data grid at rest on a small,
 // representative table — mixed column types, no scroll/edit in progress. Same boot shape
@@ -79,5 +80,6 @@ test('data grid at rest (P6)', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
   await connectAndOpenGrid(page);
 
+  await settleFonts(page);
   await expect(page).toHaveScreenshot('data-grid.png');
 });

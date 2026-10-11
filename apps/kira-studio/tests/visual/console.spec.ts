@@ -4,6 +4,7 @@ import { expect, test } from '../ui/fixtures';
 import { IPC } from '../ui/support/ipcChannels';
 import { DB_PATH, mariadbConnectionSummary, orderItemsFixture } from '../ui/support/mariadbFixture';
 import { connectionRow, expandRow, openRowMenu } from '../ui/support/tree';
+import { settleFonts } from './support/settle';
 
 // v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.3): the SQL console at rest with
 // syntax-highlighted content — CodeMirror's own decoration/theme layer has no existing pixel guard;
@@ -84,5 +85,12 @@ test('SQL console at rest with syntax-highlighted content (P6)', async ({ relaun
   await page.keyboard.type(SAMPLE_QUERY);
   await expect(view.locator('.view-lines')).toContainText('order by total desc');
 
-  await expect(page).toHaveScreenshot('console.png');
+  // Monaco's caret blink and its vertical scrollbar fade are JS-driven, so two captures of the same
+  // state differ and never form a stable pair. Blur the editor (no caret) and mask the scrollbar.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expect(view.locator('.monaco-editor.focused')).toHaveCount(0);
+  await settleFonts(page);
+  await expect(page).toHaveScreenshot('console.png', {
+    mask: [view.locator('.monaco-scrollable-element > .scrollbar.vertical')],
+  });
 });

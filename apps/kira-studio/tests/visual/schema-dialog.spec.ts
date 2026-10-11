@@ -4,6 +4,7 @@ import { expect, test } from '../ui/fixtures';
 import { IPC } from '../ui/support/ipcChannels';
 import { orderItemsFixture, postgresConnectionSummary } from '../ui/support/postgresFixture';
 import { connectionRow, openRowMenu } from '../ui/support/tree';
+import { settleFonts } from './support/settle';
 
 // v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.5): the Schema (DDL) editor at rest — P3/P4
 // this chapter both touched this surface's own formatting/completion; a pixel baseline is cheap
@@ -73,6 +74,10 @@ test('Schema (DDL) editor at rest (P6)', async ({ relaunch }) => {
   await page.click('[data-testid="menu-item-schema"]');
   const dialog = page.locator('[data-testid="schema-dialog"]');
   await expect(dialog).toBeVisible();
+  // Monaco mounts from a lazy chunk; a capture before it renders has no editor (and nothing to mask).
+  await expect(dialog.locator('.monaco-editor .line-numbers').first()).toBeAttached({
+    timeout: 30_000,
+  });
 
   // Monaco auto-focuses on mount, so the empty editor shows a blinking caret — its blink is
   // JS-driven (not a CSS animation Playwright's own animation-disabling catches), so two captures
@@ -82,6 +87,7 @@ test('Schema (DDL) editor at rest (P6)', async ({ relaunch }) => {
   await dialog.locator('.help').first().click();
   // Monaco's vertical scrollbar fades on a JS timer, so a capture lands with or without its slider
   // depending on timing. Mask it (a race, not a layout signal).
+  await settleFonts(page);
   await expect(page).toHaveScreenshot('schema-dialog.png', {
     mask: [dialog.locator('.monaco-scrollable-element > .scrollbar.vertical')],
   });
