@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Progress } from '@theme/components/ui/progress';
 import { computed } from 'vue';
+import { errorText } from '../../bridge/codedError';
 import { useInstallSemanticModel, useMemorySemanticStatus, useRetrySemantic } from '../queries';
 import { useModelDownloadsStore } from './modelDownloads';
 
@@ -14,6 +15,7 @@ const MB = 1024 * 1024;
 const status = useMemorySemanticStatus();
 const install = useInstallSemanticModel();
 const retry = useRetrySemantic();
+const installError = computed(() => (install.isError.value ? errorText(install.error.value) : ''));
 const downloads = useModelDownloadsStore();
 
 const data = computed(() => status.data.value);
@@ -32,8 +34,8 @@ function download(): void {
     <FieldLegend>Semantic search</FieldLegend>
     <template v-if="data.state === 'notInstalled'">
       <FieldDescription>Finds memories by meaning. Runs a local embedding model.</FieldDescription>
-      <Alert v-if="install.isError.value" variant="error" data-testid="memory-semantic-error">
-        <AlertDescription>{{ install.error.value?.message }}</AlertDescription>
+      <Alert v-if="installError" variant="error" data-testid="memory-semantic-error">
+        <AlertDescription>{{ installError }}</AlertDescription>
       </Alert>
       <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-download" @click="download">
         Download model (35 MB)

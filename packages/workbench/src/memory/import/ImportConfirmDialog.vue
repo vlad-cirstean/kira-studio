@@ -4,7 +4,8 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
-import { formatDuration } from './importFormat';
+import { formatDuration } from '../../behaviour/format';
+import { errorText } from '../../bridge/codedError';
 import { useImportAction, useImportJob } from './importQueries';
 import { useImportUiStore } from './importStore';
 
@@ -14,6 +15,7 @@ const ui = useImportUiStore();
 const { confirmJobId } = storeToRefs(ui);
 const detail = useImportJob(confirmJobId);
 const act = useImportAction();
+const actError = computed(() => (act.isError.value ? errorText(act.error.value) : ''));
 
 const job = computed(() => detail.data.value?.job);
 const scanning = computed(() => !job.value || job.value.state === 'scanning');
@@ -54,8 +56,8 @@ async function dismiss(): Promise<void> {
         <DialogTitle>Import documents</DialogTitle>
       </DialogHeader>
       <DialogBody class="text-kira-md">
-        <Alert v-if="act.isError.value" variant="error" data-testid="import-confirm-error">
-          <AlertDescription>{{ act.error.value?.message }}</AlertDescription>
+        <Alert v-if="actError" variant="error" data-testid="import-confirm-error">
+          <AlertDescription>{{ actError }}</AlertDescription>
         </Alert>
         <p v-if="scanning" class="m-0 text-muted-foreground" data-testid="import-scanning">Scanning…</p>
         <Alert v-else-if="failed" variant="error">
@@ -68,7 +70,7 @@ async function dismiss(): Promise<void> {
         <template v-else-if="ready && job">
           <p class="m-0" data-testid="import-estimate">
             {{ job.estimate.files }} files, {{ job.estimate.chunks }} chunks,
-            {{ job.estimate.calls }} Claude calls, {{ formatDuration(job.estimate.seconds) }}.
+            {{ job.estimate.calls }} Claude calls, {{ formatDuration(job.estimate.seconds * 1000) }}.
           </p>
           <p class="m-0 text-muted-foreground">
             Runs on your Claude subscription. {{ job.totals.skippedFiles }} files skipped,

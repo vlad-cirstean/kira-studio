@@ -7,10 +7,11 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
+import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
+import QueryState from '@workbench/components/QueryState.vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PermissionHint from '../components/PermissionHint.vue';
 import ReplySheet from '../components/ReplySheet.vue';
 import { useAuthStore } from '../state/auth';
@@ -60,11 +61,12 @@ async function confirmTakeOver(): Promise<void> {
 
 <template>
   <section class="flex flex-col" data-testid="needs-screen">
-    <p v-if="boardQuery.isPending.value" class="m-0 p-4 text-muted-foreground">Loading</p>
-    <Alert v-else-if="boardQuery.isError.value" variant="error" strip data-testid="needs-error">
-      Could not load the board.
-    </Alert>
-    <template v-else-if="model">
+    <QueryState :query="boardQuery" :is-empty="() => false">
+    <template #loading><p class="m-0 p-4 text-muted-foreground">Loading</p></template>
+    <template #error>
+      <Alert variant="error" strip data-testid="needs-error">Could not load the board.</Alert>
+    </template>
+    <template v-if="model">
       <Empty v-if="model.needs.empty" class="py-10" data-testid="needs-empty">
         <EmptyHeader>
           <EmptyTitle>Nothing needs you</EmptyTitle>
@@ -122,19 +124,23 @@ async function confirmTakeOver(): Promise<void> {
         <p class="m-0 px-3 py-2 text-kira-sm text-subtle" data-testid="needs-footer">{{ model.needs.footer }}</p>
       </template>
     </template>
+    </QueryState>
     <ReplySheet
       :open="replying !== null"
       :session-id="replying?.sessionId ?? ''"
       :context="replying?.context ?? ''"
       @close="replying = null"
     />
-    <ConfirmDialog
+    <ConfirmDialogView
+      touch
+      tone="primary"
       :open="takingOver !== null"
       title="Take over?"
-      :text="`${takingOver?.what ?? ''} Taking over stops the background run and continues it in Claude Code on your computer.`"
+      :message="`${takingOver?.what ?? ''} Taking over stops the background run and continues it in Claude Code on your computer.`"
       confirm-label="Take over"
       :busy="writes.takeOver.isPending.value"
       :error="takeOverError"
+      :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"
       @cancel="takingOver = null"
       @confirm="confirmTakeOver"
     />

@@ -9,6 +9,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/compone
 import { Input } from '@theme/components/ui/input';
 import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { errorText } from '@workbench/bridge/codedError';
+import QueryState from '@workbench/components/QueryState.vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 import RelativeTime from '@/components/RelativeTime.vue';
@@ -94,19 +95,23 @@ useSortableReorder(
     <Alert v-if="error" variant="error" strip data-testid="backlog-write-error">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
-    <p v-if="backlog.isPending.value" class="m-0 p-4 text-muted-foreground">Loading</p>
-    <Alert v-else-if="backlog.isError.value" variant="error" strip data-testid="backlog-error">
-      Could not load the backlog.
-    </Alert>
-    <Empty v-else-if="!backlog.data.value?.items.length" class="py-10" data-testid="backlog-empty">
-      <EmptyHeader>
-        <EmptyTitle>The backlog is empty</EmptyTitle>
-        <EmptyDescription>Items added here or in Kira Space appear here.</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-    <ol v-else ref="list" class="m-0 flex list-none flex-col p-0">
+    <QueryState :query="backlog" :is-empty="(d) => d.items.length === 0">
+    <template #loading><p class="m-0 p-4 text-muted-foreground">Loading</p></template>
+    <template #error>
+      <Alert variant="error" strip data-testid="backlog-error">Could not load the backlog.</Alert>
+    </template>
+    <template #empty>
+      <Empty class="py-10" data-testid="backlog-empty">
+        <EmptyHeader>
+          <EmptyTitle>The backlog is empty</EmptyTitle>
+          <EmptyDescription>Items added here or in Kira Space appear here.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    </template>
+    <template #default="{ data }">
+    <ol ref="list" class="m-0 flex list-none flex-col p-0">
       <li
-        v-for="(item, index) in backlog.data.value.items"
+        v-for="(item, index) in data.items"
         :key="item.id"
         class="border-b border-border bg-bg"
         data-backlog-row
@@ -147,5 +152,7 @@ useSortableReorder(
         </p>
       </li>
     </ol>
+    </template>
+    </QueryState>
   </section>
 </template>

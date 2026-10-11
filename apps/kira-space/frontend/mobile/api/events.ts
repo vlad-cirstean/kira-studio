@@ -80,7 +80,10 @@ export function useServerEvents(onResync: () => void) {
   // A dropped stream is a revoked device or a lost network; any 401 from this probe navigates to
   // the pairing screen through the shared handler.
   watch(error, (e) => {
-    if (e) void getJson('/api/me').catch(() => {});
+    if (e)
+      void getJson('/api/me').catch(() => {
+        // Any 401 already navigated through the shared handler; other failures change nothing here.
+      });
   });
   onScopeDispose(() => eventSource.value?.close());
 

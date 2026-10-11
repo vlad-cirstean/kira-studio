@@ -11,6 +11,8 @@ import { taskColor } from '@ade/palette';
 import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
 import type { Branch, Session, Task, Workflow } from '@ade/wire';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
+import { compareNatural } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed, ref } from 'vue';
 import { useAgentSessionsStore } from './agentSessions';
 
@@ -60,7 +62,7 @@ export const useAgentsModel = createSharedComposable(() => {
   const nowMs = ref(Date.now());
   useIntervalFn(() => {
     nowMs.value = Date.now();
-  }, 60_000);
+  }, TIMING.pollSlow);
 
   const sessions = computed(() =>
     withTuiActivity(sessionsQuery.data.value?.sessions ?? [], agent.activity),
@@ -148,7 +150,7 @@ export const useAgentsModel = createSharedComposable(() => {
       groups.set(day, group);
     }
     const plan = [...groups.entries()]
-      .sort(([a], [c]) => (a === '' ? 1 : c === '' ? -1 : a.localeCompare(c)))
+      .sort(([a], [c]) => (a === '' ? 1 : c === '' ? -1 : compareNatural(a, c)))
       .map(([, g]) => g);
 
     return { needs, cards, plan, today };

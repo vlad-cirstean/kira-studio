@@ -3,9 +3,9 @@ import { TONE_TAG_CLASS } from '@ade/tones';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
-import ConfirmDialog from '../components/ConfirmDialog.vue';
 import { useAuthStore } from '../state/auth';
 import type { PlanCard } from '../state/useAgentsModel';
 import { useTaskActions } from '../state/useTaskActions';
@@ -114,13 +114,16 @@ const stopFirst = computed(() => props.card.moves.live);
         <RouterLink :to="{ name: 'terminal', params: { sessionId: session.id } }" data-testid="plan-terminal">Terminal</RouterLink>
       </Button>
     </div>
-    <ConfirmDialog
+    <ConfirmDialogView
+      touch
+      tone="primary"
       :open="actions.intent.value !== null"
       :title="actions.dialog.value.title"
-      :text="actions.dialog.value.text"
+      :message="actions.dialog.value.text"
       :confirm-label="actions.dialog.value.confirmLabel"
       :busy="actions.busy.value"
       :error="actions.error.value"
+      :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"
       @cancel="actions.cancel"
       @confirm="actions.confirm"
     />

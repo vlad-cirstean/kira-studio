@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { cn } from '@theme/lib/utils';
@@ -13,7 +12,12 @@ import { refDebounced } from '@vueuse/core';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { storeToRefs } from 'pinia';
-import { computed, onMounted, useId, useTemplateRef } from 'vue';
+import { computed, ref, useId, useTemplateRef, watch } from 'vue';
+import { useFocusOnMount } from '../behaviour/focus';
+import { useListNavigation } from '../behaviour/listNavigation';
+import { usePanelHeaderSearch } from '../behaviour/panelSearch';
+import { TIMING } from '../behaviour/timing';
+import QueryState from '../components/QueryState.vue';
 import AddMemoryDialog from './AddMemoryDialog.vue';
 import ImportConfirmDialog from './import/ImportConfirmDialog.vue';
 import ImportMenu from './import/ImportMenu.vue';
@@ -28,15 +32,42 @@ import { useMemoryUiStore } from './store';
 // same service the kira-memory MCP server writes through.
 const ui = useMemoryUiStore();
 const { query, includeHistory, selectedId, addOpen } = storeToRefs(ui);
-const debounced = refDebounced(query, 200);
+const debounced = refDebounced(query, TIMING.search);
 const search = useMemorySearch(debounced, includeHistory);
 useMemoryChangeSync();
 useImportChangeSync();
 const imports = useImportUiStore();
 
-const searchField = useTemplateRef<{ focus: () => void }>('searchField');
-onMounted(() => {
-  searchField.value?.focus();
+const rootEl = useTemplateRef<HTMLElement>('root');
+const searchInput = computed(() => rootEl.value?.querySelector<HTMLInputElement>('[data-testid="memory-search"]') ?? null);
+useFocusOnMount(searchInput);
+// Recall-first: the field is always shown; a printable key on the list redirects into it.
+const { showSearch } = usePanelHeaderSearch(rootEl, {
+  searchable: () => true,
+  getSearch: () => query.value,
+  setSearch: (value) => {
+    query.value = value;
+  },
+  searchTestid: 'memory-search',
+});
+showSearch.value = true;
+
+const resultsEl = useTemplateRef<HTMLElement>('resultsEl');
+const activeKey = ref<string | null>(null);
+watch(
+  selectedId,
+  (id) => {
+    activeKey.value = id;
+  },
+  { immediate: true },
+);
+const nav = useListNavigation({
+  container: resultsEl,
+  items: () => search.data.value ?? [],
+  key: (m) => m.id,
+  activeKey,
+  onOpen: (m) => selectMemory(m.id),
+  onSelect: (m) => selectMemory(m.id),
 });
 const semanticStatus = useMemorySemanticStatus();
 const semanticState = computed(() => semanticStatus.data.value?.state);
@@ -51,7 +82,7 @@ const historyToggleId = useId();
 </script>
 
 <template>
-  <div class="flex h-full flex-col" data-testid="memory-panel">
+  <div ref="root" class="flex h-full flex-col" data-testid="memory-panel">
     <PanelHeader>
       Memory
       <template #actions>
@@ -65,7 +96,7 @@ const historyToggleId = useId();
       </template>
     </PanelHeader>
     <PanelBar>
-      <SearchField ref="searchField" v-model="query" placeholder="Search memories" data-testid="memory-search" />
+      <SearchField v-model="query" placeholder="Search memories" data-testid="memory-search" />
       <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
         <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
         <Label :for="historyToggleId">Include history</Label>
@@ -77,32 +108,33 @@ const historyToggleId = useId();
       />
       <ImportStatus />
     </PanelBar>
-    <div class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
-      <Alert v-if="search.isError.value" variant="error" strip data-testid="memory-error">
-        <AlertDescription>{{ search.error.value?.message }}</AlertDescription>
-      </Alert>
-      <Empty v-else-if="search.isPending.value" class="h-full">
-        <EmptyHeader>
-          <EmptyMedia><Spinner :size="24" /></EmptyMedia>
-          <EmptyTitle>Loading memories…</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
-      <Empty v-else-if="(search.data.value ?? []).length === 0" class="h-full" data-testid="memory-empty">
-        <EmptyHeader>
-          <EmptyTitle>{{ query.trim() === '' ? 'No memories yet' : 'No matching memories' }}</EmptyTitle>
-          <EmptyDescription v-if="query.trim() !== ''">Add one, or let Claude Code store them.</EmptyDescription>
-        </EmptyHeader>
-        <MemorySetupHint
-          v-if="query.trim() === ''"
-          message="Connect Claude Code in Settings to let it store memories."
-          data-testid="memory-setup-hint-claude"
-        />
-      </Empty>
-      <div v-else class="flex flex-col">
+    <div ref="resultsEl" class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
+      <QueryState :query="search" loading-label="Loading memories…">
+        <template #error="{ message }">
+          <Alert variant="error" strip data-testid="memory-error">
+            <AlertDescription>{{ message }}</AlertDescription>
+          </Alert>
+        </template>
+        <template #empty>
+          <Empty class="h-full" data-testid="memory-empty">
+            <EmptyHeader>
+              <EmptyTitle>{{ query.trim() === '' ? 'No memories yet' : 'No matching memories' }}</EmptyTitle>
+              <EmptyDescription v-if="query.trim() !== ''">Add one, or let Claude Code store them.</EmptyDescription>
+            </EmptyHeader>
+            <MemorySetupHint
+              v-if="query.trim() === ''"
+              message="Connect Claude Code in Settings to let it store memories."
+              data-testid="memory-setup-hint-claude"
+            />
+          </Empty>
+        </template>
+        <template #default="{ data }">
+        <div class="flex flex-col">
         <button
-          v-for="memory in search.data.value"
+          v-for="memory in data"
           :key="memory.id"
           type="button"
+          v-bind="nav.rowProps(memory.id)"
           :class="
             cn(
               rowVariants({ layout: 'double', selected: selectedId === memory.id }),
@@ -122,7 +154,9 @@ const historyToggleId = useId();
             <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">v{{ memory.version }}</span>
           </span>
         </button>
-      </div>
+        </div>
+        </template>
+      </QueryState>
     </div>
     <AddMemoryDialog v-if="addOpen" @close="addOpen = false" />
     <ImportConfirmDialog v-if="imports.confirmJobId" @close="imports.confirmJobId = null" />

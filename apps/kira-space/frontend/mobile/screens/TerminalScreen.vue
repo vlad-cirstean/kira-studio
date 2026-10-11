@@ -3,7 +3,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { useDebounceFn, useEventListener, useLocalStorage, useResizeObserver } from '@vueuse/core';
+import { useDebounceFn, useEventListener, useResizeObserver } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
+import { TIMING } from '@workbench/behaviour/timing';
 import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { loadTerminalRenderer } from '@workbench/terminal/terminalRendererLoader';
 import { storeToRefs } from 'pinia';
@@ -33,7 +35,7 @@ type Attached = ReturnType<Renderer['getOrCreateTerminal']>;
 const router = useRouter();
 const { permissions } = storeToRefs(useAuthStore());
 const container = ref<HTMLElement | null>(null);
-const fontSize = useLocalStorage('kira-mobile-terminal-font', 12);
+const fontSize = usePersistedState('kira.mobileTerminal.fontSize', 12, { migrateFrom: 'kira-mobile-terminal-font' });
 const compose = ref('');
 const ctrl = ref(false);
 const appCursor = ref(false);
@@ -64,7 +66,7 @@ function fromTerminal(bytes: Uint8Array): void {
 const refit = useDebounceFn(() => {
   const dims = renderer?.fitTerminal(props.sessionId);
   if (dims) remote.sendResize(dims.cols, dims.rows);
-}, 100);
+}, TIMING.search);
 
 onMounted(async () => {
   if (!permissions.value.agentInput || !container.value) return;

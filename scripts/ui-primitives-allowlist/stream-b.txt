@@ -1,22 +1,5 @@
 # Stream B: Kira Space, mobile, memory. Bare path: file exempt from U39+ until migrated (delete the line when it passes).
 # `permanent U<n> path # reason`: one guard exempt for good.
-apps/kira-space/frontend/mobile/api/events.ts
-apps/kira-space/frontend/mobile/screens/BacklogScreen.vue
-apps/kira-space/frontend/mobile/screens/NeedsScreen.vue
-apps/kira-space/frontend/mobile/screens/PlanScreen.vue
-apps/kira-space/frontend/mobile/screens/PlanTaskCard.vue
-apps/kira-space/frontend/mobile/screens/TerminalScreen.vue
-apps/kira-space/frontend/mobile/state/useAdeWrites.ts
-apps/kira-space/frontend/mobile/state/useAgentsModel.ts
-apps/kira-space/frontend/mobile/terminal/useRemoteTerminal.ts
-packages/workbench/src/memory/AddMemoryDialog.vue
-packages/workbench/src/memory/MemoryPanel.vue
-packages/workbench/src/memory/MemoryStart.vue
-packages/workbench/src/memory/import/ImportConfirmDialog.vue
-packages/workbench/src/memory/import/ImportJobDetail.vue
-packages/workbench/src/memory/import/importFormat.ts
-packages/workbench/src/memory/settings/ClaudeCodeMcpSection.vue
-packages/workbench/src/memory/settings/SemanticModelSection.vue
 permanent U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge
 permanent U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
 permanent U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
@@ -25,3 +8,4 @@ permanent U40 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue
 permanent U41 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # Cmd/Ctrl-click link open reads a mouse event modifier, not a key chord
 permanent U46 apps/kira-space/frontend/src/ade/v2/review/AdeReviewCompose.vue # 10 s wait for Claude Code to take a pasted message; a protocol timeout, not UI timing
 permanent U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
+permanent U52 apps/kira-space/frontend/mobile/state/useAgentsModel.ts # plan group label 'Tue, 14 Oct' (weekday, day, month); behaviour/format has no date-only form

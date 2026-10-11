@@ -7,6 +7,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, reactive, ref } from 'vue';
+import { errorText } from '../bridge/codedError';
 import { useStoreMemory } from './queries';
 import { useMemoryUiStore } from './store';
 
@@ -24,6 +25,7 @@ const asked = ref<MemoryClarification[]>([]);
 let controller: AbortController | null = null;
 
 const busy = computed(() => store.isPending.value);
+const storeError = computed(() => (store.isError.value ? errorText(store.error.value) : ''));
 const challenged = computed(() => result.value?.status === 'challenged');
 const stored = computed(() => result.value?.status === 'stored');
 const canSubmit = computed(() => !busy.value && text.value.trim() !== '');
@@ -88,8 +90,8 @@ function select(id: string): void {
         <DialogTitle>Add memory</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <Alert v-if="store.isError.value" variant="error" data-testid="add-memory-error">
-          <AlertDescription>{{ store.error.value?.message }}</AlertDescription>
+        <Alert v-if="storeError" variant="error" data-testid="add-memory-error">
+          <AlertDescription>{{ storeError }}</AlertDescription>
         </Alert>
 
         <template v-if="stored && result">

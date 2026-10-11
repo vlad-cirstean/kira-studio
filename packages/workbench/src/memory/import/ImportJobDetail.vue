@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ImportAction } from '@shared/domain/memoryImport';
-import { useVirtualizer } from '@tanstack/vue-virtual';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
@@ -9,6 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { storeToRefs } from 'pinia';
 import { computed, useTemplateRef } from 'vue';
+import { useVirtualRows } from '../../behaviour/virtualRows';
+import { errorText } from '../../bridge/codedError';
 import ImportFileRow from './ImportFileRow.vue';
 import { jobTitle } from './importFormat';
 import { useImportAction, useImportJob, useRetryImportFile } from './importQueries';
@@ -33,14 +34,12 @@ const percent = computed(() => {
 });
 
 const scrollRef = useTemplateRef<HTMLDivElement>('scroll');
-const virtualizer = useVirtualizer(
-  computed(() => ({
-    count: files.value.length,
-    getScrollElement: () => scrollRef.value,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 8,
-  })),
-);
+const { virtualItems, totalSize } = useVirtualRows({
+  count: () => files.value.length,
+  rowHeight: () => ROW_HEIGHT,
+  scrollElement: scrollRef,
+});
+const actError = computed(() => (act.isError.value ? errorText(act.error.value) : ''));
 
 function run(action: ImportAction): void {
   act.mutate({ action, id: props.jobId });
@@ -82,8 +81,8 @@ async function discard(): Promise<void> {
       <Alert v-if="job.reason && (job.state === 'paused' || job.state === 'failed')" variant="error" data-testid="import-reason">
         <AlertDescription>{{ job.reason }}</AlertDescription>
       </Alert>
-      <Alert v-if="act.isError.value" variant="error" data-testid="import-action-error">
-        <AlertDescription>{{ act.error.value?.message }}</AlertDescription>
+      <Alert v-if="actError" variant="error" data-testid="import-action-error">
+        <AlertDescription>{{ actError }}</AlertDescription>
       </Alert>
       <Progress v-if="job.state === 'running' || job.state === 'paused'" :model-value="percent" />
       <div class="flex flex-wrap gap-x-3 text-kira-sm text-muted-foreground" data-testid="import-totals">
@@ -97,9 +96,9 @@ async function discard(): Promise<void> {
       </div>
     </div>
     <div ref="scroll" class="min-h-0 flex-1 overflow-y-auto" data-testid="import-files">
-      <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
+      <div class="relative w-full" :style="{ height: `${totalSize}px` }">
         <div
-          v-for="row in virtualizer.getVirtualItems()"
+          v-for="row in virtualItems"
           :key="files[row.index]?.id ?? row.index"
           class="absolute left-0 top-0 w-full"
           :style="{ height: `${row.size}px`, transform: `translateY(${row.start}px)` }"

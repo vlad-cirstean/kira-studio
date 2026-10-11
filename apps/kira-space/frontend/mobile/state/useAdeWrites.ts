@@ -2,6 +2,7 @@ import { withMovedItem } from '@ade/backlogOrder';
 import { backlogKey, boardKey, sessionsKey } from '@ade/readQueries';
 import type { BacklogResult } from '@ade/wire';
 import { useMutation, useQueryClient } from '@tanstack/vue-query';
+import { optimisticUpdate } from '@workbench/behaviour/optimistic';
 import type { CodedError } from '@workbench/bridge/codedError';
 import { adeWriter } from '../api/adeWriter';
 import { useAuthStore } from './auth';
@@ -40,21 +41,19 @@ export function useAdeWrites() {
     onSettled: () => invalidate(backlogKey),
   });
 
+  const moveOptimistic = optimisticUpdate<
+    BacklogResult,
+    { id: string; toIndex: number; key: string }
+  >(queryClient, backlogKey, withMovedItem, { invalidate: 'settled' });
   const moveBacklogItem = useMutation({
     mutationFn: (v: { id: string; toIndex: number; key: string }) =>
       adeWriter.moveBacklogItem(v.id, v.toIndex, v.key),
     retry,
-    onMutate: async (v) => {
-      await queryClient.cancelQueries({ queryKey: backlogKey, exact: true });
-      const prev = queryClient.getQueryData<BacklogResult>(backlogKey);
-      if (prev) queryClient.setQueryData<BacklogResult>(backlogKey, withMovedItem(prev, v));
-      return { prev };
-    },
-    onError: (err, _v, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData<BacklogResult>(backlogKey, ctx.prev);
+    ...moveOptimistic,
+    onError: (err, v, ctx) => {
+      moveOptimistic.onError(err, v, ctx);
       onError(err);
     },
-    onSettled: () => invalidate(backlogKey),
   });
 
   const setTaskStage = useMutation({

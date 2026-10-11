@@ -5,6 +5,8 @@ import { Card } from '@theme/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
+import { formatDateTime as when } from '../behaviour/format';
+import QueryState from '../components/QueryState.vue';
 import ImportView from './import/ImportView.vue';
 import { useImportUiStore } from './import/importStore';
 import { useMemoryHistory } from './queries';
@@ -23,24 +25,24 @@ function eventsFor(id: string) {
   return (history.data.value?.events ?? []).filter((e) => e.memoryId === id);
 }
 
-function when(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 </script>
 
 <template>
   <ImportView v-if="imports.view === 'imports'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
-    <Alert v-if="history.isError.value" variant="error" strip>
-      <AlertDescription>{{ history.error.value?.message }}</AlertDescription>
-    </Alert>
-    <Empty v-else-if="!selectedId" class="h-full" data-testid="memory-detail-empty">
+    <Empty v-if="!selectedId" class="h-full" data-testid="memory-detail-empty">
       <EmptyHeader>
         <EmptyTitle>Search or add a memory</EmptyTitle>
         <EmptyDescription>Select a result to see its reason and history.</EmptyDescription>
       </EmptyHeader>
     </Empty>
-    <div v-else-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
+    <QueryState v-else :query="history" :is-empty="() => false">
+      <template #error="{ message }">
+        <Alert variant="error" strip>
+          <AlertDescription>{{ message }}</AlertDescription>
+        </Alert>
+      </template>
+    <div v-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center gap-1">
           <Badge :variant="selected.author === 'user' ? 'info' : 'default'">{{ selected.author }}</Badge>
@@ -76,5 +78,6 @@ function when(iso: string): string {
         </Card>
       </div>
     </div>
+    </QueryState>
   </div>
 </template>

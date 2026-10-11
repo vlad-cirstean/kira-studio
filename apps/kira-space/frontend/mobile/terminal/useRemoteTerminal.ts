@@ -1,4 +1,5 @@
-import { useWebSocket } from '@vueuse/core';
+import { useTimeoutFn, useWebSocket } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { readonly, ref } from 'vue';
 
 // Close codes the server sends when it ends a hold on purpose; the phone must not reconnect.
@@ -35,7 +36,13 @@ export function useRemoteTerminal(sessionId: string, handlers: Handlers) {
   const notice = ref('');
   let offset = 0;
   let known = false;
-  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  const hideNotice = useTimeoutFn(
+    () => {
+      notice.value = '';
+    },
+    TIMING.copiedFeedback,
+    { immediate: false },
+  );
 
   // A getter, not a computed: every reconnect must read the latest offset.
   const url = () => {
@@ -91,10 +98,7 @@ export function useRemoteTerminal(sessionId: string, handlers: Handlers) {
         known = true;
       } else if (frame.type === 'throttled') {
         notice.value = 'Typing too fast, some input was dropped.';
-        clearTimeout(noticeTimer);
-        noticeTimer = setTimeout(() => {
-          notice.value = '';
-        }, 3000);
+        hideNotice.start();
       }
     },
   });
