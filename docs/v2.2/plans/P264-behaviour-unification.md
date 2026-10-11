@@ -939,6 +939,40 @@ Verify: `bun run typecheck`, `bun run lint`, `bun run test:unit`, `bun run test:
 `--repeat-each=10` with the dock open, under 6 CPU burners (P263 close-out method), 0 hangs.
 Handle pixel check as P263 (shell, dock, ADE panel: 2px, same colours rest/hover/drag).
 
+### 3.9 Foundation result
+
+Commits (oldest first): db53383b4 behaviour/ moves, errorText, useAsyncAction. 12adb0bfd behaviour
+composables, TruncatedText, Button `pending`. 9c4cacba7 confirm and context-menu stores, live region,
+reference migrations. b1e77ea39 destructive dialogs and popovers. d8143dab4 resize rework, all
+callers migrated, old handles deleted. 72ef65f5e QueryState, createQueryClient, InlineEditInput,
+PointPopover, `useShortcut`. 66d9007f5 guards U39-U63, per-stream allowlists, ARCHITECTURE. Tests
+group: 2ff9e2639, fd1ca2005 (merged f16ef6ead). Follow-ups: 6247a460 byte label, 6407773f2 focused
+tree row selects, d3b237892 and f052dac6e spec updates, 4f14c59ea visual baselines.
+
+Verify at tip: typecheck, lint, test:unit (1828 pass), test:ui:studio (ui all pass),
+test:ui:space (459 pass), test:ui:space-mobile (53 pass, 1 skipped), visual studio and space (13
+each, clean after update). P132 hang-prone specs 10x under 6 CPU burners: studio panel-resize,
+operations, tree (140 runs), slick-grid (220 runs), Space panel-resize, operations (150 runs). All
+green, no hang.
+
+Spec changes for intended behaviour: byte label and cell-editor status read `208 B` (unified
+`formatBytes`); a tabs submenu spec asserts on-screen only, since the top-level menu now flips first
+(`prioritize-position`); the review-handle click stores nothing; six visual baselines moved by
+sub-pixel text shifts (px pane sizing replaces reka's percent sizing; viewed each diff, no
+structural change).
+
+Known flake, not a regression: `ui-timing` `budgets.spec.ts` completion-popup p50 (50 ms bound, 52 to
+58 ms) and `perf.spec.ts` scroll p95 (80 ms bound, 86 to 96 ms) fail in this sandbox. The base commit
+`fe84008be` shows the same failure on repeat runs (completion popup 58 ms, perf p95 94 ms). Needs a
+quieter machine, not a code change.
+
+Deviations: `useDragReleaseFallback` deleted (window `blur` cancel replaces it; panel-resize specs
+pass without it). U53 `, queryClient)` check covers `.vue` files only. `staleTime: 0` added at about
+20 implicit sites to keep mount refetch under the new Infinity default. Resize handles gained
+aria-labels (Resize project panel, request pane, cell editor, list, inspector). `PopoverContent`
+gained `destructive`; `DialogContent` gained `data-dialog-initial`. A focused `ProjectTree` row now
+selects (roving stop), so Shift+F10 works on it.
+
 ## 4. Streams (step 2)
 
 Three named streams, worktrees off the **foundation tip** (same base commit for all three):
