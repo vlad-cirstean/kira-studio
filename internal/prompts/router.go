@@ -1,8 +1,8 @@
 package prompts
 
 import (
-	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/desknotify"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Windows is the window registry the router reads.
@@ -126,20 +127,30 @@ const (
 
 func noteID(k Kind) string { return "prompt:" + string(k) }
 
-var countTitles = map[Kind]string{
-	KindSchedule:      "%d scripts wait for confirmation",
-	KindDbMcp:         "%d queries wait for approval",
-	KindGitCredential: "%d git credential requests wait",
-	KindMobilePairing: "%d phones ask for access",
-	KindUpdate:        "%d updates are available",
+// countTitle is the grouped notification title for n open prompts of kind k.
+func countTitle(k Kind, n int) string {
+	count := strconv.Itoa(n)
+	switch k {
+	case KindSchedule:
+		return i18n.T("backend.prompt.count.schedule.title", map[string]string{"count": count})
+	case KindDbMcp:
+		return i18n.T("backend.prompt.count.dbMcp.title", map[string]string{"count": count})
+	case KindGitCredential:
+		return i18n.T("backend.prompt.count.gitCredential.title", map[string]string{"count": count})
+	case KindMobilePairing:
+		return i18n.T("backend.prompt.count.mobilePairing.title", map[string]string{"count": count})
+	case KindUpdate:
+		return i18n.T("backend.prompt.count.update.title", map[string]string{"count": count})
+	}
+	return ""
 }
 
 func (r *Router) noteFor(k Kind, title string, n int) *desknotify.Note {
 	if n > 1 {
-		title = fmt.Sprintf(countTitles[k], n)
+		title = countTitle(k, n)
 	}
 	return &desknotify.Note{
-		ID: noteID(k), Title: title, Body: "Open Kira " + r.d.App + " to answer.", Thread: thread,
+		ID: noteID(k), Title: title, Body: i18n.T("backend.prompt.open.body", map[string]string{"app": r.d.App}), Thread: thread,
 		Data: map[string]string{"source": noteSource, "kind": string(k)},
 	}
 }
@@ -281,7 +292,7 @@ func (r *Router) SendTest() {
 	defer r.sinkMu.Unlock()
 	r.mu.Unlock()
 	_ = sink.Send(desknotify.Note{
-		ID: "prompt:test", Title: "Kira " + r.d.App + " notifications work", Body: "A popup that waits for you posts like this.",
+		ID: "prompt:test", Title: i18n.T("backend.prompt.test.title", map[string]string{"app": r.d.App}), Body: i18n.T("backend.prompt.test.body", nil),
 		Thread: thread, Data: map[string]string{"source": noteSource, "kind": "test"},
 	})
 }

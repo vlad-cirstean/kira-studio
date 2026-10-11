@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // jsonAttributes mirrors definition.ts's JSON_ATTRIBUTES — a few attribute values are themselves
@@ -72,7 +73,7 @@ func buildQueueDefinition(ctx context.Context, client *sqs.Client, queueURL, nam
 		Notes:          []string{},
 		Constraints:    []model.ConstraintMeta{},
 		DocumentSchema: nil,
-		Sections:       []model.DefinitionSection{{Title: "Attributes", Rows: rows}},
+		Sections:       []model.DefinitionSection{{Title: i18n.T("backend.definition.section.attributes.title", nil), Rows: rows}},
 		GeneratedAt:    time.Now().UTC().Format(time.RFC3339Nano),
 	}, nil
 }

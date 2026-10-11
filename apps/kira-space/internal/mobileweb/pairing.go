@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/pairing"
 	"github.com/kirathecat/kira-studio/internal/prompts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Pairing windows: 120s from enqueue to decide, 60s cooldown after an explicit deny.
@@ -49,9 +50,9 @@ func NewBroker(now func() time.Time, sink prompts.Sink) *Broker {
 	})
 	b.Title = func(r pairing.Request[MobileMeta]) string {
 		if r.Meta.Label == "" {
-			return "A phone asks for access"
+			return i18n.T("backend.prompt.mobilePairing.title", nil)
 		}
-		return "A phone asks for access · " + r.Meta.Label
+		return i18n.T("backend.prompt.mobilePairingNamed.title", map[string]string{"label": r.Meta.Label})
 	}
 	return b
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 func toConstraintMeta(row constraintRow) model.ConstraintMeta {
@@ -44,7 +45,7 @@ func buildTableSection(target ReadTarget) model.DefinitionSection {
 	if target.Comment != nil && *target.Comment != "" {
 		rows = append(rows, model.DefinitionSectionRow{Name: "Comment", Value: *target.Comment})
 	}
-	return model.DefinitionSection{Title: "Table properties", Rows: rows}
+	return model.DefinitionSection{Title: i18n.T("backend.definition.section.tableProperties.title", nil), Rows: rows}
 }
 
 // formatThousands is toLocaleString()'s own thousands-grouping, the one piece of that call site

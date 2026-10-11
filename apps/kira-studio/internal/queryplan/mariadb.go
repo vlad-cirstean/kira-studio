@@ -3,6 +3,8 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // mariadb.go ports planParsers/mariadb.ts verbatim: MariaDB's `EXPLAIN FORMAT=JSON` — same
@@ -163,7 +165,7 @@ func parseMariadbPlan(rawText string, thresholdRows int) (Plan, error) {
 	if block.Cost != nil {
 		rootCost = &Cost{Total: *block.Cost}
 	}
-	root := Node{Label: "Query", Cost: rootCost, Metrics: []Metric{}, Issues: []Issue{}, Children: children}
+	root := Node{Label: i18n.T("backend.queryPlan.root.query.label", nil), Cost: rootCost, Metrics: []Metric{}, Issues: []Issue{}, Children: children}
 
 	estimatedRowsRead := maxEstimatedRows(scans)
 	var nativeCost *NativeCost

@@ -12,6 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // scheduleArgs is the run a script's schedule describes. secrets fill secret params only; a
@@ -163,7 +164,7 @@ func (s *Service) openPrompt(r Run) {
 	if s.Prompts != nil {
 		s.Prompts.Open(prompts.Prompt{
 			ID: prompts.ID(prompts.KindSchedule, r.ID), Kind: prompts.KindSchedule, Ref: r.ID,
-			Title: "Run " + r.ScriptName + "?", CreatedAt: r.CreatedAt,
+			Title: i18n.T("backend.prompt.schedule.title", map[string]string{"name": r.ScriptName}), CreatedAt: r.CreatedAt,
 		})
 	}
 }

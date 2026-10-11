@@ -3,6 +3,8 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // mysql.go ports planParsers/mysql.ts verbatim: MySQL's `EXPLAIN FORMAT=JSON` — one row, one
@@ -210,7 +212,7 @@ func parseMysqlPlan(rawText string, thresholdRows int) (Plan, error) {
 	if queryCost != nil {
 		rootCost = &Cost{Total: *queryCost}
 	}
-	root := Node{Label: "Query", Cost: rootCost, Metrics: []Metric{}, Issues: []Issue{}, Children: children}
+	root := Node{Label: i18n.T("backend.queryPlan.root.query.label", nil), Cost: rootCost, Metrics: []Metric{}, Issues: []Issue{}, Children: children}
 
 	estimatedRowsRead := maxEstimatedRows(scans)
 	var nativeCost *NativeCost

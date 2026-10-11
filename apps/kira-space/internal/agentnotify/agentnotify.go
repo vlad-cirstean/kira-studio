@@ -14,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/desknotify"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Kind is what a notification is about.
@@ -95,11 +96,6 @@ const (
 	maxBodyBytes = 200
 	// maxTrackedRuns bounds the run-state map; a reset only costs one missed note per live run.
 	maxTrackedRuns = 4096
-	bodyFinished   = "Open Kira Space to read the reply"
-	bodyInput      = "Open Kira Space to answer"
-	bodyRun        = "Open Kira Space to see the result"
-	bodyAutomation = "Open Kira Space to see the run"
-	bodyTest       = "Notifications are working."
 )
 
 // wakeTools mirrors workbench agentActivity.ts WAKE_TOOLS: a session that armed one waits on a
@@ -197,12 +193,14 @@ func (n *Notifier) notifyTerminal(kind Kind, ev agenthooks.Event, message string
 		return
 	}
 	t := n.d.Describe(ev.TerminalID, ev.Cwd)
-	fallback, verb := bodyFinished, "finished"
+	fallback := i18n.T("backend.notify.agent.finished.body", nil)
+	title := i18n.T("backend.notify.agent.finished.title", map[string]string{"name": t.Name})
 	if kind == KindNeedsInput {
-		fallback, verb = bodyInput, "needs input"
+		fallback = i18n.T("backend.notify.agent.needsInput.body", nil)
+		title = i18n.T("backend.notify.agent.needsInput.title", map[string]string{"name": t.Name})
 	}
 	note := Note{
-		ID: string(kind) + ":" + ev.TerminalID, Kind: kind, Title: "Claude " + verb + " · " + t.Name,
+		ID: string(kind) + ":" + ev.TerminalID, Kind: kind, Title: title,
 		Body: body(p, message, fallback), TerminalID: ev.TerminalID, WindowKey: t.WindowKey,
 		RecordID: t.RecordID, TaskID: t.TaskID,
 	}
@@ -244,19 +242,12 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 		if detail == "" {
 			detail = r.Note
 		}
-		title := "ADE run " + r.State
-		if res := stepResult(r); res != "" {
-			title = "ADE " + res
-		}
-		if r.Purpose == "rebase" {
-			title = "Rebase " + rebaseVerdict(r)
-			if r.Outcome != nil && r.Outcome.Reason != "" {
-				detail = r.Outcome.Reason
-			}
+		if r.Purpose == "rebase" && r.Outcome != nil && r.Outcome.Reason != "" {
+			detail = r.Outcome.Reason
 		}
 		note := Note{
 			ID: string(KindRunEnded) + ":" + r.ID, Kind: KindRunEnded, TaskID: r.TaskID,
-			Title: title + " · " + name, Body: body(p, detail, bodyRun),
+			Title: runEndedTitle(r, name), Body: body(p, detail, i18n.T("backend.notify.adeRun.body", nil)),
 		}
 		n.mu.Lock()
 		if n.watchedRunLocked(r.TaskID) || !n.admitLocked(note.ID) {
@@ -293,13 +284,13 @@ func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
 		return
 	}
 	p := n.d.Prefs()
-	var verb, detail string
-	title := "Automation "
+	var title, detail string
 	switch runoutcome.Status(r.State) {
 	case runoutcome.StatusFailed:
-		verb = "failed"
 		if scheduled {
-			title = "Recurring script "
+			title = i18n.T("backend.notify.recurringScript.failed.title", map[string]string{"name": r.ScriptName})
+		} else {
+			title = i18n.T("backend.notify.automation.failed.title", map[string]string{"name": r.ScriptName})
 		}
 	case runoutcome.StatusBlocked:
 		if r.Kind != scriptruns.KindSmart {
@@ -308,12 +299,12 @@ func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
 		if !p.OnNeedsInput {
 			return
 		}
-		verb = "needs you"
+		title = i18n.T("backend.notify.automation.needsYou.title", map[string]string{"name": r.ScriptName})
 	case runoutcome.StatusDone:
 		if r.Kind != scriptruns.KindSmart || !p.OnRunEnded {
 			return
 		}
-		verb = "done"
+		title = i18n.T("backend.notify.automation.done.title", map[string]string{"name": r.ScriptName})
 	default:
 		return
 	}
@@ -328,7 +319,7 @@ func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
 	}
 	note := Note{
 		ID: string(KindAutomation) + ":" + r.ID, Kind: KindAutomation, TaskID: r.TaskID, ScriptRunID: r.ID,
-		Title: title + verb + " · " + r.ScriptName, Body: body(p, detail, bodyAutomation),
+		Title: title, Body: body(p, detail, i18n.T("backend.notify.automation.body", nil)),
 	}
 	n.mu.Lock()
 	if n.watchedScriptRunLocked(r.ID) || !n.admitLocked(note.ID) {
@@ -349,17 +340,29 @@ func (n *Notifier) watchedScriptRunLocked(runID string) bool {
 	return false
 }
 
-// rebaseVerdict is the title word of an ended rebase run.
-func rebaseVerdict(r adewire.Run) string {
-	switch {
-	case r.State == "done":
-		return "done"
-	case r.State == "failed":
-		return "failed"
-	case r.Outcome != nil && r.Outcome.Status == "cancelled":
-		return "stopped"
+// runEndedTitle is the notification title of an ended ADE run.
+func runEndedTitle(r adewire.Run, name string) string {
+	if r.Purpose == "rebase" {
+		switch {
+		case r.State == "done":
+			return i18n.T("backend.notify.rebase.done.title", map[string]string{"name": name})
+		case r.State == "failed":
+			return i18n.T("backend.notify.rebase.failed.title", map[string]string{"name": name})
+		case r.Outcome != nil && r.Outcome.Status == "cancelled":
+			return i18n.T("backend.notify.rebase.stopped.title", map[string]string{"name": name})
+		}
+		return i18n.T("backend.notify.rebase.needsYou.title", map[string]string{"name": name})
 	}
-	return "needs you"
+	if res := stepResult(r); res != "" {
+		return i18n.T("backend.notify.adeStep.title", map[string]string{"result": res, "name": name})
+	}
+	switch r.State {
+	case "done":
+		return i18n.T("backend.notify.adeRun.done.title", map[string]string{"name": name})
+	case "failed":
+		return i18n.T("backend.notify.adeRun.failed.title", map[string]string{"name": name})
+	}
+	return i18n.T("backend.notify.adeRun.stuck.title", map[string]string{"name": name})
 }
 
 // stepResult is the step result an agent reported, "" for the implicit done and failed.
@@ -385,7 +388,7 @@ func (n *Notifier) SendTest() {
 	n.mu.Lock()
 	sink := n.sink
 	n.mu.Unlock()
-	n.send(sink, Note{ID: "test:kira", Kind: KindTest, Title: "Kira Space notifications", Body: bodyTest})
+	n.send(sink, Note{ID: "test:kira", Kind: KindTest, Title: i18n.T("backend.notify.test.title", nil), Body: i18n.T("backend.notify.test.body", nil)})
 }
 
 // Click routes an OS notification click back to the window that should show its target.

@@ -9,6 +9,7 @@ package appshell
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/internal/shell"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -17,35 +18,35 @@ import (
 func BuildTemplate(appName string, isDev bool) []shell.Section {
 	appItems := shell.AppMenuHead()
 	appItems = append(appItems,
-		shell.Item{Kind: shell.ItemEmit, Label: "New Connection", Accelerator: shell.Shortcuts["app.newConnection"].Accelerator(), Channel: bridge.ChannelNewConnection},
+		shell.Item{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.newConnection.label", nil), Accelerator: shell.Shortcuts["app.newConnection"].Accelerator(), Channel: bridge.ChannelNewConnection},
 		// P28 D18: three actions that were prominent panel buttons for how rarely they are used
 		// — the two imports outright, New Request additionally (its panel + button stays, since
 		// creating a request is frequent and the panel is where the collections are). No
 		// accelerators: none is frequent enough to spend one, and accel.go's Shortcuts map is
 		// deliberately untouched.
-		shell.Item{Kind: shell.ItemEmit, Label: "New Request", Channel: bridge.ChannelNewRequest},
+		shell.Item{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.newRequest.label", nil), Channel: bridge.ChannelNewRequest},
 		shell.Item{Kind: shell.ItemSeparator},
-		shell.Item{Kind: shell.ItemEmit, Label: "Import Postman Collection…", Channel: bridge.ChannelImportPostman},
-		shell.Item{Kind: shell.ItemEmit, Label: "Import DataGrip Connections…", Channel: bridge.ChannelImportDataGrip},
+		shell.Item{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.importPostman.label", nil), Channel: bridge.ChannelImportPostman},
+		shell.Item{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.importDataGrip.label", nil), Channel: bridge.ChannelImportDataGrip},
 		shell.Item{Kind: shell.ItemSeparator},
-		shell.Item{Kind: shell.ItemEmit, Label: "Settings…", Accelerator: shell.Shortcuts["app.settings"].Accelerator(), Channel: bridge.ChannelOpenSettings},
+		shell.Item{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.settings.label", nil), Accelerator: shell.Shortcuts["app.settings"].Accelerator(), Channel: bridge.ChannelOpenSettings},
 		shell.Item{Kind: shell.ItemSeparator},
 	)
 	appItems = append(appItems, shell.AppMenuTail(appName)...)
 	appSection := shell.Section{Label: appName, Items: appItems}
 
-	editSection := shell.Section{Label: "Edit", Items: shell.EditMenu()}
+	editSection := shell.Section{Label: i18n.T("backend.menu.edit.label", nil), Items: shell.EditMenu()}
 
 	viewItems := []shell.Item{
-		{Kind: shell.ItemEmit, Label: "Toggle Project Panel", Accelerator: shell.Shortcuts["view.toggleProjectPanel"].Accelerator(), Channel: bridge.ChannelToggleProjectPanel},
-		{Kind: shell.ItemEmit, Label: "Toggle Operations Panel", Accelerator: shell.Shortcuts["view.toggleOperationsPanel"].Accelerator(), Channel: bridge.ChannelToggleOperationsPanel},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.toggleProjectPanel.label", nil), Accelerator: shell.Shortcuts["view.toggleProjectPanel"].Accelerator(), Channel: bridge.ChannelToggleProjectPanel},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.toggleOperationsPanel.label", nil), Accelerator: shell.Shortcuts["view.toggleOperationsPanel"].Accelerator(), Channel: bridge.ChannelToggleOperationsPanel},
 		{Kind: shell.ItemSeparator},
-		{Kind: shell.ItemEmit, Label: "Command Palette…", Accelerator: shell.Shortcuts["view.commandPalette"].Accelerator(), Channel: bridge.ChannelCommandPalette},
-		{Kind: shell.ItemEmit, Label: "Find", Accelerator: shell.Shortcuts["view.find"].Accelerator(), Channel: bridge.ChannelViewFind},
-		{Kind: shell.ItemEmit, Label: "Refresh", Accelerator: shell.Shortcuts["view.refresh"].Accelerator(), Channel: bridge.ChannelViewRefresh},
-		{Kind: shell.ItemEmit, Label: "Run Statement", Accelerator: shell.Shortcuts["view.run"].Accelerator(), Channel: bridge.ChannelViewRun},
-		{Kind: shell.ItemEmit, Label: "Run All", Accelerator: shell.Shortcuts["view.runAll"].Accelerator(), Channel: bridge.ChannelViewRunAll},
-		{Kind: shell.ItemEmit, Label: "Format", Accelerator: shell.Shortcuts["view.format"].Accelerator(), Channel: bridge.ChannelViewFormat},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.commandPalette.label", nil), Accelerator: shell.Shortcuts["view.commandPalette"].Accelerator(), Channel: bridge.ChannelCommandPalette},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.find.label", nil), Accelerator: shell.Shortcuts["view.find"].Accelerator(), Channel: bridge.ChannelViewFind},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.refresh.label", nil), Accelerator: shell.Shortcuts["view.refresh"].Accelerator(), Channel: bridge.ChannelViewRefresh},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.runStatement.label", nil), Accelerator: shell.Shortcuts["view.run"].Accelerator(), Channel: bridge.ChannelViewRun},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.runAll.label", nil), Accelerator: shell.Shortcuts["view.runAll"].Accelerator(), Channel: bridge.ChannelViewRunAll},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.format.label", nil), Accelerator: shell.Shortcuts["view.format"].Accelerator(), Channel: bridge.ChannelViewFormat},
 	}
 	if isDev {
 		viewItems = append(viewItems,
@@ -54,19 +55,19 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 			shell.Item{Kind: shell.ItemRole, Role: application.OpenDevTools},
 		)
 	}
-	viewSection := shell.Section{Label: "View", Items: viewItems}
+	viewSection := shell.Section{Label: i18n.T("backend.menu.view.label", nil), Items: viewItems}
 
 	// role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" below already claims — re-
 	// accelerated to Shift+W (menu.ts:120-122's deliberate remap).
 	windowItems := append([]shell.Item{
-		{Kind: shell.ItemEmit, Label: "Next Tab", Accelerator: shell.Shortcuts["tab.next"].Accelerator(), Channel: bridge.ChannelTabNext},
-		{Kind: shell.ItemEmit, Label: "Previous Tab", Accelerator: shell.Shortcuts["tab.prev"].Accelerator(), Channel: bridge.ChannelTabPrev},
-		{Kind: shell.ItemEmit, Label: "Close Tab", Accelerator: shell.Shortcuts["tab.close"].Accelerator(), Channel: bridge.ChannelTabClose},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.nextTab.label", nil), Accelerator: shell.Shortcuts["tab.next"].Accelerator(), Channel: bridge.ChannelTabNext},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.previousTab.label", nil), Accelerator: shell.Shortcuts["tab.prev"].Accelerator(), Channel: bridge.ChannelTabPrev},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.closeTab.label", nil), Accelerator: shell.Shortcuts["tab.close"].Accelerator(), Channel: bridge.ChannelTabClose},
 		{Kind: shell.ItemSeparator},
-		{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: shell.Shortcuts["window.new"].Accelerator()},
+		{Kind: shell.ItemNewWindow, Label: i18n.T("backend.menu.newWindow.label", nil), Accelerator: shell.Shortcuts["window.new"].Accelerator()},
 		{Kind: shell.ItemSeparator},
 	}, shell.WindowMenuTail(shell.Shortcuts["window.close"].Accelerator())...)
-	windowSection := shell.Section{Label: "Window", Items: windowItems}
+	windowSection := shell.Section{Label: i18n.T("backend.menu.window.label", nil), Items: windowItems}
 
 	return []shell.Section{appSection, editSection, viewSection, windowSection}
 }

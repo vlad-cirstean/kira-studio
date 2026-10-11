@@ -5,6 +5,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Bound is the bound-service surface shared by both apps; each embeds it.
@@ -51,7 +52,7 @@ func (b *Bound) Raise(args RaiseArgs) error {
 	}
 	b.R.Open(Prompt{
 		ID: ID(KindUpdate, args.Ref), Kind: KindUpdate, Ref: args.Ref,
-		Title: "Kira " + b.R.App() + " " + args.Ref + " is available",
+		Title: i18n.T("backend.prompt.update.title", map[string]string{"app": b.R.App(), "version": args.Ref}),
 	})
 	return nil
 }

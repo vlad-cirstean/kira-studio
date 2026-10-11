@@ -14,6 +14,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 func joinInts(vals []int32) string {
@@ -51,7 +52,7 @@ func buildTopicDefinition(ctx context.Context, adm *kadm.Client, topic string) (
 		partitions = detail.Partitions.Sorted()
 	}
 
-	partitionsSection := model.DefinitionSection{Title: "Partitions", Rows: make([]model.DefinitionSectionRow, len(partitions))}
+	partitionsSection := model.DefinitionSection{Title: i18n.T("backend.definition.section.partitions.title", nil), Rows: make([]model.DefinitionSectionRow, len(partitions))}
 	partitionDocs := make([]topicPartitionDoc, len(partitions))
 	for i, p := range partitions {
 		detail := fmt.Sprintf("replicas %s · isr %s", joinInts(p.Replicas), joinInts(p.ISR))
@@ -61,7 +62,7 @@ func buildTopicDefinition(ctx context.Context, adm *kadm.Client, topic string) (
 		partitionDocs[i] = topicPartitionDoc{ID: p.Partition, Leader: p.Leader, Replicas: p.Replicas, ISR: p.ISR}
 	}
 
-	configSection := model.DefinitionSection{Title: "Configuration", Rows: []model.DefinitionSectionRow{}}
+	configSection := model.DefinitionSection{Title: i18n.T("backend.definition.section.configuration.title", nil), Rows: []model.DefinitionSectionRow{}}
 	var configDocs []topicConfigDoc
 	var notes []string
 
@@ -149,7 +150,7 @@ func buildGroupDefinition(ctx context.Context, adm *kadm.Client, groupID string)
 	}
 	coordinator := fmt.Sprintf("%s:%d", group.Coordinator.Host, group.Coordinator.Port)
 	groupSection := model.DefinitionSection{
-		Title: "Group",
+		Title: i18n.T("backend.definition.section.group.title", nil),
 		Rows: []model.DefinitionSectionRow{
 			{Name: "state", Value: orEmDash(group.State), Detail: nil},
 			{Name: "protocolType", Value: orEmDash(group.ProtocolType), Detail: nil},
@@ -159,7 +160,7 @@ func buildGroupDefinition(ctx context.Context, adm *kadm.Client, groupID string)
 		},
 	}
 
-	membersSection := model.DefinitionSection{Title: "Members", Rows: make([]model.DefinitionSectionRow, len(group.Members))}
+	membersSection := model.DefinitionSection{Title: i18n.T("backend.definition.section.members.title", nil), Rows: make([]model.DefinitionSectionRow, len(group.Members))}
 	memberDocs := make([]groupMemberDoc, len(group.Members))
 	for i, m := range group.Members {
 		memberID := m.MemberID
@@ -169,7 +170,7 @@ func buildGroupDefinition(ctx context.Context, adm *kadm.Client, groupID string)
 
 	// A second, independent call — a group with read access but no offset-fetch permission still
 	// shows its Group/Members sections rather than failing the whole load.
-	offsetsSection := model.DefinitionSection{Title: "Committed offsets", Rows: []model.DefinitionSectionRow{}}
+	offsetsSection := model.DefinitionSection{Title: i18n.T("backend.definition.section.committedOffsets.title", nil), Rows: []model.DefinitionSectionRow{}}
 	var offsetDocs []groupOffsetDoc
 	var notes []string
 	if offsets, err := adm.FetchOffsets(ctx, groupID); err != nil {

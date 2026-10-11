@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/internal/prompts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // ApprovalTimeout bounds how long a prompt-mode query waits for a human answer before giving up.
@@ -244,9 +245,9 @@ func (b *ApprovalBroker) openPrompt(req ApprovalRequest) {
 	if b.Prompts == nil {
 		return
 	}
-	title := "Approve this query?"
+	title := i18n.T("backend.prompt.dbMcp.title", nil)
 	if req.ConnectionName != "" {
-		title += " · " + req.ConnectionName
+		title = i18n.T("backend.prompt.dbMcpNamed.title", map[string]string{"name": req.ConnectionName})
 	}
 	b.Prompts.Open(prompts.Prompt{
 		ID: prompts.ID(prompts.KindDbMcp, req.RequestID), Kind: prompts.KindDbMcp, Ref: req.RequestID,

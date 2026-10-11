@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // sqlite.go ports planParsers/sqlite.ts verbatim: SQLite's `EXPLAIN QUERY PLAN` — N rows x 4
@@ -71,7 +73,7 @@ func parseSqlitePlan(rows []sqliteExplainRow) Plan {
 		builders[row.id] = &sqliteBuilderNode{base: sqliteNodeForRow(row.detail)}
 	}
 
-	root := &sqliteBuilderNode{base: Node{Label: "Query plan", Metrics: []Metric{}, Issues: []Issue{}}}
+	root := &sqliteBuilderNode{base: Node{Label: i18n.T("backend.queryPlan.root.queryPlan.label", nil), Metrics: []Metric{}, Issues: []Issue{}}}
 	rawLines := make([]string, 0, len(rows))
 	for _, row := range rows {
 		rawLines = append(rawLines, fmt.Sprintf("%d\t%d\t%s", row.id, row.parent, row.detail))

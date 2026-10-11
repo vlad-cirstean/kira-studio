@@ -7,7 +7,7 @@
       "origin": "",
       "ref": "<id:1>",
       "target": "b",
-      "title": "Run first?"
+      "title": "Run first"
     },
     {
       "createdAt": 0,
@@ -16,7 +16,7 @@
       "origin": "",
       "ref": "<id:2>",
       "target": "b",
-      "title": "Run second?"
+      "title": "Run second"
     }
   ]
 }

@@ -1,6 +1,9 @@
 package shell
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
 
 // MenuDeps is BuildMenu's dependencies. P103 Part 3: Template replaces a call into each app's own
 // BuildTemplate (menu.go can no longer import an app-specific one) — each app's own main.go builds
@@ -119,7 +122,7 @@ func AppMenuTail(appName string) []Item {
 		{Kind: ItemRole, Role: application.HideOthers},
 		{Kind: ItemRole, Role: application.ShowAll},
 		{Kind: ItemSeparator},
-		{Kind: ItemQuit, Label: "Quit " + appName, Accelerator: "CmdOrCtrl+Q"},
+		{Kind: ItemQuit, Label: i18n.T("backend.menu.quit.label", map[string]string{"appName": appName}), Accelerator: "CmdOrCtrl+Q"},
 	}
 }
 

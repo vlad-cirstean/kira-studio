@@ -6,6 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 const (
@@ -52,13 +53,13 @@ func (s *MemoryImportService) Choose(args MemoryImportChooseArgs) (MemoryImportC
 	var paths []string
 	switch args.Kind {
 	case "files":
-		picked, err := s.dialogs.OpenFiles(OpenFilesRequest{Title: "Import documents", FilterName: "Documents", FilterPattern: importFilter})
+		picked, err := s.dialogs.OpenFiles(OpenFilesRequest{Title: i18n.T("backend.dialog.importDocuments.title", nil), FilterName: i18n.T("backend.dialog.documentsFilter.label", nil), FilterPattern: importFilter})
 		if err != nil {
 			return MemoryImportChoice{}, ipcerr.Internal(err.Error())
 		}
 		paths = picked
 	case "folder":
-		dir, err := s.dialogs.OpenDirectory(OpenDirectoryRequest{Title: "Import folder"})
+		dir, err := s.dialogs.OpenDirectory(OpenDirectoryRequest{Title: i18n.T("backend.dialog.importFolder.title", nil)})
 		if err != nil {
 			return MemoryImportChoice{}, ipcerr.Internal(err.Error())
 		}

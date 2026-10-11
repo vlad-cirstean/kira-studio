@@ -14,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // ErrInvalidResetMode is prepareReset's own validation refusal (G30 round-1 architecture/security
@@ -783,7 +784,7 @@ func prepareGlobalStashRemove(ctx context.Context, e *RepoEntry, conn ConnID, co
 	}
 
 	undo := &gitpreflight.UndoRecord{
-		ID: newUndoID(), Label: "Removed global stash: " + label, RecoverySha: op.Sha,
+		ID: newUndoID(), Label: i18n.T("backend.git.undo.removedGlobalStash.label", map[string]string{"label": label}), RecoverySha: op.Sha,
 		CreatedAt: time.Now().UnixMilli(), Replay: [][]string{gitops.GlobalStashSetArgs(op.Sha)},
 		OriginConn: string(conn), OriginLabel: connLabel,
 	}
@@ -918,7 +919,7 @@ func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel
 	if !op.NoCommit && statusResult.Branch.OID != "" {
 		undo = &gitpreflight.UndoRecord{
 			ID:          newUndoID(),
-			Label:       "Undo cherry-pick of " + shortSha7(op.Sha),
+			Label:       i18n.T("backend.git.undo.cherryPick.label", map[string]string{"sha": shortSha7(op.Sha)}),
 			RecoverySha: statusResult.Branch.OID,
 			CreatedAt:   time.Now().UnixMilli(),
 			Replay:      [][]string{gitops.ResetKeepArgs(statusResult.Branch.OID)}, // --keep, never --hard (D9).
@@ -1041,7 +1042,7 @@ func (e *RepoEntry) captureBranchDeleteUndo(ctx context.Context, conn ConnID, co
 	}
 
 	return &gitpreflight.UndoRecord{
-		ID: newUndoID(), Label: "Deleted branch " + name, RecoverySha: sha,
+		ID: newUndoID(), Label: i18n.T("backend.git.undo.deletedBranch.label", map[string]string{"name": name}), RecoverySha: sha,
 		CreatedAt: time.Now().UnixMilli(), Replay: replay,
 		OriginConn: string(conn), OriginLabel: connLabel,
 	}
@@ -1065,7 +1066,7 @@ func (e *RepoEntry) captureTagDeleteUndo(ctx context.Context, conn ConnID, connL
 	row := rows[0]
 
 	return &gitpreflight.UndoRecord{
-		ID: newUndoID(), Label: "Deleted tag " + name, RecoverySha: row.ObjectID,
+		ID: newUndoID(), Label: i18n.T("backend.git.undo.deletedTag.label", map[string]string{"name": name}), RecoverySha: row.ObjectID,
 		CreatedAt:  time.Now().UnixMilli(),
 		Replay:     [][]string{gitops.UndoTagArgs(name, row.ObjectID)},
 		OriginConn: string(conn), OriginLabel: connLabel,
@@ -1101,7 +1102,7 @@ func (e *RepoEntry) captureStashDropUndo(ctx context.Context, conn ConnID, connL
 	}
 
 	return &gitpreflight.UndoRecord{
-		ID: newUndoID(), Label: "Dropped stash: " + message, RecoverySha: sha,
+		ID: newUndoID(), Label: i18n.T("backend.git.undo.droppedStash.label", map[string]string{"message": message}), RecoverySha: sha,
 		CreatedAt: time.Now().UnixMilli(), Replay: [][]string{gitops.StashStoreArgs(message, sha)},
 		OriginConn: string(conn), OriginLabel: connLabel,
 	}

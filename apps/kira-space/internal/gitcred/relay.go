@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/internal/prompts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Prompt is one pending prompt as a window renders it. Never logged: Prompt can carry a username
@@ -151,9 +152,9 @@ func (r *Relay) openPromptLocked(p Prompt) {
 	if r.Prompts == nil {
 		return
 	}
-	title := "Git needs a credential"
+	title := i18n.T("backend.prompt.gitCredential.title", nil)
 	if p.RepoLabel != "" {
-		title += " · " + p.RepoLabel
+		title = i18n.T("backend.prompt.gitCredentialNamed.title", map[string]string{"repository": p.RepoLabel})
 	}
 	r.Prompts.Open(prompts.Prompt{
 		ID: prompts.ID(prompts.KindGitCredential, p.RequestID), Kind: prompts.KindGitCredential,
