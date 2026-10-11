@@ -57,13 +57,14 @@ describe('C13-4: tree sort order after the Intl.Collator hoist', () => {
     expect(dirNames).toEqual(
       [...dirNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     );
-    expect(fileNames).toEqual(
-      [...fileNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
-    );
-    expect(fileNames).toEqual(
-      ['_hidden.ts', '.env', 'apple.ts', 'Banana.ts', 'étude.ts', 'file10.ts', 'file2.ts'].sort(
-        (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }),
-      ),
-    );
+    expect(fileNames).toEqual([
+      '_hidden.ts',
+      '.env',
+      'apple.ts',
+      'Banana.ts',
+      'étude.ts',
+      'file2.ts',
+      'file10.ts',
+    ]);
   });
 });
