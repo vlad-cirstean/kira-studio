@@ -81,7 +81,7 @@ func TestEngine(t *testing.T) {
 
 	created, err := cli.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Name:   "kira-p200-engine-test",
-		Config: &container.Config{Image: testImage, Tty: false, Cmd: []string{"sh", "-c", "while true; do echo tick; sleep 1; done"}},
+		Config: &container.Config{Image: testImage, Tty: false, Cmd: []string{"sh", "-c", "trap 'exit 0' TERM; while true; do echo tick; sleep 1; done"}},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -123,20 +123,28 @@ func TestEngine(t *testing.T) {
 		}
 		return ""
 	}
+	// stop/start return before the engine's state listing settles on slow runners.
+	waitState := func(t *testing.T, want string) {
+		t.Helper()
+		deadline := time.Now().Add(15 * time.Second)
+		for time.Now().Before(deadline) {
+			if state() == want {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("state = %q, want %q", state(), want)
+	}
 
 	t.Run("stop and start", func(t *testing.T) {
 		if err := m.stop(ctx, id); err != nil {
 			t.Fatal(err)
 		}
-		if s := state(); s != "exited" {
-			t.Fatalf("after stop state = %q", s)
-		}
+		waitState(t, "exited")
 		if err := m.start(ctx, id); err != nil {
 			t.Fatal(err)
 		}
-		if s := state(); s != "running" {
-			t.Fatalf("after start state = %q", s)
-		}
+		waitState(t, "running")
 	})
 
 	t.Run("logs follow", func(t *testing.T) {
