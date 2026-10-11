@@ -97,18 +97,35 @@ const short = (sha: string): string => sha.slice(0, 7);
 
 function text(): string {
   const o = outcome.value;
-  const lines = [`${props.title}: ${state.value}${o?.reason ? `: ${o.reason}` : ''}`];
-  if (o) lines.push(`Ended by: ${o.source}${o.reported ? ' (reported by the agent)' : ''}`);
-  if (rebase.value) {
-    lines.push(`Verified by git: ${rebase.value.verified ? 'yes' : 'no'}`);
-    if (rebase.value.aborted) lines.push('The rebase was aborted.');
-    if (rebase.value.inProgress) lines.push('A rebase is still in progress in the worktree.');
+  const head = { title: props.title, state: state.value };
+  const lines = [
+    o?.reason
+      ? t('space.ade.outcome.copy.headReason.label', { ...head, reason: o.reason })
+      : t('space.ade.outcome.copy.head.label', head),
+  ];
+  if (o) {
+    lines.push(
+      t(o.reported ? 'space.ade.outcome.endedByReported.label' : 'space.ade.outcome.endedBy.label', { source: o.source }),
+    );
   }
-  if (files.value.length) lines.push(`Conflicted files: ${files.value.join(', ')}`);
-  if (o?.report?.lastGitError) lines.push(`Last git error: ${o.report.lastGitError}`);
-  if (o?.report?.tried) lines.push(`Tried: ${o.report.tried}`);
+  if (rebase.value) {
+    lines.push(
+      t(rebase.value.verified ? 'space.ade.outcome.copy.verified.label' : 'space.ade.outcome.copy.notVerified.label'),
+    );
+    if (rebase.value.aborted) lines.push(t('space.ade.outcome.copy.aborted.body'));
+    if (rebase.value.inProgress) lines.push(t('space.ade.outcome.copy.inProgress.body'));
+  }
+  if (files.value.length) lines.push(t('space.ade.outcome.copy.conflicted.label', { files: files.value.join(', ') }));
+  if (o?.report?.lastGitError) lines.push(t('space.ade.outcome.copy.gitError.label', { error: o.report.lastGitError }));
+  if (o?.report?.tried) lines.push(t('space.ade.outcome.tried.label', { tried: o.report.tried }));
   for (const b of rebase.value?.branches ?? []) {
-    lines.push(`${b.name}: ${short(b.before)} -> ${short(b.after)}${b.onBase ? '' : ' (not on its base)'}`);
+    lines.push(
+      t(b.onBase ? 'space.ade.outcome.copy.branch.label' : 'space.ade.outcome.copy.branchOffBase.label', {
+        name: b.name,
+        before: short(b.before),
+        after: short(b.after),
+      }),
+    );
   }
   return lines.join('\n');
 }

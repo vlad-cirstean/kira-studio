@@ -1,4 +1,5 @@
 import type { PaletteColor } from '@shared/domain/color';
+import { t } from '@theme/i18n';
 import { scriptRunState } from '@workbench/automations/runs/runStates';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { scriptRunTabKind } from '@workbench/tabs/scriptRunTabKind';
@@ -93,7 +94,9 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
   {
     'repo-graph': {
       mode: SPACE_TAB_KIND_MODE['repo-graph'],
-      title: (tab) => useCodeReposStore().codeRepoRecord(tab.workspaceId ?? '')?.name ?? 'Graph',
+      title: (tab) =>
+        useCodeReposStore().codeRepoRecord(tab.workspaceId ?? '')?.name ??
+        t('space.ade.workflows.editor.graph.label'),
       icon: () => 'source-control',
       railColor: repoRailColor,
       defaultState: (): RepoGraphTabState => defaultRepoGraphTabState(),

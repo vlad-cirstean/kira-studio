@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '@ade/board/actions';
 import { TONE_TAG_CLASS } from '@ade/tones';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Badge } from '@theme/components/ui/badge';
@@ -42,7 +43,7 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <Badge variant="chip" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ card.status }}</Badge>
+          <Badge variant="chip" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ statusLabel(card.status) }}</Badge>
           <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{ card.progress.label }}</span>
           <Badge v-for="repo in card.repos" :key="repo" variant="chip" class="bg-field text-muted-foreground">{{ repo }}</Badge>
         </span>

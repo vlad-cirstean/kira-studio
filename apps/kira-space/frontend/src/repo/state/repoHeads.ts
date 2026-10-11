@@ -1,4 +1,5 @@
 import type { HeadState, Transport } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { useTimeoutFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, watch } from 'vue';
@@ -31,7 +32,7 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
       case 'branch':
         return head.name;
       case 'detached':
-        return `detached @ ${head.sha.slice(0, 7)}`;
+        return t('space.repo.heads.detached.label', { sha: head.sha.slice(0, 7) });
       case 'unborn':
         return head.name; // the branch HEAD points at, not yet committed to
     }

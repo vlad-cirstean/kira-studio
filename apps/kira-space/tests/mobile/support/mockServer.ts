@@ -41,6 +41,7 @@ interface State {
     pair?: unknown;
     expired?: unknown;
     backlog?: unknown;
+    board?: unknown;
     backlogItem?: unknown;
   };
   pairWaiters: ServerResponse[];
@@ -230,6 +231,8 @@ export async function startMobileServer(): Promise<MobileServer> {
       json(res, 200, { sessions: state.agentSessions });
     } else if (path === '/api/ade/backlog' && method === 'GET') {
       json(res, 200, state.replies.backlog ?? fixture('backlog'));
+    } else if (path === '/api/ade/board' && method === 'GET' && state.replies.board) {
+      json(res, 200, state.replies.board);
     } else if (path in reads && method === 'GET') {
       json(res, 200, reads[path]);
     } else {

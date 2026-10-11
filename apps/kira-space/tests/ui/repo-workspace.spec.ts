@@ -934,7 +934,7 @@ test('every repo row shows its checked-out branch, main worktree first', async (
 
   await expect(repoRow(page).locator('.repo-head')).toHaveText('main');
   const repo2Row = page.locator(`[data-testid="repo-row"][data-repo-id="${REPO2.id}"]`);
-  await expect(repo2Row.locator('.repo-head')).toHaveText('detached @ abc1234');
+  await expect(repo2Row.locator('.repo-head')).toHaveText('Detached at abc1234');
 
   await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
   const worktreeRows = page.locator('[data-testid="repo-worktree-row"]');

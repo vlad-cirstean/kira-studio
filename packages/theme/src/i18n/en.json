@@ -5557,6 +5557,40 @@
         "back": {
           "status": "Sent back"
         },
+        "copy": {
+          "aborted": {
+            "body": "The rebase was aborted."
+          },
+          "branch": {
+            "label": "{name}: {before} to {after}"
+          },
+          "branchOffBase": {
+            "label": "{name}: {before} to {after} (not on its base)"
+          },
+          "conflicted": {
+            "label": "Conflicted files: {files}"
+          },
+          "gitError": {
+            "label": "Last git error: {error}"
+          },
+          "head": {
+            "label": "{title} ({state})"
+          },
+          "headReason": {
+            "label": "{title} ({state}): {reason}"
+          },
+          "inProgress": {
+            "body": "A rebase is still in progress in the worktree."
+          },
+          "no": {},
+          "notVerified": {
+            "label": "Not verified by git"
+          },
+          "verified": {
+            "label": "Verified by git"
+          },
+          "yes": {}
+        },
         "copyForAgent": {
           "label": "Copy for agent"
         },
@@ -6725,6 +6759,11 @@
         "script": {
           "aria": "Deployed SHA script",
           "example": "curl -s https://…/version"
+        }
+      },
+      "heads": {
+        "detached": {
+          "label": "Detached at {sha}"
         }
       },
       "manage": {
