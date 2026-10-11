@@ -696,7 +696,7 @@
 .slick-grid-host .slick-resizable-handle {
   width: 10px;
   right: -5px;
-  @apply cursor-col-resize;
+  @apply cursor-ew-resize;
 }
 
 .slick-grid-host .slick-resizable-handle::after {

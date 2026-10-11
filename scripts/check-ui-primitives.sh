@@ -88,7 +88,7 @@ U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escap
 U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
 U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
 U27 packages/workbench/src/components/ContextMenu.vue # 10px colour swatch marks a Color submenu choice, it is not a status dot
-U31 packages/workbench/src/components/WorkbenchShell.vue # row-resize cursor held shell-wide while the dock drag runs, the pointer leaves the 2px handle
+U31 packages/workbench/src/components/WorkbenchShell.vue # ns-resize cursor held shell-wide while the dock drag runs, the pointer leaves the 2px handle
 U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
 U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
 U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
@@ -150,7 +150,7 @@ U28@@vS@@@@Checkbox in a settings pane (a live boolean is a Switch)@@<Checkbox\b
 U28@@v@@/settings/|MemoryPanel.vue|AdeTaskTab.vue|ReposDialog.vue@@Switch outside settings panes (a form option is a Checkbox)@@<Switch\b
 U29@@v@@@@TooltipProvider with props (the theme owns the delays), or TooltipContent class other than whitespace-pre-wrap@@<TooltipProvider\b(?!\s*>)|<TooltipContent\b(?&t)\s:?class="(?!whitespace-pre-wrap")
 U30@@v@@@@DropdownMenuContent width, or DropdownMenuItem height/padding/gap class@@<DropdownMenuContent\b(?&t)\s:?class="[^"]*${TOK}(?:w|min-w|max-w)-|<DropdownMenuItem\b(?&t)\s:?class="[^"]*${TOK}(?:h|py|px|gap)-
-U31@@v@@@@hand-written resize cursor or handle look, or a separator without resizeHandleVariants@@${TOK}cursor-(?:col|row)-resize|<(?:ResizableHandle|KuiColumnResizeHandle)\b(?&t)\s:?class="[^"]*${TOK}(?:w-|h-|bg-|shadow|cursor|outline)|(?s)\A(?!.*resizeHandleVariants).*role="separator"
+U31@@v@@@@hand-written resize cursor or handle look, or a separator without resizeHandleVariants@@${TOK}cursor-(?:col|row|ew|ns)-resize|<(?:ResizableHandle|KuiColumnResizeHandle)\b(?&t)\s:?class="[^"]*${TOK}(?:w-|h-|bg-|shadow|cursor|outline)|(?s)\A(?!.*resizeHandleVariants).*role="separator"
 U32@@v@@@@scrollbar styling in a component (use scrollbar-none, base.css)@@\[scrollbar-|${TOK}scrollbar-(?!none(?![\w-]))[\w-]+|::-webkit-scrollbar
 U33@@v@@@@keyboard hint text (use Kbd)@@Cmd/Ctrl|\(\{\{\s*formatShortcut
 U34@@vt@@monacoTheme.ts|ansi.ts|/setiFileIcon|/ade/v2/palette.ts@@colour literal in app code (use tokens)@@(?:["'\`\[(]|:\s*)#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|(?=[0-9]*[a-fA-F])[0-9a-fA-F]{3,4}|(?<d>\d)\k<d>\k<d>\k<d>?)\b|${TOK}(?:bg|text|border)-(?:black|white)(?![\w-])

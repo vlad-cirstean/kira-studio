@@ -107,7 +107,7 @@ function onOpsResize(px: number): void {
        and the status bar's own mt-1 below — no separate spacing rule for the dock. -->
   <div
     class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome"
-    :class="{ 'cursor-row-resize select-none': dockDragging }"
+    :class="{ 'cursor-ns-resize select-none': dockDragging }"
   >
     <ResizablePanelGroup
       ref="panelGroup"

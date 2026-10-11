@@ -7,7 +7,7 @@ export { default as ResizablePanelGroup } from '@theme/components/ui/resizable/R
 
 // P263 §2.9: the one pane-resize-handle look, bound by every handle component. A 2px bar, hit area
 // +-4px (+-8px coarse), `bg-focus` on hover, keyboard focus and drag (`data-[state=drag]`; the bar is
-// the focus ring). `axis` x is a vertical bar (col-resize), y a horizontal one (row-resize); `auto`
+// the focus ring). `axis` x is a vertical bar (ew-resize, the cursor reka sets globally), y a horizontal one (ns-resize); `auto`
 // reads reka's own `data-orientation`. `line` draws the 1px divider between flat panes. `hit`
 // before: the hit area is a `::before` (hand-rolled handles); none: reka's `hitAreaMargins` owns it.
 export const resizeHandleVariants = cva(
@@ -15,9 +15,9 @@ export const resizeHandleVariants = cva(
   {
     variants: {
       axis: {
-        x: 'w-0.5 cursor-col-resize',
-        y: 'h-0.5 cursor-row-resize',
-        auto: 'data-[orientation=horizontal]:w-0.5 data-[orientation=horizontal]:cursor-col-resize data-[orientation=vertical]:h-0.5 data-[orientation=vertical]:cursor-row-resize',
+        x: 'w-0.5 cursor-ew-resize',
+        y: 'h-0.5 cursor-ns-resize',
+        auto: 'data-[orientation=horizontal]:w-0.5 data-[orientation=horizontal]:cursor-ew-resize data-[orientation=vertical]:h-0.5 data-[orientation=vertical]:cursor-ns-resize',
       },
       line: { true: '', false: '' },
       hit: { before: 'before:absolute', none: '' },
