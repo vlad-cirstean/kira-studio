@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatDateTime } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
@@ -75,11 +76,11 @@ const dbMcpInstallMessage = computed(() => {
   if (!result) return null;
   switch (result.outcome) {
     case 'installed':
-      return 'Registered with Claude Code.';
+      return t('studio.settings.dbMcp.install.installed.body');
     case 'notFound':
-      return "Claude Code's CLI isn't available. Copy the command above and run it yourself once it is installed.";
+      return t('studio.settings.dbMcp.install.notFound.body');
     case 'installFailed':
-      return `Claude Code refused the registration: ${result.detail}. Copy the command above and run it yourself.`;
+      return t('studio.settings.dbMcp.install.failed.body', { detail: result.detail });
     default:
       return null;
   }
@@ -120,12 +121,8 @@ const dbMcpEnabledId = useId();
         @update:model-value="(v) => onToggleDbMcpEnabled(v === true)"
       />
       <FieldContent>
-        <Label :for="dbMcpEnabledId">Enable the database MCP server</Label>
-        <FieldDescription
-          >Lets an AI client list, browse and query the connections exposed below, through
-          the same path this app's own SQL console uses. Starts and stops with this
-          toggle.</FieldDescription
-        >
+        <Label :for="dbMcpEnabledId">{{ t('studio.settings.dbMcp.enable.label') }}</Label>
+        <FieldDescription>{{ t('studio.settings.dbMcp.enable.description') }}</FieldDescription>
       </FieldContent>
     </Field>
 
@@ -152,15 +149,18 @@ const dbMcpEnabledId = useId();
             :disabled="dbMcpInstalling"
             data-testid="db-mcp-install-button"
             @click="onInstallDbMcpClaudeCode"
-          >{{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
+          >{{
+              dbMcpStore.status.claudeAvailable
+                ? t('studio.settings.dbMcp.register.label')
+                : t('studio.settings.dbMcp.copyCommandAbove.label')
+            }}
           </Button>
           <FieldDescription v-if="dbMcpInstallMessage" data-testid="db-mcp-install-outcome">
             {{ dbMcpInstallMessage }}
           </FieldDescription>
         </template>
         <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-no-token">
-          This server restarted since it was last enabled; its registration command needs a
-          fresh token to show again.
+          {{ t('studio.settings.dbMcp.noToken.hint') }}
         </p>
         <Button
           variant="dialog"
@@ -170,7 +170,7 @@ const dbMcpEnabledId = useId();
           data-testid="db-mcp-regenerate-button"
           @click="onRegenerateDbMcpToken"
         >
-          Regenerate token
+          {{ t('studio.settings.dbMcp.regenerate.label') }}
         </Button>
       </template>
       <FieldDescription
@@ -179,24 +179,15 @@ const dbMcpEnabledId = useId();
       >
         {{
           dbMcpTokenExpired
-            ? 'Token expired — regenerate it above.'
-            : `Token valid until ${formatDateTime(dbMcpStore.status.expiresAt)}.`
+            ? t('studio.settings.dbMcp.tokenExpired.body')
+            : t('studio.settings.dbMcp.tokenValid.body', { date: formatDateTime(dbMcpStore.status.expiresAt) })
         }}
       </FieldDescription>
     </template>
 
-    <FieldLegend>Exposed connections</FieldLegend>
-    <FieldDescription>
-      Deny by default — only connections checked here are visible to an AI client through
-      this server.
-    </FieldDescription>
-    <p class="text-subtle text-kira-sm">
-      A newly exposed connection defaults to read allow, write prompt, DDL deny — this
-      migration tightened what an already-exposed connection allowed too. Edit a
-      connection's own three modes and description in its MCP tab. Newly exposed
-      connections plan their queries before running them, and a plan over the
-      expensive-query threshold pauses for approval.
-    </p>
+    <FieldLegend>{{ t('studio.settings.dbMcp.exposed.label') }}</FieldLegend>
+    <FieldDescription>{{ t('studio.settings.dbMcp.exposed.description') }}</FieldDescription>
+    <p class="text-subtle text-kira-sm">{{ t('studio.settings.dbMcp.defaults.hint') }}</p>
     <ul
       v-if="connectionsStore.records.length"
       class="flex flex-col m-0 p-0 list-none gap-0.5"
@@ -210,12 +201,13 @@ const dbMcpEnabledId = useId();
       >
         <div class="flex flex-col min-w-0 gap-0.5">
           <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
-          <FieldDescription
-            >read {{ conn.mcpReadMode }} · write {{ conn.mcpWriteMode }} · DDL
-            {{ conn.mcpDdlMode }}<template v-if="conn.mcpAutoExplain">
-              · plans queries</template
-            ></FieldDescription
-          >
+          <FieldDescription>{{
+              t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
+                read: conn.mcpReadMode,
+                write: conn.mcpWriteMode,
+                ddl: conn.mcpDdlMode,
+              })
+            }}</FieldDescription>
           <FieldDescription v-if="mcpDescriptionFirstLine(conn)">{{
             mcpDescriptionFirstLine(conn)
           }}</FieldDescription>
@@ -225,8 +217,8 @@ const dbMcpEnabledId = useId();
           <FieldDescription
             v-if="maskRuleCountsQuery.data.value?.[conn.id]"
             :data-testid="`db-mcp-connection-masked-${conn.id}`"
-            >{{ maskRuleCountsQuery.data.value?.[conn.id] }} masked column{{
-              maskRuleCountsQuery.data.value?.[conn.id] === 1 ? '' : 's'
+            >{{
+              t('studio.settings.dbMcp.masked.status', { count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0 })
             }}</FieldDescription
           >
         </div>
@@ -238,7 +230,7 @@ const dbMcpEnabledId = useId();
       </li>
     </ul>
     <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-connections-empty">
-      No connections yet — add one first.
+      {{ t('studio.settings.dbMcp.empty.empty') }}
     </p>
     <FieldError v-if="actionError" data-testid="settings-action-error">{{ actionError }}</FieldError>
   </div>

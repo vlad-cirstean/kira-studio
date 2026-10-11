@@ -8386,6 +8386,46 @@
         }
       }
     },
+    "dbMcp": {
+      "approval": {
+        "ddl": {
+          "body": "{connection} ({kind}) wants to run a schema-changing (DDL) statement through the database MCP server."
+        },
+        "estimate": {
+          "body": "Estimated {count} row read, threshold {threshold}. | Estimated {count} rows read, threshold {threshold}."
+        },
+        "expires": {
+          "status": "Expires in {seconds}s"
+        },
+        "heavy": {
+          "body": "{connection} ({kind}) wants to run a query estimated to read {count} row, over your threshold of {threshold}. | {connection} ({kind}) wants to run a query estimated to read {count} rows, over your threshold of {threshold}."
+        },
+        "issuesOmitted": {
+          "label": "{count} more"
+        },
+        "other": {
+          "body": "{connection} ({kind}) wants to run a statement through the database MCP server."
+        },
+        "queue": {
+          "status": "{count} more waiting"
+        },
+        "read": {
+          "body": "{connection} ({kind}) wants to run a read statement through the database MCP server."
+        },
+        "unknown": {
+          "body": "{connection} ({kind}) wants to run a statement this app couldn’t classify through the database MCP server."
+        },
+        "write": {
+          "body": "{connection} ({kind}) wants to run a write statement through the database MCP server."
+        }
+      },
+      "approveConfirm": {
+        "title": "Approve this query?"
+      },
+      "heavyConfirm": {
+        "title": "Run this heavy query?"
+      }
+    },
     "definition": {
       "comment": {
         "label": "Comment"
@@ -8606,12 +8646,33 @@
       }
     },
     "generateData": {
+      "allSkipped": {
+        "body": "Every column is set to skip. Choose a recipe for at least one column to generate rows."
+      },
+      "batches": {
+        "status": "{count} batch of {size} | {count} batches of {size}"
+      },
+      "hidePreview": {
+        "label": "Hide preview"
+      },
+      "noColumns": {
+        "body": "No column information available yet. Close this dialog, let the page load, then open it again."
+      },
+      "noTransactions": {
+        "error": "{message} — {count} row committed before this batch. This connection has no transactions, so any rows the failing batch already wrote stay written. | {message} — {count} rows committed before this batch. This connection has no transactions, so any rows the failing batch already wrote stay written."
+      },
+      "progress": {
+        "tooltip": "{committed} of {count} row committed | {committed} of {count} rows committed"
+      },
       "recipe": {
         "binaryHex": {
           "label": "Binary (hex)"
         },
         "companyName": {
           "label": "Company name"
+        },
+        "constant": {
+          "label": "Constant"
         },
         "datatypeBoolean": {
           "label": "Boolean"
@@ -8634,6 +8695,7 @@
         "jsonObject": {
           "label": "JSON object"
         },
+        "label": "Recipe",
         "locationCity": {
           "label": "City"
         },
@@ -8673,9 +8735,24 @@
         "phoneNumber": {
           "label": "Phone number"
         },
+        "skip": {
+          "label": "Skip"
+        },
         "stringUuid": {
           "label": "UUID"
         }
+      },
+      "rolledBack": {
+        "error": "{message} — {count} row committed before this batch, which was rolled back. | {message} — {count} rows committed before this batch, which was rolled back."
+      },
+      "seed": {
+        "label": "Seed"
+      },
+      "stopped": {
+        "error": "Stopped. {count} row committed. | Stopped. {count} rows committed."
+      },
+      "submit": {
+        "label": "Generate"
       },
       "warning": {
         "requiredForeignKey": {
@@ -9487,8 +9564,35 @@
         "tooltip": "Upload a file"
       }
     },
+    "mode": {
+      "api": {
+        "label": "API"
+      },
+      "studio": {
+        "label": "Studio"
+      }
+    },
     "module": {
       "title": "Kira Studio"
+    },
+    "operations": {
+      "clear": {
+        "hint": "Clears the in-memory ring only. Retention of op_log is automatic."
+      },
+      "command": {
+        "status": "Command: {command}"
+      },
+      "commandTruncated": {
+        "status": "Command (truncated at 64 kibibytes, can’t be re-run): {command}"
+      },
+      "menu": {
+        "rerun": {
+          "label": "Re-run"
+        },
+        "revealTab": {
+          "label": "Reveal originating tab"
+        }
+      }
     },
     "pager": {
       "firstPage": {
@@ -10072,6 +10176,11 @@
           "label": "Update credentials…"
         }
       },
+      "panel": {
+        "empty": {
+          "empty": "Everything you connect to shows up here"
+        }
+      },
       "passwordRevealConfirm": {
         "body": "“{name}” displays the password in plain text.",
         "title": "Show saved password?"
@@ -10154,6 +10263,172 @@
         "label": "Show all rows"
       }
     },
+    "settings": {
+      "advanced": {
+        "expensiveRows": {
+          "description": "A query whose plan is estimated to read at least this many rows is flagged as expensive by the console’s explain button and by auto-explain. Not comparable across engines’ own cost figures. See the plan panel’s own note.",
+          "label": "Expensive query threshold (rows)"
+        },
+        "logLevel": {
+          "description": "Verbosity of Kira Studio’s own diagnostic log.",
+          "label": "Log level"
+        },
+        "opLogRetention": {
+          "label": "Operation log retention (days)"
+        }
+      },
+      "api": {
+        "cookieJar": {
+          "description": "Off keeps a session cookie a server sets and replays it on later requests to the same host."
+        },
+        "maxResponse": {
+          "description": "Unlimited when 0. A larger body is truncated, not refused."
+        },
+        "requestTimeout": {
+          "description": "No timeout when 0."
+        },
+        "sslVerify": {
+          "warning": {
+            "error": "Turning certificate verification off lets any server present any certificate. Anything on the network between you and the server can then read and modify every request and response, including credentials. Leave this on unless you are testing against a server with a self-signed certificate you control."
+          }
+        }
+      },
+      "appearance": {
+        "dataFont": {
+          "description": "Grid cells, editors, anything that came out of a database.",
+          "label": "Data font"
+        },
+        "fontCurrent": {
+          "label": "Current"
+        },
+        "fontInstalled": {
+          "label": "Installed"
+        },
+        "fontNotInstalled": {
+          "label": "Not installed"
+        },
+        "fontPreview": {
+          "label": "The quick brown fox jumps over the lazy dog. 0123456789"
+        },
+        "fontUnavailable": {
+          "error": "Not installed. Text falls back to the browser’s default.",
+          "fallback": {
+            "error": "Not installed. Text falls back to the browser’s {fallback} default."
+          }
+        },
+        "rowColoring": {
+          "description": "Colour grid values by their column’s data type. Off renders every row in the plain text colour.",
+          "label": "Row colouring"
+        },
+        "rowDensity": {
+          "description": "Applies to the tree, the grid and every list."
+        },
+        "typography": {
+          "label": "Typography"
+        },
+        "wordWrap": {
+          "description": "Long lines wrap instead of scrolling. Applies to the query console, the MongoDB console and the cell editor."
+        }
+      },
+      "cache": {
+        "budget": {
+          "label": "Result page cache budget (megabytes)"
+        },
+        "clear": {
+          "label": "Clear caches"
+        },
+        "hitRate": {
+          "label": "Hit rate"
+        },
+        "usage": {
+          "label": "Current usage"
+        }
+      },
+      "data": {
+        "pageSize": {
+          "label": "Default page size"
+        }
+      },
+      "dbMcp": {
+        "copyCommandAbove": {
+          "label": "Copy command above"
+        },
+        "defaults": {
+          "hint": "A newly exposed connection defaults to read allow, write prompt, DDL deny. This migration tightened what an already-exposed connection allowed too. Edit a connection’s own three modes and description in its MCP tab. Newly exposed connections plan their queries before running them, and a plan over the expensive-query threshold pauses for approval."
+        },
+        "empty": {
+          "empty": "No connections yet. Add one first"
+        },
+        "enable": {
+          "description": "Lets an MCP client list, browse and query the connections exposed below, through the same path this app’s own SQL console uses. Starts and stops with this toggle.",
+          "label": "Enable the database MCP server"
+        },
+        "exposed": {
+          "description": "Deny by default. Only connections checked here are visible to an MCP client through this server.",
+          "label": "Exposed connections"
+        },
+        "install": {
+          "failed": {
+            "body": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
+          },
+          "installed": {
+            "body": "Registered with Claude Code."
+          },
+          "notFound": {
+            "body": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
+          }
+        },
+        "masked": {
+          "status": "{count} masked column | {count} masked columns"
+        },
+        "modes": {
+          "status": "Read {read} · write {write} · DDL {ddl}"
+        },
+        "modesPlans": {
+          "status": "Read {read} · write {write} · DDL {ddl} · plans queries"
+        },
+        "noToken": {
+          "hint": "This server restarted since it was last enabled; its registration command needs a fresh token to show again."
+        },
+        "regenerate": {
+          "label": "Regenerate token"
+        },
+        "register": {
+          "label": "Register with Claude Code"
+        },
+        "tokenExpired": {
+          "body": "Token expired. Regenerate it above."
+        },
+        "tokenValid": {
+          "body": "Token valid until {date}."
+        }
+      },
+      "footer": {
+        "stored": {
+          "status": "Stored in {path}"
+        }
+      },
+      "range": {
+        "days": {
+          "status": "{min}–{max} days"
+        },
+        "mb": {
+          "status": "{min}–{max} megabytes"
+        },
+        "ms": {
+          "status": "{min}–{max} ms"
+        },
+        "plain": {
+          "status": "{min}–{max}"
+        }
+      },
+      "restartNote": {
+        "hint": "Takes effect after restart."
+      },
+      "wholeNumber": {
+        "error": "Enter a whole number."
+      }
+    },
     "shortcuts": {
       "palette": {
         "closeTab": {
@@ -10185,6 +10460,21 @@
         "toggleProjectPanel": {
           "label": "Toggle project panel"
         }
+      }
+    },
+    "start": {
+      "empty": {
+        "body": "Kira Studio needs somewhere to connect before it can show you anything.",
+        "title": "No connections yet"
+      },
+      "importDataGrip": {
+        "label": "Import from DataGrip"
+      },
+      "open": {
+        "hint": "Open something from the tree on the left, or reopen one of these."
+      },
+      "recent": {
+        "label": "Recent tables"
       }
     },
     "stream": {
@@ -10355,6 +10645,11 @@
       },
       "visibilityRange": {
         "hint": "Whole seconds from {min} to {max} (12 hours)."
+      }
+    },
+    "tab": {
+      "incognito": {
+        "tooltip": "Incognito tab. Nothing from it is saved"
       }
     },
     "tabs": {
@@ -10644,6 +10939,11 @@
       },
       "year": {
         "description": "A calendar year, stored as a 2- or 4-digit value (MariaDB)."
+      }
+    },
+    "upload": {
+      "submit": {
+        "label": "Upload"
       }
     }
   },

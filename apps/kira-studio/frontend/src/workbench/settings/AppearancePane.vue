@@ -4,6 +4,7 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLeg
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
@@ -41,6 +42,16 @@ function onRowColoringChange(checked: boolean): void {
   props.draft.appearance.rowColoring = checked;
 }
 
+// Fake sample data for the density preview, not wording.
+const PREVIEW = {
+  idColumn: 'id',
+  emailColumn: 'email',
+  rows: [
+    { id: 'c1d0-88ae', email: 'rowan.brooks@example.com' },
+    { id: '7f2b-19cd', email: 'amari.osei@example.com' },
+  ],
+};
+
 const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === 'compact' ? 22 : 28));
 
 // P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
@@ -51,13 +62,13 @@ const rowColoringId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <FieldLegend class="pt-0">Typography</FieldLegend>
+    <FieldLegend class="pt-0">{{ t('studio.settings.appearance.typography.label') }}</FieldLegend>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="fontFamilyId">Data font</Label>
+        <Label :for="fontFamilyId">{{ t('studio.settings.appearance.dataFont.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-appearance-fontFamily"
           :disabled-trigger="isAtDefault('appearance', 'fontFamily')"
           :disabled="isAtDefault('appearance', 'fontFamily')"
@@ -73,10 +84,10 @@ const rowColoringId = useId();
         :model-value="draft.appearance.fontFamily"
         @update:model-value="onFontFamilyChange"
       >
-        <optgroup v-if="!currentFontIsListed" label="Current">
+        <optgroup v-if="!currentFontIsListed" :label="t('studio.settings.appearance.fontCurrent.label')">
           <option :value="draft.appearance.fontFamily">{{ draft.appearance.fontFamily }}</option>
         </optgroup>
-        <optgroup label="On this Mac">
+        <optgroup :label="t('studio.settings.appearance.fontInstalled.label')">
           <option
             v-for="f in availableStacks.on"
             :key="f.stack"
@@ -86,7 +97,7 @@ const rowColoringId = useId();
             {{ f.label }}
           </option>
         </optgroup>
-        <optgroup label="Not installed">
+        <optgroup :label="t('studio.settings.appearance.fontNotInstalled.label')">
           <option
             v-for="f in availableStacks.off"
             :key="f.stack"
@@ -101,14 +112,15 @@ const rowColoringId = useId();
         class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-fg"
         data-testid="font-preview"
         :style="{ fontFamily: draft.appearance.fontFamily }"
-        >The quick brown fox jumps over the lazy dog — 0123456789</span
+        >{{ t('studio.settings.appearance.fontPreview.label') }}</span
       >
       <FieldError v-if="fontFamilyUnavailable" data-testid="font-unavailable">
-        Not installed<template v-if="fontFamilyFallback">
-          — text falls back to the browser's {{ fontFamilyFallback }} default.</template
-        ><template v-else> — text falls back to the browser's default.</template>
+        <template v-if="fontFamilyFallback">{{
+          t('studio.settings.appearance.fontUnavailable.fallback.error', { fallback: fontFamilyFallback })
+        }}</template>
+        <template v-else>{{ t('studio.settings.appearance.fontUnavailable.error') }}</template>
       </FieldError>
-      <FieldDescription v-else>Grid cells, editors, anything that came out of a database.</FieldDescription>
+      <FieldDescription v-else>{{ t('studio.settings.appearance.dataFont.description') }}</FieldDescription>
     </Field>
 
     <FontSizeField
@@ -119,7 +131,7 @@ const rowColoringId = useId();
    />
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>Applies to the tree, the grid and every list.</FieldDescription>
+      <FieldDescription>{{ t('studio.settings.appearance.rowDensity.description') }}</FieldDescription>
       <!-- P110 B36: every cell below carries the full computed style of the old shared
            .row-preview-cell/.row-preview-gutter/.row-preview-grow/.row-preview-head rules, resolved
            per-instance rather than stacking conflicting same-property utilities (§1.3) -- the head
@@ -138,12 +150,12 @@ const rowColoringId = useId();
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
-            >id</span
+            >{{ PREVIEW.idColumn }}</span
           >
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
-            >email</span
+            >{{ PREVIEW.emailColumn }}</span
           >
         </div>
         <div class="flex" :style="{ height: `${rowPreviewHeight}px` }">
@@ -151,10 +163,10 @@ const rowColoringId = useId();
             >1</span
           >
           <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
-            >c1d0-88ae</span
+            >{{ PREVIEW.rows[0].id }}</span
           >
           <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
-            >rowan.brooks@example.com</span
+            >{{ PREVIEW.rows[0].email }}</span
           >
         </div>
         <div class="flex border-t border-border" :style="{ height: `${rowPreviewHeight}px` }">
@@ -162,20 +174,17 @@ const rowColoringId = useId();
             >2</span
           >
           <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
-            >7f2b-19cd</span
+            >{{ PREVIEW.rows[1].id }}</span
           >
           <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
-            >amari.osei@example.com</span
+            >{{ PREVIEW.rows[1].email }}</span
           >
         </div>
       </div>
     </RowDensityField>
 
     <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription
-        >Long lines wrap instead of scrolling — the query console, the Mongo console and
-        the cell editor.</FieldDescription
-      >
+      <FieldDescription>{{ t('studio.settings.appearance.wordWrap.description') }}</FieldDescription>
     </WordWrapField>
 
     <FieldGroup>
@@ -187,16 +196,13 @@ const rowColoringId = useId();
           @update:model-value="(v) => onRowColoringChange(v === true)"
         />
         <FieldContent>
-          <Label :for="rowColoringId">Row colouring</Label>
-          <FieldDescription
-            >Colour grid values by their column's data type. Off renders every row in the
-            plain text colour.</FieldDescription
-          >
+          <Label :for="rowColoringId">{{ t('studio.settings.appearance.rowColoring.label') }}</Label>
+          <FieldDescription>{{ t('studio.settings.appearance.rowColoring.description') }}</FieldDescription>
         </FieldContent>
       </Field>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         class="ml-auto"
         data-testid="settings-reset-appearance-rowColoring"
         :disabled-trigger="isAtDefault('appearance', 'rowColoring')"

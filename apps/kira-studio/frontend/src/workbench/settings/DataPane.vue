@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { useId } from 'vue';
 import type { SettingsPaneProps } from './types';
 
@@ -28,10 +29,10 @@ const defaultPageSizeId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="defaultPageSizeId">Default page size</Label>
+        <Label :for="defaultPageSizeId">{{ t('studio.settings.data.pageSize.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-data-defaultPageSize"
           :disabled-trigger="isAtDefault('data', 'defaultPageSize')"
           :disabled="isAtDefault('data', 'defaultPageSize')"

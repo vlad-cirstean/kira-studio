@@ -2,10 +2,12 @@
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { displayValue } from '@workbench/behaviour/format';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useModeStore, workspaceKeyOf } from '../../state/mode';
@@ -25,16 +27,16 @@ const tabsStore = useTabsStore();
 const modeStore = useModeStore();
 const consoleViewStore = useConsoleViewStore();
 
-const columns: OpLogColumn[] = [
-  { id: 'time', label: 'Time', width: '90px' },
-  { id: 'connection', label: 'Connection', width: '140px' },
-  { id: 'tab', label: 'Tab', width: '40px' },
-  { id: 'kind', label: 'Kind', width: '80px' },
-  { id: 'status', label: 'Status', width: '90px' },
-  { id: 'duration', label: 'Duration', width: '70px' },
-  { id: 'rows', label: 'Rows', width: '60px' },
-  { id: 'command', label: 'Command', width: '1fr' },
-];
+const columns = computed<OpLogColumn[]>(() => [
+  { id: 'time', label: t('common.field.time.label'), width: '90px' },
+  { id: 'connection', label: t('studio.common.nodeKind.connection.label'), width: '140px' },
+  { id: 'tab', label: t('common.key.tab.label'), width: '40px' },
+  { id: 'kind', label: t('common.field.kind.label'), width: '80px' },
+  { id: 'status', label: t('common.field.status.label'), width: '90px' },
+  { id: 'duration', label: t('common.field.duration.label'), width: '70px' },
+  { id: 'rows', label: t('studio.keyValue.rows.aria'), width: '60px' },
+  { id: 'command', label: t('common.field.command.label'), width: '1fr' },
+]);
 
 function connectionFor(record: OpRecord) {
   return connectionsStore.connectionRecord(record.connectionId);
@@ -123,7 +125,7 @@ function menuFor(record: OpRecord): MenuItem[] {
     {
       type: 'item',
       id: 'reveal-tab',
-      label: 'Reveal originating tab',
+      label: t('studio.operations.menu.revealTab.label'),
       disabled: !hasTab,
       run: () => revealTab(record),
     },
@@ -132,7 +134,7 @@ function menuFor(record: OpRecord): MenuItem[] {
     {
       type: 'item',
       id: 're-run',
-      label: 'Re-run',
+      label: t('studio.operations.menu.rerun.label'),
       icon: 'play',
       // P23 D1(c): a truncated command is only a 64 KiB prefix of what actually ran — Copy
       // command stays enabled (copying a prefix is honest and useful), but Re-run must not.
@@ -151,7 +153,7 @@ function menuFor(record: OpRecord): MenuItem[] {
     :records="opsStore.visibleOps"
     :running-count="opsStore.runningCount"
     :columns="columns"
-    clear-hint="Clears the in-memory ring only — op_log retention is automatic"
+    :clear-hint="t('studio.operations.clear.hint')"
     :menu-for="menuFor"
     @clear="opsStore.clearOps"
     @cancel="(record) => opsStore.cancelOp(record.id)"
@@ -175,8 +177,8 @@ function menuFor(record: OpRecord): MenuItem[] {
           v-if="part === 'command'"
           :doc="
             record.commandTruncated
-              ? `command (truncated at 64 KiB — cannot Re-run): ${record.command}`
-              : `command: ${record.command}`
+              ? t('studio.operations.commandTruncated.status', { command: record.command ?? '' })
+              : t('studio.operations.command.status', { command: record.command ?? '' })
           "
           :language="record.kind === 'http' ? 'plain' : 'sql'"
           :sql-dialect="opSqlDialect(record)"

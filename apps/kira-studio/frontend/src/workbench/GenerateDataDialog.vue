@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
-import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
@@ -148,39 +147,41 @@ async function onTogglePreview(): Promise<void> {
   if (noUsableColumns.value) return;
   previewOpen.value = !previewOpen.value;
   if (!previewOpen.value) return;
-  const t = tab.value;
-  if (!t?.connectionId) return;
-  await runPreview(t.connectionId, t.path);
+  const active = tab.value;
+  if (!active?.connectionId) return;
+  await runPreview(active.connectionId, active.path);
 }
 
 async function onGenerate(): Promise<void> {
-  const t = tab.value;
-  if (!t?.connectionId || running.value || noUsableColumns.value) return;
+  const active = tab.value;
+  if (!active?.connectionId || running.value || noUsableColumns.value) return;
   runError.value = null;
   committedRows.value = 0;
-  await runGenerate({ connectionId: t.connectionId, path: t.path, id: t.id });
+  await runGenerate({ connectionId: active.connectionId, path: active.path, id: active.id });
   currentOpId.value = null;
   const err = generationFailure;
   if (err === null) {
     fakeDataStore.closeGenerateDataDialog();
-    await gridViewStore.reloadAfterMutation(t.id);
+    await gridViewStore.reloadAfterMutation(active.id);
     return;
   }
   if (err instanceof GenerationError) {
     committedRows.value = err.committedRows;
-    const committedText = `${formatCount(err.committedRows)} row${err.committedRows === 1 ? '' : 's'}`;
     // D7: the server's own message, how many rows already committed, and — read from
     // caps.transactions, never assumed — whether the failing batch itself rolled back.
     runError.value =
       err.code === 'E_CANCELLED'
-        ? `Stopped — ${committedText} committed.`
-        : caps.value?.transactions
-          ? `${err.message} — ${committedText} committed before this batch, which was rolled back.`
-          : `${err.message} — ${committedText} committed before this batch. This connection has no transactions, so any rows the failing batch already wrote stay written.`;
+        ? t('studio.generateData.stopped.error', { count: err.committedRows })
+        : t(
+            caps.value?.transactions
+              ? 'studio.generateData.rolledBack.error'
+              : 'studio.generateData.noTransactions.error',
+            { message: err.message, count: err.committedRows },
+          );
   } else {
     runError.value = errorText(err);
   }
-  if (committedRows.value > 0) await gridViewStore.reloadAfterMutation(t.id);
+  if (committedRows.value > 0) await gridViewStore.reloadAfterMutation(active.id);
 }
 
 function onStop(): void {
@@ -223,12 +224,12 @@ function onSequenceStartChange(index: number, start: number): void {
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
     <DialogContent size="xl" data-testid="generate-data-dialog">
       <DialogHeader close-testid="generate-data-close">
-        <DialogTitle>Generate data</DialogTitle>
+        <DialogTitle>{{ t('studio.shortcuts.palette.generateData.label') }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody>
       <div class="flex items-center gap-1.5">
-        <Label class="p-0 text-muted-foreground">Rows</Label>
+        <Label class="p-0 text-muted-foreground">{{ t('studio.keyValue.rows.aria') }}</Label>
         <NumberStepperInput
           :model-value="String(rowCount)"
           group-class="h-control-lg"
@@ -236,7 +237,7 @@ function onSequenceStartChange(index: number, start: number): void {
           :disabled="running"
           @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
         />
-        <Label class="p-0 text-muted-foreground">Seed</Label>
+        <Label class="p-0 text-muted-foreground">{{ t('studio.generateData.seed.label') }}</Label>
         <NumberStepperInput
           :model-value="String(seed)"
           group-class="h-control-lg"
@@ -245,7 +246,7 @@ function onSequenceStartChange(index: number, start: number): void {
           @update:model-value="(v: string | number) => (seed = Math.trunc(Number(v)) || 0)"
         />
         <span v-if="rowCount > BATCH_SIZE" class="text-kira-sm text-muted-foreground" data-testid="generate-data-batch-note">
-          {{ Math.ceil(rowCount / BATCH_SIZE) }} batches of {{ BATCH_SIZE }}
+          {{ t('studio.generateData.batches.status', { count: Math.ceil(rowCount / BATCH_SIZE), size: BATCH_SIZE }) }}
         </span>
       </div>
 
@@ -253,10 +254,10 @@ function onSequenceStartChange(index: number, start: number): void {
         <!-- grid-cols-[...] is a pre-existing arbitrary-value class already, not a raw
              declaration -- untouched (P110 B37/B39). -->
         <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1 p-0 text-kira-sm text-muted-foreground">
-          <span>Column</span>
-          <span>Type</span>
-          <span>Recipe</span>
-          <span>Value</span>
+          <span>{{ t('studio.project.connectionDialog.column.placeholder') }}</span>
+          <span>{{ t('common.field.type.label') }}</span>
+          <span>{{ t('studio.generateData.recipe.label') }}</span>
+          <span>{{ t('common.field.value.label') }}</span>
         </div>
         <div
           v-for="(plan, index) in plans"
@@ -274,10 +275,10 @@ function onSequenceStartChange(index: number, start: number): void {
             :disabled="running"
             @update:model-value="(v) => onRecipeChange(index, String(v))"
           >
-            <option value="skip">Skip</option>
-            <option value="null">NULL</option>
-            <option value="constant">Constant</option>
-            <option v-if="plan.column.typeClass === 'number'" value="sequence">Sequence</option>
+            <option value="skip">{{ t('studio.generateData.recipe.skip.label') }}</option>
+            <option value="null">{{ t('studio.common.nullValue.label') }}</option>
+            <option value="constant">{{ t('studio.generateData.recipe.constant.label') }}</option>
+            <option v-if="plan.column.typeClass === 'number'" value="sequence">{{ t('studio.common.nodeKind.sequence.label') }}</option>
             <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
               {{ t(opt.labelKey) }}
             </option>
@@ -304,12 +305,12 @@ function onSequenceStartChange(index: number, start: number): void {
 
       <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
         <AlertDescription>
-          No column information available yet. Close this dialog, let the page load, then try again.
+          {{ t('studio.generateData.noColumns.body') }}
         </AlertDescription>
       </Alert>
       <Alert v-else-if="allColumnsSkipped" variant="warn" data-testid="generate-data-no-columns">
         <AlertDescription>
-          Every column is set to Skip — pick a recipe for at least one column to generate rows.
+          {{ t('studio.generateData.allSkipped.body') }}
         </AlertDescription>
       </Alert>
 
@@ -331,10 +332,10 @@ function onSequenceStartChange(index: number, start: number): void {
           :disabled="noUsableColumns"
           @click="onTogglePreview"
         >
-          {{ previewOpen ? 'Hide preview' : 'Preview SQL' }}
+          {{ previewOpen ? t('studio.generateData.hidePreview.label') : t('studio.grid.previewCommand.title') }}
         </Button>
         <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">
-          <InlineState v-if="previewLoading" kind="loading">Loading…</InlineState>
+          <InlineState v-if="previewLoading" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
           <InlineState v-else-if="previewError" kind="error" data-testid="generate-data-preview-error">{{ previewError }}</InlineState>
           <MonacoHost
             v-else
@@ -361,14 +362,14 @@ function onSequenceStartChange(index: number, start: number): void {
               <Spinner :size="12" label="" />
             </span>
           </TooltipTrigger>
-          <TooltipContent>{{ `${committedRows} / ${rowCount} rows committed` }}</TooltipContent>
+          <TooltipContent>{{ t('studio.generateData.progress.tooltip', { committed: committedRows, count: rowCount }) }}</TooltipContent>
         </Tooltip>
         <Button v-if="running" variant="dialog" size="kira-lg" data-testid="generate-data-stop" @click="onStop">
-          Stop
+          {{ t('common.action.stop.label') }}
         </Button>
         <template v-else>
           <Button variant="dialog" size="kira-lg" data-testid="generate-data-cancel" @click="onClose">
-            Cancel
+            {{ t('common.action.cancel.label') }}
           </Button>
           <Button
             variant="dialog-primary"
@@ -377,7 +378,7 @@ function onSequenceStartChange(index: number, start: number): void {
             :disabled="rowCount < 1 || noUsableColumns"
             @click="onGenerate"
           >
-            Generate
+            {{ t('studio.generateData.submit.label') }}
           </Button>
         </template>
       </DialogFooter>

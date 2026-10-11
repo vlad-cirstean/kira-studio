@@ -2,6 +2,7 @@
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { type MessageKey, t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
@@ -24,16 +25,18 @@ const { remainingSeconds } = usePendingDecision({
   expiresAtMs: () => dbMcpStore.approval.pending?.expiresAtMs,
 });
 
-const CLASS_WORDS: Record<string, string> = {
-  read: 'a read statement',
-  write: 'a write statement',
-  ddl: 'a schema-changing (DDL) statement',
-  unknown: 'a statement this app could not classify',
+const CLASS_BODY_KEYS: Record<string, MessageKey> = {
+  read: 'studio.dbMcp.approval.read.body',
+  write: 'studio.dbMcp.approval.write.body',
+  ddl: 'studio.dbMcp.approval.ddl.body',
+  unknown: 'studio.dbMcp.approval.unknown.body',
 };
 
-const classWord = computed(() => {
-  const cls = dbMcpStore.approval.pending?.class;
-  return cls ? (CLASS_WORDS[cls] ?? 'a statement') : 'a statement';
+const classBody = computed(() => {
+  const pending = dbMcpStore.approval.pending;
+  if (!pending) return '';
+  const key = (pending.class && CLASS_BODY_KEYS[pending.class]) || 'studio.dbMcp.approval.other.body';
+  return t(key, { connection: pending.connectionName, kind: pending.kind });
 });
 
 // M3 §6.2/§6.3: the same dialog, one more reason to raise it — title and lede vary by reason,
@@ -41,14 +44,21 @@ const classWord = computed(() => {
 // statement <pre>) stays exactly as M2 shipped it. A heavy query and a write are the same keyboard
 // interaction.
 const dialogTitle = computed(() =>
-  dbMcpStore.approval.pending?.reason === 'heavy' ? 'Run this heavy query?' : 'Approve this query?',
+  dbMcpStore.approval.pending?.reason === 'heavy'
+    ? t('studio.dbMcp.heavyConfirm.title')
+    : t('studio.dbMcp.approveConfirm.title'),
 );
 
 const heavyLede = computed(() => {
   const plan = dbMcpStore.approval.pending?.plan;
   const pending = dbMcpStore.approval.pending;
   if (!pending || !plan || plan.estimatedRowsRead === null) return '';
-  return `${pending.connectionName} (${pending.kind}) wants to run a query estimated to read ${formatCount(plan.estimatedRowsRead)} rows — over your threshold of ${formatCount(plan.thresholdRows)}.`;
+  return t('studio.dbMcp.approval.heavy.body', {
+    connection: pending.connectionName,
+    kind: pending.kind,
+    count: plan.estimatedRowsRead,
+    threshold: formatCount(plan.thresholdRows),
+  });
 });
 
 // P108 Part 12 F2: takes the request id as an explicit argument, bound in the template from the
@@ -86,11 +96,7 @@ const DETAIL_CLASS = 'm-0 text-subtle';
         <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="m-0 whitespace-pre-wrap">
           {{ heavyLede }}
         </p>
-        <p v-else class="m-0 whitespace-pre-wrap">
-          <strong>{{ dbMcpStore.approval.pending.connectionName }}</strong>
-          ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
-          MCP server.
-        </p>
+        <p v-else class="m-0 whitespace-pre-wrap">{{ classBody }}</p>
         <pre
           class="font-data max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm m-0 py-1 px-1.5 bg-field border border-border"
           data-testid="db-mcp-approval-statement"
@@ -101,10 +107,14 @@ const DETAIL_CLASS = 'm-0 text-subtle';
         <div v-if="dbMcpStore.approval.pending.plan" class="flex flex-col gap-1" data-testid="db-mcp-approval-plan">
           <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-plan-rows">
             <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
-              Estimated {{ formatCount(dbMcpStore.approval.pending.plan.estimatedRowsRead) }} rows
-              read — threshold {{ formatCount(dbMcpStore.approval.pending.plan.thresholdRows) }}.
+              {{
+                t('studio.dbMcp.approval.estimate.body', {
+                  count: dbMcpStore.approval.pending.plan.estimatedRowsRead,
+                  threshold: formatCount(dbMcpStore.approval.pending.plan.thresholdRows),
+                })
+              }}
             </template>
-            <template v-else> No row estimate available for this plan. </template>
+            <template v-else>{{ t('studio.console.plan.noEstimate.body') }}</template>
           </p>
           <p
             v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
@@ -115,13 +125,13 @@ const DETAIL_CLASS = 'm-0 text-subtle';
             <strong>{{ issue.severity }}</strong> {{ issue.message }}
           </p>
           <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" :class="DETAIL_CLASS">
-            +{{ dbMcpStore.approval.pending.plan.issuesOmitted }} more
+            {{ t('studio.dbMcp.approval.issuesOmitted.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
           </p>
         </div>
 
-        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
+        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">{{ t('studio.dbMcp.approval.expires.status', { seconds: remainingSeconds }) }}</p>
         <p v-if="more > 0" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
-          {{ more }} more waiting
+          {{ t('studio.dbMcp.approval.queue.status', { count: more }) }}
         </p>
       </DialogBody>
 
@@ -133,7 +143,7 @@ const DETAIL_CLASS = 'm-0 text-subtle';
           data-testid="db-mcp-approval-deny"
           @click="onDeny(dbMcpStore.approval.pending!.requestId)"
         >
-          Deny
+          {{ t('common.action.deny.label') }}
         </Button>
         <Button
           variant="dialog-primary"
@@ -141,7 +151,7 @@ const DETAIL_CLASS = 'm-0 text-subtle';
           data-testid="db-mcp-approval-approve"
           @click="onApprove(dbMcpStore.approval.pending!.requestId)"
         >
-          Approve
+          {{ t('common.action.approve.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

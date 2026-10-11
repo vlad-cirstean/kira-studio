@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -38,11 +39,11 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
 <template>
   <div ref="rootEl" class="flex h-full min-h-0 flex-col">
     <PanelHeader>
-      Connections
+      {{ t('common.module.connections.label') }}
       <template #actions>
         <TooltipIconButton
           icon="search"
-          :label="showSearch ? 'Hide search' : 'Search'"
+          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
           :pressed="showSearch"
           data-testid="toggle-search"
           @click="toggleSearch"
@@ -53,7 +54,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
              exactly when a menu-bar-only affordance is hardest to find. -->
         <TooltipIconButton
           icon="add"
-          label="New connection"
+          :label="t('studio.project.connectionDialog.newConnection.title')"
           data-testid="add-connection"
           @click="connectionDialogStore.openCreateDialog"
         />
@@ -72,7 +73,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
     <Empty v-else class="h-full">
       <EmptyHeader>
         <EmptyMedia><CodiconIcon name="database" :size="24" /></EmptyMedia>
-        <EmptyDescription>Everything you connect to<br />shows up here.</EmptyDescription>
+        <EmptyDescription>{{ t('studio.project.panel.empty.empty') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   </div>

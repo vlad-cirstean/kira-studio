@@ -4,6 +4,7 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { formatCount } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
@@ -44,9 +45,12 @@ function onDisableCookieJarChange(checked: boolean): void {
 
 const requestTimeoutMsError = computed<string | null>(() => {
   const v = props.draft.api.requestTimeoutMs;
-  if (!Number.isInteger(v)) return 'Enter a whole number.';
+  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
   if (v < REQUEST_TIMEOUT_MS_RANGE.min || v > REQUEST_TIMEOUT_MS_RANGE.max) {
-    return `${REQUEST_TIMEOUT_MS_RANGE.min}–${formatCount(REQUEST_TIMEOUT_MS_RANGE.max)} ms`;
+    return t('studio.settings.range.ms.status', {
+      min: REQUEST_TIMEOUT_MS_RANGE.min,
+      max: formatCount(REQUEST_TIMEOUT_MS_RANGE.max),
+    });
   }
   return null;
 });
@@ -54,9 +58,9 @@ props.registerFieldError('api.requestTimeoutMs', requestTimeoutMsError);
 
 const maxResponseMbError = computed<string | null>(() => {
   const v = props.draft.api.maxResponseMb;
-  if (!Number.isInteger(v)) return 'Enter a whole number.';
+  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
   if (v < MAX_RESPONSE_MB_RANGE.min || v > MAX_RESPONSE_MB_RANGE.max) {
-    return `${MAX_RESPONSE_MB_RANGE.min}–${MAX_RESPONSE_MB_RANGE.max} MB`;
+    return t('studio.settings.range.mb.status', { min: MAX_RESPONSE_MB_RANGE.min, max: MAX_RESPONSE_MB_RANGE.max });
   }
   return null;
 });
@@ -64,9 +68,9 @@ props.registerFieldError('api.maxResponseMb', maxResponseMbError);
 
 const maxRedirectsError = computed<string | null>(() => {
   const v = props.draft.api.maxRedirects;
-  if (!Number.isInteger(v)) return 'Enter a whole number.';
+  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
   if (v < MAX_REDIRECTS_RANGE.min || v > MAX_REDIRECTS_RANGE.max) {
-    return `${MAX_REDIRECTS_RANGE.min}–${MAX_REDIRECTS_RANGE.max}`;
+    return t('studio.settings.range.plain.status', { min: MAX_REDIRECTS_RANGE.min, max: MAX_REDIRECTS_RANGE.max });
   }
   return null;
 });
@@ -87,10 +91,10 @@ const disableCookieJarId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="httpVersionId">HTTP version</Label>
+        <Label :for="httpVersionId">{{ t('studio.http.settings.version.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-api-httpVersion"
           :disabled-trigger="isAtDefault('api', 'httpVersion')"
           :disabled="isAtDefault('api', 'httpVersion')"
@@ -106,16 +110,16 @@ const disableCookieJarId = useId();
         :model-value="draft.api.httpVersion"
         @update:model-value="onHttpVersionChange"
       >
-        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
+        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">{{ t('studio.http.settings.versionOption.option', { version: v }) }}</option>
       </NativeSelect>
     </Field>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="requestTimeoutMsId">Request timeout (ms)</Label>
+        <Label :for="requestTimeoutMsId">{{ t('studio.http.settings.timeout.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-api-requestTimeoutMs"
           :disabled-trigger="isAtDefault('api', 'requestTimeoutMs')"
           :disabled="isAtDefault('api', 'requestTimeoutMs')"
@@ -137,15 +141,15 @@ const disableCookieJarId = useId();
       >
         {{ requestTimeoutMsError }}
       </FieldError>
-      <FieldDescription v-else>0 = no timeout.</FieldDescription>
+      <FieldDescription v-else>{{ t('studio.settings.api.requestTimeout.description') }}</FieldDescription>
     </Field>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxResponseMbId">Max response size (MB)</Label>
+        <Label :for="maxResponseMbId">{{ t('studio.http.settings.maxResponse.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-api-maxResponseMb"
           :disabled-trigger="isAtDefault('api', 'maxResponseMb')"
           :disabled="isAtDefault('api', 'maxResponseMb')"
@@ -167,7 +171,7 @@ const disableCookieJarId = useId();
       >
         {{ maxResponseMbError }}
       </FieldError>
-      <FieldDescription v-else>0 = unlimited. A larger body is truncated, not refused.</FieldDescription>
+      <FieldDescription v-else>{{ t('studio.settings.api.maxResponse.description') }}</FieldDescription>
     </Field>
 
     <FieldGroup>
@@ -178,11 +182,11 @@ const disableCookieJarId = useId();
           data-testid="settings-api-sslVerify"
           @update:model-value="(v) => onSslVerifyChange(v === true)"
         />
-        <Label :for="sslVerifyId">Verify SSL certificates</Label>
+        <Label :for="sslVerifyId">{{ t('studio.http.settings.verifySsl.label') }}</Label>
       </Field>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         class="ml-auto"
         data-testid="settings-reset-api-sslVerify"
         :disabled-trigger="isAtDefault('api', 'sslVerify')"
@@ -190,12 +194,7 @@ const disableCookieJarId = useId();
         @click="resetLeaf('api', 'sslVerify')"
      />
     </FieldGroup>
-    <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">
-      Turning certificate verification off lets any server present any certificate.
-      Anything on the network between you and the server can then read and modify every
-      request and response, including credentials. Leave this on unless you are testing
-      against a server with a self-signed certificate you control.
-    </FieldError>
+    <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">{{ t('studio.settings.api.sslVerify.warning.error') }}</FieldError>
 
     <FieldGroup>
       <Field orientation="horizontal">
@@ -205,11 +204,11 @@ const disableCookieJarId = useId();
           data-testid="settings-api-followRedirects"
           @update:model-value="(v) => onFollowRedirectsChange(v === true)"
         />
-        <Label :for="followRedirectsId">Follow redirects</Label>
+        <Label :for="followRedirectsId">{{ t('studio.http.settings.followRedirects.label') }}</Label>
       </Field>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         class="ml-auto"
         data-testid="settings-reset-api-followRedirects"
         :disabled-trigger="isAtDefault('api', 'followRedirects')"
@@ -220,10 +219,10 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxRedirectsId">Max redirects</Label>
+        <Label :for="maxRedirectsId">{{ t('studio.http.settings.maxRedirects.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-api-maxRedirects"
           :disabled-trigger="isAtDefault('api', 'maxRedirects')"
           :disabled="isAtDefault('api', 'maxRedirects')"
@@ -246,9 +245,7 @@ const disableCookieJarId = useId();
       >
         {{ maxRedirectsError }}
       </FieldError>
-      <FieldDescription v-else-if="!draft.api.followRedirects">
-        Follow redirects is off — this has no effect.
-      </FieldDescription>
+      <FieldDescription v-else-if="!draft.api.followRedirects">{{ t('studio.http.settings.redirectsOff.description') }}</FieldDescription>
     </Field>
 
     <FieldGroup>
@@ -260,16 +257,13 @@ const disableCookieJarId = useId();
           @update:model-value="(v) => onDisableCookieJarChange(v === true)"
         />
         <FieldContent>
-          <Label :for="disableCookieJarId">Disable cookie jar</Label>
-          <FieldDescription
-            >Off keeps a session cookie a server sets and replays it on later requests to
-            the same host.</FieldDescription
-          >
+          <Label :for="disableCookieJarId">{{ t('studio.http.settings.disableJar.label') }}</Label>
+          <FieldDescription>{{ t('studio.settings.api.cookieJar.description') }}</FieldDescription>
         </FieldContent>
       </Field>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         class="ml-auto"
         data-testid="settings-reset-api-disableCookieJar"
         :disabled-trigger="isAtDefault('api', 'disableCookieJar')"

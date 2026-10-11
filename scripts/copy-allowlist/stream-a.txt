@@ -1,20 +1,4 @@
 # Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue
-apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue
-apps/kira-studio/frontend/src/workbench/SettingsDialog.vue
-apps/kira-studio/frontend/src/workbench/TitleBar.vue
-apps/kira-studio/frontend/src/workbench/UploadObjectDialog.vue
-apps/kira-studio/frontend/src/workbench/host.ts
-apps/kira-studio/frontend/src/workbench/modes.ts
-apps/kira-studio/frontend/src/workbench/panels/OperationsPanel.vue
-apps/kira-studio/frontend/src/workbench/panels/ProjectPanel.vue
-apps/kira-studio/frontend/src/workbench/panels/StudioStart.vue
-apps/kira-studio/frontend/src/workbench/settings/AdvancedPane.vue
-apps/kira-studio/frontend/src/workbench/settings/ApiPane.vue
-apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue
-apps/kira-studio/frontend/src/workbench/settings/CachePane.vue
-apps/kira-studio/frontend/src/workbench/settings/DataPane.vue
-apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue
 permanent U67 apps/kira-studio/frontend/src/fonts.ts # font family names (system and installed typefaces are proper names, not wording)
 permanent U67 apps/kira-studio/frontend/src/views/console/completion.ts # Redis command syntax hints (command grammar, not wording)
 permanent U67 apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue # HTTP auth scheme tokens inserted verbatim (protocol vocabulary, not wording)

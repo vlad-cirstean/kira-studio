@@ -1,4 +1,5 @@
 import type { AppMode } from '@shared/domain/mode';
+import { t } from '@theme/i18n';
 import type { TabIconRender, WorkbenchHost } from '@workbench/host';
 import { computed } from 'vue';
 import { useModeStore } from '../state/mode';
@@ -35,7 +36,7 @@ export function createWorkbenchHost(): WorkbenchHost<AppMode, TabRecord> {
     // P71 §5.1: the incognito eye glyph — uniform across every kind, not one kind's own badge.
     tabIndicator(tab) {
       return tabIncognitoStore.isIncognito(tab.id)
-        ? { icon: 'eye-closed', tooltip: 'Incognito — nothing from this tab is saved' }
+        ? { icon: 'eye-closed', tooltip: t('studio.tab.incognito.tooltip') }
         : null;
     },
   };

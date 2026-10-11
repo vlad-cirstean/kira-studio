@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/behaviour/format';
 import { computed } from 'vue';
@@ -63,9 +64,9 @@ function openRecent(entry: RecentTableEntry): void {
       <span class="start-mark text-subtle"><CodiconIcon name="database" :size="24" /></span>
       <!-- P24 D31: no bold text anywhere in the app -- --kira-t-xl (text-kira-xl, the scale's
            largest step) already carries the emphasis a first-run heading needs. -->
-      <div class="tracking-normal text-kira-xl text-fg">No connections yet</div>
+      <div class="tracking-normal text-kira-xl text-fg">{{ t('studio.start.empty.title') }}</div>
       <div class="mt-0 text-kira-md leading-normal text-muted-foreground">
-        Kira Studio needs somewhere to connect before it can show you anything.
+        {{ t('studio.start.empty.body') }}
       </div>
       <!-- P110 B26: --kira-s-2 (4px) -> gap-1 is a real, quantified mismatch against
            dialog/kira-lg's own gap-1.5 (6px) -- kept as a class override rather than a new Button
@@ -80,7 +81,7 @@ function openRecent(entry: RecentTableEntry): void {
           @click="connectionDialogStore.openCreateDialog"
         >
           <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
-          New connection
+          {{ t('studio.project.connectionDialog.newConnection.title') }}
         </Button>
         <Button
           type="button"
@@ -91,7 +92,7 @@ function openRecent(entry: RecentTableEntry): void {
           @click="datagripImportStore.pickAndScanDataGripProject"
         >
           <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="cloud-download" :size="13" /></span>
-          Import from DataGrip
+          {{ t('studio.start.importDataGrip.label') }}
         </Button>
       </span>
     </div>
@@ -100,11 +101,11 @@ function openRecent(entry: RecentTableEntry): void {
   <!-- Empty.html — connections exist, nothing open: recent tables and nothing else. -->
   <div v-else class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="no-tab-open">
     <div class="w-140 max-w-full">
-      <div class="tracking-normal text-kira-xl text-fg">Kira Studio</div>
-      <div class="text-kira-md mt-1.5 text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
+      <div class="tracking-normal text-kira-xl text-fg">{{ t('common.product.kiraStudio.label') }}</div>
+      <div class="text-kira-md mt-1.5 text-muted-foreground">{{ t('studio.start.open.hint') }}</div>
 
       <template v-if="recentEntries.length > 0">
-        <div class="uppercase tracking-wider text-kira-sm mb-1.5 mt-4 text-subtle">Recent tables</div>
+        <div class="uppercase tracking-wider text-kira-sm mb-1.5 mt-4 text-subtle">{{ t('studio.start.recent.label') }}</div>
         <div class="flex flex-col">
           <button
             v-for="entry in recentEntries"

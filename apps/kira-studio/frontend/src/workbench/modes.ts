@@ -1,4 +1,5 @@
 import type { AppMode } from '@shared/domain/mode';
+import { t } from '@theme/i18n';
 import type { ModeRegistry, PanelModeDef } from '@workbench/modes';
 import { defineAsyncComponent } from 'vue';
 import ApiStart from '../api/ApiStart.vue';
@@ -22,12 +23,28 @@ export const MODE_ORDER: AppMode[] = ['studio', 'api', 'automations', 'docker'];
 // change, no behavior change, since this app's own shell already reads `.panel`/`.start`
 // unconditionally.
 export const MODES: ModeRegistry<AppMode, PanelModeDef> = {
-  studio: { label: 'Studio', icon: 'database', panel: ProjectPanel, start: StudioStart },
-  api: { label: 'Api', icon: 'globe', panel: CollectionsPanel, start: ApiStart },
+  studio: {
+    get label() {
+      return t('studio.mode.studio.label');
+    },
+    icon: 'database',
+    panel: ProjectPanel,
+    start: StudioStart,
+  },
+  api: {
+    get label() {
+      return t('studio.mode.api.label');
+    },
+    icon: 'globe',
+    panel: CollectionsPanel,
+    start: ApiStart,
+  },
   // P91 §2: a peer module, lazy the same reason Studio/Api's entries are — nothing
   // in a Studio-only session should pay for the terminal panel's own launch chunk.
   automations: {
-    label: 'Automations',
+    get label() {
+      return t('common.module.automations.label');
+    },
     icon: 'run-all',
     panel: defineAsyncComponent(() => import('@workbench/automations/AutomationsPanel.vue')),
     start: defineAsyncComponent(() => import('@workbench/automations/AutomationsStart.vue')),
@@ -35,7 +52,9 @@ export const MODES: ModeRegistry<AppMode, PanelModeDef> = {
   },
   // P200: lazy like Terminal; no tabs of its own, so the tab strip is hidden for this mode.
   docker: {
-    label: 'Docker',
+    get label() {
+      return t('common.product.docker.label');
+    },
     icon: 'vm',
     tabStrip: false,
     panel: defineAsyncComponent(() => import('../docker/DockerPanel.vue')),

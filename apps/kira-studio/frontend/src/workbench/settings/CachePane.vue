@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { Field, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { displayValue, formatBytes } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
@@ -24,9 +25,12 @@ function onCacheBudgetInput(e: Event): void {
 
 const cacheBudgetError = computed<string | null>(() => {
   const v = props.draft.cache.l2BudgetMb;
-  if (!Number.isInteger(v)) return 'Enter a whole number.';
+  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
   if (v < CACHE_L2_BUDGET_MB_RANGE.min || v > CACHE_L2_BUDGET_MB_RANGE.max) {
-    return `${CACHE_L2_BUDGET_MB_RANGE.min}–${CACHE_L2_BUDGET_MB_RANGE.max} MB`;
+    return t('studio.settings.range.mb.status', {
+      min: CACHE_L2_BUDGET_MB_RANGE.min,
+      max: CACHE_L2_BUDGET_MB_RANGE.max,
+    });
   }
   return null;
 });
@@ -61,10 +65,10 @@ const hitRateId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="cacheBudgetMbId">Result page cache budget (MB)</Label>
+        <Label :for="cacheBudgetMbId">{{ t('studio.settings.cache.budget.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-cache-l2BudgetMb"
           :disabled-trigger="isAtDefault('cache', 'l2BudgetMb')"
           :disabled="isAtDefault('cache', 'l2BudgetMb')"
@@ -85,7 +89,7 @@ const hitRateId = useId();
       </FieldError>
     </Field>
     <Field>
-      <Label :for="currentUsageId" class="text-muted-foreground">Current usage</Label>
+      <Label :for="currentUsageId" class="text-muted-foreground">{{ t('studio.settings.cache.usage.label') }}</Label>
       <Input
         :id="currentUsageId"
         type="text"
@@ -95,7 +99,7 @@ const hitRateId = useId();
       />
     </Field>
     <Field>
-      <Label :for="hitRateId" class="text-muted-foreground">Hit rate</Label>
+      <Label :for="hitRateId" class="text-muted-foreground">{{ t('studio.settings.cache.hitRate.label') }}</Label>
       <Input
         :id="hitRateId"
         type="text"
@@ -105,7 +109,7 @@ const hitRateId = useId();
       />
     </Field>
     <Button variant="dialog" size="kira-lg" class="self-start" data-testid="settings-clear-caches" @click="onClearCaches">
-      Clear caches
+      {{ t('studio.settings.cache.clear.label') }}
     </Button>
   </div>
 </template>

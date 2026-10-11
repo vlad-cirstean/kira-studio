@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { t } from '@theme/i18n';
 import ModeSwitcher from '@workbench/components/ModeSwitcher.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import TitleBarWindowActions from '@workbench/components/TitleBarWindowActions.vue';
@@ -53,7 +54,7 @@ function onToggleKeepAwake(): void {
     <div class="flex items-center gap-0.5 ml-auto wails-no-drag">
       <TooltipIconButton
         :icon="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
-        label="Connections"
+        :label="t('common.module.connections.label')"
         :icon-size="15"
         variant="title"
         size="title"
@@ -63,7 +64,7 @@ function onToggleKeepAwake(): void {
       />
       <TooltipIconButton
         :icon="layoutStore.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
-        label="Operations"
+        :label="t('common.module.operations.label')"
         :icon-size="15"
         variant="title"
         size="title"
@@ -73,7 +74,7 @@ function onToggleKeepAwake(): void {
       />
       <TooltipIconButton
         icon="settings-gear"
-        label="Settings"
+        :label="t('common.module.settings.label')"
         :icon-size="15"
         variant="title"
         size="title"

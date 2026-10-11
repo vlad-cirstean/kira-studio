@@ -7,6 +7,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatBytes } from '@workbench/behaviour/format';
 import { computed, ref, watch } from 'vue';
@@ -98,12 +99,12 @@ watch(
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
     <DialogContent size="md" data-testid="upload-dialog">
       <DialogHeader close-testid="upload-close">
-        <DialogTitle>Upload file</DialogTitle>
+        <DialogTitle>{{ t('studio.keyValue.upload.tooltip') }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody>
         <Button variant="dialog" size="kira-lg" class="self-start" data-testid="upload-choose-file" @click="chooseFile">
-          Choose file…
+          {{ t('studio.http.body.chooseFile.label') }}
         </Button>
         <div v-if="chosenFile" class="text-kira-sm text-muted-foreground p-0" data-testid="upload-chosen-file">
           {{ chosenFile.name }} ({{ formatBytes(chosenFile.size) }})
@@ -111,12 +112,12 @@ watch(
 
         <template v-if="chosenFile">
           <Field>
-            <Label class="text-muted-foreground p-0">Key</Label>
+            <Label class="text-muted-foreground p-0">{{ t('common.field.key.label') }}</Label>
             <Input v-model="key" class="font-data" data-testid="upload-key" />
           </Field>
 
           <Field>
-            <Label class="text-muted-foreground p-0">Content type</Label>
+            <Label class="text-muted-foreground p-0">{{ t('studio.http.body.contentType.placeholder') }}</Label>
             <Input v-model="contentType" class="font-data" data-testid="upload-content-type" />
           </Field>
         </template>
@@ -127,7 +128,9 @@ watch(
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">{{
+            t('common.action.cancel.label')
+          }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
@@ -135,7 +138,7 @@ watch(
           :disabled="!chosenFile || !key.trim() || saving"
           @click="onUpload"
         >
-          Upload
+          {{ t('studio.upload.submit.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

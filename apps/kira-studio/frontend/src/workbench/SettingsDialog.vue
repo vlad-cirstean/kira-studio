@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldError } from '@theme/components/ui/field';
+import { CatalogText, t } from '@theme/i18n';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
 import { sections, useSettingsStore } from '../state/settings';
@@ -11,6 +12,8 @@ import AppearancePane from './settings/AppearancePane.vue';
 import CachePane from './settings/CachePane.vue';
 import DatabaseMcpPane from './settings/DatabaseMcpPane.vue';
 import DataPane from './settings/DataPane.vue';
+
+const SETTINGS_DB_PATH = '~/.kira-studio/kira.sqlite';
 
 // P103 Part 2 (§5.5): the old single-file workbench/SettingsDialog.vue, now a thin composition
 // over SettingsShell.vue plus this app's own seven panes (workbench/settings/*.vue, extracted
@@ -102,11 +105,16 @@ async function save(patch: SettingsPatch): Promise<void> {
       <span class="mr-auto min-w-0 flex items-center">
         <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
         <FieldDescription v-else data-testid="settings-footer-status"
-          >Stored in <span class="font-data">~/.kira-studio/kira.sqlite</span><template v-if="f.isDirty">
-          · Unsaved changes</template></FieldDescription
+          >
+          <CatalogText k="studio.settings.footer.stored.status">
+            <template #path><span class="font-data">{{ SETTINGS_DB_PATH }}</span></template>
+          </CatalogText>
+          <template v-if="f.isDirty"> · {{ t('common.state.unsavedChanges.status') }}</template></FieldDescription
         >
       </span>
-      <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
+      <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">{{
+          t('common.action.cancel.label')
+        }}</Button>
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -114,7 +122,7 @@ async function save(patch: SettingsPatch): Promise<void> {
         :disabled="!f.isValid"
         @click="f.onSave"
       >
-        Save
+        {{ t('common.action.save.label') }}
       </Button>
     </template>
   </SettingsShell>

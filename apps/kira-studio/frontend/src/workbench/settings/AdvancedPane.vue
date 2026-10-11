@@ -2,6 +2,7 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { formatCount } from '@workbench/behaviour/format';
 import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
@@ -28,9 +29,12 @@ function onExpensiveQueryRowsInput(e: Event): void {
 
 const opLogRetentionError = computed<string | null>(() => {
   const v = props.draft.advanced.opLogRetentionDays;
-  if (!Number.isInteger(v)) return 'Enter a whole number.';
+  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
   if (v < OP_LOG_RETENTION_DAYS_RANGE.min || v > OP_LOG_RETENTION_DAYS_RANGE.max) {
-    return `${OP_LOG_RETENTION_DAYS_RANGE.min}–${OP_LOG_RETENTION_DAYS_RANGE.max} days`;
+    return t('studio.settings.range.days.status', {
+      min: OP_LOG_RETENTION_DAYS_RANGE.min,
+      max: OP_LOG_RETENTION_DAYS_RANGE.max,
+    });
   }
   return null;
 });
@@ -38,9 +42,12 @@ props.registerFieldError('advanced.opLogRetentionDays', opLogRetentionError);
 
 const expensiveQueryRowsError = computed<string | null>(() => {
   const v = props.draft.advanced.expensiveQueryRows;
-  if (!Number.isInteger(v)) return 'Enter a whole number.';
+  if (!Number.isInteger(v)) return t('studio.settings.wholeNumber.error');
   if (v < EXPENSIVE_QUERY_ROWS_RANGE.min || v > EXPENSIVE_QUERY_ROWS_RANGE.max) {
-    return `${formatCount(EXPENSIVE_QUERY_ROWS_RANGE.min)}–${formatCount(EXPENSIVE_QUERY_ROWS_RANGE.max)}`;
+    return t('studio.settings.range.plain.status', {
+      min: formatCount(EXPENSIVE_QUERY_ROWS_RANGE.min),
+      max: formatCount(EXPENSIVE_QUERY_ROWS_RANGE.max),
+    });
   }
   return null;
 });
@@ -56,10 +63,10 @@ const expensiveQueryRowsId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="opLogRetentionDaysId">Operation log retention (days)</Label>
+        <Label :for="opLogRetentionDaysId">{{ t('studio.settings.advanced.opLogRetention.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-advanced-opLogRetentionDays"
           :disabled-trigger="isAtDefault('advanced', 'opLogRetentionDays')"
           :disabled="isAtDefault('advanced', 'opLogRetentionDays')"
@@ -79,14 +86,14 @@ const expensiveQueryRowsId = useId();
         {{ opLogRetentionError }}
       </FieldError>
     </Field>
-    <p class="text-subtle text-kira-sm">Takes effect after restart.</p>
+    <p class="text-subtle text-kira-sm">{{ t('studio.settings.restartNote.hint') }}</p>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="expensiveQueryRowsId">Expensive query threshold (rows)</Label>
+        <Label :for="expensiveQueryRowsId">{{ t('studio.settings.advanced.expensiveRows.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-advanced-expensiveQueryRows"
           :disabled-trigger="isAtDefault('advanced', 'expensiveQueryRows')"
           :disabled="isAtDefault('advanced', 'expensiveQueryRows')"
@@ -108,22 +115,18 @@ const expensiveQueryRowsId = useId();
       >
         {{ expensiveQueryRowsError }}
       </FieldError>
-      <FieldDescription v-else
-        >A query whose plan is estimated to read at least this many rows is flagged as
-        expensive by the console's Explain button and by auto-explain. Not comparable
-        across engines' own cost figures — see the plan panel's own note.</FieldDescription
-      >
+      <FieldDescription v-else>{{ t('studio.settings.advanced.expensiveRows.description') }}</FieldDescription>
     </Field>
 
     <LogLevelField
       :advanced="draft.advanced"
       leaf="logLevel"
-      label="Log level"
+      :label="t('studio.settings.advanced.logLevel.label')"
       select-test-id="settings-log-level"
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
     >
-      <FieldDescription>Verbosity of Kira Studio's own diagnostic log.</FieldDescription>
+      <FieldDescription>{{ t('studio.settings.advanced.logLevel.description') }}</FieldDescription>
     </LogLevelField>
     <NotifyPromptsField
       :advanced="draft.advanced"
