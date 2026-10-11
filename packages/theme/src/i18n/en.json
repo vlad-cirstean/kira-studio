@@ -206,10 +206,10 @@
         }
       },
       "dbMcp": {
-        "title": "Approve this query?"
+        "title": "Approve this query"
       },
       "dbMcpNamed": {
-        "title": "Approve this query? · {name}"
+        "title": "Approve this query · {name}"
       },
       "gitCredential": {
         "title": "Git needs a credential"
@@ -227,7 +227,7 @@
         "body": "Open Kira {app} to answer."
       },
       "schedule": {
-        "title": "Run {name}?"
+        "title": "Run {name}"
       },
       "test": {
         "body": "A popup that waits for you posts like this.",
@@ -736,7 +736,7 @@
           "hint": "Requires Redis 7.0 or newer."
         },
         "sqlite": {
-          "hint": "Reads any SQLite 3 database file — no server required."
+          "hint": "Reads any SQLite 3 database file. No server required."
         }
       },
       "validation": {

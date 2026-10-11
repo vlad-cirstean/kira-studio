@@ -22,6 +22,8 @@ export interface DuplicateExemption {
 export const PROPER_NOUNS: readonly string[] = [
   'Kira Studio',
   'Kira Space',
+  'Kira',
+  'Apache',
   'Claude Code',
   'Claude',
   'Git',
@@ -418,7 +420,8 @@ export function ruleC5(key: string, value: string): Violation[] {
   const out: Violation[] = [];
   const text = maskPlaceholders(value)
     .replace(/\bworking directory\b/gi, '')
-    .replace(/\bhome directory\b/gi, '');
+    .replace(/\bhome directory\b/gi, '')
+    .replace(/\bcherry-pick\b/gi, '');
   for (const branch of branches(text)) {
     for (const [re, message] of BANNED) {
       if (re.test(branch)) out.push({ key, rule: 'C5', message });
