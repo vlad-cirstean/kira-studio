@@ -8,10 +8,7 @@
 # Named exemptions (PERMANENT below) cover a real requirement a primitive cannot meet. One that no
 # longer exempts anything fails the run, so the list only shrinks.
 #
-# P264 allowlists (scripts/ui-primitives-allowlist/stream-*.txt): a bare `path` line exempts that file
-# from U39 and later while it is unmigrated; `permanent U<n> path # reason` exempts one guard for
-# good. An entry that exempts nothing fails the run, so each list only shrinks. U39-U63 never scan
-# `/behaviour/` (the owning modules) or `/testing/`.
+# U39-U63 never scan `/behaviour/` (the owning modules) or `/testing/`.
 #
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
@@ -32,8 +29,6 @@ if [ -z "$GNU_GREP" ]; then
   echo "check-ui-primitives: GNU grep with -P is required (macOS: brew install grep, provides ggrep)." >&2
   exit 1
 fi
-
-ALLOW_DIR=scripts/ui-primitives-allowlist
 
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
 
@@ -117,6 +112,43 @@ U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log d
 U25 packages/workbench/src/automations/runs/RunLog.vue # stderr line colour is log data, not chrome
 U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
 U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
+U46 apps/kira-studio/frontend/src/bridge/port.ts # bridge transport timeout
+U41 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host reads modifier keys
+U62 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host owns editor focus
+U41 apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue # SlickGrid engine host reads modifier keys
+U41 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # SlickGrid engine host reads modifier keys
+U42 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # paste read inside the grid engine
+U62 apps/kira-studio/frontend/src/views/grid/slick/editor.ts # SlickGrid cell editor owns its input focus
+U41 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue # editor host reads modifier keys
+U52 apps/kira-studio/frontend/src/views/shared/celleditor/timestamp.ts # spelling-preserving timestamp re-encoding
+U42 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
+U61 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
+U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Down row reorder chord, not list navigation
+U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
+U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host exposes focus(); not a DOM element focus
+U46 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # scroll persist stays 300 ms: TIMING.persist (150) fires mid-scroll and breaks cell-editor.spec
+U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
+U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret
+U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge
+U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
+U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
+U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
+U40 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue # plain Delete must reach text fields; useShortcut preventDefaults every match
+U41 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # Cmd/Ctrl-click link open reads a mouse event modifier, not a key chord
+U46 apps/kira-space/frontend/src/ade/v2/review/AdeReviewCompose.vue # 10 s wait for Claude Code to take a pasted message; a protocol timeout, not UI timing
+U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
+U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
+U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
+U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording is domain text, not a display format
+U41 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup reads modifiers for its own accept keys
+U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
+U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
+U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
+U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
+U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not
@@ -246,36 +278,11 @@ mv "$TMP/perm_ids" "$TMP/perm"
 
 sort -u "$TMP/perm" -o "$TMP/perm"
 
-# allowlists: `path` (whole file, U39 and later) or `permanent U<n> path # reason`
-: >"$TMP/whole"
-if [ -d "$ALLOW_DIR" ]; then
-  for list in "$ALLOW_DIR"/*.txt; do
-    [ -f "$list" ] || continue
-    while IFS= read -r raw; do
-      entry=$(printf '%s' "$raw" | sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//')
-      if [ -z "$entry" ]; then continue; fi
-      case "$entry" in
-        permanent\ *)
-          # shellcheck disable=SC2086
-          set -- $entry
-          echo "$2 $3" >>"$TMP/perm" ;;
-        *) echo "$entry" >>"$TMP/whole" ;;
-      esac
-    done <"$list"
-  done
-fi
-sort -u "$TMP/whole" -o "$TMP/whole"
-sort -u "$TMP/perm" -o "$TMP/perm"
-
 STATUS=0
 : >"$TMP/used_perm"
-: >"$TMP/used_whole"
 while read -r id f; do
-  num=${id#U}
   if grep -qxF "$id $f" "$TMP/perm"; then
     echo "$id $f" >>"$TMP/used_perm"
-  elif [ "$num" -ge 39 ] && grep -qxF "$f" "$TMP/whole"; then
-    echo "$f" >>"$TMP/used_whole"
   else
     msg=$(grep "^$id@@" "$TMP/guards" | head -1 | awk -F'@@' '{print $4}')
     echo "check-ui-primitives: $f: $id $msg" >&2
@@ -290,13 +297,6 @@ while read -r id f; do
     STATUS=1
   fi
 done <"$TMP/perm"
-sort -u "$TMP/used_whole" -o "$TMP/used_whole"
-while read -r f; do
-  if ! grep -qxF "$f" "$TMP/used_whole"; then
-    echo "check-ui-primitives: stale allowlist entry (file passes U39-U63 or is gone): $f" >&2
-    STATUS=1
-  fi
-done <"$TMP/whole"
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3." >&2
