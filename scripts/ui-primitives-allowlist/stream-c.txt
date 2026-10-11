@@ -1,0 +1,68 @@
+# Stream C: git-ui, docker-ui, workbench. Bare path: file exempt from U39+ until migrated (delete the line when it passes).
+# `permanent U<n> path # reason`: one guard exempt for good.
+permanent U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
+permanent U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
+permanent U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording is domain text, not a display format
+permanent U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+permanent U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+permanent U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+packages/docker-ui/src/components/ContainerDetail.vue
+packages/docker-ui/src/components/ContainerList.vue
+packages/docker-ui/src/components/ContainerOverview.vue
+packages/docker-ui/src/components/ContainerSizeSection.vue
+packages/docker-ui/src/components/ContainerTable.vue
+packages/docker-ui/src/components/EngineDiskSection.vue
+packages/docker-ui/src/components/EngineOverview.vue
+packages/docker-ui/src/components/ImageList.vue
+packages/docker-ui/src/components/LogsView.vue
+packages/docker-ui/src/components/NetworkList.vue
+packages/docker-ui/src/components/ResourceDetail.vue
+packages/docker-ui/src/components/VirtualList.vue
+packages/docker-ui/src/components/VolumeList.vue
+packages/docker-ui/src/lib/format.ts
+packages/docker-ui/src/queries.ts
+packages/docker-ui/src/state/useStatsSubscription.ts
+packages/git-ui/src/App.vue
+packages/git-ui/src/components/BranchPicker.vue
+packages/git-ui/src/components/FileTree.vue
+packages/git-ui/src/components/LoadMoreButton.vue
+packages/git-ui/src/components/RowContextMenu.vue
+packages/git-ui/src/components/SearchBox.vue
+packages/git-ui/src/components/SearchResults.vue
+packages/git-ui/src/components/StashRows.vue
+packages/git-ui/src/components/TagList.vue
+packages/git-ui/src/components/fileTreeModel.ts
+packages/git-ui/src/components/gridKeyboard.ts
+packages/git-ui/src/components/pickerModel.ts
+packages/git-ui/src/components/refListModel.ts
+packages/git-ui/src/components/review/BaseSelector.vue
+packages/git-ui/src/components/review/ReviewCommitRow.vue
+packages/git-ui/src/components/review/ReviewView.vue
+packages/git-ui/src/graph/layoutClient.ts
+packages/git-ui/src/state/graphView.ts
+packages/git-ui/src/state/liveAnnouncements.ts
+packages/git-ui/src/state/pr.ts
+packages/git-ui/src/state/search.ts
+packages/workbench/src/automations/AutomationsPanel.vue
+packages/workbench/src/automations/ScriptDialog.vue
+packages/workbench/src/automations/run/RunScriptDialog.vue
+packages/workbench/src/automations/runs/RunElapsed.vue
+packages/workbench/src/automations/runs/RunLog.vue
+packages/workbench/src/automations/runs/RunOutcomeBlock.vue
+packages/workbench/src/automations/runs/RunsSection.vue
+packages/workbench/src/automations/runs/RunsStatusItem.vue
+packages/workbench/src/automations/runs/runText.ts
+packages/workbench/src/automations/runs/runsQueries.ts
+packages/workbench/src/automations/schedule/ScheduleConfirmDialog.vue
+packages/workbench/src/automations/schedule/ScheduleFields.vue
+packages/workbench/src/automations/schedule/scheduleQueries.ts
+packages/workbench/src/automations/smart/McpServerTools.vue
+packages/workbench/src/automations/smart/McpToolsField.vue
+packages/workbench/src/components/AutocompleteField.vue
+packages/workbench/src/components/TabStrip.vue
+packages/workbench/src/prompts/PromptHost.vue
+packages/workbench/src/prompts/promptsQueries.ts
+packages/workbench/src/settings/fields/NotifyPromptsField.vue
+packages/workbench/src/state/createAppUpdateStore.ts
+packages/workbench/src/state/createTabsStore.ts
+packages/workbench/src/state/orderedWrites.spec.ts

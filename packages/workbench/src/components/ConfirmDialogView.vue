@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { useTemplateRef } from 'vue';
 
 // The one confirm look. A danger confirm opens with focus on Cancel (Enter cancels); a primary one
 // opens on the confirm button. `touch` gives the phone's 44px buttons. Used by the store host
@@ -40,12 +39,6 @@ const ids = {
 };
 const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
 
-const confirmButton = useTemplateRef<{ $el: HTMLElement }>('confirmButton');
-function onOpenAutoFocus(event: Event): void {
-  if (props.tone === 'danger') return;
-  event.preventDefault();
-  confirmButton.value?.$el.focus();
-}
 </script>
 
 <template>
@@ -54,7 +47,6 @@ function onOpenAutoFocus(event: Event): void {
       size="sm"
       :destructive="tone === 'danger'"
       :data-testid="id('root')"
-      @open-auto-focus="onOpenAutoFocus"
     >
       <DialogHeader :close-testid="id('close')">
         <DialogTitle class="break-all">{{ title }}</DialogTitle>
@@ -80,7 +72,7 @@ function onOpenAutoFocus(event: Event): void {
           Cancel
         </Button>
         <Button
-          ref="confirmButton"
+          data-dialog-initial
           :variant="tone === 'danger' ? 'dialog-danger' : 'dialog-primary'"
           size="kira-lg"
           :class="touch ? 'h-11 flex-1' : undefined"

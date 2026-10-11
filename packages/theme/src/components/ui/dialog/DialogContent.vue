@@ -29,14 +29,14 @@ const delegatedProps = reactiveOmit(props, 'class', 'size', 'fixedHeight', 'dest
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
-// A destructive dialog opens with focus on its dismiss control (`data-dialog-dismiss`), so Enter
-// cancels instead of confirming.
+// Initial focus: a destructive dialog opens on its dismiss control (`data-dialog-dismiss`) so Enter
+// cancels instead of confirming; any other dialog may name a control with `data-dialog-initial`.
 function onOpenAutoFocus(event: Event): void {
-  if (!props.destructive) return
-  const dismiss = (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>('[data-dialog-dismiss]')
-  if (!dismiss) return
+  const root = event.currentTarget as HTMLElement | null
+  const target = root?.querySelector<HTMLElement>(props.destructive ? '[data-dialog-dismiss]' : '[data-dialog-initial]')
+  if (!target) return
   event.preventDefault()
-  dismiss.focus()
+  target.focus()
 }
 
 const contentClass = computed(() => cn('bg-elevated text-fg data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-fg/10 rounded-kira-pill text-kira-md ring-1 duration-100 fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 outline-none', dialogContentSizeVariants({ size: props.size, fixedHeight: props.fixedHeight }), props.class))

@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { cn } from '@theme/lib/utils';
 import { computed, ref } from 'vue';
 import { useCopy } from '../behaviour/clipboard';
+import { displayValue, formatClockTime, formatDuration } from '../behaviour/format';
 import { useListNavigation } from '../behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -113,17 +114,6 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   },
 });
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
-}
-
-function formatDuration(ms: number | null): string {
-  if (ms === null) return '—';
-  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`;
-}
-
 function onRowClick(record: R): void {
   toggleExpanded(record);
 }
@@ -157,6 +147,10 @@ defineSlots<{
   cell(props: { column: OpLogColumn; record: R }): unknown;
   detail?(props: { record: R; part: 'command' | 'error' }): unknown;
 }>();
+
+function durationText(ms: number | null): string | null {
+  return ms === null ? null : formatDuration(ms);
+}
 </script>
 
 <template>
@@ -227,7 +221,7 @@ defineSlots<{
             >
               <template v-for="column in columns" :key="column.id">
                 <span v-if="column.id === 'time'" class="font-data" data-testid="op-time-cell">{{
-                  formatTime(listItems[vi.index].record.startedAt)
+                  formatClockTime(listItems[vi.index].record.startedAt)
                 }}</span>
                 <span v-else-if="column.id === 'kind'">{{ listItems[vi.index].record.kind }}</span>
                 <span v-else-if="column.id === 'status'" class="flex items-center gap-1">
@@ -244,7 +238,7 @@ defineSlots<{
                   </button>
                 </span>
                 <span v-else-if="column.id === 'duration'">{{
-                  formatDuration(listItems[vi.index].record.durationMs)
+                  displayValue(durationText(listItems[vi.index].record.durationMs))
                 }}</span>
                 <template v-else-if="column.id === 'command'">
                   <Tooltip v-if="listItems[vi.index].record.status === 'error'">

@@ -1,5 +1,5 @@
 #!/bin/sh
-# P262/P263: one UI language. Guards the element rules of docs/v2.2/plans/P262-ui-unification.md §2
+# P262/P263/P264: one UI language. Guards the element rules of docs/v2.2/plans/P262-ui-unification.md §2
 # (U1-U21: dialog structure, secondary tabs, buttons, form controls, weights, icon sizes, bars,
 # popovers) and docs/v2.2/plans/P263-ui-unification-2.md §2 (U22-U38: titles, spinners, alerts, tones,
 # dots, toggles, tooltips, menus, resize handles, scrollbars, kbd, colours, focus, cards, tables, scale).
@@ -7,6 +7,11 @@
 #
 # Named exemptions (PERMANENT below) cover a real requirement a primitive cannot meet. One that no
 # longer exempts anything fails the run, so the list only shrinks.
+#
+# P264 allowlists (scripts/ui-primitives-allowlist/stream-*.txt): a bare `path` line exempts that file
+# from U39 and later while it is unmigrated; `permanent U<n> path # reason` exempts one guard for
+# good. An entry that exempts nothing fails the run, so each list only shrinks. U39-U63 never scan
+# `/behaviour/` (the owning modules) or `/testing/`.
 #
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
@@ -24,6 +29,8 @@ if [ -z "$GNU_GREP" ]; then
   echo "check-ui-primitives: GNU grep with -P is required (macOS: brew install grep, provides ggrep)." >&2
   exit 1
 fi
+
+ALLOW_DIR=scripts/ui-primitives-allowlist
 
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
 
@@ -157,6 +164,32 @@ U35@@v@@CommitGrid.vue|/git-ui/src/App.vue|AdeNotesEditor.vue|ReviewThread.vue|A
 U36@@v@@@@hand-rolled box (use Card)@@\bclass="(?=[^"]*${TOK}rounded-kira(?:-sm|-lg)?(?![\w-]))(?=[^"]*${TOK}border(?![\w-]))(?=[^"]*${TOK}(?:p|px|py)-)
 U37@@vt@@createSettingsStore.ts@@raw table markup, density formula, or hand-rolled row state (use Table, useRowHeight, rowVariants)@@<(?:table|thead|tbody|tr|th|td)\b|rowDensity\s*===|${TOK}(?:hover:)?bg-(?:select|hover)(?![\w-])
 U38@@v@@@@scale leftovers: text-kira-xs, stock text size/radius, text-[Npx], raw h-5..h-12@@${TOK}text-kira-xs(?![\w-])|${TOK}text-(?:xs|sm|base|lg|xl|2xl)(?![\w-])|${TOK}text-\[\d|${TOK}rounded(?:-md|-lg|-xl)?(?![\w-])|${TOK}h-(?:5|6|7|8|9|10|12)(?![\w.-])
+U39@@vt@@/behaviour/|/testing/|codedError.ts@@instanceof Error ? message : String (use errorText)@@instanceof\s+Error\s*\?\s*[\w.]+\.message\s*:\s*String\(
+U40@@vt@@/behaviour/|/testing/|useShortcut.ts@@@keydown.<modifier>, @keydown.context-menu or onKeyStroke (use useShortcut)@@@keydown\.(?:meta|ctrl|alt|shift)|@keydown\.context-menu|\bonKeyStroke\(
+U41@@vt@@/behaviour/|/testing/|keys.ts|useShortcut.ts@@raw metaKey/ctrlKey read (use SHORTCUTS and useShortcut)@@\.(?:metaKey|ctrlKey)\b
+U42@@vt@@/behaviour/|/testing/@@useClipboard or navigator.clipboard (use useCopy, copyText)@@useClipboard\(|navigator\.clipboard
+U43@@vt@@/behaviour/|/testing/@@direct web storage (use usePersistedState)@@useStorage\(|useLocalStorage\(|\blocalStorage\.|\bsessionStorage\b
+U44@@vt@@/behaviour/|/testing/@@useVirtualizer (use useVirtualRows)@@useVirtualizer\(
+U45@@vt@@/behaviour/|/testing/@@reka splitter, pointer capture or useDraggable (use ResizeHandle, usePaneResize)@@<(?:ResizablePanelGroup|ResizablePanel|ResizableHandle|KuiColumnResizeHandle|DockResizeHandle|AdePanelResizeHandle)\b|setPointerCapture|import\b[^;]*\buseDraggable\b[^;]*from '@vueuse/core'
+U46@@vt@@/behaviour/|/testing/@@numeric timer delay or setTimeout/setInterval (use TIMING with VueUse)@@\b(?:useDebounceFn|useThrottleFn|useIntervalFn|useTimeoutFn)\((?:[^()]|\([^()]*\))*,\s*\d[\d_]*\s*[,)]|\b(?:refDebounced|watchDebounced)\((?:[^()]|\([^()]*\))*,\s*(?:\d[\d_]*\s*[,)]|\{[^}]*\bdebounce:\s*\d)|refetchInterval:\s*\d|copiedDuring|\bsetTimeout\(|\bsetInterval\(
+U47@@vt@@/behaviour/|/testing/@@ArrowUp/ArrowDown, or role listbox/tree without useListNavigation@@'Arrow(?:Down|Up)'|(?s)\A(?!.*useListNavigation).*role="(?:listbox|tree)"
+U48@@vt@@/behaviour/|/testing/@@RowContextMenu or useRowMenu (use the context menu store)@@<RowContextMenu\b|useRowMenu\(
+U49@@v@@/behaviour/|/testing/@@AdeConfirmDialog, window.confirm or a local ConfirmDialog (use the confirm store or ConfirmDialogView)@@<AdeConfirmDialog\b|window\.confirm|import ConfirmDialog from '\.\./components/
+U50@@vt@@/behaviour/|/testing/@@input committing on blur and Enter, or useCommitField (use InlineEditInput, useInlineEdit)@@<(?:input|Input|InputGroupInput)\b(?=(?&t)\s@blur=)(?=(?&t)\s@keydown\.enter)|useCommitField\(
+U51@@vt@@/behaviour/|/testing/@@hand-rolled pending ref (use useAsyncAction or mutation.isPending)@@const (?:busy|pending|saving|loading|submitting|running|deleting|retrying|copying)\s*=\s*ref(?:<boolean>)?\((?:true|false)\)
+U52@@vt@@/behaviour/|/testing/@@locale or Intl formatting, useTimeAgo, local format helper (use behaviour/format)@@toLocaleString\(|toLocaleDateString|toLocaleTimeString|Intl\.(?:NumberFormat|DateTimeFormat|RelativeTimeFormat)|useTimeAgo\(|function (?:plural|formatDuration|formatElapsed|formatSize|formatTime|formatMs)\b
+U53@@vt@@/behaviour/|/testing/|queryClient.ts@@own QueryClient or a query option restating the createQueryClient default@@new QueryClient\b|retry:\s*false|refetchOnWindowFocus:\s*false|staleTime:\s*(?:Infinity|Number\.POSITIVE_INFINITY)
+U53@@v@@/behaviour/|/testing/@@explicit queryClient argument in a component (inject it with useQueryClient)@@,\s*queryClient\)
+U54@@v@@/behaviour/|/testing/@@v-if on isLoading/isError (use QueryState)@@v-(?:else-)?if="[^"]*\.(?:isLoading|isError)\b
+U55@@vt@@/behaviour/|/testing/@@onMutate (use optimisticUpdate)@@onMutate:
+U56@@vt@@/behaviour/|/testing/@@localeCompare, Collator or lowercase includes (use matchesQuery, compareNatural)@@localeCompare\(|new Intl\.Collator|\.toLowerCase\(\)\.includes\(
+U57@@vt@@/behaviour/|/testing/@@manual scroll-to-end or scrollIntoView (use useFollowTail, revealElement)@@scrollTop\s*=\s*\w+(?:\.value)?\.scrollHeight|scrollIntoView\(
+U58@@vt@@/behaviour/|/testing/|floatingPosition.ts|/kira-ui/@@computeFloatPosition or pointReference (use PointPopover)@@computeFloatPosition|pointReference
+U59@@vt@@/behaviour/|/testing/@@placeholder dash literal (use displayValue)@@(?:\?\?|\|\|)\s*'[—-]'|return\s+'[—-]'
+U60@@vt@@/behaviour/|/testing/@@vue-draggable-plus (use useSortableReorder)@@from 'vue-draggable-plus'
+U61@@vt@@/behaviour/|/testing/@@empty catch (give a reason comment or surface the error)@@catch\s*(?:\(\w*\))?\s*\{\s*\}|\.catch\(\(\)\s*=>\s*(?:\{\s*\}|undefined)\)
+U62@@vt@@/behaviour/|/testing/@@manual focus() (use useFocusOnMount, useFocusReturn, useListNavigation)@@\.focus\(\)|nextTick\([^)]*\.focus
+U63@@s@@/behaviour/|/testing/@@side panel with SearchField and no usePanelHeaderSearch@@(?s)\A(?!.*usePanelHeaderSearch).*<SearchField
 GUARDS
 
 # hits: "U<n> path"
@@ -210,11 +243,36 @@ mv "$TMP/perm_ids" "$TMP/perm"
 
 sort -u "$TMP/perm" -o "$TMP/perm"
 
+# allowlists: `path` (whole file, U39 and later) or `permanent U<n> path # reason`
+: >"$TMP/whole"
+if [ -d "$ALLOW_DIR" ]; then
+  for list in "$ALLOW_DIR"/*.txt; do
+    [ -f "$list" ] || continue
+    while IFS= read -r raw; do
+      entry=$(printf '%s' "$raw" | sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//')
+      if [ -z "$entry" ]; then continue; fi
+      case "$entry" in
+        permanent\ *)
+          # shellcheck disable=SC2086
+          set -- $entry
+          echo "$2 $3" >>"$TMP/perm" ;;
+        *) echo "$entry" >>"$TMP/whole" ;;
+      esac
+    done <"$list"
+  done
+fi
+sort -u "$TMP/whole" -o "$TMP/whole"
+sort -u "$TMP/perm" -o "$TMP/perm"
+
 STATUS=0
 : >"$TMP/used_perm"
+: >"$TMP/used_whole"
 while read -r id f; do
+  num=${id#U}
   if grep -qxF "$id $f" "$TMP/perm"; then
     echo "$id $f" >>"$TMP/used_perm"
+  elif [ "$num" -ge 39 ] && grep -qxF "$f" "$TMP/whole"; then
+    echo "$f" >>"$TMP/used_whole"
   else
     msg=$(grep "^$id@@" "$TMP/guards" | head -1 | awk -F'@@' '{print $4}')
     echo "check-ui-primitives: $f: $id $msg" >&2
@@ -229,10 +287,17 @@ while read -r id f; do
     STATUS=1
   fi
 done <"$TMP/perm"
+sort -u "$TMP/used_whole" -o "$TMP/used_whole"
+while read -r f; do
+  if ! grep -qxF "$f" "$TMP/used_whole"; then
+    echo "check-ui-primitives: stale allowlist entry (file passes U39-U63 or is gone): $f" >&2
+    STATUS=1
+  fi
+done <"$TMP/whole"
 
 if [ "$STATUS" -ne 0 ]; then
-  echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md and P263-ui-unification-2.md §2." >&2
+  echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3." >&2
 else
-  echo "check-ui-primitives: every guarded element follows the P262 and P263 rules."
+  echo "check-ui-primitives: every guarded element follows the P262, P263 and P264 rules."
 fi
 exit $STATUS
