@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 /**
  * `docs/plans/P4.md` W11: the real shell. P0 sketched two empty regions and P3 hung a live-data
@@ -75,6 +76,7 @@ import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import { useSectionMenu } from './components/useSectionMenu.ts';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { useGraphVisible } from './graphVisibility.ts';
+import { ASYNC_FAILURES, type AsyncFailure } from './state/asyncFailures.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
@@ -276,14 +278,14 @@ const { text: liveAnnouncement, announce } = useLiveRegion();
  *  below already drive. `transport-closed` (the one code `bridge.dispose()` itself produces, this
  *  file's own `onBeforeUnmount`) is ignored outright — this view is already gone by the time it
  *  lands, so there is nothing left to announce it to. */
-function reportAsyncError(err: unknown, prefix: string): void {
+function reportAsyncError(err: unknown, failure: AsyncFailure): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  announce(`${prefix} — ${errorText(err)}`);
+  announce(t(failure.error, { error: errorText(err) }));
   // A cancel announces but never raises the banner; a graph stream failure already has its own
   // (with Retry) that this generic one would replace.
   if (err instanceof TransportError && err.code === 'cancelled') return;
   if (graphView.streamFailure.value !== undefined) return;
-  showFailure(composeAsyncFailureNotice(prefix, err), 'async');
+  showFailure(composeAsyncFailureNotice(t(failure.title), err), 'async');
 }
 
 // P173: the visible banner. One notice, latest wins; history lives in Kira Space's Operations log.
@@ -310,7 +312,7 @@ watch(graphView.streamFailure, (notice) =>
 
 function retryGraph(): void {
   clearFailure();
-  graphView.refresh().catch((err: unknown) => reportAsyncError(err, "Couldn't reload the graph"));
+  graphView.refresh().catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.reloadGraph));
 }
 
 watch(graphView.loadedRows, () => {
@@ -324,7 +326,7 @@ watch(graphView.loadedRows, () => {
   if (selection.selectBySha(sha)) {
     commitGridRef.value
       ?.scrollToRow(selection.row.value)
-      .catch((err: unknown) => reportAsyncError(err, "Couldn't scroll to the selected commit"));
+      .catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.scrollToSelected));
   }
 });
 
@@ -592,7 +594,7 @@ async function handleSearchSelect(option: SearchOption): Promise<void> {
 watch(searchState.activeHit, (hit) => {
   if (hit === undefined) return;
   revealAndSelectSha(hit.sha).catch((err: unknown) =>
-    reportAsyncError(err, "Couldn't reveal the selected commit"),
+    reportAsyncError(err, ASYNC_FAILURES.revealSelected),
   );
 });
 
@@ -664,7 +666,7 @@ function handleGridContextMenu(detail: { row: number; x: number; y: number }): v
 function handleGridOpenPullRequest(number: number): void {
   actions.value
     ?.openPullRequest({ number })
-    .catch((err: unknown) => reportAsyncError(err, "Couldn't open the pull request"));
+    .catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.openPullRequest));
 }
 
 // P108 F2: the commit captured when the menu opened, not re-resolved by row — see the doc comment
@@ -696,13 +698,13 @@ async function onCommitMenuSelect(commit: CommitRecord, id: string): Promise<voi
       await opsState.runCherryPick(commit.sha);
       return;
     case 'copySha':
-      actions.value?.copy(commit.sha, 'full SHA');
+      actions.value?.copy(commit.sha, t('git.copy.fullSha.announce'));
       return;
     case 'copyMessage':
       // The subject line only — available synchronously from the store. `CommitMeta.vue`'s own
       // dedicated button (P5) copies the full trailer-joined message once its detail has loaded;
       // duplicating that async fetch here for a context-menu convenience is not worth the race.
-      actions.value?.copy(commit.subject, 'commit message');
+      actions.value?.copy(commit.subject, t('git.copy.commitMessage.announce'));
       return;
     default:
       return;
@@ -1055,7 +1057,7 @@ function runUiAction(
     case 'revertSelected': {
       const sha = selection.sha.value;
       if (sha) void opsState.runRevert([sha]);
-      else announce('Select a commit first.');
+      else announce(t('git.app.noSelection.announce'));
       break;
     }
     case 'continueOperation':
@@ -1091,7 +1093,7 @@ function runUiAction(
     case 'revealCommit':
       if (target) {
         revealCommitInGraph(target).catch((err: unknown) =>
-          reportAsyncError(err, "Couldn't reveal the commit"),
+          reportAsyncError(err, ASYNC_FAILURES.revealCommit),
         );
       }
       break;
@@ -1107,13 +1109,13 @@ function runUiAction(
     case 'resetSelected': {
       const sha = selection.sha.value;
       if (sha) void opsState.runReset(sha, 'mixed');
-      else announce('Select a commit first.');
+      else announce(t('git.app.noSelection.announce'));
       break;
     }
     case 'cherryPickSelected': {
       const sha = selection.sha.value;
       if (sha) void opsState.runCherryPick(sha);
-      else announce('Select a commit first.');
+      else announce(t('git.app.noSelection.announce'));
       break;
     }
     // G26 D13: the palette's own route to "Restack this stack" — the CURRENT branch stands in for
@@ -1121,7 +1123,7 @@ function runUiAction(
     case 'restackStack': {
       const branch = refsState.currentBranchName.value;
       if (branch) stackDialogTarget.value = { mode: 'restack', branch };
-      else announce('Checkout a branch first.');
+      else announce(t('git.app.noCurrentBranch.announce'));
       break;
     }
     // G26 D13/§7.3: alt+up/alt+down's own palette equivalents — resolve a target client-side
@@ -1137,7 +1139,7 @@ function runUiAction(
             ? parentOf(stackResult, branch)
             : childOf(stackResult, branch);
       if (target !== undefined) void opsState.runCheckout(target, 'switch');
-      else announce('No branch to navigate to.');
+      else announce(t('git.app.noStackTarget.announce'));
       break;
     }
     // G-UX D9: the palette's own route to toggling the graph search row — the same assignment
@@ -1685,9 +1687,9 @@ onBeforeUnmount(() => {
       class="flex flex-col items-center justify-center gap-2 h-full p-4 text-center text-fg"
       data-testid="boot-error"
     >
-      <p class=" max-w-120 text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
+      <p class=" max-w-120 text-muted-foreground">{{ t('git.app.bootError.error', { error: bootError }) }}</p>
       <Button variant="dialog" size="kira" data-testid="boot-retry" @click="retryBootstrap">
-        Retry
+        {{ t('common.action.retry.label') }}
       </Button>
     </div>
     <template v-else-if="repoState">
@@ -1704,7 +1706,7 @@ onBeforeUnmount(() => {
         role="status"
         data-testid="boot-error-banner"
       >
-        <AlertDescription>Couldn't load the repository — {{ bootError }}</AlertDescription>
+        <AlertDescription>{{ t('git.app.bootError.error', { error: bootError }) }}</AlertDescription>
         <AlertAction class="top-1/2 -translate-y-1/2">
           <Button
             variant="dialog"
@@ -1712,7 +1714,7 @@ onBeforeUnmount(() => {
             data-testid="boot-error-banner-retry"
             @click="retryBootstrap"
           >
-            Retry
+            {{ t('common.action.retry.label') }}
           </Button>
         </AlertAction>
       </Alert>
@@ -1757,7 +1759,7 @@ onBeforeUnmount(() => {
         </div>
         <ConflictBanner :ops="opsState" />
         <main class="flex flex-1 min-h-0 min-w-0">
-          <section class="relative flex-1 min-w-0 flex flex-col bg-bg" data-testid="graph-region" aria-label="Commit graph">
+          <section class="relative flex-1 min-w-0 flex flex-col bg-bg" data-testid="graph-region" :aria-label="t('git.graph.region.aria')">
             <UncommittedChangesStrip
               :graph-view="graphView"
               :ops-state="opsState"
@@ -1799,13 +1801,13 @@ onBeforeUnmount(() => {
             v-if="detailOpen && breakpoint !== 'overlay'"
             class="relative shrink-0 border-l border-border bg-bg overflow-auto"
             data-testid="detail-region"
-            aria-label="Commit detail"
+            :aria-label="t('git.detail.region.aria')"
             :style="{ width: detailWidthPx }"
           >
             <ResizeHandle
               v-if="breakpoint === 'wide'"
               class="absolute inset-y-0 left-0 -ml-px z-2"
-              label="Resize detail pane"
+              :label="t('git.detail.resizeHandle.label')"
               direction="reverse"
               :size="detailWidth"
               :min="MIN_DETAIL_WIDTH"
@@ -1815,7 +1817,7 @@ onBeforeUnmount(() => {
             />
             <Empty v-if="!hasSelection" class="h-full p-6">
               <EmptyMedia><CodiconIcon name="git-commit" :size="24" /></EmptyMedia>
-              <EmptyTitle>Select a commit to see its details.</EmptyTitle>
+              <EmptyTitle>{{ t('git.detail.noSelection.emptyHint') }}</EmptyTitle>
             </Empty>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
@@ -1848,11 +1850,11 @@ onBeforeUnmount(() => {
             ref="overlayDetailRegionEl"
             class="relative shrink-0 border-l border-border bg-bg overflow-auto w-80 max-w-[90vw] shadow-kira-dialog"
             data-testid="detail-region"
-            aria-label="Commit detail"
+            :aria-label="t('git.detail.region.aria')"
           >
             <Empty v-if="!hasSelection" class="h-full p-6">
               <EmptyMedia><CodiconIcon name="git-commit" :size="24" /></EmptyMedia>
-              <EmptyTitle>Select a commit to see its details.</EmptyTitle>
+              <EmptyTitle>{{ t('git.detail.noSelection.emptyHint') }}</EmptyTitle>
             </Empty>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
@@ -1898,15 +1900,15 @@ onBeforeUnmount(() => {
               class="w-auto flex-row items-center gap-1 px-2 py-1"
               destructive
             >
-              <span>“{{ forceDeleteRefCandidate?.name }}” is not fully merged.</span>
-              <Button variant="danger" size="kira" @click="confirmForceDeleteRef">Force delete</Button>
+              <span>{{ t('git.common.forceDelete.body', { name: forceDeleteRefCandidate?.name ?? '' }) }}</span>
+              <Button variant="danger" size="kira" @click="confirmForceDeleteRef">{{ t('git.common.forceDelete.confirm') }}</Button>
               <Button
                 data-dialog-dismiss
                 variant="toolbar"
                 size="kira"
                 @click="forceDeleteRefCandidate = undefined"
               >
-                Cancel
+                {{ t('common.action.cancel.label') }}
               </Button>
             </PopoverContent>
           </Popover>

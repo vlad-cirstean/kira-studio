@@ -22,6 +22,7 @@
 import { describeInProgress } from '@kira/git-core';
 import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 
@@ -84,7 +85,7 @@ const PATH_DISPLAY_CAP = 20;
     <div class="flex items-center gap-1">
       <span>{{ describeInProgress(inProgress) }}</span>
       <span v-if="inProgress.unmergedCount > 0" class="text-muted-foreground text-kira-sm">
-        {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
+        {{ t('git.conflict.unresolved.label', { count: inProgress.unmergedCount }) }}
       </span>
 
       <span class="flex-1"></span>
@@ -97,7 +98,7 @@ const PATH_DISPLAY_CAP = 20;
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
       >
-        Continue
+        {{ t('git.common.continue.label') }}
       </Button>
       <Button
         v-if="inProgress.canSkip"
@@ -106,7 +107,7 @@ const PATH_DISPLAY_CAP = 20;
         :disabled="busyAction !== undefined"
         @click="onSkip"
       >
-        Skip
+        {{ t('git.common.skip.label') }}
       </Button>
       <Button
         v-if="inProgress.canAbort"
@@ -115,7 +116,7 @@ const PATH_DISPLAY_CAP = 20;
         :disabled="busyAction !== undefined"
         @click="onAbort"
       >
-        Abort
+        {{ t('git.common.abort.label') }}
       </Button>
     </div>
 
@@ -124,12 +125,15 @@ const PATH_DISPLAY_CAP = 20;
       :id="CONTINUE_REASON_ID"
       class="mt-0.5 text-kira-sm text-muted-foreground"
     >
-      Resolve the remaining {{ inProgress.unmergedCount }}
-      {{ inProgress.unmergedCount === 1 ? "file" : "files" }} in your own editor and stage them,
-      then Continue{{ inProgress.canSkip ? ", or Skip this commit and move on." : "." }}
+      {{
+        t(
+          inProgress.canSkip ? 'git.conflict.resolveOrSkip.description' : 'git.conflict.resolve.description',
+          { count: inProgress.unmergedCount },
+        )
+      }}
     </p>
     <p v-else-if="inProgress.canSkip" class="mt-0.5 text-kira-sm text-muted-foreground">
-      No conflicts remain. Continue to commit this change, or Skip if it is already present.
+      {{ t('git.conflict.resolved.description') }}
     </p>
 
     <ul
@@ -143,7 +147,7 @@ const PATH_DISPLAY_CAP = 20;
         v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"
         class="text-muted-foreground"
       >
-        +{{ inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }} more
+        {{ t('git.conflict.more.label', { count: inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }) }}
       </li>
     </ul>
   </Alert>

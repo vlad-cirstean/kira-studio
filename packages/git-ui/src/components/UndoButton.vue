@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 /**
  * `docs/plans/P6.md` W17: §7.12's single-level "Undo last operation". Present only while
  * `ops.undoSlot` holds a record (`OpsState.refreshUndo`/`#applyResult` are the only things that
@@ -11,15 +14,13 @@
  * for a reset, per hard part 1's own table) rather than staying the single fixed string this file
  * used to render inline.
  */
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { composeUndoTooltip } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
 
 const props = defineProps<{
   ops: OpsState;
-  copy: (text: string, whatCopied: string) => void;
+  copy: (text: string, message: string) => void;
 }>();
 
 async function undo(): Promise<void> {
@@ -48,12 +49,12 @@ async function undo(): Promise<void> {
           variant="toolbar"
           size="kira"
           class="font-data text-kira-sm text-muted-foreground cursor-copy"
-          @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
+          @click="copy(ops.undoSlot.value.recoverySha, t('git.copy.recoverySha.announce'))"
         >
           {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Copy recovery SHA {{ ops.undoSlot.value.recoverySha }}</TooltipContent>
+      <TooltipContent>{{ t('git.undo.copyRecovery.tooltip', { sha: ops.undoSlot.value.recoverySha }) }}</TooltipContent>
     </Tooltip>
   </div>
 </template>

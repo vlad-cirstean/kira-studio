@@ -23,17 +23,21 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Button } from '@theme/components/ui/button';
+import { Kbd } from '@theme/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
+import { ASYNC_FAILURES, type AsyncFailure } from '../state/asyncFailures.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { RepoState } from '../state/repo.ts';
 
 const props = defineProps<{
   graphView: GraphViewState;
   repoState: RepoState;
-  reportError: (err: unknown, prefix: string) => void;
+  reportError: (err: unknown, failure: AsyncFailure) => void;
 }>();
 
+const REFRESH_CHORD = 'F5';
 const hasPendingChange = ref(false);
 
 watch(
@@ -56,16 +60,13 @@ watch(
 const isBusy = computed(() => props.graphView.loading.value !== 'idle');
 const isRefreshing = computed(() => props.graphView.loading.value === 'refreshing');
 
-const tooltip = computed(() =>
-  hasPendingChange.value ? 'The history changed on disk — refresh to see it' : 'Refresh (F5)',
-);
 
 async function doRefresh(): Promise<void> {
   if (isBusy.value) return;
   try {
     await props.graphView.refresh();
   } catch (err) {
-    props.reportError(err, "Couldn't refresh");
+    props.reportError(err, ASYNC_FAILURES.refresh);
   }
 }
 
@@ -80,7 +81,7 @@ defineExpose({ refresh: doRefresh });
         size="kira-icon"
         class="relative"
         :disabled="isBusy"
-        aria-label="Refresh"
+        :aria-label="t('common.action.refresh.label')"
         @click="doRefresh"
       >
         <Spinner v-if="isRefreshing" icon="refresh" label="" />
@@ -93,6 +94,7 @@ defineExpose({ refresh: doRefresh });
         />
       </Button>
     </TooltipTrigger>
-    <TooltipContent>{{ tooltip }}</TooltipContent>
+    <TooltipContent v-if="hasPendingChange">{{ t('git.toolbar.refreshPending.hint') }}</TooltipContent>
+    <TooltipContent v-else>{{ t('common.action.refresh.label') }} <Kbd>{{ REFRESH_CHORD }}</Kbd></TooltipContent>
   </Tooltip>
 </template>

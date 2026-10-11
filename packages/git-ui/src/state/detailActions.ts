@@ -12,7 +12,7 @@ export interface DetailActions {
    *  live region — fire-and-forget from the caller's own perspective (a button click handler),
    *  since every copy site's feedback is the same live-region text plus its own local ~1.5s
    *  inline confirmation, never a value the caller needs to await. */
-  copy(text: string, whatCopied: string): void;
+  copy(text: string, message: string): void;
   /** Feeds W10's "Open in editor"/"Go to file" outcome text into the same shared live region
    *  `copy`'s own announcements use — kept as a separate method (rather than routing through
    *  `copy`) because these are not clipboard outcomes and should never be confused for one in a
@@ -82,8 +82,8 @@ export function createDetailActions(
   repoId: () => string | undefined,
 ): DetailActions {
   return {
-    copy(text, whatCopied) {
-      void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
+    copy(text, message) {
+      void copyToClipboard(bridge, text, message).then((outcome) => {
         announce(outcome.message);
       });
     },

@@ -19,6 +19,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
@@ -84,12 +85,12 @@ async function removeFromStack(branch: string): Promise<void> {
 </script>
 
 <template>
-  <section aria-label="Stacks">
-    <SectionHeading label="Stacks" />
+  <section :aria-label="t('git.stack.list.label')">
+    <SectionHeading :label="t('git.stack.list.label')" />
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="mb-1">
       <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
-        <span class="flex-1 min-w-0 truncate" :data-kira-tip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
+        <span class="flex-1 min-w-0 truncate" :data-kira-tip="t('git.stack.base.tooltip', { base: group.summary.base })">{{ group.summary.base }}</span>
         <Button
           variant="toolbar"
           size="kira"
@@ -97,7 +98,7 @@ async function removeFromStack(branch: string): Promise<void> {
           :disabled="!group.summary.needsRestack"
           @click="requestRestack(group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base)"
         >
-          Restack
+          {{ t('git.common.restack.label') }}
         </Button>
       </div>
 
@@ -110,14 +111,14 @@ async function removeFromStack(branch: string): Promise<void> {
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
         <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
-          <span v-if="row.isHead" class="text-kira-sm text-subtle" data-kira-tip="Current branch">●</span>
+          <span v-if="row.isHead" class="text-kira-sm text-subtle" :data-kira-tip="t('git.common.currentBranch.tooltip')">●</span>
           <span class="truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
             :class="refBadgeClass('warn')"
             :data-kira-tip="row.staleText"
           >
-            stale
+            {{ t('git.stack.stale.status') }}
           </span>
           <button
             v-if="row.pr"
@@ -135,13 +136,12 @@ async function removeFromStack(branch: string): Promise<void> {
         </div>
         <TooltipIconButton
           icon="list-tree"
-          label="Set stack parent…"
-          aria-label="Set stack parent"
+          :label="t('git.stack.setParent.tooltip')"
           @click="requestSetParent(row.name)"
         />
         <TooltipIconButton
           icon="close"
-          label="Remove from stack"
+          :label="t('git.stack.remove.tooltip')"
           @click="removeFromStack(row.name)"
         />
       </div>
@@ -149,7 +149,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div v-if="orphans.visible.length > 0" class="mb-1">
       <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
-        <span class="flex-1 min-w-0 truncate">Needs attention</span>
+        <span class="flex-1 min-w-0 truncate">{{ t('git.stack.needsAttention.label') }}</span>
       </div>
       <div data-testid="branch-row"
         v-for="row in orphanRows()"
@@ -164,8 +164,7 @@ async function removeFromStack(branch: string): Promise<void> {
         </div>
         <TooltipIconButton
           icon="list-tree"
-          label="Set stack parent…"
-          aria-label="Set stack parent"
+          :label="t('git.stack.setParent.tooltip')"
           @click="requestSetParent(row.name)"
         />
       </div>
@@ -177,7 +176,7 @@ async function removeFromStack(branch: string): Promise<void> {
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
       class="text-kira-sm text-subtle py-1 px-1.5"
     >
-      No stacked branches
+      {{ t('git.stack.list.empty') }}
     </div>
   </section>
 </template>

@@ -1,4 +1,5 @@
 import type { ResultOf, ReviewComment } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { createLatestRequest, runLatest } from '@workbench/behaviour/latest';
 import { errorText } from '@workbench/bridge/codedError';
 import { type ShallowRef, shallowRef } from 'vue';
@@ -157,7 +158,11 @@ export class ReviewCommentsState {
         repoId: target.repoId,
         branch: target.branch,
       });
-      const outcome = await copyToClipboard(this.#bridge, result.text, 'review comments');
+      const outcome = await copyToClipboard(
+        this.#bridge,
+        result.text,
+        t('git.copy.reviewComments.announce'),
+      );
       this.announcement.value = outcome.message;
     } catch (error) {
       this.announcement.value = errorText(error);

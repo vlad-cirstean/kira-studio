@@ -65,6 +65,7 @@ import {
 } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
+import { t } from '@theme/i18n';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
@@ -98,9 +99,9 @@ const countLabel = computed(() => {
   if (props.search.compiled.value.kind !== 'ok') return '';
   if (props.search.scope.value === 'refs') return '';
   const { n, exact } = props.search.matchCount.value;
-  if (n === 0) return 'No matches';
+  if (n === 0) return t('common.state.noMatches.empty');
   const position = props.search.activeIndex.value >= 0 ? props.search.activeIndex.value + 1 : 1;
-  return `${position} of ${n}${exact ? '' : '+'}`;
+  return t('git.search.position.status', { position, total: exact ? String(n) : `${n}+` });
 });
 
 // ---------------------------------------------------------------------------------------
@@ -249,8 +250,8 @@ defineExpose({ focusInput });
             <InputGroupInput
               ref="searchInputEl"
               :model-value="search.text.value"
-              placeholder="Search"
-              aria-label="Search"
+              :placeholder="t('common.action.search.label')"
+              :aria-label="t('common.action.search.label')"
               role="combobox"
               tabindex="0"
               aria-haspopup="listbox"
@@ -263,12 +264,12 @@ defineExpose({ focusInput });
               @keydown="onKeydown"
             />
             <InputGroupAddon v-if="search.text.value" align="inline-end">
-              <InputGroupButton aria-label="Clear search" @click="search.text.value = ''">
+              <InputGroupButton :aria-label="t('common.action.clearSearch.label')" @click="search.text.value = ''">
                 <CodiconIcon name="close" :size="12" />
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <section class="flex gap-0.25" aria-label="Search options">
+          <section class="flex gap-0.25" :aria-label="t('git.search.options.aria')">
             <SearchOptionToggles
               v-model:match-case="search.caseSensitive.value"
               v-model:whole-word="search.wholeWord.value"
@@ -280,17 +281,17 @@ defineExpose({ focusInput });
           <NativeSelect
             variant="bordered"
             size="kira"
-            aria-label="Search scope"
+            :aria-label="t('git.search.scope.aria')"
             data-testid="search-scope"
             :model-value="search.scope.value"
             @update:model-value="(v) => onScopeChange(v as string)"
           >
-            <option value="both">Both</option>
-            <option value="commits">Commits</option>
-            <option value="refs">Refs</option>
+            <option value="both">{{ t('git.search.scope.both.option') }}</option>
+            <option value="commits">{{ t('common.module.commits.label') }}</option>
+            <option value="refs">{{ t('git.common.refs.label') }}</option>
           </NativeSelect>
           <span v-if="countLabel" class="px-0.5 text-muted-foreground text-kira-sm whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
-          <TooltipIconButton icon="close" label="Close search" data-testid="search-close-button" @click="emit('close')" />
+          <TooltipIconButton icon="close" :label="t('common.action.closeSearch.label')" data-testid="search-close-button" @click="emit('close')" />
         </div>
       </div>
     </PopoverAnchor>

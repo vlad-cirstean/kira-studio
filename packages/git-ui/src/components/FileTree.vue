@@ -29,6 +29,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
@@ -115,16 +116,18 @@ interface ListModeOption {
   readonly label: string;
 }
 
-const listModeOptions: readonly ListModeOption[] = [
-  { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
-  { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
-];
-const listModeItems = listModeOptions.map((option) => ({
-  value: option.id,
-  label: option.label,
-  icon: codiconName(option.icon),
-  tooltip: option.label,
-}));
+const listModeOptions = computed<readonly ListModeOption[]>(() => [
+  { id: 'tree', icon: ACTION_ICONS.listTree, label: t('git.fileTree.listTree.tooltip') },
+  { id: 'flat', icon: ACTION_ICONS.listFlat, label: t('git.fileTree.listFlat.tooltip') },
+]);
+const listModeItems = computed(() =>
+  listModeOptions.value.map((option) => ({
+    value: option.id,
+    label: option.label,
+    icon: codiconName(option.icon),
+    tooltip: option.label,
+  })),
+);
 
 const filterInput = ref(props.filter);
 watch(
@@ -233,7 +236,9 @@ watch(
   capped,
   (value) => {
     if (value.hiddenCount > 0 && value.hiddenCount !== lastHiddenCount) {
-      props.actions.announce(`Showing ${value.visible.length} of ${rows.value.length} files`);
+      props.actions.announce(
+        t('git.fileTree.capped.announce', { shown: value.visible.length, total: rows.value.length }),
+      );
     }
     lastHiddenCount = value.hiddenCount;
   },
@@ -339,8 +344,8 @@ const parentOptions = computed<ParentOption[]>(() =>
     const subject = row !== -1 ? props.store.subjectAt(row) : undefined;
     const shortSha = sha.slice(0, 7);
     const label = subject
-      ? `Parent ${index + 1} · ${shortSha} · ${subject}`
-      : `Parent ${index + 1} · ${shortSha}`;
+      ? t('git.fileTree.parent.label', { number: index + 1, sha: shortSha, subject })
+      : t('git.fileTree.parentNoSubject.label', { number: index + 1, sha: shortSha });
     return { sha, label };
   }),
 );
@@ -375,13 +380,17 @@ function fileIconStyle(path: string): Record<string, string> {
 function fileTitle(change: FileChange): string {
   const rename = renameDisplay(change);
   if (rename && change.similarity !== undefined) {
-    return `${change.similarity}% similar — ${rename.from} → ${rename.to}`;
+    return t('git.fileTree.similar.tooltip', {
+      percent: change.similarity,
+      from: rename.from,
+      to: rename.to,
+    });
   }
   return change.path;
 }
 
 function copyPath(path: string): void {
-  props.actions.copy(path, 'file path');
+  props.actions.copy(path, t('git.copy.filePath.announce'));
 }
 
 // G19 D7 / G21 D11: a right-click "Copy path" menu — the one copy-path affordance in every tree
@@ -418,16 +427,16 @@ async function goToFile(path: string): Promise<void> {
     switch (outcome.kind) {
       case 'liveFile':
       case 'virtualBlob':
-        props.actions.announce(`Opened ${outcome.path}`);
+        props.actions.announce(t('git.fileTree.opened.announce', { path: outcome.path }));
         break;
       case 'unavailable':
-        props.actions.announce(`Couldn't open ${path} — ${outcome.reason}`);
+        props.actions.announce(
+          t('git.fileTree.openError.error', { path, error: outcome.reason }),
+        );
         break;
     }
   } catch (err) {
-    props.actions.announce(
-      `Couldn't open ${path} — ${errorText(err)}`,
-    );
+    props.actions.announce(t('git.fileTree.openError.error', { path, error: errorText(err) }));
   }
 }
 
@@ -451,7 +460,7 @@ function reviewStatusFor(path: string): ReviewFileStatus | undefined {
 }
 function reviewToggleTitle(path: string): string {
   const kind = reviewStatusFor(path)?.kind ?? 'none';
-  return kind === 'none' ? 'Mark reviewed' : 'Mark unreviewed';
+  return kind === 'none' ? t('git.review.markReviewed.tooltip') : t('git.review.markUnreviewed.tooltip');
 }
 function reviewCheckboxState(path: string): boolean | 'indeterminate' {
   const kind = reviewStatusFor(path)?.kind;
@@ -479,7 +488,7 @@ const parentSelectId = useId();
          treeEl always names whichever of the two row containers below is currently mounted. -->
     <AttributeTooltip :container="treeEl" />
     <div v-if="parentOptions.length > 1" class="flex flex-col gap-0.5 px-3 pb-2 text-graph-md">
-      <Label :for="parentSelectId">Diffing against</Label>
+      <Label :for="parentSelectId">{{ t('git.fileTree.diffAgainst.label') }}</Label>
       <NativeSelect
         :id="parentSelectId"
         :model-value="String(parentIndex)"
@@ -498,14 +507,14 @@ const parentSelectId = useId();
         <SearchField
           data-testid="file-filter"
           :model-value="filterInput"
-          placeholder="Filter files"
-          aria-label="Filter files"
+          :placeholder="t('git.fileTree.filter.placeholder')"
+          :aria-label="t('git.fileTree.filter.placeholder')"
           @update:model-value="onFilterInput"
         />
       </div>
       <SecondaryTabs
         variant="segmented"
-        aria-label="File list display"
+        :aria-label="t('git.fileTree.display.aria')"
         :model-value="listMode"
         :items="listModeItems"
         @update:model-value="(v) => emit('update:listMode', v as FileListMode)"
@@ -521,7 +530,7 @@ const parentSelectId = useId();
       v-if="listMode === 'tree'"
       ref="treeEl"
       class="flex-1 min-h-0 overflow-auto group"
-      aria-label="File tree"
+      :aria-label="t('git.fileTree.tree.aria')"
       role="tree"
     >
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
@@ -557,7 +566,7 @@ const parentSelectId = useId();
           />
           <span class="font-ui truncate">{{ row.node.name }}</span>
           <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
-            {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
+            {{ t('git.common.fileCount.label', { count: row.node.fileCount }) }}
           </span>
         </template>
         <template v-else>
@@ -606,7 +615,7 @@ const parentSelectId = useId();
           <StatusDot
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
             tone="warn"
-            data-kira-tip="Changed since you reviewed it"
+            :data-kira-tip="t('git.review.changedSince.hint')"
             aria-hidden="true"
           />
         </template>
@@ -616,7 +625,7 @@ const parentSelectId = useId();
       v-else
       ref="treeEl"
       class="flex-1 min-h-0 overflow-auto group"
-      aria-label="File list"
+      :aria-label="t('git.fileTree.list.aria')"
       role="listbox"
     >
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
@@ -650,7 +659,7 @@ const parentSelectId = useId();
           />
           <span class="font-ui truncate">{{ row.node.name }}</span>
           <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
-            {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
+            {{ t('git.common.fileCount.label', { count: row.node.fileCount }) }}
           </span>
         </template>
         <template v-else>
@@ -702,7 +711,7 @@ const parentSelectId = useId();
           <StatusDot
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
             tone="warn"
-            data-kira-tip="Changed since you reviewed it"
+            :data-kira-tip="t('git.review.changedSince.hint')"
             aria-hidden="true"
           />
         </template>
@@ -717,7 +726,7 @@ const parentSelectId = useId();
       class="text-focus w-full border-t border-border p-1 h-auto justify-start"
       @click="capLifted = true"
     >
-      Show all {{ rows.length }} files
+      {{ t('git.fileTree.showAll.label', { count: rows.length }) }}
     </Button>
 
   </div>

@@ -33,12 +33,14 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
+import type { AsyncFailure } from '../state/asyncFailures.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
-import { composeAutoFetchStoppedText } from '../state/liveAnnouncements.ts';
+import { composeAutoFetchStoppedAnnouncement } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
@@ -83,7 +85,7 @@ const props = defineProps<{
    *  collapse-toggle button's own `active` state, same convention as `searchOpen` above. */
   collapseBranches: boolean;
   /** Routes a rejected refresh to the shared live region (`App.vue`'s `reportAsyncError`). */
-  reportError: (err: unknown, prefix: string) => void;
+  reportError: (err: unknown, failure: AsyncFailure) => void;
 }>();
 const emit = defineEmits<{
   /** `docs/plans/P9.md` W14: opens `StashDialog.vue`'s create mode — owned by `App.vue`, exactly
@@ -118,8 +120,8 @@ const emit = defineEmits<{
   (event: 'toggle-collapse-branches'): void;
 }>();
 
-function copy(text: string, whatCopied: string): void {
-  props.actions?.copy(text, whatCopied);
+function copy(text: string, message: string): void {
+  props.actions?.copy(text, message);
 }
 
 // P74 §3.3: BranchPicker.vue's own branch-row badge and StackList.vue's own row badge each open
@@ -164,7 +166,7 @@ const autoFetchStopped = computed(() => props.opsState.autoFetch.value);
 const autoFetchTooltip = computed(() => {
   const stopped = autoFetchStopped.value;
   if (stopped === null) return '';
-  return `${composeAutoFetchStoppedText(stopped.kind)} — Fetch to resume.`;
+  return composeAutoFetchStoppedAnnouncement(stopped.kind);
 });
 
 async function onAutoFetchMarkerClick(): Promise<void> {
@@ -174,19 +176,19 @@ async function onAutoFetchMarkerClick(): Promise<void> {
 const isForcePushMenuOpen = ref(false);
 
 // G34 D8: driving `MenuSections` — today, one item. `danger: true` renders the error tone.
-const pushMenuSections: readonly MenuSection[] = [
+const pushMenuSections = computed<readonly MenuSection[]>(() => [
   {
     items: [
       {
         id: 'force-push-trigger',
-        label: 'Force push…',
+        label: t('git.toolbar.forcePush.label'),
         disabled: false,
         disabledReason: undefined,
         danger: true,
       },
     ],
   },
-];
+]);
 
 function onPushMenuSelect(id: string): void {
   if (id === 'force-push-trigger') void doForcePush();
@@ -213,22 +215,25 @@ async function doForcePush(): Promise<void> {
   await props.opsState.runForcePush(remote, branch);
 }
 
-const remoteOpLabel: Record<string, string> = {
-  fetch: 'Fetching',
-  pull: 'Pulling',
-  push: 'Pushing',
-  forcePush: 'Force pushing',
-  deleteRemoteBranch: 'Deleting remote branch',
+const remoteOpLabel: Record<string, MessageKey> = {
+  fetch: 'git.toolbar.fetching.loading',
+  pull: 'git.toolbar.pulling.loading',
+  push: 'git.toolbar.pushing.loading',
+  forcePush: 'git.toolbar.forcePushing.loading',
+  deleteRemoteBranch: 'git.toolbar.deletingRemoteBranch.loading',
 };
 
 const progressText = computed(() => {
   const kind = props.opsState.activeRemoteOp.value;
   if (kind === undefined) return '';
   const progress = props.opsState.remoteProgress.value;
-  if (!progress) return `${remoteOpLabel[kind]}…`;
-  const prefix = progress.remote ? 'Remote: ' : '';
-  const pct = progress.percent === undefined ? '' : ` ${progress.percent}%`;
-  return `${prefix}${progress.phase}${pct}`;
+  const label = remoteOpLabel[kind];
+  if (!progress) return label === undefined ? '' : t(label);
+  const phase =
+    progress.percent === undefined
+      ? progress.phase
+      : t('git.toolbar.progress.status', { phase: progress.phase, percent: progress.percent });
+  return progress.remote ? t('git.toolbar.progressRemote.status', { phase }) : phase;
 });
 
 /** D50's cancellability table, read into the toolbar's own affordance: only fetch and pull's own
@@ -242,13 +247,13 @@ const cancelDisabledReason = computed(() => {
     case 'pull':
       return undefined;
     case 'push':
-      return 'A push in flight cannot be cancelled — its outcome on the remote would be unknown.';
+      return t('git.toolbar.cancelPush.hint');
     case 'forcePush':
-      return 'A force push in flight cannot be cancelled.';
+      return t('git.toolbar.cancelForcePush.hint');
     case 'deleteRemoteBranch':
-      return 'This cannot be cancelled once it has started.';
+      return t('git.toolbar.cancelDeleteRemote.hint');
     default:
-      return 'Nothing is running.';
+      return t('git.toolbar.nothingRunning.hint');
   }
 });
 const cancellable = computed(() => cancelDisabledReason.value === undefined);
@@ -283,7 +288,7 @@ const stashDisabled = computed(
        allows overriding a `<header>`'s own implicit "banner" role with — a plain `<div>` carries
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (§6.2's own layout, not a page banner). -->
-  <ViewToolbar role="toolbar" aria-label="Kira Space toolbar">
+  <ViewToolbar role="toolbar" :aria-label="t('git.toolbar.region.aria')">
     <BranchPicker
       ref="branchPickerRef"
       :refs="refsState"
@@ -308,7 +313,7 @@ const stashDisabled = computed(
       aria-live="polite"
     >
       <Spinner icon="sync" label="" />
-      Restacking…
+      {{ t('git.toolbar.restacking.loading') }}
     </span>
     <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
     <RefreshButton
@@ -330,10 +335,10 @@ const stashDisabled = computed(
             @click="doFetch"
           >
             <CodiconIcon name="cloud-download" :size="13" />
-            Fetch
+            {{ t('git.toolbar.fetch.label') }}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Fetch {{ defaultRemote }}</TooltipContent>
+        <TooltipContent>{{ t('git.toolbar.fetch.tooltip', { remote: defaultRemote ?? '' }) }}</TooltipContent>
       </Tooltip>
 
       <PullStrategyPicker
@@ -357,10 +362,10 @@ const stashDisabled = computed(
               @click="doPush"
             >
               <CodiconIcon name="repo-push" :size="13" />
-              Push
+              {{ t('git.toolbar.push.label') }}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Push to {{ defaultRemote }}</TooltipContent>
+          <TooltipContent>{{ t('git.toolbar.push.tooltip', { remote: defaultRemote ?? '' }) }}</TooltipContent>
         </Tooltip>
         <DropdownMenu v-model:open="isForcePushMenuOpen">
           <DropdownMenuTrigger as-child>
@@ -369,13 +374,13 @@ const stashDisabled = computed(
               size="kira-icon"
               class="rounded-l-none border-l-0 px-0.5"
               :disabled="pushPullDisabled"
-              aria-label="Push options"
+              :aria-label="t('git.toolbar.pushOptions.aria')"
               data-testid="push-overflow-trigger"
             >
               <CodiconIcon name="chevron-down" :size="13" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" aria-label="Push options">
+          <DropdownMenuContent align="end" :aria-label="t('git.toolbar.pushOptions.aria')">
             <MenuSections :sections="pushMenuSections" @select="onPushMenuSelect" />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -391,7 +396,7 @@ const stashDisabled = computed(
           @click="onAutoFetchMarkerClick"
         >
           <CodiconIcon name="warning" :size="13" />
-          Auto-fetch stopped
+          {{ t('git.toolbar.autoFetchStopped.label') }}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{{ autoFetchTooltip }}</TooltipContent>
@@ -408,17 +413,17 @@ const stashDisabled = computed(
           @click="emit('stash-changes')"
         >
           <CodiconIcon name="inbox" :size="13" />
-          Stash
+          {{ t('git.toolbar.stash.label') }}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Stash changes</TooltipContent>
+      <TooltipContent>{{ t('git.toolbar.stash.tooltip') }}</TooltipContent>
     </Tooltip>
 
     <span class="flex-1" aria-hidden="true"></span>
 
     <TooltipIconButton
       icon="list-tree"
-      label="Collapse other branches"
+      :label="t('git.toolbar.collapseBranches.tooltip')"
       :aria-pressed="collapseBranches"
       class="aria-pressed:bg-field aria-pressed:text-fg"
       data-testid="graph-collapse-toggle"
@@ -427,7 +432,7 @@ const stashDisabled = computed(
 
     <TooltipIconButton
       icon="search"
-      label="Search"
+      :label="t('common.action.search.label')"
       :aria-pressed="searchOpen"
       class="aria-pressed:bg-field aria-pressed:text-fg"
       data-testid="search-toggle-button"
@@ -436,7 +441,7 @@ const stashDisabled = computed(
 
     <TooltipIconButton
       icon="gear"
-      label="Repository settings"
+      :label="t('git.toolbar.repoSettings.tooltip')"
       data-testid="repo-settings-button"
       @click="emit('open-repo-settings')"
     />
@@ -450,7 +455,7 @@ const stashDisabled = computed(
       <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65">{{ progressText }}</span>
       <TooltipIconButton
         icon="close"
-        :label="cancellable ? 'Cancel' : (cancelDisabledReason ?? '')"
+        :label="cancellable ? t('common.action.cancel.label') : (cancelDisabledReason ?? '')"
         :disabled="!cancellable"
         disabled-trigger
         data-testid="remote-cancel"

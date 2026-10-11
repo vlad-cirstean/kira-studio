@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Empty, EmptyDescription, EmptyMedia } from '@theme/components/ui/empty';
+import { CatalogText } from '@theme/i18n';
 /**
  * §6.2's "repository with no commits" state — an unborn HEAD (P1 detects it; P2's store renders
  * it as zero rows). A one-line explanation, not an empty list with a scrollbar: showing the real
@@ -20,8 +21,9 @@ defineProps<{ branchName: string }>();
       <CodiconIcon :name="codiconName(STATE_ICONS.commit)" :size="24" />
     </EmptyMedia>
     <EmptyDescription class="max-w-105">
-      This repository has no commits yet. Create the first one on
-      <strong>{{ branchName }}</strong> to see it here.
+      <CatalogText k="git.emptyRepository.description">
+        <template #branch><strong>{{ branchName }}</strong></template>
+      </CatalogText>
     </EmptyDescription>
   </Empty>
 </template>

@@ -254,7 +254,7 @@ export function composeAutoFetchStoppedAnnouncement(kind: OpErrorKind): string {
 const MAX_DETAIL_LENGTH = 200;
 
 /** First non-empty line of a server message, capped, or undefined when there is none. */
-function firstLine(text: string | undefined): string | undefined {
+export function firstLine(text: string | undefined): string | undefined {
   const line = text
     ?.split('\n')
     .map((l) => l.trim())

@@ -22,6 +22,7 @@
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import SectionHeading from '@theme/components/SectionHeading.vue';
+import { t } from '@theme/i18n';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
@@ -62,10 +63,10 @@ function stashRowModel(entry: StashEntry): StashRowModel {
   const origin = originLabel(entry, props.currentBranch);
   return {
     id: `stash:${entry.sha}`,
-    rowTooltip: `Base: ${entry.baseSha.slice(0, 7)} ${entry.baseSubject}`,
+    rowTooltip: t('git.stash.base.tooltip', { sha: entry.baseSha.slice(0, 7), subject: entry.baseSubject }),
     badge: `stash@{${entry.index}}`,
     origin,
-    originTooltip: origin === undefined ? undefined : `Stashed from ${origin}`,
+    originTooltip: origin === undefined ? undefined : t('git.stash.stashedFrom.tooltip', { origin }),
     auto: isAutoStash(entry),
     message: stashLabel(entry),
     messageTooltip: entry.message,
@@ -104,14 +105,14 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 </script>
 
 <template>
-  <section data-testid="branch-section" aria-label="Stashes">
-    <SectionHeading label="Stashes" />
+  <section data-testid="branch-section" :aria-label="t('git.stash.list.label')">
+    <SectionHeading :label="t('git.stash.list.label')" />
     <StashRows
       :section="section"
       :stash="stash"
       :show-more="showMore"
       :focused-row-id="focusedRowId"
-      empty-message="No stashes"
+      :empty-message="t('git.stash.list.empty')"
       :row-model="stashRowModel"
       :menu-for="menuFor"
       @selected="emit('selected')"

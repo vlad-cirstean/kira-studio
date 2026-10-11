@@ -10,6 +10,7 @@
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
 import { rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { OpsState } from '../state/ops.ts';
@@ -80,8 +81,8 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
 </script>
 
 <template>
-  <section aria-label="Tags">
-    <SectionHeading label="Tags" />
+  <section :aria-label="t('git.tag.list.label')">
+    <SectionHeading :label="t('git.tag.list.label')" />
     <div data-testid="branch-row"
       v-for="row in section.visible"
       :key="row.refname"
@@ -100,7 +101,7 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
           aria-hidden="true"
         ></span>
         <span class="truncate">{{ row.shortName }}</span>
-        <span class="text-kira-sm text-muted-foreground">{{ row.annotation ? "annotated" : "lightweight" }}</span>
+        <span class="text-kira-sm text-muted-foreground">{{ row.annotation ? t('git.tag.annotated.status') : t('git.tag.lightweight.status') }}</span>
         <span
           v-if="row.annotation"
           class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground"
@@ -116,7 +117,7 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
       />
     </div>
     <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No tags</div>
+    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('git.tag.list.empty') }}</div>
 
   </section>
 </template>

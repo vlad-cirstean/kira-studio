@@ -13,6 +13,7 @@ import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { onMounted, ref } from 'vue';
 import { codiconName, STATE_ICONS } from '../icons/index.ts';
@@ -59,7 +60,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     <EmptyMedia>
       <CodiconIcon :name="codiconName(STATE_ICONS.repo)" :size="24" />
     </EmptyMedia>
-    <EmptyTitle>Open a repository</EmptyTitle>
+    <EmptyTitle>{{ t('git.noRepository.open.title') }}</EmptyTitle>
     <ul
       v-if="repoState.candidates.value.length > 0"
       class="flex flex-col gap-0.5 m-0 p-0 list-none max-w-105 w-full"
@@ -86,10 +87,10 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         class="max-w-105"
         data-testid="no-repository-refresh-error"
       >
-        Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
+        {{ t('git.noRepository.refreshError.error', { error: refreshError }) }}
       </EmptyDescription>
       <EmptyDescription v-else class="max-w-105">
-        This workspace's folder is not a Git repository.
+        {{ t('git.noRepository.notRepository.description') }}
       </EmptyDescription>
       <Button
         v-if="refreshError"
@@ -98,11 +99,11 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         data-testid="no-repository-retry"
         @click="refreshCandidates"
       >
-        Retry
+        {{ t('common.action.retry.label') }}
       </Button>
     </template>
     <EmptyDescription v-if="pickError" class="max-w-105" data-testid="no-repository-pick-error">
-      Couldn't open that repository — {{ pickError }}.
+      {{ t('git.noRepository.openError.error', { error: pickError }) }}
     </EmptyDescription>
   </Empty>
 </template>

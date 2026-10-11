@@ -20,6 +20,7 @@ import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
@@ -96,8 +97,8 @@ function onContextMenu(event: MouseEvent): void {
 function onMenuSelect(id: string): void {
   const c = commit.value;
   if (!c) return;
-  if (id === 'copySha') props.actions.copy(c.sha, 'full SHA');
-  else if (id === 'copyMessage') props.actions.copy(c.subject, 'commit message');
+  if (id === 'copySha') props.actions.copy(c.sha, t('git.copy.fullSha.announce'));
+  else if (id === 'copyMessage') props.actions.copy(c.subject, t('git.copy.commitMessage.announce'));
 }
 
 // G14 D8 row action 1 / G21 D8c: "Open all changes" — one awaited `openAllChanges` call rather

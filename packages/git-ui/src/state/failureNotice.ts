@@ -1,6 +1,7 @@
 import type { OpErrorKind } from '@kira/git-ipc';
+import { type MessageKey, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
-import { composeOpFailureParts, type OpFailureError } from './liveAnnouncements.ts';
+import { composeOpFailureParts, firstLine, type OpFailureError } from './liveAnnouncements.ts';
 
 export interface FailureNotice {
   readonly title: string;
@@ -12,19 +13,17 @@ export interface FailureNotice {
   readonly retryGraph: boolean;
 }
 
-const RETRY_HINT: Partial<Record<OpErrorKind, string>> = {
-  NonFastForward: 'Pull, then push again.',
-  AuthFailed: 'Check your credentials, then try again.',
-  NetworkFailed: 'Check the network, then try again.',
-  DirtyWorktree: 'Commit or stash your changes first.',
-  UntrackedWouldBeOverwritten: 'Commit or stash your changes first.',
-  LockHeld: 'Wait for the other git process to finish, then try again.',
-  HookRejected: 'Fix what the hook reported, then push again.',
-  ProtectedBranch: 'Type the branch name to confirm.',
-  RemoteNotFound: "Check the remote's URL.",
+const RETRY_HINT: Partial<Record<OpErrorKind, MessageKey>> = {
+  NonFastForward: 'git.failure.nonFastForward.hint',
+  AuthFailed: 'git.failure.authFailed.hint',
+  NetworkFailed: 'git.failure.networkFailed.hint',
+  DirtyWorktree: 'git.failure.dirtyWorktree.hint',
+  UntrackedWouldBeOverwritten: 'git.failure.dirtyWorktree.hint',
+  LockHeld: 'git.failure.lockHeld.hint',
+  HookRejected: 'git.failure.hookRejected.hint',
+  ProtectedBranch: 'git.failure.protectedBranch.hint',
+  RemoteNotFound: 'git.failure.remoteNotFound.hint',
 };
-
-const DEFAULT_HINT = 'Try again.';
 
 export function composeFailureNotice(
   action: string,
@@ -35,18 +34,21 @@ export function composeFailureNotice(
   return {
     title,
     detail,
-    hint: (error && RETRY_HINT[error.kind]) ?? DEFAULT_HINT,
+    hint: t((error && RETRY_HINT[error.kind]) ?? 'common.action.retry.label'),
     logged,
     retryGraph: false,
   };
 }
 
-/** A rejected fire-and-forget call outside the op executors: no hint beyond "Try again", and never
- *  in the Operations log. */
-export function composeAsyncFailureNotice(prefix: string, error: unknown): FailureNotice {
-  const message = errorText(error);
-  const { detail } = composeOpFailureParts(prefix, { kind: 'Unknown', message });
-  return { title: `${prefix}.`, detail, hint: DEFAULT_HINT, logged: false, retryGraph: false };
+/** A rejected fire-and-forget call outside the op executors; never in the Operations log. */
+export function composeAsyncFailureNotice(title: string, error: unknown): FailureNotice {
+  return {
+    title,
+    detail: firstLine(errorText(error)),
+    hint: t('common.action.retry.label'),
+    logged: false,
+    retryGraph: false,
+  };
 }
 
 export function composeGraphFailureNotice(
@@ -54,5 +56,5 @@ export function composeGraphFailureNotice(
   detail: string | undefined,
   logged: boolean,
 ): FailureNotice {
-  return { title, detail, hint: 'Retry reloads the graph.', logged, retryGraph: true };
+  return { title, detail, hint: t('git.failure.retryGraph.hint'), logged, retryGraph: true };
 }

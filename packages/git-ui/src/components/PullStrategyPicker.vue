@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -40,12 +41,14 @@ const preview = ref<{ strategy: PullStrategy; source: PullStrategySource } | und
 const previewLoading = ref(false);
 
 const lastRun = computed(() => props.ops.pullStrategy.value);
-const mainLabel = computed(() => 'Pull');
 const mainTitle = computed(() => {
   const last = lastRun.value;
   return last
-    ? `Pull — last ran ${PULL_STRATEGY_LABELS[last.strategy]} (${describePullStrategySource(last.source)})`
-    : 'Pull — resolves a strategy from your git configuration before running (§7.3)';
+    ? t('git.toolbar.pullLast.tooltip', {
+        strategy: PULL_STRATEGY_LABELS[last.strategy],
+        source: describePullStrategySource(last.source),
+      })
+    : t('git.toolbar.pull.hint');
 });
 
 const STRATEGIES: readonly PullStrategy[] = ['ff-only', 'merge', 'rebase'];
@@ -60,13 +63,16 @@ const menuSections = computed<MenuSection[]>(() => [
     items: [
       {
         id: DEFAULT_ID,
-        label: 'Follow your configuration',
+        label: t('git.toolbar.pullDefault.label'),
         disabled: false,
         disabledReason: undefined,
         detail: previewLoading.value
-          ? 'resolving…'
+          ? t('git.toolbar.pullResolving.loading')
           : preview.value
-            ? `${PULL_STRATEGY_LABELS[preview.value.strategy]} — ${describePullStrategySource(preview.value.source)}`
+            ? t('git.toolbar.pullPreview.status', {
+                strategy: PULL_STRATEGY_LABELS[preview.value.strategy],
+                source: describePullStrategySource(preview.value.source),
+              })
             : undefined,
       },
       ...STRATEGIES.map((strategy) => ({
@@ -147,7 +153,7 @@ defineExpose({ run: runDefault });
           @click="runDefault"
         >
           <CodiconIcon name="repo-pull" :size="13" />
-          {{ mainLabel }}
+          {{ t('git.toolbar.pull.label') }}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{{ mainTitle }}</TooltipContent>
@@ -160,13 +166,13 @@ defineExpose({ run: runDefault });
           size="kira-icon"
           class="rounded-l-none border-l-0 px-0.5"
           :disabled="disabled"
-          aria-label="Pull strategy options"
+          :aria-label="t('git.toolbar.pullOptions.aria')"
           data-testid="pull-strategy-trigger"
         >
           <CodiconIcon name="chevron-down" :size="13" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" aria-label="Pull strategy">
+      <DropdownMenuContent align="start" :aria-label="t('git.toolbar.pullStrategy.aria')">
         <MenuSections :sections="menuSections" @select="onMenuSelect" />
       </DropdownMenuContent>
     </DropdownMenu>

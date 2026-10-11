@@ -25,6 +25,7 @@ import type { CommitStore } from '@kira/git-core';
 import Spinner from '@theme/components/Spinner.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -70,7 +71,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div data-testid="detail-pane" class="flex flex-col min-h-0 h-full">
     <FieldError v-if="detailState.error.value" class="p-3">
-      Couldn't load this commit — {{ detailState.error.value }}
+      {{ t('git.detail.loadError.error', { error: detailState.error.value }) }}
     </FieldError>
 
     <template v-if="detail">
@@ -101,7 +102,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 
     <Empty v-else-if="!detailState.error.value" class="h-full p-6">
       <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
-      <EmptyTitle>Loading…</EmptyTitle>
+      <EmptyTitle>{{ t('common.state.loading.loading') }}</EmptyTitle>
     </Empty>
   </div>
 </template>

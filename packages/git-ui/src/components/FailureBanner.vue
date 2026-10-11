@@ -8,6 +8,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { FailureNotice } from '../state/failureNotice.ts';
 
@@ -19,11 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{ dismiss: []; retry: [] }>();
 
 const detail = computed(() => props.notice.detail);
-const hint = computed(() =>
-  props.notice.logged && props.showOperations === undefined
-    ? `${props.notice.hint} Details: Kira Space → Operations.`
-    : props.notice.hint,
-);
+const showLogHint = computed(() => props.notice.logged && props.showOperations === undefined);
 const canShowOperations = computed(() => props.notice.logged && props.showOperations !== undefined);
 </script>
 
@@ -34,12 +31,12 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
     strip
     class="shrink-0"
     role="region"
-    aria-label="Last failure"
+    :aria-label="t('git.failure.banner.aria')"
     data-testid="failure-banner"
   >
     <AlertTitle>{{ notice.title }}</AlertTitle>
     <AlertDescription v-if="detail" class="whitespace-pre-wrap">{{ detail }}</AlertDescription>
-    <AlertDescription data-testid="failure-banner-hint">{{ hint }}</AlertDescription>
+    <AlertDescription data-testid="failure-banner-hint">{{ notice.hint }}<template v-if="showLogHint"> {{ t('git.failure.hintLogged.hint') }}</template></AlertDescription>
     <AlertAction class="flex items-center gap-1">
       <Button
         v-if="notice.retryGraph"
@@ -48,7 +45,7 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
         data-testid="failure-banner-retry"
         @click="emit('retry')"
       >
-        Retry
+        {{ t('common.action.retry.label') }}
       </Button>
       <Button
         v-if="canShowOperations"
@@ -57,12 +54,12 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
         data-testid="failure-banner-operations"
         @click="showOperations?.()"
       >
-        Show in Operations
+        {{ t('git.failure.showOperations.label') }}
       </Button>
       <Button
         variant="toolbar"
         size="kira-icon"
-        aria-label="Dismiss"
+        :aria-label="t('common.action.dismiss.label')"
         data-testid="failure-banner-dismiss"
         @click="emit('dismiss')"
       >

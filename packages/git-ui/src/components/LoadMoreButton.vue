@@ -11,14 +11,16 @@
  */
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { computed } from 'vue';
+import { ASYNC_FAILURES, type AsyncFailure } from '../state/asyncFailures.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 
 const props = defineProps<{
   graphView: GraphViewState;
   pageSize: number;
-  reportError: (err: unknown, prefix: string) => void;
+  reportError: (err: unknown, failure: AsyncFailure) => void;
 }>();
 
 const isLoading = computed(() => props.graphView.loading.value !== 'idle');
@@ -26,18 +28,21 @@ const isLoading = computed(() => props.graphView.loading.value !== 'idle');
 const buttonLabel = computed(() => {
   const remaining = props.graphView.remaining.value;
   if (isLoading.value) {
-    return `Loading… (${formatCount(remaining)} remaining)`;
+    return t('git.loadMore.busy.label', { remaining: formatCount(remaining) });
   }
   if (remaining < props.pageSize) {
-    return `Load the last ${formatCount(remaining)}`;
+    return t('git.loadMore.last.label', { count: remaining });
   }
-  return `Load ${formatCount(props.pageSize)} more (${formatCount(remaining)} remaining)`;
+  return t('git.loadMore.page.label', {
+    pageSize: formatCount(props.pageSize),
+    remaining: formatCount(remaining),
+  });
 });
 
 function handlePress(event: MouseEvent): void {
   if (isLoading.value) return;
   const load = event.altKey ? props.graphView.loadAll() : props.graphView.loadMore();
-  load.catch((err: unknown) => props.reportError(err, "Couldn't load more history"));
+  load.catch((err: unknown) => props.reportError(err, ASYNC_FAILURES.loadMoreHistory));
 }
 
 function handleCancel(): void {
@@ -61,7 +66,7 @@ function handleCancel(): void {
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        Alt-click to load everything remaining — this keeps every loaded commit in memory.
+        {{ t('git.loadMore.loadAll.hint') }}
       </TooltipContent>
     </Tooltip>
     <!-- G34: the toolbar Button box already matches this shape; Cancel keeps its one genuine
@@ -71,10 +76,10 @@ function handleCancel(): void {
       variant="toolbar"
       size="kira"
       class="underline"
-      aria-label="Cancel loading"
+      :aria-label="t('git.loadMore.cancel.aria')"
       @click="handleCancel"
     >
-      Cancel
+      {{ t('common.action.cancel.label') }}
     </Button>
   </div>
 </template>

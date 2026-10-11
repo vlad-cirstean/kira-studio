@@ -18,6 +18,7 @@
 import type { CommitRecord, RowPlan } from '@kira/git-core';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { ResizeHandle } from '@theme/components/ui/resizable';
+import { t } from '@theme/i18n';
 import { useEventListener, useResizeObserver } from '@vueuse/core';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
@@ -1331,7 +1332,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     <ResizeHandle
       class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftGraph}px` }"
-      label="Resize graph column"
+      :label="t('git.grid.resizeGraph.label')"
       :size="effectiveWidths.graph"
       :min="minWidthFor('graph')"
       :max="maxGraph"
@@ -1341,7 +1342,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       v-if="!detailOpen"
       class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftAuthor}px` }"
-      label="Resize author column"
+      :label="t('git.grid.resizeAuthor.label')"
       direction="reverse"
       :size="effectiveWidths.author"
       :min="MIN_COLUMN_WIDTH"
@@ -1352,7 +1353,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       v-if="!detailOpen"
       class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftDate}px` }"
-      label="Resize date column"
+      :label="t('git.grid.resizeDate.label')"
       direction="reverse"
       :size="effectiveWidths.date"
       :min="minWidthFor('date')"

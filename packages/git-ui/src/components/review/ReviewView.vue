@@ -405,8 +405,8 @@ const rowActions = computed<DetailActions | undefined>(() => review.value?.rowAc
 // really serves here.
 const filesActions = computed<DetailActions>(() => {
   return {
-    copy(text, whatCopied) {
-      void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
+    copy(text, message) {
+      void copyToClipboard(bridge, text, message).then((outcome) => {
         announce(outcome.message);
       });
     },

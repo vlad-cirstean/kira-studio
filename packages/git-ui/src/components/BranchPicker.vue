@@ -27,6 +27,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener, useFocus } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
@@ -51,6 +52,7 @@ import {
   type PickerModel,
   type PickerTab,
 } from './pickerModel.ts';
+import { prStateLabel } from './prStateLabel.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import {
   formatTrack,
@@ -83,13 +85,6 @@ const props = defineProps<{
   openPullRequest: (number: number) => void;
 }>();
 
-const PR_STATE_LABEL: Readonly<Record<string, string>> = {
-  open: 'Open',
-  draft: 'Draft',
-  merged: 'Merged',
-  closed: 'Closed',
-};
-
 /** The one PR record known for a branch's own short name, or `undefined` — same "render nothing"
  *  rule every other G24 surface follows. */
 function prFor(
@@ -101,7 +96,7 @@ function prFor(
 function prTooltip(shortName: string): string {
   const pr = prFor(shortName);
   if (!pr) return '';
-  return `${pr.title} — ${PR_STATE_LABEL[pr.state] ?? pr.state}`;
+  return t('git.picker.prTitle.tooltip', { title: pr.title, state: prStateLabel(pr.state) });
 }
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
@@ -123,12 +118,20 @@ const emit = defineEmits<{
   (e: 'openSetStackParentDialog', branch: string): void;
 }>();
 
-const TAB_LABELS: Readonly<Record<PickerTab, string>> = {
-  branches: 'Branches',
-  tags: 'Tags',
-  stashes: 'Stashes',
-  worktrees: 'Worktrees',
-  stacks: 'Stacks',
+const TAB_LABELS: Readonly<Record<PickerTab, MessageKey>> = {
+  branches: 'common.module.branches.label',
+  tags: 'git.tag.list.label',
+  stashes: 'git.stash.list.label',
+  worktrees: 'common.module.worktrees.label',
+  stacks: 'git.stack.list.label',
+};
+
+const TAB_FILTER_PLACEHOLDERS: Readonly<Record<PickerTab, MessageKey>> = {
+  branches: 'git.picker.filterBranches.placeholder',
+  tags: 'git.picker.filterTags.placeholder',
+  stashes: 'git.picker.filterStashes.placeholder',
+  worktrees: 'git.picker.filterWorktrees.placeholder',
+  stacks: 'git.picker.filterStacks.placeholder',
 };
 
 const isOpen = ref(false);
@@ -153,7 +156,7 @@ const triggerLabel = computed(() => {
   const head = props.refs.head.value;
   if (!head) return '…';
   if (head.kind === 'branch') return head.name;
-  if (head.kind === 'unborn') return `${head.name} (unborn)`;
+  if (head.kind === 'unborn') return t('git.picker.unborn.label', { name: head.name });
   return head.sha.slice(0, 7);
 });
 
@@ -219,7 +222,7 @@ const nav = useListNavigation<PickerRow>({
   rowSelector: (key) => `[data-row-id="${CSS.escape(key)}"]`,
   // Worktree/stack rows have no main button, so Enter does nothing there.
   onOpen: (row) => rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="branch-row-main"]')?.click(),
-  onMenu: (row) => rowEl(row.id)?.querySelector<HTMLElement>('button[aria-label="More actions"]')?.click(),
+  onMenu: (row) => rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="row-actions"]')?.click(),
   onExitTop: () => focusFilter(),
 });
 
@@ -249,26 +252,26 @@ const tabOptions = computed<readonly PickerTabOption[]>(() => [
   {
     id: 'branches',
     icon: PICKER_TAB_ICONS.branches,
-    label: 'Branches',
+    label: t(TAB_LABELS.branches),
     badge: model.value.counts.branches,
   },
-  { id: 'tags', icon: PICKER_TAB_ICONS.tags, label: 'Tags', badge: model.value.counts.tags },
+  { id: 'tags', icon: PICKER_TAB_ICONS.tags, label: t(TAB_LABELS.tags), badge: model.value.counts.tags },
   {
     id: 'stashes',
     icon: PICKER_TAB_ICONS.stashes,
-    label: 'Stashes',
+    label: t(TAB_LABELS.stashes),
     badge: model.value.counts.stashes,
   },
   {
     id: 'worktrees',
     icon: PICKER_TAB_ICONS.worktrees,
-    label: 'Worktrees',
+    label: t(TAB_LABELS.worktrees),
     badge: model.value.counts.worktrees,
   },
   {
     id: 'stacks',
     icon: PICKER_TAB_ICONS.stacks,
-    label: 'Stacks',
+    label: t(TAB_LABELS.stacks),
     badge: model.value.counts.stacks,
   },
 ]);
@@ -535,7 +538,7 @@ watch(visibleBranchNames, (names) => {
       <PopoverContent
         align="start"
         class="w-96 p-0 gap-0"
-        :aria-label="`${TAB_LABELS[activeTab]} picker`"
+        :aria-label="t('git.picker.region.aria', { tab: t(TAB_LABELS[activeTab]) })"
         @open-auto-focus="onOpenAutoFocus"
         @close-auto-focus="onCloseAutoFocus"
       >
@@ -545,7 +548,7 @@ watch(visibleBranchNames, (names) => {
           <SecondaryTabs
             data-testid="branch-tabs"
             class="mx-1 mt-1"
-            aria-label="Picker section"
+            :aria-label="t('git.picker.sections.aria')"
             :model-value="activeTab"
             :items="tabItems"
             @update:model-value="(v) => (activeTab = v as PickerTab)"
@@ -561,8 +564,8 @@ watch(visibleBranchNames, (names) => {
             <SearchField
               ref="filterEl"
               v-model="filter"
-              :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
-              :aria-label="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
+              :placeholder="t(TAB_FILTER_PLACEHOLDERS[activeTab])"
+              :aria-label="t(TAB_FILTER_PLACEHOLDERS[activeTab])"
               @keydown.down="onFilterDown"
             />
           </div>
@@ -570,12 +573,12 @@ watch(visibleBranchNames, (names) => {
           <div
             ref="rowsScrollEl"
             class="overflow-y-auto min-h-0"
-            :aria-label="TAB_LABELS[activeTab]"
+            :aria-label="t(TAB_LABELS[activeTab])"
           >
             <AttributeTooltip :container="rowsScrollEl" />
             <template v-if="activeTab === 'branches'">
-        <section aria-label="Branches">
-          <SectionHeading label="Branches" />
+        <section :aria-label="t('common.module.branches.label')">
+          <SectionHeading :label="t('common.module.branches.label')" />
           <div data-testid="branch-row"
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
@@ -586,7 +589,7 @@ watch(visibleBranchNames, (names) => {
             <InlineEditInput
               v-if="renaming === row.shortName"
               data-testid="branch-rename-input"
-              aria-label="Rename branch"
+              :aria-label="t('git.picker.rename.aria')"
               :name="row.shortName"
               @commit="(to) => submitRename(row.shortName, to)"
               @cancel="renaming = undefined"
@@ -600,12 +603,12 @@ watch(visibleBranchNames, (names) => {
                 <span
                   class="w-2.5 text-focus"
                   :role="row.isHead ? 'img' : undefined"
-                  :aria-label="row.isHead ? 'current branch' : undefined"
+                  :aria-label="row.isHead ? t('git.common.currentBranch.tooltip') : undefined"
                   :aria-hidden="!row.isHead"
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="truncate">{{ row.shortName }}</span>
-                <Badge v-if="row.checkedOutIn" :data-kira-tip="`Checked out in ${row.checkedOutIn}`">worktree</Badge>
+                <Badge v-if="row.checkedOutIn" :data-kira-tip="t('git.picker.checkedOutIn.tooltip', { path: row.checkedOutIn })">{{ t('git.picker.worktree.label') }}</Badge>
                 <span v-if="formatTrack(row.track)" class="text-kira-sm text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </button>
               <button
@@ -622,18 +625,18 @@ watch(visibleBranchNames, (names) => {
             </template>
           </div>
           <Alert v-if="forceDeleteCandidate" variant="warn" strip>
-            <AlertDescription>“{{ forceDeleteCandidate }}” is not fully merged.</AlertDescription>
+            <AlertDescription>{{ t('git.common.forceDelete.body', { name: forceDeleteCandidate }) }}</AlertDescription>
             <div class="flex items-center gap-1">
-              <Button variant="danger" size="kira" @click="confirmForceDelete">Force delete</Button>
-              <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
+              <Button variant="danger" size="kira" @click="confirmForceDelete">{{ t('git.common.forceDelete.confirm') }}</Button>
+              <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">{{ t('common.action.cancel.label') }}</Button>
             </div>
           </Alert>
           <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">No branches</InlineState>
+          <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">{{ t('git.picker.branches.empty') }}</InlineState>
         </section>
 
-        <section aria-label="Remote branches">
-          <SectionHeading label="Remote branches" />
+        <section :aria-label="t('git.picker.remoteBranches.label')">
+          <SectionHeading :label="t('git.picker.remoteBranches.label')" />
           <div data-testid="branch-row"
             v-for="row in model.branchesRemote.visible"
             :key="row.refname"
@@ -657,7 +660,7 @@ watch(visibleBranchNames, (names) => {
           </div>
           <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
           <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
-            No remote branches
+            {{ t('git.picker.remoteBranches.empty') }}
           </InlineState>
         </section>
         </template>

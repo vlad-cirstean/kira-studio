@@ -26,6 +26,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -36,6 +37,7 @@ import { prBadgeClass } from './badgeClass.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { appendLinkifiedText } from './linkify.ts';
 import { openAllChangesAnnounced } from './openAllChangesAnnounced.ts';
+import { prStateLabel } from './prStateLabel.ts';
 import { buildRefBadges } from './refBadges.ts';
 
 const props = defineProps<{
@@ -125,14 +127,14 @@ const committerDiffersFromAuthor = computed(() => {
   );
 });
 
-const SIGNATURE_TEXT: Readonly<Record<string, string>> = {
-  G: 'Good signature',
-  B: 'Bad signature',
-  U: 'Good signature, unknown validity',
-  X: 'Good signature, expired signature',
-  Y: 'Good signature, expired key',
-  R: 'Good signature, revoked key',
-  E: 'Cannot check signature',
+const SIGNATURE_TEXT: Readonly<Record<string, MessageKey>> = {
+  G: 'git.signature.good.status',
+  B: 'git.signature.bad.status',
+  U: 'git.signature.unknownValidity.status',
+  X: 'git.signature.expiredSignature.status',
+  Y: 'git.signature.expiredKey.status',
+  R: 'git.signature.revokedKey.status',
+  E: 'git.signature.uncheckable.status',
 };
 
 /** `undefined` for an unsigned commit (`status: "N"`) — §6.4/W7: "an unsigned commit shows no
@@ -140,8 +142,9 @@ const SIGNATURE_TEXT: Readonly<Record<string, string>> = {
 const signatureText = computed<string | undefined>(() => {
   const signature = props.detail?.signature;
   if (!signature || signature.status === 'N') return undefined;
-  const text = SIGNATURE_TEXT[signature.status] ?? signature.status;
-  return signature.signer ? `${text} by ${signature.signer}` : text;
+  const key = SIGNATURE_TEXT[signature.status];
+  const text = key === undefined ? signature.status : t(key);
+  return signature.signer ? t('git.signature.bySigner.status', { status: text, signer: signature.signer }) : text;
 });
 
 /** G24 D12: the one "Pull request" row — resolved with a PR (one line per associated PR),
@@ -150,12 +153,6 @@ const signatureText = computed<string | undefined>(() => {
  *  rule applying everywhere else but here). `disabled` renders nothing at all — this computed is
  *  `undefined` for both `disabled` and "nothing resolved yet", collapsing them into the same
  *  "no row" template branch below. */
-const PR_STATE_LABEL: Readonly<Record<string, string>> = {
-  open: 'Open',
-  draft: 'Draft',
-  merged: 'Merged',
-  closed: 'Closed',
-};
 
 // P110 A14 (§1.3): a lookup map, not string interpolation, so every text-badge-pr-* class
 // Tailwind must scan appears as a complete literal below. Replaces the old dynamic
@@ -186,7 +183,7 @@ const prDetail = computed<PrDetailView | undefined>(() => {
   const result = props.prResult;
   if (result === undefined || result.kind === 'disabled') return undefined;
   if (result.kind === 'unavailable') {
-    return { kind: 'unavailable', prs: [], reason: result.gh.reason ?? 'GitHub did not answer' };
+    return { kind: 'unavailable', prs: [], reason: result.gh.reason ?? t('git.pr.noAnswer.hint') };
   }
   if (result.prs.length === 0) {
     return { kind: 'none', prs: [], reason: undefined };
@@ -198,7 +195,7 @@ const prDetail = computed<PrDetailView | undefined>(() => {
       number: pr.number,
       title: pr.title,
       state: pr.state,
-      stateLabel: PR_STATE_LABEL[pr.state] ?? pr.state,
+      stateLabel: prStateLabel(pr.state),
     })),
   };
 });
@@ -252,7 +249,7 @@ const shortSha = computed(() => props.detail?.sha.slice(0, 7) ?? '');
 function copySha(): void {
   const sha = props.detail?.sha;
   if (!sha) return;
-  props.actions.copy(sha, 'full SHA');
+  props.actions.copy(sha, t('git.copy.fullSha.announce'));
 }
 
 /** G-UX (item 6): replaces the old copy-message header button — "Open all changes", the exact
@@ -271,9 +268,7 @@ async function openPullRequest(number: number): Promise<void> {
   try {
     await props.actions.openPullRequest({ number });
   } catch (err) {
-    props.actions.announce(
-      `Couldn't open the pull request — ${errorText(err)}`,
-    );
+    props.actions.announce(t('git.async.openPullRequest.error', { error: errorText(err) }));
   }
 }
 
@@ -283,9 +278,7 @@ async function openLink(url: string): Promise<void> {
   try {
     await props.actions.openExternalLink(url);
   } catch (err) {
-    props.actions.announce(
-      `Couldn't open the link — ${errorText(err)}`,
-    );
+    props.actions.announce(t('git.link.open.error', { error: errorText(err) }));
   }
 }
 
@@ -301,7 +294,7 @@ const prIcon = computed(() => {
     number: first.number,
     title: first.title,
     state: first.state,
-    stateLabel: PR_STATE_LABEL[first.state] ?? first.state,
+    stateLabel: prStateLabel(first.state),
   };
 });
 </script>
@@ -331,7 +324,7 @@ const prIcon = computed(() => {
             variant="link"
             size="kira"
             :class="cn('h-auto p-0 border-0 leading-none ml-auto', PR_ICON_CLASS[prIcon!.state])"
-            :aria-label="`Open pull request #${prIcon!.number} on GitHub`"
+            :aria-label="t('git.pr.openOnGithub.aria', { number: prIcon!.number })"
             data-testid="commit-meta-pr-icon"
             @click="openPullRequest(prIcon!.number)"
           >
@@ -339,7 +332,11 @@ const prIcon = computed(() => {
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{
-          `#${prIcon!.number} ${prIcon!.title} — ${prIcon!.stateLabel}`
+          t('git.pr.summary.tooltip', {
+            number: prIcon!.number,
+            title: prIcon!.title,
+            state: prIcon!.stateLabel,
+          })
         }}</TooltipContent>
       </Tooltip>
     </ViewToolbar>
@@ -358,7 +355,7 @@ const prIcon = computed(() => {
       </p>
       <p data-testid="meta-identity" v-if="committerDiffersFromAuthor" class="text-graph-sm text-muted-foreground">
         {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
-        <span class="text-graph-sm">committer</span>
+        <span class="text-graph-sm">{{ t('git.commit.committer.label') }}</span>
       </p>
       <dl data-testid="meta-trailers"
         v-if="trailerRows.length > 0"
@@ -377,15 +374,15 @@ const prIcon = computed(() => {
         class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
       >
         <template v-if="detail.decoration.length > 0">
-          <dt class="text-muted-foreground">Refs</dt>
+          <dt class="text-muted-foreground">{{ t('git.common.refs.label') }}</dt>
           <dd data-testid="meta-refs" ref="decorationEl" class="flex flex-wrap gap-0.5"></dd>
         </template>
         <template v-if="signatureText">
-          <dt class="text-muted-foreground">Signature</dt>
+          <dt class="text-muted-foreground">{{ t('git.commit.signature.label') }}</dt>
           <dd>{{ signatureText }}</dd>
         </template>
         <template v-if="prDetail">
-          <dt class="text-muted-foreground">Pull request</dt>
+          <dt class="text-muted-foreground">{{ t('git.commit.pullRequest.label') }}</dt>
           <dd v-if="prDetail.kind === 'prs'" class="flex flex-col gap-0.5">
             <div
               v-for="pr in prDetail.prs"
@@ -405,7 +402,7 @@ const prIcon = computed(() => {
               </Button>
             </div>
           </dd>
-          <dd v-else-if="prDetail.kind === 'none'">No pull request</dd>
+          <dd v-else-if="prDetail.kind === 'none'">{{ t('git.commit.noPullRequest.empty') }}</dd>
           <dd v-else class="text-muted-foreground" data-testid="pr-unavailable">
             {{ prDetail.reason }}
           </dd>
@@ -421,7 +418,7 @@ const prIcon = computed(() => {
         class="h-auto p-0 justify-start text-muted-foreground hover:text-fg"
         @click="expanded = !expanded"
       >
-        {{ expanded ? 'Show less' : 'Show more' }}
+        {{ expanded ? t('common.action.showLess.label') : t('common.action.showMore.label') }}
       </Button>
       <div class="ml-auto flex items-center gap-2">
         <Tooltip>
@@ -430,14 +427,14 @@ const prIcon = computed(() => {
               as="button"
               type="button"
               class="cursor-pointer"
-              aria-label="Copy full SHA"
+              :aria-label="t('git.commit.copySha.tooltip')"
               data-testid="commit-meta-sha"
               @click="copySha"
             >
               {{ shortSha }}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent>Copy full SHA</TooltipContent>
+          <TooltipContent>{{ t('git.commit.copySha.tooltip') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -447,7 +444,7 @@ const prIcon = computed(() => {
         </Tooltip>
         <TooltipIconButton
           icon="diff-multiple"
-          label="Open all changes"
+          :label="t('git.commit.openAllChanges.tooltip')"
           data-testid="open-all-changes-button"
           @click="openAllChanges"
         />

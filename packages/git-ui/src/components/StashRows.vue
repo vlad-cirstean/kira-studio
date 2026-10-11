@@ -12,6 +12,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { MenuSection } from '../lib/menuModel.ts';
@@ -21,6 +22,8 @@ import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { useSectionMenu } from './useSectionMenu.ts';
+
+const UNTRACKED_FLAG = '-u';
 
 export interface StashRowModel {
   /** `data-row-id`/roving-tabindex key — `stash:<sha>` or `global:<sha>`, distinguishing the two
@@ -89,12 +92,12 @@ function onMenuSelect(entry: StashEntry, id: string): void {
         :data-kira-tip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</Badge
       >
-      <Badge v-if="rowModel(entry).auto" data-kira-tip="Created automatically by an auto-stashed checkout"
-        >auto</Badge
+      <Badge v-if="rowModel(entry).auto" :data-kira-tip="t('git.stash.auto.hint')"
+        >{{ t('git.stash.auto.label') }}</Badge
       >
       <span data-testid="stash-message" class="flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" data-kira-tip="Includes untracked files">-u</span>
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
+      <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" :data-kira-tip="t('git.stash.untracked.hint')">{{ UNTRACKED_FLAG }}</span>
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ t('git.common.fileCount.label', { count: entry.fileCount }) }}</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </button>
     <RowActionsButton

@@ -17,6 +17,7 @@
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { t } from '@theme/i18n';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
@@ -50,7 +51,7 @@ function globalStashRowModel(entry: StashEntry): StashRowModel {
   return {
     id: `global:${entry.sha}`,
     origin: model.origin,
-    originTooltip: model.origin === undefined ? undefined : `Saved from ${model.origin}`,
+    originTooltip: model.origin === undefined ? undefined : t('git.stash.savedFrom.tooltip', { origin: model.origin }),
     auto: model.auto,
     message: model.label,
     messageTooltip: entry.message,
@@ -83,16 +84,16 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 </script>
 
 <template>
-  <section aria-label="Global stash">
-    <SectionHeading label="Global stash">
-      <TooltipIconButton icon="add" label="Save to global stash…" @click="emit('saveGlobalStash')" />
+  <section :aria-label="t('git.stash.global.label')">
+    <SectionHeading :label="t('git.stash.global.label')">
+      <TooltipIconButton icon="add" :label="t('git.stash.saveGlobal.tooltip')" @click="emit('saveGlobalStash')" />
     </SectionHeading>
     <StashRows
       :section="section"
       :stash="stash"
       :show-more="showMore"
       :focused-row-id="focusedRowId"
-      empty-message="No saved entries"
+      :empty-message="t('git.stash.globalEmpty.empty')"
       :row-model="globalStashRowModel"
       :menu-for="menuFor"
       @selected="emit('selected')"

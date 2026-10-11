@@ -700,8 +700,583 @@
     }
   },
   "git": {
+    "app": {
+      "bootError": {
+        "error": "Couldn’t load the repository: {error}"
+      },
+      "noCurrentBranch": {
+        "announce": "Check out a branch first"
+      },
+      "noSelection": {
+        "announce": "Select a commit first"
+      },
+      "noStackTarget": {
+        "announce": "No branch to navigate to"
+      }
+    },
+    "async": {
+      "loadMoreHistory": {
+        "error": "Couldn’t load more history: {error}",
+        "title": "Couldn’t load more history"
+      },
+      "openPullRequest": {
+        "error": "Couldn’t open the pull request: {error}",
+        "title": "Couldn’t open the pull request"
+      },
+      "refresh": {
+        "error": "Couldn’t refresh: {error}",
+        "title": "Couldn’t refresh"
+      },
+      "reloadGraph": {
+        "error": "Couldn’t refresh the graph: {error}",
+        "title": "Couldn’t refresh the graph"
+      },
+      "revealCommit": {
+        "error": "Couldn’t reveal the commit: {error}",
+        "title": "Couldn’t reveal the commit"
+      },
+      "revealSelected": {
+        "error": "Couldn’t reveal the selected commit: {error}",
+        "title": "Couldn’t reveal the selected commit"
+      },
+      "scrollToSelected": {
+        "error": "Couldn’t scroll to the selected commit: {error}",
+        "title": "Couldn’t scroll to the selected commit"
+      }
+    },
+    "commit": {
+      "committer": {
+        "label": "Committer"
+      },
+      "copySha": {
+        "tooltip": "Copy full SHA"
+      },
+      "noPullRequest": {
+        "empty": "No pull request"
+      },
+      "openAllChanges": {
+        "tooltip": "Open all changes"
+      },
+      "pullRequest": {
+        "label": "Pull request"
+      },
+      "signature": {
+        "label": "Signature"
+      }
+    },
+    "common": {
+      "abort": {
+        "label": "Abort"
+      },
+      "continue": {
+        "label": "Continue"
+      },
+      "currentBranch": {
+        "tooltip": "Current branch"
+      },
+      "fileCount": {
+        "label": "{count} file | {count} files"
+      },
+      "forceDelete": {
+        "body": "“{name}” is not fully merged.",
+        "confirm": "Force delete"
+      },
+      "moreActions": {
+        "tooltip": "More actions"
+      },
+      "refs": {
+        "label": "Refs"
+      },
+      "restack": {
+        "label": "Restack"
+      },
+      "skip": {
+        "label": "Skip"
+      }
+    },
+    "conflict": {
+      "more": {
+        "label": "{count} more"
+      },
+      "resolve": {
+        "description": "Resolve the remaining {count} file in your own editor and stage it, then continue. | Resolve the remaining {count} files in your own editor and stage them, then continue."
+      },
+      "resolved": {
+        "description": "No conflicts remain. Continue to commit this change, or skip if it is already present."
+      },
+      "resolveOrSkip": {
+        "description": "Resolve the remaining {count} file in your own editor and stage it, then continue, or skip this commit and move on. | Resolve the remaining {count} files in your own editor and stage them, then continue, or skip this commit and move on."
+      },
+      "unresolved": {
+        "label": "{count} unresolved file | {count} unresolved files"
+      }
+    },
+    "copy": {
+      "commitMessage": {
+        "announce": "Copied commit message"
+      },
+      "filePath": {
+        "announce": "Copied file path"
+      },
+      "fullSha": {
+        "announce": "Copied full SHA"
+      },
+      "recoverySha": {
+        "announce": "Copied recovery SHA"
+      },
+      "reviewComments": {
+        "announce": "Copied review comments"
+      }
+    },
+    "detail": {
+      "loadError": {
+        "error": "Couldn’t load this commit: {error}"
+      },
+      "noSelection": {
+        "emptyHint": "Select a commit to see its details."
+      },
+      "region": {
+        "aria": "Commit detail"
+      },
+      "resizeHandle": {
+        "label": "Resize detail pane"
+      }
+    },
+    "emptyRepository": {
+      "description": "This repository has no commits yet. Create the first one on {branch} to see it here."
+    },
+    "failure": {
+      "authFailed": {
+        "hint": "Check your credentials, then retry."
+      },
+      "banner": {
+        "aria": "Last failure"
+      },
+      "dirtyWorktree": {
+        "hint": "Commit or stash your changes first."
+      },
+      "hintLogged": {
+        "hint": "Details are in the Kira Space operations log."
+      },
+      "hookRejected": {
+        "hint": "Fix what the hook reported, then push again."
+      },
+      "lockHeld": {
+        "hint": "Wait for the other Git process to finish, then retry."
+      },
+      "networkFailed": {
+        "hint": "Check the network, then retry."
+      },
+      "nonFastForward": {
+        "hint": "Pull, then push again."
+      },
+      "protectedBranch": {
+        "hint": "Type the branch name to confirm."
+      },
+      "remoteNotFound": {
+        "hint": "Check the remote’s URL."
+      },
+      "retryGraph": {
+        "hint": "Retry refreshes the graph."
+      },
+      "showOperations": {
+        "label": "Show in operations"
+      }
+    },
+    "fileTree": {
+      "capped": {
+        "announce": "Showing {shown} of {total} files"
+      },
+      "diffAgainst": {
+        "label": "Diffing against"
+      },
+      "display": {
+        "aria": "File list display"
+      },
+      "filter": {
+        "placeholder": "Filter files"
+      },
+      "list": {
+        "aria": "File list"
+      },
+      "listFlat": {
+        "tooltip": "Flat view"
+      },
+      "listTree": {
+        "tooltip": "Tree view"
+      },
+      "openError": {
+        "error": "Couldn’t open {path}: {error}"
+      },
+      "opened": {
+        "announce": "Opened {path}"
+      },
+      "parent": {
+        "label": "Parent {number} · {sha} · {subject}"
+      },
+      "parentNoSubject": {
+        "label": "Parent {number} · {sha}"
+      },
+      "showAll": {
+        "label": "Show all {count} files"
+      },
+      "similar": {
+        "tooltip": "{percent}% similar — {from} → {to}"
+      },
+      "tree": {
+        "aria": "File tree"
+      }
+    },
+    "graph": {
+      "region": {
+        "aria": "Commit graph"
+      }
+    },
+    "grid": {
+      "resizeAuthor": {
+        "label": "Resize author column"
+      },
+      "resizeDate": {
+        "label": "Resize date column"
+      },
+      "resizeGraph": {
+        "label": "Resize graph column"
+      }
+    },
+    "link": {
+      "open": {
+        "error": "Couldn’t open the link: {error}"
+      }
+    },
+    "loadMore": {
+      "busy": {
+        "label": "Loading… ({remaining} remaining)"
+      },
+      "cancel": {
+        "aria": "Cancel loading"
+      },
+      "last": {
+        "label": "Load the last {count}"
+      },
+      "loadAll": {
+        "hint": "Alt-click to load everything remaining. This keeps every loaded commit in memory."
+      },
+      "page": {
+        "label": "Load {pageSize} more ({remaining} remaining)"
+      }
+    },
     "module": {
       "title": "Git"
+    },
+    "noRepository": {
+      "notRepository": {
+        "description": "This workspace’s folder isn’t a Git repository."
+      },
+      "open": {
+        "title": "Open a repository"
+      },
+      "openError": {
+        "error": "Couldn’t open that repository: {error}"
+      },
+      "refreshError": {
+        "error": "Couldn’t check this workspace’s folders for a Git repository: {error}"
+      }
+    },
+    "picker": {
+      "branches": {
+        "empty": "No branches yet"
+      },
+      "checkedOutIn": {
+        "tooltip": "Checked out in {path}"
+      },
+      "filterBranches": {
+        "placeholder": "Filter branches"
+      },
+      "filterStacks": {
+        "placeholder": "Filter stacks"
+      },
+      "filterStashes": {
+        "placeholder": "Filter stashes"
+      },
+      "filterTags": {
+        "placeholder": "Filter tags"
+      },
+      "filterWorktrees": {
+        "placeholder": "Filter worktrees"
+      },
+      "prTitle": {
+        "tooltip": "{title} — {state}"
+      },
+      "region": {
+        "aria": "{tab} picker"
+      },
+      "remoteBranches": {
+        "empty": "No remote branches",
+        "label": "Remote branches"
+      },
+      "rename": {
+        "aria": "Rename branch"
+      },
+      "sections": {
+        "aria": "Picker section"
+      },
+      "unborn": {
+        "label": "{name} (unborn)"
+      },
+      "worktree": {
+        "label": "Worktree"
+      }
+    },
+    "pr": {
+      "closed": {
+        "status": "Closed"
+      },
+      "draft": {
+        "status": "Draft"
+      },
+      "merged": {
+        "status": "Merged"
+      },
+      "noAnswer": {
+        "hint": "GitHub did not answer."
+      },
+      "openOnGithub": {
+        "aria": "Open pull request #{number} on GitHub"
+      },
+      "summary": {
+        "tooltip": "#{number} {title} — {state}"
+      }
+    },
+    "review": {
+      "changedSince": {
+        "hint": "Changed since you reviewed it."
+      },
+      "markReviewed": {
+        "tooltip": "Mark reviewed"
+      },
+      "markUnreviewed": {
+        "tooltip": "Mark unreviewed"
+      }
+    },
+    "search": {
+      "bodySearch": {
+        "label": "Search message bodies"
+      },
+      "hidden": {
+        "hint": "{count} more. Refine your search."
+      },
+      "options": {
+        "aria": "Search options"
+      },
+      "position": {
+        "status": "Match {position} of {total}"
+      },
+      "results": {
+        "aria": "Search results"
+      },
+      "scope": {
+        "aria": "Search scope",
+        "both": {
+          "option": "Both"
+        }
+      },
+      "searching": {
+        "loading": "Searching…"
+      },
+      "tailStale": {
+        "hint": "Refs changed since this search ran."
+      }
+    },
+    "signature": {
+      "bad": {
+        "status": "Bad signature"
+      },
+      "bySigner": {
+        "status": "{status} by {signer}"
+      },
+      "expiredKey": {
+        "status": "Good signature, expired key"
+      },
+      "expiredSignature": {
+        "status": "Good signature, expired signature"
+      },
+      "good": {
+        "status": "Good signature"
+      },
+      "revokedKey": {
+        "status": "Good signature, revoked key"
+      },
+      "uncheckable": {
+        "status": "Can’t check signature"
+      },
+      "unknownValidity": {
+        "status": "Good signature, unknown validity"
+      }
+    },
+    "stack": {
+      "base": {
+        "tooltip": "Base: {base}"
+      },
+      "list": {
+        "empty": "No stacked branches yet",
+        "label": "Stacks"
+      },
+      "needsAttention": {
+        "label": "Needs attention"
+      },
+      "remove": {
+        "tooltip": "Remove from stack"
+      },
+      "setParent": {
+        "tooltip": "Set stack parent…"
+      },
+      "stale": {
+        "status": "Stale"
+      }
+    },
+    "stash": {
+      "auto": {
+        "hint": "Created automatically by an auto-stashed checkout.",
+        "label": "Auto"
+      },
+      "base": {
+        "tooltip": "Base: {sha} {subject}"
+      },
+      "global": {
+        "label": "Global stash"
+      },
+      "globalEmpty": {
+        "empty": "No saved entries yet"
+      },
+      "list": {
+        "empty": "No stashes yet",
+        "label": "Stashes"
+      },
+      "loadError": {
+        "error": "Couldn’t load this stash: {error}"
+      },
+      "savedFrom": {
+        "tooltip": "Saved from {origin}"
+      },
+      "saveGlobal": {
+        "tooltip": "Save to global stash…"
+      },
+      "stashedFrom": {
+        "tooltip": "Stashed from {origin}"
+      },
+      "untracked": {
+        "hint": "Includes untracked files."
+      }
+    },
+    "tag": {
+      "annotated": {
+        "status": "Annotated"
+      },
+      "lightweight": {
+        "status": "Lightweight"
+      },
+      "list": {
+        "empty": "No tags yet",
+        "label": "Tags"
+      }
+    },
+    "toolbar": {
+      "autoFetchStopped": {
+        "label": "Auto-fetch stopped"
+      },
+      "cancelDeleteRemote": {
+        "hint": "This can’t be cancelled once it has started."
+      },
+      "cancelForcePush": {
+        "hint": "A force push in flight can’t be cancelled."
+      },
+      "cancelPush": {
+        "hint": "A push in flight can’t be cancelled. Its outcome on the remote would be unknown."
+      },
+      "collapseBranches": {
+        "tooltip": "Collapse other branches"
+      },
+      "deletingRemoteBranch": {
+        "loading": "Deleting remote branch…"
+      },
+      "fetch": {
+        "label": "Fetch",
+        "tooltip": "Fetch {remote}"
+      },
+      "fetching": {
+        "loading": "Fetching…"
+      },
+      "forcePush": {
+        "label": "Force push…"
+      },
+      "forcePushing": {
+        "loading": "Force pushing…"
+      },
+      "nothingRunning": {
+        "hint": "Nothing is running."
+      },
+      "progress": {
+        "status": "{phase} {percent}%"
+      },
+      "progressRemote": {
+        "status": "Remote: {phase}"
+      },
+      "pull": {
+        "hint": "Pull. Resolves a strategy from your Git configuration before running.",
+        "label": "Pull"
+      },
+      "pullDefault": {
+        "label": "Follow your configuration"
+      },
+      "pulling": {
+        "loading": "Pulling…"
+      },
+      "pullLast": {
+        "tooltip": "Pull. Last ran {strategy} ({source})"
+      },
+      "pullOptions": {
+        "aria": "Pull strategy options"
+      },
+      "pullPreview": {
+        "status": "{strategy} from {source}"
+      },
+      "pullResolving": {
+        "loading": "Resolving…"
+      },
+      "pullStrategy": {
+        "aria": "Pull strategy"
+      },
+      "push": {
+        "label": "Push",
+        "tooltip": "Push to {remote}"
+      },
+      "pushing": {
+        "loading": "Pushing…"
+      },
+      "pushOptions": {
+        "aria": "Push options"
+      },
+      "refreshPending": {
+        "hint": "The history changed on disk. Refresh to see it."
+      },
+      "region": {
+        "aria": "Kira Space toolbar"
+      },
+      "repoSettings": {
+        "tooltip": "Repository settings"
+      },
+      "restacking": {
+        "loading": "Restacking…"
+      },
+      "stash": {
+        "label": "Stash",
+        "tooltip": "Stash changes"
+      }
+    },
+    "undo": {
+      "copyRecovery": {
+        "tooltip": "Copy recovery SHA {sha}"
+      }
     }
   },
   "memory": {

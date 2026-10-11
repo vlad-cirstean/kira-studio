@@ -21,6 +21,7 @@
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
 import { formatRelativeDate } from './dateFormat.ts';
@@ -63,13 +64,13 @@ function optionClass(option: SearchOption): string {
     <!-- ARIA's listbox role only permits `option`/`group` children (`aria-required-children`) —
          the status line, section titles and options live inside this inner listbox div; the
          stale hint, footers and the body-search button are its *siblings*, not its children. -->
-    <div :id="SEARCH_LISTBOX_ID" role="listbox" aria-label="Search results">
+    <div :id="SEARCH_LISTBOX_ID" role="listbox" :aria-label="t('git.search.results.aria')">
       <div
         v-if="searching"
         class="text-kira-sm text-subtle py-1 px-1.5"
         data-testid="search-status"
       >
-        Searching…
+        {{ t('git.search.searching.loading') }}
       </div>
 
       <template v-for="section in model.sections" :key="section.title">
@@ -111,11 +112,11 @@ function optionClass(option: SearchOption): string {
           </div>
         </template>
         <div v-if="section.hiddenCount > 0" class="text-kira-sm text-subtle py-1 px-1.5">
-          {{ section.hiddenCount }} more — refine your search
+          {{ t('git.search.hidden.hint', { count: section.hiddenCount }) }}
         </div>
       </template>
 
-      <div v-if="isEmpty" class="text-kira-sm text-subtle py-1 px-1.5">No results</div>
+      <div v-if="isEmpty" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('common.state.noMatches.empty') }}</div>
     </div>
 
     <div
@@ -123,7 +124,7 @@ function optionClass(option: SearchOption): string {
       class="text-kira-sm text-subtle py-1 px-1.5"
       data-testid="search-tail-stale"
     >
-      Refs changed since this search ran
+      {{ t('git.search.tailStale.hint') }}
     </div>
     <div v-if="model.loadedFooter" class="text-kira-sm text-subtle py-1 px-1.5">
       {{ model.loadedFooter }}
@@ -146,7 +147,7 @@ function optionClass(option: SearchOption): string {
       data-testid="search-body-button"
       @click="emit('runBodySearch')"
     >
-      Search message bodies
+      {{ t('git.search.bodySearch.label') }}
     </Button>
   </div>
 </template>

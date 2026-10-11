@@ -4,8 +4,9 @@
 // aria-label, differing only in the click-to-open-menu/contextmenu-to-open-menu handlers a caller
 // binds through this component's single-root attrs fallthrough (@click, @contextmenu).
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { t } from '@theme/i18n';
 </script>
 
 <template>
-  <TooltipIconButton icon="ellipsis" label="More actions" />
+  <TooltipIconButton icon="ellipsis" data-testid="row-actions" :label="t('git.common.moreActions.tooltip')" />
 </template>

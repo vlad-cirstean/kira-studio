@@ -20,6 +20,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -64,7 +65,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div class="flex flex-col min-h-0 h-full">
     <FieldError v-if="stash.error.value" class="p-3">
-      Couldn't load this stash — {{ stash.error.value }}
+      {{ t('git.stash.loadError.error', { error: stash.error.value }) }}
     </FieldError>
 
     <template v-if="entry">
@@ -103,7 +104,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 
     <Empty v-else-if="!stash.error.value" class="p-6">
       <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
-      <EmptyTitle>Loading…</EmptyTitle>
+      <EmptyTitle>{{ t('common.state.loading.loading') }}</EmptyTitle>
     </Empty>
   </div>
 </template>
