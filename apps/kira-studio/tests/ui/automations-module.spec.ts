@@ -187,7 +187,8 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
   const row = page.locator(`[data-testid="script-${SCRIPT.id}"]`);
   await expect(row).toContainText('echo one…');
   await expect(row).not.toContainText('echo two');
-  await expect(row).toHaveAttribute('title', MULTI);
+  await row.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(MULTI);
 
   await page.locator('[data-testid="automations-add"]').click();
 

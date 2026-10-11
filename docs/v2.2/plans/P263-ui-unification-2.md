@@ -898,3 +898,26 @@ Deviations:
 
 Left: see `P263-stream-b-findings.md`.
 
+
+## Stream C result
+
+Base `cff645739`. Commits (none pushed, no `--no-verify` at tip):
+
+- `ac35633d3` C1 git components
+- `580161bcb` C2 git dialogs and review
+- `10642ce1a` C3 docker views
+- `63ad94cf5` C4 and C5 automations and workbench shell (one commit: each hook run typechecks the whole tree, slow under load)
+- C6 sweep and verify commit (this section, specs, baselines)
+
+Allowlist: `stream-c.txt` holds only `permanent` lines: OriginIcon U34 (brand colour), LogsView and RunLog U25 (stderr log data colour), AutocompleteField and InlineRenameInput U36 (caret popups, bare input). `check-ui-primitives`, `bun run lint`, `bun run typecheck` green.
+
+Verify: Studio `ui` docker-*/automations-* and `visual` automations-module pass; Space `ui` automations-*, repo-graph-*, repo-commit-*, repo-branch-picker, repo-floating-geometry, repo-review-interaction and `visual` git-module pass.
+
+Baselines re-recorded after viewing diffs: studio `script-dialog` (Kbd chord replaces `Cmd/Ctrl+Enter` text), space `git-graph` and `git-graph-detail` (uncommitted strip row on `rowVariants`).
+
+Deviations:
+
+- Spec `automations-module.spec.ts` asserts the script row command in the Tooltip (hover, `tooltip-content`) instead of the native `title` attribute.
+- Reka renders tooltip text twice (visually hidden a11y copy), so the assert uses `toContainText`.
+- `WordWrapField` is a Switch (live setting), `EditRecreateSection`/`EditSize` and automations form toggles are Checkbox.
+- `createSettingsStore.ts` and `NotifyPromptsField` unchanged by design.
