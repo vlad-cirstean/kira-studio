@@ -952,4 +952,8 @@ Flakes, root causes (each reproduced under 6 CPU burners and 8 workers on 4 core
 - `mutations`: single 7-scenario test at 60s default, ~13s unloaded; budget 180s.
 - Visuals: `console` caret blink and scrollbar fade (JS-driven, no stable pair); `data-grid`/`console` codicon font painting late (`settleFonts`); `schema-dialog` captured before the lazy Monaco chunk mounted (no editor, mask target missing). Also `connection-dialog`, `console`, `data-grid`, `schema-dialog` baselines had drifted inside the 0.2 pixel threshold (scrim 0.3 vs old 0.1, alert `/20` border vs old grey), leaving no margin for jitter; re-recorded and viewed.
 
+Final run (after the fixes above): typecheck, lint, `test:unit` 1793, `test:visual:studio` 13/13, `test:visual:space` 13/13 green; `test:ui:studio` 425 pass; `test:ui:space` 456 pass, `test:ui:space-mobile` 52 pass. Two more flakes surfaced in that run and were fixed: Space `ade-v2-workflows` stage-chip drag (release before Sortable's 150ms swap animation registered, ~15% fail, now 16/16) and mobile `pairing` (mock server resolved before the phone's `POST /api/pair` arrived, leaving it parked; the mock now answers on arrival, 150/150).
+
+Open: `ui-timing` budgets (`budgets.spec.ts` console keystroke p50 and scroll frame time, `perf.spec.ts` p95 scroll) fail on this runner. Not a P263 regression: the same budgets fail at the pre-P263 base `d381439d6` (keystroke p50 57ms vs 50) and at the foundation tip (57/86 vs 50/80); they passed in the foundation session on a faster runner. Left unchanged (hardware-dependent budgets, a design decision, not a race).
+
 Deviations: none from §5.5. Space `ui`, `ui-timing` and Go untouched.
