@@ -1,4 +1,9 @@
+import { useTimeoutFn } from '@vueuse/core';
+import { ref } from 'vue';
 import { errorText } from '../bridge/codedError';
+import { announceApp } from './liveRegion';
+import { TIMING } from './timing';
+
 // Extracted from what used to be three separate copy-paste-identical definitions
 // (project/menus.ts, TabStrip.vue) — a fourth and fifth (grid, ops panel) made a shared module
 // worth having (P6 realities #3).
@@ -55,4 +60,47 @@ export async function copyOrReportErrorLazy(
   } catch (err) {
     onError(errorText(err));
   }
+}
+
+async function copyWithAnnouncement(text: string, what?: string): Promise<string | null> {
+  try {
+    await copyText(text);
+  } catch (err) {
+    const message = errorText(err);
+    announceApp(`Couldn't copy — ${message}`);
+    return message;
+  }
+  announceApp(what ? `Copied ${what}` : 'Copied');
+  return null;
+}
+
+/** Copy and announce through the app live region, nothing else: for menu items, which close and
+ *  have no control to flash. Resolves `false` after announcing a rejection. */
+export async function copyAnnounced(text: string, what?: string): Promise<boolean> {
+  return (await copyWithAnnouncement(text, what)) === null;
+}
+
+/**
+ * Copy with feedback. `copy` resolves `true` on success; `copied` stays true for
+ * `TIMING.copiedFeedback` (icon buttons swap to `check`, text buttons to "Copied"); a rejection
+ * lands in `error`. Both outcomes are announced. Built on `copyText`, not VueUse `useClipboard`,
+ * which swallows the `writeText` rejection `copyText` exists to surface.
+ */
+export function useCopy() {
+  const copied = ref(false);
+  const error = ref<string | null>(null);
+  const { start } = useTimeoutFn(
+    () => {
+      copied.value = false;
+    },
+    TIMING.copiedFeedback,
+    { immediate: false },
+  );
+  async function copy(text: string, opts: { what?: string } = {}): Promise<boolean> {
+    error.value = await copyWithAnnouncement(text, opts.what);
+    copied.value = error.value === null;
+    if (copied.value) start();
+    return copied.value;
+  }
+  return { copy, copied, error };
 }

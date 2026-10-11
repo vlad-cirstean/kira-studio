@@ -1,30 +1,118 @@
-// P24 D35: sibling of clipboard.ts — a small renderer-root utility module. One byte-formatting
-// convention app-wide, replacing three near-identical formatters (StatusBar.vue/SettingsDialog.vue's
-// MB-only division, KeyValueView.vue's B/KiB/MiB) and the cell editor's bare `${n} bytes`.
+import { type UseTimeAgoOptions, useTimeAgo } from '@vueuse/core';
+import type { MaybeRefOrGetter } from 'vue';
 
-/** '842 bytes' / '1.2 KB' / '3.4 MB' / '1.5 GB'. Decimal-looking KB/MB (divided by 1024, per this app's own
- *  existing convention); under 1024 the word stays "bytes" — it reads as a count there, not a
- *  unit. */
-export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} bytes`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 ** 3) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(n / 1024 ** 3).toFixed(1)} GB`;
+// The one place app code turns a number or instant into text. Anything shown to a user as a size,
+// a count, a duration, an age, a date-time or a missing value comes from here.
+
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+
+/** '0 B' / '842 B' / '1.2 KB' / '341 MB': 1024 steps, one decimal under 100, none above. */
+export function formatBytes(bytes: number): string {
+  let value = Math.max(0, bytes);
+  let unit = 0;
+  while (unit < BYTE_UNITS.length - 1 && Math.round(value) >= 1024) {
+    value /= 1024;
+    unit++;
+  }
+  if (unit === 0) return `${Math.round(value)} B`;
+  const text = value.toFixed(value < 99.95 ? 1 : 0);
+  if (text === '1024' && unit < BYTE_UNITS.length - 1) return `1.0 ${BYTE_UNITS[unit + 1]}`;
+  return `${text} ${BYTE_UNITS[unit]}`;
 }
 
-/** 'just now' / '5m ago' / '3h ago' / 'yesterday' / '2d ago'. Sibling of formatBytes: one
- *  relative-time convention app-wide, replacing three copies (StudioStart, ResponseHistoryList,
- *  VariableHistoryMenu) that had already drifted into two spellings. The no-space form wins —
- *  two of the three copies already used it, and it fits ResponseHistoryList's own fixed-width
- *  time column. Accepts either an epoch number (StudioStart's openedAt) or an ISO string (both
- *  Api callers), so every site collapses onto this without a per-caller adapter. */
-export function formatRelative(at: number | string): string {
-  const then = typeof at === 'number' ? at : new Date(at).getTime();
-  const minutes = Math.floor((Date.now() - then) / 60000);
+/** One decimal under 100%, whole numbers above (multi-core CPU can pass 100%). */
+export function formatPercent(n: number): string {
+  return n >= 100 ? `${Math.round(n)}%` : `${n.toFixed(1)}%`;
+}
+
+const COUNT_FORMAT = new Intl.NumberFormat();
+
+/** A count with the locale's digit grouping: '12,345'. */
+export function formatCount(n: number): string {
+  return COUNT_FORMAT.format(n);
+}
+
+/** '1 file' / '2 files'. */
+export function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+/** A finished duration: '240 ms' / '3.4 s' / '2m 5s' / '1h 2m'. */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const tenths = Math.round(ms / 100) / 10;
+  if (tenths < 60) return `${tenths.toFixed(1)} s`;
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes}m ${totalSeconds % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+/** A running clock: 'm:ss', or 'h:mm:ss' from the first hour. */
+export function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes}:${seconds}`;
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${seconds}`;
+}
+
+type Instant = number | string | Date;
+
+function toMillis(at: Instant): number {
+  return at instanceof Date ? at.getTime() : typeof at === 'number' ? at : new Date(at).getTime();
+}
+
+/** 'just now' / '5m ago' / '3h ago' / '2d ago'. */
+export function formatRelative(at: Instant, now: number = Date.now()): string {
+  const minutes = Math.floor((now - toMillis(at)) / 60000);
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? 'yesterday' : `${days}d ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
+/** 'Oct 11, 2026, 4:29 AM' in the user's locale. */
+export function formatDateTime(at: Instant): string {
+  return DATE_TIME_FORMAT.format(toMillis(at));
+}
+
+/** '04:29:57.123' in local time. */
+export function formatClockTime(at: Instant): string {
+  const d = new Date(toMillis(at));
+  const pad = (n: number, len = 2): string => String(n).padStart(len, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+/** The placeholder for a missing value: an em dash, never an empty cell or '-'. */
+export function displayValue(value: string | number | null | undefined): string {
+  return value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+const RELATIVE_OPTIONS: UseTimeAgoOptions<false, 'minute' | 'hour' | 'day'> = {
+  messages: {
+    justNow: 'just now',
+    past: (n: string) => `${n} ago`,
+    future: (n: string) => `in ${n}`,
+    invalid: '',
+    minute: (n: number) => `${n}m`,
+    hour: (n: number) => `${n}h`,
+    day: (n: number) => `${n}d`,
+  },
+  units: [
+    { max: 3_600_000, value: 60_000, name: 'minute' },
+    { max: 86_400_000, value: 3_600_000, name: 'hour' },
+    { max: Number.POSITIVE_INFINITY, value: 86_400_000, name: 'day' },
+  ],
+};
+
+/** A reactive `formatRelative`: the same words, kept current as time passes. */
+export function useRelativeTime(at: MaybeRefOrGetter<Date | number | string>) {
+  return useTimeAgo(at, RELATIVE_OPTIONS);
 }
