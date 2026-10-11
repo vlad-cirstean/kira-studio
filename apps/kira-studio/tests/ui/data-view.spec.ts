@@ -11,6 +11,7 @@ import {
   gridCell,
   gridRow,
   gridScroller,
+  gutterCell,
   nullMarker,
   sortIndicators,
 } from './support/grid';
@@ -1023,13 +1024,24 @@ async function firstGutterNumber(page: Page): Promise<string> {
   await grid.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(50);
-  return (await page.locator('[data-testid="grid-gutter-cell"]').first().innerText()).trim();
+  // Page row 0, not the first DOM node: SlickGrid recycles row nodes, so under load the first node
+  // still holds a stale far row until the post-scroll render lands.
+  return (await gutterCell(page, 0).innerText()).trim();
 }
 
 async function lastGutterNumber(page: Page): Promise<string> {
   await scrollGridToBottom(page);
-  return (await page.locator('[data-testid="grid-gutter-cell"]').last().innerText()).trim();
+  // Highest page row, not the last DOM node (recycled nodes break DOM order, see above).
+  return page.evaluate(() => {
+    let best: { row: number; text: string } | null = null;
+    for (const el of document.querySelectorAll(
+      '[data-testid="data-grid"] .slick-row[data-row] [data-testid="grid-gutter-cell"]',
+    )) {
+      const row = Number(el.closest('.slick-row')?.getAttribute('data-row'));
+      if (!best || row > best.row) best = { row, text: (el.textContent ?? '').trim() };
+    }
+    return best?.text ?? '';
+  });
 }
 
 // Playwright's clipboard-permission grant (`browserContext.grantPermissions(['clipboard-read'])`)

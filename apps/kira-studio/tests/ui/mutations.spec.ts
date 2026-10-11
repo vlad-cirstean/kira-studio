@@ -220,6 +220,9 @@ async function editCell(
 test('mutations — edit, add, delete, preview, commit, discard, read-only guard', async ({
   relaunch,
 }) => {
+  // Seven scenarios and two connection setups in one test: ~13s unloaded, but it ran into the 60s
+  // default on a CPU-starved runner (parallel suites).
+  test.setTimeout(180_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
 
   await page.click('[data-testid="add-connection"]');
