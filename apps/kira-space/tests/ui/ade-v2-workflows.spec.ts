@@ -240,6 +240,11 @@ test('dragging a stage chip reorders the stages', async ({ relaunch }) => {
   await page.mouse.down();
   for (let i = 1; i <= 10; i++)
     await page.mouse.move(from.x + ((to.x - from.x) * i) / 10 + 4, to.y + to.height / 2);
+  // Sortable animates the swap for 150ms and ignores pointer moves over a target that is still
+  // moving, so a release straight after the last move can land before the swap registered.
+  await page.waitForTimeout(250);
+  await page.mouse.move(to.x + 6, to.y + to.height / 2);
+  await page.waitForTimeout(250);
   await page.mouse.up();
   await expect(page.locator(t('ade-wf-strip-chip')).nth(1)).toHaveAttribute(
     'data-stage-id',

@@ -44,6 +44,8 @@ interface State {
     backlogItem?: unknown;
   };
   pairWaiters: ServerResponse[];
+  /** Outcome resolved before the phone's `POST /api/pair` arrived; the request answers on arrival. */
+  earlyPair: PairOutcome | null;
   streams: Set<ServerResponse>;
 }
 
@@ -121,9 +123,26 @@ export async function startMobileServer(): Promise<MobileServer> {
     agentSessions: [],
     replies: {},
     pairWaiters: [],
+    earlyPair: null,
     streams: new Set(),
   });
   const state: State = initial();
+
+  function answerPair(outcome: PairOutcome): void {
+    for (const res of state.pairWaiters) {
+      if (outcome === 'approve') {
+        state.auth = 'ok';
+        json(res, 200, state.replies.pair ?? { deviceId: 'dev-1', label: 'Test phone' });
+      } else {
+        json(res, 403, {
+          code: 'E_PAIRING_DENIED',
+          message: outcome === 'deny' ? 'access denied' : 'request timed out',
+          reason: outcome === 'deny' ? 'denied' : 'timeout',
+        });
+      }
+    }
+    state.pairWaiters = [];
+  }
   const repos = (
     fixture('repos') as { repos: { codeRepoId: string; name: string; nickname: string }[] }
   ).repos.map(({ codeRepoId, name, nickname }) => ({ codeRepoId, name, nickname }));
@@ -160,6 +179,13 @@ export async function startMobileServer(): Promise<MobileServer> {
       res.on('close', () => {
         state.pairWaiters = state.pairWaiters.filter((r) => r !== res);
       });
+      // The pairing screen shows "waiting" before the POST reaches the server, so a test can
+      // resolve first.
+      if (state.earlyPair) {
+        const outcome = state.earlyPair;
+        state.earlyPair = null;
+        answerPair(outcome);
+      }
       return;
     }
     if (state.auth !== 'ok') {
@@ -231,19 +257,8 @@ export async function startMobileServer(): Promise<MobileServer> {
         res.write(`event: ${channel}\ndata: ${JSON.stringify(data)}\n\n`);
     },
     resolvePair(outcome) {
-      for (const res of state.pairWaiters) {
-        if (outcome === 'approve') {
-          state.auth = 'ok';
-          json(res, 200, state.replies.pair ?? { deviceId: 'dev-1', label: 'Test phone' });
-        } else {
-          json(res, 403, {
-            code: 'E_PAIRING_DENIED',
-            message: outcome === 'deny' ? 'access denied' : 'request timed out',
-            reason: outcome === 'deny' ? 'denied' : 'timeout',
-          });
-        }
-      }
-      state.pairWaiters = [];
+      if (state.pairWaiters.length === 0) state.earlyPair = outcome;
+      else answerPair(outcome);
     },
     nonGet: () =>
       state.requests
