@@ -7755,9 +7755,6 @@
         "field": {
           "tooltip": "{format}, in the zone selected above"
         },
-        "pick": {
-          "tooltip": "Choose a date and time"
-        },
         "title": "Date and time",
         "unparseable": {
           "status": "Not a recognizable {format} value"
@@ -7807,7 +7804,7 @@
         "tooltip": "Value truncated at {size}"
       },
       "clearFilters": {
-        "tooltip": "Empty both fields and refetch"
+        "tooltip": "Empty all filter fields and refetch"
       },
       "columns": {
         "label": "Columns"
@@ -7894,6 +7891,9 @@
       },
       "nullValue": {
         "label": "NULL"
+      },
+      "pickDateTime": {
+        "tooltip": "Choose a date and time"
       },
       "raw": {
         "label": "Raw"
@@ -10185,6 +10185,176 @@
         "toggleProjectPanel": {
           "label": "Toggle project panel"
         }
+      }
+    },
+    "stream": {
+      "addMessage": {
+        "aria": "Add message"
+      },
+      "allPartitions": {
+        "label": "All partitions"
+      },
+      "column": {
+        "attributes": {
+          "label": "Attributes"
+        },
+        "timestamp": {
+          "label": "Timestamp"
+        }
+      },
+      "compose": {
+        "body": {
+          "placeholder": "Message body"
+        },
+        "headers": {
+          "label": "Headers (optional JSON object)"
+        },
+        "key": {
+          "label": "Key (optional)"
+        }
+      },
+      "copiedBody": {
+        "announce": "Copied body"
+      },
+      "copiedKey": {
+        "announce": "Copied key"
+      },
+      "copyBody": {
+        "label": "Copy body"
+      },
+      "copyKey": {
+        "label": "Copy key"
+      },
+      "count": {
+        "label": "Count"
+      },
+      "deleteConfirm": {
+        "body": "The message with ID {id} is removed from the queue.",
+        "title": "Delete message?"
+      },
+      "deleteMessage": {
+        "aria": "Delete message"
+      },
+      "deleteSelected": {
+        "tooltip": "Delete the selected message"
+      },
+      "emptyFilter": {
+        "label": "Empty filter"
+      },
+      "hideDuration": {
+        "description": "How long each received message stays hidden from other consumers. A longer time avoids receiving a message twice in one poll. A shorter time keeps messages available to consumers. The minimum is 1 s because the AWS SDK can’t send 0. Stop doesn’t unhide messages early."
+      },
+      "history": {
+        "offset": {
+          "label": "Offset {value}"
+        },
+        "partitions": {
+          "label": "Partitions {list}"
+        },
+        "since": {
+          "label": "Since {value}"
+        }
+      },
+      "hours": {
+        "status": "{count} hour | {count} hours"
+      },
+      "minutes": {
+        "status": "{count} minute | {count} minutes"
+      },
+      "noFilterHistory": {
+        "empty": "No filter history yet"
+      },
+      "noMessages": {
+        "empty": "No messages"
+      },
+      "noPartitions": {
+        "empty": "No partitions"
+      },
+      "offset": {
+        "label": "Offset",
+        "placeholder": "For example 1000"
+      },
+      "partition": {
+        "label": "Partition {id}"
+      },
+      "partitionFilter": {
+        "tooltip": "Filter by partition"
+      },
+      "partitions": {
+        "label": "{count} partition | {count} partitions"
+      },
+      "poll": {
+        "label": "Poll",
+        "tooltip": "Poll for messages"
+      },
+      "pollConfirm": {
+        "body": "Each poll hides received messages from other consumers for {duration} and raises their receive count.",
+        "title": "Poll this queue?"
+      },
+      "pollPrompt": {
+        "empty": "Poll to fetch messages"
+      },
+      "pollWarningConsume": {
+        "description": "Each poll consumes messages from the queue, subject to the visibility timeout above. It doesn’t browse a stable position."
+      },
+      "pollWarningReadOnly": {
+        "description": "Each poll hides received messages from other consumers for {duration} and raises their receive count. A longer hide avoids receiving the same message twice in one poll but keeps it from consumers that long. A short hide can end a poll early."
+      },
+      "produce": {
+        "label": "Produce a message"
+      },
+      "produceAction": {
+        "label": "Produce"
+      },
+      "redriveLimit": {
+        "description": "This queue moves a message to its dead-letter queue after {count} receive. | This queue moves a message to its dead-letter queue after {count} receives."
+      },
+      "redriveNone": {
+        "description": "This queue has no redrive limit."
+      },
+      "redriveUnknown": {
+        "description": "Its redrive limit couldn’t be read."
+      },
+      "resizeColumn": {
+        "aria": "Resize {column} column"
+      },
+      "rows": {
+        "aria": "Stream rows"
+      },
+      "rowsOnPage": {
+        "status": "{count} row on this page | {count} rows on this page"
+      },
+      "seconds": {
+        "status": "{count} second | {count} seconds"
+      },
+      "selectFirst": {
+        "tooltip": "Select a message first"
+      },
+      "send": {
+        "label": "Send a message"
+      },
+      "since": {
+        "label": "Since"
+      },
+      "timestamp": {
+        "invalid": {
+          "error": "Not a recognizable timestamp."
+        }
+      },
+      "tombstone": {
+        "tooltip": "Null (tombstone)"
+      },
+      "total": {
+        "status": "{approx}{total} total"
+      },
+      "visibility": {
+        "status": "Visibility {time}"
+      },
+      "visibilityQueue": {
+        "status": "Queue visibility {time}"
+      },
+      "visibilityRange": {
+        "hint": "Whole seconds from {min} to {max} (12 hours)."
       }
     },
     "tabs": {

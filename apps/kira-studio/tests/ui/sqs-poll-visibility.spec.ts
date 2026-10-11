@@ -33,7 +33,7 @@ test('read-only sqs poll hide time: validated field, confirm text, filter on the
     'for 1 second and raises their receive count',
   );
   await expect(view.locator('[data-testid="stream-poll-warning"]')).toContainText(
-    'a short hide can end a poll early',
+    'A short hide can end a poll early',
   );
 
   for (const bad of ['0', '43201']) {

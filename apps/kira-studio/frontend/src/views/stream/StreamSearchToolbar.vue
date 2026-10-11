@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { CatalogText, t } from '@theme/i18n';
 import { useFindBar } from '@workbench/behaviour/findBar';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { formatCount } from '@workbench/behaviour/format';
@@ -95,23 +96,26 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="stream-search-toolbar">
     <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField v-model="query" @keydown.escape.stop="close" placeholder="Find" data-testid="stream-search-input" />
+      <SearchField v-model="query" @keydown.escape.stop="close" :placeholder="t('common.action.find.label')" data-testid="stream-search-input" />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">
-        <b class="font-data">{{ entry.index + 1 }}</b> of <b class="font-data">{{ entry.matches.length }}</b>
+        <CatalogText k="studio.search.count.status">
+          <template #index><b class="font-data">{{ entry.index + 1 }}</b></template>
+          <template #total><b class="font-data">{{ entry.matches.length }}</b></template>
+        </CatalogText>
       </template>
-      <template v-else>0 of 0</template>
+      <template v-else>{{ t('common.state.noMatches.empty') }}</template>
     </span>
     <TooltipIconButton
       icon="chevron-up"
-      label="Previous match"
+      :label="t('common.action.previousMatch.label')"
       data-testid="stream-search-prev"
       @click="prev"
     />
     <TooltipIconButton
       icon="chevron-down"
-      label="Next match"
+      :label="t('common.action.nextMatch.label')"
       data-testid="stream-search-next"
       @click="next"
     />
@@ -121,8 +125,8 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     <div class="flex items-center gap-1.5 min-w-0">
       <TooltipIconButton
         icon="filter"
-        :label="filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'"
-        aria-label="Show only matching rows"
+        :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
+        :aria-label="t('studio.search.filterRows.tooltip')"
         :class="{ 'bg-field text-fg': filtering }"
         data-testid="stream-search-filter-rows"
         @click="toggleFilter"
@@ -131,13 +135,13 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
       <template v-if="filtering && filteredRowCount !== null">
-        showing {{ formatCount(filteredRowCount) }} of {{ formatCount(loadedRowCount) }} loaded rows
+        {{ t('studio.search.scopeFilteredRows.status', { shown: formatCount(filteredRowCount), count: loadedRowCount }) }}
       </template>
-      <template v-else>in the {{ formatCount(loadedRowCount) }} loaded rows</template>
+      <template v-else>{{ t('studio.search.scopeRows.status', { count: loadedRowCount }) }}</template>
     </span>
     <TooltipIconButton
       icon="close"
-      label="Close"
+      :label="t('common.action.close.label')"
       class="ml-auto"
       data-testid="stream-search-close"
       @click="close"

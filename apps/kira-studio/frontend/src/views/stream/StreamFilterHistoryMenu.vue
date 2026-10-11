@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed, onMounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
@@ -39,11 +40,11 @@ const savedEntries = computed<StreamFilterHistoryEntry[]>(() => entries.value);
 
 function summarize(entry: StreamFilterHistoryEntry): string {
   const parts: string[] = [];
-  if (entry.offset !== null) parts.push(`offset ${entry.offset}`);
-  if (entry.partitions.length === 1) parts.push(`partition ${entry.partitions[0]}`);
-  else if (entry.partitions.length > 1) parts.push(`partitions ${entry.partitions.join(', ')}`);
-  if (entry.timestamp !== null) parts.push(`ts ${entry.timestamp}`);
-  return parts.length > 0 ? parts.join(' · ') : '(empty filter)';
+  if (entry.offset !== null) parts.push(t('studio.stream.history.offset.label', { value: entry.offset }));
+  if (entry.partitions.length === 1) parts.push(t('studio.stream.partition.label', { id: entry.partitions[0] }));
+  else if (entry.partitions.length > 1) parts.push(t('studio.stream.history.partitions.label', { list: entry.partitions.join(', ') }));
+  if (entry.timestamp !== null) parts.push(t('studio.stream.history.since.label', { value: entry.timestamp }));
+  return parts.length > 0 ? parts.join(' · ') : t('studio.stream.emptyFilter.label');
 }
 
 function apply(entry: StreamFilterHistoryEntry): void {
@@ -68,12 +69,12 @@ function remove(entry: StreamFilterHistoryEntry): void {
 
 <template>
   <SavedListMenu
-    title="Filter history"
+    :title="t('studio.common.filterHistory.placeholder')"
     :saved="savedEntries"
     panel-test-id="stream-filter-history"
     backdrop-test-id="stream-filter-history-backdrop"
     saved-entry-test-id="stream-filter-history-entry"
-    empty-saved-text="No filter history yet"
+    :empty-saved-text="t('studio.stream.noFilterHistory.empty')"
     :entry-text="summarize"
     @apply="apply"
     @toggle-pin="togglePin"

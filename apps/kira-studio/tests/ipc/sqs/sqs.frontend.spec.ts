@@ -91,7 +91,7 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
     /visibility \d+s/,
   );
   const firstRow = view.locator('[data-testid="stream-row"]').first();
-  await expect(firstRow.locator('[data-testid="stream-key"]')).not.toHaveText('(none)');
+  await expect(firstRow.locator('[data-testid="stream-key"]')).not.toHaveText('None');
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');
   await expect(firstRow.locator('[data-testid="stream-body"]')).toContainText('seq');
 

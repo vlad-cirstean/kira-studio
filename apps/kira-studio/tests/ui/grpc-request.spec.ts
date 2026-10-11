@@ -801,7 +801,7 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
 
   await clearBtn.click();
   await expect(page.locator('[data-testid="confirm-dialog-message"]')).toHaveText(
-    'Clear this request’s call history? This cannot be undone.',
+    'Every past call of this request is removed. This can’t be undone.',
   );
   await acceptConfirm(page);
 

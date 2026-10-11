@@ -6,6 +6,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref } from 'vue';
@@ -22,6 +23,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: [] }>();
 
+const HEADERS_EXAMPLE = '{"source": "manual"}';
 const key = ref('');
 const body = ref('');
 const headers = ref('');
@@ -51,10 +53,10 @@ async function submit(): Promise<void> {
   <div class="flex flex-col">
     <div class="flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground normal-case tracking-normal">
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
-      <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
+      <span>{{ t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label') }}</span>
       <TooltipIconButton
         icon="close"
-        label="Close"
+        :label="t('common.action.close.label')"
         class="ml-auto"
         @click="emit('close')"
       />
@@ -62,10 +64,10 @@ async function submit(): Promise<void> {
 
     <div class="flex flex-col gap-1.5 p-2">
       <Label v-if="isKafka" class="flex flex-col gap-0.5">
-        <span class="text-kira-md text-muted-foreground">Key (optional)</span>
+        <span class="text-kira-md text-muted-foreground">{{ t('studio.stream.compose.key.label') }}</span>
         <Input
           :model-value="key"
-          placeholder="(none)"
+          :placeholder="t('common.state.none.option')"
           size="kira"
           class="font-data"
           data-testid="stream-add-message-key"
@@ -74,24 +76,24 @@ async function submit(): Promise<void> {
       </Label>
 
       <Label class="flex flex-col gap-0.5">
-        <span class="text-kira-md text-muted-foreground">Body</span>
+        <span class="text-kira-md text-muted-foreground">{{ t('studio.http.pane.body.label') }}</span>
         <Textarea
           v-model="body"
           class="font-data"
           rows="6"
-          placeholder="Message body"
+          :placeholder="t('studio.stream.compose.body.placeholder')"
           data-testid="stream-add-message-body"
           @keydown="wrapSelectionOnType"
         />
       </Label>
 
       <Label class="flex flex-col gap-0.5">
-        <span class="text-kira-md text-muted-foreground">Headers (optional JSON object)</span>
+        <span class="text-kira-md text-muted-foreground">{{ t('studio.stream.compose.headers.label') }}</span>
         <Textarea
           v-model="headers"
           class="font-data"
           rows="3"
-          placeholder='{"source": "manual"}'
+          :placeholder="HEADERS_EXAMPLE"
           data-testid="stream-add-message-headers"
           @keydown="wrapSelectionOnType"
         />
@@ -101,7 +103,7 @@ async function submit(): Promise<void> {
     </div>
 
     <div class="flex justify-end gap-1.5 border-t border-border py-1.5 px-2">
-      <Button variant="dialog" size="kira-lg" @click="emit('close')">Cancel</Button>
+      <Button variant="dialog" size="kira-lg" @click="emit('close')">{{ t('common.action.cancel.label') }}</Button>
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -109,7 +111,7 @@ async function submit(): Promise<void> {
         data-testid="stream-add-message-submit"
         @click="submit"
       >
-        {{ isKafka ? 'Produce' : 'Send' }}
+        {{ t(isKafka ? 'studio.stream.produceAction.label' : 'common.action.send.label') }}
       </Button>
     </div>
   </div>

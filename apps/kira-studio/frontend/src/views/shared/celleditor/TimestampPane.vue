@@ -150,7 +150,7 @@ watch(calendarOpen, (open) => {
         <span ref="calendarAnchorRef" class="relative shrink-0">
           <TooltipIconButton
             icon="calendar"
-            :label="t('studio.cellEditor.timestamp.pick.tooltip')"
+            :label="t('studio.common.pickDateTime.tooltip')"
             disabled-trigger
             ref="calendarTriggerEl"
             :disabled="readOnly"

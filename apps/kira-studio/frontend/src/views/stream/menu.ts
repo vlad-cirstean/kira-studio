@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -15,18 +16,20 @@ export function rowMenu(
     items.push({
       type: 'item',
       id: 'copy-key',
-      label: 'Copy key',
+      label: t('studio.stream.copyKey.label'),
       icon: 'copy',
-      run: () => copyOrReportError(key, onError, () => announceApp('Copied key')),
+      run: () =>
+        copyOrReportError(key, onError, () => announceApp(t('studio.stream.copiedKey.announce'))),
     });
   }
   if (body !== null) {
     items.push({
       type: 'item',
       id: 'copy-body',
-      label: 'Copy body',
+      label: t('studio.stream.copyBody.label'),
       icon: 'copy',
-      run: () => copyOrReportError(body, onError, () => announceApp('Copied body')),
+      run: () =>
+        copyOrReportError(body, onError, () => announceApp(t('studio.stream.copiedBody.announce'))),
     });
   }
   return items;

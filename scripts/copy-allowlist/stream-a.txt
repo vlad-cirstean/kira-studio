@@ -1,9 +1,4 @@
 # Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
-apps/kira-studio/frontend/src/views/stream/StreamFilterHistoryMenu.vue
-apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
-apps/kira-studio/frontend/src/views/stream/StreamView.vue
-apps/kira-studio/frontend/src/views/stream/menu.ts
 apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue
 apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue
 apps/kira-studio/frontend/src/workbench/SettingsDialog.vue

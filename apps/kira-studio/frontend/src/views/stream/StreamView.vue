@@ -22,10 +22,11 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
-import { formatCount, plural } from '@workbench/behaviour/format';
+import { formatBytes, formatCount } from '@workbench/behaviour/format';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
@@ -114,19 +115,38 @@ const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord
 const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
 const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
 function redriveSentence(limit: number | 'none' | null): string {
-  if (limit === null) return 'Its redrive limit could not be read';
-  if (limit === 'none') return 'This queue has no redrive limit';
-  return `This queue moves a message to its dead-letter queue after ${limit} receives`;
+  if (limit === null) return t('studio.stream.redriveUnknown.description');
+  if (limit === 'none') return t('studio.stream.redriveNone.description');
+  return t('studio.stream.redriveLimit.description', { count: limit });
 }
 
 function visibilityLabel(seconds: number): string {
-  if (seconds % 3600 === 0) return plural(seconds / 3600, 'hour');
-  if (seconds % 60 === 0) return plural(seconds / 60, 'minute');
-  return plural(seconds, 'second');
+  if (seconds % 3600 === 0) return t('studio.stream.hours.status', { count: seconds / 3600 });
+  if (seconds % 60 === 0) return t('studio.stream.minutes.status', { count: seconds / 60 });
+  return t('studio.stream.seconds.status', { count: seconds });
 }
 const hideDuration = computed(() => visibilityLabel(props.tab.state.sqsVisibilityTimeoutSeconds));
 
-const VISIBILITY_RANGE_HINT = `Whole seconds from ${SQS_MIN_VISIBILITY_TIMEOUT_SECONDS} to ${SQS_MAX_VISIBILITY_TIMEOUT_SECONDS} (12 h)`;
+const visibilityRangeHint = computed(() =>
+  t('studio.stream.visibilityRange.hint', {
+    min: SQS_MIN_VISIBILITY_TIMEOUT_SECONDS,
+    max: SQS_MAX_VISIBILITY_TIMEOUT_SECONDS,
+  }),
+);
+
+const COLUMN_LABEL_KEYS = {
+  key: 'common.field.key.label',
+  timestamp: 'studio.stream.column.timestamp.label',
+  headers: 'studio.http.pane.headers.label',
+  attrs: 'studio.stream.column.attributes.label',
+  body: 'studio.http.pane.body.label',
+} as const satisfies Record<string, MessageKey>;
+function columnLabel(id: keyof typeof COLUMN_LABEL_KEYS): string {
+  return t(COLUMN_LABEL_KEYS[id]);
+}
+function resizeLabel(id: keyof typeof COLUMN_LABEL_KEYS): string {
+  return t('studio.stream.resizeColumn.aria', { column: columnLabel(id).toLowerCase() });
+}
 function validVisibility(text: string): boolean {
   const n = Number(text.trim());
   return (
@@ -138,7 +158,7 @@ function validVisibility(text: string): boolean {
 const visibility = useInlineEdit({
   source: () => String(props.tab.state.sqsVisibilityTimeoutSeconds),
   commit: (text) => {
-    if (!validVisibility(text)) throw new Error(VISIBILITY_RANGE_HINT);
+    if (!validVisibility(text)) throw new Error(visibilityRangeHint.value);
     streamViewStore.setPollVisibilityTimeout(props.tab.id, Number(text));
   },
 });
@@ -328,7 +348,15 @@ async function onPoll(): Promise<void> {
   if (isReadOnlyBatch.value && !visibilityValid.value) return;
   if (isReadOnlyBatch.value && !rt.value?.receiveAcknowledged) {
     const limit = redriveLimit.value ?? (await streamViewStore.fetchRedriveLimit(props.tab.id));
-    const ok = await confirmDialogStore.confirm({ message: `Each poll hides received messages from other consumers for ${hideDuration.value} and raises their receive count. ${redriveSentence(limit)}. Poll anyway?`, confirmLabel: 'Delete', tone: 'danger' });
+    const ok = await confirmDialogStore.confirm({
+      title: t('studio.stream.pollConfirm.title'),
+      message: [
+        t('studio.stream.pollConfirm.body', { duration: hideDuration.value }),
+        redriveSentence(limit),
+      ].join(' '),
+      confirmLabel: t('studio.stream.poll.label'),
+      tone: 'primary',
+    });
     if (!ok) return;
     streamViewStore.acknowledgeReceive(props.tab.id);
   }
@@ -344,9 +372,14 @@ const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
   const parts: string[] = [];
-  parts.push(`${r.rowCount} row${r.rowCount === 1 ? '' : 's'} on this page`);
+  parts.push(t('studio.stream.rowsOnPage.status', { count: r.rowCount }));
   if (r.count) {
-    parts.push(`${r.count.exact ? '' : '~'}${formatCount(r.count.value)} total`);
+    parts.push(
+      t('studio.stream.total.status', {
+        approx: r.count.exact ? '' : '~',
+        total: formatCount(r.count.value),
+      }),
+    );
   }
   return parts.join(' · ');
 });
@@ -425,7 +458,7 @@ function validateTimestamp(): boolean {
     return true;
   }
   if (Number.isNaN(Date.parse(timestampText.value.trim()))) {
-    timestampError.value = 'Not a recognizable timestamp';
+    timestampError.value = t('studio.stream.timestamp.invalid.error');
     return false;
   }
   timestampError.value = null;
@@ -524,9 +557,9 @@ function onTogglePartition(p: number): void {
 
 const partitionButtonLabel = computed(() => {
   const n = selectedPartitions.value.length;
-  if (n === 0) return 'all partitions';
-  if (n === 1) return `partition ${selectedPartitions.value[0]}`;
-  return `${n} partitions`;
+  if (n === 0) return t('studio.stream.allPartitions.label');
+  if (n === 1) return t('studio.stream.partition.label', { id: selectedPartitions.value[0] });
+  return t('studio.stream.partitions.label', { count: n });
 });
 
 const hasSelectedRow = computed(
@@ -546,9 +579,16 @@ async function onDeleteMessage(): Promise<void> {
   if (selectedRow === null || selectedRow === undefined) return;
   const row = rowAt(selectedRow);
   if (!row?.key) return;
-  if (!(await confirmDialogStore.confirm({ message: `Delete this message (id: ${row.key})? This cannot be undone.`, confirmLabel: 'Delete', tone: 'danger' }))) {
-    return;
-  }
+  const confirmed = await confirmDialogStore.confirm({
+    title: t('studio.stream.deleteConfirm.title'),
+    message: [
+      t('studio.stream.deleteConfirm.body', { id: row.key }),
+      t('common.confirm.irreversible.body'),
+    ].join(' '),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   try {
     await deleteSqsMessage(props.tab.id, row.key);
     streamViewStore.setActionError(props.tab.id, null);
@@ -742,7 +782,7 @@ onUnmounted(() => {
           v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
           data-testid="stream-visibility-timeout"
         >
-          {{ isReadOnlyBatch ? 'queue visibility' : 'visibility' }} {{ page.visibilityTimeoutSeconds }}s
+          {{ t(isReadOnlyBatch ? 'studio.stream.visibilityQueue.status' : 'studio.stream.visibility.status', { time: t('format.duration.secondsCompact', { seconds: page.visibilityTimeoutSeconds }) }) }}
         </Badge>
       </span>
     </ViewToolbar>
@@ -752,7 +792,7 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           disabled-trigger
           data-testid="stream-refresh"
           :disabled="isBatch"
@@ -760,7 +800,7 @@ onUnmounted(() => {
         />
         <TooltipIconButton
           icon="debug-stop"
-          label="Stop"
+          :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': running }"
           data-testid="stream-stop"
@@ -782,7 +822,7 @@ onUnmounted(() => {
               variant="toolbar"
               size="kira-icon"
               :class="rt?.countError ? 'text-error' : ''"
-              aria-label="Count"
+              :aria-label="t('studio.stream.count.label')"
               data-testid="stream-count"
               @click="streamViewStore.runCount(tab.id)"
             >
@@ -793,14 +833,14 @@ onUnmounted(() => {
                is no longer silent (applyStreamFilter now clears countError the same way it already
                clears count/countOpId, so a stale message never outlives the filter it was for). -->
           <TooltipContent data-testid="stream-count-tooltip">{{
-            rt?.countError ? `Count failed: ${rt.countError}` : 'Count'
+            rt?.countError ? t('studio.common.countFailed.tooltip', { error: rt.countError }) : t('studio.stream.count.label')
           }}</TooltipContent>
         </Tooltip>
         <span class="text-kira-sm text-muted-foreground" data-testid="stream-status">{{ statusLine }}</span>
         <Tooltip v-if="isReadOnlyBatch">
           <TooltipTrigger as-child>
             <InputGroup variant="kira" class="flex w-24 shrink-0 font-data" :aria-invalid="!visibilityValid">
-              <span class="shrink-0 text-kira-sm text-muted-foreground">hide</span>
+              <span class="shrink-0 text-kira-sm text-muted-foreground">{{ t('common.action.hide.label') }}</span>
               <InputGroupInput
                 :model-value="visibility.text.value"
                 type="number"
@@ -814,17 +854,13 @@ onUnmounted(() => {
                 @keydown="visibility.onKeydown"
                 @blur="visibility.onCommit"
               />
-              <span class="shrink-0 text-kira-sm text-muted-foreground">s</span>
+              <span class="shrink-0 text-kira-sm text-muted-foreground">{{ t('format.duration.secondsCompact', { seconds: '' }) }}</span>
             </InputGroup>
           </TooltipTrigger>
-          <TooltipContent>
-            How long each received message stays hidden from other consumers. Longer avoids
-            receiving a message twice in one poll; shorter keeps messages available to consumers.
-            1 s minimum: the AWS SDK cannot send 0. Stop does not unhide messages early.
-          </TooltipContent>
+          <TooltipContent>{{ t('studio.stream.hideDuration.description') }}</TooltipContent>
         </Tooltip>
         <FieldError v-if="isReadOnlyBatch && !visibilityValid" data-testid="stream-poll-visibility-error">{{
-          VISIBILITY_RANGE_HINT
+          visibilityRangeHint
         }}</FieldError>
         <Tooltip v-if="isBatch">
           <TooltipTrigger as-child>
@@ -837,17 +873,17 @@ onUnmounted(() => {
               @click="onPoll"
             >
               <CodiconIcon name="arrow-swap" :size="13" />
-              Poll
+              {{ t('studio.stream.poll.label') }}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{{
-            isReadOnlyBatch && !visibilityValid ? VISIBILITY_RANGE_HINT : "Poll for messages"
+            isReadOnlyBatch && !visibilityValid ? visibilityRangeHint : t('studio.stream.poll.tooltip')
           }}</TooltipContent>
         </Tooltip>
         <TooltipIconButton
           v-else
           icon="arrow-right"
-          label="Next page"
+          :label="t('common.action.nextPage.label')"
           data-testid="stream-next"
           disabled-trigger
           :disabled="!rt?.hasMore"
@@ -869,8 +905,8 @@ onUnmounted(() => {
           <TooltipIconButton
             v-if="canInsert"
             icon="add"
-            :label="isKafka ? 'Produce a message' : 'Send a message'"
-            aria-label="Add message"
+            :label="t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
+            :aria-label="t('studio.stream.addMessage.aria')"
             ref="addMessageTriggerEl"
             data-testid="stream-add-message"
             @click="composeOpen = !composeOpen"
@@ -889,8 +925,8 @@ onUnmounted(() => {
         <TooltipIconButton
           v-if="canDelete"
           icon="trash"
-          :label="hasSelectedRow ? 'Delete the selected message' : 'Select a message first'"
-          aria-label="Delete message"
+          :label="t(hasSelectedRow ? 'studio.stream.deleteSelected.tooltip' : 'studio.stream.selectFirst.tooltip')"
+          :aria-label="t('studio.stream.deleteMessage.aria')"
           disabled-trigger
           :disabled="!hasSelectedRow"
           data-testid="stream-delete-message"
@@ -898,7 +934,7 @@ onUnmounted(() => {
         />
         <TooltipIconButton
           icon="search"
-          label="Search this page"
+          :label="t('studio.common.searchPage.label')"
           :class="{ 'bg-field text-fg': rt?.searchOpen }"
           data-testid="stream-search-toggle"
           @click="onToggleSearch"
@@ -920,7 +956,7 @@ onUnmounted(() => {
         <div class="relative">
           <TooltipIconButton
             icon="history"
-            label="Filter history"
+            :label="t('studio.common.filterHistory.placeholder')"
             data-testid="stream-filter-history-button"
             @click="filterHistoryOpen = !filterHistoryOpen"
           />
@@ -936,11 +972,11 @@ onUnmounted(() => {
             <span
               class="shrink-0 text-kira-sm"
               :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"
-              >offset</span
+              >{{ t('studio.stream.offset.label') }}</span
             >
             <InputGroupInput
               :model-value="offsetText"
-              placeholder="e.g. 1000"
+              :placeholder="t('studio.stream.offset.placeholder')"
               class="h-full p-0 font-data"
               data-testid="stream-filter-offset"
               @update:model-value="offsetEdit.onInput"
@@ -964,7 +1000,7 @@ onUnmounted(() => {
                 {{ partitionButtonLabel }}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Filter by partition</TooltipContent>
+            <TooltipContent>{{ t('studio.stream.partitionFilter.tooltip') }}</TooltipContent>
           </Tooltip>
           <Popover :open="partitionMenuOpen" @update:open="(v) => (partitionMenuOpen = v)">
             <PopoverAnchor :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
@@ -972,8 +1008,8 @@ onUnmounted(() => {
               <!-- Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-
                    PopoverPanel shape. -->
               <div class="flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1">
-                <InlineState v-if="partitionOptionsLoading" kind="loading">Loading…</InlineState>
-                <InlineState v-else-if="partitionOptions.length === 0" kind="empty">No partitions</InlineState>
+                <InlineState v-if="partitionOptionsLoading" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
+                <InlineState v-else-if="partitionOptions.length === 0" kind="empty">{{ t('studio.stream.noPartitions.empty') }}</InlineState>
                 <Label
                   v-for="p in partitionOptions"
                   :key="p"
@@ -987,7 +1023,7 @@ onUnmounted(() => {
                   >
                     <CodiconIcon name="check" :size="12" />
                   </Checkbox>
-                  <span>partition {{ p }}</span>
+                  <span>{{ t('studio.stream.partition.label', { id: p }) }}</span>
                 </Label>
               </div>
             </PopoverContent>
@@ -1008,11 +1044,11 @@ onUnmounted(() => {
                   <span
                     class="shrink-0 text-kira-sm"
                     :class="tab.state.timestampFilter ? 'text-state-on' : 'text-muted-foreground'"
-                    >since</span
+                    >{{ t('studio.stream.since.label') }}</span
                   >
                   <InputGroupInput
                     :model-value="timestampText"
-                    placeholder="ISO timestamp"
+                    :placeholder="t('studio.cellEditor.detect.iso8601.status')"
                     class="h-full p-0 font-data"
                     data-testid="stream-filter-timestamp"
                     @update:model-value="timestampEdit.onInput"
@@ -1026,7 +1062,7 @@ onUnmounted(() => {
             <span class="relative shrink-0">
               <TooltipIconButton
                 icon="calendar"
-                label="Pick a date and time"
+                :label="t('studio.common.pickDateTime.tooltip')"
                 ref="timestampCalendarTriggerEl"
                 data-testid="stream-filter-timestamp-calendar"
                 @click="timestampCalendarOpen = !timestampCalendarOpen"
@@ -1050,28 +1086,22 @@ onUnmounted(() => {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira" data-testid="stream-filter-clear" @click="onClearFilter">
-              Clear
+              {{ t('common.action.clear.label') }}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Empty every field and refetch</TooltipContent>
+          <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
         </Tooltip>
     </ViewToolbar>
 
     <!-- The one destructive truth of this view, stated once at the top. -->
     <Alert v-if="isBatch" variant="warn" strip data-testid="stream-poll-warning">
       <AlertDescription v-if="isReadOnlyBatch">
-        Each poll hides received messages from other consumers for {{ hideDuration }} and raises
-        their receive count. A longer hide avoids receiving the same message twice in one poll but
-        keeps it from consumers that long; a short hide can end a poll early.<template
-          v-if="redriveLimit !== null"
-        >
-          This queue moves a message to its dead-letter queue after {{ redriveLimit }} receives.</template
-        >
+        {{ t('studio.stream.pollWarningReadOnly.description', { duration: hideDuration }) }}
+        <template v-if="redriveLimit !== null">{{ redriveSentence(redriveLimit) }}</template>
       </AlertDescription>
       <AlertDescription v-else>
-        Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
-        above) — it does not browse a stable position.<template v-if="redriveLimit !== null">
-        This queue moves a message to its dead-letter queue after {{ redriveLimit }} receives.</template>
+        {{ t('studio.stream.pollWarningConsume.description') }}
+        <template v-if="redriveLimit !== null">{{ redriveSentence(redriveLimit) }}</template>
       </AlertDescription>
     </Alert>
 
@@ -1097,7 +1127,7 @@ onUnmounted(() => {
          — the part that actually needs a live connection — swaps for the gate. -->
     <Empty v-if="needsReconnect" data-testid="stream-reconnect">
       <Button variant="dialog-primary" size="kira-lg" data-testid="stream-reconnect-load" @click="onReconnectAndLoad">
-        Reconnect & load
+        {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
     </Empty>
     <template v-else>
@@ -1113,13 +1143,13 @@ onUnmounted(() => {
       <Empty v-if="isBatch && !rt?.polled" class="no-rows absolute inset-0">
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="arrow-swap" :size="24" /></EmptyMedia>
-          <EmptyTitle>Click Poll to fetch messages</EmptyTitle>
+          <EmptyTitle>{{ t('studio.stream.pollPrompt.empty') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <Empty v-else-if="!rt || rt.rowCount === 0" class="no-rows absolute inset-0">
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="inbox" :size="24" /></EmptyMedia>
-          <EmptyTitle v-if="rt">No messages</EmptyTitle>
+          <EmptyTitle v-if="rt">{{ t('studio.stream.noMessages.empty') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
@@ -1135,12 +1165,12 @@ onUnmounted(() => {
           <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative w-10" />
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('key')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">key</span>
+              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('key') }}</span>
               <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-key"
-                label="Resize key column"
+                :label="resizeLabel('key')"
                 :size="widthFor('key')"
                 :min="40"
                 @live="(w) => onResizeLive('key', w)"
@@ -1150,12 +1180,12 @@ onUnmounted(() => {
               />
             </div>
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('timestamp')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">timestamp</span>
+              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('timestamp') }}</span>
               <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-timestamp"
-                label="Resize timestamp column"
+                :label="resizeLabel('timestamp')"
                 :size="widthFor('timestamp')"
                 :min="40"
                 @live="(w) => onResizeLive('timestamp', w)"
@@ -1165,12 +1195,12 @@ onUnmounted(() => {
               />
             </div>
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('headers')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">headers</span>
+              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('headers') }}</span>
               <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-headers"
-                label="Resize headers column"
+                :label="resizeLabel('headers')"
                 :size="widthFor('headers')"
                 :min="40"
                 @live="(w) => onResizeLive('headers', w)"
@@ -1180,12 +1210,12 @@ onUnmounted(() => {
               />
             </div>
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('attrs')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">attrs</span>
+              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('attrs') }}</span>
               <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-attrs"
-                label="Resize attrs column"
+                :label="resizeLabel('attrs')"
                 :size="widthFor('attrs')"
                 :min="40"
                 @live="(w) => onResizeLive('attrs', w)"
@@ -1194,14 +1224,14 @@ onUnmounted(() => {
                 @click.stop
               />
             </div>
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative flex-1"><span class="text-fg overflow-hidden text-ellipsis">body</span></div>
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative flex-1"><span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('body') }}</span></div>
           </div>
           <div
             ref="scrollEl"
             class="flex-1 min-h-0 overflow-auto"
             data-testid="virtual-list"
             role="listbox"
-            aria-label="Stream rows"
+            :aria-label="t('studio.stream.rows.aria')"
             @scroll="onScroll"
           >
             <div class="relative" :style="{ height: `${totalSize}px` }">
@@ -1235,8 +1265,8 @@ onUnmounted(() => {
                   @click="onKeyCellClickFromEvent"
                   @keydown="onCellKeydownFromEvent($event, 'key')"
                 >
-                  <Badge data v-if="rowAt(rowIndices[vi.index])?.keyBinary" class="mr-1" data-testid="stream-key-binary">base64</Badge>
-                  {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
+                  <Badge data v-if="rowAt(rowIndices[vi.index])?.keyBinary" class="mr-1" data-testid="stream-key-binary">{{ t('studio.cellEditor.format.base64.label') }}</Badge>
+                  {{ rowAt(rowIndices[vi.index])?.key ?? t('common.state.none.option') }}
                 </div>
                 <div
                   class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
@@ -1278,7 +1308,7 @@ onUnmounted(() => {
                   class="flex items-center px-2 border-r border-b border-border font-data truncate flex-1 text-muted-foreground text-kira-sm"
                   data-testid="stream-body"
                   role="option"
-                  :aria-label="rowAt(rowIndices[vi.index])?.body === null ? 'null (tombstone)' : undefined"
+                  :aria-label="rowAt(rowIndices[vi.index])?.body === null ? t('studio.stream.tombstone.tooltip') : undefined"
                   tabindex="0"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
                   @click="onBodyCellClickFromEvent"
@@ -1286,19 +1316,19 @@ onUnmounted(() => {
                 >
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.body === null">
                     <TooltipTrigger as-child>
-                      <span class="text-subtle italic" data-testid="stream-body-null">NULL</span>
+                      <span class="text-subtle italic" data-testid="stream-body-null">{{ t('studio.common.nullValue.label') }}</span>
                     </TooltipTrigger>
-                    <TooltipContent>null (tombstone)</TooltipContent>
+                    <TooltipContent>{{ t('studio.stream.tombstone.tooltip') }}</TooltipContent>
                   </Tooltip>
                   <template v-else>
-                    <Badge v-if="rowAt(rowIndices[vi.index])?.bodyBinary" class="mr-1" data-testid="stream-body-binary">base64</Badge>
+                    <Badge v-if="rowAt(rowIndices[vi.index])?.bodyBinary" class="mr-1" data-testid="stream-body-binary">{{ t('studio.cellEditor.format.base64.label') }}</Badge>
                     {{ rowAt(rowIndices[vi.index])?.body }}
                   </template>
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
-                      <span class="text-kira-sm text-muted-foreground">(truncated)</span>
+                      <span class="text-kira-sm text-muted-foreground">{{ t('studio.common.truncated.status') }}</span>
                     </TooltipTrigger>
-                    <TooltipContent>body truncated</TooltipContent>
+                    <TooltipContent>{{ t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
                   </Tooltip>
                 </div>
               </div>
