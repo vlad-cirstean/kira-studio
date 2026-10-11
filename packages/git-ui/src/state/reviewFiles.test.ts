@@ -88,8 +88,8 @@ describe('ReviewFilesState — sinceReview mode opens each file against its own 
     await sleep();
 
     expect(openRangeDiffCalls).toEqual([
-      { path: 'a.ts', leftRev: 'a-reviewed-sha', leftLabel: 'your last review' },
-      { path: 'b.ts', leftRev: 'b-reviewed-sha', leftLabel: 'your last review' },
+      { path: 'a.ts', leftRev: 'a-reviewed-sha', leftLabel: 'Your last review' },
+      { path: 'b.ts', leftRev: 'b-reviewed-sha', leftLabel: 'Your last review' },
     ]);
   });
 });

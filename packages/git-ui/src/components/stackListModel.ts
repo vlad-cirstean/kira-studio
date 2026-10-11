@@ -12,6 +12,7 @@ import type {
   StackListResult,
   StackSummary,
 } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { formatTrack } from './refListModel.ts';
 
 /** One renderable row of the stack section — depth carries the indent (D3's own pre-order,
@@ -37,11 +38,11 @@ export interface StackRow {
 
 export function staleChipText(branch: StackBranch): string | undefined {
   if (branch.state !== 'needsRestack') return undefined;
-  return branch.behind === 1 ? '1 commit behind' : `${branch.behind} commits behind`;
+  return t('git.stack.behind.status', { count: branch.behind });
 }
 
 export function aheadText(branch: StackBranch): string {
-  return branch.ahead === 1 ? '1 commit' : `${branch.ahead} commits`;
+  return t('git.review.commits.count.label', { count: branch.ahead });
 }
 
 function baseRow(
@@ -90,8 +91,8 @@ export function buildOrphanRows(
     isOrphan: true,
     orphanReason:
       branch.parent === ''
-        ? 'this branch sits in a cycle'
-        : `parent "${branch.parent}" no longer exists`,
+        ? t('git.stack.orphanCycle.hint')
+        : t('git.stack.orphanMissing.hint', { parent: branch.parent }),
   }));
 }
 

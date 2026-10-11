@@ -1,5 +1,6 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript } from '@shared/domain/scripts';
+import { t } from '@theme/i18n';
 import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
 import { type RunDialogRequest, useScriptRunDialogStore } from './run/runDialog';
@@ -52,7 +53,7 @@ export function useRerun(): (run: ScriptRun) => Promise<string | null> {
   const runScript = useRunScript();
   return async (run) => {
     const script = ctx.scripts.records().find((s) => s.id === run.scriptId);
-    if (!script) return 'This script no longer exists.';
+    if (!script) return t('automations.script.gone.error');
     const prefill: Record<string, string[]> = {};
     for (const p of script.params) {
       const was = run.params.find((x) => x.name === p.name);

@@ -7,7 +7,7 @@
  */
 import type { SearchField, SearchScope } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';
-import { t } from '@theme/i18n';
+import { type MessageKey, t } from '@theme/i18n';
 import type { CommitHit, RefHit, SearchRunResult } from '../state/search.ts';
 import { capItems, REF_LIST_SECTION_CAP } from './refListModel.ts';
 
@@ -62,24 +62,24 @@ export interface SearchResultsModel {
  *  for a hit that matched somewhere other than the subject"). `undefined` when `subject`/
  *  `refName` is present, since that is the row's own visible text and needs no label pointing at
  *  it. */
-const FIELD_LABELS: Readonly<Record<SearchField, string>> = {
-  subject: 'subject',
-  body: 'body',
-  authorName: 'author',
-  authorEmail: 'author email',
-  committerName: 'committer',
-  committerEmail: 'committer email',
-  sha: 'sha',
-  refName: 'name',
-  tagAnnotation: 'tag message',
-  prNumber: 'PR number',
-  prTitle: 'PR title',
-};
+const FIELD_LABEL_KEYS = {
+  subject: 'git.search.field.subject.label',
+  body: 'git.search.field.body.label',
+  authorName: 'git.search.field.author.label',
+  authorEmail: 'git.search.field.authorEmail.label',
+  committerName: 'git.commit.committer.label',
+  committerEmail: 'git.search.field.committerEmail.label',
+  sha: 'git.search.field.sha.label',
+  refName: 'common.field.name.label',
+  tagAnnotation: 'git.search.field.tagMessage.label',
+  prNumber: 'git.search.field.prNumber.label',
+  prTitle: 'git.search.field.prTitle.label',
+} as const satisfies Record<SearchField, MessageKey>;
 
 export function fieldLabel(fields: readonly SearchField[]): string | undefined {
   const other = fields.filter((f) => f !== 'subject' && f !== 'refName');
   if (other.length === 0) return undefined;
-  return other.map((f) => FIELD_LABELS[f]).join(', ');
+  return other.map((f) => t(FIELD_LABEL_KEYS[f])).join(', ');
 }
 
 const SEARCH_SECTION_CAP = REF_LIST_SECTION_CAP;
@@ -125,9 +125,9 @@ export function buildSearchResultsModel(input: SearchResultsInput): SearchResult
     const remotes = input.refHits.filter((h) => h.ref.kind === 'remoteBranch');
     const tags = input.refHits.filter((h) => h.ref.kind === 'tag');
     for (const section of [
-      buildRefSection('Branches', branches),
-      buildRefSection('Remote branches', remotes),
-      buildRefSection('Tags', tags),
+      buildRefSection(t('common.module.branches.label'), branches),
+      buildRefSection(t('git.picker.remoteBranches.label'), remotes),
+      buildRefSection(t('git.tag.list.label'), tags),
     ]) {
       if (section) sections.push(section);
     }
@@ -140,19 +140,22 @@ export function buildSearchResultsModel(input: SearchResultsInput): SearchResult
   const loaded = input.loaded;
   const loadedFooter =
     loaded !== undefined && !loaded.complete
-      ? `Searched ${loaded.scannedRows} of ${input.loadedRowCount} loaded commits`
+      ? t('git.search.loadedFooter.status', {
+          scanned: loaded.scannedRows,
+          count: input.loadedRowCount,
+        })
       : undefined;
 
   const tail = input.tail;
   const tailFooter =
     tail?.kind === 'ok' && tail.truncated
-      ? `${tail.total - tail.hits.length} more match${tail.total - tail.hits.length === 1 ? '' : 'es'} in history`
+      ? t('git.search.tailFooter.status', { count: tail.total - tail.hits.length })
       : undefined;
   const tailNotice =
     tail?.kind === 'unsupportedPattern'
       ? tail.message
       : input.tailError !== undefined
-        ? `Search of unloaded history failed — ${input.tailError}`
+        ? t('git.search.tailFailed.error', { error: input.tailError })
         : undefined;
 
   return {

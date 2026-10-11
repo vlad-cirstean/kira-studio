@@ -6,6 +6,7 @@ import type {
   ReviewDiffMode,
   ReviewFileEntry,
 } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { createLatestRequest, runLatest } from '@workbench/behaviour/latest';
 import { errorText } from '@workbench/bridge/codedError';
 import { type ShallowRef, shallowRef } from 'vue';
@@ -200,7 +201,7 @@ export class ReviewFilesState {
     const sinceReview =
       this.diffMode.value === 'sinceReview' ? entry.review.reviewedAtSha : undefined;
     const leftRev = sinceReview ?? this.#mergeBase;
-    const leftLabel = sinceReview ? 'your last review' : target.base;
+    const leftLabel = sinceReview ? t('git.review.lastReview.label') : target.base;
     await this.#bridge.request('editor.openRangeDiff', {
       repoId: target.repoId,
       branch: target.branch,

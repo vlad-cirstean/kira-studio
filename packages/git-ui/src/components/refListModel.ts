@@ -6,6 +6,7 @@
  * DOM-touching renderer.
  */
 import type { RefRow, RefTrack } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 
 /** §7.8's own rule reused verbatim (`fileTreeModel.ts`'s `filterFiles`): case-insensitive
@@ -101,8 +102,8 @@ export function remoteCheckoutLabel(remoteRow: RefRow, branches: readonly RefRow
   const localName = localNameForRemoteBranch(remoteRow.shortName);
   const hasLocal = branches.some((row) => row.shortName === localName);
   return hasLocal
-    ? `Switch to ${localName}`
-    : `Create local branch tracking ${remoteRow.shortName}`;
+    ? t('git.picker.switchTo.label', { name: localName })
+    : t('git.picker.createTracking.label', { name: remoteRow.shortName });
 }
 
 /** The `op.run`/`preflight.checkout` `target` string a remote branch row's row-level checkout

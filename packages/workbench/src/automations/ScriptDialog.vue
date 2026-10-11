@@ -24,7 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
-import { CatalogText, t } from '@theme/i18n';
+import { CatalogText, type MessageKey, t } from '@theme/i18n';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
 import { useFocus } from '@vueuse/core';
@@ -116,13 +116,16 @@ const collection = ref(props.script?.collectionId ?? props.collectionId ?? '');
 const color = ref<PaletteColor>((props.script?.color as PaletteColor | undefined) ?? 'none');
 const error = ref<string | null>(null);
 
-const TABS: readonly { id: EditorTab; label: string }[] = [
-  { id: 'script', label: t('automations.script.fallback.label') },
-  { id: 'params', label: t('automations.params.title.label') },
-  { id: 'schedule', label: t('automations.schedule.title.label') },
-];
+const TAB_IDS: readonly EditorTab[] = ['script', 'params', 'schedule'];
+const TAB_LABEL_KEYS = {
+  script: 'automations.script.fallback.label',
+  params: 'automations.params.title.label',
+  schedule: 'automations.schedule.title.label',
+} as const satisfies Record<EditorTab, MessageKey>;
 const tab = ref<EditorTab>(props.initialTab ?? 'script');
-const tabItems = TABS.map((t) => ({ value: t.id, label: t.label, testid: `script-dialog-tab-${t.id}` }));
+const tabItems = computed(() =>
+  TAB_IDS.map((id) => ({ value: id, label: t(TAB_LABEL_KEYS[id]), testid: `script-dialog-tab-${id}` })),
+);
 
 // Empty-field errors show once the field was edited; Save stays disabled until none remain.
 const shown = reactive({ name: false, body: false, folder: false });
@@ -143,7 +146,7 @@ const draft = computed(() => ({
 const errors = computed(() => editorErrors(draft.value, shown));
 const canSave = computed(() => {
   const all = editorErrors(draft.value, ALL_SHOWN);
-  return TABS.every((t) => tabErrorCount(all, t.id) === 0);
+  return TAB_IDS.every((id) => tabErrorCount(all, id) === 0);
 });
 
 async function chooseWorkingDir(): Promise<void> {

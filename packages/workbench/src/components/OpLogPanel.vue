@@ -70,11 +70,11 @@ interface OpsListItem {
 
 const expandedId = ref<string | null>(null);
 
-const statusFilterOptions = [
+const statusFilterOptions = computed(() => [
   { value: 'all', label: t('common.state.all.option') },
   { value: 'running', label: t('common.state.running.status') },
   { value: 'error', label: t('workbench.opLog.errors.option') },
-] as const;
+] as const);
 
 const STATUS_LABEL: Record<OpStatus, MessageKey> = {
   running: 'common.state.running.status',

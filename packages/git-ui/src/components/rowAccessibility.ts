@@ -7,6 +7,7 @@
  * name must live on the row rather than be assembled by a screen reader from the cell soup.
  */
 import type { CommitRecord, DecorationRef } from '@kira/git-core';
+import { t } from '@theme/i18n';
 import { badgeSpecFor } from './refBadges.ts';
 
 /** One decoration, in words — reuses `badgeSpecFor`'s own `text` (the same string a sighted user
@@ -17,15 +18,17 @@ function describeDecoration(ref: DecorationRef): string {
   const name = badgeSpecFor(ref).text;
   switch (ref.kind) {
     case 'branch':
-      return ref.isHead ? `current branch ${name}` : `branch ${name}`;
+      return ref.isHead
+        ? t('git.grid.decoration.currentBranch.aria', { name })
+        : t('git.grid.decoration.branch.aria', { name });
     case 'remoteBranch':
-      return `remote branch ${name}`;
+      return t('git.grid.decoration.remoteBranch.aria', { name });
     case 'tag':
-      return `tag ${name}`;
+      return t('git.grid.decoration.tag.aria', { name });
     case 'stash':
-      return 'stash';
+      return t('git.toolbar.stash.label');
     case 'head':
-      return 'HEAD';
+      return t('git.grid.decoration.head.aria');
   }
 }
 

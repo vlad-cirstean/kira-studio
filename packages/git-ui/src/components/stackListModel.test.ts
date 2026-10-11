@@ -92,7 +92,7 @@ describe('buildOrphanRows — the orphans section', () => {
     expect(rows.length).toBe(1);
     expect(rows[0]?.isOrphan).toBe(true);
     expect(rows[0]?.depth).toBe(0);
-    expect(rows[0]?.orphanReason).toBe('parent "gone" no longer exists');
+    expect(rows[0]?.orphanReason).toBe('Parent “gone” no longer exists.');
   });
 
   test('a cycle member (empty recorded parent from the orphan builder) gets its own reason', () => {
@@ -100,7 +100,7 @@ describe('buildOrphanRows — the orphans section', () => {
       [branch({ name: 'a', parent: '', state: 'parentMissing' })],
       new Map(),
     );
-    expect(rows[0]?.orphanReason).toBe('this branch sits in a cycle');
+    expect(rows[0]?.orphanReason).toBe('This branch sits in a cycle.');
   });
 });
 

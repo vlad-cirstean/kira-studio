@@ -6,6 +6,7 @@
  * fixtures.
  */
 import type { StashEntry } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 
 /** `AutoStashMessagePrefix`'s own TS-side literal (`gitops.AutoStashMessagePrefix`, Go) — kept as
  *  a plain string constant rather than crossing the wire: the marker is a message PREFIX, not a
@@ -68,7 +69,9 @@ export function applyMenuLabel(
   currentBranch: string | null | undefined,
 ): string {
   const origin = originLabel(entry, currentBranch);
-  return origin === undefined ? 'Apply' : `Apply here (from ${origin})`;
+  return origin === undefined
+    ? t('common.action.apply.label')
+    : t('git.menu.stashApplyHere.label', { origin });
 }
 
 /** One global-bucket row's own display fields, computed once per render rather than re-derived by

@@ -4,6 +4,7 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { computed } from 'vue';
 
 // I2-18: the row-density button pair (compact/comfortable) was byte-identical between kira-studio's
 // and kira-space's own AppearancePane.vue; each app's own helper text and (kira-studio only) preview
@@ -14,10 +15,10 @@ const props = defineProps<{
   resetLeaf: (section: 'appearance', key: 'rowDensity') => void;
 }>();
 
-const DENSITY_ITEMS = [
+const DENSITY_ITEMS = computed(() => [
   { value: 'compact', label: t('workbench.settings.rowCompact.option'), testid: 'settings-appearance-rowDensity-compact' },
   { value: 'comfortable', label: t('workbench.settings.rowComfortable.option'), testid: 'settings-appearance-rowDensity-comfortable' },
-];
+]);
 
 function setRowDensity(density: RowDensity): void {
   props.appearance.rowDensity = density;

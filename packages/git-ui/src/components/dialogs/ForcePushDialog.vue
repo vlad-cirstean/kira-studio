@@ -73,7 +73,7 @@ const canConfirmLease = computed(() => branchNameMatches.value);
 const canConfirmPlain = computed(() => branchNameMatches.value && understandPlain.value);
 
 function shortSha(sha: string | null): string {
-  return sha === null ? 'nothing yet' : sha.slice(0, 7);
+  return (sha ?? '').slice(0, 7);
 }
 
 function cancel(): void {
@@ -102,7 +102,9 @@ function confirmPlain(): void {
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          <CatalogText k="git.dialog.forcePushConfirm.body">
+          <CatalogText
+            :k="pending.preflight.remoteTip === null ? 'git.dialog.forcePushConfirm.bodyNew.body' : 'git.dialog.forcePushConfirm.body'"
+          >
             <template #ref><code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code></template>
             <template #sha><code class="font-data">{{ shortSha(pending.preflight.remoteTip) }}</code></template>
           </CatalogText>

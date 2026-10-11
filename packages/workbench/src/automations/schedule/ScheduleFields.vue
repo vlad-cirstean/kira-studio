@@ -63,7 +63,7 @@ const cronError = computed(() => {
 
 watch(cronError, (e) => emit('valid', e === null), { immediate: true });
 
-const presets = schedulePresets();
+const presets = computed(() => schedulePresets());
 const zoneOpen = ref(false);
 const zones = timezones();
 function pickZone(zone: string): void {

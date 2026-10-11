@@ -2308,6 +2308,9 @@
           "hint": "It is {count} commit ahead of what you last saw. | It is {count} commits ahead of what you last saw."
         },
         "body": "This will overwrite {ref}, currently at {sha}.",
+        "bodyNew": {
+          "body": "This will create {ref}, which does not exist on the remote yet."
+        },
         "confirm": "Force push with lease",
         "plain": {
           "hint": "This skips the lease check entirely. It overwrites the remote branch even if someone else pushed since the lease tip was read, with no protection against discarding their work.",
@@ -2785,6 +2788,23 @@
       }
     },
     "grid": {
+      "decoration": {
+        "branch": {
+          "aria": "Branch {name}"
+        },
+        "currentBranch": {
+          "aria": "Current branch {name}"
+        },
+        "head": {
+          "aria": "HEAD"
+        },
+        "remoteBranch": {
+          "aria": "Remote branch {name}"
+        },
+        "tag": {
+          "aria": "Tag {name}"
+        }
+      },
       "resizeAuthor": {
         "label": "Resize author column"
       },
@@ -2871,6 +2891,9 @@
       },
       "stackRestack": {
         "label": "Restack this stack"
+      },
+      "stashApplyHere": {
+        "label": "Apply here (from {origin})"
       },
       "stashBranch": {
         "label": "New branch from stash…"
@@ -3337,6 +3360,9 @@
       "checkedOutIn": {
         "tooltip": "Checked out in {path}"
       },
+      "createTracking": {
+        "label": "Create local branch tracking {name}"
+      },
       "filterBranches": {
         "placeholder": "Filter branches"
       },
@@ -3364,6 +3390,9 @@
       },
       "sections": {
         "aria": "Picker section"
+      },
+      "switchTo": {
+        "label": "Switch to {name}"
       },
       "unborn": {
         "label": "{name} (unborn)"
@@ -3574,6 +3603,9 @@
       "filesChanged": {
         "label": "{count} file changed | {count} files changed"
       },
+      "lastReview": {
+        "label": "Your last review"
+      },
       "loading": {
         "loading": "Loading review…"
       },
@@ -3641,8 +3673,40 @@
       "bodySearch": {
         "label": "Search message bodies"
       },
+      "field": {
+        "author": {
+          "label": "Author"
+        },
+        "authorEmail": {
+          "label": "Author email"
+        },
+        "body": {
+          "label": "Body"
+        },
+        "committerEmail": {
+          "label": "Committer email"
+        },
+        "prNumber": {
+          "label": "PR number"
+        },
+        "prTitle": {
+          "label": "PR title"
+        },
+        "sha": {
+          "label": "SHA"
+        },
+        "subject": {
+          "label": "Subject"
+        },
+        "tagMessage": {
+          "label": "Tag message"
+        }
+      },
       "hidden": {
         "hint": "{count} more. Refine your search."
+      },
+      "loadedFooter": {
+        "status": "Searched {scanned} of {count} loaded commit | Searched {scanned} of {count} loaded commits"
       },
       "options": {
         "aria": "Search options"
@@ -3661,6 +3725,12 @@
       },
       "searching": {
         "loading": "Searching…"
+      },
+      "tailFailed": {
+        "error": "Couldn’t search unloaded history: {error}"
+      },
+      "tailFooter": {
+        "status": "{count} more match in history | {count} more matches in history"
       },
       "tailStale": {
         "hint": "Refs changed since this search ran."
@@ -3696,12 +3766,21 @@
       "base": {
         "tooltip": "Base: {base}"
       },
+      "behind": {
+        "status": "{count} commit behind | {count} commits behind"
+      },
       "list": {
         "empty": "No stacked branches yet",
         "label": "Stacks"
       },
       "needsAttention": {
         "label": "Needs attention"
+      },
+      "orphanCycle": {
+        "hint": "This branch sits in a cycle."
+      },
+      "orphanMissing": {
+        "hint": "Parent “{parent}” no longer exists."
       },
       "remove": {
         "tooltip": "Remove from stack"

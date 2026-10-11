@@ -23,11 +23,11 @@ const ctx = useAutomationsModule();
 type Filter = 'all' | 'running' | 'failed';
 const open = usePersistedState('kira.automations.runsOpen', true);
 const filter = ref<Filter>('all');
-const FILTER_ITEMS = [
+const FILTER_ITEMS = computed(() => [
   { value: 'all', label: t('common.state.all.option'), testid: 'runs-filter-all' },
   { value: 'running', label: t('common.state.running.status'), testid: 'runs-filter-running' },
   { value: 'failed', label: t('common.state.failed.status'), testid: 'runs-filter-failed' },
-];
+]);
 const expanded = ref<string | null>(null);
 const { data } = useScriptRuns();
 const stop = useStopScriptRun();
