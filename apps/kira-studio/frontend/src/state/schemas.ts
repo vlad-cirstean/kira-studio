@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import { useMutation } from '@tanstack/vue-query';
+import { t } from '@theme/i18n';
 import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -157,11 +158,12 @@ export function ddlParseSummary(kind: ConnectionKind | undefined, text: string):
   const dialect = sqlDialectFor(kind);
   if (!dialect) return null;
   const schema = parseDdl(dialect, text);
-  if (schema.tables.length === 0) return 'No tables recognised in this text — check the paste';
-  const columns = schema.tables.reduce((n, t) => n + t.columns.length, 0);
-  const tableWord = schema.tables.length === 1 ? 'table' : 'tables';
-  const columnWord = columns === 1 ? 'column' : 'columns';
-  return `${schema.tables.length} ${tableWord}, ${columns} ${columnWord}`;
+  if (schema.tables.length === 0) return t('studio.project.schemaDialog.noTables.status');
+  const columns = schema.tables.reduce((n, table) => n + table.columns.length, 0);
+  return t('studio.project.schemaDialog.summary.status', {
+    tables: t('studio.project.schemaDialog.tables.status', { count: schema.tables.length }),
+    columns: t('studio.grid.columnCount.status', { count: columns }),
+  });
 }
 
 function applyRemote(ddl: ConnectionDdl): void {

@@ -299,7 +299,7 @@ export const TAB_KINDS: TabKindRegistry<
     mode: STUDIO_TAB_KIND_MODE['variable-set'],
     // D16: the owner's last-known name, falling back to a generic title before the list has
     // loaded after a restore (mirrors HttpRequestTabState's own `name` field's own convention).
-    title: (tab) => (tab as VariableSetTabRecord).state.name || 'Variables',
+    title: (tab) => (tab as VariableSetTabRecord).state.name || t('common.module.variables.label'),
     // D16: collection scope keeps the variable symbol; environment scope reads as a settings
     // surface — distinguishable at a glance in a strip holding both.
     icon: (tab) =>
@@ -326,7 +326,7 @@ export const TAB_KINDS: TabKindRegistry<
   // `reuse: true` gives exactly one of these however many times the action is invoked.
   environments: {
     mode: STUDIO_TAB_KIND_MODE.environments,
-    title: () => 'Environments',
+    title: () => t('studio.api.common.environments.label'),
     icon: () => 'server-environment',
     railColor: () => undefined,
     defaultState: (): EnvironmentsTabState => ({}),

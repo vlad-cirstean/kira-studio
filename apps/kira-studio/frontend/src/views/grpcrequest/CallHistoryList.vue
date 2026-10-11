@@ -108,7 +108,7 @@ async function onClear(): Promise<void> {
 <template>
   <div class="flex flex-1 min-h-0 flex-col" data-testid="grpc-history-list">
     <ViewToolbar>
-      <span class="text-kira-sm text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
+      <span class="text-kira-sm text-subtle">{{ t('studio.grpc.history.count.status', { count: entries.length }) }}</span>
       <span class="ml-auto" />
       <Button
         variant="toolbar"

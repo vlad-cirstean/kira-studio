@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { ConsoleHoverInfo } from '../../editor/hoverInfo';
 import type { SqlDialect } from '../shared/sqlIdent';
 import { type DdlColumn, type DdlSchema, type DdlTable, findTable } from './ddl';
@@ -35,11 +36,15 @@ function columnFlags(col: DdlColumn): string {
 
 function tableHoverInfo(table: DdlTable, from: number, to: number): ConsoleHoverInfo {
   const qualifiedName = table.schema ? `${table.schema}.${table.name}` : table.name;
-  const lines = [table.isView ? `${qualifiedName} (view)` : qualifiedName];
+  const lines = [
+    table.isView ? t('studio.console.hover.view.label', { name: qualifiedName }) : qualifiedName,
+  ];
   const shown = table.columns.slice(0, MAX_TABLE_COLUMNS);
   for (const col of shown) lines.push(`  ${col.name}  ${col.type}`);
   if (table.columns.length > shown.length) {
-    lines.push(`  +${table.columns.length - shown.length} more`);
+    lines.push(
+      `  ${t('studio.common.more.label', { count: table.columns.length - shown.length })}`,
+    );
   }
   return { from, to, lines };
 }

@@ -47,7 +47,7 @@ function onTargetInput(value: string): void {
 async function chooseProtoFile(): Promise<void> {
   const chosen = await control.filesChooseOpen({
     title: t('studio.grpc.schema.chooseProto.title'),
-    filters: [{ name: 'Protocol Buffers', extensions: ['proto'] }],
+    filters: [{ name: t('studio.grpc.schema.protoFilter.label'), extensions: ['proto'] }],
   });
   if (chosen.canceled || !chosen.file) return;
   patchGrpcRequestTabState(props.tab.id, { protoPath: chosen.file.path });

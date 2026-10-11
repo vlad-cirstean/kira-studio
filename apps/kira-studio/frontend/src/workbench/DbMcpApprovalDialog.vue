@@ -125,7 +125,7 @@ const DETAIL_CLASS = 'm-0 text-subtle';
             <strong>{{ issue.severity }}</strong> {{ issue.message }}
           </p>
           <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" :class="DETAIL_CLASS">
-            {{ t('studio.dbMcp.approval.issuesOmitted.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
+            {{ t('studio.common.more.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
           </p>
         </div>
 

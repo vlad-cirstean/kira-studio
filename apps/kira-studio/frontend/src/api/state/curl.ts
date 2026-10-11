@@ -7,6 +7,7 @@ import {
   toCurl,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -27,22 +28,24 @@ function bodySummary(state: ParsedCurl['state']): string | null {
     case 'none':
       return null;
     case 'raw':
-      return 'raw body';
+      return t('studio.api.curl.summary.rawBody.label');
     case 'code':
-      return `${CODE_LABEL[state.codeLanguage]} body`;
+      return t('studio.api.curl.summary.codeBody.label', {
+        language: CODE_LABEL[state.codeLanguage],
+      });
     case 'urlencoded':
-      return 'form body';
+      return t('studio.api.curl.summary.formBody.label');
     case 'formdata':
-      return 'multipart body';
+      return t('studio.api.curl.summary.multipartBody.label');
     case 'file':
-      return 'binary body';
+      return t('studio.api.curl.summary.binaryBody.label');
   }
 }
 
 /** A URL that still carries an unresolved `{{var}}` fails `new URL()` — this is a live preview
  *  over untrusted pasted text, so the summary falls back to the raw string rather than throwing. */
 function urlSummary(url: string): string {
-  if (url === '') return '(no URL)';
+  if (url === '') return t('studio.api.curl.summary.noUrl.label');
   try {
     const u = new URL(url);
     return `${u.host}${u.pathname}`;
@@ -55,7 +58,7 @@ function urlSummary(url: string): string {
 function summarizeParsed(state: ParsedCurl['state']): string {
   const parts = [state.method, urlSummary(state.url)];
   if (state.headers.length > 0) {
-    parts.push(`${state.headers.length} header${state.headers.length === 1 ? '' : 's'}`);
+    parts.push(t('studio.api.curl.summary.headers.label', { count: state.headers.length }));
   }
   const body = bodySummary(state);
   if (body) parts.push(body);

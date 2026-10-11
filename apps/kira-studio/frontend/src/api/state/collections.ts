@@ -312,7 +312,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   const createCollectionMutation = useMutation(
     {
       mutationKey: ['apiCollectionsTree', 'createCollection'],
-      mutationFn: () => control.collectionsCreateCollection('New collection'),
+      mutationFn: () => control.collectionsCreateCollection(t('studio.api.collections.new.label')),
       onSuccess: afterTreeListChange,
     },
     queryClient,
@@ -342,7 +342,10 @@ export const useCollectionsStore = defineStore('collections', () => {
           collectionId: args.collectionId,
           parentId: args.parentId,
           kind: args.kind,
-          name: args.kind === 'folder' ? 'New folder' : 'New request',
+          name:
+            args.kind === 'folder'
+              ? t('studio.api.collections.newFolder.label')
+              : t('studio.api.common.newRequest.label'),
         }),
       onSuccess: afterTreeListChange,
     },
@@ -373,7 +376,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         control.collectionsCreateGrpcItem({
           collectionId: args.collectionId,
           parentId: args.parentId,
-          name: 'New gRPC request',
+          name: t('shared.grpc.newRequest.title'),
         }),
       onSuccess: afterTreeListChange,
     },
@@ -540,7 +543,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   /** Duplicating a folder or a request copies the row itself, not its subtree — moving and
    *  reordering are D18/§8 OQ-9's, and a deep copy would need both. */
   async function duplicateRow(row: CollectionRowVm): Promise<void> {
-    const name = `${row.name} copy`;
+    const name = t('studio.api.collections.copyName.label', { name: row.name });
     try {
       if (row.kind === 'folder') {
         await control.collectionsCreateItem({
@@ -777,13 +780,11 @@ export const useCollectionsStore = defineStore('collections', () => {
       const report = await control.collectionsExport(collectionId, chosen.filePath);
       const notes: string[] = [];
       if (report.secretCount > 0) {
-        notes.push(
-          `${report.secretCount} secret value${report.secretCount === 1 ? ' was' : 's were'} not written to the file.`,
-        );
+        notes.push(t('studio.api.collections.exportSecrets.body', { count: report.secretCount }));
       }
       if (report.skippedGrpc > 0) {
         notes.push(
-          `${report.skippedGrpc} gRPC request${report.skippedGrpc === 1 ? '' : 's'} ${report.skippedGrpc === 1 ? 'was' : 'were'} skipped — Postman collections cannot represent gRPC requests.`,
+          t('studio.api.collections.exportSkippedGrpc.body', { count: report.skippedGrpc }),
         );
       }
       state.exportWarning = notes.length > 0 ? notes.join(' ') : null;

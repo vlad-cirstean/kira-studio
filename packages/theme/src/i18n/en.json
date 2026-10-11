@@ -7227,6 +7227,9 @@
         }
       },
       "collections": {
+        "copyName": {
+          "label": "{name} copy"
+        },
         "deleteCollectionConfirm": {
           "title": "Delete collection?"
         },
@@ -7244,6 +7247,12 @@
         "emptyHint": "Create one from the {plus} above, or import a Postman collection.",
         "export": {
           "label": "Export collection…"
+        },
+        "exportSecrets": {
+          "body": "{count} secret value was not written to the file. | {count} secret values were not written to the file."
+        },
+        "exportSkippedGrpc": {
+          "body": "{count} gRPC request was skipped. Postman collections can’t represent gRPC requests. | {count} gRPC requests were skipped. Postman collections can’t represent gRPC requests."
         },
         "import": {
           "title": "Import Postman collection"
@@ -7331,6 +7340,43 @@
           "label": "Show secret values"
         },
         "title": "Copy as curl"
+      },
+      "curl": {
+        "dynamicValues": {
+          "hint": "Dynamic values are generated once for this command. Running it twice sends the same values."
+        },
+        "realSecrets": {
+          "body": "This command contains real secret values."
+        },
+        "secretsHidden": {
+          "body": "{count} secret value is not shown: {names}. The command will not run as-is. | {count} secret values are not shown: {names}. The command will not run as-is."
+        },
+        "secretsStillHidden": {
+          "body": "This command contains real secret values. {count} value is still hidden: {names}. | This command contains real secret values. {count} values are still hidden: {names}."
+        },
+        "summary": {
+          "binaryBody": {
+            "label": "Binary body"
+          },
+          "codeBody": {
+            "label": "{language} body"
+          },
+          "formBody": {
+            "label": "Form body"
+          },
+          "headers": {
+            "label": "{count} header | {count} headers"
+          },
+          "multipartBody": {
+            "label": "Multipart body"
+          },
+          "noUrl": {
+            "label": "No URL"
+          },
+          "rawBody": {
+            "label": "Raw body"
+          }
+        }
       },
       "dynamicValues": {
         "loadError": {
@@ -7566,6 +7612,9 @@
       }
     },
     "browse": {
+      "count": {
+        "status": "{count} item | {count} items"
+      },
       "deleteObjectConfirm": {
         "body": "“{name}” will be removed from the bucket.",
         "title": "Delete object?"
@@ -7580,6 +7629,9 @@
       },
       "filter": {
         "placeholder": "Filter items"
+      },
+      "filtered": {
+        "status": "Showing {shown} of {total}"
       },
       "items": {
         "empty": "No items"
@@ -7839,6 +7891,9 @@
       "import": {
         "label": "Import"
       },
+      "more": {
+        "label": "{count} more"
+      },
       "nodeKind": {
         "bucket": {
           "label": "Bucket"
@@ -7900,6 +7955,9 @@
       },
       "reconnectAndLoad": {
         "label": "Reconnect and load"
+      },
+      "refreshFailed": {
+        "error": "Saved, but refresh failed: {errors}"
       },
       "regenerate": {
         "label": "Regenerate"
@@ -8007,6 +8065,11 @@
           "error": "Unexpected trailing content after statement."
         }
       },
+      "hover": {
+        "view": {
+          "label": "{name} (view)"
+        }
+      },
       "lint": {
         "invalidArgument": {
           "error": "Invalid argument at offset {offset}."
@@ -8036,6 +8099,9 @@
         }
       },
       "plan": {
+        "access": {
+          "label": "{access} access on {name}"
+        },
         "cost": {
           "generic": {
             "label": "Cost {value}"
@@ -8055,6 +8121,9 @@
         },
         "estimatedRows": {
           "status": "Estimated to read {count} row | Estimated to read {count} rows"
+        },
+        "fullScan": {
+          "label": "Full scan on {name}"
         },
         "issue": {
           "allParts": {
@@ -8149,6 +8218,9 @@
         },
         "sqliteNoEstimate": {
           "body": "SQLite’s query planner reports no row estimates, so the expensive-query threshold doesn’t apply here."
+        },
+        "tooLarge": {
+          "error": "The query plan was too large to display."
         }
       },
       "result": {
@@ -8183,6 +8255,14 @@
           "label": "Save current query…"
         },
         "title": "Saved queries"
+      },
+      "status": {
+        "cancelled": {
+          "status": "Cancelled"
+        },
+        "results": {
+          "status": "{count} result | {count} results"
+        }
       },
       "target": {
         "fallback": {
@@ -8399,9 +8479,6 @@
         },
         "heavy": {
           "body": "{connection} ({kind}) wants to run a query estimated to read {count} row, over your threshold of {threshold}. | {connection} ({kind}) wants to run a query estimated to read {count} rows, over your threshold of {threshold}."
-        },
-        "issuesOmitted": {
-          "label": "{count} more"
         },
         "other": {
           "body": "{connection} ({kind}) wants to run a statement through the database MCP server."
@@ -8964,6 +9041,9 @@
           "body": "Every past call of this request is removed.",
           "title": "Clear call history?"
         },
+        "count": {
+          "status": "{count} call | {count} calls"
+        },
         "empty": "No past calls yet",
         "incognito": {
           "empty": "Calls aren’t recorded in an incognito tab"
@@ -9072,6 +9152,9 @@
         },
         "noProto": {
           "placeholder": "No proto file chosen"
+        },
+        "protoFilter": {
+          "label": "Protocol buffers"
         },
         "source": {
           "proto": {
@@ -9192,6 +9275,9 @@
         },
         "compare": {
           "label": "Compare"
+        },
+        "count": {
+          "status": "{count} response | {count} responses"
         },
         "empty": "No past responses yet",
         "fieldsElided": {
@@ -9321,6 +9407,9 @@
         },
         "headersFilter": {
           "placeholder": "Filter headers"
+        },
+        "redirects": {
+          "status": "{count} redirect to {url} | {count} redirects to {url}"
         },
         "timeTooltip": {
           "tooltip": "See where the time went"
@@ -9490,6 +9579,17 @@
           "placeholder": "Initial value"
         }
       },
+      "column": {
+        "field": {
+          "label": "Field"
+        },
+        "index": {
+          "label": "Index"
+        },
+        "score": {
+          "label": "Score"
+        }
+      },
       "copiedField": {
         "announce": "Copied field"
       },
@@ -9556,6 +9656,17 @@
       },
       "rows": {
         "aria": "Rows"
+      },
+      "status": {
+        "loaded": {
+          "status": "{count} loaded"
+        },
+        "total": {
+          "status": "{total} total"
+        },
+        "totalApprox": {
+          "status": "About {total} total"
+        }
       },
       "tooLarge": {
         "description": "This object is too large to preview ({size}, over the {limit} limit). Download it to open it locally."
@@ -9847,10 +9958,19 @@
         },
         "throttle": {
           "description": "A value of 0 disables the limit. Reads served from cache are never throttled, and connecting is never throttled. Applies immediately to a connected connection.",
-          "label": "Throttle commands"
+          "label": "Throttle commands",
+          "number": {
+            "error": "Enter a number."
+          },
+          "range": {
+            "status": "Unlimited (0), or {min}–{max}"
+          }
         },
         "unchanged": {
           "placeholder": "Unchanged; click the eye to reveal"
+        },
+        "unnamed": {
+          "label": "Unnamed connection"
         },
         "uriNote": {
           "hidden": {
@@ -10120,6 +10240,53 @@
           "hint": "Showing the first 500 rows. Type to narrow."
         }
       },
+      "group": {
+        "bucket": {
+          "label": "Buckets"
+        },
+        "consumerGroup": {
+          "label": "Consumer groups"
+        },
+        "database": {
+          "label": "Databases"
+        },
+        "function": {
+          "label": "Functions"
+        },
+        "matview": {
+          "label": "Materialized views"
+        },
+        "namespace": {
+          "label": "Namespaces"
+        },
+        "partition": {
+          "label": "Partitions"
+        },
+        "prefix": {
+          "label": "Prefixes"
+        },
+        "queue": {
+          "label": "Queues"
+        },
+        "routine": {
+          "label": "Routines"
+        },
+        "schema": {
+          "label": "Schemas"
+        },
+        "sequence": {
+          "label": "Sequences"
+        },
+        "table": {
+          "label": "Tables"
+        },
+        "topic": {
+          "label": "Topics"
+        },
+        "view": {
+          "label": "Views"
+        }
+      },
       "menu": {
         "browseKeys": {
           "label": "Browse keys"
@@ -10176,6 +10343,11 @@
           "label": "Update credentials…"
         }
       },
+      "nodeKind": {
+        "routine": {
+          "label": "Routine"
+        }
+      },
       "panel": {
         "empty": {
           "empty": "Everything you connect to shows up here"
@@ -10202,8 +10374,17 @@
         "intro": {
           "body": "Table and column completion normally fills in on its own from the connection’s cached schema metadata. No setup needed. Paste a schema here only to override that. Use it for a schema that doesn’t exist yet, or a connection this app can’t introspect."
         },
+        "noTables": {
+          "status": "No tables recognised in this text. Check the paste"
+        },
         "pasteHint": {
           "hint": "Paste output from {pgDump}, {showCreate} or {sqliteSchema}. Use whichever your connection’s engine gives you."
+        },
+        "summary": {
+          "status": "{tables}, {columns}"
+        },
+        "tables": {
+          "status": "{count} table | {count} tables"
         }
       },
       "tree": {

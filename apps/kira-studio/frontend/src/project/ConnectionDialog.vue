@@ -325,7 +325,7 @@ async function requestReveal(id: string): Promise<void> {
 
   const result = await revealConnectionSecret(
     id,
-    target?.name || 'this connection',
+    target?.name || t('studio.project.connectionDialog.unnamed.label'),
     target?.mode === 'uri' ? 'uri' : 'fields',
     stillCurrent,
   );
@@ -471,9 +471,12 @@ function setThrottlePerSec(value: string): void {
 // outside CONNECTION_THROTTLE_RANGE is not — mirrors connections/input.go's Validate().
 const throttlePerSecError = computed<string | null>(() => {
   const v = draft.value?.throttlePerSec ?? 0;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isFinite(v)) return t('studio.project.connectionDialog.throttle.number.error');
   if (v !== 0 && (v < CONNECTION_THROTTLE_RANGE.min || v > CONNECTION_THROTTLE_RANGE.max)) {
-    return `0 (unlimited), or ${CONNECTION_THROTTLE_RANGE.min}–${CONNECTION_THROTTLE_RANGE.max}`;
+    return t('studio.project.connectionDialog.throttle.range.status', {
+      min: CONNECTION_THROTTLE_RANGE.min,
+      max: CONNECTION_THROTTLE_RANGE.max,
+    });
   }
   return null;
 });

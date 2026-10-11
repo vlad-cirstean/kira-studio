@@ -1,4 +1,5 @@
 import type { DataGripPreview, DataGripPreviewRow, DataGripReport } from '@shared/domain/datagrip';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -65,7 +66,7 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
     state.error = null;
     let path: string;
     try {
-      const chosen = await control.filesChooseFolder('Import from DataGrip');
+      const chosen = await control.filesChooseFolder(t('studio.start.importDataGrip.label'));
       if (chosen.canceled || !chosen.path) return false;
       path = chosen.path;
     } catch (err) {

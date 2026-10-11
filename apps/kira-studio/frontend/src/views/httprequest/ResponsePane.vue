@@ -143,7 +143,7 @@ const redirectCaption = computed(() => {
   const r = response.value;
   if (!r || r.redirects.length === 0) return '';
   const n = r.redirects.length;
-  return `${n} redirect${n === 1 ? '' : 's'} → ${r.finalUrl}`;
+  return t('studio.http.response.redirects.status', { count: n, url: r.finalUrl });
 });
 
 // D12/D13: a view toggle, never an edit — Pretty shows the formatted body, Raw the bytes exactly

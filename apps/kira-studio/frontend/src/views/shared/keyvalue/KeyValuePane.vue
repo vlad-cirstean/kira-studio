@@ -717,9 +717,13 @@ function onRefresh(): void {
 const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
-  const parts: string[] = [`${formatCount(r.rowCount)} loaded`];
+  const parts: string[] = [t('studio.keyValue.status.loaded.status', { count: r.rowCount })];
   if (r.count) {
-    parts.push(`${r.count.exact ? '' : '~'}${formatCount(r.count.value)} total`);
+    parts.push(
+      t(r.count.exact ? 'studio.keyValue.status.total.status' : 'studio.keyValue.status.totalApprox.status', {
+        total: formatCount(r.count.value),
+      }),
+    );
   }
   return parts.join(' · ');
 });
@@ -1054,11 +1058,15 @@ onUnmounted(() => {
           <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-10 shrink-0"></div>
           <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-56 shrink-0">
             <span class="text-fg overflow-hidden text-ellipsis">{{
-              page?.redisType === 'string' ? '' : page?.redisType === 'list' ? 'index' : 'field'
+              page?.redisType === 'string'
+                ? ''
+                : page?.redisType === 'list'
+                  ? t('studio.keyValue.column.index.label')
+                  : t('studio.keyValue.column.field.label')
             }}</span>
           </div>
           <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap flex-1 min-w-0">
-            <span class="text-fg overflow-hidden text-ellipsis">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
+            <span class="text-fg overflow-hidden text-ellipsis">{{ page?.redisType === 'zset' ? t('studio.keyValue.column.score.label') : t('common.field.value.label') }}</span>
           </div>
         </div>
         <!-- P49 D5/P104 §3.4: the virtualizer's own scroll container (kv-virtual-scroll below) owns

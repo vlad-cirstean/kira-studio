@@ -29,13 +29,12 @@ const stripTone = computed<'info' | 'warn'>(() => (hasRevealedAny.value ? 'warn'
 // revealed yet, or a reveal for one name succeeded while another was cancelled/errored/declined.
 const stripText = computed(() => {
   const masked = maskedNames.value;
-  if (masked.length === 0) return 'This command contains real secret values.';
-  const label = masked.length === 1 ? 'value is' : 'values are';
+  if (masked.length === 0) return t('studio.api.curl.realSecrets.body');
   const names = masked.join(', ');
-  if (!hasRevealedAny.value) {
-    return `${masked.length} secret ${label} not shown: ${names}. The command will not run as-is.`;
-  }
-  return `This command contains real secret values. ${masked.length} ${label} still hidden: ${names}.`;
+  return t(
+    hasRevealedAny.value ? 'studio.api.curl.secretsStillHidden.body' : 'studio.api.curl.secretsHidden.body',
+    { count: masked.length, names },
+  );
 });
 
 // P6 D12 fact 2: {{$…}} values are frozen into the command on open (D10 whole reason to exist) —
@@ -46,10 +45,6 @@ const hasDynamicValue = computed(() =>
     (r) => r.kind === 'resolved' && r.name.startsWith('$'),
   ),
 );
-// Built in script rather than the template: a literal '{{$…}}' inside a template mustache would
-// be misread by the Vue compiler as the interpolation's own closing '}}'.
-const dynamicNote =
-  '{{$…}} values are generated once for this command; running it twice sends the same values.';
 
 function onReveal(): void {
   void copyAsCurlStore.revealSecretValues();
@@ -99,7 +94,7 @@ function close(): void {
       </Alert>
 
       <div v-if="hasDynamicValue" class="text-kira-sm text-muted-foreground" data-testid="copy-as-curl-dynamic-note">
-        {{ dynamicNote }}
+        {{ t('studio.api.curl.dynamicValues.hint') }}
       </div>
 
       <Alert v-if="copyAsCurlStore.error" variant="error" data-testid="copy-as-curl-error">

@@ -1,4 +1,5 @@
 import type { MutationRowOp } from '@shared/domain/mutations';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { data } from '../../bridge/data';
 import { reloadTabsForTarget } from '../../state/viewCommands';
@@ -52,7 +53,7 @@ export function createImmediateMutator<
       failures.push(errorText(err));
     }
     if (failures.length > 0) {
-      throw new Error(`saved, but refresh failed: ${failures.join('; ')}`);
+      throw new Error(t('studio.common.refreshFailed.error', { errors: failures.join('; ') }));
     }
   };
 }

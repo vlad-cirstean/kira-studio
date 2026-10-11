@@ -64,8 +64,9 @@ export function isOverThreshold(
  *  two fields, both dialects' own `RawTable` differs everywhere else, this pair stays structural. */
 export function tableLabel(table: { table_name?: string; access_type?: string }): string {
   const name = table.table_name ?? '?';
-  if (table.access_type === 'ALL') return `Full scan on ${name}`;
-  if (table.access_type) return `${table.access_type} access on ${name}`;
+  if (table.access_type === 'ALL') return t('studio.console.plan.fullScan.label', { name });
+  if (table.access_type)
+    return t('studio.console.plan.access.label', { access: table.access_type, name });
   return name;
 }
 

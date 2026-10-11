@@ -29,6 +29,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
+import { nodeKindLabel } from '../../state/nodeKindLabel';
 import { useRunState } from '../../state/runState';
 import type { DocumentTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
@@ -43,7 +44,6 @@ import {
   mongoSortCandidates,
   useMongoFieldSampleStore,
 } from '../shared/mongoFieldSample';
-import { nodeKindLabel } from '../shared/nodeKindLabel';
 import PagerControls from '../shared/page/PagerControls.vue';
 import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';

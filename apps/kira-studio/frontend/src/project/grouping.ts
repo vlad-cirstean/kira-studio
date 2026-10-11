@@ -3,48 +3,39 @@
 // one caller), so it costs no round trip and survives a cached listing unchanged.
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
+import { type MessageKey, t } from '@theme/i18n';
+import { nodeKindLabel } from '../state/nodeKindLabel';
 
-interface KindLabel {
-  singular: string;
-  plural: string;
-}
-
-// P28 D14: the one place a kind gets a human name. Every NodeKind has an entry, not just the five
-// that get their own P19 folder — the checkbox filter's Object types section (P28) needs a label
-// for every kind present under a connection, and FiltersDialog.vue used to hardcode its own
-// three-entry map instead of reusing this one.
-const KIND_LABELS: Record<NodeKind, KindLabel> = {
-  connection: { singular: 'Connection', plural: 'Connections' },
-  database: { singular: 'Database', plural: 'Databases' },
-  schema: { singular: 'Schema', plural: 'Schemas' },
-  table: { singular: 'Table', plural: 'Tables' },
-  view: { singular: 'View', plural: 'Views' },
-  matview: { singular: 'Materialized view', plural: 'Materialized views' },
-  function: { singular: 'Function', plural: 'Functions' },
-  sequence: { singular: 'Sequence', plural: 'Sequences' },
-  column: { singular: 'Column', plural: 'Columns' },
-  collection: { singular: 'Collection', plural: 'Collections' },
-  namespace: { singular: 'Namespace', plural: 'Namespaces' },
-  key: { singular: 'Key', plural: 'Keys' },
-  topic: { singular: 'Topic', plural: 'Topics' },
-  partition: { singular: 'Partition', plural: 'Partitions' },
-  consumerGroup: { singular: 'Consumer group', plural: 'Consumer groups' },
-  queue: { singular: 'Queue', plural: 'Queues' },
-  bucket: { singular: 'Bucket', plural: 'Buckets' },
-  prefix: { singular: 'Prefix', plural: 'Prefixes' },
-  object: { singular: 'Object', plural: 'Objects' },
+// P28 D14: the one place a kind gets a plural human name (singular names live in nodeKindLabel).
+// Every NodeKind has an entry, not just the five that get their own P19 folder — the checkbox
+// filter's Object types section (P28) needs a label for every kind present under a connection.
+const PLURAL_KEYS: Record<NodeKind, MessageKey> = {
+  connection: 'common.module.connections.label',
+  database: 'studio.project.group.database.label',
+  schema: 'studio.project.group.schema.label',
+  table: 'studio.project.group.table.label',
+  view: 'studio.project.group.view.label',
+  matview: 'studio.project.group.matview.label',
+  function: 'studio.project.group.function.label',
+  sequence: 'studio.project.group.sequence.label',
+  column: 'studio.common.columns.label',
+  collection: 'studio.api.collections.title',
+  namespace: 'studio.project.group.namespace.label',
+  key: 'studio.browse.list.aria',
+  topic: 'studio.project.group.topic.label',
+  partition: 'studio.project.group.partition.label',
+  consumerGroup: 'studio.project.group.consumerGroup.label',
+  queue: 'studio.project.group.queue.label',
+  bucket: 'studio.project.group.bucket.label',
+  prefix: 'studio.project.group.prefix.label',
+  object: 'studio.project.filtersDialog.objects.heading.label',
 };
 
-// Per-connection-kind overrides — MariaDB's and MySQL's `function` nodes include stored procedures
-// (P34 F21b: MySQL calls them stored routines too, from the same information_schema.ROUTINES
-// source), and §5.1 calls that level "routines".
-const KIND_LABEL_OVERRIDES: Partial<Record<NodeKind, Partial<Record<ConnectionKind, KindLabel>>>> =
-  {
-    function: {
-      mariadb: { singular: 'Routine', plural: 'Routines' },
-      mysql: { singular: 'Routine', plural: 'Routines' },
-    },
-  };
+// MariaDB's and MySQL's `function` nodes include stored procedures (P34 F21b), and §5.1 calls that
+// level "routines".
+function isRoutineKind(kind: NodeKind, connectionKind: ConnectionKind): boolean {
+  return kind === 'function' && (connectionKind === 'mariadb' || connectionKind === 'mysql');
+}
 
 /** The display label for any node kind, per connection kind. Plural for a folder or a checkbox
  *  row ("Views"), singular where a single object is named. The one place a kind gets a human
@@ -54,8 +45,10 @@ export function labelForKind(
   connectionKind: ConnectionKind,
   form: 'singular' | 'plural' = 'plural',
 ): string {
-  const override = KIND_LABEL_OVERRIDES[kind]?.[connectionKind];
-  return (override ?? KIND_LABELS[kind])[form];
+  const routine = isRoutineKind(kind, connectionKind);
+  if (form === 'singular')
+    return routine ? t('studio.project.nodeKind.routine.label') : nodeKindLabel(kind);
+  return t(routine ? 'studio.project.group.routine.label' : PLURAL_KEYS[kind]);
 }
 
 // The complete, curated list of kinds that get their own folder, in render order. Any kind not

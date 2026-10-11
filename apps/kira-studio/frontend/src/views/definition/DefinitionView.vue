@@ -21,11 +21,11 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
+import { nodeKindLabel } from '../../state/nodeKindLabel';
 import { useRunState } from '../../state/runState';
 import type { DefinitionTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import EngineIcon from '../../theme/EngineIcon.vue';
-import { nodeKindLabel } from '../shared/nodeKindLabel';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,

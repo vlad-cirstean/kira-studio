@@ -126,8 +126,10 @@ const filteredNodes = computed<TreeNode[]>(() => {
 
 const countText = computed(() => {
   const total = rt.value?.nodes.length ?? 0;
-  if (filterText.value.trim()) return `${filteredNodes.value.length} of ${total}`;
-  return `${total} item${total === 1 ? '' : 's'}`;
+  if (filterText.value.trim()) {
+    return t('studio.browse.filtered.status', { shown: filteredNodes.value.length, total });
+  }
+  return t('studio.browse.count.status', { count: total });
 });
 
 // P63 §2.1/§2.2: the vertical split's own state. `listWidth` mirrors HttpRequestView.vue's own

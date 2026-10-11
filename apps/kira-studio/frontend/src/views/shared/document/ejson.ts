@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 // Parses one document body — canonical extended JSON, `read.ts`'s `EJSON.stringify(doc, {relaxed:
 // false})` — into a plain, frozen, non-reactive node tree, and formats values back out in Mongo
 // shell form. No `bson` import: every BSON wrapper is recognised by shape against the closed EJSON
@@ -258,8 +259,10 @@ function renderScalar(value: string | number | boolean | null): ScalarRender {
 function summaryFor(kind: 'object' | 'array', count: number): string {
   if (count === 0) return kind === 'object' ? '{}' : '[]';
   const noun =
-    kind === 'object' ? (count === 1 ? 'field' : 'fields') : count === 1 ? 'item' : 'items';
-  return kind === 'object' ? `{…} ${count} ${noun}` : `[…] ${count} ${noun}`;
+    kind === 'object'
+      ? t('studio.documents.row.fieldCount.status', { count })
+      : t('studio.browse.count.status', { count });
+  return kind === 'object' ? `{…} ${noun}` : `[…] ${noun}`;
 }
 
 function buildNode(value: unknown, key: string, path: string): DocNode {

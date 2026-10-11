@@ -17,7 +17,7 @@ const decoder = new TextDecoder();
 // manual Explain button a real message, auto-explain a "couldn't check" strip rather than nothing.
 export class ExplainTruncatedError extends Error {
   constructor() {
-    super('The query plan was too large to display.');
+    super(t('studio.console.plan.tooLarge.error'));
     this.name = 'ExplainTruncatedError';
   }
 }
