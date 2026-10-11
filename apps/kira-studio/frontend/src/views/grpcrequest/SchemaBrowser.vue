@@ -12,6 +12,7 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
+import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -78,13 +79,11 @@ const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredServices = computed(() => {
   const services = props.schema?.services ?? [];
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return services;
+  if (!isFiltered.value) return services;
+  const q = filterQuery.value;
   return services.flatMap((svc) => {
-    const svcMatches = svc.name.toLowerCase().includes(q);
-    const methods = svcMatches
-      ? svc.methods
-      : svc.methods.filter((m) => m.name.toLowerCase().includes(q));
+    const svcMatches = matchesQuery(svc.name, q);
+    const methods = svcMatches ? svc.methods : svc.methods.filter((m) => matchesQuery(m.name, q));
     return methods.length > 0 ? [{ ...svc, methods }] : [];
   });
 });

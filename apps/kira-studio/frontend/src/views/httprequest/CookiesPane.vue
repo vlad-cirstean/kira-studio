@@ -7,6 +7,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
@@ -34,8 +35,7 @@ const confirmDialogStore = useConfirmDialogStore();
 const filter = ref('');
 
 function matches(c: HttpCookieWire, q: string): boolean {
-  if (!q) return true;
-  return c.name.toLowerCase().includes(q) || c.value.toLowerCase().includes(q);
+  return matchesQuery(c.name, q) || matchesQuery(c.value, q);
 }
 
 // §3: "Domain=… Path=… Expires=… Secure HttpOnly SameSite=Lax" — attributes with nothing to show
@@ -55,8 +55,7 @@ function attributeLine(c: HttpCookieWire): string {
 
 const requestCookies = computed(() => props.cookies ?? []);
 const filteredRequestCookies = computed(() => {
-  const q = filter.value.trim().toLowerCase();
-  return requestCookies.value.filter((c) => matches(c, q));
+  return requestCookies.value.filter((c) => matches(c, filter.value));
 });
 
 const emit = defineEmits<{ refresh: [] }>();
@@ -79,13 +78,17 @@ const requestError = computed(
 async function onRemove(c: HttpCookieWire): Promise<void> {
   if (!props.url) return;
   clearMutation.reset();
-  await removeMutation.mutateAsync(c).catch(() => {});
+  await removeMutation.mutateAsync(c).catch(() => {
+    // shown through requestError
+  });
 }
 async function onClearAll(): Promise<void> {
   // Go's jar is process-wide: this empties every host, not just this request's URL.
   if (!(await confirmDialogStore.confirm({ message: 'Clear all cookies for every host?', confirmLabel: 'Delete', tone: 'danger' }))) return;
   removeMutation.reset();
-  await clearMutation.mutateAsync().catch(() => {});
+  await clearMutation.mutateAsync().catch(() => {
+    // shown through requestError
+  });
 }
 
 function onEditGlobalDefaults(): void {

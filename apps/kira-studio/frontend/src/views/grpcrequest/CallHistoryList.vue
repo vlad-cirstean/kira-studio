@@ -15,6 +15,8 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/behaviour/format';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
@@ -30,7 +32,7 @@ const grpcCallHistoryStore = useGrpcCallHistoryStore();
 // views/httprequest/ResponseHistoryList.vue's shape exactly — a real toolbar (count + Clear,
 // P12's own clearGrpcHistory finally reachable), rows as a <div> rather than a <button> nested
 // inside a <button> (F20 — invalid HTML the parser silently hoisted the delete control out of),
-// is-viewing highlighting, and formatRelative instead of an absolute toLocaleTimeString.
+// is-viewing highlighting, and formatRelative instead of an absolute clock time.
 //
 // No Compare: HTTP's rides Monaco's diff editor over two response *bodies*; a gRPC call is a
 // message *sequence* with metadata, a genuinely different design left for a future row (§5).
@@ -56,13 +58,12 @@ const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredEntries = computed<GrpcCallHistoryEntry[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return entries.value;
+  const q = filterQuery.value;
   return entries.value.filter(
     (e) =>
-      e.method.toLowerCase().includes(q) ||
-      e.codeName.toLowerCase().includes(q) ||
-      formatRelative(e.calledAt).toLowerCase().includes(q),
+      matchesQuery(e.method, q) ||
+      matchesQuery(e.codeName, q) ||
+      matchesQuery(formatRelative(e.calledAt), q),
   );
 });
 
@@ -70,13 +71,23 @@ function onRowClick(id: string): void {
   void grpcCallHistoryStore.viewGrpcHistoryEntry(props.tab.id, id);
 }
 
-// P105 §5.2(c): Enter/Space mirror a single click — the Delete button nested inside stays its own
-// tab stop, so this handler never claims either key from it.
+// The list navigation claims Enter and the arrows; Space mirrors a click. Controls nested in a row
+// stay their own tab stops.
 function onRowKeydown(e: KeyboardEvent, id: string): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ' || e.target !== e.currentTarget) return;
   e.preventDefault();
   onRowClick(id);
 }
+
+const listEl = ref<HTMLElement | null>(null);
+const activeKey = ref<string | null>(null);
+const nav = useListNavigation<{ id: string }>({
+  container: listEl,
+  items: () => filteredEntries.value,
+  key: (entry) => entry.id,
+  activeKey,
+  onSelect: (entry) => onRowClick(entry.id),
+});
 
 function onDelete(id: string): void {
   void grpcCallHistoryStore.deleteGrpcHistoryEntry(props.tab.id, id);
@@ -127,6 +138,7 @@ async function onClear(): Promise<void> {
     <div
       v-if="entries.length > 0 && filteredEntries.length > 0"
       class="flex flex-1 min-h-0 flex-col overflow-auto"
+      ref="listEl"
       role="listbox"
       aria-label="Call history"
     >
@@ -136,7 +148,8 @@ async function onClear(): Promise<void> {
         :class="cn(rowVariants({ layout: 'tree', selected: entry.id === viewingId }), 'cursor-pointer border-b border-border py-1')"
         data-testid="grpc-history-row"
         role="option"
-        tabindex="0"
+        v-bind="nav.rowProps(entry.id)"
+        :tabindex="nav.tabindexFor(entry.id)"
         :aria-selected="entry.id === viewingId"
         @click="onRowClick(entry.id)"
         @keydown="onRowKeydown($event, entry.id)"

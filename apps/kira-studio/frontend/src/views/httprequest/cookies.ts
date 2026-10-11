@@ -7,7 +7,7 @@ import { control } from '../../bridge/control';
 
 // P175 D4: what the shared jar would send for a URL right now (CookiesPane request mode and the
 // Cookies segment badge), as TanStack Query server state. The jar is process-wide, so lists are
-// keyed by URL, never by tab. staleTime: Infinity — only a send, Remove or Clear changes the jar.
+// keyed by URL, never by tab. the default staleTime (Infinity) — only a send, Remove or Clear changes the jar.
 // P8 D11's lazy rule is `enabled`: a hidden tab is unmounted (no observer), a jar-off pane never
 // fetches, and invalidation refetches only a mounted, enabled observer.
 
@@ -36,7 +36,6 @@ export function useJarCookies(url: MaybeRefOrGetter<string>, enabled: MaybeRefOr
       queryKey: jarCookiesKey(key),
       queryFn: () => fetchJarCookies(key),
       enabled: toValue(enabled) && key !== '',
-      staleTime: Number.POSITIVE_INFINITY,
     };
   }, queryClient);
 }

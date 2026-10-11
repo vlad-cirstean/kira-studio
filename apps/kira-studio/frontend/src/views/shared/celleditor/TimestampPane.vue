@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useFocus } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
@@ -85,8 +86,9 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 // fires no focusout at all, and the pick is silently lost (cell-editor.spec.ts's day-pick-then-
 // blur scenario caught it). Returning focus to this trigger on close (the old, non-teleported
 // PopoverPanel's own implicit behavior) restores a real element inside `.editor-body` to blur from.
+const { focused: triggerFocused } = useFocus(computed(() => calendarTriggerEl.value?.$el));
 watch(calendarOpen, (open) => {
-  if (!open) void nextTick(() => calendarTriggerEl.value?.$el.focus());
+  if (!open) void nextTick(() => (triggerFocused.value = true));
 });
 </script>
 

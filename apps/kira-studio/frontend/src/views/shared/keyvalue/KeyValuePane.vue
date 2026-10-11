@@ -28,7 +28,6 @@ import {
   OBJECT_BODY_EDIT_BYTES,
   SINGLE_ROW_MAX_BYTES,
 } from '@shared/protocol/page';
-import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -45,8 +44,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
-import { formatBytes } from '@workbench/behaviour/format';
-import { VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { formatBytes, formatCount } from '@workbench/behaviour/format';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -187,20 +187,19 @@ function rowAt(i: number) {
 // reachable from there.
 const { single: rowHeight } = useRowHeight();
 
-// P104 §3.4: @tanstack/vue-virtual replaces VirtualList.vue directly at this call site — the
-// scroll container (below, in the template) is now this component's own, not a wrapper's.
-// overscan: 8 matches VirtualList's own former default.
+// P104 §3.4: useVirtualRows replaces VirtualList.vue; the scroll container (below, in the
+// template) is this component's own. overscan: 8 matches VirtualList's own former default.
 const scrollRef = ref<HTMLElement | null>(null);
-const rowVirtualizer = useVirtualizer(
-  computed(() => ({
-    count: rowIndices.value.length,
-    getScrollElement: () => scrollRef.value,
-    estimateSize: () => rowHeight.value,
-    overscan: 8,
-  })),
-);
-const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
-const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+const {
+  virtualItems: virtualRows,
+  totalSize,
+  scrollToIndex,
+} = useVirtualRows({
+  count: () => rowIndices.value.length,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollRef,
+  overscan: 8,
+});
 // A virtual item's own `index` is its position in rowIndices (0..count-1), not the page-row
 // number the rest of this file works in (rowAt/isSearchMatch/data-row) — resolved once per row
 // here rather than at every one of the template's own uses of it.
@@ -502,14 +501,11 @@ async function submitAdd(): Promise<void> {
   }
 }
 
-function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
-  e.preventDefault();
+function rowMenuFor(field: string, value: string) {
   const p = page.value;
-  if (!p) return;
+  if (!p) return null;
   const isObject = p.redisType === 'object';
-  contextMenuStore.openContextMenu(
-    e,
-    rowMenu({
+  return rowMenu({
       field,
       value,
       redisType: p.redisType,
@@ -531,8 +527,18 @@ function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
       },
       onDelete: () => void onDeleteKey(),
       onDownload: () => void onDownload(),
-    }),
-  );
+    });
+}
+
+function onRowContextMenu(e: MouseEvent, i: number): void {
+  e.preventDefault();
+  const row = rowAt(i);
+  const items = row ? rowMenuFor(row.field, row.value) : null;
+  if (items) {
+    contextMenuStore.openContextMenu(e, items, {
+      onRestoreFocus: () => void nav.focusKey(String(i)),
+    });
+  }
 }
 
 // §11's cell-editor seam (state/cellSelection.ts): clicking a row previews its value read-only
@@ -591,19 +597,37 @@ function onRowClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'row');
   if (i !== null) onRowClick(i);
 }
-// P105 §5.2(c): Enter/Space mirror a single click.
+// The list navigation claims Enter and the arrows; Space mirrors a single click.
 function onRowKeydownFromEvent(e: KeyboardEvent): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ') return;
   e.preventDefault();
   const i = datasetNumber(e.currentTarget, 'row');
   if (i !== null) onRowClick(i);
 }
 function onRowContextMenuFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'row');
-  if (i === null) return;
-  const row = rowAt(i);
-  if (row) onRowContextMenu(e, row.field, row.value);
+  if (i !== null) onRowContextMenu(e, i);
 }
+
+const activeRow = ref<string | null>(null);
+const nav = useListNavigation<number>({
+  container: scrollRef,
+  items: () => rowIndices.value,
+  key: (row) => String(row),
+  activeKey: activeRow,
+  onSelect: onRowClick,
+  onMenu: (i, rect) => {
+    const row = rowAt(i);
+    const items = row ? rowMenuFor(row.field, row.value) : null;
+    if (items) {
+      contextMenuStore.openContextMenuAt(rect.left, rect.bottom, items, {
+        onRestoreFocus: () => void nav.focusKey(String(i)),
+      });
+    }
+  },
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualRows.value,
+});
 
 // --- search: filters the already-loaded page only, never a new query (mirrors
 // views/grid/search.ts's discipline exactly — see keyvalue/search.ts). ------------------------------
@@ -622,7 +646,7 @@ function onCloseSearch(): void {
 // top-aligned above the viewport, bottom-aligned below it.
 function onGoToMatch(match: Match): void {
   const index = rowIndices.value.indexOf(match.row);
-  if (index >= 0) rowVirtualizer.value.scrollToIndex(index, { align: 'auto' });
+  if (index >= 0) scrollToIndex(index);
 }
 
 // P49 F7/D5: closes the hole keyvalue/search.ts's own runSearch doc comment named — until this
@@ -669,9 +693,9 @@ function onRefresh(): void {
 const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
-  const parts: string[] = [`${r.rowCount.toLocaleString()} loaded`];
+  const parts: string[] = [`${formatCount(r.rowCount)} loaded`];
   if (r.count) {
-    parts.push(`${r.count.exact ? '' : '~'}${r.count.value.toLocaleString()} total`);
+    parts.push(`${r.count.exact ? '' : '~'}${formatCount(r.count.value)} total`);
   }
   return parts.join(' · ');
 });
@@ -1048,7 +1072,8 @@ onUnmounted(() => {
                   :data-row="entry.i"
                   :style="{ transform: `translateY(${entry.row.start}px)` }"
                   role="option"
-                  tabindex="0"
+                  v-bind="nav.rowProps(String(entry.i))"
+                  :tabindex="nav.tabindexFor(String(entry.i))"
                   @click="onRowClickFromEvent"
                   @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"

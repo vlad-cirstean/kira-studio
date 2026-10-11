@@ -17,6 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
 import { formatBytes, formatRelative } from '@workbench/behaviour/format';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
@@ -55,15 +57,14 @@ const atCap = computed(() => entries.value.length >= HISTORY_PER_SCOPE_LIMIT);
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredEntries = computed<ResponseHistoryEntry[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return entries.value;
+  const q = filterQuery.value;
   return entries.value.filter(
     (e) =>
-      e.method.toLowerCase().includes(q) ||
-      e.url.toLowerCase().includes(q) ||
-      e.statusText.toLowerCase().includes(q) ||
-      String(e.status).includes(q) ||
-      e.environment.toLowerCase().includes(q),
+      matchesQuery(e.method, q) ||
+      matchesQuery(e.url, q) ||
+      matchesQuery(e.statusText, q) ||
+      matchesQuery(String(e.status), q) ||
+      matchesQuery(e.environment, q),
   );
 });
 
@@ -83,13 +84,23 @@ function onRowClick(id: string): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: 'body' });
 }
 
-// P105 §5.2(c): Enter/Space mirror a single click — the checkbox nested inside stays its own tab
-// stop, so this handler never claims either key from it.
+// The list navigation claims Enter and the arrows; Space mirrors a click. Controls nested in a row
+// stay their own tab stops.
 function onRowKeydown(e: KeyboardEvent, id: string): void {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.key !== ' ' || e.target !== e.currentTarget) return;
   e.preventDefault();
   onRowClick(id);
 }
+
+const listEl = ref<HTMLElement | null>(null);
+const activeKey = ref<string | null>(null);
+const nav = useListNavigation<{ id: string }>({
+  container: listEl,
+  items: () => filteredEntries.value,
+  key: (entry) => entry.id,
+  activeKey,
+  onSelect: (entry) => onRowClick(entry.id),
+});
 
 function onToggle(id: string): void {
   httpHistoryStore.toggleSelected(props.tab.id, id);
@@ -168,6 +179,7 @@ async function onClear(): Promise<void> {
     <div
       v-if="entries.length > 0 && filteredEntries.length > 0"
       class="flex flex-1 min-h-0 flex-col overflow-auto"
+      ref="listEl"
       role="listbox"
       aria-label="Response history"
     >
@@ -177,7 +189,8 @@ async function onClear(): Promise<void> {
         :class="cn(rowVariants({ layout: 'double', selected: entry.id === viewingId }), 'cursor-pointer border-b border-border')"
         data-testid="http-history-row"
         role="option"
-        tabindex="0"
+        v-bind="nav.rowProps(entry.id)"
+        :tabindex="nav.tabindexFor(entry.id)"
         :aria-selected="entry.id === viewingId"
         @click="onRowClick(entry.id)"
         @keydown="onRowKeydown($event, entry.id)"

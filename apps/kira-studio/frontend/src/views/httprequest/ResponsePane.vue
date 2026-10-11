@@ -9,7 +9,8 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatBytes } from '@workbench/behaviour/format';
+import { formatBytes, formatClockTime } from '@workbench/behaviour/format';
+import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -154,7 +155,7 @@ const bodyNotStored = computed(() => (viewing.value ? !viewing.value.snapshot.bo
 const viewingTime = computed(() => {
   const iso = viewing.value?.snapshot.entry.sentAt;
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString([], { hour12: false });
+  return formatClockTime(iso);
 });
 
 function onBackToLatest(): void {
@@ -168,10 +169,10 @@ function onBackToLatest(): void {
 // satisfied trivially since the box is always visible while the pane is.
 const headerFilter = ref('');
 const filteredHeaders = computed(() => {
-  const q = headerFilter.value.trim().toLowerCase();
-  const all = response.value?.headers ?? [];
-  if (!q) return all;
-  return all.filter((h) => h.name.toLowerCase().includes(q) || h.value.toLowerCase().includes(q));
+  const q = headerFilter.value;
+  return (response.value?.headers ?? []).filter(
+    (h) => matchesQuery(h.name, q) || matchesQuery(h.value, q),
+  );
 });
 
 // P16 D11: the find bar over the response body and the raw exchange's two documents. Component-

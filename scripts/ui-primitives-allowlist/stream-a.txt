@@ -15,17 +15,5 @@ permanent U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Do
 permanent U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
 permanent U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host exposes focus(); not a DOM element focus
 permanent U46 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # scroll persist stays 300 ms: TIMING.persist (150) fires mid-scroll and breaks cell-editor.spec
-apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue
-apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
-apps/kira-studio/frontend/src/views/grpcrequest/schemaQuery.ts
-apps/kira-studio/frontend/src/views/httprequest/CookiesPane.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/httprequest/TimelinePane.vue
-apps/kira-studio/frontend/src/views/httprequest/cookies.ts
-apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
-apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue
-apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue
-apps/kira-studio/frontend/src/views/shared/keyvalue/KeyValuePane.vue
-apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
+permanent U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
+permanent U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret

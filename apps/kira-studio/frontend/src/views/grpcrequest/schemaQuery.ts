@@ -130,7 +130,6 @@ export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
       queryKey: grpcSchemaKey(s),
       queryFn: ({ signal }) => describeSchema(s, false, signal),
       enabled: s.ready && isComplete(s),
-      staleTime: Number.POSITIVE_INFINITY,
     };
   }, queryClient);
 
@@ -144,7 +143,9 @@ export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
         queryFn: ({ signal }) => describeSchema(s, true, signal),
         staleTime: 0,
       })
-      .catch(() => {});
+      .catch(() => {
+        // the failure lands in the query's own error state
+      });
   }
 
   return {

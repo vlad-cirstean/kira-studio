@@ -7,6 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { formatDuration } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { useHttpHistoryViewing } from './history';
@@ -50,17 +51,15 @@ function failurePhaseText(hop: HttpTimelineHop): string {
 // F18's one extension to RunState.vue's own ms/s convention: a sub-millisecond figure keeps two
 // decimals rather than rounding to "0 ms" — the reused-connection case this pane exists to explain
 // is exactly the sub-millisecond one (D4).
-function formatMs(ms: number): string {
-  if (ms < 1) return `${ms.toFixed(2)} ms`;
-  if (ms < 1000) return `${Math.round(ms)} ms`;
-  return `${(ms / 1000).toFixed(1)} s`;
+function formatHopMs(ms: number): string {
+  return ms < 1 ? `${ms.toFixed(2)} ms` : formatDuration(ms);
 }
 
 const summary = computed(() => {
   const tl = timeline.value;
   if (!tl) return '';
   const n = tl.hops.length;
-  let text = `${n} hop${n === 1 ? '' : 's'} · ${formatMs(tl.totalMs)} total`;
+  let text = `${n} hop${n === 1 ? '' : 's'} · ${formatHopMs(tl.totalMs)} total`;
   if (tl.hops[0]?.reused) text += ' · connection reused';
   return text;
 });
@@ -148,7 +147,7 @@ function reuseNote(hop: HttpTimelineHop): string {
     if (!hop.dns && !hop.connect) return 'No DNS lookup — the URL names an IP address.';
     return '';
   }
-  const idle = hop.idleMs !== undefined ? ` (idle ${formatMs(hop.idleMs)})` : '';
+  const idle = hop.idleMs !== undefined ? ` (idle ${formatHopMs(hop.idleMs)})` : '';
   return `Reused an existing connection${idle} — no DNS lookup, TCP connect or TLS handshake was needed.`;
 }
 
@@ -164,7 +163,7 @@ function info1xxNote(hop: HttpTimelineHop): string {
 
 function residueNote(hop: HttpTimelineHop): string {
   if (!residueIsNotable(hop)) return '';
-  return `${formatMs(residueMs(hop))} of this hop is not attributed to a phase — for a request through an HTTP proxy this is the CONNECT tunnel setup, which Go does not report separately.`;
+  return `${formatHopMs(residueMs(hop))} of this hop is not attributed to a phase — for a request through an HTTP proxy this is the CONNECT tunnel setup, which Go does not report separately.`;
 }
 
 // D11: a "note" that fires on the common case (a reused connection is the common case) is a
@@ -272,7 +271,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
                 <TooltipContent>{{ phaseTooltip(hop, seg.key) }}</TooltipContent>
               </Tooltip>
               <span v-else class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="true">
-                {{ seg.label }} {{ formatMs(hop[seg.key]!.durationMs) }}
+                {{ seg.label }} {{ formatHopMs(hop[seg.key]!.durationMs) }}
               </span>
             </template>
           </div>

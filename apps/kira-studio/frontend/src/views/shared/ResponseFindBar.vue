@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { unrefElement, useEventListener } from '@vueuse/core';
+import { useFindBar } from '@workbench/behaviour/findBar';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
 // P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
@@ -90,11 +91,12 @@ function scrollToCurrent(): void {
 }
 
 // The options belong here alongside the query: changing one changes the match set, so the cursor
-// has to go back to the first match exactly as it does on a new query.
+// has to go back to the first match exactly as it does on a new query. The reset is immediate (the
+// highlights follow it); the scroll waits for useFindBar's query debounce.
 watch([query, options], () => {
   currentGlobal.value = 0;
-  scrollToCurrent();
 });
+watch(options, scrollToCurrent);
 
 function goNext(): void {
   if (totalMatches.value === 0) return;
@@ -111,37 +113,27 @@ function close(): void {
   emit('close');
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    close();
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (e.shiftKey) goPrev();
-    else goNext();
-  }
-}
-
-// P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
+// P105 §5.1: the toolbar div is not interactive -- useFindBar binds the keys on it.
 const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
-useEventListener(
-  computed(() => unrefElement(rootEl)),
-  'keydown',
-  onKeydown,
-);
+useFindBar({
+  root: rootEl,
+  query,
+  onQuery: scrollToCurrent,
+  next: goNext,
+  prev: goPrev,
+  close,
+});
 
 // Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
-const searchField = useTemplateRef<{ focus: () => void }>('searchField');
-onMounted(() => {
-  searchField.value?.focus();
-});
+const fieldWrap = useTemplateRef<HTMLElement>('fieldWrap');
+useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
 </script>
 
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
-    <div class="w-52 shrink-0">
-      <SearchField ref="searchField" v-model="query" @keydown.escape.stop="close" placeholder="Find" :aria-invalid="invalid" data-testid="http-find-input" />
+    <div ref="fieldWrap" class="w-52 shrink-0">
+      <SearchField v-model="query" @keydown.escape.stop="close" placeholder="Find" :aria-invalid="invalid" data-testid="http-find-input" />
     </div>
     <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical

@@ -8,6 +8,8 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
 import { useEventListener } from '@vueuse/core';
+import { revealElement } from '@workbench/behaviour/focus';
+import { matchesQuery } from '@workbench/behaviour/match';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import type { Completion } from '@workbench/editor/fieldCompletion';
 import { templateToken, wholeFieldToken } from '@workbench/editor/fieldCompletion';
@@ -97,13 +99,10 @@ interface DisplayEntry {
 }
 
 const displayRows = computed<DisplayEntry[]>(() => {
-  const q = (props.filterQuery ?? '').trim().toLowerCase();
-  const withIndex = props.rows.map((row, index) => ({ row, index }));
-  const filtered = q
-    ? withIndex.filter(
-        ({ row }) => row.name.toLowerCase().includes(q) || row.value.toLowerCase().includes(q),
-      )
-    : withIndex;
+  const q = props.filterQuery ?? '';
+  const filtered = props.rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => matchesQuery(row.name, q) || matchesQuery(row.value, q));
   return [...filtered, { row: props.blankRow(), index: props.rows.length }];
 });
 
@@ -162,9 +161,8 @@ watch(
   (next, prev) => {
     if (next <= prev) return;
     void nextTick(() => {
-      containerRef.value
-        ?.querySelector('.field-row:last-child')
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const last = containerRef.value?.querySelector('.field-row:last-child');
+      if (last) revealElement(last);
     });
   },
 );

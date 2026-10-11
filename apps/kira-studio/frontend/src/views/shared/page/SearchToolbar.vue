@@ -1,11 +1,13 @@
 <script setup lang="ts" generic="M extends { row: number }">
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
+import { useFindBar } from '@workbench/behaviour/findBar';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
+import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
 import { usePageSearchFilterStore } from './searchFilter';
@@ -155,23 +157,15 @@ function startSearch(autoScroll = true): void {
   });
 }
 
-// P21 round 3 performance finding 1: every keystroke used to cancel and restart the whole
-// (potentially many-frame) scan immediately — `runChunkedScan`'s own per-frame cost is bounded now
-// (chunkRowsForColumns above), but restarting it six times over while typing "orders" is still six
-// full scans thrown away for one that matters. Debounced at the same 150 ms the tree
-// (project/state/tree.ts's SEARCH_DEBOUNCE_MS) and the collections panel
-// (api/state/collections.ts's SEARCH_DEBOUNCE_MS) already use for their own search inputs — the
-// toggles (matchCase/wholeWord/regex) stay immediate, since a checkbox click is a single, deliberate
-// action, not a typing stream.
-const QUERY_DEBOUNCE_MS = 150;
-const startSearchDebounced = useDebounceFn(() => startSearch(), QUERY_DEBOUNCE_MS);
-watch(query, () => {
-  void startSearchDebounced();
-});
-watch([matchCase, wholeWord, regex], () => {
-  startSearchDebounced.cancel();
-  startSearch();
-});
+// P21 round 3 performance finding 1: every keystroke used to restart the whole (potentially
+// many-frame) scan. useFindBar debounces the query run (TIMING.search); the toggles
+// (matchCase/wholeWord/regex) stay immediate, since a checkbox click is a single, deliberate
+// action, not a typing stream. `closed` drops a debounced run that lands after the bar closed.
+let closed = false;
+function onQuery(): void {
+  if (!closed) startSearch();
+}
+watch([matchCase, wholeWord, regex], () => startSearch());
 
 // P31 D22/D23/F23: paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
 // setPage and bump pageVersion.n — without this, searchState[tabId].matches keeps pointing at
@@ -208,7 +202,7 @@ function goPrev(): void {
 }
 
 function close(): void {
-  startSearchDebounced.cancel();
+  closed = true;
   handle?.cancel();
   handle = null;
   props.api.clearSearchState(props.tabId);
@@ -217,26 +211,12 @@ function close(): void {
   emit('close');
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') {
-    close();
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (e.shiftKey) goPrev();
-    else goNext();
-  }
-}
-
-// P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
+// P105 §5.1: the toolbar div is not interactive -- useFindBar binds the keys on it.
 const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
-useEventListener(
-  computed(() => unrefElement(rootEl)),
-  'keydown',
-  onKeydown,
-);
+useFindBar({ root: rootEl, query, onQuery, next: goNext, prev: goPrev, close });
 
 onUnmounted(() => {
-  startSearchDebounced.cancel();
+  closed = true;
   handle?.cancel();
   handle = null;
   props.api.clearSearchState(props.tabId);
@@ -246,10 +226,8 @@ onUnmounted(() => {
 });
 
 // Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
-const searchField = useTemplateRef<{ focus: () => void }>('searchField');
-onMounted(() => {
-  searchField.value?.focus();
-});
+const fieldWrap = useTemplateRef<HTMLElement>('fieldWrap');
+useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
 </script>
 
 <template>
@@ -260,8 +238,8 @@ onMounted(() => {
     class="bg-elevated"
     :data-testid="`${testidPrefix}search-toolbar`"
   >
-    <div class="w-52 shrink-0">
-      <SearchField ref="searchField" v-model="query" @keydown.escape.stop="close" placeholder="Find" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
+    <div ref="fieldWrap" class="w-52 shrink-0">
+      <SearchField v-model="query" @keydown.escape.stop="close" placeholder="Find" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
          single-value picker, so each is its own icon button rather than a <SegmentedControl> (which
@@ -313,7 +291,7 @@ onMounted(() => {
         <template v-if="scanning">{{ foundSoFar }}…</template>
         <template v-else-if="entry && entry.matches.length > 0">
           <b class="font-data">{{ entry.index + 1 }}</b> of
-          <b class="font-data">{{ (entry.found ?? entry.matches.length).toLocaleString() }}</b>
+          <b class="font-data">{{ formatCount(entry.found ?? entry.matches.length) }}</b>
           <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —
                a user cannot act on the un-shown remainder, so this says plainly that only the
                first N are on offer for Prev/Next/highlight. -->
@@ -321,7 +299,7 @@ onMounted(() => {
             v-if="entry.found !== undefined && entry.found > entry.matches.length"
             :data-testid="`${testidPrefix}search-capped`"
           >
-            (first {{ entry.matches.length.toLocaleString() }} shown)
+            (first {{ formatCount(entry.matches.length) }} shown)
           </span>
         </template>
         <template v-else>0 of 0</template>
@@ -341,10 +319,10 @@ onMounted(() => {
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <span class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
-          showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }}
+          showing {{ formatCount(filteredRowCount) }} of {{ formatCount(loadedRowCount) }}
           loaded {{ rowNoun }}
         </template>
-        <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded {{ rowNoun }}</template>
+        <template v-else>in the {{ formatCount(loadedRowCount) }} loaded {{ rowNoun }}</template>
       </span>
       <!-- M5 §6.6: search stays over raw stored values even while the grid's own preview shows
            masked ones — a surprising mismatch otherwise ("why did my search for a real name match

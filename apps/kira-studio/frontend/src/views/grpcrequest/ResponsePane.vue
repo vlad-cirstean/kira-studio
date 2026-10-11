@@ -5,7 +5,6 @@ import {
   grpcCodeClass,
   grpcCodeHint,
 } from '@shared/domain/grpc';
-import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -16,7 +15,8 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
-import { formatBytes } from '@workbench/behaviour/format';
+import { formatBytes, formatClockTime } from '@workbench/behaviour/format';
+import { useVirtualRows } from '@workbench/behaviour/virtualRows';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -156,27 +156,25 @@ function toggleExpanded(seq: number): void {
 // height per row" contract OperationsPanel.vue's own expandable row already follows).
 const MESSAGE_ROW_HEIGHT = 22; // matches --kira-h-sm
 const MESSAGE_DETAIL_HEIGHT = 200;
-function messageRowHeight(index: number): number {
-  const m = messages.value[index];
-  return m && expanded.value.has(m.seq) ? MESSAGE_ROW_HEIGHT + MESSAGE_DETAIL_HEIGHT : MESSAGE_ROW_HEIGHT;
-}
-
-// P104 §3.4: @tanstack/vue-virtual replaces VirtualList.vue directly at this call site.
-// estimateSize is the *actual* per-row height, not merely a first guess (P27 D18's own "rowHeights
-// replaces the uniform math" contract, carried over unchanged) — options are a computed, so
-// toggling one row's expanded state re-measures through the same reactive path count does.
-const scrollRef = ref<HTMLElement | null>(null);
-const messageVirtualizer = useVirtualizer(
-  computed(() => ({
-    count: messages.value.length,
-    getScrollElement: () => scrollRef.value,
-    estimateSize: messageRowHeight,
-    overscan: 8,
-    getItemKey: (index: number) => messages.value[index]?.seq ?? index,
-  })),
+const messageRowHeights = computed(() =>
+  messages.value.map((m) =>
+    expanded.value.has(m.seq) ? MESSAGE_ROW_HEIGHT + MESSAGE_DETAIL_HEIGHT : MESSAGE_ROW_HEIGHT,
+  ),
 );
-const virtualMessages = computed(() => messageVirtualizer.value.getVirtualItems());
-const totalMessagesSize = computed(() => messageVirtualizer.value.getTotalSize());
+
+// P104 §3.4: useVirtualRows replaces VirtualList.vue at this call site. rowHeights carries the
+// actual per-row height (P27 D18's contract), so toggling one row's expanded state re-measures.
+const scrollRef = ref<HTMLElement | null>(null);
+const {
+  virtualItems: virtualMessages,
+  totalSize: totalMessagesSize,
+} = useVirtualRows({
+  count: () => messages.value.length,
+  rowHeight: () => MESSAGE_ROW_HEIGHT,
+  rowHeights: () => messageRowHeights.value,
+  scrollElement: scrollRef,
+  overscan: 8,
+});
 const visibleMessages = computed(() =>
   virtualMessages.value.map((row) => ({ row, m: messages.value[row.index] })),
 );
@@ -249,7 +247,7 @@ const messageHighlights = computed<(doc: string) => readonly RangeHighlight[]>((
 const viewingTime = computed(() => {
   const iso = viewing.value?.snapshot.entry.calledAt;
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString([], { hour12: false });
+  return formatClockTime(iso);
 });
 
 let unregisterCommands: Array<() => void> = [];
