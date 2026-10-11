@@ -81,6 +81,19 @@
       }
     },
     {
+      "includes": ["packages/theme/src/i18n/*.json"],
+      "assist": {
+        "actions": {
+          "source": {
+            "useSortedKeys": { "level": "on", "options": { "sortOrder": "natural" } }
+          }
+        }
+      },
+      "json": {
+        "formatter": { "expand": "always" }
+      }
+    },
+    {
       "includes": ["knip.json"],
       "json": {
         "parser": { "allowComments": true }
