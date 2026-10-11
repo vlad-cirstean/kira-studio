@@ -5,16 +5,669 @@
     }
   },
   "backend": {
+    "definition": {
+      "section": {
+        "attributes": {
+          "title": "Attributes"
+        },
+        "committedOffsets": {
+          "title": "Committed offsets"
+        },
+        "configuration": {
+          "title": "Configuration"
+        },
+        "group": {
+          "title": "Group"
+        },
+        "members": {
+          "title": "Members"
+        },
+        "partitions": {
+          "title": "Partitions"
+        },
+        "tableProperties": {
+          "title": "Table properties"
+        }
+      }
+    },
+    "dialog": {
+      "documentsFilter": {
+        "label": "Documents"
+      },
+      "importDocuments": {
+        "title": "Import documents"
+      },
+      "importFolder": {
+        "title": "Import folder"
+      }
+    },
+    "git": {
+      "undo": {
+        "cherryPick": {
+          "label": "Undo cherry-pick of {sha}"
+        },
+        "deletedBranch": {
+          "label": "Deleted branch {name}"
+        },
+        "deletedTag": {
+          "label": "Deleted tag {name}"
+        },
+        "droppedStash": {
+          "label": "Dropped stash: {message}"
+        },
+        "removedGlobalStash": {
+          "label": "Removed global stash: {label}"
+        }
+      }
+    },
     "menu": {
+      "closeTab": {
+        "label": "Close Tab"
+      },
+      "commandPalette": {
+        "label": "Command Palette…"
+      },
       "edit": {
         "label": "Edit"
+      },
+      "find": {
+        "label": "Find"
+      },
+      "format": {
+        "label": "Format"
+      },
+      "importDataGrip": {
+        "label": "Import DataGrip Connections…"
+      },
+      "importPostman": {
+        "label": "Import Postman Collection…"
+      },
+      "newConnection": {
+        "label": "New Connection"
+      },
+      "newRequest": {
+        "label": "New Request"
+      },
+      "newWindow": {
+        "label": "New Window"
+      },
+      "nextTab": {
+        "label": "Next Tab"
+      },
+      "previousTab": {
+        "label": "Previous Tab"
+      },
+      "quit": {
+        "label": "Quit {appName}"
+      },
+      "refresh": {
+        "label": "Refresh"
+      },
+      "runAll": {
+        "label": "Run All"
+      },
+      "runStatement": {
+        "label": "Run Statement"
+      },
+      "settings": {
+        "label": "Settings…"
+      },
+      "toggleOperationsPanel": {
+        "label": "Toggle Operations Panel"
+      },
+      "toggleProjectPanel": {
+        "label": "Toggle Project Panel"
+      },
+      "view": {
+        "label": "View"
+      },
+      "window": {
+        "label": "Window"
+      }
+    },
+    "notify": {
+      "adeRun": {
+        "body": "Open Kira Space to see the result.",
+        "done": {
+          "title": "ADE run done · {name}"
+        },
+        "failed": {
+          "title": "ADE run failed · {name}"
+        },
+        "stuck": {
+          "title": "ADE run stuck · {name}"
+        }
+      },
+      "adeStep": {
+        "title": "ADE {result} · {name}"
+      },
+      "agent": {
+        "finished": {
+          "body": "Open Kira Space to read the reply.",
+          "title": "Claude finished · {name}"
+        },
+        "needsInput": {
+          "body": "Open Kira Space to answer.",
+          "title": "Claude needs input · {name}"
+        }
+      },
+      "automation": {
+        "body": "Open Kira Space to see the run.",
+        "done": {
+          "title": "Automation done · {name}"
+        },
+        "failed": {
+          "title": "Automation failed · {name}"
+        },
+        "needsYou": {
+          "title": "Automation needs you · {name}"
+        }
+      },
+      "rebase": {
+        "done": {
+          "title": "Rebase done · {name}"
+        },
+        "failed": {
+          "title": "Rebase failed · {name}"
+        },
+        "needsYou": {
+          "title": "Rebase needs you · {name}"
+        },
+        "stopped": {
+          "title": "Rebase stopped · {name}"
+        }
+      },
+      "recurringScript": {
+        "failed": {
+          "title": "Recurring script failed · {name}"
+        }
+      },
+      "test": {
+        "body": "Notifications are working.",
+        "title": "Kira Space notifications"
+      }
+    },
+    "prompt": {
+      "count": {
+        "dbMcp": {
+          "title": "{count} queries wait for approval"
+        },
+        "gitCredential": {
+          "title": "{count} Git credential requests wait"
+        },
+        "mobilePairing": {
+          "title": "{count} phones ask for access"
+        },
+        "schedule": {
+          "title": "{count} scripts wait for confirmation"
+        },
+        "update": {
+          "title": "{count} updates are available"
+        }
+      },
+      "dbMcp": {
+        "title": "Approve this query?"
+      },
+      "dbMcpNamed": {
+        "title": "Approve this query? · {name}"
+      },
+      "gitCredential": {
+        "title": "Git needs a credential"
+      },
+      "gitCredentialNamed": {
+        "title": "Git needs a credential · {repository}"
+      },
+      "mobilePairing": {
+        "title": "A phone asks for access"
+      },
+      "mobilePairingNamed": {
+        "title": "A phone asks for access · {label}"
+      },
+      "open": {
+        "body": "Open Kira {app} to answer."
+      },
+      "schedule": {
+        "title": "Run {name}?"
+      },
+      "test": {
+        "body": "A popup that waits for you posts like this.",
+        "title": "Kira {app} notifications work"
+      },
+      "update": {
+        "title": "Kira {app} {version} is available"
+      }
+    },
+    "queryPlan": {
+      "root": {
+        "query": {
+          "label": "Query"
+        },
+        "queryPlan": {
+          "label": "Query plan"
+        }
       }
     }
   },
   "common": {
     "action": {
+      "add": {
+        "label": "Add"
+      },
+      "apply": {
+        "label": "Apply"
+      },
+      "approve": {
+        "label": "Approve"
+      },
+      "back": {
+        "label": "Back"
+      },
       "cancel": {
         "label": "Cancel"
+      },
+      "checkOut": {
+        "label": "Check out"
+      },
+      "clear": {
+        "label": "Clear"
+      },
+      "clearAll": {
+        "label": "Clear all"
+      },
+      "clearHistory": {
+        "label": "Clear history"
+      },
+      "clearSearch": {
+        "label": "Clear search"
+      },
+      "close": {
+        "label": "Close"
+      },
+      "closeAll": {
+        "label": "Close all"
+      },
+      "closeOthers": {
+        "label": "Close others"
+      },
+      "closeSearch": {
+        "label": "Close search"
+      },
+      "closeToTheRight": {
+        "label": "Close to the right"
+      },
+      "collapse": {
+        "label": "Collapse"
+      },
+      "collapseAll": {
+        "label": "Collapse all"
+      },
+      "copy": {
+        "label": "Copy"
+      },
+      "copyAll": {
+        "label": "Copy all"
+      },
+      "copyAsJson": {
+        "label": "Copy as JSON"
+      },
+      "copyId": {
+        "label": "Copy ID"
+      },
+      "copyName": {
+        "label": "Copy name"
+      },
+      "copyPath": {
+        "label": "Copy path"
+      },
+      "copyValue": {
+        "label": "Copy value"
+      },
+      "create": {
+        "label": "Create"
+      },
+      "delete": {
+        "label": "Delete"
+      },
+      "deny": {
+        "label": "Deny"
+      },
+      "discard": {
+        "label": "Discard"
+      },
+      "dismiss": {
+        "label": "Dismiss"
+      },
+      "download": {
+        "label": "Download"
+      },
+      "duplicate": {
+        "label": "Duplicate"
+      },
+      "edit": {
+        "label": "Edit"
+      },
+      "expand": {
+        "label": "Expand"
+      },
+      "expandAll": {
+        "label": "Expand all"
+      },
+      "filter": {
+        "label": "Filter"
+      },
+      "find": {
+        "label": "Find"
+      },
+      "hide": {
+        "label": "Hide"
+      },
+      "hideSearch": {
+        "label": "Hide search"
+      },
+      "next": {
+        "label": "Next"
+      },
+      "nextMatch": {
+        "label": "Next match"
+      },
+      "nextPage": {
+        "label": "Next page"
+      },
+      "open": {
+        "label": "Open"
+      },
+      "openInNewTab": {
+        "label": "Open in new tab"
+      },
+      "openSettings": {
+        "label": "Open settings"
+      },
+      "openTerminal": {
+        "label": "Open terminal"
+      },
+      "previous": {
+        "label": "Previous"
+      },
+      "previousMatch": {
+        "label": "Previous match"
+      },
+      "previousPage": {
+        "label": "Previous page"
+      },
+      "refresh": {
+        "label": "Refresh"
+      },
+      "remove": {
+        "label": "Remove"
+      },
+      "rename": {
+        "label": "Rename"
+      },
+      "reset": {
+        "label": "Reset"
+      },
+      "resetToDefault": {
+        "label": "Reset to default"
+      },
+      "restore": {
+        "label": "Restore"
+      },
+      "retry": {
+        "label": "Retry"
+      },
+      "reveal": {
+        "label": "Reveal"
+      },
+      "run": {
+        "label": "Run"
+      },
+      "runAll": {
+        "label": "Run all"
+      },
+      "save": {
+        "label": "Save"
+      },
+      "search": {
+        "label": "Search"
+      },
+      "select": {
+        "label": "Select"
+      },
+      "send": {
+        "label": "Send"
+      },
+      "show": {
+        "label": "Show"
+      },
+      "showAll": {
+        "label": "Show all"
+      },
+      "showLess": {
+        "label": "Show less"
+      },
+      "showMore": {
+        "label": "Show more"
+      },
+      "start": {
+        "label": "Start"
+      },
+      "startAll": {
+        "label": "Start all"
+      },
+      "stop": {
+        "label": "Stop"
+      },
+      "stopAll": {
+        "label": "Stop all"
+      },
+      "takeOver": {
+        "label": "Take over"
+      }
+    },
+    "confirm": {
+      "irreversible": {
+        "body": "This can’t be undone."
+      }
+    },
+    "copy": {
+      "copied": {
+        "announce": "Copied"
+      },
+      "copiedId": {
+        "announce": "Copied ID"
+      },
+      "copiedJson": {
+        "announce": "Copied JSON"
+      },
+      "copiedName": {
+        "announce": "Copied name"
+      },
+      "copiedPath": {
+        "announce": "Copied path"
+      },
+      "copiedValue": {
+        "announce": "Copied value"
+      },
+      "failed": {
+        "error": "Couldn’t copy: {error}"
+      }
+    },
+    "field": {
+      "branch": {
+        "label": "Branch"
+      },
+      "colour": {
+        "label": "Colour"
+      },
+      "command": {
+        "label": "Command"
+      },
+      "date": {
+        "label": "Date"
+      },
+      "description": {
+        "label": "Description"
+      },
+      "duration": {
+        "label": "Duration"
+      },
+      "email": {
+        "label": "Email"
+      },
+      "key": {
+        "label": "Key"
+      },
+      "kind": {
+        "label": "Kind"
+      },
+      "name": {
+        "label": "Name"
+      },
+      "noColour": {
+        "label": "No colour"
+      },
+      "number": {
+        "label": "Number"
+      },
+      "source": {
+        "label": "Source"
+      },
+      "status": {
+        "label": "Status"
+      },
+      "text": {
+        "label": "Text"
+      },
+      "time": {
+        "label": "Time"
+      },
+      "timeout": {
+        "label": "Timeout"
+      },
+      "title": {
+        "label": "Title"
+      },
+      "type": {
+        "label": "Type"
+      },
+      "value": {
+        "label": "Value"
+      }
+    },
+    "key": {
+      "enter": {
+        "label": "Enter"
+      },
+      "escape": {
+        "label": "Esc"
+      },
+      "tab": {
+        "label": "Tab"
+      }
+    },
+    "module": {
+      "automations": {
+        "label": "Automations"
+      },
+      "branches": {
+        "label": "Branches"
+      },
+      "commits": {
+        "label": "Commits"
+      },
+      "connections": {
+        "label": "Connections"
+      },
+      "files": {
+        "label": "Files"
+      },
+      "git": {
+        "label": "Git"
+      },
+      "history": {
+        "label": "History"
+      },
+      "memory": {
+        "label": "Memory"
+      },
+      "operations": {
+        "label": "Operations"
+      },
+      "repositories": {
+        "label": "Repositories"
+      },
+      "settings": {
+        "label": "Settings"
+      },
+      "terminal": {
+        "label": "Terminal"
+      },
+      "variables": {
+        "label": "Variables"
+      },
+      "worktrees": {
+        "label": "Worktrees"
+      }
+    },
+    "product": {
+      "claudeCode": {
+        "label": "Claude Code"
+      },
+      "docker": {
+        "label": "Docker"
+      },
+      "github": {
+        "label": "GitHub"
+      },
+      "jira": {
+        "label": "Jira"
+      },
+      "kiraSpace": {
+        "label": "Kira Space"
+      },
+      "kiraStudio": {
+        "label": "Kira Studio"
+      }
+    },
+    "state": {
+      "all": {
+        "option": "All"
+      },
+      "default": {
+        "option": "Default"
+      },
+      "failed": {
+        "status": "Failed"
+      },
+      "idle": {
+        "status": "Idle"
+      },
+      "inherit": {
+        "option": "Inherit"
+      },
+      "loadFailed": {
+        "title": "Couldn’t load"
+      },
+      "loading": {
+        "loading": "Loading…"
+      },
+      "noMatches": {
+        "empty": "No matches"
+      },
+      "none": {
+        "option": "None"
+      },
+      "readOnly": {
+        "status": "Read-only"
+      },
+      "running": {
+        "status": "Running"
+      },
+      "saving": {
+        "loading": "Saving…"
+      },
+      "unsavedChanges": {
+        "status": "Unsaved changes"
       }
     }
   },
@@ -24,8 +677,23 @@
     }
   },
   "format": {
+    "duration": {
+      "hoursMinutes": "{hours}h {minutes}m",
+      "minutesSeconds": "{minutes}m {seconds}s",
+      "ms": "{value} ms",
+      "seconds": "{value} s",
+      "secondsCompact": "{seconds}s"
+    },
     "relative": {
-      "justNow": "just now"
+      "days": "{count}d ago",
+      "future": "in {time}",
+      "hours": "{count}h ago",
+      "justNow": "just now",
+      "minutes": "{count}m ago",
+      "past": "{time} ago",
+      "unitDay": "{count}d",
+      "unitHour": "{count}h",
+      "unitMinute": "{count}m"
     }
   },
   "git": {
@@ -44,8 +712,83 @@
     }
   },
   "shared": {
-    "module": {
-      "title": "Shared"
+    "connection": {
+      "minVersion": {
+        "clickhouse": {
+          "hint": "Requires ClickHouse 25.3 or newer."
+        },
+        "kafka": {
+          "hint": "Requires Apache Kafka 3.4 or newer."
+        },
+        "mariadb": {
+          "hint": "Requires MariaDB 10.11 or newer."
+        },
+        "mongodb": {
+          "hint": "Requires MongoDB 4.4 or newer."
+        },
+        "mysql": {
+          "hint": "Requires MySQL 8.0 or newer."
+        },
+        "postgres": {
+          "hint": "Requires PostgreSQL 14 or newer."
+        },
+        "redis": {
+          "hint": "Requires Redis 7.0 or newer."
+        },
+        "sqlite": {
+          "hint": "Reads any SQLite 3 database file — no server required."
+        }
+      },
+      "validation": {
+        "databaseAbsolute": {
+          "error": "The database file must be an absolute path."
+        },
+        "databaseRequired": {
+          "error": "A database file is required."
+        },
+        "hostRequired": {
+          "error": "Host is required."
+        },
+        "portRequired": {
+          "error": "Port is required."
+        },
+        "uriRequired": {
+          "error": "A connection URI is required."
+        }
+      }
+    },
+    "grpc": {
+      "newRequest": {
+        "title": "New gRPC request"
+      },
+      "streaming": {
+        "stream": {
+          "label": "Stream"
+        },
+        "unary": {
+          "label": "Unary"
+        }
+      }
+    },
+    "sqlLint": {
+      "unbalancedParenthesis": {
+        "error": "Unbalanced parenthesis."
+      },
+      "unmatchedParenthesis": {
+        "error": "Unmatched closing parenthesis."
+      },
+      "unterminatedBlockComment": {
+        "error": "Unterminated block comment."
+      },
+      "unterminatedDollarQuote": {
+        "error": "Unterminated dollar-quoted string."
+      },
+      "unterminatedIdentifier": {
+        "error": "Unterminated quoted identifier."
+      },
+      "unterminatedString": {
+        "error": "Unterminated string literal."
+      }
     }
   },
   "space": {
@@ -59,13 +802,41 @@
     }
   },
   "theme": {
-    "module": {
-      "title": "Theme"
+    "commandDialog": {
+      "description": "Search for a command to run.",
+      "title": "Command palette"
+    },
+    "numberStepper": {
+      "decrease": {
+        "tooltip": "Decrease"
+      },
+      "increase": {
+        "tooltip": "Increase"
+      }
+    },
+    "scriptProgress": {
+      "elapsedOf": {
+        "label": "{elapsed} of {timeout}"
+      }
+    },
+    "varText": {
+      "aria": "{name}: {value}"
     }
   },
   "workbench": {
+    "bootFailure": {
+      "title": "{product} couldn’t start"
+    },
+    "confirmDialog": {
+      "title": "Confirm"
+    },
     "module": {
       "title": "Workbench"
+    },
+    "showMore": {
+      "remaining": {
+        "label": "Show more ({count} remaining)"
+      }
     }
   }
 }
