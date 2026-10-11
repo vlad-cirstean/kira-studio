@@ -36,6 +36,7 @@ import { Button } from '@theme/components/ui/button';
  */
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
+import { CatalogText, type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatCount } from '@workbench/behaviour/format';
@@ -113,9 +114,9 @@ let targetSequence = 0;
  *  this view is already gone by the time it lands, so there is nothing left to announce it to. */
 const { text: liveAnnouncement, announce } = useLiveRegion();
 
-function reportAsyncError(err: unknown, prefix: string): void {
+function reportAsyncError(err: unknown, key: MessageKey): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  announce(`${prefix} — ${errorText(err)}`);
+  announce(t(key, { error: errorText(err) }));
 }
 
 async function applyTarget(
@@ -153,7 +154,7 @@ async function recompare(): Promise<void> {
 }
 
 function retryCompare(): void {
-  recompare().catch((err: unknown) => reportAsyncError(err, "Couldn't compare"));
+  recompare().catch((err: unknown) => reportAsyncError(err, 'git.review.async.compare.error'));
 }
 
 async function bootstrap(): Promise<void> {
@@ -175,7 +176,7 @@ async function bootstrap(): Promise<void> {
 
   unsubscribeTarget = bridge.on('review.target', (event) => {
     applyTarget(event.repoId, event.branch).catch((err: unknown) =>
-      reportAsyncError(err, "Couldn't switch to the pushed target"),
+      reportAsyncError(err, 'git.review.async.switchTarget.error'),
     );
   });
   // G11 D17: the palette's own route into this already-mounted webview — toggles the file
@@ -246,7 +247,7 @@ function scheduleSessionSave(): void {
   sessionSaveScheduled = true;
   queueMicrotask(() => {
     sessionSaveScheduled = false;
-    persistSession().catch((err: unknown) => reportAsyncError(err, "Couldn't save this session"));
+    persistSession().catch((err: unknown) => reportAsyncError(err, 'git.review.async.saveSession.error'));
   });
 }
 
@@ -315,7 +316,7 @@ function onUiAction(action: UiActionKind): void {
       const rf = reviewFiles.value;
       const path = rf?.selectedPath.value;
       if (!rf || path === null || path === undefined) {
-        announce('Open a file in the Files tab first.');
+        announce(t('git.review.noOpenFile.announce'));
         return;
       }
       const entry = rf.files.value.find((e) => e.change.path === path);
@@ -425,17 +426,17 @@ const filesActions = computed<DetailActions>(() => {
     },
     async openAllChanges({ sha, parentIndex }) {
       const repo = repoId.value;
-      if (!repo) throw new Error('ReviewView: openAllChanges called with no active repo');
+      if (!repo) throw new Error('openAllChanges: no active repo');
       return bridge.request('editor.openAllChanges', { repoId: repo, sha, parentIndex });
     },
     async goToFile({ rev, path, line }) {
       const repo = repoId.value;
-      if (!repo) throw new Error('ReviewView: goToFile called with no active repo');
+      if (!repo) throw new Error('goToFile: no active repo');
       return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
     },
     async openPullRequest({ number }) {
       const repo = repoId.value;
-      if (!repo) throw new Error('ReviewView: openPullRequest called with no active repo');
+      if (!repo) throw new Error('openPullRequest: no active repo');
       await bridge.request('pr.openExternal', { repoId: repo, number });
     },
     async openExternalLink(url) {
@@ -558,7 +559,7 @@ const commitCountLabel = computed(() => {
   const resolution = review.value?.resolution.value;
   if (resolution?.range.kind !== 'ready') return '';
   const count = resolution.range.commitCount;
-  return `${formatCount(count)} ${count === 1 ? 'commit' : 'commits'}`;
+  return t('git.review.commits.count.label', { count });
 });
 
 // G14 D8 row 3/4: bare counts for the comparison summary node and the pane-toggle badges — the
@@ -578,39 +579,41 @@ const commentsCount = computed(() => reviewComments.value?.comments.value.length
 interface ReviewToggleOption {
   readonly id: string;
   readonly icon: string;
-  readonly label: string;
+  readonly label: MessageKey;
   readonly ariaLabel?: string;
   readonly badge?: number;
 }
 
 // G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged section nodes.
 const panelOptions = computed<readonly ReviewToggleOption[]>(() => [
-  { id: 'commits', icon: ACTION_ICONS.commits, label: 'Commits', badge: commitsCount.value },
-  { id: 'files', icon: ACTION_ICONS.files, label: 'Files', badge: filesChangedCount.value },
-  { id: 'comments', icon: ACTION_ICONS.comments, label: 'Comments', badge: commentsCount.value },
+  { id: 'commits', icon: ACTION_ICONS.commits, label: 'common.module.commits.label', badge: commitsCount.value },
+  { id: 'files', icon: ACTION_ICONS.files, label: 'common.module.files.label', badge: filesChangedCount.value },
+  { id: 'comments', icon: ACTION_ICONS.comments, label: 'git.review.pane.comments.label', badge: commentsCount.value },
 ]);
 
 const listModeOptions: readonly ReviewToggleOption[] = [
-  { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
-  { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
+  { id: 'tree', icon: ACTION_ICONS.listTree, label: 'git.fileTree.listTree.tooltip' },
+  { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'git.fileTree.listFlat.tooltip' },
 ];
 
 const panelItems = computed(() =>
   panelOptions.value.map((o) => ({
     value: o.id,
-    label: o.label,
+    label: t(o.label),
     icon: codiconName(o.icon),
     count: o.badge,
-    tooltip: o.label,
+    tooltip: t(o.label),
     testid: `review-pane-${o.id}`,
   })),
 );
-const listModeItems = listModeOptions.map((o) => ({
-  value: o.id,
-  label: o.label,
-  icon: codiconName(o.icon),
-  tooltip: o.label,
-}));
+const listModeItems = computed(() =>
+  listModeOptions.map((o) => ({
+    value: o.id,
+    label: t(o.label),
+    icon: codiconName(o.icon),
+    tooltip: t(o.label),
+  })),
+);
 
 function onPaneChange(pane: string): void {
   review.value?.setPane(pane as ReviewPane);
@@ -623,19 +626,22 @@ const comparisonSummaryLabel = computed(() => {
   const commits = commitCountLabel.value;
   if (!commits) return '';
   const files = filesChangedCount.value;
-  return `${commits} · ${formatCount(files)} ${files === 1 ? 'file' : 'files'} changed`;
+  return t('git.review.summary.label', { commits, files: t('git.review.filesChanged.label', { count: files }) });
 });
 
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
 
 function loadMoreLabel(): string {
   const r = review.value;
-  if (!r) return 'Load more';
-  if (r.isLoadingMore.value) return 'Loading…';
+  if (!r) return t('git.review.loadMore.label');
+  if (r.isLoadingMore.value) return t('common.state.loading.loading');
   const remaining = r.remaining.value;
   return remaining < FALLBACK_PAGE_SIZE
-    ? `Load the last ${formatCount(remaining)}`
-    : `Load more (${formatCount(remaining)} remaining)`;
+    ? t('git.loadMore.last.label', { count: remaining })
+    : t('git.loadMore.page.label', {
+        pageSize: formatCount(FALLBACK_PAGE_SIZE),
+        remaining: formatCount(remaining),
+      });
 }
 
 function handleLoadMore(): void {
@@ -741,19 +747,19 @@ watch(
     const base = r.resolution.value?.base ?? '';
     switch (phase) {
       case 'ask':
-        announce(`No base detected for ${branch}. Choose one to compare against.`);
+        announce(t('git.review.phase.ask.announce', { branch }));
         break;
       case 'unrelated':
-        announce(`${branch} and ${base} share no common history.`);
+        announce(t('git.review.phase.unrelated.announce', { branch, base }));
         break;
       case 'empty':
-        announce(`${branch} adds no commits to ${base}.`);
+        announce(t('git.review.phase.empty.announce', { branch, base }));
         break;
       case 'listing':
-        announce(`Comparing ${branch} to ${base}: ${commitCountLabel.value}.`);
+        announce(t('git.review.phase.listing.announce', { branch, base, summary: commitCountLabel.value }));
         break;
       case 'error':
-        announce(`Couldn't compare ${branch} — ${r.resolveError.value ?? ''}`);
+        announce(t('git.review.phase.error.error', { branch, error: r.resolveError.value ?? '' }));
         break;
       default:
         break;
@@ -778,9 +784,9 @@ watch(
 
     <template v-if="bootError">
       <div class="flex flex-col gap-2 p-3" data-testid="boot-error">
-        <p class=" text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
+        <p class=" text-muted-foreground">{{ t('git.app.bootError.error', { error: bootError }) }}</p>
         <Button variant="dialog" size="kira" class="self-start" data-testid="boot-retry" @click="retryBootstrap">
-          Retry
+          {{ t('common.action.retry.label') }}
         </Button>
       </div>
     </template>
@@ -788,14 +794,14 @@ watch(
     <template v-else-if="!review">
       <Empty class="h-full">
         <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
-        <EmptyTitle>Loading review…</EmptyTitle>
+        <EmptyTitle>{{ t('git.review.loading.loading') }}</EmptyTitle>
       </Empty>
     </template>
 
     <template v-else-if="noActiveRepo">
       <div class="flex flex-col gap-1 p-3 min-h-0">
-        <h2 class="text-kira-md text-fg">Review branch changes</h2>
-        <p>Open a repository first, then pick a branch to review.</p>
+        <h2 class="text-kira-md text-fg">{{ t('git.review.start.title') }}</h2>
+        <p>{{ t('git.review.noRepo.emptyHint') }}</p>
       </div>
     </template>
 
@@ -804,19 +810,19 @@ watch(
         class="flex flex-col gap-1 p-3 min-h-0 h-full"
         data-testid="review-no-branch"
       >
-        <h2 class="text-kira-md text-fg">Review branch changes</h2>
+        <h2 class="text-kira-md text-fg">{{ t('git.review.start.title') }}</h2>
         <p class=" text-muted-foreground">
-          Pick a branch to compare its commits against a base you choose or one we detect.
+          {{ t('git.review.noBranch.emptyHint') }}
         </p>
         <SearchField
           ref="branchFilter"
           v-model="branchFilter"
-          placeholder="Filter branches"
-          aria-label="Filter branches"
+          :placeholder="t('git.picker.filterBranches.placeholder')"
+          :aria-label="t('git.picker.filterBranches.placeholder')"
         />
         <div class="flex-1 min-h-0 overflow-auto">
           <div>
-            <SectionHeading label="Branches" />
+            <SectionHeading :label="t('common.module.branches.label')" />
             <button
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
@@ -828,11 +834,11 @@ watch(
               {{ row.shortName }}
             </button>
             <InlineState v-if="branchSections.branches.visible.length === 0" kind="empty">
-              No matching branches
+              {{ t('common.state.noMatches.empty') }}
             </InlineState>
           </div>
           <div>
-            <SectionHeading label="Remote branches" />
+            <SectionHeading :label="t('git.picker.remoteBranches.label')" />
             <button
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
@@ -860,7 +866,7 @@ watch(
       <ViewToolbar>
         <TooltipIconButton
           icon="chevron-left"
-          label="Back to branch selection"
+          :label="t('git.review.back.tooltip')"
           data-testid="review-back-button"
           @click="goBackToSelection"
         />
@@ -878,7 +884,7 @@ watch(
         />
         <TooltipIconButton
           icon="arrow-swap"
-          label="Swap branch and base"
+          :label="t('git.review.swap.tooltip')"
           data-testid="review-swap-button"
           @click="onSwapBaseAndBranch"
         />
@@ -895,7 +901,7 @@ watch(
            expanded row plus a third, separately-stateful copy in the Files pane. -->
       <ViewToolbar v-if="review.phase.value === 'listing'" data-testid="review-toolbar">
         <SecondaryTabs
-          aria-label="Review pane"
+          :aria-label="t('git.review.pane.aria')"
           :model-value="review.pane.value"
           :items="panelItems"
           @update:model-value="onPaneChange"
@@ -913,7 +919,7 @@ watch(
              applied filter still visibly signals itself even while hidden. -->
         <TooltipIconButton
           icon="search"
-          label="Filter files"
+          :label="t('git.fileTree.filter.placeholder')"
           :pressed="filterVisible || filter.length > 0"
           data-testid="review-filter-toggle"
           @click="toggleFilterVisible"
@@ -922,15 +928,15 @@ watch(
           <SearchField
             ref="toolbarFilter"
             data-testid="review-file-filter"
-            placeholder="Filter files"
-            aria-label="Filter files"
+            :placeholder="t('git.fileTree.filter.placeholder')"
+            :aria-label="t('git.fileTree.filter.placeholder')"
             :model-value="filter"
             @update:model-value="filter = $event"
           />
         </div>
         <SecondaryTabs
           variant="segmented"
-          aria-label="File list display"
+          :aria-label="t('git.fileTree.display.aria')"
           :model-value="listMode"
           :items="listModeItems"
           @update:model-value="(v) => (listMode = v as FileListMode)"
@@ -944,16 +950,16 @@ watch(
 
       <div class="flex-1 min-h-0 flex flex-col">
         <p v-if="review.phase.value === 'resolving'" class=" p-3 text-muted-foreground">
-          Resolving comparison…
+          {{ t('git.review.resolving.loading') }}
         </p>
 
         <div
           v-else-if="review.phase.value === 'error'"
           class="flex flex-col items-start gap-1 p-3"
         >
-          <FieldError>Couldn't compare — {{ review.resolveError.value }}</FieldError>
+          <FieldError>{{ t('git.review.async.compare.error', { error: review.resolveError.value ?? '' }) }}</FieldError>
           <Button variant="dialog" size="kira" data-testid="review-retry" @click="retryCompare">
-            Retry
+            {{ t('common.action.retry.label') }}
           </Button>
         </div>
 
@@ -962,7 +968,11 @@ watch(
           class=" p-3 text-muted-foreground"
           data-testid="review-ask"
         >
-          <p>Nothing was detected for <strong>{{ review.branch.value }}</strong> — pick a base above. We won't guess.</p>
+          <p>
+            <CatalogText k="git.review.ask.body" :params="{ branch: review.branch.value }">
+              <template #branch><strong>{{ review.branch.value }}</strong></template>
+            </CatalogText>
+          </p>
         </div>
 
         <p
@@ -970,8 +980,7 @@ watch(
           class=" p-3 text-muted-foreground"
           data-testid="review-unrelated"
         >
-          “{{ review.branch.value }}” and “{{ review.resolution.value?.base }}” share no common
-          history.
+          {{ t('git.review.unrelated.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' }) }}
         </p>
 
         <p
@@ -979,7 +988,7 @@ watch(
           class=" p-3 text-muted-foreground"
           data-testid="review-empty"
         >
-          “{{ review.branch.value }}” adds no commits to “{{ review.resolution.value?.base }}”.
+          {{ t('git.review.empty.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' }) }}
         </p>
 
         <template
@@ -991,10 +1000,10 @@ watch(
             role="status"
             data-testid="review-stale-banner"
           >
-            <span>This comparison has changed.</span>
+            <span>{{ t('git.review.stale.status') }}</span>
             <TooltipIconButton
               icon="refresh"
-              label="Refresh"
+              :label="t('common.action.refresh.label')"
               class="ml-auto"
               @click="review.acknowledgeStaleReview()"
             />
@@ -1004,7 +1013,7 @@ watch(
             ref="rowsEl"
             class="flex-1 min-h-0 overflow-auto"
             role="tree"
-            aria-label="Commits"
+            :aria-label="t('common.module.commits.label')"
             :tabindex="focusedRowMounted ? -1 : 0"
             @scroll="onScroll"
           >

@@ -28,6 +28,7 @@ import type {
   UndoSlotSnapshot,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { type MessageKey, t } from '@theme/i18n';
 import { createLatestRequest } from '@workbench/behaviour/latest';
 import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
@@ -51,8 +52,11 @@ import {
   composeStashPushAnnouncement,
   composeUndoAnnouncement,
   createAnnouncementRef,
+  type OpAction,
   type OpFailureError,
+  opFailedTitle,
   type StashPredictionMismatch,
+  stashRef,
 } from './liveAnnouncements.ts';
 import { createPendingSlot, type PendingSlot } from './pendingSlot.ts';
 import type { RefsState } from './refs.ts';
@@ -67,8 +71,6 @@ export type { StashPredictionMismatch } from './liveAnnouncements.ts';
  *  at each of its two call sites rather than given its own top-level name — §7.10/§7.6 both do
  *  this). */
 type StashPrediction = StashPopPreflight['prediction'];
-
-const STASHED_NOTE = ' Your changes are stashed — see the stash list.';
 
 /** `StashDialog.vue`'s own pending state for the shared apply/pop confirmation (OQ7: one dialog,
  *  the verb and one sentence differing) — opened only when `preflight.stashPop`'s verdict is not
@@ -492,7 +494,7 @@ export class OpsState {
         });
         this.#applyResult(repoId, result);
         if (!result.ok) {
-          this.#fail('Checkout', result.error, true);
+          this.#fail('checkout', result.error, true);
           return;
         }
         landedOnBranch = auto.mode === 'switch';
@@ -521,7 +523,7 @@ export class OpsState {
         // navigated away from.
         if (this.#repo.repoId !== repoId) return;
         if (route === null) {
-          this.announcement.value = 'Checkout cancelled.';
+          this.announcement.value = t('git.op.cancelled.checkout.announce');
           return;
         }
         if (route.kind === 'stashAndCarry') {
@@ -545,8 +547,11 @@ export class OpsState {
                   autoStash: false,
                 },
               }),
-            'Checkout',
-            () => `Checked out ${target}${mode === 'detach' ? ' (detached)' : ''}`,
+            'checkout',
+            () =>
+              t('git.op.checkout.announce', {
+                where: mode === 'detach' ? t('git.op.detachedTarget.label', { target }) : target,
+              }),
           );
           return;
         }
@@ -558,10 +563,10 @@ export class OpsState {
       });
       this.#applyResult(repoId, result);
       if (result.ok) this.announcement.value = composeCheckoutAnnouncement(preflight, target);
-      else this.#fail('Checkout', result.error, true);
+      else this.#fail('checkout', result.error, true);
       landedOnBranch = result.ok && mode === 'switch';
     } catch (error) {
-      this.#announceRejection('Checkout', error);
+      this.#announceRejection('checkout', error);
     } finally {
       this.busy.value = false;
     }
@@ -644,8 +649,8 @@ export class OpsState {
     preflight: TPreflight;
     needsDialog: (preflight: TPreflight) => boolean;
     slot: PendingSlot<TPreflight, TRoute | null>;
-    cancelText: string;
-    action: string;
+    cancelText: MessageKey;
+    action: OpAction;
     buildOp: (mainline: number | undefined, noCommit: boolean) => OpRequest;
     /** `undefined` for a plain failure, which `#fail` composes. */
     announce: (result: OpResult, noCommit: boolean) => string | undefined;
@@ -659,7 +664,7 @@ export class OpsState {
       // #checkoutSlot.ask above — the active repo can change while this dialog is open.
       if (this.#repo.repoId !== repoId) return;
       if (route === null) {
-        this.announcement.value = opts.cancelText;
+        this.announcement.value = t(opts.cancelText);
         return;
       }
       mainline = route.mainline;
@@ -688,14 +693,14 @@ export class OpsState {
         preflight,
         needsDialog: (p) => p.verdict !== 'clean' || p.mainlineRequired.length > 0,
         slot: this.#revertSlot,
-        cancelText: 'Revert cancelled.',
-        action: 'Revert',
+        cancelText: 'git.op.cancelled.revert.announce',
+        action: 'revert',
         buildOp: (mainline, noCommit) => ({ kind: 'revert', shas, mainline, noCommit }),
         announce: (result, noCommit) =>
           result.ok ? composeRevertAnnouncement(shas, noCommit) : undefined,
       });
     } catch (error) {
-      this.#announceRejection('Revert', error);
+      this.#announceRejection('revert', error);
     } finally {
       this.busy.value = false;
     }
@@ -739,8 +744,8 @@ export class OpsState {
       const preflight = await this.#bridge.request('preflight.reset', { repoId, target, mode });
       if (preflight.verdict === 'blocked') {
         this.announcement.value = preflight.blockers.includes('inProgressOperation')
-          ? 'Reset failed — another operation is in progress.'
-          : `Reset failed — ${target} does not resolve to a commit.`;
+          ? `${opFailedTitle('reset')} ${t('git.op.reason.operationInProgress.error')}`
+          : t('git.op.reset.unresolved.error', { target });
         return;
       }
       const route = await this.#resetSlot.ask(preflight);
@@ -748,7 +753,7 @@ export class OpsState {
       // #checkoutSlot.ask above — the active repo can change while this dialog is open.
       if (this.#repo.repoId !== repoId) return;
       if (route === null) {
-        this.announcement.value = 'Reset cancelled.';
+        this.announcement.value = t('git.op.cancelled.reset.announce');
         return;
       }
       if (route.stashFirst) {
@@ -764,7 +769,7 @@ export class OpsState {
         });
         this.#applyResult(repoId, push);
         if (!push.ok) {
-          this.#fail('Stash', push.error, true);
+          this.#fail('stash', push.error, true);
           return;
         }
         stashedFirst = true;
@@ -782,9 +787,9 @@ export class OpsState {
       });
       this.#applyResult(repoId, result);
       if (result.ok) this.announcement.value = composeResetAnnouncement(route.mode, target);
-      else this.#fail('Reset', result.error, true, stashedFirst ? STASHED_NOTE : '');
+      else this.#fail('reset', result.error, true, stashedFirst);
     } catch (error) {
-      this.#announceRejection('Reset', error, stashedFirst ? STASHED_NOTE : '');
+      this.#announceRejection('reset', error, stashedFirst);
     } finally {
       this.busy.value = false;
     }
@@ -844,8 +849,8 @@ export class OpsState {
         needsDialog: (p) =>
           p.verdict !== 'clean' || p.mainlineRequired.length > 0 || p.alreadyApplied,
         slot: this.#cherryPickSlot,
-        cancelText: 'Cherry-pick cancelled.',
-        action: 'Cherry-pick',
+        cancelText: 'git.op.cancelled.cherryPick.announce',
+        action: 'cherryPick',
         buildOp: (mainline, noCommit) => ({ kind: 'cherryPick', sha, mainline, noCommit }),
         announce: (result, noCommit) => {
           const mismatch = this.#reconcileCherryPick(preflight.prediction, result);
@@ -857,7 +862,7 @@ export class OpsState {
         },
       });
     } catch (error) {
-      this.#announceRejection('Cherry-pick', error);
+      this.#announceRejection('cherryPick', error);
     } finally {
       this.busy.value = false;
     }
@@ -920,10 +925,10 @@ export class OpsState {
     readonly paths: readonly string[];
   }): Promise<OpResult> {
     const repoId = this.#repo.repoId;
-    if (repoId === undefined) return this.#failedResult('no repository is open');
+    if (repoId === undefined) return this.#failedResult(t('git.op.noRepository.error'));
     if (this.busy.value) {
-      this.announcement.value = 'Stash failed — another operation is already running.';
-      return this.#failedResult('another operation is already running');
+      this.announcement.value = `${opFailedTitle('stash')} ${t('git.op.busy.error')}`;
+      return this.#failedResult(t('git.op.busy.error'));
     }
     this.busy.value = true;
     try {
@@ -939,10 +944,10 @@ export class OpsState {
         pushed = after.entries.length > before.entries.length;
       }
       if (result.ok) this.announcement.value = composeStashPushAnnouncement(pushed);
-      else this.#fail('Stash', result.error, true);
+      else this.#fail('stash', result.error, true);
       return result;
     } catch (error) {
-      this.#announceRejection('Stash', error);
+      this.#announceRejection('stash', error);
       return this.#failedResult(errorText(error));
     } finally {
       this.busy.value = false;
@@ -989,7 +994,11 @@ export class OpsState {
         // #checkoutSlot.ask above — the active repo can change while this dialog is open.
         if (this.#repo.repoId !== repoId) return undefined;
         if (!proceed) {
-          this.announcement.value = `Stash ${verb} cancelled.`;
+          this.announcement.value = t(
+            verb === 'apply'
+              ? 'git.op.cancelled.stashApply.announce'
+              : 'git.op.cancelled.stashPop.announce',
+          );
           return undefined;
         }
       }
@@ -1007,10 +1016,11 @@ export class OpsState {
         mismatch,
         this.#refs.currentBranchName.value ?? null,
       );
-      if (!result.ok) this.#noteFailure(`Stash ${verb}`, result.error, true);
+      if (!result.ok)
+        this.#noteFailure(verb === 'apply' ? 'stashApply' : 'stashPop', result.error, true);
       return result;
     } catch (error) {
-      this.#announceRejection(`Stash ${verb}`, error);
+      this.#announceRejection(verb === 'apply' ? 'stashApply' : 'stashPop', error);
       return undefined;
     } finally {
       this.busy.value = false;
@@ -1060,9 +1070,9 @@ export class OpsState {
       { kind: 'stashDrop', sha: entry.sha, index: entry.index },
       (ok) =>
         ok
-          ? `Dropped stash@{${entry.index}}: ${entry.message} — undo available until your next operation.`
+          ? t('git.op.dropStash.body', { ref: stashRef(entry.index), message: entry.message })
           : undefined,
-      'Drop stash',
+      'dropStash',
     );
   }
 
@@ -1089,8 +1099,9 @@ export class OpsState {
   async runStashBranch(entry: StashEntry, name: string): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'stashBranch', branch: name, sha: entry.sha, index: entry.index, scope: entry.scope },
-      (ok) => (ok ? `Created branch ${name} from ${stashLabel(entry)}` : undefined),
-      'Create branch from stash',
+      (ok) =>
+        ok ? t('git.op.stashBranch.announce', { name, label: stashLabel(entry) }) : undefined,
+      'stashBranch',
     );
   }
 
@@ -1107,8 +1118,8 @@ export class OpsState {
   async runGlobalStashSave(label: string, sha: string | undefined): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'globalStashSave', label, sha },
-      (ok) => (ok ? `Saved "${label}" to the global stash` : undefined),
-      'Save to global stash',
+      (ok) => (ok ? t('git.op.saveGlobalStash.announce', { label }) : undefined),
+      'saveGlobalStash',
     );
   }
 
@@ -1117,11 +1128,8 @@ export class OpsState {
   async runGlobalStashRemove(entry: StashEntry): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'globalStashRemove', sha: entry.sha },
-      (ok) =>
-        ok
-          ? `Removed "${stashLabel(entry)}" from the global stash — undo available until your next operation.`
-          : undefined,
-      'Remove from global stash',
+      (ok) => (ok ? t('git.op.removeGlobalStash.body', { label: stashLabel(entry) }) : undefined),
+      'removeGlobalStash',
     );
   }
 
@@ -1139,8 +1147,8 @@ export class OpsState {
   }): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'worktreeAdd', ...params },
-      (ok) => (ok ? `Created worktree at ${params.path}` : undefined),
-      'Create worktree',
+      (ok) => (ok ? t('git.op.createWorktree.announce', { path: params.path }) : undefined),
+      'createWorktree',
     );
   }
 
@@ -1152,8 +1160,8 @@ export class OpsState {
   async runWorktreeRemove(path: string, confirmToken?: string): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'worktreeRemove', path, force: confirmToken !== undefined, confirmToken },
-      (ok) => (ok ? `Removed worktree at ${path}` : undefined),
-      'Remove worktree',
+      (ok) => (ok ? t('git.op.removeWorktree.announce', { path }) : undefined),
+      'removeWorktree',
     );
   }
 
@@ -1170,10 +1178,10 @@ export class OpsState {
       (ok) =>
         ok
           ? parent === undefined
-            ? `Removed ${branch} from its stack`
-            : `Set ${branch}'s stack parent to ${parent}`
+            ? t('git.op.removeFromStack.announce', { branch })
+            : t('git.op.setStackParent.announce', { branch, parent })
           : undefined,
-      'Set stack parent',
+      'setStackParent',
     );
   }
 
@@ -1186,7 +1194,7 @@ export class OpsState {
   async runRestack(branch: string): Promise<RestackResult | undefined> {
     if (this.#stack === undefined) return undefined;
     if (this.busy.value) {
-      this.announcement.value = 'Restack failed — another operation is already running.';
+      this.announcement.value = `${opFailedTitle('restack')} ${t('git.op.busy.error')}`;
       return undefined;
     }
     // F3: captured for the same reason `#applyResult`'s own doc comment gives every other
@@ -1213,11 +1221,11 @@ export class OpsState {
         this.announcement.value = result.ok
           ? composeRestackAnnouncement(result.restacked, undefined, [])
           : composeRestackAnnouncement(result.restacked, result.stoppedAt, result.remaining);
-        if (!result.ok && result.error) this.#noteFailure('Restack', result.error, true);
+        if (!result.ok && result.error) this.#noteFailure('restack', result.error, true);
       }
       return result;
     } catch (error) {
-      this.#announceRejection('Restack', error);
+      this.#announceRejection('restack', error);
       return undefined;
     } finally {
       this.busy.value = false;
@@ -1268,7 +1276,7 @@ export class OpsState {
   async #stashAndCarry(
     repoId: string,
     runMiddle: () => Promise<CarryMiddleResult>,
-    actionLabel: string,
+    action: OpAction,
     announceMiddleOk: () => string,
   ): Promise<void> {
     // G31 round-2 functional-correctness review, finding #1 (high): the stash-list snapshot
@@ -1294,7 +1302,7 @@ export class OpsState {
     });
     this.#applyResult(repoId, pushResult);
     if (!pushResult.ok) {
-      this.#fail('Stash', pushResult.error, true);
+      this.#fail('stash', pushResult.error, true);
       return;
     }
 
@@ -1302,7 +1310,7 @@ export class OpsState {
     try {
       middle = await runMiddle();
     } catch (error) {
-      this.#announceRejection(actionLabel, error, STASHED_NOTE);
+      this.#announceRejection(action, error, true);
       return;
     }
     // Same identity guard as #applyResult's own (this write isn't routed through it, since
@@ -1315,7 +1323,7 @@ export class OpsState {
         this.statusSummary.value = { ...current, head: middle.head, inProgress: middle.inProgress };
     }
     if (!middle.ok) {
-      this.#fail(actionLabel, middle.error, true, STASHED_NOTE);
+      this.#fail(action, middle.error, true, true);
       return;
     }
 
@@ -1337,7 +1345,7 @@ export class OpsState {
       index: top.index,
     });
     if (preflight.verdict !== 'clean') {
-      this.announcement.value = `${announceMiddleOk()} — your stashed changes were kept (popping back would conflict); pop stash@{${top.index}} manually when ready.`;
+      this.announcement.value = `${announceMiddleOk()}. ${t('git.op.stashKept.body', { ref: stashRef(top.index) })}`;
       return;
     }
 
@@ -1349,9 +1357,9 @@ export class OpsState {
     const mismatch = this.#reconcileStashPop('pop', preflight.prediction, popResult);
     if (mismatch) {
       this.announcement.value = composeStashAnnouncement('pop', top, popResult, mismatch);
-      if (!popResult.ok) this.#noteFailure('Stash pop', popResult.error, true);
+      if (!popResult.ok) this.#noteFailure('stashPop', popResult.error, true);
     } else if (popResult.ok) this.announcement.value = announceMiddleOk();
-    else this.#fail('Stash pop', popResult.error, true);
+    else this.#fail('stashPop', popResult.error, true);
   }
 
   // -------------------------------------------------------------------------------------
@@ -1369,24 +1377,24 @@ export class OpsState {
   }): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'branchCreate', ...req },
-      (ok) => (ok ? `Created branch ${req.name}` : undefined),
-      'Create branch',
+      (ok) => (ok ? t('git.op.createBranch.announce', { name: req.name }) : undefined),
+      'createBranch',
     );
   }
 
   async branchDelete(name: string, force: boolean): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'branchDelete', name, force },
-      (ok) => (ok ? `Deleted branch ${name}` : undefined),
-      'Delete branch',
+      (ok) => (ok ? t('git.op.deleteBranch.announce', { name }) : undefined),
+      'deleteBranch',
     );
   }
 
   async branchRename(from: string, to: string): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'branchRename', from, to },
-      (ok) => (ok ? `Renamed branch ${from} to ${to}` : undefined),
-      'Rename branch',
+      (ok) => (ok ? t('git.op.renameBranch.announce', { from, to }) : undefined),
+      'renameBranch',
     );
   }
 
@@ -1398,16 +1406,16 @@ export class OpsState {
   }): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'tagCreate', ...req },
-      (ok) => (ok ? `Created tag ${req.name}` : undefined),
-      'Create tag',
+      (ok) => (ok ? t('git.op.createTag.announce', { name: req.name }) : undefined),
+      'createTag',
     );
   }
 
   async tagDelete(name: string): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'tagDelete', name },
-      (ok) => (ok ? `Deleted tag ${name}` : undefined),
-      'Delete tag',
+      (ok) => (ok ? t('git.op.deleteTag.announce', { name }) : undefined),
+      'deleteTag',
     );
   }
 
@@ -1415,29 +1423,37 @@ export class OpsState {
     return this.#runSimple(
       { kind: 'tagPush', remote, names },
       (ok) =>
-        ok ? `Pushed ${names === 'all' ? 'all tags' : names.join(', ')} to ${remote}` : undefined,
-      'Push tag',
+        ok
+          ? names === 'all'
+            ? t('git.op.pushAllTags.announce', { remote })
+            : t('git.op.pushTag.announce', { names: names.join(', '), remote })
+          : undefined,
+      'pushTag',
     );
   }
 
   async tagDeleteRemote(remote: string, name: string): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'tagDeleteRemote', remote, name },
-      (ok) => (ok ? `Deleted tag ${name} on ${remote}` : undefined),
-      'Delete remote tag',
+      (ok) => (ok ? t('git.op.deleteRemoteTag.announce', { name, remote }) : undefined),
+      'deleteRemoteTag',
     );
   }
 
   async continueOp(): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'opContinue' },
-      (ok) => (ok ? 'Continued' : undefined),
-      'Continue',
+      (ok) => (ok ? t('git.op.continued.announce') : undefined),
+      'continue',
     );
   }
 
   async abortOp(): Promise<OpResult> {
-    return this.#runSimple({ kind: 'opAbort' }, (ok) => (ok ? 'Aborted' : undefined), 'Abort');
+    return this.#runSimple(
+      { kind: 'opAbort' },
+      (ok) => (ok ? t('git.op.aborted.announce') : undefined),
+      'abort',
+    );
   }
 
   /** §7.11's third sequencer verb (probe 6) — `ConflictBanner.vue`'s Skip button, rendered only
@@ -1445,7 +1461,11 @@ export class OpsState {
    *  them, the confirmation already happened (the banner itself), so there is no separate confirm
    *  step here either. */
   async skipOp(): Promise<OpResult> {
-    return this.#runSimple({ kind: 'opSkip' }, (ok) => (ok ? 'Skipped' : undefined), 'Skip');
+    return this.#runSimple(
+      { kind: 'opSkip' },
+      (ok) => (ok ? t('git.op.skipped.announce') : undefined),
+      'skip',
+    );
   }
 
   async undo(): Promise<OpResult | undefined> {
@@ -1457,10 +1477,10 @@ export class OpsState {
       const result = await this.#bridge.request('undo.run', { repoId, id: slot.id });
       this.#applyResult(repoId, result);
       if (result.ok) this.announcement.value = composeUndoAnnouncement(slot.label);
-      else this.#fail('Undo', result.error, true);
+      else this.#fail('undo', result.error, true);
       return result;
     } catch (error) {
-      this.#announceRejection('Undo', error);
+      this.#announceRejection('undo', error);
       return undefined;
     } finally {
       this.busy.value = false;
@@ -1499,8 +1519,8 @@ export class OpsState {
         plainForce: undefined,
         confirmToken: undefined,
       },
-      (result) => (result.ok ? `Fetched ${remote}` : undefined),
-      'Fetch',
+      (result) => (result.ok ? t('git.op.fetched.announce', { remote }) : undefined),
+      'fetch',
     );
   }
 
@@ -1531,7 +1551,7 @@ export class OpsState {
     try {
       await this.#runPull(remote, branch, explicitStrategy);
     } catch (error) {
-      this.#announceRejection('Pull', error);
+      this.#announceRejection('pull', error);
     }
   }
 
@@ -1556,7 +1576,7 @@ export class OpsState {
       // #checkoutSlot.ask above — the active repo can change while this dialog is open.
       if (this.#repo.repoId !== repoId) return;
       if (!proceed) {
-        this.announcement.value = 'Pull cancelled.';
+        this.announcement.value = t('git.op.cancelled.pull.announce');
         return;
       }
       if (this.busy.value) return; // another op started while the dialog was open
@@ -1579,8 +1599,8 @@ export class OpsState {
               plainForce: undefined,
               confirmToken: undefined,
             }),
-          'Pull',
-          () => `Pulled ${remote}/${branch} (${strategy})`,
+          'pull',
+          () => t('git.op.pulled.announce', { remote, branch, strategy }),
         );
       } finally {
         this.busy.value = false;
@@ -1602,8 +1622,9 @@ export class OpsState {
         plainForce: undefined,
         confirmToken: undefined,
       },
-      (result) => (result.ok ? `Pulled ${remote}/${branch} (${strategy})` : undefined),
-      'Pull',
+      (result) =>
+        result.ok ? t('git.op.pulled.announce', { remote, branch, strategy }) : undefined,
+      'pull',
     );
   }
 
@@ -1628,7 +1649,7 @@ export class OpsState {
     try {
       await this.#runPush(remote, branch);
     } catch (error) {
-      this.#announceRejection('Push', error);
+      this.#announceRejection('push', error);
     }
   }
 
@@ -1655,8 +1676,8 @@ export class OpsState {
         plainForce: undefined,
         confirmToken: undefined,
       },
-      (result) => (result.ok ? `Pushed ${branch} to ${remote}` : undefined),
-      'Push',
+      (result) => (result.ok ? t('git.op.pushed.announce', { branch, remote }) : undefined),
+      'push',
     );
   }
 
@@ -1673,7 +1694,7 @@ export class OpsState {
     try {
       await this.#runForcePush(remote, branch);
     } catch (error) {
-      this.#announceRejection('Force push', error);
+      this.#announceRejection('forcePush', error);
     }
   }
 
@@ -1691,7 +1712,7 @@ export class OpsState {
     // #checkoutSlot.ask above — the active repo can change while this dialog is open.
     if (this.#repo.repoId !== repoId) return;
     if (route === null) {
-      this.announcement.value = 'Force push cancelled.';
+      this.announcement.value = t('git.op.cancelled.forcePush.announce');
       return;
     }
     await this.#runRemote(
@@ -1708,8 +1729,8 @@ export class OpsState {
         plainForce: route.plain,
         confirmToken: route.confirmToken,
       },
-      (result) => (result.ok ? `Force-pushed ${branch} to ${remote}` : undefined),
-      'Force push',
+      (result) => (result.ok ? t('git.op.forcePushed.announce', { branch, remote }) : undefined),
+      'forcePush',
     );
   }
 
@@ -1735,7 +1756,7 @@ export class OpsState {
   async #runRemote(
     op: Omit<RemoteOpParams, 'repoId'>,
     announceOk: (result: RemoteOpResult) => string | undefined,
-    actionLabel: string,
+    action: OpAction,
   ): Promise<RemoteOpResult | undefined> {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return undefined;
@@ -1746,11 +1767,11 @@ export class OpsState {
       const result = await this.#bridge.request('remote.run', { repoId, ...op });
       if (this.#repo.repoId !== repoId) return result;
       this.#applyRemoteResult(result);
-      if (result.ok) this.announcement.value = announceOk(result) ?? `${actionLabel} succeeded`;
-      else this.#fail(actionLabel, result.error, true);
+      if (result.ok) this.announcement.value = announceOk(result) ?? t('git.op.done.announce');
+      else this.#fail(action, result.error, true);
       return result;
     } catch (error) {
-      this.#announceRejection(actionLabel, error);
+      this.#announceRejection(action, error);
       return undefined;
     } finally {
       this.busy.value = false;
@@ -1785,22 +1806,28 @@ export class OpsState {
   /** A rejected request (reconnect race, socket drop, `E_GIT_UNAVAILABLE`) never reaches an
    *  `OpResult`, so no failure path above announces it, and every caller treats these methods as
    *  fire-and-forget. Announce instead of rethrowing; a local cancel stays silent. */
-  #announceRejection(action: string, error: unknown, suffix = ''): void {
+  #announceRejection(action: OpAction, error: unknown, stashed = false): void {
     if (error instanceof TransportError && error.code === 'cancelled') return;
     const message = errorText(error);
-    this.#fail(action, { kind: 'Unknown', message }, false, suffix);
+    this.#fail(action, { kind: 'Unknown', message }, false, stashed);
   }
 
   /** Every failure the user should see: the live-region text (unchanged wording) plus the visible
    *  banner notice. `logged` says whether the Operations log recorded it. A user cancel announces
    *  but never raises the banner. */
-  #fail(action: string, error: OpFailureError | undefined, logged: boolean, suffix = ''): void {
-    this.announcement.value = `${composeOpFailureAnnouncement(action, error)}${suffix}`;
+  #fail(
+    action: OpAction,
+    error: OpFailureError | undefined,
+    logged: boolean,
+    stashed = false,
+  ): void {
+    const note = stashed ? ` ${t('git.op.stashedNote.body')}` : '';
+    this.announcement.value = `${composeOpFailureAnnouncement(action, error)}${note}`;
     this.#noteFailure(action, error, logged);
   }
 
   /** The banner half of `#fail`, for outcomes whose announcement text is composed elsewhere. */
-  #noteFailure(action: string, error: OpFailureError | undefined, logged: boolean): void {
+  #noteFailure(action: OpAction, error: OpFailureError | undefined, logged: boolean): void {
     if (error?.kind === 'Cancelled') return;
     this.lastFailure.value = composeFailureNotice(action, error, logged);
   }
@@ -1820,23 +1847,23 @@ export class OpsState {
   async #runSimple(
     op: OpRequest,
     announceOk: (ok: true) => string | undefined,
-    actionLabel: string,
+    action: OpAction,
   ): Promise<OpResult> {
     const repoId = this.#repo.repoId;
-    if (repoId === undefined) return this.#failedResult('no repository is open');
+    if (repoId === undefined) return this.#failedResult(t('git.op.noRepository.error'));
     if (this.busy.value) {
-      this.announcement.value = `${actionLabel} failed — another operation is already running.`;
-      return this.#failedResult('another operation is already running');
+      this.announcement.value = `${opFailedTitle(action)} ${t('git.op.busy.error')}`;
+      return this.#failedResult(t('git.op.busy.error'));
     }
     this.busy.value = true;
     try {
       const result = await this.#bridge.request('op.run', { repoId, op });
       this.#applyResult(repoId, result);
-      if (result.ok) this.announcement.value = announceOk(true) ?? `${actionLabel} succeeded`;
-      else this.#fail(actionLabel, result.error, true);
+      if (result.ok) this.announcement.value = announceOk(true) ?? t('git.op.done.announce');
+      else this.#fail(action, result.error, true);
       return result;
     } catch (error) {
-      this.#announceRejection(actionLabel, error);
+      this.#announceRejection(action, error);
       return this.#failedResult(errorText(error));
     } finally {
       this.busy.value = false;

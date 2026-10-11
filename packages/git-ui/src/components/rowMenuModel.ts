@@ -12,6 +12,7 @@ import type {
   RefKind,
   StashEntry,
 } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 // P131 Part 2 §3.3: MenuItem/MenuSection live in this package's own lib/menuModel.ts (originally
 // a copy of kira-ui's own contextMenuModel.ts, now gone along with KuiContextMenu -- P131 Part 3
 // §6.1) -- re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
@@ -62,21 +63,21 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
   const mutating: MenuItem[] = [
     gatedItem(
       'checkoutDetached',
-      'Checkout this commit (detached HEAD)',
+      t('git.menu.checkoutDetached.label'),
       'checkout',
       ctx.inProgress,
       'codicon-check',
     ),
-    plainItem('createBranchHere', 'Create branch here…', 'codicon-git-branch'),
-    plainItem('createTagHere', 'Create tag here…', 'codicon-tag'),
+    plainItem('createBranchHere', t('git.menu.newBranch.label'), 'codicon-git-branch'),
+    plainItem('createTagHere', t('git.menu.newTag.label'), 'codicon-tag'),
     // P76 §8: worktreeAdd is not in GATED_OP_KINDS (git-core/src/model/operation.ts) — canRunOp
     // returns true for it unconditionally, so plainItem (not gatedItem, which would gate nothing)
     // is the honest call. Creating a worktree during a merge/rebase touches neither the sequencer
     // state nor the current worktree.
-    plainItem('createWorktreeHere', 'Create worktree here…', 'codicon-multiple-windows'),
+    plainItem('createWorktreeHere', t('git.worktree.create.label'), 'codicon-multiple-windows'),
     gatedItem(
       'revertThisCommit',
-      'Revert this commit…',
+      t('git.menu.revertCommit.label'),
       'revert',
       ctx.inProgress,
       'codicon-history',
@@ -84,7 +85,7 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
     ),
     gatedItem(
       'resetToThisCommit',
-      'Reset to this commit…',
+      t('git.menu.resetToCommit.label'),
       'reset',
       ctx.inProgress,
       'codicon-debug-step-back',
@@ -92,7 +93,7 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
     ),
     gatedItem(
       'cherryPickThisCommit',
-      'Cherry-pick this commit…',
+      t('git.menu.cherryPickCommit.label'),
       'cherryPick',
       ctx.inProgress,
       'codicon-git-commit',
@@ -102,8 +103,8 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
     { items: mutating },
     {
       items: [
-        plainItem('copySha', 'Copy SHA', 'codicon-copy'),
-        plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
+        plainItem('copySha', t('git.menu.copySha.label'), 'codicon-copy'),
+        plainItem('copyMessage', t('git.menu.copyCommitMessage.label'), 'codicon-copy'),
       ],
     },
   ];
@@ -123,8 +124,8 @@ export function buildReadOnlyRowMenu(): MenuSection[] {
   return [
     {
       items: [
-        plainItem('copySha', 'Copy SHA', 'codicon-copy'),
-        plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
+        plainItem('copySha', t('git.menu.copySha.label'), 'codicon-copy'),
+        plainItem('copyMessage', t('git.menu.copyCommitMessage.label'), 'codicon-copy'),
       ],
     },
   ];
@@ -142,8 +143,9 @@ export function buildReadOnlyRowMenu(): MenuSection[] {
  */
 export function buildFileRowMenu(goToFileEnabled: boolean): MenuSection[] {
   const items: MenuItem[] = [];
-  if (goToFileEnabled) items.push(plainItem('goToFile', 'Go to file', 'codicon-go-to-file'));
-  items.push(plainItem('copyPath', 'Copy path', 'codicon-copy'));
+  if (goToFileEnabled)
+    items.push(plainItem('goToFile', t('git.menu.goToFile.label'), 'codicon-go-to-file'));
+  items.push(plainItem('copyPath', t('common.action.copyPath.label'), 'codicon-copy'));
   return [{ items }];
 }
 
@@ -182,8 +184,21 @@ export interface RefMenuContext {
 export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
   if (ctx.kind === 'tag') {
     const items: MenuItem[] = [
-      gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
-      gatedItem('deleteRef', 'Delete tag', 'tagDelete', ctx.inProgress, 'codicon-trash', true),
+      gatedItem(
+        'checkoutRef',
+        t('common.action.checkOut.label'),
+        'checkout',
+        ctx.inProgress,
+        'codicon-check',
+      ),
+      gatedItem(
+        'deleteRef',
+        t('common.action.delete.label'),
+        'tagDelete',
+        ctx.inProgress,
+        'codicon-trash',
+        true,
+      ),
     ];
     // G32 round-3 functional-correctness review, finding #4: tagPush/tagDeleteRemote are the two
     // OpRequest kinds opTable has never served (RunOp's write path has no askpass wiring — see
@@ -192,18 +207,18 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     // E_UNKNOWN_METHOD and the rejection was discarded, a silent no-op with no toast, no error, no
     // announcement. Disabled with a reason until that server-side move actually lands, rather than
     // offering an action that can never succeed.
-    const TAG_REMOTE_OPS_UNSUPPORTED = 'Not supported yet';
+    const TAG_REMOTE_OPS_UNSUPPORTED = t('git.menu.notSupported.hint');
     for (const remote of ctx.knownRemotes) {
       items.push({
         id: `pushRef:${remote}`,
-        label: `Push to ${remote}`,
+        label: t('git.toolbar.push.tooltip', { remote }),
         disabled: true,
         disabledReason: TAG_REMOTE_OPS_UNSUPPORTED,
         icon: 'codicon-cloud',
       });
       items.push({
         id: `deleteRemoteRef:${remote}`,
-        label: `Delete on ${remote}`,
+        label: t('git.menu.deleteOnRemote.label', { remote }),
         disabled: true,
         disabledReason: TAG_REMOTE_OPS_UNSUPPORTED,
         icon: 'codicon-trash',
@@ -222,18 +237,34 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     return [
       {
         items: [
-          gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
-          plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple'),
-          plainItem('createWorktreeHere', 'Create worktree here…', 'codicon-multiple-windows'),
+          gatedItem(
+            'checkoutRef',
+            t('common.action.checkOut.label'),
+            'checkout',
+            ctx.inProgress,
+            'codicon-check',
+          ),
+          plainItem('reviewBranch', t('git.review.start.title'), 'codicon-diff-multiple'),
+          plainItem(
+            'createWorktreeHere',
+            t('git.worktree.create.label'),
+            'codicon-multiple-windows',
+          ),
         ],
       },
     ];
   }
   const items: MenuItem[] = [
-    gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
-    plainItem('renameRef', 'Rename branch…', 'codicon-edit'),
-    plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple'),
-    plainItem('createWorktreeHere', 'Create worktree here…', 'codicon-multiple-windows'),
+    gatedItem(
+      'checkoutRef',
+      t('common.action.checkOut.label'),
+      'checkout',
+      ctx.inProgress,
+      'codicon-check',
+    ),
+    plainItem('renameRef', t('common.action.rename.label'), 'codicon-edit'),
+    plainItem('reviewBranch', t('git.review.start.title'), 'codicon-diff-multiple'),
+    plainItem('createWorktreeHere', t('git.worktree.create.label'), 'codicon-multiple-windows'),
   ];
   // git refuses to delete the branch you are currently on — not one of §7.11's gated op kinds
   // (the gate is scoped to what an in-progress *operation* blocks), so this is its own, simpler
@@ -242,15 +273,15 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     ctx.isHead
       ? {
           id: 'deleteRef',
-          label: 'Delete branch',
+          label: t('common.action.delete.label'),
           disabled: true,
-          disabledReason: 'This is the current branch.',
+          disabledReason: t('git.menu.currentBranch.hint'),
           icon: 'codicon-trash',
           danger: true,
         }
       : gatedItem(
           'deleteRef',
-          'Delete branch',
+          t('common.action.delete.label'),
           'branchDelete',
           ctx.inProgress,
           'codicon-trash',
@@ -266,17 +297,23 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     const stackItems: MenuItem[] = [
       plainItem(
         'stackSetParent',
-        ctx.stack.hasParent ? 'Change stack parent…' : 'Set stack parent…',
+        ctx.stack.hasParent
+          ? t('git.menu.stackChangeParent.label')
+          : t('git.stack.setParent.tooltip'),
         'codicon-list-tree',
       ),
     ];
     if (ctx.stack.hasParent) {
-      stackItems.push(plainItem('stackRemove', 'Remove from stack', 'codicon-close'));
-      stackItems.push(plainItem('stackRestack', 'Restack this stack', 'codicon-sync'));
-      stackItems.push(plainItem('stackGoToParent', 'Go to parent branch', 'codicon-arrow-up'));
+      stackItems.push(plainItem('stackRemove', t('git.stack.remove.tooltip'), 'codicon-close'));
+      stackItems.push(plainItem('stackRestack', t('git.menu.stackRestack.label'), 'codicon-sync'));
+      stackItems.push(
+        plainItem('stackGoToParent', t('git.menu.stackGoToParent.label'), 'codicon-arrow-up'),
+      );
     }
     if (ctx.stack.hasChild) {
-      stackItems.push(plainItem('stackGoToChild', 'Go to child branch', 'codicon-arrow-down'));
+      stackItems.push(
+        plainItem('stackGoToChild', t('git.menu.stackGoToChild.label'), 'codicon-arrow-down'),
+      );
     }
     sections.push({ items: stackItems });
   }
@@ -317,19 +354,34 @@ export function buildStashMenu(
     ),
   ];
   if (!crossBranch) {
-    items.push(gatedItem('stashPop', 'Pop', 'stashPop', inProgress, 'codicon-export'));
+    items.push(
+      gatedItem(
+        'stashPop',
+        t('git.dialog.stash.popConfirm.confirm'),
+        'stashPop',
+        inProgress,
+        'codicon-export',
+      ),
+    );
   }
   items.push(
-    gatedItem('stashDrop', 'Drop', 'stashDrop', inProgress, 'codicon-trash', true),
+    gatedItem(
+      'stashDrop',
+      t('git.menu.stashDrop.label'),
+      'stashDrop',
+      inProgress,
+      'codicon-trash',
+      true,
+    ),
     gatedItem(
       'stashBranch',
-      'Create branch from stash…',
+      t('git.menu.stashBranch.label'),
       'stashBranch',
       inProgress,
       'codicon-git-branch',
     ),
-    plainItem('stashSaveGlobal', 'Save to global stash…', 'codicon-archive'),
-    plainItem('stashShow', 'Show changes', 'codicon-eye'),
+    plainItem('stashSaveGlobal', t('git.stash.saveGlobal.tooltip'), 'codicon-archive'),
+    plainItem('stashShow', t('git.menu.stashShow.label'), 'codicon-eye'),
   );
   return [{ items }];
 }
@@ -359,15 +411,15 @@ export function buildGlobalStashMenu(
         ),
         gatedItem(
           'stashBranch',
-          'Create branch from this…',
+          t('git.menu.globalStashBranch.label'),
           'stashBranch',
           inProgress,
           'codicon-git-branch',
         ),
-        plainItem('stashShow', 'Show changes', 'codicon-eye'),
+        plainItem('stashShow', t('git.menu.stashShow.label'), 'codicon-eye'),
         gatedItem(
           'globalStashRemove',
-          'Remove from global stash',
+          t('git.menu.globalStashRemove.label'),
           'globalStashRemove',
           inProgress,
           'codicon-trash',

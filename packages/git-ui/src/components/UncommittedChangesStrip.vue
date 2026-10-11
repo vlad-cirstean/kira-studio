@@ -32,6 +32,7 @@
  */
 import { rowVariants } from '@theme/components/rowVariants';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { GEOMETRY } from '../graph/geometry.ts';
@@ -167,7 +168,7 @@ const tooltipText = computed(() => {
           class="min-w-0 truncate text-muted-foreground text-graph-sm"
           data-testid="uncommitted-strip-label"
         >
-          {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}
+          {{ t('git.strip.uncommittedCount.label', { count: totalCount }) }}
         </span>
       </TooltipTrigger>
       <TooltipContent>{{ tooltipText }}</TooltipContent>

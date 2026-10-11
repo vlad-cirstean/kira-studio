@@ -1,7 +1,12 @@
 import type { OpErrorKind } from '@kira/git-ipc';
 import { type MessageKey, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
-import { composeOpFailureParts, firstLine, type OpFailureError } from './liveAnnouncements.ts';
+import {
+  composeOpFailureParts,
+  firstLine,
+  type OpAction,
+  type OpFailureError,
+} from './liveAnnouncements.ts';
 
 export interface FailureNotice {
   readonly title: string;
@@ -26,7 +31,7 @@ const RETRY_HINT: Partial<Record<OpErrorKind, MessageKey>> = {
 };
 
 export function composeFailureNotice(
-  action: string,
+  action: OpAction,
   error: OpFailureError | undefined,
   logged: boolean,
 ): FailureNotice {

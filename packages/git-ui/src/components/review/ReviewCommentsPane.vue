@@ -16,6 +16,7 @@ import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, useTemplateRef } from 'vue';
 import type { ReviewCommentsState } from '../../state/reviewComments.ts';
@@ -48,11 +49,13 @@ const groups = computed<readonly PathGroup[]>(() => {
 
 const countLabel = computed(() => {
   const n = props.reviewComments.comments.value.length;
-  return `${n} ${n === 1 ? 'comment' : 'comments'}`;
+  return t('git.review.comments.count.label', { count: n });
 });
 
 function lineLabel(range: LineRange): string {
-  return range.start === range.end ? `L${range.start}` : `L${range.start}-${range.end}`;
+  return range.start === range.end
+    ? t('git.review.comments.line.example', { start: range.start })
+    : t('git.review.comments.lineRange.example', { start: range.start, end: range.end });
 }
 
 /** D12's own two suffix forms, restated for the sidebar rather than the export's plain text. */
@@ -60,9 +63,9 @@ function anchorTitle(c: ReviewComment): string | undefined {
   const sha8 = c.anchorSha.slice(0, 8);
   switch (c.anchor) {
     case 'removed':
-      return `These lines no longer exist — shown as of ${sha8}`;
+      return t('git.review.comments.anchorRemoved.hint', { sha: sha8 });
     case 'stale':
-      return `Lines as of ${sha8} — history was rewritten since`;
+      return t('git.review.comments.anchorStale.hint', { sha: sha8 });
     case 'exact':
     case 'projected':
       return undefined;
@@ -83,7 +86,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
       }}</span>
       <TooltipIconButton
         icon="copy"
-        label="Copy for AI"
+        :label="t('git.review.comments.copyForAi.tooltip')"
         class="ml-auto"
         :disabled="reviewComments.comments.value.length === 0"
         @click="reviewComments.copyForAi()"
@@ -91,25 +94,25 @@ const listEl = useTemplateRef<HTMLElement>('list');
       <TooltipIconButton
         v-if="!reviewComments.confirmingClear.value"
         icon="clear-all"
-        label="Clear all comments"
+        :label="t('git.review.comments.clearAll.tooltip')"
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />
       <div v-else class="flex items-center gap-1 ml-auto text-graph-md">
         <Button variant="toolbar" size="kira" @click="reviewComments.clear()">
-          Confirm clear ({{ reviewComments.comments.value.length }})
+          {{ t('git.review.comments.confirmClear.label', { count: reviewComments.comments.value.length }) }}
         </Button>
-        <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">Cancel</Button>
+        <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">{{ t('common.action.cancel.label') }}</Button>
       </div>
     </ViewToolbar>
 
     <FieldError v-if="reviewComments.loadError.value" class="p-3">
-      Couldn't load the comment list — {{ reviewComments.loadError.value }}
+      {{ t('git.review.comments.loadError.error', { error: reviewComments.loadError.value }) }}
     </FieldError>
 
     <template v-else>
       <template v-if="groups.length > 0">
-      <section ref="list" class="flex-1 min-h-0 overflow-auto" aria-label="Comments">
+      <section ref="list" class="flex-1 min-h-0 overflow-auto" :aria-label="t('git.review.pane.comments.label')">
         <section
           v-for="group in groups"
           :key="group.path"
@@ -134,7 +137,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
                   variant="link"
                   size="kira"
                   class="h-auto p-0 border-0 font-data font-normal text-muted-foreground text-graph-sm after:absolute after:inset-0"
-                  :aria-label="`Open ${group.path} ${lineLabel(c.range)}`"
+                  :aria-label="t('git.review.comments.open.aria', { path: group.path, line: lineLabel(c.range) })"
                   @click="emit('select-comment', group.path)"
                 >
                   {{ lineLabel(c.range) }}
@@ -148,7 +151,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
                 ></span>
                 <TooltipIconButton
                   icon="trash"
-                  label="Delete comment"
+                  :label="t('git.review.comments.delete.tooltip')"
                   class="relative z-10 ml-auto"
                   :disabled="reviewComments.pending.value"
                   @click="reviewComments.remove(c.id)"
@@ -163,11 +166,11 @@ const listEl = useTemplateRef<HTMLElement>('list');
       </template>
 
       <p v-else-if="!reviewComments.loading.value" class="m-0 p-3 text-muted-foreground">
-        No comments yet — open a file from the Files tab and use the + in the diff's gutter.
+        {{ t('git.review.comments.empty.emptyHint') }}
       </p>
 
       <InlineState v-if="reviewComments.loading.value && groups.length === 0" kind="loading">
-        Loading…
+        {{ t('common.state.loading.loading') }}
       </InlineState>
     </template>
   </div>

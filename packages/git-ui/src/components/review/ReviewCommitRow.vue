@@ -129,9 +129,7 @@ async function revealInGraph(): Promise<void> {
   try {
     const { revealed } = await props.actions.revealInGraph({ sha: props.sha });
     if (!revealed) {
-      props.actions.announce(
-        "Couldn't reveal this commit — no graph is open for this repository.",
-      );
+      props.actions.announce(t('git.review.commit.noGraph.error'));
     }
   } catch (err) {
     // P108 F10: a template handler — Vue's own async-error handling already stops this from
@@ -139,9 +137,7 @@ async function revealInGraph(): Promise<void> {
     // reached the user either. `transport-closed` (this row's own host disconnecting mid-request)
     // is ignored outright — nothing left to announce it to once the row is gone.
     if (err instanceof TransportError && err.code === 'transport-closed') return;
-    props.actions.announce(
-      `Couldn't reveal this commit — ${errorText(err)}`,
-    );
+    props.actions.announce(t('git.async.revealCommit.error', { error: errorText(err) }));
   }
 }
 
@@ -165,9 +161,7 @@ function onOpenFile(index: number, pinned: boolean): void {
     })
     .catch((err: unknown) => {
       if (err instanceof TransportError && err.code === 'transport-closed') return;
-      props.actions.announce(
-        `Couldn't open the file — ${errorText(err)}`,
-      );
+      props.actions.announce(t('git.review.commit.openFile.error', { error: errorText(err) }));
     });
 }
 </script>
@@ -229,7 +223,7 @@ function onOpenFile(index: number, pinned: boolean): void {
       >
         <TooltipIconButton
           icon="diff-multiple"
-          label="Open all changes"
+          :label="t('git.commit.openAllChanges.tooltip')"
           @click="openAllChanges"
         />
         <!-- P75 §2.3: a real button now — no more command: anchor a bubble-phase
@@ -238,7 +232,7 @@ function onOpenFile(index: number, pinned: boolean): void {
              toggling the row. -->
         <TooltipIconButton
           icon="git-commit"
-          label="Open in graph"
+          :label="t('git.review.commit.openInGraph.tooltip')"
           @click="revealInGraph"
         />
       </span>
@@ -246,7 +240,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 
     <div v-if="expanded" class="border-t border-border min-h-30 max-h-80 flex flex-col">
       <FieldError v-if="expansion?.detail.error.value" class="p-2">
-        Couldn't load this commit — {{ expansion.detail.error.value }}
+        {{ t('git.detail.loadError.error', { error: expansion.detail.error.value }) }}
       </FieldError>
       <FileTree
         v-else-if="expansion?.detail.detail.value"
@@ -262,7 +256,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         @open-file="onOpenFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
-      <InlineState v-else kind="loading">Loading…</InlineState>
+      <InlineState v-else kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
     </div>
 
   </div>

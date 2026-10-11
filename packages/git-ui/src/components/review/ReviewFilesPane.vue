@@ -23,6 +23,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { FieldError } from '@theme/components/ui/field';
+import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
@@ -36,7 +37,7 @@ import FileTree from '../FileTree.vue';
 interface DiffModeOption {
   readonly id: ReviewDiffMode;
   readonly icon: string;
-  readonly label: string;
+  readonly label: MessageKey;
 }
 
 const props = defineProps<{
@@ -63,18 +64,20 @@ const needsReviewCount = computed(
 );
 
 const diffModeOptions: readonly DiffModeOption[] = [
-  { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'Since review' },
-  { id: 'range', icon: ACTION_ICONS.diffMultiple, label: 'Full range' },
+  { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'git.review.files.sinceReview.label' },
+  { id: 'range', icon: ACTION_ICONS.diffMultiple, label: 'git.review.files.fullRange.label' },
 ];
-const diffModeItems = diffModeOptions.map((o) => ({
-  value: o.id,
-  label: o.label,
-  icon: codiconName(o.icon),
-  tooltip: o.label,
-}));
+const diffModeItems = computed(() =>
+  diffModeOptions.map((o) => ({
+    value: o.id,
+    label: t(o.label),
+    icon: codiconName(o.icon),
+    tooltip: t(o.label),
+  })),
+);
 const showingItems = computed(() => [
-  { value: 'needsReview', label: `Needs review · ${needsReviewCount.value}` },
-  { value: 'all', label: 'All' },
+  { value: 'needsReview', label: t('git.review.files.needsReview.label', { count: needsReviewCount.value }) },
+  { value: 'all', label: t('common.state.all.option') },
 ]);
 
 const shown = computed(() =>
@@ -107,14 +110,14 @@ const selectedIndex = computed(() => {
 const deltaStatusText = computed(() => {
   switch (props.reviewFiles.deltaSource.value) {
     case 'noSnapshot':
-      return 'Never reviewed — showing the full range diff.';
+      return t('git.review.files.neverReviewed.status');
     case 'unchanged':
-      return 'Reviewed — nothing has changed since.';
+      return t('git.review.files.unchanged.status');
     case 'fast':
     case 'slow':
-      return 'Changed since you reviewed it.';
+      return t('git.review.changedSince.hint');
     case 'snapshotUnavailable':
-      return "Reviewed, but what changed since can't be shown.";
+      return t('git.review.files.snapshotUnavailable.status');
     default:
       return undefined;
   }
@@ -137,7 +140,7 @@ function onToggleReviewed(path: string): void {
 <template>
   <div class="flex flex-col min-h-0 h-full">
     <FieldError v-if="reviewFiles.loadError.value" class="p-3">
-      Couldn't load the file list — {{ reviewFiles.loadError.value }}
+      {{ t('git.review.files.loadError.error', { error: reviewFiles.loadError.value }) }}
     </FieldError>
 
     <template v-else>
@@ -146,7 +149,7 @@ function onToggleReviewed(path: string): void {
       <ViewToolbar class="font-ui">
         <SecondaryTabs
           variant="segmented"
-          aria-label="What to compare"
+          :aria-label="t('git.review.files.compare.aria')"
           :model-value="reviewFiles.diffMode.value"
           :items="diffModeItems"
           @update:model-value="(v) => reviewFiles.setDiffMode(v as ReviewDiffMode)"
@@ -159,26 +162,26 @@ function onToggleReviewed(path: string): void {
         <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{ deltaStatusText }}</span>
       </ViewToolbar>
       <FieldError v-if="reviewFiles.diffError.value" class="p-3">
-        Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
+        {{ t('git.review.files.diffError.error', { error: reviewFiles.diffError.value }) }}
       </FieldError>
       <!-- G30 round-1 functional-correctness review, finding #7: a failed review.mark used to be
            an unhandled promise rejection with nothing shown here — the checkbox just silently
            reverted on the next render. Mirrors loadError/diffError's own pattern exactly. -->
       <FieldError v-if="reviewFiles.markError.value" class="p-3">
-        Couldn't update that file's review status — {{ reviewFiles.markError.value }}
+        {{ t('git.review.files.markError.error', { error: reviewFiles.markError.value }) }}
       </FieldError>
 
       <ViewToolbar v-if="hasFilter" class="font-ui">
         <SecondaryTabs
           variant="segmented"
-          aria-label="Which files to list"
+          :aria-label="t('git.review.files.showing.aria')"
           :model-value="showing"
           :items="showingItems"
           @update:model-value="(v) => (showing = v as 'all' | 'needsReview')"
         />
       </ViewToolbar>
       <p v-if="nothingToReview" class="m-0 p-3 text-muted-foreground">
-        Nothing changed since your last review.
+        {{ t('git.review.files.nothingToReview.emptyHint') }}
       </p>
 
       <FileTree data-testid="review-files-tree"
@@ -198,7 +201,7 @@ function onToggleReviewed(path: string): void {
         @toggle-reviewed="onToggleReviewed"
       />
       <InlineState v-if="reviewFiles.loading.value && files.length === 0" kind="loading">
-        Loading…
+        {{ t('common.state.loading.loading') }}
       </InlineState>
     </template>
   </div>

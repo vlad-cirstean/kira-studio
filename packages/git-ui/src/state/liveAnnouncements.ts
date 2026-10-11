@@ -17,6 +17,7 @@ import type {
   ResetMode,
   StashEntry,
 } from '@kira/git-ipc';
+import { type MessageKey, t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { customRef, type Ref } from 'vue';
 import { originLabel, stashLabel } from '../components/stashListModel.ts';
@@ -46,17 +47,18 @@ export function composeLoadMoreAnnouncement(
   remaining: number,
   exhausted: boolean,
 ): string {
-  const addedText = `${formatCount(added)} more loaded`;
   return exhausted
-    ? `${addedText}, history fully loaded`
-    : `${addedText}, ${formatCount(remaining)} remaining`;
+    ? t('git.announce.loadMoreDone.announce', { added: formatCount(added) })
+    : t('git.announce.loadMore.announce', {
+        added: formatCount(added),
+        remaining: formatCount(remaining),
+      });
 }
 
 /** §6.2's refresh action, completed: a keyboard user who cannot see the toolbar spinner stop has
  *  no other way to learn a refresh finished (or how many commits it re-walked). */
 export function composeRefreshAnnouncement(totalLoaded: number): string {
-  const noun = totalLoaded === 1 ? 'commit' : 'commits';
-  return `Refreshed — ${formatCount(totalLoaded)} ${noun} loaded`;
+  return t('git.announce.refreshed.announce', { count: totalLoaded });
 }
 
 /** `docs/plans/P11.md` W13: `GraphViewState.revealSha`'s own live-region text — §5.1.1's
@@ -70,8 +72,8 @@ export function composeRefreshAnnouncement(totalLoaded: number): string {
  *  failure mode §6.4 already names for the clipboard. */
 export function composeRevealSearchHitAnnouncement(outcome: 'loading' | 'notFound'): string {
   return outcome === 'loading'
-    ? 'Loading history to find the selected result…'
-    : 'Result not found — it may no longer exist in this repository';
+    ? t('git.announce.revealLoading.announce')
+    : t('git.announce.revealNotFound.announce');
 }
 
 /** A short name for `target`, the way every P6 confirmation reads it: a raw sha is shortened,
@@ -84,12 +86,12 @@ function shortTarget(target: string): string {
  *  prompt", not "proceed with no acknowledgement" — the carried files are still worth a sentence,
  *  just not a dialog. */
 export function composeCheckoutAnnouncement(preflight: CheckoutPreflight, target: string): string {
-  const where = preflight.detaches ? `${shortTarget(target)} (detached)` : shortTarget(target);
+  const short = shortTarget(target);
+  const where = preflight.detaches ? t('git.op.detachedTarget.label', { target: short }) : short;
   if (preflight.verdict === 'cleanCarry') {
-    const n = preflight.carried.length;
-    return `Checked out ${where} — ${n} local ${n === 1 ? 'change' : 'changes'} carried over`;
+    return t('git.op.checkoutCarried.announce', { where, count: preflight.carried.length });
   }
-  return `Checked out ${where}`;
+  return t('git.op.checkout.announce', { where });
 }
 
 /** G28 D16: the auto-stash announcement — mandatory, never decoration, since the working tree
@@ -99,45 +101,42 @@ export function composeCheckoutAnnouncement(preflight: CheckoutPreflight, target
  *  `fromBranch` is the ORIGIN branch (where the switch started, not the target) — matching D1's
  *  own tagging: the entry is tagged with the branch it came FROM. */
 export function composeAutoStashAnnouncement(fileCount: number, fromBranch: string): string {
-  const noun = fileCount === 1 ? 'file' : 'files';
-  return (
-    `Stashed ${fileCount} ${noun} from ${fromBranch}` +
-    ` — the stash is tagged ${fromBranch}; apply it back from the stash list.`
-  );
+  return t('git.op.autoStash.body', { count: fileCount, branch: fromBranch });
 }
 
 /** G28 D6: the auto-detach announcement — mandatory, the entire safety story for landing a user
  *  in a detached HEAD they did not directly ask for. Names both the branch and the worktree path
  *  that already holds it. */
 export function composeAutoDetachAnnouncement(target: string, worktreePath: string): string {
-  return (
-    `${shortTarget(target)} is checked out in ${worktreePath} — HEAD is now detached at its ` +
-    `commit. Create a branch here, or switch to another branch, when you're done.`
-  );
+  return t('git.op.autoDetach.body', { target: shortTarget(target), path: worktreePath });
 }
 
 /** §7.10: a `noCommit` revert stages rather than commits, and the toolbar's live region is the
  *  only way a keyboard/screen-reader user learns which one just happened. */
 export function composeRevertAnnouncement(shas: readonly string[], noCommit: boolean): string {
-  const subject =
-    shas.length === 1 ? `commit ${shortTarget(shas[0] ?? '')}` : `${shas.length} commits`;
-  return noCommit ? `Reverted ${subject} — changes staged, not committed` : `Reverted ${subject}`;
+  if (shas.length === 1) {
+    return t(noCommit ? 'git.op.revertedOneStaged.announce' : 'git.op.revertedOne.announce', {
+      sha: shortTarget(shas[0] ?? ''),
+    });
+  }
+  return t(noCommit ? 'git.op.revertedManyStaged.announce' : 'git.op.revertedMany.announce', {
+    count: shas.length,
+  });
 }
 
 /** `docs/plans/P10.md` W10: §7.7's own reset, given a voice — the target's subject is not carried
  *  here (the live region names *what was done*, not the full advisory the dialog already showed
  *  and the user already read before confirming). */
 export function composeResetAnnouncement(mode: ResetMode, target: string): string {
-  return `Reset (${mode}) to ${shortTarget(target)}`;
+  return t('git.op.reset.announce', { mode, target: shortTarget(target) });
 }
 
 /** `docs/plans/P10.md` W10, §7.10's own `noCommit` wording reused verbatim for cherry-pick
  *  (§7.13 states the same "staged, not committed" outcome for `--no-commit`). */
 export function composeCherryPickAnnouncement(sha: string, noCommit: boolean): string {
-  const subject = `commit ${shortTarget(sha)}`;
-  return noCommit
-    ? `Cherry-picked ${subject} — changes staged, not committed`
-    : `Cherry-picked ${subject}`;
+  return t(noCommit ? 'git.op.cherryPickedStaged.announce' : 'git.op.cherryPicked.announce', {
+    sha: shortTarget(sha),
+  });
 }
 
 /** `docs/plans/P10.md` W10, hard part 7's own answer, given a voice: `CherryPickPreflight`'s
@@ -150,69 +149,104 @@ export interface CherryPickPredictionMismatch {
   readonly actual: 'clean' | 'conflicts' | 'refused';
 }
 
+const CHERRY_PICK_MISMATCH: Record<
+  CherryPickPredictionMismatch['predicted'],
+  Partial<Record<CherryPickPredictionMismatch['actual'], MessageKey>>
+> = {
+  clean: {
+    conflicts: 'git.op.cherryPickMismatch.cleanConflicts.body',
+    refused: 'git.op.cherryPickMismatch.cleanRefused.body',
+  },
+  conflicts: {
+    clean: 'git.op.cherryPickMismatch.conflictsClean.body',
+    refused: 'git.op.cherryPickMismatch.conflictsRefused.body',
+  },
+};
+
 export function composeCherryPickMismatchAnnouncement(
   mismatch: CherryPickPredictionMismatch,
 ): string {
-  const predictedText = mismatch.predicted === 'clean' ? 'a clean apply' : 'conflicts';
-  const actualText =
-    mismatch.actual === 'clean'
-      ? 'applied cleanly'
-      : mismatch.actual === 'conflicts'
-        ? 'conflicted'
-        : 'was refused';
-  return (
-    `This cherry-pick ${actualText}, though the pre-flight predicted ${predictedText} — the tree ` +
-    'changed in between.'
-  );
+  const key = CHERRY_PICK_MISMATCH[mismatch.predicted][mismatch.actual];
+  // predicted and actual never agree on a mismatch
+  return key === undefined ? t('git.op.done.announce') : t(key);
 }
 
-const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
-  AuthFailed: 'authentication failed',
-  NonFastForward: 'not a fast-forward',
-  Conflict: 'conflicts need resolving',
-  DirtyWorktree: 'the working tree has local changes',
-  UntrackedWouldBeOverwritten: 'untracked files would be overwritten',
-  LockHeld: 'the repository is locked by another process',
-  NotFound: 'not found',
-  AlreadyExists: 'already exists',
-  NotFullyMerged: 'not fully merged',
-  WorktreeConflict: 'checked out in another worktree',
-  OperationInProgress: 'another operation is in progress',
-  RemoteRefMissing: 'the remote ref is missing',
-  HookRejected: 'a hook rejected it',
-  LeaseViolation: 'the remote moved since it was last checked',
-  RemoteRefUpdated: 'the remote moved since it was last fetched',
-  NetworkFailed: 'a network error occurred',
-  RemoteNotFound: 'the remote repository was not found',
-  ProtectedBranch: 'the branch is protected',
-  Cancelled: 'it was cancelled',
-  StashConflict: 'it merged with conflicts — the stash was kept',
-  StashIndexConflict: 'the index already has conflicts — try again without restoring it',
-  StashUntrackedCollision: 'untracked files were in the way — the stash was kept',
-  ConfirmationRequired: 'the typed confirmation was missing or did not match',
-  EmptyCherryPick: 'this change is already present on this branch',
-  MainlineRequired: 'a merge commit needs a parent chosen first',
-  /** G25 D15, probe M5: `worktree remove` on a locked worktree. Kept distinct from `LockHeld`'s
-   *  own phrase above — this names the remedy (unlock it), not "wait and retry". */
-  WorktreeLocked: 'the worktree is locked',
-  /** G26 D5/D10: this phase's own one new `OpErrorKind`, produced exclusively by `stackSet`'s
-   *  own cycle check — never by rebase itself. */
-  StackCycle: 'that would make a branch its own ancestor',
-  /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — this phase's
-   *  own one new `OpErrorKind`. */
-  NothingToStash: 'there is nothing to save — the working tree is clean',
-  /** G30 round-1 functional-correctness review, finding #2: this round's own one new
-   *  `OpErrorKind`, produced exclusively by a pull whose target branch was checked out away from
-   *  between the fetch and the merge/rebase. */
-  BranchChanged: 'a different branch is checked out now',
-  Unknown: 'an unexpected error occurred',
+const OP_ERROR_REASON: Record<OpErrorKind, MessageKey> = {
+  AuthFailed: 'git.op.reason.authFailed.error',
+  NonFastForward: 'git.op.reason.nonFastForward.error',
+  Conflict: 'git.op.reason.conflict.error',
+  DirtyWorktree: 'git.op.reason.dirtyWorktree.error',
+  UntrackedWouldBeOverwritten: 'git.op.reason.untrackedWouldBeOverwritten.error',
+  LockHeld: 'git.op.reason.lockHeld.error',
+  NotFound: 'git.op.reason.notFound.error',
+  AlreadyExists: 'git.op.reason.alreadyExists.error',
+  NotFullyMerged: 'git.op.reason.notFullyMerged.error',
+  WorktreeConflict: 'git.op.reason.worktreeConflict.error',
+  OperationInProgress: 'git.op.reason.operationInProgress.error',
+  RemoteRefMissing: 'git.op.reason.remoteRefMissing.error',
+  HookRejected: 'git.op.reason.hookRejected.error',
+  LeaseViolation: 'git.op.reason.leaseViolation.error',
+  RemoteRefUpdated: 'git.op.reason.remoteRefUpdated.error',
+  NetworkFailed: 'git.op.reason.networkFailed.error',
+  RemoteNotFound: 'git.op.reason.remoteNotFound.error',
+  ProtectedBranch: 'git.op.reason.protectedBranch.error',
+  Cancelled: 'git.op.reason.cancelled.error',
+  StashConflict: 'git.op.reason.stashConflict.error',
+  StashIndexConflict: 'git.op.reason.stashIndexConflict.error',
+  StashUntrackedCollision: 'git.op.reason.stashUntrackedCollision.error',
+  ConfirmationRequired: 'git.op.reason.confirmationRequired.error',
+  EmptyCherryPick: 'git.op.reason.emptyCherryPick.error',
+  MainlineRequired: 'git.op.reason.mainlineRequired.error',
+  WorktreeLocked: 'git.op.reason.worktreeLocked.error',
+  StackCycle: 'git.op.reason.stackCycle.error',
+  NothingToStash: 'git.op.reason.nothingToStash.error',
+  BranchChanged: 'git.op.reason.branchChanged.error',
+  Unknown: 'git.op.reason.unknown.error',
 };
+
+/** Every user-facing operation a failure can name; each has a `git.op.failed.<action>.error` message. */
+export type OpAction =
+  | 'checkout'
+  | 'revert'
+  | 'stash'
+  | 'reset'
+  | 'cherryPick'
+  | 'stashPop'
+  | 'stashApply'
+  | 'dropStash'
+  | 'stashBranch'
+  | 'saveGlobalStash'
+  | 'removeGlobalStash'
+  | 'createWorktree'
+  | 'removeWorktree'
+  | 'setStackParent'
+  | 'restack'
+  | 'createBranch'
+  | 'deleteBranch'
+  | 'renameBranch'
+  | 'createTag'
+  | 'deleteTag'
+  | 'pushTag'
+  | 'deleteRemoteTag'
+  | 'continue'
+  | 'abort'
+  | 'skip'
+  | 'undo'
+  | 'fetch'
+  | 'pull'
+  | 'push'
+  | 'forcePush';
+
+/** What was attempted, as its own sentence ("Couldn’t check out."). */
+export function opFailedTitle(action: OpAction): string {
+  return t(`git.op.failed.${action}.error`);
+}
 
 /** Every op failure the live region reports — including one that never reached git at all (a
  *  gated action, `op.run`'s own guard) — reads the same way: what was attempted, then why it
  *  didn't happen. A silent failure is the clipboard's own failure mode (§6.4), applied here. */
 export function composeOpFailureAnnouncement(
-  action: string,
+  action: OpAction,
   error: OpFailureError | undefined,
 ): string {
   const { title, detail } = composeOpFailureParts(action, error);
@@ -225,14 +259,15 @@ export interface OpFailureError {
   readonly remoteMessage?: string | undefined;
 }
 
-/** The announcement split into its sentence and the optional first server line, so the visible
+/** The announcement split into its sentences and the optional first server line, so the visible
  *  failure banner and the live region read from one composition. */
 export function composeOpFailureParts(
-  action: string,
+  action: OpAction,
   error: OpFailureError | undefined,
 ): { readonly title: string; readonly detail: string | undefined } {
-  if (!error) return { title: `${action} failed.`, detail: undefined };
-  const title = `${action} failed — ${OP_ERROR_TEXT[error.kind]}.`;
+  const what = opFailedTitle(action);
+  if (!error) return { title: what, detail: undefined };
+  const title = `${what} ${t(OP_ERROR_REASON[error.kind])}`;
   const detail =
     error.kind === 'HookRejected'
       ? error.remoteMessage
@@ -243,12 +278,9 @@ export function composeOpFailureParts(
 }
 
 /** Why auto-fetch stopped, in the same wording the failure announcements use. */
-export function composeAutoFetchStoppedText(kind: OpErrorKind): string {
-  return OP_ERROR_TEXT[kind];
-}
-
 export function composeAutoFetchStoppedAnnouncement(kind: OpErrorKind): string {
-  return `Auto-fetch stopped — ${OP_ERROR_TEXT[kind]}. Fetch to resume.`;
+  const stopped = t('git.op.autoFetchStopped.error', { reason: t(OP_ERROR_REASON[kind]) });
+  return `${stopped} ${t('git.op.autoFetchResume.hint')}`;
 }
 
 const MAX_DETAIL_LENGTH = 200;
@@ -268,7 +300,7 @@ export function firstLine(text: string | undefined): string | undefined {
  *  named for the clipboard — `pushed` is `ops.ts`'s own before/after stash-count comparison,
  *  the only way to tell the two outcomes apart. */
 export function composeStashPushAnnouncement(pushed: boolean): string {
-  return pushed ? 'Changes stashed' : 'Nothing to stash — the working tree matched HEAD';
+  return t(pushed ? 'git.op.stashed.announce' : 'git.op.nothingToStash.announce');
 }
 
 /** §7.6's concrete answer to hard part 1: non-null only when an executed pop/apply disagreed with
@@ -284,65 +316,87 @@ export interface StashPredictionMismatch {
   readonly stashKept: boolean;
 }
 
+// The backend owns this label (`RepoService`'s stash-drop undo capture) and it stays English.
 const STASH_DROP_UNDO_LABEL_PREFIX = 'Dropped stash@{';
 
 /** `docs/plans/P9.md` W15: undoing a dropped stash does not restore it to its old stack position
  *  — probe 9 found it always lands back at `stash@{0}` — so the generic "Undone: `<label>`" text
  *  would read as if `stash@{2}` (say) came back exactly as it was, which a user watching for that
  *  position would take as a sign the undo failed. Detected from the slot's own `label` rather
- *  than a dedicated field: `UndoSlotSnapshot` carries no "kind" to switch on, and
- *  `RepoService`'s stash-drop undo capture is the only call site that ever begins a label this
- *  way (mirrored exactly in the harness's own mock bridge). */
+ *  than a dedicated field: `UndoSlotSnapshot` carries no "kind" to switch on. */
 export function composeUndoAnnouncement(label: string): string {
   return label.startsWith(STASH_DROP_UNDO_LABEL_PREFIX)
-    ? 'Restored as stash@{0}'
-    : `Undone: ${label}`;
+    ? t('git.op.undoStash.announce', { ref: stashRef(0) })
+    : t('git.op.undone.announce', { label });
+}
+
+/** A literal `stash@{N}` cannot sit in a catalog message (`{0}` is a positional placeholder). */
+export function stashRef(index: number | string): string {
+  return `stash@{${index}}`;
 }
 
 /** `docs/plans/P10.md` W14, hard part 1's own table, given a voice: the undo button's tooltip is
  *  the one place a user learns *what a reset's undo actually restores* before they need it, and
  *  the three modes are not interchangeable (probe 5's own finding — a mixed reset's undo does not
  *  bring back what was staged, because that index state was never written to the object database
- *  at all). Detected from `UndoRecord.label`'s own text, the same way `composeUndoAnnouncement`
- *  detects a dropped stash above: `RepoService`'s reset undo capture (mirrored in the harness's
- *  own mock bridge) is the only call site that ever labels a record `Reset (<mode>) to …`, so the
- *  label doubles as the mode carrier without a dedicated field. Every other undoable op — cherry-
- *  pick's `reset --keep` included — keeps the plain, generic caveat this file has always used:
- *  §7.12's own "does not restore uncommitted work" already covers what a cherry-pick's undo
- *  cannot bring back (unrelated dirt `--keep` never touched), so it needs no mode table of its
- *  own. */
+ *  at all). Detected from `UndoRecord.label`'s own text (backend-owned, English), the same way
+ *  `composeUndoAnnouncement` detects a dropped stash above. */
 const RESET_UNDO_LABEL_PATTERN = /^Reset \((soft|mixed|hard)\) to /;
 
-const RESET_UNDO_TOOLTIP_SUFFIX: Record<ResetMode, string> = {
-  soft: 'restores the branch pointer, index, and working tree — a full round trip',
-  mixed: 'restores the commits; what was staged before the reset is not recoverable',
-  hard: 'restores the commits — does not restore uncommitted work',
+const RESET_UNDO_TOOLTIP: Record<ResetMode, MessageKey> = {
+  soft: 'git.undo.tooltipSoft.tooltip',
+  mixed: 'git.undo.tooltipMixed.tooltip',
+  hard: 'git.undo.tooltipHard.tooltip',
 };
-
-const DEFAULT_UNDO_TOOLTIP_SUFFIX = 'one level, does not restore uncommitted work';
 
 export function composeUndoTooltip(label: string): string {
   const resetMatch = label.match(RESET_UNDO_LABEL_PATTERN);
   const mode = resetMatch?.[1] as ResetMode | undefined;
-  const suffix = mode ? RESET_UNDO_TOOLTIP_SUFFIX[mode] : DEFAULT_UNDO_TOOLTIP_SUFFIX;
-  return `${label} — ${suffix}`;
+  return t(mode ? RESET_UNDO_TOOLTIP[mode] : 'git.undo.tooltipDefault.tooltip', { label });
 }
 
+const STASH_MISMATCH: Record<
+  'apply' | 'pop',
+  Record<
+    StashPredictionMismatch['predicted'],
+    Partial<Record<StashPredictionMismatch['actual'], MessageKey>>
+  >
+> = {
+  apply: {
+    clean: {
+      conflicts: 'git.op.applyMismatch.cleanConflicts.body',
+      refused: 'git.op.applyMismatch.cleanRefused.body',
+    },
+    conflicts: {
+      clean: 'git.op.applyMismatch.conflictsClean.body',
+      refused: 'git.op.applyMismatch.conflictsRefused.body',
+    },
+  },
+  pop: {
+    clean: {
+      conflicts: 'git.op.popMismatch.cleanConflicts.body',
+      refused: 'git.op.popMismatch.cleanRefused.body',
+    },
+    conflicts: {
+      clean: 'git.op.popMismatch.conflictsClean.body',
+      refused: 'git.op.popMismatch.conflictsRefused.body',
+    },
+  },
+};
+
 /** §7.6's own worked example, given a voice: *"This pop conflicted, though the pre-flight
- *  predicted a clean apply — the tree changed in between. Your stash was kept."* A `mismatch`
+ *  predicted a clean apply. The tree changed in between. Your stash was kept."* A `mismatch`
  *  takes priority over the plain success/failure text — it is the more specific, more surprising
- *  fact, and staying silent about it (rendering only the generic failure text `StashConflict`
- *  already has in `OP_ERROR_TEXT`) is exactly the "silently rendering the outcome" §7.6 rules
+ *  fact, and staying silent about it is exactly the "silently rendering the outcome" §7.6 rules
  *  out. With no mismatch, this reads exactly like `composeOpFailureAnnouncement`'s own output for
- *  a failure, or a short "Applied"/"Popped" sentence for a plain, agreeing success. */
-/** G28 D5: `currentBranch` (optional — every pre-G28 call site keeps working with no clause at
- *  all) adds a `"(from <origin>)"` parenthetical whenever `entry`'s own origin branch differs
- *  from it — the cross-branch apply's own "you're not where this came from" reminder, on the
- *  SAME sentence shape every other outcome already uses rather than a second, separate
- *  announcement. `label` now reads `stashLabel(entry)` (the user's own text, stripped of git's
- *  own "On &lt;b&gt;: " framing) rather than the position-addressed `stash@{N}` — correct for a
- *  global entry too, whose `index` is D17's own `-1` sentinel and would otherwise render as
- *  `stash@{-1}`. */
+ *  a failure, or a short "Applied"/"Popped" sentence for a plain, agreeing success.
+ *
+ *  G28 D5: `currentBranch` (optional — omitted means "the caller does not know", which suppresses
+ *  the origin clause rather than comparing against `undefined`) adds the origin whenever `entry`'s
+ *  own origin branch differs from it — the cross-branch apply's own "you're not where this came
+ *  from" reminder. `label` reads `stashLabel(entry)` (the user's own text) rather than the
+ *  position-addressed `stash@{N}` — correct for a global entry too, whose `index` is D17's own
+ *  `-1` sentinel. */
 export function composeStashAnnouncement(
   verb: 'apply' | 'pop',
   entry: StashEntry,
@@ -351,29 +405,22 @@ export function composeStashAnnouncement(
   currentBranch?: string | null,
 ): string {
   const label = stashLabel(entry);
-  // currentBranch OMITTED (not merely a detached-HEAD `null`) means "the caller does not know" —
-  // every pre-G28 call site, none of which pass this argument at all — so the clause is
-  // suppressed rather than comparing against `undefined` (which would never equal a real branch
-  // name and so would ALWAYS add the clause, breaking every existing announcement's wording).
   const origin = currentBranch === undefined ? undefined : originLabel(entry, currentBranch);
-  const originClause = origin === undefined ? '' : ` (from ${origin})`;
-  const actionLabel = verb === 'apply' ? 'Stash apply' : 'Stash pop';
   if (mismatch) {
-    const predictedText = mismatch.predicted === 'clean' ? 'a clean apply' : 'conflicts';
-    const actualText =
-      mismatch.actual === 'clean'
-        ? 'applied cleanly'
-        : mismatch.actual === 'conflicts'
-          ? 'conflicted'
-          : 'was refused';
-    const keptText = mismatch.stashKept ? ' Your stash was kept.' : '';
-    return (
-      `This ${verb}${originClause} ${actualText}, though the pre-flight predicted ${predictedText}` +
-      ` — the tree changed in between.${keptText}`
-    );
+    const key = STASH_MISMATCH[verb][mismatch.predicted][mismatch.actual];
+    const parts = [key === undefined ? t('git.op.done.announce') : t(key)];
+    if (origin !== undefined) parts.push(t('git.op.mismatchOrigin.body', { origin }));
+    if (mismatch.stashKept) parts.push(t('git.op.mismatchKept.body'));
+    return parts.join(' ');
   }
-  if (!result.ok) return composeOpFailureAnnouncement(actionLabel, result.error);
-  return verb === 'apply' ? `Applied ${label}${originClause}` : `Popped ${label}${originClause}`;
+  if (!result.ok)
+    return composeOpFailureAnnouncement(verb === 'apply' ? 'stashApply' : 'stashPop', result.error);
+  if (origin === undefined)
+    return t(verb === 'apply' ? 'git.op.applied.announce' : 'git.op.popped.announce', { label });
+  return t(verb === 'apply' ? 'git.op.appliedFrom.announce' : 'git.op.poppedFrom.announce', {
+    label,
+    origin,
+  });
 }
 
 /** G26 D8/D11: `stack.restack`'s own live-region text — a full success, a paused conflict
@@ -386,17 +433,19 @@ export function composeRestackAnnouncement(
   remaining: readonly string[],
 ): string {
   if (stoppedAt !== undefined) {
-    const doneText = restacked.length > 0 ? `${restacked.length} restacked so far — ` : '';
-    return (
-      `Restack paused on ${stoppedAt} — ${doneText}resolve the conflict, then Continue, then ` +
-      `Restack again to finish the remaining ${remaining.length}.`
-    );
+    return restacked.length > 0
+      ? t('git.op.restackPausedDone.body', {
+          branch: stoppedAt,
+          done: restacked.length,
+          count: remaining.length,
+        })
+      : t('git.op.restackPaused.body', { branch: stoppedAt, count: remaining.length });
   }
   if (remaining.length > 0) {
-    return `Restack cancelled after ${restacked.length} — ${remaining.length} branch${remaining.length === 1 ? '' : 'es'} left. Restack again to finish.`;
+    return t('git.op.restackCancelled.body', { done: restacked.length, count: remaining.length });
   }
-  if (restacked.length === 0) return 'Already up to date — nothing to restack.';
+  if (restacked.length === 0) return t('git.op.restackUpToDate.body');
   return restacked.length === 1
-    ? `Restacked ${restacked[0]}`
-    : `Restacked ${restacked.length} branches`;
+    ? t('git.op.restackedOne.announce', { branch: restacked[0] })
+    : t('git.op.restackedMany.announce', { count: restacked.length });
 }

@@ -137,7 +137,9 @@ export class ReviewCommentsState {
       });
       if (this.#target !== target) return;
       this.comments.value = [];
-      this.announcement.value = `Cleared ${result.removed} ${result.removed === 1 ? 'comment' : 'comments'}`;
+      this.announcement.value = t('git.review.comments.cleared.announce', {
+        count: result.removed,
+      });
     } catch (error) {
       if (this.#target === target) {
         this.announcement.value = errorText(error);

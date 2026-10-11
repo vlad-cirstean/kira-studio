@@ -7,6 +7,7 @@
  */
 import type { SearchField, SearchScope } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import type { CommitHit, RefHit, SearchRunResult } from '../state/search.ts';
 import { capItems, REF_LIST_SECTION_CAP } from './refListModel.ts';
 
@@ -97,7 +98,7 @@ function buildCommitSection(hits: readonly CommitHit[]): SearchResultsSection | 
   if (hits.length === 0) return undefined;
   const { visible, hiddenCount } = capItems(hits, SEARCH_SECTION_CAP);
   return {
-    title: 'Commits',
+    title: t('common.module.commits.label'),
     hiddenCount,
     options: visible.map((hit) => ({ kind: 'commit', id: commitOptionId(hit), hit }) as const),
   };

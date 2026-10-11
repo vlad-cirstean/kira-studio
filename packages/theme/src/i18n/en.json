@@ -700,6 +700,23 @@
     }
   },
   "git": {
+    "announce": {
+      "loadMore": {
+        "announce": "{added} more loaded, {remaining} remaining"
+      },
+      "loadMoreDone": {
+        "announce": "{added} more loaded, history fully loaded"
+      },
+      "refreshed": {
+        "announce": "Refreshed, {count} commit loaded | Refreshed, {count} commits loaded"
+      },
+      "revealLoading": {
+        "announce": "Loading history to find the selected result…"
+      },
+      "revealNotFound": {
+        "announce": "Result not found, it may no longer exist in this repository"
+      }
+    },
     "app": {
       "bootError": {
         "error": "Couldn’t load the repository: {error}"
@@ -1417,6 +1434,15 @@
       }
     },
     "graph": {
+      "corrupted": {
+        "error": "Couldn’t read the graph history."
+      },
+      "corruptedDetail": {
+        "error": "The data stream was corrupted."
+      },
+      "loadFailed": {
+        "error": "Couldn’t load the graph."
+      },
       "region": {
         "aria": "Commit graph"
       }
@@ -1454,6 +1480,71 @@
         "label": "Load {pageSize} more ({remaining} remaining)"
       }
     },
+    "menu": {
+      "checkoutDetached": {
+        "label": "Check out (detached)"
+      },
+      "cherryPickCommit": {
+        "label": "Cherry-pick this commit…"
+      },
+      "copyCommitMessage": {
+        "label": "Copy commit message"
+      },
+      "copySha": {
+        "label": "Copy SHA"
+      },
+      "currentBranch": {
+        "hint": "This is the current branch."
+      },
+      "deleteOnRemote": {
+        "label": "Delete on {remote}"
+      },
+      "globalStashBranch": {
+        "label": "New branch from this…"
+      },
+      "globalStashRemove": {
+        "label": "Remove from global stash"
+      },
+      "goToFile": {
+        "label": "Go to file"
+      },
+      "newBranch": {
+        "label": "New branch…"
+      },
+      "newTag": {
+        "label": "New tag…"
+      },
+      "notSupported": {
+        "hint": "Not supported yet."
+      },
+      "resetToCommit": {
+        "label": "Reset to this commit…"
+      },
+      "revertCommit": {
+        "label": "Revert this commit…"
+      },
+      "stackChangeParent": {
+        "label": "Change stack parent…"
+      },
+      "stackGoToChild": {
+        "label": "Go to child branch"
+      },
+      "stackGoToParent": {
+        "label": "Go to parent branch"
+      },
+      "stackRestack": {
+        "label": "Restack this stack"
+      },
+      "stashBranch": {
+        "label": "New branch from stash…"
+      },
+      "stashDrop": {
+        "label": "Drop"
+      },
+      "stashShow": {
+        "label": "Show changes"
+      }
+    },
     "module": {
       "title": "Git"
     },
@@ -1469,6 +1560,437 @@
       },
       "refreshError": {
         "error": "Couldn’t check this workspace’s folders for a Git repository: {error}"
+      }
+    },
+    "op": {
+      "aborted": {
+        "announce": "Aborted"
+      },
+      "applied": {
+        "announce": "Applied {label}"
+      },
+      "appliedFrom": {
+        "announce": "Applied {label} (from {origin})"
+      },
+      "applyMismatch": {
+        "cleanConflicts": {
+          "body": "This apply conflicted, though the pre-flight predicted a clean apply. The tree changed in between."
+        },
+        "cleanRefused": {
+          "body": "This apply was refused, though the pre-flight predicted a clean apply. The tree changed in between."
+        },
+        "conflictsClean": {
+          "body": "This apply applied cleanly, though the pre-flight predicted conflicts. The tree changed in between."
+        },
+        "conflictsRefused": {
+          "body": "This apply was refused, though the pre-flight predicted conflicts. The tree changed in between."
+        }
+      },
+      "autoDetach": {
+        "body": "{target} is checked out in {path}. HEAD is now detached at its commit. Create a branch here, or switch to another branch, when you’re done."
+      },
+      "autoFetchResume": {
+        "hint": "Fetch to resume."
+      },
+      "autoFetchStopped": {
+        "error": "Auto-fetch stopped. {reason}"
+      },
+      "autoStash": {
+        "body": "Stashed {count} file from {branch}. The stash is tagged {branch}. Apply it back from the stash list. | Stashed {count} files from {branch}. The stash is tagged {branch}. Apply it back from the stash list."
+      },
+      "busy": {
+        "error": "Another operation is already running."
+      },
+      "cancelled": {
+        "checkout": {
+          "announce": "Cancelled the checkout"
+        },
+        "cherryPick": {
+          "announce": "Cancelled the cherry-pick"
+        },
+        "forcePush": {
+          "announce": "Cancelled the force push"
+        },
+        "pull": {
+          "announce": "Cancelled the pull"
+        },
+        "reset": {
+          "announce": "Cancelled the reset"
+        },
+        "revert": {
+          "announce": "Cancelled the revert"
+        },
+        "stashApply": {
+          "announce": "Cancelled the stash apply"
+        },
+        "stashPop": {
+          "announce": "Cancelled the stash pop"
+        }
+      },
+      "checkout": {
+        "announce": "Checked out {where}"
+      },
+      "checkoutCarried": {
+        "announce": "Checked out {where}, {count} local change carried over | Checked out {where}, {count} local changes carried over"
+      },
+      "cherryPicked": {
+        "announce": "Cherry-picked commit {sha}"
+      },
+      "cherryPickedStaged": {
+        "announce": "Cherry-picked commit {sha}, changes staged but not committed"
+      },
+      "cherryPickMismatch": {
+        "cleanConflicts": {
+          "body": "This cherry-pick conflicted, though the pre-flight predicted a clean apply. The tree changed in between."
+        },
+        "cleanRefused": {
+          "body": "This cherry-pick was refused, though the pre-flight predicted a clean apply. The tree changed in between."
+        },
+        "conflictsClean": {
+          "body": "This cherry-pick applied cleanly, though the pre-flight predicted conflicts. The tree changed in between."
+        },
+        "conflictsRefused": {
+          "body": "This cherry-pick was refused, though the pre-flight predicted conflicts. The tree changed in between."
+        }
+      },
+      "continued": {
+        "announce": "Continued"
+      },
+      "createBranch": {
+        "announce": "Created branch {name}"
+      },
+      "createTag": {
+        "announce": "Created tag {name}"
+      },
+      "createWorktree": {
+        "announce": "Created worktree at {path}"
+      },
+      "deleteBranch": {
+        "announce": "Deleted branch {name}"
+      },
+      "deleteRemoteTag": {
+        "announce": "Deleted tag {name} on {remote}"
+      },
+      "deleteTag": {
+        "announce": "Deleted tag {name}"
+      },
+      "detachedTarget": {
+        "label": "{target} (detached)"
+      },
+      "done": {
+        "announce": "Done"
+      },
+      "dropStash": {
+        "body": "Dropped {ref}: {message}. Undo is available until your next operation."
+      },
+      "failed": {
+        "abort": {
+          "error": "Couldn’t abort."
+        },
+        "checkout": {
+          "error": "Couldn’t check out."
+        },
+        "cherryPick": {
+          "error": "Couldn’t cherry-pick."
+        },
+        "continue": {
+          "error": "Couldn’t continue."
+        },
+        "createBranch": {
+          "error": "Couldn’t create the branch."
+        },
+        "createTag": {
+          "error": "Couldn’t create the tag."
+        },
+        "createWorktree": {
+          "error": "Couldn’t create the worktree."
+        },
+        "deleteBranch": {
+          "error": "Couldn’t delete the branch."
+        },
+        "deleteRemoteTag": {
+          "error": "Couldn’t delete the remote tag."
+        },
+        "deleteTag": {
+          "error": "Couldn’t delete the tag."
+        },
+        "dropStash": {
+          "error": "Couldn’t drop the stash."
+        },
+        "fetch": {
+          "error": "Couldn’t fetch."
+        },
+        "forcePush": {
+          "error": "Couldn’t force push."
+        },
+        "pull": {
+          "error": "Couldn’t pull."
+        },
+        "push": {
+          "error": "Couldn’t push."
+        },
+        "pushTag": {
+          "error": "Couldn’t push the tag."
+        },
+        "removeGlobalStash": {
+          "error": "Couldn’t remove from the global stash."
+        },
+        "removeWorktree": {
+          "error": "Couldn’t remove the worktree."
+        },
+        "renameBranch": {
+          "error": "Couldn’t rename the branch."
+        },
+        "reset": {
+          "error": "Couldn’t reset."
+        },
+        "restack": {
+          "error": "Couldn’t restack."
+        },
+        "revert": {
+          "error": "Couldn’t revert."
+        },
+        "saveGlobalStash": {
+          "error": "Couldn’t save to the global stash."
+        },
+        "setStackParent": {
+          "error": "Couldn’t set the stack parent."
+        },
+        "skip": {
+          "error": "Couldn’t skip."
+        },
+        "stash": {
+          "error": "Couldn’t stash."
+        },
+        "stashApply": {
+          "error": "Couldn’t apply the stash."
+        },
+        "stashBranch": {
+          "error": "Couldn’t create the branch from the stash."
+        },
+        "stashPop": {
+          "error": "Couldn’t pop the stash."
+        },
+        "undo": {
+          "error": "Couldn’t undo."
+        }
+      },
+      "fetched": {
+        "announce": "Fetched {remote}"
+      },
+      "forcePushed": {
+        "announce": "Force-pushed {branch} to {remote}"
+      },
+      "mismatchKept": {
+        "body": "Your stash was kept."
+      },
+      "mismatchOrigin": {
+        "body": "The stash came from {origin}."
+      },
+      "noRepository": {
+        "error": "No repository is open."
+      },
+      "nothingToStash": {
+        "announce": "Nothing to stash, the working tree has no local changes"
+      },
+      "popMismatch": {
+        "cleanConflicts": {
+          "body": "This pop conflicted, though the pre-flight predicted a clean apply. The tree changed in between."
+        },
+        "cleanRefused": {
+          "body": "This pop was refused, though the pre-flight predicted a clean apply. The tree changed in between."
+        },
+        "conflictsClean": {
+          "body": "This pop applied cleanly, though the pre-flight predicted conflicts. The tree changed in between."
+        },
+        "conflictsRefused": {
+          "body": "This pop was refused, though the pre-flight predicted conflicts. The tree changed in between."
+        }
+      },
+      "popped": {
+        "announce": "Popped {label}"
+      },
+      "poppedFrom": {
+        "announce": "Popped {label} (from {origin})"
+      },
+      "pulled": {
+        "announce": "Pulled {remote}/{branch} ({strategy})"
+      },
+      "pushAllTags": {
+        "announce": "Pushed all tags to {remote}"
+      },
+      "pushed": {
+        "announce": "Pushed {branch} to {remote}"
+      },
+      "pushTag": {
+        "announce": "Pushed tag {names} to {remote}"
+      },
+      "reason": {
+        "alreadyExists": {
+          "error": "It already exists."
+        },
+        "authFailed": {
+          "error": "Authentication failed."
+        },
+        "branchChanged": {
+          "error": "A different branch is checked out now."
+        },
+        "cancelled": {
+          "error": "It was cancelled."
+        },
+        "confirmationRequired": {
+          "error": "The typed confirmation was missing or didn’t match."
+        },
+        "conflict": {
+          "error": "Conflicts need resolving."
+        },
+        "dirtyWorktree": {
+          "error": "The working tree has local changes."
+        },
+        "emptyCherryPick": {
+          "error": "This change is already present on this branch."
+        },
+        "hookRejected": {
+          "error": "A hook rejected it."
+        },
+        "leaseViolation": {
+          "error": "The remote moved since it was last checked."
+        },
+        "lockHeld": {
+          "error": "Another process has locked the repository."
+        },
+        "mainlineRequired": {
+          "error": "A merge commit needs a parent chosen first."
+        },
+        "networkFailed": {
+          "error": "A network error occurred."
+        },
+        "nonFastForward": {
+          "error": "Not a fast-forward."
+        },
+        "notFound": {
+          "error": "Not found."
+        },
+        "notFullyMerged": {
+          "error": "It isn’t fully merged."
+        },
+        "nothingToStash": {
+          "error": "There is nothing to save. The working tree is clean."
+        },
+        "operationInProgress": {
+          "error": "Another operation is in progress."
+        },
+        "protectedBranch": {
+          "error": "The branch is protected."
+        },
+        "remoteNotFound": {
+          "error": "The remote repository wasn’t found."
+        },
+        "remoteRefMissing": {
+          "error": "The remote ref is missing."
+        },
+        "remoteRefUpdated": {
+          "error": "The remote moved since it was last fetched."
+        },
+        "stackCycle": {
+          "error": "That would make a branch its own ancestor."
+        },
+        "stashConflict": {
+          "error": "It merged with conflicts. The stash was kept."
+        },
+        "stashIndexConflict": {
+          "error": "The index already has conflicts. Retry without restoring it."
+        },
+        "stashUntrackedCollision": {
+          "error": "Untracked files were in the way. The stash was kept."
+        },
+        "unknown": {
+          "error": "An unexpected error occurred."
+        },
+        "untrackedWouldBeOverwritten": {
+          "error": "Untracked files would be overwritten."
+        },
+        "worktreeConflict": {
+          "error": "It’s checked out in another worktree."
+        },
+        "worktreeLocked": {
+          "error": "The worktree is locked."
+        }
+      },
+      "removeFromStack": {
+        "announce": "Removed {branch} from its stack"
+      },
+      "removeGlobalStash": {
+        "body": "Removed “{label}” from the global stash. Undo is available until your next operation."
+      },
+      "removeWorktree": {
+        "announce": "Removed worktree at {path}"
+      },
+      "renameBranch": {
+        "announce": "Renamed branch {from} to {to}"
+      },
+      "reset": {
+        "announce": "Reset ({mode}) to {target}",
+        "unresolved": {
+          "error": "Couldn’t reset. {target} doesn’t resolve to a commit."
+        }
+      },
+      "restackCancelled": {
+        "body": "Restack cancelled after {done}. {count} branch left. Restack again to finish. | Restack cancelled after {done}. {count} branches left. Restack again to finish."
+      },
+      "restackedMany": {
+        "announce": "Restacked {count} branch | Restacked {count} branches"
+      },
+      "restackedOne": {
+        "announce": "Restacked {branch}"
+      },
+      "restackPaused": {
+        "body": "Restack paused on {branch}. Resolve the conflict, then continue, then restack again to finish the remaining {count} branch. | Restack paused on {branch}. Resolve the conflict, then continue, then restack again to finish the remaining {count} branches."
+      },
+      "restackPausedDone": {
+        "body": "Restack paused on {branch}. {done} restacked so far. Resolve the conflict, then continue, then restack again to finish the remaining {count} branch. | Restack paused on {branch}. {done} restacked so far. Resolve the conflict, then continue, then restack again to finish the remaining {count} branches."
+      },
+      "restackUpToDate": {
+        "body": "Already up to date. Nothing to restack."
+      },
+      "revertedMany": {
+        "announce": "Reverted {count} commit | Reverted {count} commits"
+      },
+      "revertedManyStaged": {
+        "announce": "Reverted {count} commit, changes staged but not committed | Reverted {count} commits, changes staged but not committed"
+      },
+      "revertedOne": {
+        "announce": "Reverted commit {sha}"
+      },
+      "revertedOneStaged": {
+        "announce": "Reverted commit {sha}, changes staged but not committed"
+      },
+      "saveGlobalStash": {
+        "announce": "Saved “{label}” to the global stash"
+      },
+      "setStackParent": {
+        "announce": "Set the stack parent of {branch} to {parent}"
+      },
+      "skipped": {
+        "announce": "Skipped"
+      },
+      "stashBranch": {
+        "announce": "Created branch {name} from {label}"
+      },
+      "stashed": {
+        "announce": "Changes stashed"
+      },
+      "stashedNote": {
+        "body": "Your changes are stashed. See the stash list."
+      },
+      "stashKept": {
+        "body": "Your stashed changes were kept because popping them back would conflict. Pop {ref} manually when ready."
+      },
+      "undone": {
+        "announce": "Undone: {label}"
+      },
+      "undoStash": {
+        "announce": "Restored as {ref}"
       }
     },
     "picker": {
@@ -1568,14 +2090,214 @@
       }
     },
     "review": {
+      "ask": {
+        "body": "Nothing was detected for {branch}. Choose a base above. Kira doesn’t guess."
+      },
+      "async": {
+        "compare": {
+          "error": "Couldn’t compare: {error}"
+        },
+        "saveSession": {
+          "error": "Couldn’t save this session: {error}"
+        },
+        "switchTarget": {
+          "error": "Couldn’t switch to the pushed target: {error}"
+        }
+      },
+      "back": {
+        "tooltip": "Back to branch selection"
+      },
+      "base": {
+        "allBranches": {
+          "label": "All branches"
+        },
+        "choose": {
+          "label": "Choose a base…"
+        },
+        "hidden": {
+          "hint": "{count} more. Type to filter."
+        },
+        "loading": {
+          "loading": "Loading branches…"
+        },
+        "popover": {
+          "aria": "Choose a comparison base"
+        },
+        "reasonDefaultBranch": {
+          "label": "Default branch"
+        },
+        "reasonUpstream": {
+          "label": "Upstream"
+        },
+        "suggested": {
+          "label": "Suggested"
+        }
+      },
       "changedSince": {
         "hint": "Changed since you reviewed it."
+      },
+      "comments": {
+        "anchorRemoved": {
+          "hint": "These lines no longer exist. Shown as of {sha}."
+        },
+        "anchorStale": {
+          "hint": "Lines as of {sha}. History was rewritten since."
+        },
+        "clearAll": {
+          "tooltip": "Clear all comments"
+        },
+        "cleared": {
+          "announce": "Cleared {count} comment | Cleared {count} comments"
+        },
+        "confirmClear": {
+          "label": "Clear {count} comment | Clear {count} comments"
+        },
+        "copyForAi": {
+          "tooltip": "Copy as prompt"
+        },
+        "count": {
+          "label": "{count} comment | {count} comments"
+        },
+        "delete": {
+          "tooltip": "Delete comment"
+        },
+        "empty": {
+          "emptyHint": "No comments yet. Open a file from the file list and use the + in the diff gutter."
+        },
+        "line": {
+          "example": "L{start}"
+        },
+        "lineRange": {
+          "example": "L{start}-{end}"
+        },
+        "loadError": {
+          "error": "Couldn’t load the comment list: {error}"
+        },
+        "open": {
+          "aria": "Open {path} {line}"
+        }
+      },
+      "commit": {
+        "noGraph": {
+          "error": "Couldn’t reveal this commit. No graph is open for this repository."
+        },
+        "openFile": {
+          "error": "Couldn’t open the file: {error}"
+        },
+        "openInGraph": {
+          "tooltip": "Open in graph"
+        }
+      },
+      "commits": {
+        "count": {
+          "label": "{count} commit | {count} commits"
+        }
+      },
+      "empty": {
+        "body": "“{branch}” adds no commits to “{base}”."
+      },
+      "files": {
+        "compare": {
+          "aria": "What to compare"
+        },
+        "diffError": {
+          "error": "Couldn’t open that file in the editor: {error}"
+        },
+        "fullRange": {
+          "label": "Full range"
+        },
+        "loadError": {
+          "error": "Couldn’t load the file list: {error}"
+        },
+        "markError": {
+          "error": "Couldn’t update that file’s review status: {error}"
+        },
+        "needsReview": {
+          "label": "Needs review · {count}"
+        },
+        "neverReviewed": {
+          "status": "Never reviewed, showing the full range diff"
+        },
+        "nothingToReview": {
+          "emptyHint": "Nothing changed since your last review."
+        },
+        "showing": {
+          "aria": "Which files to list"
+        },
+        "sinceReview": {
+          "label": "Since review"
+        },
+        "snapshotUnavailable": {
+          "status": "Reviewed, but what changed since can’t be shown"
+        },
+        "unchanged": {
+          "status": "Reviewed, nothing has changed since"
+        }
+      },
+      "filesChanged": {
+        "label": "{count} file changed | {count} files changed"
+      },
+      "loading": {
+        "loading": "Loading review…"
+      },
+      "loadMore": {
+        "label": "Load more"
       },
       "markReviewed": {
         "tooltip": "Mark reviewed"
       },
       "markUnreviewed": {
         "tooltip": "Mark unreviewed"
+      },
+      "noBranch": {
+        "emptyHint": "Choose a branch to compare its commits against a base you set or one Kira detects."
+      },
+      "noOpenFile": {
+        "announce": "Open a file in the file list first"
+      },
+      "noRepo": {
+        "emptyHint": "Open a repository first, then choose a branch to review."
+      },
+      "pane": {
+        "aria": "Review pane",
+        "comments": {
+          "label": "Comments"
+        }
+      },
+      "phase": {
+        "ask": {
+          "announce": "No base detected for {branch}, choose one to compare against"
+        },
+        "empty": {
+          "announce": "{branch} adds no commits to {base}"
+        },
+        "error": {
+          "error": "Couldn’t compare {branch}: {error}"
+        },
+        "listing": {
+          "announce": "Comparing {branch} to {base}, {summary}"
+        },
+        "unrelated": {
+          "announce": "{branch} and {base} share no common history"
+        }
+      },
+      "resolving": {
+        "loading": "Resolving comparison…"
+      },
+      "stale": {
+        "status": "This comparison has changed"
+      },
+      "start": {
+        "title": "Review branch changes"
+      },
+      "summary": {
+        "label": "{commits} · {files}"
+      },
+      "swap": {
+        "tooltip": "Swap branch and base"
+      },
+      "unrelated": {
+        "body": "“{branch}” and “{base}” share no common history."
       }
     },
     "search": {
@@ -1685,7 +2407,13 @@
         "tooltip": "Stashed from {origin}"
       },
       "untracked": {
+        "example": "-u",
         "hint": "Includes untracked files."
+      }
+    },
+    "strip": {
+      "uncommittedCount": {
+        "label": "{count} uncommitted change | {count} uncommitted changes"
       }
     },
     "tag": {
@@ -1796,6 +2524,18 @@
     "undo": {
       "copyRecovery": {
         "tooltip": "Copy recovery SHA {sha}"
+      },
+      "tooltipDefault": {
+        "tooltip": "{label}. One level only, and does not restore uncommitted work"
+      },
+      "tooltipHard": {
+        "tooltip": "{label}. Restores the commits, but not uncommitted work"
+      },
+      "tooltipMixed": {
+        "tooltip": "{label}. Restores the commits, but what was staged before the reset is not recoverable"
+      },
+      "tooltipSoft": {
+        "tooltip": "{label}. Restores the branch pointer, index and working tree, a full round trip"
       }
     },
     "worktree": {

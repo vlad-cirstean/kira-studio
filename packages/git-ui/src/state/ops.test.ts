@@ -178,7 +178,7 @@ describe('OpsState — rejected requests are announced, not thrown', () => {
     await sleep();
     ops.resolvePullDialog(true);
     await run;
-    expect(ops.announcement.value).toContain('Pull failed');
+    expect(ops.announcement.value).toContain('Couldn’t pull.');
     expect(ops.announcement.value).toContain('socket closed');
     expect(ops.announcement.value).toContain('Your changes are stashed');
     expect(ops.busy.value).toBe(false);
@@ -190,7 +190,7 @@ describe('OpsState — rejected requests are announced, not thrown', () => {
     });
     await sleep();
     await ops.runFetch('origin');
-    expect(ops.announcement.value).toContain('Fetch failed');
+    expect(ops.announcement.value).toContain('Couldn’t fetch.');
   });
 });
 

@@ -2,6 +2,7 @@ import type { CommitStore, LayoutChunk, RowPlan } from '@kira/git-core';
 import { identityRowPlan, projectLayoutInput } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { markRaw, type Ref, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
@@ -35,8 +36,6 @@ export interface LayoutRange {
   readonly from: number;
   readonly to: number;
 }
-
-const CORRUPTED_ANNOUNCEMENT = 'Graph history could not be read — the data stream was corrupted.';
 
 /**
  * The UI-side half of §5.4's cache/rehydration story (P3 W9), rebuilt for P4 W5 into the module
@@ -334,7 +333,7 @@ export class GraphViewState {
       if (!(error instanceof TransportError && error.code === 'cancelled')) {
         const detail = errorText(error);
         this.streamFailure.value = composeGraphFailureNotice(
-          'Graph failed to load.',
+          t('git.graph.loadFailed.error'),
           detail,
           false,
         );
@@ -428,12 +427,10 @@ export class GraphViewState {
   /** The stream can no longer be trusted: announce, show the banner, and ask the host to log it
    *  (fire-and-forget; a failed report must never mask the failure itself). */
   #failCorrupted(): void {
-    this.announcement.value = CORRUPTED_ANNOUNCEMENT;
-    this.streamFailure.value = composeGraphFailureNotice(
-      'Graph history could not be read.',
-      'The data stream was corrupted.',
-      true,
-    );
+    const title = t('git.graph.corrupted.error');
+    const detail = t('git.graph.corruptedDetail.error');
+    this.announcement.value = `${title} ${detail}`;
+    this.streamFailure.value = composeGraphFailureNotice(title, detail, true);
     const repoId = this.#repoId;
     if (repoId) {
       this.#bridge

@@ -17,6 +17,7 @@ import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
 import { codiconName, STATE_ICONS } from '../../icons/index.ts';
@@ -37,16 +38,16 @@ const emit = defineEmits<(e: 'select-base', ref: string) => void>();
 function reasonLabel(reason: BaseResolutionReason): string | undefined {
   switch (reason) {
     case 'upstream':
-      return 'upstream';
+      return t('git.review.base.reasonUpstream.label');
     case 'defaultBranch':
-      return 'default branch';
+      return t('git.review.base.reasonDefaultBranch.label');
     case 'override':
     case 'none':
       return undefined;
   }
 }
 
-const triggerLabel = computed(() => props.resolution?.base ?? 'Choose a base…');
+const triggerLabel = computed(() => props.resolution?.base ?? t('git.review.base.choose.label'));
 const triggerReason = computed(() => {
   const resolution = props.resolution;
   if (!resolution || resolution.base === null) return undefined;
@@ -126,7 +127,7 @@ function onOpenAutoFocus(e: Event): void {
       <PopoverContent
         align="start"
         class="w-80 p-0 gap-0"
-        aria-label="Choose a comparison base"
+        :aria-label="t('git.review.base.popover.aria')"
         @open-auto-focus="onOpenAutoFocus"
       >
         <div class="max-h-80 flex flex-col min-h-0">
@@ -134,13 +135,13 @@ function onOpenAutoFocus(e: Event): void {
             <SearchField
               ref="filterEl"
               v-model="filter"
-              placeholder="Filter branches"
-              aria-label="Filter branches"
+              :placeholder="t('git.picker.filterBranches.placeholder')"
+              :aria-label="t('git.picker.filterBranches.placeholder')"
             />
           </div>
           <div class="overflow-auto min-h-0">
-            <section v-if="suggested.length > 0" aria-label="Suggested">
-              <SectionHeading label="Suggested" />
+            <section v-if="suggested.length > 0" :aria-label="t('git.review.base.suggested.label')">
+              <SectionHeading :label="t('git.review.base.suggested.label')" />
               <button
                 v-for="candidate in suggested"
                 :key="candidate.ref"
@@ -153,8 +154,8 @@ function onOpenAutoFocus(e: Event): void {
               </button>
             </section>
 
-            <section aria-label="All branches">
-              <SectionHeading label="All branches" />
+            <section :aria-label="t('git.review.base.allBranches.label')">
+              <SectionHeading :label="t('git.review.base.allBranches.label')" />
               <button
                 v-for="row in sections.branches.visible"
                 :key="row.refname"
@@ -179,13 +180,13 @@ function onOpenAutoFocus(e: Event): void {
                 kind="empty"
                 data-testid="base-selector-hidden"
               >
-                {{ hiddenCount }} more — type to filter
+                {{ t('git.review.base.hidden.hint', { count: hiddenCount }) }}
               </InlineState>
               <InlineState
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
                 :kind="refsLoading ? 'loading' : 'empty'"
               >
-                {{ refsLoading ? 'Loading branches…' : 'No matching branches' }}
+                {{ refsLoading ? t('git.review.base.loading.loading') : t('common.state.noMatches.empty') }}
               </InlineState>
             </section>
           </div>

@@ -77,7 +77,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           <TooltipContent>{{ entry.message }}</TooltipContent>
         </Tooltip>
         <Badge>{{ entry.baseSha.slice(0, 7) }}</Badge>
-        <Badge v-if="entry.includedUntracked">-u</Badge>
+        <Badge v-if="entry.includedUntracked">{{ t('git.stash.untracked.example') }}</Badge>
         <Tooltip>
           <TooltipTrigger as-child>
             <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(entry.timestamp) }}</span>
