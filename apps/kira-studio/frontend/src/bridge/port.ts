@@ -53,7 +53,9 @@ export const ready = new Promise<void>((resolve, reject) => {
 // The stream is opened at module scope and `ready` may reject before any caller attaches a
 // handler; without this, a failed open is an unhandled rejection in the console rather than the
 // error `initEngineState`'s own catch is about to report.
-void ready.catch(() => {});
+void ready.catch(() => {
+  // Reported by initEngineState's own catch; this only marks the rejection as handled.
+});
 
 function handleMessage(message: PortResponse | PortEvent): void {
   if (message.kind === 'evt') {

@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { formatCount } from '@workbench/behaviour/format';
 import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
 import NotifyPromptsField from '@workbench/settings/fields/NotifyPromptsField.vue';
 import { computed, useId } from 'vue';
@@ -39,7 +40,7 @@ const expensiveQueryRowsError = computed<string | null>(() => {
   const v = props.draft.advanced.expensiveQueryRows;
   if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < EXPENSIVE_QUERY_ROWS_RANGE.min || v > EXPENSIVE_QUERY_ROWS_RANGE.max) {
-    return `${EXPENSIVE_QUERY_ROWS_RANGE.min.toLocaleString()}–${EXPENSIVE_QUERY_ROWS_RANGE.max.toLocaleString()}`;
+    return `${formatCount(EXPENSIVE_QUERY_ROWS_RANGE.min)}–${formatCount(EXPENSIVE_QUERY_ROWS_RANGE.max)}`;
   }
   return null;
 });

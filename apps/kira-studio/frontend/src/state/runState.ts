@@ -1,3 +1,4 @@
+import { useIntervalFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { type ComputedRef, computed, ref, watchEffect } from 'vue';
 import { useOpsStore } from './ops';
@@ -8,6 +9,9 @@ export interface RunStateVm {
   elapsedMs: number | null;
 }
 
+// Sub-second: the toolbar label shows tenths of a second (TIMING has no entry this fast).
+const RUN_TICK_MS = 200;
+
 const IDLE: RunStateVm = { status: 'idle', elapsedMs: null };
 
 // One shared ticker for the whole app instead of a per-view setInterval: started only while at
@@ -15,20 +19,23 @@ const IDLE: RunStateVm = { status: 'idle', elapsedMs: null };
 // timer when a view unmounts mid-run (tests/e2e/leaks.spec.ts).
 const useRunStateStore = defineStore('runState', () => {
   const now = ref(Date.now());
-  let timer: ReturnType<typeof setInterval> | null = null;
+  const ticker = useIntervalFn(
+    () => {
+      now.value = Date.now();
+    },
+    RUN_TICK_MS,
+    { immediate: false },
+  );
 
   const opsStore = useOpsStore();
 
   watchEffect(() => {
     const running = opsStore.records.some((r) => r.status === 'running');
-    if (running && !timer) {
+    if (running && !ticker.isActive.value) {
       now.value = Date.now();
-      timer = setInterval(() => {
-        now.value = Date.now();
-      }, 200);
-    } else if (!running && timer) {
-      clearInterval(timer);
-      timer = null;
+      ticker.resume();
+    } else if (!running && ticker.isActive.value) {
+      ticker.pause();
     }
   });
 

@@ -5,6 +5,8 @@
 // same shape as `CodeMirrorHost.vue`, restated for Monaco's own API rather than redesigned.
 
 import type { EditorLanguageId } from '@shared/domain/editor';
+import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import {
   KIRA_EDITOR_THEME,
   loadMonaco,
@@ -78,7 +80,7 @@ const LARGE_DOC_CHARS = 262_144;
 // a multi-MB doc blocked the main thread for over a second (measured, P160).
 const FILL_CHUNK_CHARS = 262_144;
 
-const pending = ref(true);
+const previewShown = ref(true);
 const previewDoc = computed(() =>
   props.doc.length > PENDING_PREVIEW_CHARS ? props.doc.slice(0, PENDING_PREVIEW_CHARS) : props.doc,
 );
@@ -106,7 +108,6 @@ let decorations: DecorationsCollection | null = null;
 let completionDisposable: MonacoDisposable | null = null;
 let hoverDisposable: MonacoDisposable | null = null;
 let wrapDisposable: MonacoDisposable | null = null;
-let lintTimer: ReturnType<typeof setTimeout> | undefined;
 
 function resolveWordWrap(): 'on' | 'off' {
   if (props.singleLine) return 'off';
@@ -363,17 +364,14 @@ function repaintRanges(): void {
   decorations.set(built);
 }
 
-// §4.5: 400 ms-debounced, mapped to `editor.setModelMarkers` — a themed wavy underline plus a
+// §4.5: debounced by TIMING.preview, mapped to `editor.setModelMarkers` — a themed wavy underline plus a
 // hover, no gutter and no lint panel (D24/D25's own reasoning, restated for Monaco).
-function scheduleLint(m: MonacoModule): void {
-  clearTimeout(lintTimer);
-  if (!model || !props.lintSource) {
-    if (model) m.editor.setModelMarkers(model, 'kira', []);
-    return;
-  }
-  const source = props.lintSource;
-  const targetModel = model;
-  lintTimer = setTimeout(() => {
+const runLint = useDebounceFn(
+  (
+    m: MonacoModule,
+    targetModel: TextModel,
+    source: (text: string) => readonly ConsoleDiagnostic[],
+  ) => {
     if (targetModel.isDisposed()) return;
     const markers: MarkerData[] = source(targetModel.getValue()).map((d) => {
       const start = targetModel.getPositionAt(d.from);
@@ -388,7 +386,17 @@ function scheduleLint(m: MonacoModule): void {
       };
     });
     m.editor.setModelMarkers(targetModel, 'kira', markers);
-  }, 400);
+  },
+  TIMING.preview,
+);
+
+function scheduleLint(m: MonacoModule): void {
+  if (!model || !props.lintSource) {
+    runLint.cancel();
+    if (model) m.editor.setModelMarkers(model, 'kira', []);
+    return;
+  }
+  void runLint(m, model, props.lintSource);
 }
 
 function applyBaseOptions(): ConstructionOptions {
@@ -515,7 +523,7 @@ onMounted(async () => {
   // The pending <pre> is removed once Monaco's own DOM holds the first content (Vue batches the
   // v-if), so there is never a window with neither showing real content.
   void fillModel(props.doc, () => {
-    pending.value = false;
+    previewShown.value = false;
   });
   editor.onDidChangeCursorPosition((e) => {
     if (!model) return;
@@ -525,7 +533,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   cancelFill();
-  clearTimeout(lintTimer);
+  runLint.cancel();
   decorations?.clear();
   decorations = null;
   completionDisposable?.dispose();
@@ -703,12 +711,12 @@ watch(
 </script>
 
 <template>
-  <!-- A single root, not `pending`'s <pre> and this <div> as two siblings — a multi-root template
+  <!-- A single root, not the preview <pre> and this <div> as two siblings — a multi-root template
        gets no automatic $attrs fallthrough at all (Vue silently drops every data-testid/class a
        call site passes on the <MonacoHost> tag, e.g. RawExchangePane's own `data-testid="http-
        wire-request-editor"`), which every mount site's own drop-in contract (§3) depends on.
        Monaco mounts into this same div (`rootRef`); the pending <pre> is a child of it, removed by
-       `v-if` the instant `pending` flips false, which is also the instant `editor.create()` has
+       `v-if` the instant `previewShown` flips false, which is also the instant `editor.create()` has
        already appended Monaco's own DOM into the same container — briefly (one microtask) both
        are present, never observably so.
 
@@ -725,7 +733,7 @@ watch(
     :class="{ 'monaco-host--single-line': singleLine }"
   >
     <pre
-      v-if="pending"
+      v-if="previewShown"
       class="m-0 font-data text-kira-md text-fg bg-bg overflow-auto"
       :class="singleLine ? 'p-0 whitespace-pre' : 'py-2 px-0 whitespace-pre-wrap'"
       v-text="previewDoc"

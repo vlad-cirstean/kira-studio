@@ -6,13 +6,13 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { formatDateTime } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
 import { useSettingsStore } from '../../state/settings';
 import type { SettingsPaneProps } from './types';
-import { useActionError } from './useActionError';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Database MCP'"` branch. Bypasses draft/Save entirely —
@@ -25,7 +25,6 @@ const settingsStore = useSettingsStore();
 const maskRuleCountsQuery = useQuery({
   queryKey: maskRuleCountsQueryKey,
   queryFn: loadMaskRuleCounts,
-  staleTime: Number.POSITIVE_INFINITY,
 });
 
 // M1 §6.2: the DB MCP token's own expiry line — "expired, regenerate" rather than a stale-looking
@@ -34,16 +33,42 @@ function tokenExpired(expiresAt: string): boolean {
   return !!expiresAt && new Date(expiresAt).getTime() <= Date.now();
 }
 
-const { error: actionError, guard } = useActionError();
-const { pending: dbMcpToggling, run: onToggleDbMcpEnabled } = useAsyncAction(
-  guard((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled)),
+// Instant-action settings (bypassing draft/Save) report a rejected call here, so the switch that
+// snaps back is not the only trace of the failure. One error line serves all three actions.
+const toggle = useAsyncAction((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled));
+const regenerate = useAsyncAction(() => dbMcpStore.regenerateDbMcpToken());
+const install = useAsyncAction(() => dbMcpStore.installDbMcpClaudeCode());
+const connectionToggle = useAsyncAction((id: string, enabled: boolean) =>
+  connectionsStore.setConnectionMcpEnabled(id, enabled),
 );
-const { pending: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useAsyncAction(
-  guard(() => dbMcpStore.regenerateDbMcpToken()),
+const dbMcpToggling = toggle.pending;
+const dbMcpRegenerating = regenerate.pending;
+const dbMcpInstalling = install.pending;
+const actionError = computed(
+  () =>
+    toggle.error.value ??
+    regenerate.error.value ??
+    install.error.value ??
+    connectionToggle.error.value,
 );
-const { pending: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useAsyncAction(
-  guard(() => dbMcpStore.installDbMcpClaudeCode()),
-);
+function clearActionErrors(): void {
+  toggle.error.value = null;
+  regenerate.error.value = null;
+  install.error.value = null;
+  connectionToggle.error.value = null;
+}
+async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
+  clearActionErrors();
+  await toggle.run(enabled);
+}
+async function onRegenerateDbMcpToken(): Promise<void> {
+  clearActionErrors();
+  await regenerate.run();
+}
+async function onInstallDbMcpClaudeCode(): Promise<void> {
+  clearActionErrors();
+  await install.run();
+}
 
 const dbMcpInstallMessage = computed(() => {
   const result = dbMcpStore.installResult;
@@ -65,9 +90,10 @@ const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpStore.status.expiresA
 // M1 §6.1: exposure itself (deny by default) stays an instant toggle here. M2 §7.3: the three
 // permission modes and the description are edited in the connection's own MCP tab, not here —
 // this list stays a read-only glance plus the one control it already had.
-const onToggleConnectionMcpEnabled = guard(async (id: string, enabled: boolean) => {
-  await connectionsStore.setConnectionMcpEnabled(id, enabled);
-});
+async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promise<void> {
+  clearActionErrors();
+  await connectionToggle.run(id, enabled);
+}
 
 // M2 §7.3: the row's own description glance — first line only, "" when unset.
 function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
@@ -154,7 +180,7 @@ const dbMcpEnabledId = useId();
         {{
           dbMcpTokenExpired
             ? 'Token expired — regenerate it above.'
-            : `Token valid until ${new Date(dbMcpStore.status.expiresAt).toLocaleString()}.`
+            : `Token valid until ${formatDateTime(dbMcpStore.status.expiresAt)}.`
         }}
       </FieldDescription>
     </template>

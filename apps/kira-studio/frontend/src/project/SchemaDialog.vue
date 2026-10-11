@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -38,13 +39,12 @@ const draft = ref('');
 // P12 round 1 finding #12: `draft` (the editor's own live doc) updates every keystroke, but the
 // parse summary below reads this instead — a full Lezer parse of the whole document (measured up
 // to ~58ms on a 200-table schema, against the app's own 50ms interaction budget) has no business
-// running on every keystroke. 400ms mirrors MonacoHost.vue's own marker (`setModelMarkers`) debounce
-// precedent. An external load (the watcher below) writes both refs immediately, with no delay —
-// only typing goes through the timer.
+// running on every keystroke. TIMING.preview, the same wait as MonacoHost.vue's marker debounce. An external load (the watcher
+// below) writes both refs immediately, with no delay — only typing goes through the timer.
 const debouncedDraft = ref('');
 const setDebouncedDraft = useDebounceFn((text: string) => {
   debouncedDraft.value = text;
-}, 400);
+}, TIMING.preview);
 onBeforeUnmount(() => setDebouncedDraft.cancel());
 
 const connectionId = computed(() => schemaDialogStore.connectionId);

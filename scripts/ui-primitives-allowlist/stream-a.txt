@@ -13,16 +13,6 @@ permanent U42 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # 
 permanent U61 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
 permanent U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Down row reorder chord, not list navigation
 permanent U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
-apps/kira-studio/frontend/src/bridge/port.ts
-apps/kira-studio/frontend/src/editor/MonacoHost.vue
-apps/kira-studio/frontend/src/project/ConnectionDialog.vue
-apps/kira-studio/frontend/src/project/FiltersDialog.vue
-apps/kira-studio/frontend/src/project/SchemaDialog.vue
-apps/kira-studio/frontend/src/project/credentialPaste/CredentialPastePanel.vue
-apps/kira-studio/frontend/src/project/filterTree.ts
-apps/kira-studio/frontend/src/project/state/tree.ts
-apps/kira-studio/frontend/src/state/runState.ts
-apps/kira-studio/frontend/src/state/schemas.ts
 apps/kira-studio/frontend/src/views/browse/BrowseView.vue
 apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue
 apps/kira-studio/frontend/src/views/console/ConsoleSavedMenu.vue
@@ -56,9 +46,3 @@ apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
 apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
 apps/kira-studio/frontend/src/views/stream/StreamView.vue
 apps/kira-studio/frontend/src/views/stream/search.ts
-apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue
-apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue
-apps/kira-studio/frontend/src/workbench/UploadObjectDialog.vue
-apps/kira-studio/frontend/src/workbench/settings/AdvancedPane.vue
-apps/kira-studio/frontend/src/workbench/settings/ApiPane.vue
-apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue

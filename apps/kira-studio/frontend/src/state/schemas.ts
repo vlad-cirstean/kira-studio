@@ -42,7 +42,6 @@ function commitDdl(connectionId: string, ddl: string): void {
 export function schemaQueryOptions(connectionId: string): {
   queryKey: readonly ['schema', string];
   queryFn: () => Promise<string>;
-  staleTime: number;
 } {
   return {
     queryKey: schemaQueryKey(connectionId),
@@ -57,7 +56,6 @@ export function schemaQueryOptions(connectionId: string): {
       }
       return ddl;
     },
-    staleTime: Number.POSITIVE_INFINITY, // the Go side pushes onSchemaChanged — never stale silently
   };
 }
 

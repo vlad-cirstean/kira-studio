@@ -5,6 +5,7 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { formatCount } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
 import {
   type ApiSettings,
@@ -45,7 +46,7 @@ const requestTimeoutMsError = computed<string | null>(() => {
   const v = props.draft.api.requestTimeoutMs;
   if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < REQUEST_TIMEOUT_MS_RANGE.min || v > REQUEST_TIMEOUT_MS_RANGE.max) {
-    return `${REQUEST_TIMEOUT_MS_RANGE.min}–${REQUEST_TIMEOUT_MS_RANGE.max.toLocaleString()} ms`;
+    return `${REQUEST_TIMEOUT_MS_RANGE.min}–${formatCount(REQUEST_TIMEOUT_MS_RANGE.max)} ms`;
   }
   return null;
 });

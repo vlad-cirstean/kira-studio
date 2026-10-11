@@ -36,6 +36,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -273,9 +275,7 @@ const minVersionNote = computed(() => {
 });
 
 const filteredKinds = computed(() => {
-  const q = engineSearch.value.trim().toLowerCase();
-  if (!q) return kinds;
-  return kinds.filter((kind) => KIND_LABEL[kind].toLowerCase().includes(q));
+  return kinds.filter((kind) => matchesQuery(KIND_LABEL[kind], engineSearch.value));
 });
 
 // P108 Part 12 F17: draft is edited in place (every field's v-model mutates the same reactive
@@ -423,7 +423,11 @@ const TAB_FOR_FIELD: Record<string, DetailTab> = {
 };
 
 // Guards a double click: two in-flight creates would insert two connections.
-const saving = ref(false);
+const {
+  run: runSave,
+  pending: saving,
+  error: saveError,
+} = useAsyncAction(() => connectionDialogStore.saveDialog());
 
 async function onSave(): Promise<void> {
   const d = draft.value;
@@ -447,14 +451,7 @@ async function onSave(): Promise<void> {
   // one while the new one is in flight; saveDialog() throws rather than returning null on
   // failure (see its own comment), so catching here is the one place a failed save is handled.
   connectionDialogStore.error = null;
-  saving.value = true;
-  try {
-    await connectionDialogStore.saveDialog();
-  } catch (err) {
-    connectionDialogStore.error = errorText(err);
-  } finally {
-    saving.value = false;
-  }
+  if (!(await runSave())) connectionDialogStore.error = saveError.value;
 }
 
 // P28 §5.6: mirrors setPort's own parse-on-input, same Input modelValue-type reason.
@@ -512,7 +509,6 @@ const maskRulesQuery = useQuery(() => ({
   queryKey: maskRulesQueryKey(editingConnectionId.value ?? ''),
   queryFn: () => loadMaskRules(editingConnectionId.value ?? ''),
   enabled: activeTab.value === 'Privacy' && !!editingConnectionId.value,
-  staleTime: Number.POSITIVE_INFINITY,
 }));
 const maskRules = computed(() => maskRulesQuery.data.value ?? []);
 

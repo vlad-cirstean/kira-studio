@@ -9,7 +9,8 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { errorText } from '@workbench/bridge/codedError';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { revealElement } from '@workbench/behaviour/focus';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import {
@@ -34,10 +35,19 @@ const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
 // Saving replaces the whole persisted set, so the draft must seed from the loaded set, never from
 // an empty default: Filters... is offered on connections that were never expanded.
-const loading = ref(false);
-const loadError = ref<string | null>(null);
-const saveError = ref<string | null>(null);
-const saving = ref(false);
+const {
+  run: runLoad,
+  pending: loading,
+  error: loadError,
+} = useAsyncAction((connectionId: string) => treeStore.loadVisibility(connectionId));
+const {
+  run: runSave,
+  pending: saving,
+  error: saveError,
+} = useAsyncAction(async (connectionId: string) => {
+  await treeStore.saveVisibility(connectionId, draft.value);
+  filtersDialogStore.closeFiltersDialog();
+});
 
 // D20: every ancestor segment of `path`, outermost first — mirrors state/tree.ts's own
 // revealPath() accumulation, since a dialog row and a tree row share the same path encoding.
@@ -60,17 +70,10 @@ watch(
     nameFilter.value = '';
     loadError.value = null;
     saveError.value = null;
-    loading.value = false;
     draft.value = EMPTY_VISIBILITY;
     if (!connectionId) return;
-    loading.value = true;
-    try {
-      await treeStore.loadVisibility(connectionId);
-    } catch (err) {
-      loadError.value = errorText(err);
-    }
+    await runLoad(connectionId);
     if (filtersDialogStore.connectionId !== connectionId) return;
-    loading.value = false;
     const existing = treeStore.visibility[connectionId];
     if (!existing) {
       loadError.value ??= 'Saved filters could not be loaded.';
@@ -82,9 +85,10 @@ watch(
     };
     if (!focusPath) return;
     await nextTick();
-    document
-      .querySelector(`[data-testid="filter-object-row"][data-path="${CSS.escape(focusPath)}"]`)
-      ?.scrollIntoView({ block: 'center' });
+    const row = document.querySelector(
+      `[data-testid="filter-object-row"][data-path="${CSS.escape(focusPath)}"]`,
+    );
+    if (row) revealElement(row);
   },
   { immediate: true },
 );
@@ -157,16 +161,7 @@ function noneKinds(): void {
 async function onSave(): Promise<void> {
   const connectionId = filtersDialogStore.connectionId;
   if (!connectionId || saving.value) return;
-  saving.value = true;
-  saveError.value = null;
-  try {
-    await treeStore.saveVisibility(connectionId, draft.value);
-    filtersDialogStore.closeFiltersDialog();
-  } catch (err) {
-    saveError.value = errorText(err);
-  } finally {
-    saving.value = false;
-  }
+  await runSave(connectionId);
 }
 
 // Title identity (FiltersDialog.html: "Tree filters — prod-analytics") — reads the name off

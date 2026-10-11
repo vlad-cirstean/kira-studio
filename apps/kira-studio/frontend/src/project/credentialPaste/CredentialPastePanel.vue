@@ -7,8 +7,10 @@ import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
-import { useDebounceFn, useTimeoutFn } from '@vueuse/core';
-import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
+import { TIMING } from '@workbench/behaviour/timing';
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue';
 import { type PasteCandidate, type PasteField, type PasteResult, parseCredentialPaste } from './parse';
 
 // The pasted text lives only in this component's refs: never in a store, localStorage, the op log
@@ -37,15 +39,27 @@ const showText = ref(false);
 const showPassword = ref(false);
 const result = ref<PasteResult | null>(null);
 const picks = ref<Partial<Record<PasteField, number>>>({});
-const input = useTemplateRef<{ $el: HTMLTextAreaElement }>('input');
+const input = useTemplateRef<HTMLElement>('input');
 
 function parseNow(): void {
   result.value = text.value === '' ? null : parseCredentialPaste(text.value, props.kind);
   picks.value = {};
 }
-const parseDebounced = useDebounceFn(parseNow, 150);
-// The paste event fires before the textarea value updates; parse on the next task.
-const { start: parseAfterPaste } = useTimeoutFn(parseNow, 0, { immediate: false });
+const parseDebounced = useDebounceFn(parseNow, TIMING.preview);
+// A paste parses at once instead of waiting out the typing debounce: the paste event fires before
+// the textarea value updates, so the flag defers to the model update that follows it.
+let pasted = false;
+function onPaste(): void {
+  pasted = true;
+}
+function onTextChange(): void {
+  if (!pasted) {
+    void parseDebounced();
+    return;
+  }
+  pasted = false;
+  void nextTick(parseNow);
+}
 
 function reset(): void {
   text.value = '';
@@ -55,7 +69,7 @@ function reset(): void {
   showPassword.value = false;
 }
 
-onMounted(() => input.value?.$el.focus());
+useFocusOnMount(input);
 onBeforeUnmount(reset);
 
 interface Row {
@@ -119,8 +133,8 @@ function onCancel(): void {
         data-1p-ignore
         data-lpignore="true"
         data-testid="paste-credentials-input"
-        @paste="parseAfterPaste()"
-        @update:model-value="parseDebounced()"
+        @paste="onPaste()"
+        @update:model-value="onTextChange()"
       />
     </div>
 

@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import { useConnectionsStore } from '../state/connections';
 import { isVisible, toSets } from './filter';
 import { isLeafKind, labelForKind } from './grouping';
@@ -52,7 +53,7 @@ export function kindRows(connectionId: string, v: TreeVisibility): FilterKindRow
   const connectionKind = connectionKindFor(connectionId);
   const hidden = new Set(v.hiddenKinds);
   return [...counts.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
+    .sort((a, b) => compareNatural(a[0], b[0]))
     .map(([kind, count]) => ({
       kind,
       label: connectionKind ? labelForKind(kind, connectionKind) : kind,
@@ -96,7 +97,7 @@ export function nodeRows(
   // Whether `node` or anything cached beneath it matches the name filter — used only when a
   // filter is active, to decide which branches survive and are force-expanded (D17).
   function matches(node: TreeNode): boolean {
-    if (node.name.toLowerCase().includes(query)) return true;
+    if (matchesQuery(node.name, query)) return true;
     return childrenOf(node)?.some(matches) ?? false;
   }
 

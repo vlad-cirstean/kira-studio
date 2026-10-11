@@ -7,6 +7,8 @@ import type { SavedFilterQuery } from '@shared/domain/queries';
 import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { refDebounced } from '@vueuse/core';
+import { matchesQuery } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { computed, reactive, shallowReactive, toRefs } from 'vue';
@@ -493,7 +495,7 @@ export const useTreeStore = defineStore('tree', () => {
     stats: SearchStats,
   ): boolean {
     const k = rowKey(connectionId, node.path);
-    const selfMatches = query ? node.name.toLowerCase().includes(query) : false;
+    const selfMatches = query ? matchesQuery(node.name, query) : false;
     // P19 D5: a table/view/matview is a leaf regardless of what a cached node's own hasChildren
     // says — its columns moved into the definition view, but an L1 payload cached before this
     // phase can still carry `hasChildren: true` until the connection's next reconnect. P41 adds
@@ -621,15 +623,14 @@ export const useTreeStore = defineStore('tree', () => {
   // for a large expanded schema or key-browser namespace, that's a full traversal of thousands of
   // nodes on every single keystroke SearchBox.vue/ProjectPanel.vue write into treeState.search
   // directly (so the input itself stays instantly responsive). debouncedQuery only updates
-  // SEARCH_DEBOUNCE_MS after typing settles, and searchResult (plus TreeRow.vue's own highlight,
+  // TIMING.search after typing settles, and searchResult (plus TreeRow.vue's own highlight,
   // via activeSearchQuery below) reads that instead, so a fast typist causes one recompute per pause
   // rather than one per character.
-  const SEARCH_DEBOUNCE_MS = 150;
   // P99 §9.3: refDebounced replaces the watch+setTimeout pair this used to hand-roll — the
   // trim/lowercase step moves to activeSearchQuery below, reactively, off the debounced value.
   const debouncedQuery = refDebounced(
     computed(() => treeState.search),
-    SEARCH_DEBOUNCE_MS,
+    TIMING.search,
   );
 
   // TreeRow.vue's highlightParts() needs the exact query that produced row.matched, not the live
@@ -666,7 +667,7 @@ export const useTreeStore = defineStore('tree', () => {
       descendantMatch = buildRows(conn.id, '', childNodes, 1, view, query, childOut, stats);
     }
 
-    const selfMatches = query ? conn.name.toLowerCase().includes(query) : false;
+    const selfMatches = query ? matchesQuery(conn.name, query) : false;
     if (query && !selfMatches && !descendantMatch) return null;
 
     const rowExpanded = query ? naturallyExpanded || descendantMatch : naturallyExpanded;

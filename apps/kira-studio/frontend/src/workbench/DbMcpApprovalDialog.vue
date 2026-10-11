@@ -2,6 +2,7 @@
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
@@ -47,7 +48,7 @@ const heavyLede = computed(() => {
   const plan = dbMcpStore.approval.pending?.plan;
   const pending = dbMcpStore.approval.pending;
   if (!pending || !plan || plan.estimatedRowsRead === null) return '';
-  return `${pending.connectionName} (${pending.kind}) wants to run a query estimated to read ${plan.estimatedRowsRead.toLocaleString()} rows — over your threshold of ${plan.thresholdRows.toLocaleString()}.`;
+  return `${pending.connectionName} (${pending.kind}) wants to run a query estimated to read ${formatCount(plan.estimatedRowsRead)} rows — over your threshold of ${formatCount(plan.thresholdRows)}.`;
 });
 
 // P108 Part 12 F2: takes the request id as an explicit argument, bound in the template from the
@@ -100,8 +101,8 @@ const DETAIL_CLASS = 'm-0 text-subtle';
         <div v-if="dbMcpStore.approval.pending.plan" class="flex flex-col gap-1" data-testid="db-mcp-approval-plan">
           <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-plan-rows">
             <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
-              Estimated {{ dbMcpStore.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
-              read — threshold {{ dbMcpStore.approval.pending.plan.thresholdRows.toLocaleString() }}.
+              Estimated {{ formatCount(dbMcpStore.approval.pending.plan.estimatedRowsRead) }} rows
+              read — threshold {{ formatCount(dbMcpStore.approval.pending.plan.thresholdRows) }}.
             </template>
             <template v-else> No row estimate available for this plan. </template>
           </p>

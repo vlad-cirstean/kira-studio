@@ -9,6 +9,8 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
@@ -55,14 +57,57 @@ const plans = ref<ColumnPlan[]>([]);
 
 const previewOpen = ref(false);
 const previewStatements = ref<string[]>([]);
-const previewLoading = ref(false);
-const previewError = ref<string | null>(null);
-
-const running = ref(false);
 const committedRows = ref(0);
 const runError = ref<string | null>(null);
 const currentOpId = ref<string | null>(null);
 let abortController: AbortController | null = null;
+let generationFailure: unknown = null;
+
+const {
+  run: runPreview,
+  pending: previewLoading,
+  error: previewError,
+} = useAsyncAction(async (connectionId: string, path: string) => {
+  // D10: the same seed as a real run, so this is literally the first rows that run would write.
+  const ops = await previewFirstRows(
+    plans.value,
+    seed.value,
+    Math.min(5, rowCount.value),
+    sqlDialect.value,
+  );
+  previewStatements.value = ops.length
+    ? (await data.preview({ connectionId, path, ops })).statements
+    : [];
+});
+
+// Failures are kept for onGenerate to word (GenerationError carries committed-row counts), so the
+// action itself resolves either way.
+const { run: runGenerate, pending: running } = useAsyncAction(
+  async (t: { connectionId: string; path: string; id: string }) => {
+    generationFailure = null;
+    abortController = new AbortController();
+    try {
+      await runGeneration({
+        connectionId: t.connectionId,
+        path: t.path,
+        tabId: t.id,
+        plans: plans.value,
+        total: rowCount.value,
+        seed: seed.value,
+        dialect: sqlDialect.value,
+        onBatchStart: (opId) => {
+          currentOpId.value = opId;
+        },
+        onProgress: (rows) => {
+          committedRows.value = rows;
+        },
+        signal: abortController.signal,
+      });
+    } catch (err) {
+      generationFailure = err;
+    }
+  },
+);
 
 // D9: recomputed on every plan change, not baked into recipeFor's own one-time proposal.
 const warnings = computed(() => planWarnings(plans.value, meta.value));
@@ -104,73 +149,37 @@ async function onTogglePreview(): Promise<void> {
   if (!previewOpen.value) return;
   const t = tab.value;
   if (!t?.connectionId) return;
-  previewLoading.value = true;
-  previewError.value = null;
-  try {
-    // D10: the same seed as a real run, so this is literally the first rows that run would write.
-    const ops = await previewFirstRows(
-      plans.value,
-      seed.value,
-      Math.min(5, rowCount.value),
-      sqlDialect.value,
-    );
-    previewStatements.value = ops.length
-      ? (await data.preview({ connectionId: t.connectionId, path: t.path, ops })).statements
-      : [];
-  } catch (err) {
-    previewError.value = errorText(err);
-  } finally {
-    previewLoading.value = false;
-  }
+  await runPreview(t.connectionId, t.path);
 }
 
 async function onGenerate(): Promise<void> {
   const t = tab.value;
   if (!t?.connectionId || running.value || noUsableColumns.value) return;
-  running.value = true;
   runError.value = null;
   committedRows.value = 0;
-  abortController = new AbortController();
-  try {
-    await runGeneration({
-      connectionId: t.connectionId,
-      path: t.path,
-      tabId: t.id,
-      plans: plans.value,
-      total: rowCount.value,
-      seed: seed.value,
-      dialect: sqlDialect.value,
-      onBatchStart: (opId) => {
-        currentOpId.value = opId;
-      },
-      onProgress: (rows) => {
-        committedRows.value = rows;
-      },
-      signal: abortController.signal,
-    });
-    running.value = false;
-    currentOpId.value = null;
+  await runGenerate({ connectionId: t.connectionId, path: t.path, id: t.id });
+  currentOpId.value = null;
+  const err = generationFailure;
+  if (err === null) {
     fakeDataStore.closeGenerateDataDialog();
     await gridViewStore.reloadAfterMutation(t.id);
-  } catch (err) {
-    running.value = false;
-    currentOpId.value = null;
-    if (err instanceof GenerationError) {
-      committedRows.value = err.committedRows;
-      const committedText = `${err.committedRows.toLocaleString()} row${err.committedRows === 1 ? '' : 's'}`;
-      // D7: the server's own message, how many rows already committed, and — read from
-      // caps.transactions, never assumed — whether the failing batch itself rolled back.
-      runError.value =
-        err.code === 'E_CANCELLED'
-          ? `Stopped — ${committedText} committed.`
-          : caps.value?.transactions
-            ? `${err.message} — ${committedText} committed before this batch, which was rolled back.`
-            : `${err.message} — ${committedText} committed before this batch. This connection has no transactions, so any rows the failing batch already wrote stay written.`;
-    } else {
-      runError.value = errorText(err);
-    }
-    if (committedRows.value > 0) await gridViewStore.reloadAfterMutation(t.id);
+    return;
   }
+  if (err instanceof GenerationError) {
+    committedRows.value = err.committedRows;
+    const committedText = `${formatCount(err.committedRows)} row${err.committedRows === 1 ? '' : 's'}`;
+    // D7: the server's own message, how many rows already committed, and — read from
+    // caps.transactions, never assumed — whether the failing batch itself rolled back.
+    runError.value =
+      err.code === 'E_CANCELLED'
+        ? `Stopped — ${committedText} committed.`
+        : caps.value?.transactions
+          ? `${err.message} — ${committedText} committed before this batch, which was rolled back.`
+          : `${err.message} — ${committedText} committed before this batch. This connection has no transactions, so any rows the failing batch already wrote stay written.`;
+  } else {
+    runError.value = errorText(err);
+  }
+  if (committedRows.value > 0) await gridViewStore.reloadAfterMutation(t.id);
 }
 
 function onStop(): void {

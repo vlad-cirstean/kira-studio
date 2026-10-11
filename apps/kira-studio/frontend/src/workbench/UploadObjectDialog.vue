@@ -7,8 +7,8 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatBytes } from '@workbench/behaviour/format';
-import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useObjectStoreStore } from '../state/objectStore';
@@ -26,8 +26,23 @@ const tabsStore = useTabsStore();
 const chosenFile = ref<{ path: string; name: string; size: number } | null>(null);
 const key = ref('');
 const contentType = ref('');
-const saving = ref(false);
-const error = ref<string | null>(null);
+const {
+  run: runUpload,
+  pending: saving,
+  error,
+} = useAsyncAction(async (connectionId: string, file: { path: string }) => {
+  const newPath = await objectStoreStore.uploadObject({
+    connectionId,
+    containerPath: objectStoreStore.containerPath,
+    key: key.value.trim(),
+    sourcePath: file.path,
+    contentType: contentType.value.trim() || 'application/octet-stream',
+    tabId: null,
+  });
+  browseInvalidate(connectionId, objectStoreStore.containerPath);
+  objectStoreStore.closeUploadDialog();
+  tabsStore.openKeyValueTab(connectionId, newPath, { newTab: true });
+});
 
 // P43 F1/D1: every ancestor `prefix` segment of the container path, joined — not just the last
 // one. A bucket has none; a one-level-nested container has one; `bucket/prefix:a/prefix:b` joins
@@ -62,25 +77,7 @@ async function onUpload(): Promise<void> {
   const connectionId = objectStoreStore.connectionId;
   const file = chosenFile.value;
   if (!connectionId || !file || !key.value.trim()) return;
-  saving.value = true;
-  error.value = null;
-  try {
-    const newPath = await objectStoreStore.uploadObject({
-      connectionId,
-      containerPath: objectStoreStore.containerPath,
-      key: key.value.trim(),
-      sourcePath: file.path,
-      contentType: contentType.value.trim() || 'application/octet-stream',
-      tabId: null,
-    });
-    browseInvalidate(connectionId, objectStoreStore.containerPath);
-    objectStoreStore.closeUploadDialog();
-    tabsStore.openKeyValueTab(connectionId, newPath, { newTab: true });
-  } catch (err) {
-    error.value = errorText(err);
-  } finally {
-    saving.value = false;
-  }
+  await runUpload(connectionId, file);
 }
 
 // Reset every time the dialog opens — a stale chosen file from a previous open must never carry
@@ -93,7 +90,6 @@ watch(
     key.value = '';
     contentType.value = '';
     error.value = null;
-    saving.value = false;
   },
 );
 </script>
