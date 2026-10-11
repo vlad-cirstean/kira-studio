@@ -1996,9 +1996,6 @@
         "label": "RAM"
       }
     },
-    "module": {
-      "title": "Docker"
-    },
     "mount": {
       "readOnly": {
         "label": "{type}, read-only"
@@ -3070,9 +3067,6 @@
       "stashShow": {
         "label": "Show changes"
       }
-    },
-    "module": {
-      "title": "Git"
     },
     "noRepository": {
       "notRepository": {
@@ -4267,9 +4261,6 @@
         "title": "Connect Claude Code"
       }
     },
-    "module": {
-      "title": "Memory"
-    },
     "panel": {
       "connectClaude": {
         "hint": "Connect Claude Code in the settings to let it store memories."
@@ -4381,9 +4372,6 @@
       "unreachable": {
         "error": "Can’t reach Kira Space."
       }
-    },
-    "module": {
-      "title": "Kira Space"
     },
     "needs": {
       "list": {
@@ -6533,9 +6521,6 @@
       "workflows": {
         "label": "Workflows"
       }
-    },
-    "module": {
-      "title": "Kira Space"
     },
     "repo": {
       "blame": {
@@ -9465,9 +9450,6 @@
       "studio": {
         "label": "Studio"
       }
-    },
-    "module": {
-      "title": "Kira Studio"
     },
     "operations": {
       "clear": {

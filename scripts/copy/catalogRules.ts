@@ -116,24 +116,7 @@ export const PROPER_NOUNS: readonly string[] = [
 ];
 
 /** Duplicate and near-duplicate groups that stay on purpose. Every entry names why. */
-export const ALLOWED_DUPLICATES: readonly DuplicateExemption[] = [
-  {
-    keys: ['space.module.title', 'mobile.module.title', 'common.product.kiraSpace'],
-    reason:
-      'Per-app module titles mirror the product name; the module title is a separate translation unit',
-  },
-  {
-    keys: [
-      '*.module.title',
-      'common.module.*',
-      'common.module.*.label',
-      'common.product.*',
-      'common.product.*.label',
-    ],
-    reason:
-      'F0 seed module titles overlap the shared vocabulary until F4 and the streams replace them',
-  },
-];
+export const ALLOWED_DUPLICATES: readonly DuplicateExemption[] = [];
 
 export const ROLES: ReadonlySet<string> = new Set([
   'label',

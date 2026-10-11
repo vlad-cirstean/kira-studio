@@ -87,7 +87,7 @@ async function refresh(): Promise<void> {
 <template>
   <div ref="rootEl" class="flex h-full flex-col" data-testid="docker-panel">
     <PanelHeader>
-      {{ t('docker.module.title') }}
+      {{ t('common.product.docker.label') }}
       <EndpointChip />
       <template #actions>
         <TooltipIconButton
