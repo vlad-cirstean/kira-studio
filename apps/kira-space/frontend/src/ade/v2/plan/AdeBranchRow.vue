@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, useTemplateRef } from 'vue';
@@ -57,13 +58,13 @@ function onMenu(ev: MouseEvent): void {
   ev.stopPropagation();
   const id = props.row.id;
   contextMenu.openContextMenu(ev, [
-    { type: 'label', label: `${props.row.repo} · ${props.row.name}` },
+    { type: 'label', label: t('space.ade.plan.branchRow.menuTitle.label', { name: props.row.name, repo: props.row.repo }) },
     ...(choice.value
       ? [
           {
             type: 'item' as const,
             id: 'ade-review-code',
-            label: 'Review code',
+            label: t('space.ade.board.taskMenu.reviewCode.label'),
             disabled: choice.value.disabled,
             hint: choice.value.tip,
             shortcut: 'ade.reviewCode' as const,
@@ -77,7 +78,7 @@ function onMenu(ev: MouseEvent): void {
     ...(!items
       ? []
       : items.length === 0
-      ? [{ type: 'item' as const, id: 'ade-fix-none', label: 'Nothing to fix', disabled: true, run: () => {} }]
+      ? [{ type: 'item' as const, id: 'ade-fix-none', label: t('space.ade.board.fixMenu.none.label'), disabled: true, run: () => {} }]
       : items.map((it) => ({
           type: 'item' as const,
           id: it.id,
@@ -159,10 +160,10 @@ const rowBgClass = computed(() => {
       /></Badge>
     </AdeTip>
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
-    <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">
+    <AdeTip v-if="row.isReview" :text="t('space.ade.plan.branchRow.review.tooltip')">
       <Badge variant="chip" :class="TONE_TAG_CLASS.blue" data-testid="ade-owner-pill">{{ row.branch.owner }}</Badge>
     </AdeTip>
-    <AdeTip v-if="row.branch.origin === 'agent'" text="Added or named by the agent">
+    <AdeTip v-if="row.branch.origin === 'agent'" :text="t('space.ade.agentOrigin.tooltip')">
       <span class="inline-flex shrink-0 text-subtle" data-testid="ade-branch-agent">
         <CodiconIcon name="sparkle" :size="13" />
       </span>
@@ -219,7 +220,7 @@ const rowBgClass = computed(() => {
     <TooltipIconButton
       v-if="choice"
       icon="git-compare"
-      label="Review code"
+        :label="t('space.ade.board.taskMenu.reviewCode.label')"
       class="size-5 shrink-0"
       :class="selected ? 'opacity-100' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'"
       disabled-trigger

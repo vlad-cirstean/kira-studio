@@ -1,6 +1,8 @@
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { Branch } from '../wire';
 import { type BranchGraph, isDraft, shortBranchName } from './branchGraph';
+import { catalogParts } from './catalogParts';
 
 export interface BaseMarker {
   /** `⑂` for a base inside the same task, else `⑂ <base without its first path segment>`. */
@@ -21,12 +23,16 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
   const p = parent === undefined ? undefined : graph.byBranch.get(parent);
   if (p) {
     const outside = p.taskId !== b.taskId;
-    const tip: TextPart[] = [
-      'starts from ',
-      base(p.name),
-      p.kind === 'review' ? ` (${p.owner}’s branch)` : outside ? ' (another task)' : '',
-      ', not main',
-    ];
+    const vars = { base: p.name };
+    const tip =
+      p.kind === 'review'
+        ? catalogParts('space.ade.baseMarker.startsFromOwner.tooltip', vars, { owner: p.owner })
+        : catalogParts(
+            outside
+              ? 'space.ade.baseMarker.startsFromOtherTask.tooltip'
+              : 'space.ade.baseMarker.startsFromNotMain.tooltip',
+            vars,
+          );
     return {
       label: outside ? ['⑂ ', base(shortBranchName(p.name))] : ['⑂'],
       tone: p.kind === 'review' ? 'blue' : 'grey',
@@ -39,7 +45,9 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
       ? {
           label: ['⑂ ', base(b.base || mainName)],
           tone: 'grey',
-          tip: ['starts from ', base(b.base || mainName)],
+          tip: catalogParts('space.ade.baseMarker.startsFrom.tooltip', {
+            base: b.base || mainName,
+          }),
           pending,
         }
       : null;
@@ -48,16 +56,18 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
   return {
     label: ['⑂ ', base(shortBranchName(b.base))],
     tone: owner ? 'blue' : 'grey',
-    tip: ['starts from ', base(b.base), owner ? ` (${owner}’s branch)` : '', ', not main'],
+    tip: owner
+      ? catalogParts('space.ade.baseMarker.startsFromOwner.tooltip', { base: b.base }, { owner })
+      : catalogParts('space.ade.baseMarker.startsFromNotMain.tooltip', { base: b.base }),
     pending,
   };
 }
 
-/** Second-line context of a branch not created yet: `no branch yet · from <base>`. */
+/** Second-line context of a branch not created yet: `No branch yet · from <base>`. */
 export function baseContext(b: Branch, graph: BranchGraph): string {
   if (!isDraft(b)) return '';
   const parent = graph.parentOf.get(b.id);
   const base =
     (parent !== undefined ? graph.byBranch.get(parent)?.name : undefined) || b.base || 'main';
-  return `no branch yet · from ${base}`;
+  return t('space.ade.baseMarker.draft.label', { base });
 }

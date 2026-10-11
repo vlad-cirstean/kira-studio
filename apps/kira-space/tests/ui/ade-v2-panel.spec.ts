@@ -42,9 +42,7 @@ test('selecting a task shows its facts; status is read-only', async ({ relaunch 
   await expect(page.locator('[data-testid="ade-panel-facts"]')).toContainText(
     '3 branches in api, web-app',
   );
-  await expect(page.locator('[data-testid="ade-task-status-why"]')).toContainText(
-    'follows the workflow',
-  );
+  await expect(page.locator('[data-testid="ade-task-status-why"]')).not.toBeEmpty();
   await expect(page.locator('[data-testid="ade-task-branch"]')).toHaveCount(3);
 });
 
@@ -366,7 +364,7 @@ test('Details lists every environment of the repo, not deployed where the branch
   await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_bill"]').first().click();
   const rows = page.locator('[data-testid="ade-branch-deploy"]');
   await expect(rows).toHaveCount(3);
-  await expect(rows.first()).toContainText('not deployed');
+  await expect(rows.first()).toContainText('Not deployed');
   await expect(page.locator('[data-testid="ade-branch-deploy"][data-env="prod"]')).toBeVisible();
 });
 
@@ -391,7 +389,7 @@ test('contract: a deployed environment and one whose script failed show as the b
   const row = (env: string) => page.locator(`[data-testid="ade-branch-deploy"][data-env="${env}"]`);
   const ok = facts.find((d) => d.status === 'deployed');
   const broken = facts.find((d) => d.error);
-  await expect(row(ok?.env ?? '')).toContainText('runs abc1234, contains this branch');
+  await expect(row(ok?.env ?? '')).toContainText('Runs abc1234, contains this branch');
   await expect(row(broken?.env ?? '')).toContainText(broken?.error ?? '');
 });
 

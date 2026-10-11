@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { AnyExtension } from '@tiptap/core';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
@@ -15,7 +16,7 @@ export function notesExtensions(): AnyExtension[] {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Placeholder.configure({ placeholder: 'Write notes…' }),
+    Placeholder.configure({ placeholder: t('space.ade.notes.placeholder.placeholder') }),
     Markdown,
   ];
 }

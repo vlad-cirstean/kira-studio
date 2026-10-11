@@ -168,7 +168,7 @@ async function discard(): Promise<void> {
         />
 
         <div v-if="baseBranch" class="flex items-center gap-2" data-testid="ade-dialog-base">
-          <span class="text-muted-foreground">{{ t('space.ade.claudeDialog.base.label') }}</span>
+          <span class="text-muted-foreground">{{ t('space.common.base.label') }}</span>
           <AdeBasePicker
             :code-repo-id="baseBranch.codeRepoId"
             :branch-id="baseBranch.id"

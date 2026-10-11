@@ -296,7 +296,7 @@ describe('per branch', () => {
         expect([b.id, flat(m?.label ?? [])]).toEqual([b.id, row.baseLabel]);
         if (m) {
           expect([b.id, m.tone === 'blue']).toEqual([b.id, row.baseStyle.includes('#93b6ff')]);
-          expect([b.id, flat(m.tip)]).toEqual([b.id, row.baseTip]);
+          expect([b.id, lc(flat(m.tip))]).toEqual([b.id, lc(row.baseTip)]);
         }
       }
     }
@@ -330,7 +330,7 @@ describe('branch second line', () => {
             .replace(/^(\S+): deployed sha unknown$/i, 'deployed sha of $1 unknown')
             .toLowerCase(),
         ];
-        expect([b.id, line.context]).toEqual([b.id, row.hasSub ? row.sub : '']);
+        expect([b.id, lc(line.context)]).toEqual([b.id, lc(row.hasSub ? row.sub : '')]);
         expect([b.id, line.merged.map(pick)]).toEqual([b.id, row.into.map(pick)]);
         expect([b.id, line.deployed.map(pick)]).toEqual([b.id, row.deploys.map(pick)]);
       }

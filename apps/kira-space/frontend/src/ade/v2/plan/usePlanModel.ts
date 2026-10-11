@@ -1,4 +1,5 @@
 import type { AgentActivity } from '@shared/domain/agent';
+import { t } from '@theme/i18n';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed, ref, watch } from 'vue';
@@ -45,7 +46,7 @@ export interface BranchRowModel {
   repo: string;
   base: BaseMarker | null;
   draft: boolean;
-  /** Branch name, `new branch` until created. */
+  /** Branch name, `New branch` until created. */
   name: string;
   isReview: boolean;
   /** Second line: `no branch yet · from main`, or a review item's PR title. */
@@ -120,7 +121,8 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
   const prog = taskProgress ? branchProgress(taskProgress, bid) : null;
   const line2 = branchLine2(br, graph, c.prTitle(bid));
   let context = '';
-  if (draft) context = `no branch yet · from ${parentName || br.base || 'main'}`;
+  if (draft)
+    context = t('space.ade.baseMarker.draft.label', { base: parentName || br.base || 'main' });
   else if (br.kind === 'review') context = c.prTitle(bid);
   return {
     id: bid,
@@ -129,7 +131,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
     repo: c.repoLabel(br.codeRepoId),
     base: baseMarker(br, graph, main),
     draft,
-    name: draft ? 'new branch' : br.name,
+    name: draft ? t('space.common.newBranch.label') : br.name,
     isReview: br.kind === 'review',
     context,
     tag: branchTag({

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type {
   BacklogPatch,
   MergedInto,
@@ -27,12 +28,14 @@ export function parseGithub(url: string): GithubLink | null {
 
 /** Why the status chip reads as it does (D10: status follows the workflow). */
 export function statusWhy(task: Task, status: DerivedStatus, progress: TaskProgress): string {
-  if (task.kind === 'review') return 'someone else’s branch';
-  if (task.kind === 'parked') return 'not merging';
-  if (progress.finished) return 'workflow finished';
-  if (status === 'Blocked') return 'a step is stuck or failed';
-  if (status === 'To do') return 'not started';
-  return progress.stage ? `${progress.stage.name} stage` : '';
+  if (task.kind === 'review') return t('space.ade.board.branchTag.review.tooltip');
+  if (task.kind === 'parked') return t('space.ade.board.branchTag.parked.tooltip');
+  if (progress.finished) return t('space.ade.panelFacts.why.finished.hint');
+  if (status === 'Blocked') return t('space.ade.panelFacts.why.stuck.hint');
+  if (status === 'To do') return t('space.ade.panelFacts.why.notStarted.hint');
+  return progress.stage
+    ? t('space.ade.panelFacts.why.stage.hint', { stage: progress.stage.name })
+    : '';
 }
 
 /** `Today–Wed 23 · 3 branches in api, web-app · 1/5 steps`. */
@@ -45,15 +48,20 @@ export function taskFacts(i: {
 }): string {
   const parts = [
     i.span,
-    `${i.branches} ${i.branches === 1 ? 'branch' : 'branches'}${i.repos.length ? ` in ${i.repos.join(', ')}` : ''}`,
+    i.repos.length
+      ? t('space.ade.panelFacts.branchesIn.label', { count: i.branches, repos: i.repos.join(', ') })
+      : t('space.ade.panelFacts.branches.label', { count: i.branches }),
   ];
-  if (i.steps > 0) parts.push(`${i.doneSteps}/${i.steps} steps`);
+  if (i.steps > 0)
+    parts.push(t('space.ade.panelFacts.steps.label', { count: i.steps, done: i.doneSteps }));
   return parts.join(' · ');
 }
 
 /** A remote operation's failure as one line: the remote's own words when it sent any. */
 export function remoteErrorText(e: RemoteOpError): string {
-  return e.remoteMessage ? `${e.message}: ${e.remoteMessage}` : e.message;
+  return e.remoteMessage
+    ? t('space.ade.remoteOp.failure.status', { message: e.message, remoteMessage: e.remoteMessage })
+    : e.message;
 }
 
 function countByTarget(merged: readonly MergedInto[]): Map<string, number> {
@@ -62,12 +70,13 @@ function countByTarget(merged: readonly MergedInto[]): Map<string, number> {
   return byTarget;
 }
 
-/** `3 refs changed · 1 merged into develop`; `no changes` when the fetch moved nothing. */
+/** `3 refs changed · 1 merged into develop`; `No changes` when the fetch moved nothing. */
 export function refreshNote(r: RepoRefresh): string {
   const byTarget = countByTarget(r.mergedInto);
-  if (r.refsChanged === 0 && byTarget.size === 0) return 'no changes';
-  const parts = [`${r.refsChanged} ${r.refsChanged === 1 ? 'ref' : 'refs'} changed`];
-  for (const [target, n] of byTarget) parts.push(`${n} merged into ${target}`);
+  if (r.refsChanged === 0 && byTarget.size === 0) return t('space.ade.refresh.noChanges.status');
+  const parts = [t('space.ade.refresh.refsChanged.status', { count: r.refsChanged })];
+  for (const [target, n] of byTarget)
+    parts.push(t('space.ade.refresh.mergedInto.status', { count: n, target }));
   return parts.join(' · ');
 }
 

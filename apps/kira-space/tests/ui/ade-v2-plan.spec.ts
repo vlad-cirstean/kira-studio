@@ -70,9 +70,9 @@ test('branch rows show base markers and the derived branch tags', async ({ relau
   expect(markers.map((m) => m.replace(/\s+/g, ''))).toContain('⑂search-schema');
   const tags = await page.locator('[data-testid="ade-tag"]').allInnerTexts();
   expect(tags).toContain('↓3 main');
-  expect(tags).toContain('checking…');
-  expect(tags).toContain('conflict check failed');
-  expect(tags).toContain('✕ setup failed');
+  expect(tags).toContain('Checking…');
+  expect(tags).toContain('Conflict check failed');
+  expect(tags).toContain('✕ Setup failed');
 });
 
 test('a repo chip hides and shows its branches', async ({ relaunch }) => {

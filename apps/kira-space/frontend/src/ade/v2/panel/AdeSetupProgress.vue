@@ -2,6 +2,7 @@
 import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
@@ -48,7 +49,7 @@ async function onRetry(): Promise<void> {
           data-testid="ade-setup-retry"
           @click="onRetry"
         >
-          Retry setup
+          {{ t('space.ade.setup.retry.label') }}
         </Button>
       </template>
       <AdeRunLog

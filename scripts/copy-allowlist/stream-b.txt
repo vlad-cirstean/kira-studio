@@ -1,30 +1,6 @@
 # Stream B (Kira Space, mobile, memory). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
 permanent U64 apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue # `z` is the waiting-on-monitor glyph, not text
-apps/kira-space/frontend/src/ade/v2/needs/AdeAllSessions.vue
-apps/kira-space/frontend/src/ade/v2/needs/AdeNeedsPage.vue
-apps/kira-space/frontend/src/ade/v2/needs/AdeNeedsRow.vue
-apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue
-apps/kira-space/frontend/src/ade/v2/notes/notesExtensions.ts
-apps/kira-space/frontend/src/ade/v2/panel/AdeArchivedPanel.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeChangesTab.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeEstimateField.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeLinkRow.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdePanel.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeRunOutcome.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeSetupProgress.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeStageBlock.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeStageMover.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeTaskPanel.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeTaskTab.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeWorkflowBlock.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeWorktreeSetup.vue
-apps/kira-space/frontend/src/ade/v2/panel/headerActions.ts
 apps/kira-space/frontend/src/ade/v2/panel/useLinkFields.ts
-apps/kira-space/frontend/src/ade/v2/plan/AdeAttention.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue
 apps/kira-space/frontend/src/ade/v2/plan/AdeDayControls.vue
 apps/kira-space/frontend/src/ade/v2/plan/AdeHistoryBar.vue
 apps/kira-space/frontend/src/ade/v2/plan/AdePlanHeader.vue

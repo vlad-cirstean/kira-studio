@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
 import { computed, ref } from 'vue';
 import type { Tone } from '../board/actions';
-import type { NeedsItem } from '../board/needsYou';
+import { type NeedsItem, needsActionLabel, needsKindLabel } from '../board/needsYou';
 import AdeRunLog from '../panel/AdeRunLog.vue';
 import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
 import { useNeedsAction } from './useNeedsAction';
@@ -40,7 +41,7 @@ const ROW_BG_CLASS: Record<Tone, string> = {
         class="w-23 shrink-0 whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm"
         :class="TONE_TAG_CLASS[item.tone]"
         data-testid="ade-needs-kind"
-        >{{ item.kind }}</span
+        >{{ needsKindLabel(item.kind) }}</span
       >
       <span class="w-19 shrink-0 text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ item.ageMs === null ? '' : formatRelative(0, item.ageMs) }}</span>
       <Button variant="dialog"
@@ -51,7 +52,7 @@ const ROW_BG_CLASS: Record<Tone, string> = {
         data-testid="ade-needs-action"
         @click="perform(item)"
       >
-        {{ item.action }}
+        {{ needsActionLabel(item.action) }}
       </Button>
       <span class="w-17.5 shrink-0 truncate text-kira-sm text-subtle" data-testid="ade-needs-scope">{{ item.scope }}</span>
       <div class="flex min-w-0 flex-1 flex-col">
@@ -65,7 +66,7 @@ const ROW_BG_CLASS: Record<Tone, string> = {
             data-testid="ade-needs-log"
             @click="logOpen = !logOpen"
           >
-            {{ logOpen ? 'Hide log' : 'Log' }}
+            {{ logOpen ? t('space.common.hideLog.label') : t('space.ade.needsPage.log.label') }}
           </Button>
         </span>
         <span v-if="item.detail" class="truncate text-kira-sm text-muted-foreground" data-testid="ade-needs-detail">{{ item.detail }}</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import AdeTip from '../AdeTip.vue';
 import type { NeedsItem } from '../board/needsYou';
 import { useNeedsAction } from '../needs/useNeedsAction';
@@ -20,7 +21,7 @@ function onClick(): void {
     <Button size="kira"
       type="button"
       variant="ghost"
-      aria-label="Needs you"
+      :aria-label="t('space.common.needsYou.label')"
       class="size-4.5 cursor-pointer rounded-full border-0 p-0 text-kira-sm font-extrabold shadow-[0_0_0_3px_var(--color-tone-amber-tint)]"
       :class="TONE_SOLID_CLASS.amber"
       :disabled="busy"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { TONE_TAG_CLASS } from '../tones';
@@ -19,9 +20,11 @@ function basename(path: string): string {
 
 const worktree = computed(() => {
   const b = props.branch;
-  if (b.name === '') return 'created on Start';
-  const where = b.worktree || 'no worktree';
-  return b.dirty.length ? `${where} · ${b.dirty.length} uncommitted` : where;
+  if (b.name === '') return t('space.ade.changes.createdOnStart.status');
+  const where = b.worktree || t('space.ade.changes.noWorktree.status');
+  return b.dirty.length
+    ? t('space.ade.changes.worktreeDirty.label', { where, count: b.dirty.length })
+    : where;
 });
 const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).join(', '));
 
@@ -35,9 +38,9 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
     data-testid="ade-changes-tab"
   >
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
-      <span class="text-muted-foreground">Base</span>
+      <span class="text-muted-foreground">{{ t('space.common.base.label') }}</span>
       <span class="font-data text-kira-sm">{{ base }} · ↑{{ branch.ahead }} ↓{{ branch.behind }}</span>
-      <span class="text-muted-foreground">Worktree</span>
+      <span class="text-muted-foreground">{{ t('space.common.worktree.label') }}</span>
       <span
         class="font-data text-kira-sm"
         :class="branch.dirty.length ? 'text-tone-amber' : undefined"
@@ -45,13 +48,13 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
         >{{ worktree }}</span
       >
       <template v-if="conflicts">
-        <span class="text-muted-foreground">Conflicts</span>
+        <span class="text-muted-foreground">{{ t('space.ade.changes.conflicts.label') }}</span>
         <span class="font-data text-kira-sm text-tone-red" data-testid="ade-changes-conflict">{{
           conflicts
         }}</span>
       </template>
       <template v-if="shared">
-        <span class="text-muted-foreground">Shares</span>
+        <span class="text-muted-foreground">{{ t('space.ade.changes.shares.label') }}</span>
         <span class="font-data text-kira-sm text-tone-amber" data-testid="ade-changes-shared">{{
           shared
         }}</span>
@@ -59,7 +62,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
     </div>
 
     <div v-if="branch.dirty.length" class="flex flex-col gap-0.5">
-      <div class="text-muted-foreground">Uncommitted</div>
+      <div class="text-muted-foreground">{{ t('space.ade.changes.uncommitted.label') }}</div>
       <div
         v-for="d in branch.dirty"
         :key="d.path"
@@ -72,7 +75,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
     </div>
 
     <div class="flex flex-col gap-0.5">
-      <div class="text-muted-foreground">Commits</div>
+      <div class="text-muted-foreground">{{ t('common.module.commits.label') }}</div>
       <div
         v-for="c in branch.commits"
         :key="c.sha"
@@ -83,12 +86,12 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
         <AdeTip :text="commitTitle(c)"><span class="truncate">{{ c.message }}</span></AdeTip>
       </div>
       <div v-if="branch.commitCount > branch.commits.length" class="text-kira-sm text-muted-foreground">
-        + {{ branch.commitCount - branch.commits.length }} more
+        {{ t('space.ade.changes.moreCommits.label', { count: branch.commitCount - branch.commits.length }) }}
       </div>
     </div>
 
     <div class="flex flex-col gap-0.5">
-      <div class="text-muted-foreground">Files</div>
+      <div class="text-muted-foreground">{{ t('common.module.files.label') }}</div>
       <div
         v-for="f in branch.files"
         :key="f.path"

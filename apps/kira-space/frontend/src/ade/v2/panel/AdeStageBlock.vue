@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -15,7 +16,7 @@ import { integrationChips } from '../board/labels';
 import type { StepRun } from '../board/progress';
 import { WAITING_SETUP_NOTES } from '../board/setupGate';
 import { nextStageId, type StageBlock } from '../board/stageBlocks';
-import type { CardModel } from '../plan/usePlanModel';
+import { type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useApprove, useRetryRun, useSetTaskStage } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -35,6 +36,9 @@ const retry = useRetryRun();
 const setStage = useSetTaskStage();
 const contextMenu = useContextMenuStore();
 const reviewCode = useReviewCode();
+const { model } = usePlanModel();
+const mainNameOf = (codeRepoId: string): string =>
+  model.value?.board.repos.find((r) => r.codeRepoId === codeRepoId)?.mainName ?? 'main';
 
 const error = ref('');
 const openLog = ref<string | null>(null);
@@ -54,13 +58,13 @@ function moveTo(stageId: string): void {
 function onMenu(ev: MouseEvent): void {
   ev.preventDefault();
   const live = props.card.task.runs.some((r) => r.state === 'running');
-  const hint = live ? 'Stop its running agents first' : undefined;
+  const hint = live ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : undefined;
   const items: MenuItem[] = [
     { type: 'label', label: props.block.stage.name },
     {
       type: 'item',
       id: 'ade-stage-move-here',
-      label: 'Move task here',
+      label: t('space.ade.stageBlock.moveHere.label'),
       disabled: current.value || skipped.value || live,
       hint: current.value || skipped.value ? undefined : hint,
       run: () => moveTo(props.block.stage.id),
@@ -70,7 +74,7 @@ function onMenu(ev: MouseEvent): void {
     items.push({
       type: 'item',
       id: 'ade-stage-skip-this',
-      label: 'Skip this stage',
+      label: t('space.ade.stageBlock.skipThis.label'),
       disabled: live,
       hint,
       run: () => moveTo(nextStageId(props.card.blocks, props.block.stage.id)),
@@ -90,7 +94,13 @@ const reportRun = (runId: string) => {
 };
 const heldRow = (rl: { run: { branchId: string }; note: string }) =>
   WAITING_SETUP_NOTES.includes(rl.note) ? props.card.rows.find((r) => r.id === rl.run.branchId) : undefined;
-const stateLabel = (s: StageBlock['state']): string => (s === 'now' ? 'now' : s);
+const STATE_LABEL = {
+  done: 'space.common.status.done.status',
+  now: 'space.ade.stageBlock.state.now.status',
+  next: 'common.action.next.label',
+  skipped: 'space.common.skipped.status',
+} as const satisfies Record<StageBlock['state'], MessageKey>;
+const stateLabel = (s: StageBlock['state']): string => t(STATE_LABEL[s]);
 
 const GLYPH_BOX: Record<string, string> = {
   done: 'bg-tone-green-solid text-bg',
@@ -142,7 +152,14 @@ const onReview = (branchId: string): void => {
   error.value = '';
   reviewCode.open(props.card.task.id, branchId, null, { onError: (msg) => (error.value = msg) });
 };
-const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
+const chipClass = (tone: 'muted' | 'stale' | 'unknown'): string => (tone === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
+function logToggleLabel(runId: string): string {
+  const open = openLog.value === runId;
+  if (props.block.stage.kind === 'script') {
+    return open ? t('space.ade.stageBlock.hideOutput.label') : t('space.ade.stageBlock.output.label');
+  }
+  return open ? t('space.common.hideLog.label') : t('space.ade.needsPage.log.label');
+}
 </script>
 
 <template>
@@ -187,7 +204,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           data-testid="ade-step-approve"
           @click="onApprove(sv.step.id)"
         >
-          Approve
+          {{ t('common.action.approve.label') }}
         </Button>
         <span class="shrink-0 text-kira-sm text-subtle">{{ sv.step.n }}.</span>
         <span
@@ -198,7 +215,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         >
         <SmartBadge v-if="sv.step.smartScript" />
         <span v-if="sv.routeText" data-testid="ade-step-route" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue">{{ sv.routeText }}</span>
-        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">needs approval</span>
+        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">{{ t('space.ade.stageBlock.needsApproval.status') }}</span>
         <AdeTip :text="sv.scope">
           <span
             class="min-w-0 shrink truncate text-kira-sm text-subtle"
@@ -224,7 +241,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-run-log-toggle"
             @click="openLog = openLog === rl.run.runId ? null : rl.run.runId"
           >
-            {{ block.stage.kind === 'script' ? (openLog === rl.run.runId ? 'Hide output' : 'Output') : openLog === rl.run.runId ? 'Hide log' : 'Log' }}
+            {{ logToggleLabel(rl.run.runId) }}
           </Button>
           <Button variant="dialog"
             v-if="canTakeOver(rl.run)"
@@ -235,7 +252,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-run-takeover"
             @click="takeOver.request(rl.run.sessionId)"
           >
-            Take over
+            {{ t('common.action.takeOver.label') }}
           </Button>
           <Button variant="dialog"
             v-if="rl.canRetry"
@@ -245,7 +262,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-run-retry"
             @click="onRetry(rl.run.runId)"
           >
-            Retry
+            {{ t('common.action.retry.label') }}
           </Button>
           <AdeTip v-if="rl.note" :text="rl.note">
             <span class="min-w-0 truncate text-kira-sm text-muted-foreground" data-testid="ade-run-note">{{ rl.note }}</span>
@@ -261,7 +278,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         <AdeRunOutcome
           v-if="reportRun(rl.run.runId)"
           :run="reportRun(rl.run.runId)!"
-          :title="`${block.stage.name} report`"
+          :title="t('space.ade.stageBlock.report.title', { stage: block.stage.name })"
           class="my-0.5 ml-6"
         />
         <div v-if="openLog === rl.run.runId && rl.run.runId" class="my-0.5 ml-6">
@@ -281,7 +298,9 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
       @click="ui.selectBranch(card.task.id, row.id)"
     >
       <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-medium" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{
-        row.branch.mergedIntoMain ? 'main ✓' : 'main —'
+        t(row.branch.mergedIntoMain ? 'space.ade.stageBlock.mainMerged.status' : 'space.ade.stageBlock.mainOpen.status', {
+          main: mainNameOf(row.branch.codeRepoId),
+        })
       }}</span>
       <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
         <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{ c.label }}</span>
@@ -308,7 +327,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-review-code"
             @click="onReview(row.id)"
           >
-            Review code
+            {{ t('space.ade.board.taskMenu.reviewCode.label') }}
           </Button>
         </TooltipDisabledTrigger>
       </AdeTip>

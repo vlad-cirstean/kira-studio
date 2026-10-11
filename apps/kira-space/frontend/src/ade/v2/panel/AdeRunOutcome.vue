@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
+import { type MessageKey, t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -54,8 +55,18 @@ const STATE_TONE: Record<string, Tone> = {
   running: 'blue',
   pending: 'grey',
 };
-const STATE_LABEL: Record<string, string> = { stuck: 'needs you', back: 'sent back' };
-const state = computed(() => STATE_LABEL[props.run.state] ?? props.run.state);
+const STATE_LABEL: Record<string, MessageKey> = {
+  done: 'space.common.status.done.status',
+  failed: 'common.state.failed.status',
+  stuck: 'space.common.needsYou.label',
+  back: 'space.ade.outcome.back.status',
+  running: 'common.state.running.status',
+  pending: 'space.common.pending.status',
+};
+const state = computed(() => {
+  const key = STATE_LABEL[props.run.state];
+  return key ? t(key) : props.run.state;
+});
 
 // A step's own result, shown next to the state; the implicit done and failed say nothing more.
 const result = computed(() => {
@@ -70,14 +81,26 @@ const route = computed(() => {
     case 'next':
       return '';
     case 'end':
-      return '→ end of stage';
+      return t('space.ade.outcome.routeEnd.label');
     case 'stop':
-      return 'stopped';
+      return t('space.ade.activity.stopped.status');
     case 'retry':
       return `↻ ${props.run.note}`;
     default:
       return r.startsWith('back:') ? `↩ ${props.run.note}` : `→ ${r}`;
   }
+});
+
+const endedBy = computed(() => {
+  const o = outcome.value;
+  if (!o) return '';
+  return [
+    t(o.reported ? 'space.ade.outcome.endedByReported.label' : 'space.ade.outcome.endedBy.label', {
+      source: o.source,
+    }),
+    ...(rebase.value?.aborted ? [t('space.ade.outcome.aborted.status')] : []),
+    ...(rebase.value?.inProgress ? [t('space.ade.outcome.inProgress.status')] : []),
+  ].join(' · ');
 });
 
 const short = (sha: string): string => sha.slice(0, 7);
@@ -114,19 +137,17 @@ function copy(): void {
       <span v-if="route" class="text-kira-sm text-muted-foreground" data-testid="ade-outcome-route">{{ route }}</span>
       <AdeChip
         v-if="rebase"
-        :label="rebase.verified ? 'verified' : 'not verified'"
+        :label="rebase.verified ? t('space.ade.outcome.verified.status') : t('space.ade.outcome.notVerified.status')"
         :tone="rebase.verified ? 'green' : 'amber'"
       />
       <span class="flex-1" />
       <Button size="kira" variant="ghost" class="text-muted-foreground" data-testid="ade-outcome-copy" @click="copy">
-        {{ copied ? 'Copied' : 'Copy for agent' }}
+        {{ copied ? t('common.copy.copied.announce') : t('space.ade.outcome.copyForAgent.label') }}
       </Button>
     </div>
     <p v-if="outcome?.reason" class="m-0 text-kira-md" data-testid="ade-outcome-reason">{{ outcome.reason }}</p>
     <p v-if="outcome" class="m-0 text-kira-sm text-subtle" data-testid="ade-outcome-source">
-      ended by {{ outcome.source }}{{ outcome.reported ? ' · reported by the agent' : '' }}
-      <template v-if="rebase?.aborted"> · aborted</template>
-      <template v-if="rebase?.inProgress"> · rebase still in progress</template>
+      {{ endedBy }}
     </p>
     <ul v-if="files.length" class="m-0 flex list-none flex-col gap-0.5 p-0 font-data text-kira-sm" data-testid="ade-outcome-files">
       <li v-for="f in files" :key="f" class="truncate text-tone-red">{{ f }}</li>
@@ -135,12 +156,12 @@ function copy(): void {
       <FieldError class="whitespace-pre-wrap font-data">{{ outcome.report.lastGitError }}</FieldError>
     </Card>
     <p v-if="outcome?.report?.tried" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-outcome-tried">
-      Tried: {{ outcome.report.tried }}
+      {{ t('space.ade.outcome.tried.label', { tried: outcome.report.tried }) }}
     </p>
     <div v-for="b in rebase?.branches ?? []" :key="b.branchId" class="flex items-center gap-1.5 font-data text-kira-sm" data-testid="ade-outcome-branch">
       <span class="min-w-0 truncate">{{ b.name }}</span>
       <span class="text-subtle">{{ short(b.before) }} → {{ short(b.after) }}</span>
-      <span v-if="!b.onBase" class="text-tone-amber">not on its base</span>
+      <span v-if="!b.onBase" class="text-tone-amber">{{ t('space.ade.outcome.notOnBase.status') }}</span>
     </div>
     <FieldError v-if="copyError">{{ copyError }}</FieldError>
     <div v-if="acts?.length" class="flex flex-wrap gap-1.5">
@@ -158,7 +179,7 @@ function copy(): void {
       </AdeTip>
     </div>
     <Button size="kira" variant="ghost" class="self-start text-muted-foreground" data-testid="ade-outcome-log-toggle" @click="showLog = !showLog">
-      {{ showLog ? 'Hide log' : 'Show log' }}
+      {{ showLog ? t('space.common.hideLog.label') : t('space.common.showLog.label') }}
     </Button>
     <AdeRunLog v-if="showLog" kind="run" :id="run.id" />
   </div>

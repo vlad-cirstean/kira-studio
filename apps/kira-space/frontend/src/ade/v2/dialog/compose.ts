@@ -210,8 +210,7 @@ export function mergeSpec(ctx: DialogCtx, branchId: string, target: string): Dia
 }
 
 export function stageSpec(ctx: DialogCtx, taskId: string): DialogSpec {
-  const stage =
-    taskOf(ctx, taskId)?.currentStage?.name ?? t('space.ade.claudeDialog.stageFallback.label');
+  const stage = taskOf(ctx, taskId)?.currentStage?.name ?? t('space.common.stage.label');
   return {
     kind: 'stage',
     title: t('space.ade.claudeDialog.stage.title', { stage }),

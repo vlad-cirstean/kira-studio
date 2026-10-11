@@ -4116,9 +4116,6 @@
         "finalizing": {
           "status": "Finalising"
         },
-        "pending": {
-          "status": "Pending"
-        },
         "skipped": {}
       },
       "files": {
@@ -4690,12 +4687,33 @@
           "label": "Add task"
         }
       },
+      "agentOrigin": {
+        "tooltip": "Added or named by the agent"
+      },
       "allSessions": {
         "archived": {
           "status": "Stopped · archived"
         },
+        "empty": {
+          "empty": "No sessions"
+        },
+        "running": {
+          "label": "Running {count}"
+        },
+        "stopped": {
+          "label": "Stopped {count}"
+        },
         "stuck": {
           "status": "Stuck · needs you"
+        },
+        "summaryInput": {
+          "label": "{count} needs input | {count} need input"
+        },
+        "summaryWaiting": {
+          "label": "{count} waiting on monitor"
+        },
+        "summaryWorking": {
+          "label": "{count} working"
         }
       },
       "automation": {
@@ -4752,6 +4770,23 @@
         },
         "selectHint": {
           "hint": "Select an item to add links and notes."
+        }
+      },
+      "baseMarker": {
+        "draft": {
+          "label": "No branch yet · from {base}"
+        },
+        "startsFrom": {
+          "tooltip": "Starts from {base}"
+        },
+        "startsFromNotMain": {
+          "tooltip": "Starts from {base}, not main"
+        },
+        "startsFromOtherTask": {
+          "tooltip": "Starts from {base} (another task), not main"
+        },
+        "startsFromOwner": {
+          "tooltip": "Starts from {base} ({owner}’s branch), not main"
         }
       },
       "basePicker": {
@@ -4922,6 +4957,9 @@
           "merge": {
             "label": "Merge into {target}"
           },
+          "none": {
+            "label": "Nothing to fix"
+          },
           "reMerge": {
             "label": "Re-merge into {target} (stale)"
           }
@@ -5079,15 +5117,121 @@
           "tooltip": "Task status"
         }
       },
+      "branchPanel": {
+        "back": {
+          "label": "← {title}"
+        },
+        "changes": {
+          "label": "Changes"
+        },
+        "copyBranchLink": {
+          "tooltip": "Copy branch link"
+        },
+        "copyPrLink": {
+          "tooltip": "Copy PR link"
+        },
+        "deployedTo": {
+          "label": "Deployed to"
+        },
+        "details": {
+          "label": "Details"
+        },
+        "draftTitle": {
+          "title": "New branch ({repo})"
+        },
+        "facts": {
+          "label": "{repo} · base {base} · ↑{ahead} ↓{behind}"
+        },
+        "hasChangesNotIn": {
+          "status": "Has changes not in {target}"
+        },
+        "lastRebase": {
+          "label": "Last rebase"
+        },
+        "merge": {
+          "label": "Merge"
+        },
+        "mergedInto": {
+          "label": "Merged into"
+        },
+        "noEnvironments": {
+          "emptyHint": "No environments configured for this repository."
+        },
+        "noIntegration": {
+          "emptyHint": "This repository has no integration branches besides main."
+        },
+        "pr": {
+          "label": "PR"
+        },
+        "preparing": {
+          "status": "Preparing"
+        },
+        "runs": {
+          "status": "Runs {sha}, contains this branch"
+        },
+        "runsStale": {
+          "status": "Runs {sha}"
+        },
+        "state": {
+          "closed": {
+            "status": "Closed"
+          },
+          "deployed": {
+            "status": "Deployed"
+          },
+          "draft": {
+            "status": "Draft"
+          },
+          "merged": {
+            "status": "Merged"
+          },
+          "notDeployed": {
+            "status": "Not deployed"
+          },
+          "notMerged": {
+            "status": "Not merged"
+          },
+          "open": {},
+          "stale": {
+            "status": "Stale"
+          },
+          "unknown": {
+            "status": "Unknown"
+          }
+        },
+        "upToDate": {
+          "status": "Up to date"
+        }
+      },
+      "changes": {
+        "conflicts": {
+          "label": "Conflicts"
+        },
+        "createdOnStart": {
+          "status": "Created on start"
+        },
+        "moreCommits": {
+          "label": "{count} more"
+        },
+        "noWorktree": {
+          "status": "No worktree"
+        },
+        "shares": {
+          "label": "Shares"
+        },
+        "uncommitted": {
+          "label": "Uncommitted"
+        },
+        "worktreeDirty": {
+          "label": "{where} · {count} uncommitted"
+        }
+      },
       "claudeDialog": {
         "archive": {
           "title": "Archive would lose work"
         },
         "autostash": {
           "label": "Autostash the uncommitted changes, rebase, then restore them"
-        },
-        "base": {
-          "label": "Base"
         },
         "busy": {
           "hint": "Agents are busy on branches this would rewrite. Wait until they’re idle or need input."
@@ -5165,9 +5309,6 @@
         "stage": {
           "title": "{stage} · interactive Claude Code"
         },
-        "stageFallback": {
-          "label": "Stage"
-        },
         "start": {
           "title": "Start Claude Code (interactive)"
         },
@@ -5178,9 +5319,50 @@
           "label": "Undo override"
         }
       },
+      "estimate": {
+        "days": {
+          "option": "Days"
+        },
+        "extend": {
+          "aria": "Extend estimate",
+          "label": "Extend"
+        },
+        "field": {
+          "label": "Estimate"
+        },
+        "hours": {
+          "option": "Hours"
+        },
+        "label": {},
+        "spans": {
+          "label": "Spans {count} day | Spans {count} days"
+        },
+        "unit": {
+          "aria": "Estimate unit"
+        }
+      },
       "forcePushConfirm": {
         "body": "Replaces the remote branch “{branch}” in {repo} with your local one. Refused when someone else pushed since your last fetch.",
         "title": "Force push?"
+      },
+      "header": {
+        "created": {
+          "label": "Created when the pipeline runs"
+        },
+        "startAgent": {
+          "label": "▶ Start agent"
+        }
+      },
+      "link": {
+        "copy": {
+          "tooltip": "Copy {label} link"
+        },
+        "field": {
+          "label": "{label} link"
+        },
+        "remove": {
+          "tooltip": "Remove {label} link"
+        }
       },
       "needs": {
         "action": {
@@ -5263,6 +5445,152 @@
           }
         }
       },
+      "needsPage": {
+        "empty": {
+          "emptyHint": "Nothing needs you right now."
+        },
+        "hideAll": {
+          "label": "Hide all sessions"
+        },
+        "log": {
+          "label": "Log"
+        },
+        "showAll": {
+          "label": "All sessions"
+        },
+        "summary": {
+          "label": "{count} item · oldest first, most urgent on top | {count} items · oldest first, most urgent on top"
+        }
+      },
+      "notes": {
+        "bold": {
+          "tooltip": "Bold"
+        },
+        "bulletedList": {
+          "tooltip": "Bulleted list"
+        },
+        "checklist": {
+          "tooltip": "Checklist"
+        },
+        "code": {
+          "tooltip": "Code"
+        },
+        "formatting": {
+          "aria": "Formatting"
+        },
+        "heading": {
+          "tooltip": "Heading"
+        },
+        "italic": {
+          "tooltip": "Italic"
+        },
+        "link": {
+          "tooltip": "Link"
+        },
+        "linkUrl": {
+          "example": "https://",
+          "label": "Link URL"
+        },
+        "numberedList": {
+          "tooltip": "Numbered list"
+        },
+        "placeholder": {
+          "placeholder": "Write notes"
+        }
+      },
+      "outcome": {
+        "aborted": {
+          "status": "Aborted"
+        },
+        "back": {
+          "status": "Sent back"
+        },
+        "copyForAgent": {
+          "label": "Copy for agent"
+        },
+        "endedBy": {
+          "label": "Ended by {source}"
+        },
+        "endedByReported": {
+          "label": "Ended by {source} · reported by the agent"
+        },
+        "inProgress": {
+          "status": "Rebase still in progress"
+        },
+        "notOnBase": {
+          "status": "Not on its base"
+        },
+        "notVerified": {
+          "status": "Not verified"
+        },
+        "routeEnd": {
+          "label": "→ End of stage"
+        },
+        "tried": {
+          "label": "Tried: {tried}"
+        },
+        "verified": {
+          "status": "Verified"
+        }
+      },
+      "panel": {
+        "archived": {
+          "label": "Archived"
+        },
+        "archivedTitle": {
+          "title": "Archived task"
+        },
+        "empty": {
+          "emptyHint": "Select a task to see its details."
+        },
+        "resize": {
+          "label": "Resize panel"
+        },
+        "sessionsTab": {
+          "label": "Sessions {count}"
+        }
+      },
+      "panelFacts": {
+        "branches": {
+          "label": "{count} branch | {count} branches"
+        },
+        "branchesIn": {
+          "label": "{count} branch in {repos} | {count} branches in {repos}"
+        },
+        "steps": {
+          "label": "{done}/{count} step | {done}/{count} steps"
+        },
+        "why": {
+          "finished": {
+            "hint": "The workflow is finished."
+          },
+          "notStarted": {
+            "hint": "Not started."
+          },
+          "stage": {
+            "hint": "In the {stage} stage."
+          },
+          "stuck": {
+            "hint": "A step is stuck or failed."
+          }
+        }
+      },
+      "plan": {
+        "band": {
+          "hours": {},
+          "off": {
+            "status": "Off"
+          }
+        },
+        "branchRow": {
+          "menuTitle": {
+            "label": "{name} in {repo}"
+          },
+          "review": {
+            "tooltip": "Someone else’s branch, read-only here"
+          }
+        }
+      },
       "rebase": {
         "abort": {
           "label": "Abort rebase",
@@ -5304,6 +5632,114 @@
           "tooltip": "Shares {file} with {base}; rebase onto it"
         }
       },
+      "refresh": {
+        "mergedInto": {
+          "status": "{count} merged into {target}"
+        },
+        "noChanges": {
+          "status": "No changes"
+        },
+        "refsChanged": {
+          "status": "{count} ref changed | {count} refs changed"
+        }
+      },
+      "remoteOp": {
+        "failure": {
+          "status": "{message} — {remoteMessage}"
+        }
+      },
+      "runLog": {
+        "empty": {
+          "empty": "No output yet"
+        },
+        "truncated": {
+          "status": "Earlier output dropped"
+        }
+      },
+      "setup": {
+        "retry": {
+          "label": "Retry setup"
+        },
+        "title": {
+          "label": "Worktree setup"
+        }
+      },
+      "stageBlock": {
+        "hideOutput": {
+          "label": "Hide output"
+        },
+        "mainMerged": {
+          "status": "{main} ✓"
+        },
+        "mainOpen": {
+          "status": "{main} —"
+        },
+        "moveHere": {
+          "label": "Move task here"
+        },
+        "needsApproval": {
+          "status": "Needs approval"
+        },
+        "output": {
+          "label": "Output"
+        },
+        "report": {
+          "title": "{stage} report"
+        },
+        "skipThis": {
+          "label": "Skip this stage"
+        },
+        "state": {
+          "next": {},
+          "now": {
+            "status": "Now"
+          }
+        }
+      },
+      "stageMover": {
+        "back": {
+          "tooltip": "Back one stage"
+        },
+        "next": {
+          "tooltip": "Next stage"
+        }
+      },
+      "taskPanel": {
+        "more": {
+          "label": "More actions"
+        },
+        "reviewNote": {
+          "body": "{owner}’s work. Read-only here; you can keep your own notes."
+        },
+        "someone": {
+          "label": "Someone"
+        },
+        "task": {
+          "label": "Task"
+        }
+      },
+      "taskTab": {
+        "addBranch": {
+          "label": "Add branch"
+        },
+        "addRepo": {
+          "aria": "Add a repository to this task",
+          "option": "Add repository…",
+          "tooltip": "Add a branch in this repository; created when work starts"
+        },
+        "githubPlaceholder": {
+          "placeholder": "Paste GitHub issue or PR link"
+        },
+        "issue": {
+          "label": "Issue"
+        },
+        "jiraPlaceholder": {
+          "placeholder": "Paste Jira link or key"
+        },
+        "notMerging": {
+          "hint": "Stays on the plan; never merged."
+        }
+      },
       "view": {
         "empty": {
           "hint": "Add repositories from the Git module to start planning agent work.",
@@ -5311,6 +5747,26 @@
         },
         "import": {
           "label": "Import repositories…"
+        }
+      },
+      "workflowBlock": {
+        "choose": {
+          "option": "Choose a workflow"
+        },
+        "edit": {
+          "label": "Edit workflows ↗"
+        },
+        "outdated": {
+          "status": "Updated, applies to new work only"
+        },
+        "outdatedHint": {
+          "hint": "This task runs the version of the workflow it started with."
+        },
+        "spaceTools": {
+          "label": "Kira Space tools"
+        },
+        "spaceToolsHint": {
+          "hint": "Agents in this workflow can declare repositories and request branches."
         }
       }
     },
@@ -5326,6 +5782,9 @@
       },
       "backlogEmpty": {
         "empty": "No backlog items yet"
+      },
+      "base": {
+        "label": "Base"
       },
       "claudeSession": {
         "label": "Claude {id}"
@@ -5353,6 +5812,12 @@
       "githubPr": {
         "label": "PR {ref}"
       },
+      "hideLog": {
+        "label": "Hide log"
+      },
+      "needsYou": {
+        "label": "Needs you"
+      },
       "needYou": {
         "label": "Need you"
       },
@@ -5365,6 +5830,9 @@
       "notes": {
         "label": "Notes"
       },
+      "pending": {
+        "status": "Pending"
+      },
       "plan": {
         "label": "Plan"
       },
@@ -5374,8 +5842,14 @@
       "reply": {
         "label": "Reply"
       },
+      "showLog": {
+        "label": "Show log"
+      },
       "skipped": {
         "status": "Skipped"
+      },
+      "stage": {
+        "label": "Stage"
       },
       "status": {
         "blocked": {
@@ -5393,6 +5867,12 @@
         "todo": {
           "status": "To do"
         }
+      },
+      "workflow": {
+        "label": "Workflow"
+      },
+      "worktree": {
+        "label": "Worktree"
       }
     },
     "module": {

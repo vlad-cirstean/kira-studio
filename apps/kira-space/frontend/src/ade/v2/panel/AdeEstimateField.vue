@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 
 // Estimate row. Unset: number plus an hours/days toggle, written on `change`. Set: extend-only
@@ -58,14 +59,16 @@ function extend(): void {
   extendBy.value = '';
 }
 
-const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
+const hint = computed(() =>
+  props.days > 1 ? t('space.ade.estimate.spans.label', { count: props.days }) : '',
+);
 </script>
 
 <template>
   <div class="flex flex-col gap-0.5">
     <div v-if="locked" class="flex min-h-row items-center gap-1.5">
       <span class="text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
-      <Label for="ade-estimate-extend" class="sr-only">Extend estimate</Label>
+      <Label for="ade-estimate-extend" class="sr-only">{{ t('space.ade.estimate.extend.aria') }}</Label>
       <Input
         id="ade-estimate-extend"
         v-model="extendBy"
@@ -76,7 +79,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         class="w-20"
         data-testid="ade-estimate-extend"
       />
-      <span class="text-kira-sm text-muted-foreground">{{ parsed.unit === 'd' ? 'days' : 'hours' }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{ parsed.unit === 'd' ? t('space.ade.estimate.days.option') : t('space.ade.estimate.hours.option') }}</span>
       <Button
         variant="dialog"
         size="kira-lg"
@@ -84,12 +87,12 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         data-testid="ade-estimate-extend-submit"
         @click="extend"
       >
-        Extend
+        {{ t('space.ade.estimate.extend.label') }}
       </Button>
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
     <div v-else class="flex min-h-row items-center gap-1.5">
-      <Label for="ade-est-num" class="sr-only">Estimate</Label>
+      <Label for="ade-est-num" class="sr-only">{{ t('space.ade.estimate.field.label') }}</Label>
       <Input
         id="ade-est-num"
         v-model="num"
@@ -102,7 +105,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         @change="commit"
       />
       <fieldset
-        aria-label="Estimate unit"
+        :aria-label="t('space.ade.estimate.unit.aria')"
         class="m-0 flex gap-0.5 border-0 p-0"
       >
         <!-- mousedown.prevent: a click would otherwise blur the number input first and commit with the stale unit. -->
@@ -113,7 +116,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
           @mousedown.prevent
           @click="pickUnit('h')"
         >
-          hours
+          {{ t('space.ade.estimate.hours.option') }}
         </Button>
         <Button
           :variant="unit === 'd' ? 'dialog' : 'ghost'"
@@ -122,7 +125,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
           @mousedown.prevent
           @click="pickUnit('d')"
         >
-          days
+          {{ t('space.ade.estimate.days.option') }}
         </Button>
       </fieldset>
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>

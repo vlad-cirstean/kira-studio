@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
@@ -83,8 +84,8 @@ const subClass = computed(() => {
   return props.band.overflowHours > 0 && !props.band.isLater ? 'text-tone-red' : 'text-muted-foreground';
 });
 const sub = computed(() => {
-  if (props.band.dayOff) return 'off';
-  return props.band.hours ? `${props.band.hours}h` : '';
+  if (props.band.dayOff) return t('space.ade.plan.band.off.status');
+  return props.band.hours ? t('format.relative.unitHour', { count: props.band.hours }) : '';
 });
 const solidBorder = computed(
   () => props.band.isMonday || props.band.isLater || props.band.isToday,
@@ -153,7 +154,7 @@ const solidBorder = computed(
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
         >
-          Move to today
+          {{ t('space.ade.board.taskMenu.moveToday.label') }}
         </Button>
       </div>
       <div v-if="over" class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-red">

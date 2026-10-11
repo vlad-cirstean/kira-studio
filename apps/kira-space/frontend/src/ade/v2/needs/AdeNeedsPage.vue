@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import { usePlanModel } from '../plan/usePlanModel';
@@ -21,10 +22,10 @@ function taskOf(taskId: string): { title: string; color: string } {
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" data-testid="ade-needs-page">
     <PanelHeader>
-      Needs you
+      {{ t('space.common.needsYou.label') }}
       <template v-if="needs && !needs.empty" #actions>
         <span class="normal-case tracking-normal" data-testid="ade-needs-summary"
-          >{{ needs.items.length }} items · oldest first, most urgent on top</span
+          >{{ t('space.ade.needsPage.summary.label', { count: needs.items.length }) }}</span
         >
       </template>
     </PanelHeader>
@@ -38,12 +39,12 @@ function taskOf(taskId: string): { title: string; color: string } {
           :task-color="taskOf(n.taskId).color"
         />
         <div v-if="needs.empty" class="border-b border-border px-3 py-6 text-kira-lg text-tone-green" data-testid="ade-needs-empty">
-          Nothing needs you right now.
+          {{ t('space.ade.needsPage.empty.emptyHint') }}
         </div>
         <div class="flex items-center gap-2.5 border-b border-border px-3 py-2 text-kira-md text-muted-foreground">
           <span class="flex-1" data-testid="ade-needs-footer">{{ needs.footer }}</span>
           <Button variant="dialog" size="kira-lg" data-testid="ade-needs-all" @click="showAll = !showAll">
-            {{ showAll ? 'Hide all sessions' : 'All sessions' }}
+            {{ showAll ? t('space.ade.needsPage.hideAll.label') : t('space.ade.needsPage.showAll.label') }}
           </Button>
         </div>
       </template>

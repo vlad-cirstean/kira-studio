@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { stageMoves } from '../board/stageMoves';
@@ -28,7 +29,7 @@ const at = computed(() => moves.value.at);
 const prev = computed(() => moves.value.prev);
 const next = computed(() => moves.value.next);
 const live = computed(() => moves.value.live);
-const reason = computed(() => (live.value ? 'Stop its running agents first' : ''));
+const reason = computed(() => (live.value ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : ''));
 
 async function move(stageId: string): Promise<void> {
   error.value = '';
@@ -43,11 +44,11 @@ async function move(stageId: string): Promise<void> {
 <template>
   <div v-if="card.blocks.length" class="flex flex-col gap-1" data-testid="ade-stage-mover">
     <div class="flex items-center gap-1">
-      <span class="text-kira-sm text-muted-foreground">Stage</span>
+      <span class="text-kira-sm text-muted-foreground">{{ t('space.common.stage.label') }}</span>
       <TooltipIconButton
         icon="arrow-left"
-        :label="reason || 'Back one stage'"
-        aria-label="Back one stage"
+        :label="reason || t('space.ade.stageMover.back.tooltip')"
+        :aria-label="t('space.ade.stageMover.back.tooltip')"
         :disabled="live || !prev"
         disabled-trigger
         data-testid="ade-stage-back"
@@ -68,14 +69,14 @@ async function move(stageId: string): Promise<void> {
             :disabled="o.skipped"
             @select="move(o.id)"
           >
-            {{ o.name }}<span v-if="o.skipped" class="text-subtle"> (skipped)</span>
+            {{ o.name }}<span v-if="o.skipped" class="text-subtle"> {{ t('space.common.skipped.status') }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <TooltipIconButton
         icon="arrow-right"
-        :label="reason || 'Next stage'"
-        aria-label="Next stage"
+        :label="reason || t('space.ade.stageMover.next.tooltip')"
+        :aria-label="t('space.ade.stageMover.next.tooltip')"
         :disabled="live || !next"
         disabled-trigger
         data-testid="ade-stage-next"

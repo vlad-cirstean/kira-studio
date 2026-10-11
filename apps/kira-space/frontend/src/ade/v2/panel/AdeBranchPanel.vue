@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -56,13 +57,18 @@ const graph = computed(() => props.model.view.graph);
 const baseName = computed(() => baseNameOf(props.row, graph.value));
 const reviewChoice = computed(() => reviewCode.choiceOf(props.row));
 const reviewOff = computed(() => reviewCode.pending.value || !reviewChoice.value || reviewChoice.value.disabled);
-const facts = computed(
-  () => `${props.row.repo} · base ${baseName.value} · ↑${branch.value.ahead} ↓${branch.value.behind}`,
+const facts = computed(() =>
+  t('space.ade.branchPanel.facts.label', {
+    repo: props.row.repo,
+    base: baseName.value,
+    ahead: branch.value.ahead,
+    behind: branch.value.behind,
+  }),
 );
 const chipLabel = computed(() => {
   const state = branch.value.setup?.state;
-  if (state === 'running') return 'preparing';
-  return state === 'failed' ? 'setup failed' : props.row.tag.label;
+  if (state === 'running') return t('space.ade.branchPanel.preparing.status');
+  return state === 'failed' ? t('space.ade.needs.kind.setupFailed.label') : props.row.tag.label;
 });
 const setupFailed = computed(() => branch.value.setup?.state === 'failed');
 async function onRetrySetup(): Promise<void> {
@@ -133,6 +139,14 @@ const branchUrl = computed(() =>
   webUrl.value && branch.value.name ? `${webUrl.value}/tree/${branch.value.name}` : '',
 );
 const PR_TONE: Record<string, Tone> = { open: 'green', merged: 'purple', closed: 'red', draft: 'grey' };
+const PR_STATE = {
+  open: 'common.action.open.label',
+  merged: 'space.ade.branchPanel.state.merged.status',
+  closed: 'space.ade.branchPanel.state.closed.status',
+  draft: 'space.ade.branchPanel.state.draft.status',
+} as const satisfies Record<string, MessageKey>;
+const prStateLabel = (state: string): string => (state in PR_STATE ? t(PR_STATE[state as keyof typeof PR_STATE]) : state);
+const FORCE_PUSH_CMD = 'git push --force-with-lease';
 
 function copyLink(key: string, text: string): void {
   copiedKey.value = key;
@@ -180,10 +194,15 @@ const deployRows = computed((): Deployment[] => {
 const canMerge = computed(() => branch.value.kind === 'mine' && branch.value.name !== '');
 
 const INTO_TONE: Record<Integration['status'], Tone> = { merged: 'green', stale: 'amber', 'not merged': 'grey' };
+const INTO_STATUS = {
+  merged: 'space.ade.branchPanel.state.merged.status',
+  stale: 'space.ade.branchPanel.state.stale.status',
+  'not merged': 'space.ade.branchPanel.state.notMerged.status',
+} as const satisfies Record<Integration['status'], MessageKey>;
 function intoNote(i: Integration): string {
   if (i.note) return i.note;
-  if (i.status === 'merged') return 'up to date';
-  return i.status === 'stale' ? `has changes not in ${i.target}` : '';
+  if (i.status === 'merged') return t('space.ade.branchPanel.upToDate.status');
+  return i.status === 'stale' ? t('space.ade.branchPanel.hasChangesNotIn.status', { target: i.target }) : '';
 }
 
 const DEPLOY_TONE: Record<Deployment['status'], Tone> = {
@@ -192,9 +211,15 @@ const DEPLOY_TONE: Record<Deployment['status'], Tone> = {
   'not deployed': 'grey',
   unknown: 'grey',
 };
+const DEPLOY_STATUS = {
+  deployed: 'space.ade.branchPanel.state.deployed.status',
+  stale: 'space.ade.branchPanel.state.stale.status',
+  'not deployed': 'space.ade.branchPanel.state.notDeployed.status',
+  unknown: 'space.ade.branchPanel.state.unknown.status',
+} as const satisfies Record<Deployment['status'], MessageKey>;
 function deployNote(d: Deployment): string {
-  if (d.status === 'deployed') return `runs ${d.deployedSha}, contains this branch`;
-  if (d.status === 'stale') return d.note || `runs ${d.deployedSha}`;
+  if (d.status === 'deployed') return t('space.ade.branchPanel.runs.status', { sha: d.deployedSha });
+  if (d.status === 'stale') return d.note || t('space.ade.branchPanel.runsStale.status', { sha: d.deployedSha });
   return d.status === 'unknown' ? d.error : '';
 }
 </script>
@@ -202,11 +227,11 @@ function deployNote(d: Deployment): string {
 <template>
   <AdePanelFrame
     v-model="ui.branchTab"
-    title="Branch"
+    :title="t('common.field.branch.label')"
     :tabs="[
-      { value: 'details', label: 'Details' },
-      { value: 'changes', label: 'Changes' },
-      { value: 'sessions', label: `Sessions ${sessionCount}` },
+      { value: 'details', label: t('space.ade.branchPanel.details.label') },
+      { value: 'changes', label: t('space.ade.branchPanel.changes.label') },
+      { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },
     ]"
   >
     <template #header>
@@ -217,7 +242,7 @@ function deployNote(d: Deployment): string {
         data-testid="ade-panel-back"
         @click="ui.select(card.task.id)"
       >
-        ← {{ card.title }}
+        {{ t('space.ade.branchPanel.back.label', { title: card.title }) }}
       </Button>
       <div class="flex items-start gap-2">
         <span
@@ -229,7 +254,7 @@ function deployNote(d: Deployment): string {
         <AdeTip :text="row.tag.tip">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" />
         </AdeTip>
-        <AdeTip v-if="branch.origin === 'agent'" text="Added or named by the agent">
+        <AdeTip v-if="branch.origin === 'agent'" :text="t('space.ade.agentOrigin.tooltip')">
           <span class="mt-px inline-flex shrink-0 text-subtle" data-testid="ade-panel-agent">
             <CodiconIcon name="sparkle" :size="13" />
           </span>
@@ -238,7 +263,7 @@ function deployNote(d: Deployment): string {
           class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-medium leading-4.5"
           data-testid="ade-panel-title"
         >
-          {{ row.draft ? `new branch (${row.repo})` : branch.name }}
+          {{ row.draft ? t('space.ade.branchPanel.draftTitle.title', { repo: row.repo }) : branch.name }}
         </h3>
       </div>
       <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
@@ -255,9 +280,9 @@ function deployNote(d: Deployment): string {
           data-testid="ade-panel-retry-setup"
           @click="onRetrySetup"
         >
-          Retry setup
+          {{ t('space.ade.setup.retry.label') }}
         </Button>
-        <AdeTip v-if="canForcePush" text="git push --force-with-lease">
+        <AdeTip v-if="canForcePush" :text="FORCE_PUSH_CMD">
           <Button variant="dialog"
             size="kira-lg"
             
@@ -265,7 +290,7 @@ function deployNote(d: Deployment): string {
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
           >
-            Force push
+            {{ t('space.common.forcePush.label') }}
           </Button>
         </AdeTip>
         <template v-for="a in actions" :key="(a.kind === 'rebase' ? a.act.id : a.kind) + a.label">
@@ -318,7 +343,7 @@ function deployNote(d: Deployment): string {
       data-testid="ade-branch-details"
     >
       <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-        <span class="text-kira-sm text-muted-foreground">Branch</span>
+        <span class="text-kira-sm text-muted-foreground">{{ t('common.field.branch.label') }}</span>
         <div class="flex min-h-row min-w-0 items-center gap-2">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" wide />
           <template v-if="branch.name">
@@ -333,15 +358,15 @@ function deployNote(d: Deployment): string {
             <span class="flex-1" />
             <TooltipIconButton
               :icon="copied && copiedKey === 'branch' ? 'check' : 'copy'"
-              label="Copy Branch link"
+              :label="t('space.ade.branchPanel.copyBranchLink.tooltip')"
               class="shrink-0"
               @click="copyLink('branch', branchUrl || branch.name)"
             />
           </template>
         </div>
-        <span class="text-kira-sm text-muted-foreground">PR</span>
+        <span class="text-kira-sm text-muted-foreground">{{ t('space.ade.branchPanel.pr.label') }}</span>
         <div class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
-          <AdeChip :label="pr ? pr.state : 'none'" :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'" wide />
+          <AdeChip :label="pr ? prStateLabel(pr.state) : t('common.state.none.option')" :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'" wide />
           <template v-if="pr">
             <a
               :href="pr.url"
@@ -352,7 +377,7 @@ function deployNote(d: Deployment): string {
             <span class="min-w-0 flex-1 truncate text-kira-md">{{ pr.title }}</span>
             <TooltipIconButton
               :icon="copied && copiedKey === 'pr' ? 'check' : 'copy'"
-              label="Copy PR link"
+              :label="t('space.ade.branchPanel.copyPrLink.tooltip')"
               class="shrink-0"
               @click="copyLink('pr', pr.url)"
             />
@@ -362,10 +387,10 @@ function deployNote(d: Deployment): string {
 
       <AdeWorktreeSetup :row="row" />
 
-      <AdeRunOutcome v-if="lastRebase" :run="lastRebase" title="Last rebase" :acts="outcomeActs" listen />
+      <AdeRunOutcome v-if="lastRebase" :run="lastRebase" :title="t('space.ade.branchPanel.lastRebase.label')" :acts="outcomeActs" listen />
 
       <div class="flex flex-col gap-0.5">
-        <div class="pb-0.5 text-kira-sm text-muted-foreground">Merged into</div>
+        <div class="pb-0.5 text-kira-sm text-muted-foreground">{{ t('space.ade.branchPanel.mergedInto.label') }}</div>
         <div
           v-for="i in intoRows"
           :key="i.target"
@@ -373,7 +398,7 @@ function deployNote(d: Deployment): string {
           data-testid="ade-branch-into"
           :data-target="i.target"
         >
-          <AdeChip :label="i.status" :tone="INTO_TONE[i.status]" wide />
+          <AdeChip :label="t(INTO_STATUS[i.status])" :tone="INTO_TONE[i.status]" wide />
           <span class="font-data text-kira-md">{{ i.target }}</span>
           <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
           <Button variant="dialog"
@@ -385,16 +410,16 @@ function deployNote(d: Deployment): string {
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"
           >
-            {{ i.status === 'stale' ? 'Re-merge' : 'Merge' }}
+            {{ i.status === 'stale' ? t('space.ade.needs.action.reMerge.label') : t('space.ade.branchPanel.merge.label') }}
           </Button>
         </div>
         <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">
-          This repo has no integration branches besides main.
+          {{ t('space.ade.branchPanel.noIntegration.emptyHint') }}
         </div>
       </div>
 
       <div class="flex flex-col gap-0.5">
-        <div class="pb-0.5 text-kira-sm text-muted-foreground">Deployed to</div>
+        <div class="pb-0.5 text-kira-sm text-muted-foreground">{{ t('space.ade.branchPanel.deployedTo.label') }}</div>
         <div
           v-for="d in deployRows"
           :key="d.env"
@@ -402,12 +427,12 @@ function deployNote(d: Deployment): string {
           data-testid="ade-branch-deploy"
           :data-env="d.env"
         >
-          <AdeChip :label="d.status" :tone="DEPLOY_TONE[d.status]" wide />
+          <AdeChip :label="t(DEPLOY_STATUS[d.status])" :tone="DEPLOY_TONE[d.status]" wide />
           <span class="font-data text-kira-md">{{ d.env }}</span>
           <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{ deployNote(d) }}</span>
         </div>
         <div v-if="deployRows.length === 0" class="text-kira-md text-subtle">
-          No environments configured for this repo.
+          {{ t('space.ade.branchPanel.noEnvironments.emptyHint') }}
         </div>
       </div>
     </div>

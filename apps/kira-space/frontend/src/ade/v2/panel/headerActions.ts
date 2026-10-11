@@ -1,3 +1,5 @@
+import { t } from '@theme/i18n';
+import { plainText } from '@theme/varText';
 import type { Tone } from '../board/actions';
 import type { BranchGraph } from '../board/branchGraph';
 import { type RebaseAct, rebaseActs } from '../board/rebaseActions';
@@ -24,9 +26,6 @@ export interface HeaderInput {
   mainName: string;
 }
 
-const plain = (parts: readonly (string | { value: string })[]): string =>
-  parts.map((p) => (typeof p === 'string' ? p : p.value)).join('');
-
 const ACT_TONE: Record<RebaseAct['kind'], Tone> = {
   rebase: 'amber',
   queue: 'red',
@@ -36,7 +35,11 @@ const ACT_TONE: Record<RebaseAct['kind'], Tone> = {
 
 export function headerActions(i: HeaderInput): HeaderAction[] {
   const b = i.branch;
-  const review: HeaderAction = { kind: 'review', label: 'Review code', tone: 'grey' };
+  const review: HeaderAction = {
+    kind: 'review',
+    label: t('space.ade.board.taskMenu.reviewCode.label'),
+    tone: 'grey',
+  };
   const acts = rebaseActs({
     branch: b,
     graph: i.graph,
@@ -46,13 +49,13 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
   });
   const asHeader = (a: RebaseAct): HeaderAction => ({
     kind: 'rebase',
-    label: plain(a.label),
+    label: plainText(a.label),
     tone: ACT_TONE[a.kind],
     act: a,
   });
   if (b.name === '') {
     return [
-      { kind: 'created', label: 'Created when the pipeline runs', tone: 'grey' },
+      { kind: 'created', label: t('space.ade.header.created.label'), tone: 'grey' },
       ...acts.map(asHeader),
     ];
   }
@@ -62,14 +65,18 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
     if (g.status === 'stale') {
       out.push({
         kind: 'remerge',
-        label: `Re-merge into ${g.target}`,
+        label: t('space.ade.claudeDialog.reMerge.title', { target: g.target }),
         tone: 'amber',
         target: g.target,
       });
     }
   }
   const setupOk = b.setup === null || b.setup.state === 'ready';
-  if (!i.hadSession && setupOk) out.push({ kind: 'start', label: '▶ Start agent', tone: 'claude' });
-  out.push({ kind: 'automation', label: 'Run automation…', tone: 'grey' }, review);
+  if (!i.hadSession && setupOk)
+    out.push({ kind: 'start', label: t('space.ade.header.startAgent.label'), tone: 'claude' });
+  out.push(
+    { kind: 'automation', label: t('space.ade.board.taskMenu.runAutomation.label'), tone: 'grey' },
+    review,
+  );
   return out;
 }

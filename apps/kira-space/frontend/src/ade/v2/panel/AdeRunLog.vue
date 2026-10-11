@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import InlineState from '@theme/components/InlineState.vue';
 import { Card } from '@theme/components/ui/card';
+import { t } from '@theme/i18n';
 import { useFollowTail } from '@workbench/behaviour/followTail';
 import QueryState from '@workbench/components/QueryState.vue';
 import { computed, useTemplateRef } from 'vue';
@@ -39,8 +40,8 @@ function failed(c: LogChunk): boolean {
         <InlineState kind="error" data-testid="ade-run-log-error">{{ message }}</InlineState>
       </template>
       <template #default="{ data }">
-        <div v-if="data.truncated" class="text-subtle">… earlier output dropped</div>
-        <div v-if="data.chunks.length === 0" class="text-subtle">No output yet.</div>
+        <div v-if="data.truncated" class="text-subtle">{{ t('space.ade.runLog.truncated.status') }}</div>
+        <div v-if="data.chunks.length === 0" class="text-subtle">{{ t('space.ade.runLog.empty.empty') }}</div>
         <div
           v-for="c in data.chunks"
           :key="c.seq"

@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -54,7 +55,7 @@ const editor = useEditor({
   contentType: 'markdown',
   extensions: notesExtensions(),
   editorProps: {
-    attributes: { class: PROSE, 'aria-label': 'Notes' },
+    attributes: { class: PROSE, 'aria-label': t('space.common.notes.label') },
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null;
       const link = target?.closest('a');
@@ -113,44 +114,44 @@ const toolbar = computed<ToolbarButton[]>(() => {
   if (!ed) return [];
   const chain = () => ed.chain().focus();
   return [
-    { label: 'Bold', icon: 'bold', glyph: 'B', active: ed.isActive('bold'), run: () => chain().toggleBold().run() },
+    { label: t('space.ade.notes.bold.tooltip'), icon: 'bold', glyph: 'B', active: ed.isActive('bold'), run: () => chain().toggleBold().run() },
     {
-      label: 'Italic',
+      label: t('space.ade.notes.italic.tooltip'),
       icon: 'italic',
       glyph: 'I',
       active: ed.isActive('italic'),
       run: () => chain().toggleItalic().run(),
     },
-    { label: 'Code', icon: 'code', glyph: '</>', active: ed.isActive('code'), run: () => chain().toggleCode().run() },
+    { label: t('space.ade.notes.code.tooltip'), icon: 'code', glyph: '</>', active: ed.isActive('code'), run: () => chain().toggleCode().run() },
     {
-      label: 'Heading',
+      label: t('space.ade.notes.heading.tooltip'),
       icon: '',
       glyph: 'H',
       active: ed.isActive('heading', { level: 2 }),
       run: () => chain().toggleHeading({ level: 2 }).run(),
     },
     {
-      label: 'Bulleted list',
+      label: t('space.ade.notes.bulletedList.tooltip'),
       icon: 'list-unordered',
       glyph: '•',
       active: ed.isActive('bulletList'),
       run: () => chain().toggleBulletList().run(),
     },
     {
-      label: 'Numbered list',
+      label: t('space.ade.notes.numberedList.tooltip'),
       icon: 'list-ordered',
       glyph: '1.',
       active: ed.isActive('orderedList'),
       run: () => chain().toggleOrderedList().run(),
     },
     {
-      label: 'Checklist',
+      label: t('space.ade.notes.checklist.tooltip'),
       icon: 'checklist',
       glyph: '☐',
       active: ed.isActive('taskList'),
       run: () => chain().toggleTaskList().run(),
     },
-    { label: 'Link', icon: 'link', glyph: '🔗', active: ed.isActive('link'), run: openLink },
+    { label: t('space.ade.notes.link.tooltip'), icon: 'link', glyph: '🔗', active: ed.isActive('link'), run: openLink },
   ];
 });
 
@@ -196,10 +197,10 @@ function keepFocus(e: MouseEvent): void {
   <div class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-border-strong bg-bg">
     <div
       role="toolbar"
-      aria-label="Formatting"
+      :aria-label="t('space.ade.notes.formatting.aria')"
       class="flex shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1.5 py-1"
     >
-      <span class="px-1.5 text-kira-sm text-muted-foreground">Notes</span>
+      <span class="px-1.5 text-kira-sm text-muted-foreground">{{ t('space.common.notes.label') }}</span>
       <Button
         v-for="btn in toolbar"
         :key="btn.label"
@@ -217,17 +218,17 @@ function keepFocus(e: MouseEvent): void {
         <span v-else>{{ btn.glyph }}</span>
       </Button>
       <template v-if="linkOpen">
-        <Label for="ade-notes-link" class="sr-only">Link URL</Label>
+        <Label for="ade-notes-link" class="sr-only">{{ t('space.ade.notes.linkUrl.label') }}</Label>
         <Input
           id="ade-notes-link"
           v-model="linkUrl"
-          placeholder="https://"
+          :placeholder="t('space.ade.notes.linkUrl.example')"
           size="kira"
           class="ml-1 w-42.5 font-data"
           @keydown="onLinkKey"
         />
         <Button variant="dialog" size="kira" class="shrink-0" @mousedown="keepFocus" @click="applyLink"
-          >Add</Button
+          >{{ t('common.action.add.label') }}</Button
         >
       </template>
     </div>

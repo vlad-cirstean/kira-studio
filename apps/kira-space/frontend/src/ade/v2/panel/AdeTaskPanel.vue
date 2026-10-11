@@ -3,13 +3,13 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
-import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import AdeAutomationsBlock from '../automation/AdeAutomationsBlock.vue';
-import { archiveTip, STATUS_TONE } from '../board/actions';
+import { archiveTip, STATUS_TONE, statusLabel } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
 import { taskReviewTip } from '../board/reviewCode';
@@ -43,7 +43,7 @@ function openMore(ev: MouseEvent): void {
 }
 const reviewCode = useReviewCode();
 const choices = computed(() => reviewCode.choicesOf(props.card));
-const reviewTip = computed(() => [...taskReviewTip(choices.value), ` (${formatShortcut('ade.reviewCode')})`]);
+const reviewTip = computed(() => taskReviewTip(choices.value));
 const reviewDisabled = computed(() => reviewCode.pending.value || choices.value.every((c) => c.disabled));
 const notesError = ref('');
 
@@ -53,13 +53,15 @@ const quietArchive = computed(
 );
 
 const tone = computed(() => (props.card.parked ? 'grey' : STATUS_TONE[props.card.status]));
-const label = computed(() => (props.card.parked ? 'not merging' : props.card.status));
+const label = computed(() =>
+  props.card.parked ? t('space.ade.board.notMerging.label') : statusLabel(props.card.status),
+);
 
 const facts = computed(() => {
   const e = props.card.entry;
   const cal = props.model.cal;
   const span =
-    e.day === LATER ? 'Later' : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
+    e.day === LATER ? t('space.common.day.later.label') : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
   const repos: string[] = [];
   for (const row of props.card.rows) if (!repos.includes(row.repo)) repos.push(row.repo);
   const p = props.card.progress;
@@ -85,11 +87,11 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
 <template>
   <AdePanelFrame
     v-model="ui.taskTab"
-    title="Task"
+    :title="t('space.ade.taskPanel.task.label')"
     :tabs="[
-      { value: 'task', label: 'Task' },
-      { value: 'notes', label: 'Notes' },
-      { value: 'sessions', label: `Sessions ${sessionCount}` },
+      { value: 'task', label: t('space.ade.taskPanel.task.label') },
+      { value: 'notes', label: t('space.common.notes.label') },
+      { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },
     ]"
   >
     <template #actions>
@@ -102,7 +104,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           data-testid="ade-panel-archive"
           @click="dialogs.archive(card.task.id)"
         >
-          Archive
+          {{ t('space.common.archive.label') }}
         </Button>
       </AdeTip>
       <AdeTip v-if="choices.length" :parts="reviewTip">
@@ -114,13 +116,13 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
             data-testid="ade-panel-review"
             @click="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
           >
-            Review code
+            {{ t('space.ade.board.taskMenu.reviewCode.label') }}
           </Button>
         </TooltipDisabledTrigger>
       </AdeTip>
       <TooltipIconButton
         icon="ellipsis"
-        label="More actions"
+        :label="t('space.ade.taskPanel.more.label')"
         class="shrink-0"
         data-testid="ade-panel-more"
         @click="openMore"
@@ -155,7 +157,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         :class="TONE_TAG_CLASS.blue"
         data-testid="ade-panel-review-note"
       >
-        {{ card.task.owner || 'Someone' }}’s work. Read-only here: you can keep your own notes.
+        {{ t('space.ade.taskPanel.reviewNote.body', { owner: card.task.owner || t('space.ade.taskPanel.someone.label') }) }}
       </div>
     </template>
     <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />

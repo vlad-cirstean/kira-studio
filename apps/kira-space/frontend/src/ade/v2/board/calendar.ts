@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { Settings } from '../../../state/settingsDomain';
 
 // Calendar arithmetic shared by the ADE queue engines: integer day offsets from `today`, via
@@ -159,8 +160,8 @@ export function firstWork(cal: Calendar, k: number): number {
 }
 
 export function dayLabel(cal: Calendar, k: number): string {
-  if (k === LATER) return 'Later';
-  if (k === 0) return 'Today';
+  if (k === LATER) return t('space.common.day.later.label');
+  if (k === 0) return t('space.common.day.today.label');
   const p = dateParts(cal, k);
   return `${WD[p.dow]} ${p.date}`;
 }

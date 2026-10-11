@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -57,21 +58,21 @@ function openLink(e: MouseEvent): void {
         <span class="min-w-0 flex-1" />
         <TooltipIconButton
           :icon="copied ? 'check' : 'copy'"
-          :label="`Copy ${label} link`"
+          :label="t('space.ade.link.copy.tooltip', { label })"
           class="shrink-0"
           :data-testid="`${id}-copy`"
           @click="copy(url || text)"
         />
         <TooltipIconButton
           icon="close"
-          :label="`Remove ${label} link`"
+          :label="t('space.ade.link.remove.tooltip', { label })"
           class="shrink-0"
           :data-testid="`${id}-clear`"
           @click="emit('clear')"
         />
       </template>
       <template v-else>
-        <Label :for="id" class="sr-only">{{ label }} link</Label>
+        <Label :for="id" class="sr-only">{{ t('space.ade.link.field.label', { label }) }}</Label>
         <Input
           :id="id"
           v-model="draft"
@@ -88,7 +89,7 @@ function openLink(e: MouseEvent): void {
           :data-testid="`${id}-save`"
           @click="onSave"
         >
-          Save
+          {{ t('common.action.save.label') }}
         </Button>
       </template>
     </div>

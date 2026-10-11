@@ -5,6 +5,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
@@ -13,7 +14,7 @@ import { useRepos } from '../../../repo/state/reposQueries';
 import { repoTint } from '../../../state/coderepos';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
-import { STATUS_TONE, tagLabel } from '../board/actions';
+import { STATUS_TONE, statusLabel as statusText, tagLabel } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import { statusWhy, taskPatch } from '../board/panelFacts';
 import { type CardModel, usePlanModel } from '../plan/usePlanModel';
@@ -67,7 +68,9 @@ const nameEdit = useInlineEdit({
 const statusTone = computed(() =>
   props.card.parked ? 'grey' : STATUS_TONE[props.card.status],
 );
-const statusLabel = computed(() => (props.card.parked ? 'not merging' : props.card.status));
+const statusLabel = computed(() =>
+  props.card.parked ? t('space.ade.board.notMerging.label') : statusText(props.card.status),
+);
 const why = computed(() => statusWhy(task.value, props.card.status, props.card.progress));
 
 // ---- links
@@ -108,7 +111,7 @@ async function onAddRepo(value: unknown): Promise<void> {
 }
 
 function branchLabel(row: CardModel['rows'][number]): string {
-  return row.draft ? `new branch · ${row.context.replace(/^no branch yet · /, '')}` : row.name;
+  return row.draft ? row.context : row.name;
 }
 
 const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
@@ -120,7 +123,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     data-testid="ade-task-tab"
   >
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-      <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">Name</Label>
+      <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">{{ t('common.field.name.label') }}</Label>
       <Input
         id="ade-task-name"
         :model-value="nameEdit.text.value"
@@ -131,34 +134,34 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         @blur="nameEdit.onCommit"
         @keydown="nameEdit.onKeydown"
       />
-      <span class="text-kira-sm text-muted-foreground">Status</span>
+      <span class="text-kira-sm text-muted-foreground">{{ t('common.field.status.label') }}</span>
       <div class="flex min-h-row items-center gap-2">
         <AdeChip :label="statusLabel" :tone="statusTone" />
-        <span class="text-kira-sm text-subtle" data-testid="ade-task-status-why">follows the workflow: {{ why }}</span>
+        <span class="text-kira-sm text-subtle" data-testid="ade-task-status-why">{{ why }}</span>
       </div>
       <AdeLinkRow
         id="ade-task-jira"
-        label="Jira"
+        :label="t('common.product.jira.label')"
         chip=""
         :text="jira?.key ?? ''"
         :url="jira?.url ?? ''"
-        placeholder="paste Jira link or key"
+        :placeholder="t('space.ade.taskTab.jiraPlaceholder.placeholder')"
         :error="links.jiraError.value"
         @save="links.saveJira"
         @clear="links.clearJira"
       />
       <AdeLinkRow
         id="ade-task-github"
-        label="GitHub"
-        :chip="github?.kind ?? ''"
+        :label="t('common.product.github.label')"
+        :chip="github ? t(github.kind === 'PR' ? 'space.ade.branchPanel.pr.label' : 'space.ade.taskTab.issue.label') : ''"
         :text="github?.ref ?? ''"
         :url="github ? task.githubUrl : ''"
-        placeholder="paste GitHub issue or PR link"
+        :placeholder="t('space.ade.taskTab.githubPlaceholder.placeholder')"
         :error="links.githubError.value"
         @save="links.saveGithub"
         @clear="links.clearGithub"
       />
-      <span class="text-kira-sm text-muted-foreground">Estimate</span>
+      <span class="text-kira-sm text-muted-foreground">{{ t('space.ade.estimate.field.label') }}</span>
       <AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" />
       <template v-if="!review">
         <span />
@@ -169,8 +172,8 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-task-parked"
             @update:model-value="(v: boolean) => write({ kind: v ? 'parked' : 'task' })"
           />
-          <Label for="ade-task-parked" class="text-kira-md">Not merging</Label>
-          <span class="text-kira-sm text-subtle">stays on the plan, never merged</span>
+          <Label for="ade-task-parked" class="text-kira-md">{{ t('space.ade.board.notMerging.label') }}</Label>
+          <span class="text-kira-sm text-subtle">{{ t('space.ade.taskTab.notMerging.hint') }}</span>
         </div>
       </template>
     </div>
@@ -180,20 +183,20 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
 
     <div class="flex flex-col gap-0.5">
       <div class="flex items-center gap-2 pb-0.5">
-        <span class="text-kira-sm text-muted-foreground">Branches</span>
+        <span class="text-kira-sm text-muted-foreground">{{ t('common.module.branches.label') }}</span>
         <span class="flex-1" />
         <template v-if="!review">
-          <Label for="ade-add-repo" class="sr-only">Add a repo to this task</Label>
+          <Label for="ade-add-repo" class="sr-only">{{ t('space.ade.taskTab.addRepo.aria') }}</Label>
           <NativeSelect
             id="ade-add-repo"
             :model-value="addRepoValue"
             variant="default"
             class="max-w-50"
-            title="Add a new branch in this repo (created when work starts)"
+            :title="t('space.ade.taskTab.addRepo.tooltip')"
             data-testid="ade-add-repo"
             @update:model-value="onAddRepo"
           >
-            <option value="">+ Add repo…</option>
+            <option value="">{{ t('space.ade.taskTab.addRepo.option') }}</option>
             <option v-for="r in lackedRepos" :key="r.codeRepoId" :value="r.codeRepoId">
               {{ r.nickname || r.name }} · {{ r.name }}
             </option>
@@ -205,7 +208,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           data-testid="ade-add-branch"
           @click="addUi.openAttach(task.id, card.title)"
         >
-          + Add branch
+          {{ t('space.ade.taskTab.addBranch.label') }}
         </Button>
       </div>
       <Button size="kira"

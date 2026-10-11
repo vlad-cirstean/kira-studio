@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
+import { t } from '@theme/i18n';
 import { useElementSize, useParentElement } from '@vueuse/core';
 import { computed } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
@@ -43,7 +44,7 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
 
 <template>
   <ResizeHandle
-    label="Resize panel"
+    :label="t('space.ade.panel.resize.label')"
     data-testid="ade-panel-resize-handle"
     direction="reverse"
     :min="MIN_WIDTH"
@@ -61,7 +62,7 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
     </template>
     <AdeArchivedPanel v-else-if="archived" :entry="archived" />
     <p v-else class="p-5 text-kira-md text-muted-foreground" data-testid="ade-panel-empty">
-      Select a task to see its details.
+      {{ t('space.ade.panel.empty.emptyHint') }}
     </p>
   </aside>
 </template>

@@ -278,7 +278,7 @@ describe('ripple', () => {
     expect(r.branchIds.sort()).toEqual(['b_kid', 'b_sharer']);
     expect(r.taskIds.sort()).toEqual(['kid', 'sharer']);
     expect(r.text).toBe('rebase b_kid, b_sharer');
-    expect(rippleOf(v, { kind: 'task', id: 'sharer' }).text).toBe('nothing to rebase');
+    expect(rippleOf(v, { kind: 'task', id: 'sharer' }).text).toBe('Nothing to rebase');
   });
 
   test('a base cycle neither recurses without end nor drops its rows', () => {

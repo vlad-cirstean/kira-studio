@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { type MessageKey, t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import { ACTIVITY_RANK, type ActivityKind, activityLabel } from '../activity';
+import { ACTIVITY_RANK, type ActivityKind } from '../activity';
 import { usePlanModel } from '../plan/usePlanModel';
 import type { SessionView } from '../sessions/sessionView';
 import { useSessionViews } from '../sessions/useSessionViews';
@@ -11,6 +12,12 @@ import AdeAllSessionRow from './AdeAllSessionRow.vue';
 // Every session, grouped by task: Running or Stopped, most urgent group first (SPEC2 section 11).
 const { model } = usePlanModel();
 const { sessions, view } = useSessionViews();
+
+const SUMMARY = {
+  input: 'space.ade.allSessions.summaryInput.label',
+  working: 'space.ade.allSessions.summaryWorking.label',
+  waiting: 'space.ade.allSessions.summaryWaiting.label',
+} as const satisfies Partial<Record<ActivityKind, MessageKey>>;
 
 const filter = ref<'running' | 'stopped'>('running');
 const running = computed(() => sessions.value.filter((s) => s.state === 'running').length);
@@ -61,7 +68,7 @@ const summary = computed(() => {
   }
   return (['input', 'working', 'waiting'] as const)
     .filter((k) => counts.has(k))
-    .map((k) => ({ kind: k, text: `${counts.get(k)} ${activityLabel(k)}` }));
+    .map((k) => ({ kind: k, text: t(SUMMARY[k], { count: counts.get(k) ?? 0 }) }));
 });
 
 </script>
@@ -71,10 +78,10 @@ const summary = computed(() => {
     <div class="flex items-center gap-3.5">
       <div class="flex gap-1">
         <Button :variant="filter === 'running' ? 'dialog' : 'ghost'" size="kira-lg" data-testid="ade-all-running" @click="filter = 'running'">
-          Running {{ running }}
+          {{ t('space.ade.allSessions.running.label', { count: running }) }}
         </Button>
         <Button :variant="filter === 'stopped' ? 'dialog' : 'ghost'" size="kira-lg" data-testid="ade-all-stopped" @click="filter = 'stopped'">
-          Stopped {{ stopped }}
+          {{ t('space.ade.allSessions.stopped.label', { count: stopped }) }}
         </Button>
       </div>
       <div class="flex gap-3">
@@ -90,6 +97,6 @@ const summary = computed(() => {
       </div>
       <AdeAllSessionRow v-for="r in g.rows" :key="r.session.id" :view="r" :archived="g.archived" />
     </section>
-    <div v-if="groups.length === 0" class="p-3 text-kira-lg text-muted-foreground" data-testid="ade-all-empty">Nothing here.</div>
+    <div v-if="groups.length === 0" class="p-3 text-kira-lg text-muted-foreground" data-testid="ade-all-empty">{{ t('space.ade.allSessions.empty.empty') }}</div>
   </div>
 </template>

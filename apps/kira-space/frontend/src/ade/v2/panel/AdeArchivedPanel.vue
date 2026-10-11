@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
@@ -19,11 +20,11 @@ const repos = computed(() => props.entry.codeRepoIds.map(repoLabel).join(' · ')
 </script>
 
 <template>
-  <AdePanelFrame v-model="tab" title="Archived task" :tabs="[{ value: 'sessions', label: `Sessions ${count}` }]">
+  <AdePanelFrame v-model="tab" :title="t('space.ade.panel.archivedTitle.title')" :tabs="[{ value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count }) }]">
     <template #header>
       <div class="flex items-start gap-2">
         <span class="mt-1 box-border size-3 shrink-0 rounded-kira-xs bg-disabled" />
-        <AdeChip label="archived" tone="grey" />
+        <AdeChip :label="t('space.ade.panel.archived.label')" tone="grey" />
         <AdeTip :text="entry.title">
           <h3
             class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-medium leading-4.5"

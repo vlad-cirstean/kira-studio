@@ -5,6 +5,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
@@ -44,8 +45,8 @@ function edit(): void {
 <template>
   <div class="flex flex-col gap-1.5" data-testid="ade-workflow-block">
     <div class="flex items-center gap-2">
-      <span class="text-kira-sm text-muted-foreground">Workflow</span>
-      <Label for="ade-workflow-select" class="sr-only">Workflow</Label>
+      <span class="text-kira-sm text-muted-foreground">{{ t('space.common.workflow.label') }}</span>
+      <Label for="ade-workflow-select" class="sr-only">{{ t('space.common.workflow.label') }}</Label>
       <NativeSelect
         id="ade-workflow-select"
         variant="bordered"
@@ -53,20 +54,20 @@ function edit(): void {
         data-testid="ade-workflow-select"
         @update:model-value="pick"
       >
-        <option v-if="card.task.workflowId === ''" value="">Pick a workflow…</option>
+        <option v-if="card.task.workflowId === ''" value="">{{ t('space.ade.workflowBlock.choose.option') }}</option>
         <option v-for="v in valid" :key="v.wf.id" :value="v.wf.id">{{ v.wf.name }}</option>
       </NativeSelect>
       <Tooltip v-if="card.task.workflowOutdated">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="ade-workflow-outdated">updated — applies to new work only</Badge>
+          <Badge variant="warn" data-testid="ade-workflow-outdated">{{ t('space.ade.workflowBlock.outdated.status') }}</Badge>
         </TooltipTrigger>
-        <TooltipContent>This task runs the version of the workflow it started with.</TooltipContent>
+        <TooltipContent>{{ t('space.ade.workflowBlock.outdatedHint.hint') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="spaceTools">
         <TooltipTrigger as-child>
-          <Badge variant="info" data-testid="ade-workflow-space">Kira Space tools</Badge>
+          <Badge variant="info" data-testid="ade-workflow-space">{{ t('space.ade.workflowBlock.spaceTools.label') }}</Badge>
         </TooltipTrigger>
-        <TooltipContent>Agents in this workflow can declare repos and request branches.</TooltipContent>
+        <TooltipContent>{{ t('space.ade.workflowBlock.spaceToolsHint.hint') }}</TooltipContent>
       </Tooltip>
       <Button
         variant="link"
@@ -75,7 +76,7 @@ function edit(): void {
         data-testid="ade-edit-workflows"
         @click="edit"
       >
-        Edit workflows ↗
+        {{ t('space.ade.workflowBlock.edit.label') }}
       </Button>
     </div>
     <FieldError v-if="error" data-testid="ade-workflow-error">{{ error }}</FieldError>
