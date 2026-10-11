@@ -15,7 +15,15 @@ export function notesExtensions(): AnyExtension[] {
       link: { openOnClick: false, autolink: true },
     }),
     TaskList,
-    TaskItem.configure({ nested: true }),
+    TaskItem.configure({
+      nested: true,
+      a11y: {
+        checkboxLabel: (node) =>
+          node.textContent
+            ? t('space.ade.notes.taskItem.aria', { text: node.textContent })
+            : t('space.ade.notes.taskItemEmpty.aria'),
+      },
+    }),
     Placeholder.configure({ placeholder: t('space.ade.notes.placeholder.placeholder') }),
     Markdown,
   ];

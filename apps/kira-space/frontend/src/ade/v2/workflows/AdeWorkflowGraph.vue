@@ -158,6 +158,7 @@ const flowEdges = computed<Edge[]>(() =>
       sourceHandle: stage ? 'out' : e.sourceHandle,
       targetHandle: e.loop ? 'loop-in' : 'in',
       selectable: false,
+      ariaLabel: t('space.ade.workflows.graph.edge.aria', { source: e.source, target: e.target }),
       data,
     };
   }),

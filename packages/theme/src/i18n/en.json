@@ -5552,6 +5552,12 @@
         },
         "placeholder": {
           "placeholder": "Write notes"
+        },
+        "taskItem": {
+          "aria": "Checklist item: {text}"
+        },
+        "taskItemEmpty": {
+          "aria": "Empty checklist item"
         }
       },
       "outcome": {
@@ -6212,6 +6218,9 @@
         "graph": {
           "addStage": {
             "label": "Add stage"
+          },
+          "edge": {
+            "aria": "Connection from {source} to {target}"
           },
           "fixInYaml": {
             "label": "Fix it in YAML"
