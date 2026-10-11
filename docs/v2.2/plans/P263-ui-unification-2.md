@@ -882,3 +882,19 @@ Deviations:
 - `FieldRowsTable` selector is `input:not([type=checkbox])` (unquoted) to avoid the U28 literal.
 
 Open: see `P263-stream-a-findings.md` (WordWrapField Checkbox).
+
+## Stream B result
+
+Branch `p263-b`. Commits: B1 ce749a487, B2 cfcdb0034, B3 2b2c765a9, B4 c640b3768, B5 3f8797bc0, B6 sweep and baselines (this commit).
+
+Verify: `bash scripts/check-ui-primitives.sh`, `bun run lint`, `bun run typecheck` pass on every commit via hook. `stream-b.txt` holds only `permanent` lines. `bun run test:ui:space` minus Stream C specs: 348 passed. `test:ui:space-mobile`: 53 passed, 1 skipped. Visual: ade-workflow-graph and settings re-recorded and viewed, rerun clean.
+
+Deviations:
+- Status-bar items use `Button variant="toolbar" size="kira"` with size overrides.
+- Rows holding controls use `min-h-row`, not `h-row`. `h-9` became `h-row`.
+- Mobile Alerts use `strip`, status dot uses `StatusDot` with `aria-label`, so mobile specs assert `aria-label` not `title`. Release button `h-9` became `h-11` (44px).
+- AdeStepResults uses `Card variant="section"`: inset fill hides inner controls.
+- Permanent exemptions: U26 reviewDecorations.ts, U34 MobileQr.vue, U38 RepoFileView.vue, AdeActionCell.vue, AdeBranchRow.vue, ReplySheet.vue, TerminalScreen.vue, U37 AdeTaskCard.vue, U25 AdeRunLog.vue. Reasons in `stream-b.txt`.
+
+Left: see `P263-stream-b-findings.md`.
+

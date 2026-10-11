@@ -25,7 +25,8 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
     <Card
       v-for="r in step.results"
       :key="r.id"
-      class="gap-1"
+      variant="section"
+      class="gap-1 p-2"
       data-testid="ade-wf-result"
       :data-result="r.id"
     >
