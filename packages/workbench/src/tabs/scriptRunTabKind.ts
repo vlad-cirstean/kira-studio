@@ -4,6 +4,7 @@ import {
   scriptRunTabStateSchema,
   type TabScope,
 } from '@shared/domain/tabs';
+import { t } from '@theme/i18n';
 import { parseStateWith, type TabKindDef } from './types';
 
 /** The tab of one smart script run; its badge follows the run's state. `runState` reads the live
@@ -23,7 +24,7 @@ export function scriptRunTabKind<
 
   return {
     mode,
-    title: (tab) => (tab as RunRecord).state.label || 'Smart script',
+    title: (tab) => (tab as RunRecord).state.label || t('workbench.tabKind.smartScript.title'),
     icon: () => 'sparkle' as Icon,
     railColor: () => undefined,
     defaultState: (): RunState => ({ runId: '', label: '' }) as RunState,
@@ -33,15 +34,15 @@ export function scriptRunTabKind<
     badge: (tab) => {
       switch (runState((tab as RunRecord).state.runId)) {
         case 'running':
-          return { icon: 'loading', tooltip: 'Running' };
+          return { icon: 'loading', tooltip: t('common.state.running.status') };
         case 'done':
-          return { icon: 'check', tooltip: 'Succeeded' };
+          return { icon: 'check', tooltip: t('automations.run.state.done.status') };
         case 'failed':
-          return { icon: 'error', tooltip: 'Failed' };
+          return { icon: 'error', tooltip: t('common.state.failed.status') };
         case 'blocked':
-          return { icon: 'warning', tooltip: 'Needs you' };
+          return { icon: 'warning', tooltip: t('automations.run.state.blocked.status') };
         case 'waiting':
-          return { icon: 'bell', tooltip: 'Waiting for you' };
+          return { icon: 'bell', tooltip: t('automations.run.state.waiting.status') };
         default:
           return null;
       }

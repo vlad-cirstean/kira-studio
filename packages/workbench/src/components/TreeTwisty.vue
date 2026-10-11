@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import type { HTMLAttributes } from 'vue';
 
@@ -44,7 +45,7 @@ function onClick(e: MouseEvent): void {
       !hasChildren && 'invisible',
       props.class,
     )"
-    :aria-label="expanded ? 'Collapse' : 'Expand'"
+    :aria-label="expanded ? t('common.action.collapse.label') : t('common.action.expand.label')"
     :aria-expanded="ariaExpanded"
     :data-testid="testid"
     @click="onClick"

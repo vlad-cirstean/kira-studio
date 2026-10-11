@@ -1,21 +1,3 @@
 # Stream C (git-ui, docker-ui, workbench except memory/ and foundation files). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-packages/workbench/src/components/OpLogPanel.vue
-packages/workbench/src/components/SearchOptionToggles.vue
-packages/workbench/src/components/SettingsShell.vue
-packages/workbench/src/components/TabStrip.vue
-packages/workbench/src/components/TitleBarWindowActions.vue
-packages/workbench/src/components/TreeTwisty.vue
-packages/workbench/src/components/UpdateAvailableItem.vue
-packages/workbench/src/components/UpdateDialog.vue
-packages/workbench/src/components/WorkbenchShell.vue
-packages/workbench/src/components/opLog.ts
-packages/workbench/src/settings/fields/FontSizeField.vue
-packages/workbench/src/settings/fields/LogLevelField.vue
-packages/workbench/src/settings/fields/NotifyPromptsField.vue
-packages/workbench/src/settings/fields/RowDensityField.vue
-packages/workbench/src/settings/fields/WordWrapField.vue
-packages/workbench/src/tabs/scriptRunTabKind.ts
-packages/workbench/src/tabs/terminalTabKind.ts
-packages/workbench/src/util/collectionMenu.ts
 permanent U64 packages/workbench/src/automations/run/RunPreview.vue # `--tools` and `--allowedTools` are claude CLI flag names, shown as the command line
 permanent U64 packages/workbench/src/automations/smart/ToolsField.vue # `--allowedTools` is a claude CLI flag name, shown as the command line

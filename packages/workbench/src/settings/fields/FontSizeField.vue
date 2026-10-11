@@ -4,6 +4,7 @@ import { FONT_SIZE_RANGE } from '@shared/domain/settings';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, useId } from 'vue';
@@ -24,9 +25,9 @@ function onFontSizeInput(e: Event): void {
 
 const fontSizeError = computed<string | null>(() => {
   const v = props.appearance.fontSize;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isFinite(v)) return t('workbench.settings.fontSizeNumber.error');
   if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
-    return `${FONT_SIZE_RANGE.min}–${FONT_SIZE_RANGE.max} px`;
+    return t('workbench.settings.fontSizeRange.label', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max });
   }
   return null;
 });
@@ -41,10 +42,10 @@ const fieldId = useId();
 <template>
   <Field>
     <div class="flex items-center justify-between gap-1">
-      <Label :for="fieldId">Data font size</Label>
+      <Label :for="fieldId">{{ t('workbench.settings.fontSize.label') }}</Label>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         data-testid="settings-reset-appearance-fontSize"
         :disabled-trigger="isAtDefault('appearance', 'fontSize')"
         :disabled="isAtDefault('appearance', 'fontSize')"
@@ -64,6 +65,6 @@ const fieldId = useId();
     <FieldError v-if="fontSizeError" data-testid="settings-font-size-error">
       {{ fontSizeError }}
     </FieldError>
-    <FieldDescription v-else>{{ FONT_SIZE_RANGE.min }}–{{ FONT_SIZE_RANGE.max }} px</FieldDescription>
+    <FieldDescription v-else>{{ t('workbench.settings.fontSizeRange.label', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max }) }}</FieldDescription>
   </Field>
 </template>

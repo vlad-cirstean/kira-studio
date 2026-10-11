@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { t } from '@theme/i18n';
 
 // P113 F3: the match-case/whole-word/regex toggle trio — identical icons, labels, active-state
 // class and toggle shape — repeated across SearchToolbar.vue (the data views' find widget),
@@ -32,7 +33,7 @@ defineEmits<{
 <template>
   <TooltipIconButton
     icon="case-sensitive"
-    label="Match case"
+    :label="t('workbench.search.matchCase.label')"
     :class="{ 'bg-field text-fg': matchCase }"
     :aria-pressed="matchCase"
     :data-testid="matchCaseTestId ?? `${testidPrefix ?? ''}match-case`"
@@ -40,7 +41,7 @@ defineEmits<{
   />
   <TooltipIconButton
     icon="whole-word"
-    label="Whole word"
+    :label="t('workbench.search.wholeWord.label')"
     :class="{ 'bg-field text-fg': wholeWord }"
     :aria-pressed="wholeWord"
     :data-testid="`${testidPrefix ?? ''}whole-word`"
@@ -48,7 +49,7 @@ defineEmits<{
   />
   <TooltipIconButton
     icon="regex"
-    label="Regular expression"
+    :label="t('workbench.search.regex.label')"
     :class="{ 'bg-field text-fg': regex }"
     :aria-pressed="regex"
     :data-testid="`${testidPrefix ?? ''}regex`"

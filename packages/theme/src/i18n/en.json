@@ -4049,20 +4049,172 @@
     "bootFailure": {
       "title": "{product} couldn’t start"
     },
+    "collectionMenu": {
+      "move": {
+        "label": "Move to collection"
+      }
+    },
     "confirmDialog": {
       "title": "Confirm"
     },
     "module": {
       "title": "Workbench"
     },
+    "opLog": {
+      "cancel": {
+        "aria": "Cancel operation"
+      },
+      "copiedCommand": {
+        "announce": "Copied command"
+      },
+      "copiedError": {
+        "announce": "Copied error"
+      },
+      "copyCommand": {
+        "label": "Copy command"
+      },
+      "copyError": {
+        "label": "Copy error"
+      },
+      "error": {
+        "status": "Error"
+      },
+      "errorDetail": {
+        "label": "Failed: {value}"
+      },
+      "errors": {
+        "option": "Errors"
+      },
+      "filter": {
+        "aria": "Filter operations"
+      },
+      "none": {
+        "empty": "No operations yet"
+      }
+    },
+    "search": {
+      "matchCase": {
+        "label": "Match case"
+      },
+      "regex": {
+        "label": "Regular expression"
+      },
+      "wholeWord": {
+        "label": "Whole word"
+      }
+    },
+    "settings": {
+      "fontSize": {
+        "label": "Data font size"
+      },
+      "fontSizeNumber": {
+        "error": "Enter a number."
+      },
+      "fontSizeRange": {
+        "label": "{min}–{max} px"
+      },
+      "logLevelDebug": {
+        "option": "Debug"
+      },
+      "logLevelInfo": {
+        "option": "Info"
+      },
+      "logLevelWarn": {
+        "option": "Warn"
+      },
+      "notifyPrompts": {
+        "description": "Posts a system notification when a popup waits in a window that is not in front.",
+        "label": "Notify me when a popup waits for an answer"
+      },
+      "notifyTest": {
+        "label": "Send test notification"
+      },
+      "rowComfortable": {
+        "option": "Comfortable · 28 px"
+      },
+      "rowCompact": {
+        "option": "Compact · 22 px"
+      },
+      "rowHeight": {
+        "label": "Row height"
+      },
+      "wordWrap": {
+        "label": "Word wrap"
+      }
+    },
+    "shell": {
+      "resizeOps": {
+        "label": "Resize operations panel"
+      },
+      "resizeProject": {
+        "label": "Resize project panel"
+      }
+    },
     "showMore": {
       "remaining": {
         "label": "Show more ({count} remaining)"
       }
     },
+    "tabKind": {
+      "smartScript": {
+        "title": "Smart script"
+      }
+    },
     "tabStrip": {
+      "duplicate": {
+        "label": "Duplicate tab"
+      },
       "newTab": {
         "label": "New tab"
+      }
+    },
+    "terminal": {
+      "exited": {
+        "status": "Process exited with code {code}"
+      },
+      "startFailed": {
+        "error": "Couldn’t start the terminal."
+      }
+    },
+    "titleBar": {
+      "allowSleep": {
+        "tooltip": "Allow this Mac to sleep"
+      },
+      "keepAwake": {
+        "tooltip": "Keep this Mac awake"
+      },
+      "keepAwakeFailed": {
+        "error": "Couldn’t keep this Mac awake: {error}"
+      },
+      "newWindow": {
+        "label": "New window"
+      }
+    },
+    "update": {
+      "available": {
+        "label": "Update {version}",
+        "tooltip": "Version {latest} is available (you have {current})"
+      },
+      "dialog": {
+        "title": "{app} update"
+      },
+      "explain": {
+        "body": "Updating quits {app}, installs the new version into {folder}, then reopens it. If it doesn’t reopen within a few minutes, see {log}."
+      },
+      "install": {
+        "label": "Update"
+      },
+      "installDetails": {
+        "error": "Details: {log}."
+      },
+      "installing": {
+        "body": "Downloading and verifying {app} {version}. {app} quits once the new version is ready."
+      },
+      "later": {
+        "label": "Later"
+      },
+      "versions": {
+        "body": "{app} {latest} is available. You have {current}."
       }
     }
   }

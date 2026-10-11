@@ -111,5 +111,5 @@ test('a failed install shows the error and re-enables Try again', async ({ relau
 
   const install = window.locator('[data-testid="update-dialog-install"]');
   await expect(install).toBeEnabled();
-  await expect(install).toHaveText('Try again');
+  await expect(install).toHaveText('Retry');
 });

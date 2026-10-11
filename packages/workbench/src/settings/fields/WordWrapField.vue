@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldContent, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import { useId } from 'vue';
 
 // I2-18: the word-wrap checkbox row (checkbox, reset button) was byte-identical between
@@ -34,13 +35,13 @@ const wordWrapId = useId();
         @update:model-value="(v) => onWordWrapChange(v === true)"
       />
       <FieldContent>
-        <Label :for="wordWrapId">Word wrap</Label>
+        <Label :for="wordWrapId">{{ t('workbench.settings.wordWrap.label') }}</Label>
         <slot />
       </FieldContent>
     </Field>
     <TooltipIconButton
       icon="discard"
-      label="Reset to default"
+      :label="t('common.action.resetToDefault.label')"
       class="ml-auto"
       data-testid="settings-reset-appearance-wordWrap"
       :disabled-trigger="isAtDefault('appearance', 'wordWrap')"

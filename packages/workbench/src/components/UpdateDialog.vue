@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { AppUpdateStore } from '../state/createAppUpdateStore';
 
@@ -48,27 +49,24 @@ function onEscapeOrOutside(e: Event): void {
       @pointer-down-outside="onEscapeOrOutside"
     >
       <DialogHeader :closable="state !== 'installing'">
-        <DialogTitle>{{ store.appName }} update</DialogTitle>
+        <DialogTitle>{{ t('workbench.update.dialog.title', { app: store.appName }) }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody>
         <template v-if="state === 'installing'">
           <p class="m-0">
-            Downloading and verifying {{ store.appName }} {{ store.latestVersion }}…
-            {{ store.appName }} quits once the new version is ready.
+            {{ t('workbench.update.installing.body', { app: store.appName, version: store.latestVersion }) }}
           </p>
         </template>
         <template v-else>
           <p class="m-0" data-testid="update-dialog-versions">
-            {{ store.appName }} {{ store.latestVersion }} is available. You have
-            {{ store.currentVersion }}.
+            {{ t('workbench.update.versions.body', { app: store.appName, latest: store.latestVersion, current: store.currentVersion }) }}
           </p>
           <p class="m-0 text-subtle">
-            Updating quits {{ store.appName }}, installs the new version into /Applications, then
-            reopens it. If it doesn't reopen within a few minutes, see {{ store.installLogPath }}.
+            {{ t('workbench.update.explain.body', { app: store.appName, folder: '/Applications', log: store.installLogPath }) }}
           </p>
           <FieldError v-if="state === 'error'" data-testid="update-dialog-error">
-            {{ store.installError }} Details: {{ store.installLogPath }}.
+            {{ store.installError }} {{ t('workbench.update.installDetails.error', { log: store.installLogPath }) }}
           </FieldError>
         </template>
       </DialogBody>
@@ -81,7 +79,7 @@ function onEscapeOrOutside(e: Event): void {
             data-testid="update-dialog-cancel"
             @click="store.cancelInstall()"
           >
-            Cancel
+            {{ t('common.action.cancel.label') }}
           </Button>
         </template>
         <template v-else>
@@ -91,7 +89,7 @@ function onEscapeOrOutside(e: Event): void {
             data-testid="update-dialog-later"
             @click="store.later()"
           >
-            Later
+            {{ t('workbench.update.later.label') }}
           </Button>
           <Button
             variant="dialog-primary"
@@ -99,7 +97,7 @@ function onEscapeOrOutside(e: Event): void {
             data-testid="update-dialog-install"
             @click="store.install()"
           >
-            {{ state === 'error' ? 'Try again' : 'Update' }}
+            {{ state === 'error' ? t('common.action.retry.label') : t('workbench.update.install.label') }}
           </Button>
         </template>
       </DialogFooter>

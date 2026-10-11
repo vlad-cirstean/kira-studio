@@ -1,4 +1,5 @@
 import { type TabScope, type TerminalTabState, terminalTabStateSchema } from '@shared/domain/tabs';
+import { t } from '@theme/i18n';
 import { parseStateWith, type TabKindDef } from './types';
 
 export interface TerminalSessionStatus {
@@ -39,7 +40,7 @@ export function terminalTabKind<
     mode,
     title: (tab) => {
       const s = (tab as TerminalRecord).state;
-      return s.label || basename(s.cwd) || 'Terminal';
+      return s.label || basename(s.cwd) || t('common.module.terminal.label');
     },
     // 'terminal-bash', not 'terminal': the 'console' kind (a SQL console) already owns that glyph.
     // The launch kind shows in the title and the rail colour, not a second icon vocabulary.
@@ -67,15 +68,15 @@ export function terminalTabKind<
     menuExtras: () => [],
     // A script tab shows how its run is going; a plain shell has nothing to flag.
     badge: (tab) => {
-      const t = tab as TerminalRecord;
-      if (t.state.launchKind !== 'script') return null;
-      const s = sessionStatus(t.id);
+      const rec = tab as TerminalRecord;
+      if (rec.state.launchKind !== 'script') return null;
+      const s = sessionStatus(rec.id);
       if (!s) return null;
       if (s.status === 'starting' || s.status === 'running')
-        return { icon: 'loading', tooltip: 'Running' };
+        return { icon: 'loading', tooltip: t('common.state.running.status') };
       if (s.status === 'failed' || (s.exitCode ?? 0) !== 0)
-        return { icon: 'error', tooltip: 'Failed' };
-      return { icon: 'check', tooltip: 'Succeeded' };
+        return { icon: 'error', tooltip: t('common.state.failed.status') };
+      return { icon: 'check', tooltip: t('automations.run.state.done.status') };
     },
     parseState: parseStateWith(terminalTabStateSchema) as (raw: unknown) => TerminalState | null,
   };

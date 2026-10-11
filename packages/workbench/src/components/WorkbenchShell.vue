@@ -5,6 +5,7 @@
 // re-ran reka's layout on every ResizeObserver tick beside a virtualized SlickGrid). The handles
 // emit the size on release; a drag previews through local state, so the parent store sees one write.
 import { ResizeHandle } from '@theme/components/ui/resizable';
+import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import MainView from './MainView.vue';
 import TabStrip from './TabStrip.vue';
@@ -75,7 +76,7 @@ function commitOps(size: number): void {
       </div>
       <ResizeHandle
         v-if="projectVisible"
-        label="Resize project panel"
+        :label="t('workbench.shell.resizeProject.label')"
         :size="projectSize"
         :min="PROJECT_MIN_PX"
         :max="PROJECT_MAX_PX"
@@ -104,7 +105,7 @@ function commitOps(size: number): void {
 
     <template v-if="opsVisible">
       <ResizeHandle
-        label="Resize operations panel"
+        :label="t('workbench.shell.resizeOps.label')"
         axis="y"
         direction="reverse"
         :size="dockHeight"

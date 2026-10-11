@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogFooter as UiDialogFooter,
 } from '@theme/components/ui/dialog';
+import { t } from '@theme/i18n';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, reactive, ref } from 'vue';
 import { errorText } from '../bridge/codedError';
@@ -185,7 +186,7 @@ async function onSave(): Promise<void> {
   <Dialog :open="true" @update:open="(v) => !v && onDismiss()">
     <DialogContent size="xl" fixed-height data-testid="settings-dialog">
       <DialogHeader icon="gear" close-testid="settings-dialog-close">
-        <DialogTitle>Settings</DialogTitle>
+        <DialogTitle>{{ t('common.module.settings.label') }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody flush class="flex-row">

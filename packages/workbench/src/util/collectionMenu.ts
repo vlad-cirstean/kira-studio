@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { MenuItem } from '../state/contextMenu';
 
 export interface CollectionChoice {
@@ -21,7 +22,7 @@ export function moveToCollectionMenu(opts: {
     items.push({
       type: 'item',
       id: 'move-to-none',
-      label: 'No collection',
+      label: t('automations.dialog.script.noCollection.option'),
       checked: opts.current === null,
       disabled: !canMoveTo(null),
       run: () => opts.onMove(null),
@@ -42,7 +43,7 @@ export function moveToCollectionMenu(opts: {
     {
       type: 'item',
       id: 'move-to-new',
-      label: 'New collection',
+      label: t('automations.collection.new.label'),
       icon: 'new-folder',
       run: () => opts.onNew(),
     },
@@ -50,7 +51,7 @@ export function moveToCollectionMenu(opts: {
   return {
     type: 'submenu',
     id: 'move-to-collection',
-    label: 'Move to collection',
+    label: t('workbench.collectionMenu.move.label'),
     icon: 'folder-library',
     items,
   };

@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 
 // P119: hoisted from Kira Studio's own StatusBar.vue (same data-testid, same markup) —
@@ -12,8 +13,8 @@ const props = defineProps<{ latestVersion: string; currentVersion: string }>();
 
 const emit = defineEmits<(e: 'open') => void>();
 
-const tooltip = computed(
-  () => `Version ${props.latestVersion} is available. You have ${props.currentVersion}.`,
+const tooltip = computed(() =>
+  t('workbench.update.available.tooltip', { latest: props.latestVersion, current: props.currentVersion }),
 );
 </script>
 
@@ -28,7 +29,7 @@ const tooltip = computed(
         @click="emit('open')"
       >
         <CodiconIcon name="cloud-download" :size="13" />
-        Update {{ latestVersion }}
+        {{ t('workbench.update.available.label', { version: latestVersion }) }}
       </Button>
     </TooltipTrigger>
     <TooltipContent>{{ tooltip }}</TooltipContent>

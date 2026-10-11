@@ -1,5 +1,6 @@
 import type { OpLogRecord } from '@shared/domain/ops';
-import { copyAnnounced } from '../behaviour/clipboard';
+import { t } from '@theme/i18n';
+import { copyAndAnnounce } from '../behaviour/clipboard';
 import type { MenuItem } from '../state/contextMenu';
 
 // P132 Part 1 (§2.3): OpLogPanel.vue's own column contract — `columns` is a plain prop array
@@ -26,30 +27,32 @@ export function opLogMenuItems<R extends OpLogRecord>(
   record: R,
   cancel: () => void,
   canCancel = true,
-  copy: (text: string, opts: { what: string }) => Promise<boolean> = (text, { what }) =>
-    copyAnnounced(text, what),
+  copy: (text: string, opts: { message: string }) => Promise<boolean> = (text, { message }) =>
+    copyAndAnnounce(text, message),
 ): MenuItem[] {
   return [
     {
       type: 'item',
       id: 'copy-command',
-      label: 'Copy command',
+      label: t('workbench.opLog.copyCommand.label'),
       icon: 'copy',
       disabled: !record.command,
-      run: () => void copy(record.command ?? '', { what: 'command' }),
+      run: () =>
+        void copy(record.command ?? '', { message: t('workbench.opLog.copiedCommand.announce') }),
     },
     {
       type: 'item',
       id: 'copy-error',
-      label: 'Copy error',
+      label: t('workbench.opLog.copyError.label'),
       icon: 'copy',
       disabled: !record.error,
-      run: () => void copy(record.error ?? '', { what: 'error' }),
+      run: () =>
+        void copy(record.error ?? '', { message: t('workbench.opLog.copiedError.announce') }),
     },
     {
       type: 'item',
       id: 'cancel',
-      label: 'Cancel',
+      label: t('common.action.cancel.label'),
       icon: 'debug-stop',
       disabled: record.status !== 'running' || !canCancel,
       run: cancel,

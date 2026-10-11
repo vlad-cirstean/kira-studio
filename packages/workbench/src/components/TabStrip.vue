@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../behaviour/clipboard';
 import { revealElement } from '../behaviour/focus';
@@ -70,7 +71,7 @@ function closeItems(tab: TabLike): MenuItem[] {
     items.push({
       type: 'item',
       id: 'close',
-      label: 'Close',
+      label: t('common.action.close.label'),
       icon: 'close',
       // P21 D13: `tab.close` always closes the *active* tab, not the clicked one — printed anyway
       // (VS Code does the same on this exact row) since it's the keyboard route to this command.
@@ -82,7 +83,7 @@ function closeItems(tab: TabLike): MenuItem[] {
     items.push({
       type: 'item',
       id: 'close-others',
-      label: 'Close others',
+      label: t('common.action.closeOthers.label'),
       run: () => closeOthers(tab.id),
     });
   }
@@ -90,7 +91,7 @@ function closeItems(tab: TabLike): MenuItem[] {
     items.push({
       type: 'item',
       id: 'close-to-the-right',
-      label: 'Close to the right',
+      label: t('common.action.closeToTheRight.label'),
       run: () => closeToTheRight(tab.id),
     });
   }
@@ -98,7 +99,7 @@ function closeItems(tab: TabLike): MenuItem[] {
     items.push({
       type: 'item',
       id: 'close-all',
-      label: 'Close all',
+      label: t('common.action.closeAll.label'),
       run: () => closeAll(host.activeWorkspace.value),
     });
   }
@@ -114,7 +115,7 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
       {
         type: 'item',
         id: 'copy-name',
-        label: 'Copy name',
+        label: t('common.action.copyName.label'),
         icon: 'copy',
         run: () => copyText(titleFor(tab)),
       },
@@ -131,7 +132,7 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
           {
             type: 'item',
             id: 'duplicate-tab',
-            label: 'Duplicate tab',
+            label: t('workbench.tabStrip.duplicate.label'),
             icon: 'copy',
             run: () => void duplicateTab(tab.id),
           } as const,
@@ -140,7 +141,7 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
     {
       type: 'item',
       id: 'copy-name',
-      label: 'Copy name',
+      label: t('common.action.copyName.label'),
       icon: 'copy',
       run: () => copyText(titleFor(tab)),
     },
@@ -309,7 +310,7 @@ if (moveTab) {
           size="title"
           class="tab-close size-4 p-0"
           :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100'"
-          :aria-label="`Close ${titleFor(tab)}`"
+          :aria-label="t('docker.exec.close.tooltip', { title: titleFor(tab) })"
           data-testid="tab-close"
           @click="onClose($event, tab)"
         >

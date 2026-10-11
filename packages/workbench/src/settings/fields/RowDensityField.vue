@@ -3,6 +3,7 @@ import type { AppearanceSettings, RowDensity } from '@shared/domain/settings';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 
 // I2-18: the row-density button pair (compact/comfortable) was byte-identical between kira-studio's
 // and kira-space's own AppearancePane.vue; each app's own helper text and (kira-studio only) preview
@@ -14,8 +15,8 @@ const props = defineProps<{
 }>();
 
 const DENSITY_ITEMS = [
-  { value: 'compact', label: 'Compact · 22 px', testid: 'settings-appearance-rowDensity-compact' },
-  { value: 'comfortable', label: 'Comfortable · 28 px', testid: 'settings-appearance-rowDensity-comfortable' },
+  { value: 'compact', label: t('workbench.settings.rowCompact.option'), testid: 'settings-appearance-rowDensity-compact' },
+  { value: 'comfortable', label: t('workbench.settings.rowComfortable.option'), testid: 'settings-appearance-rowDensity-comfortable' },
 ];
 
 function setRowDensity(density: RowDensity): void {
@@ -26,10 +27,10 @@ function setRowDensity(density: RowDensity): void {
 <template>
   <Field>
     <div class="flex items-center justify-between gap-1">
-      <span>Row height</span>
+      <span>{{ t('workbench.settings.rowHeight.label') }}</span>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         data-testid="settings-reset-appearance-rowDensity"
         :disabled-trigger="isAtDefault('appearance', 'rowDensity')"
         :disabled="isAtDefault('appearance', 'rowDensity')"

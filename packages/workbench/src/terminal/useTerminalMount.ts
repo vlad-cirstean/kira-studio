@@ -1,4 +1,5 @@
 import type { TerminalLaunchKind, TerminalTabState } from '@shared/domain/tabs';
+import { t } from '@theme/i18n';
 import { computed, onMounted, onUnmounted, type Ref, watch } from 'vue';
 import type { TerminalRendererDeps } from './terminalRenderer';
 import { loadTerminalRenderer } from './terminalRendererLoader';
@@ -68,8 +69,9 @@ export function useTerminalMount(options: UseTerminalMountOptions) {
   const footerText = computed(() => {
     const s = session.value;
     if (!s) return '';
-    if (s.status === 'failed') return s.error || 'The terminal could not start.';
-    if (s.status === 'exited') return `Process exited (code ${s.exitCode ?? 0})`;
+    if (s.status === 'failed') return s.error || t('workbench.terminal.startFailed.error');
+    if (s.status === 'exited')
+      return t('workbench.terminal.exited.status', { code: s.exitCode ?? 0 });
     return '';
   });
 

@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { computed, useId } from 'vue';
 
 // P120: generalized from the former GitLogLevelField.vue — the select/reset markup was
@@ -37,7 +38,7 @@ const fieldId = useId();
       <Label :for="fieldId">{{ label }}</Label>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         :data-testid="resetTestId"
         :disabled-trigger="isAtDefault('advanced', leaf)"
         :disabled="isAtDefault('advanced', leaf)"
@@ -52,11 +53,11 @@ const fieldId = useId();
       :model-value="advanced[leaf]"
       @update:model-value="onLogLevelChange"
     >
-      <option value="off">Off</option>
-      <option value="error">Error</option>
-      <option value="warn">Warn</option>
-      <option value="info">Info</option>
-      <option value="debug">Debug</option>
+      <option value="off">{{ t('automations.schedule.off.status') }}</option>
+      <option value="error">{{ t('workbench.opLog.error.status') }}</option>
+      <option value="warn">{{ t('workbench.settings.logLevelWarn.option') }}</option>
+      <option value="info">{{ t('workbench.settings.logLevelInfo.option') }}</option>
+      <option value="debug">{{ t('workbench.settings.logLevelDebug.option') }}</option>
     </NativeSelect>
     <slot />
   </Field>
