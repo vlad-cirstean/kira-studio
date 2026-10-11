@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
+import { t } from '@theme/i18n';
 import type { Completion } from '@workbench/editor/fieldCompletion';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -58,8 +59,8 @@ function onUpdateRows(metadata: GrpcMetadataState[]): void {
     :rows="tab.state.metadata"
     :blank-row="blankMetadata"
     show-enabled
-    name-placeholder="key (lowercase, - _ . only)"
-    value-placeholder="value"
+    :name-placeholder="t('studio.grpc.metadata.name.placeholder')"
+    :value-placeholder="t('common.field.value.label')"
     testid-prefix="grpc-metadata"
     container-testid="grpc-metadata-table"
     :name-candidates="WELL_KNOWN_REQUEST_METADATA"

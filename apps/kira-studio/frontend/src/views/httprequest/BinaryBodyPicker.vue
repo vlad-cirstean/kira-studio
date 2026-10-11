@@ -2,6 +2,7 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { formatBytes } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -24,7 +25,7 @@ const caption = computed(() => {
 });
 
 async function onChooseFile(): Promise<void> {
-  const file = await chooseBodyFile('Choose file');
+  const file = await chooseBodyFile(t('studio.http.body.chooseFile.label'));
   if (!file) return;
   patchHttpRequestTabState(props.tab.id, { binaryFile: file });
 }
@@ -37,7 +38,7 @@ function onClearFile(): void {
 <template>
   <div class="flex items-center gap-1 p-1.5">
     <Button variant="toolbar" size="kira" data-testid="http-binary-choose-file" @click="onChooseFile">
-      Choose file…
+      {{ t('studio.http.body.chooseFile.label') }}
     </Button>
     <template v-if="tab.state.binaryFile">
       <Tooltip>
@@ -48,7 +49,7 @@ function onClearFile(): void {
       </Tooltip>
       <TooltipIconButton
         icon="close"
-        label="Clear"
+        :label="t('common.action.clear.label')"
         data-testid="http-binary-clear-file"
         @click="onClearFile"
       />

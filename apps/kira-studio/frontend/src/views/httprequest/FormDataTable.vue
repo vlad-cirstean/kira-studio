@@ -7,6 +7,7 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { formatBytes } from '@workbench/behaviour/format';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import { templateToken } from '@workbench/editor/fieldCompletion';
@@ -66,7 +67,7 @@ function onKindChange(index: number, value: unknown): void {
 // file's bytes, only {path, name, size}. contentTypeForFilename prefills the per-part override
 // from the same small extension table UploadObjectDialog.vue already uses (object-store.ts).
 async function onChooseFile(index: number): Promise<void> {
-  const file = await chooseBodyFile('Choose file');
+  const file = await chooseBodyFile(t('studio.http.body.chooseFile.label'));
   if (!file) return;
   updateRow(index, {
     path: file.path,
@@ -86,8 +87,8 @@ function onClearFile(index: number): void {
     :rows="tab.state.formData"
     :blank-row="blankField"
     show-enabled
-    name-placeholder="key"
-    value-placeholder="value"
+    :name-placeholder="t('common.field.key.label')"
+    :value-placeholder="t('common.field.value.label')"
     testid-prefix="http-formdata"
     container-testid="http-formdata-table"
     :filter-query="filterQuery"
@@ -101,7 +102,7 @@ function onClearFile(index: number): void {
           grow
           class="w-full"
           :model-value="row.value"
-          placeholder="value"
+          :placeholder="t('common.field.value.label')"
           data-testid="http-formdata-value"
           :candidates="variables.candidates"
           :token-at="templateToken"
@@ -112,7 +113,7 @@ function onClearFile(index: number): void {
         <InputGroup v-else>
           <InputGroupTextarea
             :model-value="row.value"
-            placeholder="value"
+            :placeholder="t('common.field.value.label')"
             data-testid="http-formdata-value"
             rows="1"
             @update:model-value="update(String($event))"
@@ -128,12 +129,12 @@ function onClearFile(index: number): void {
         :model-value="row.kind"
         @update:model-value="(v) => onKindChange(index, v)"
       >
-        <option value="text">Text</option>
-        <option value="file">File</option>
+        <option value="text">{{ t('common.field.text.label') }}</option>
+        <option value="file">{{ t('common.field.file.label') }}</option>
       </NativeSelect>
       <template v-if="row.kind === 'file'">
         <Button variant="toolbar" size="kira" data-testid="http-formdata-choose-file" @click="onChooseFile(index)">
-          Choose file…
+          {{ t('studio.http.body.chooseFile.label') }}
         </Button>
         <Tooltip v-if="row.fileName">
           <TooltipTrigger as-child>
@@ -146,14 +147,14 @@ function onClearFile(index: number): void {
         <TooltipIconButton
           v-if="row.fileName"
           icon="close"
-          label="Clear file"
+          :label="t('studio.http.body.clearFile.label')"
           data-testid="http-formdata-clear-file"
           @click="onClearFile(index)"
         />
         <div class="flex-1 min-w-0">
           <Input
             :model-value="row.contentType"
-            placeholder="Content type"
+            :placeholder="t('studio.http.body.contentType.placeholder')"
             data-testid="http-formdata-content-type"
             @update:model-value="(v) => updateRow(index, { contentType: String(v) })"
           />

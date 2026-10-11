@@ -5,6 +5,8 @@ import { Field, FieldDescription, FieldGroup } from '@theme/components/ui/field'
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
+import { formatBytes, formatDuration } from '@workbench/behaviour/format';
 import { computed, useId } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
@@ -124,7 +126,7 @@ const disableCookieJarId = useId();
   <div class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5" data-testid="http-settings-pane">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="httpVersionId">HTTP version</Label>
+        <Label :for="httpVersionId">{{ t('studio.http.settings.version.label') }}</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.httpVersion === null"
@@ -133,7 +135,7 @@ const disableCookieJarId = useId();
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          Inherit
+          {{ t('common.state.inherit.option') }}
         </Label>
       </div>
       <NativeSelect
@@ -146,14 +148,14 @@ const disableCookieJarId = useId();
         :model-value="settings.httpVersion ?? global.httpVersion"
         @update:model-value="onHttpVersionChange"
       >
-        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
+        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">{{ t('studio.http.settings.versionOption.option', { version: v }) }}</option>
       </NativeSelect>
-      <FieldDescription>Global: HTTP/{{ global.httpVersion }}</FieldDescription>
+      <FieldDescription>{{ t('studio.http.settings.global.status', { value: t('studio.http.settings.versionOption.option', { version: global.httpVersion }) }) }}</FieldDescription>
     </Field>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="requestTimeoutMsId">Request timeout (ms)</Label>
+        <Label :for="requestTimeoutMsId">{{ t('studio.http.settings.timeout.label') }}</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.requestTimeoutMs === null"
@@ -162,7 +164,7 @@ const disableCookieJarId = useId();
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          Inherit
+          {{ t('common.state.inherit.option') }}
         </Label>
       </div>
       <Input
@@ -177,13 +179,13 @@ const disableCookieJarId = useId();
         @input="onRequestTimeoutMsInput"
       />
       <FieldDescription>
-        Global: {{ global.requestTimeoutMs === 0 ? 'no timeout' : `${global.requestTimeoutMs} ms` }}
+        {{ global.requestTimeoutMs === 0 ? t('studio.http.settings.globalNoTimeout.status') : t('studio.http.settings.global.status', { value: formatDuration(global.requestTimeoutMs) }) }}
       </FieldDescription>
     </Field>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxResponseMbId">Max response size (MB)</Label>
+        <Label :for="maxResponseMbId">{{ t('studio.http.settings.maxResponse.label') }}</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxResponseMb === null"
@@ -192,7 +194,7 @@ const disableCookieJarId = useId();
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          Inherit
+          {{ t('common.state.inherit.option') }}
         </Label>
       </div>
       <Input
@@ -207,7 +209,7 @@ const disableCookieJarId = useId();
         @input="onMaxResponseMbInput"
       />
       <FieldDescription>
-        Global: {{ global.maxResponseMb === 0 ? 'unlimited' : `${global.maxResponseMb} MB` }}
+        {{ global.maxResponseMb === 0 ? t('studio.http.settings.globalUnlimited.status') : t('studio.http.settings.global.status', { value: formatBytes(global.maxResponseMb * 1024 * 1024) }) }}
       </FieldDescription>
     </Field>
 
@@ -222,7 +224,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        <Label :for="sslVerifyId">Verify SSL certificates</Label>
+        <Label :for="sslVerifyId">{{ t('studio.http.settings.verifySsl.label') }}</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
@@ -232,10 +234,10 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        Inherit
+        {{ t('common.state.inherit.option') }}
       </Label>
     </FieldGroup>
-    <FieldDescription>Global: {{ global.sslVerify ? 'on' : 'off' }}</FieldDescription>
+    <FieldDescription>{{ t(global.sslVerify ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status') }}</FieldDescription>
 
     <FieldGroup class="items-center">
       <Field orientation="horizontal">
@@ -248,7 +250,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        <Label :for="followRedirectsId">Follow redirects</Label>
+        <Label :for="followRedirectsId">{{ t('studio.http.settings.followRedirects.label') }}</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
@@ -258,14 +260,14 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        Inherit
+        {{ t('common.state.inherit.option') }}
       </Label>
     </FieldGroup>
-    <FieldDescription>Global: {{ global.followRedirects ? 'on' : 'off' }}</FieldDescription>
+    <FieldDescription>{{ t(global.followRedirects ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status') }}</FieldDescription>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxRedirectsId">Max redirects</Label>
+        <Label :for="maxRedirectsId">{{ t('studio.http.settings.maxRedirects.label') }}</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxRedirects === null"
@@ -274,7 +276,7 @@ const disableCookieJarId = useId();
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>
-          Inherit
+          {{ t('common.state.inherit.option') }}
         </Label>
       </div>
       <Input
@@ -289,9 +291,9 @@ const disableCookieJarId = useId();
         @input="onMaxRedirectsInput"
       />
       <FieldDescription v-if="!effectiveFollowRedirects">
-        Follow redirects is off — this has no effect.
+        {{ t('studio.http.settings.redirectsOff.description') }}
       </FieldDescription>
-      <FieldDescription v-else>Global: {{ global.maxRedirects }}</FieldDescription>
+      <FieldDescription v-else>{{ t('studio.http.settings.global.status', { value: global.maxRedirects }) }}</FieldDescription>
     </Field>
 
     <FieldGroup class="items-center">
@@ -305,7 +307,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        <Label :for="disableCookieJarId">Disable cookie jar</Label>
+        <Label :for="disableCookieJarId">{{ t('studio.http.settings.disableJar.label') }}</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
@@ -315,13 +317,13 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        Inherit
+        {{ t('common.state.inherit.option') }}
       </Label>
     </FieldGroup>
-    <FieldDescription>Global: {{ global.disableCookieJar ? 'off' : 'on' }}</FieldDescription>
+    <FieldDescription>{{ t(global.disableCookieJar ? 'studio.http.settings.globalOff.status' : 'studio.http.settings.globalOn.status') }}</FieldDescription>
 
     <button type="button" class="self-start cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
-      Edit global defaults…
+      {{ t('studio.http.settings.editGlobal.label') }}
     </button>
   </div>
 </template>

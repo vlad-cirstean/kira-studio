@@ -13,6 +13,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
@@ -94,7 +95,12 @@ function onDelete(id: string): void {
 }
 
 async function onClear(): Promise<void> {
-  const ok = await confirmDialogStore.confirm({ message: 'Clear this request’s call history? This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' });
+  const ok = await confirmDialogStore.confirm({
+    title: t('studio.grpc.history.clearConfirm.title'),
+    message: [t('studio.grpc.history.clearConfirm.body'), t('common.confirm.irreversible.body')].join(' '),
+    confirmLabel: t('common.action.clear.label'),
+    tone: 'danger',
+  });
   if (ok) await grpcCallHistoryStore.clearGrpcHistory(props.tab.id);
 }
 </script>
@@ -112,7 +118,7 @@ async function onClear(): Promise<void> {
         @click="onClear"
       >
         <CodiconIcon name="trash" :size="13" />
-        Clear history
+        {{ t('common.action.clearHistory.label') }}
       </Button>
     </ViewToolbar>
 
@@ -121,17 +127,17 @@ async function onClear(): Promise<void> {
     </Alert>
     <Empty v-else-if="entries.length === 0">
       <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ incognito ? 'Calls are not recorded in an incognito tab.' : 'No past calls yet' }}</EmptyTitle>
+      <EmptyTitle>{{ incognito ? t('studio.grpc.history.incognito.empty') : t('studio.grpc.history.empty') }}</EmptyTitle>
     </Empty>
 
     <template v-else>
-      <SearchField v-model="filterQuery" placeholder="Filter history" data-testid="grpc-history-filter" />
+      <SearchField v-model="filterQuery" :placeholder="t('studio.common.filterHistory.placeholder')" data-testid="grpc-history-filter" />
       <Empty
         v-if="isFiltered && filteredEntries.length === 0"
         data-testid="grpc-history-filter-empty"
       >
         <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>No matches</EmptyTitle>
+        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
       </Empty>
     </template>
 
@@ -140,7 +146,7 @@ async function onClear(): Promise<void> {
       class="flex flex-1 min-h-0 flex-col overflow-auto"
       ref="listEl"
       role="listbox"
-      aria-label="Call history"
+      :aria-label="t('studio.grpc.history.list.aria')"
     >
       <div
         v-for="entry in filteredEntries"
@@ -170,7 +176,7 @@ async function onClear(): Promise<void> {
         <span class="ml-auto" />
         <TooltipIconButton
           icon="trash"
-          label="Delete"
+          :label="t('common.action.delete.label')"
           data-testid="grpc-history-delete"
           @click.stop="onDelete(entry.id)"
         />
@@ -178,8 +184,7 @@ async function onClear(): Promise<void> {
     </div>
 
     <div v-if="atCap" class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="grpc-history-cap-note">
-      Only the last {{ GRPC_HISTORY_PER_SCOPE_LIMIT }} are kept — older calls are removed
-      automatically.
+      {{ t('studio.grpc.history.capNote.hint', { limit: GRPC_HISTORY_PER_SCOPE_LIMIT }) }}
     </div>
     <!-- P110 I2-17: `.history-row:hover`/`.history-row.is-viewing` (same background either way)
          folded into one ternary -- no test locates by either class (checked; grpc-history-row is

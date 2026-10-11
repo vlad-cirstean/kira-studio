@@ -9,7 +9,8 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatBytes, formatClockTime } from '@workbench/behaviour/format';
+import { t } from '@theme/i18n';
+import { formatBytes, formatClockTime, formatDuration } from '@workbench/behaviour/format';
 import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
@@ -67,25 +68,28 @@ const responseCookiesCount = computed(
   () => (response.value?.sentCookies?.length ?? 0) + (response.value?.receivedCookies?.length ?? 0),
 );
 
-const RESPONSE_PANE_OPTIONS = [
-  { value: 'body' as const, label: 'Body', testid: 'http-response-pane-body' },
-  { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
-  { value: 'history' as const, label: 'History', testid: 'http-response-pane-history' },
+const RESPONSE_PANE_OPTIONS = computed(() => [
+  { value: 'body' as const, label: t('studio.http.pane.body.label'), testid: 'http-response-pane-body' },
+  { value: 'headers' as const, label: t('studio.http.pane.headers.label'), testid: 'http-response-pane-headers' },
+  { value: 'history' as const, label: t('common.module.history.label'), testid: 'http-response-pane-history' },
   // P9 D12/F19: the fourth segment — never on screen at the same time as the body's own Pretty/Raw
   // toggle (gated on responsePane === 'body' below), so the shared "Raw" label never collides.
-  { value: 'raw' as const, label: 'Raw', testid: 'http-response-pane-raw' },
+  { value: 'raw' as const, label: t('studio.common.raw.label'), testid: 'http-response-pane-raw' },
   // P10 D11/F19: the fifth segment — where the time went, per hop.
-  { value: 'timeline' as const, label: 'Timeline', testid: 'http-response-pane-timeline' },
-];
+  { value: 'timeline' as const, label: t('studio.http.pane.timeline.label'), testid: 'http-response-pane-timeline' },
+]);
 
 // P90 §3.2: the sixth segment, count-badged like REQUEST_PANE_OPTIONS's own Settings/Cookies
 // entries — a computed array rather than the plain literal list above, since the label carries a
 // count that changes with the response.
 const RESPONSE_PANE_OPTIONS_WITH_COOKIES = computed(() => [
-  ...RESPONSE_PANE_OPTIONS,
+  ...RESPONSE_PANE_OPTIONS.value,
   {
     value: 'cookies' as const,
-    label: responseCookiesCount.value > 0 ? `Cookies (${responseCookiesCount.value})` : 'Cookies',
+    label:
+      responseCookiesCount.value > 0
+        ? t('studio.http.pane.cookiesCount.label', { count: responseCookiesCount.value })
+        : t('studio.http.pane.cookies.label'),
     testid: 'http-response-pane-cookies',
   },
 ]);
@@ -120,10 +124,10 @@ const {
   computed(() => props.tab.state.responseView),
 );
 
-const RESPONSE_VIEW_OPTIONS = [
-  { value: 'pretty' as const, label: 'Pretty', testid: 'http-response-view-pretty' },
-  { value: 'raw' as const, label: 'Raw', testid: 'http-response-view-raw' },
-];
+const RESPONSE_VIEW_OPTIONS = computed(() => [
+  { value: 'pretty' as const, label: t('studio.http.view.pretty.label'), testid: 'http-response-view-pretty' },
+  { value: 'raw' as const, label: t('studio.common.raw.label'), testid: 'http-response-view-raw' },
+]);
 
 function setResponseView(view: 'pretty' | 'raw'): void {
   patchHttpRequestTabState(props.tab.id, { responseView: view });
@@ -278,10 +282,10 @@ onUnmounted(() => {
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
-              {{ response.elapsedMs }} ms
+              {{ formatDuration(response.elapsedMs) }}
             </button>
           </TooltipTrigger>
-          <TooltipContent>See where the time went</TooltipContent>
+          <TooltipContent>{{ t('studio.http.response.timeTooltip.tooltip') }}</TooltipContent>
         </Tooltip>
         <span class="text-kira-sm text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <SecondaryTabs :model-value="tab.state.responseView" :items="RESPONSE_VIEW_OPTIONS" data-testid="http-response-view-toggle" @update:model-value="(v) => setResponseView(v as 'pretty' | 'raw')" />
@@ -293,7 +297,7 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'"
         icon="search"
-        label="Find in response"
+        :label="t('studio.http.response.find.label')"
         :class="{ 'bg-field text-fg': findOpen }"
         data-testid="http-find-toggle"
         @click="toggleFind"
@@ -323,34 +327,33 @@ onUnmounted(() => {
 
     <Alert strip v-if="viewing" variant="info" data-testid="http-history-band">
       <AlertDescription>
-        Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
-        {{ viewing?.snapshot.entry.url }}
+        {{ t('studio.http.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.entry.method ?? '', url: viewing?.snapshot.entry.url ?? '' }) }}
       </AlertDescription>
       <AlertAction>
         <Button variant="toolbar" size="kira" data-testid="http-history-back" @click="onBackToLatest">
-          {{ rt?.response ? 'Back to latest' : 'Close' }}
+          {{ rt?.response ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label') }}
         </Button>
       </AlertAction>
     </Alert>
 
     <Alert strip v-if="response?.bodyTruncated" variant="warn" data-testid="http-body-truncated">
       <AlertDescription>
-        Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
+        {{ t('studio.http.response.truncated.description', { size: formatBytes(response.bodyBytes) }) }}
       </AlertDescription>
     </Alert>
     <Alert strip v-if="bodyStorageTruncated" variant="info" data-testid="http-history-truncated">
       <AlertDescription>
-        Only the first 256 KB of this response was kept in history.
+        {{ t('studio.http.response.bodyKept.description', { size: formatBytes(256 * 1024) }) }}
       </AlertDescription>
     </Alert>
     <Alert strip v-if="requestFieldsElided" variant="info" data-testid="http-history-fields-elided">
       <AlertDescription>
-        Request field values were not stored — too large for history.
+        {{ t('studio.http.history.fieldsElided.description') }}
       </AlertDescription>
     </Alert>
     <Alert strip v-if="bodyNotStored" variant="info" data-testid="http-history-binary-note">
       <AlertDescription>
-        This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
+        {{ t('studio.http.response.binaryNotKept.description', { size: response ? formatBytes(response.bodyBytes) : '' }) }}
       </AlertDescription>
     </Alert>
     <Tooltip v-if="redirectCaption">
@@ -364,7 +367,7 @@ onUnmounted(() => {
           {{ redirectCaption }}
         </button>
       </TooltipTrigger>
-      <TooltipContent>See where the time went</TooltipContent>
+      <TooltipContent>{{ t('studio.http.response.timeTooltip.tooltip') }}</TooltipContent>
     </Tooltip>
 
     <ResponseHistoryList
@@ -374,13 +377,13 @@ onUnmounted(() => {
     />
     <div v-else-if="tab.state.responsePane === 'headers'" class="flex flex-1 min-h-0 flex-col" data-testid="http-response-headers">
       <template v-if="response">
-        <SearchField v-model="headerFilter" placeholder="Filter headers" data-testid="http-response-headers-filter" />
+        <SearchField v-model="headerFilter" :placeholder="t('studio.http.response.headersFilter.placeholder')" data-testid="http-response-headers-filter" />
         <span
           v-if="headerFilter.trim()"
           class="text-kira-sm subtle px-1.5 pt-1 pb-0"
           data-testid="http-response-headers-count"
         >
-          {{ filteredHeaders.length }} of {{ response.headers.length }} headers
+          {{ t('studio.http.response.headersCount.status', { shown: filteredHeaders.length, count: response.headers.length }) }}
         </span>
         <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
           <div v-for="(h, i) in filteredHeaders" :key="i" class="flex gap-1.5 text-kira-sm" data-testid="response-header-row">
@@ -391,7 +394,7 @@ onUnmounted(() => {
       </template>
       <Empty v-else>
         <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-        <EmptyTitle>Send a request to see the response</EmptyTitle>
+        <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
       </Empty>
     </div>
     <RawExchangePane
@@ -410,7 +413,7 @@ onUnmounted(() => {
           class="text-kira-sm text-muted-foreground p-1.5"
           data-testid="http-response-binary"
         >
-          {{ response.bodyBytes }} bytes of binary data
+          {{ t('studio.http.response.binary.status', { count: response.bodyBytes }) }}
         </span>
         <template v-else-if="bodyPending">
           <span
@@ -418,7 +421,7 @@ onUnmounted(() => {
             class="text-kira-sm text-muted-foreground p-1.5"
             data-testid="http-response-formatting"
           >
-            Formatting response…
+            {{ t('studio.http.response.formatting.loading') }}
           </span>
         </template>
         <MonacoHost
@@ -432,7 +435,7 @@ onUnmounted(() => {
       </template>
       <Empty v-else>
         <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-        <EmptyTitle>Send a request to see the response</EmptyTitle>
+        <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
         <button
           v-if="hasHistory"
           type="button"
@@ -440,7 +443,7 @@ onUnmounted(() => {
           data-testid="http-history-hint"
           @click="viewHistory"
         >
-          {{ historyCount }} past response{{ historyCount === 1 ? '' : 's' }} · View history
+          {{ t('studio.http.response.viewHistory.label', { count: historyCount }) }}
         </button>
       </Empty>
     </div>

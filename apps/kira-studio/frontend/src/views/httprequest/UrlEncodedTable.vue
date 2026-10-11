@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HttpUrlEncodedFieldState } from '@shared/domain/http';
+import { t } from '@theme/i18n';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
@@ -32,8 +33,8 @@ function onUpdateRows(urlEncoded: HttpUrlEncodedFieldState[]): void {
     :rows="tab.state.urlEncoded"
     :blank-row="blankField"
     show-enabled
-    name-placeholder="key"
-    value-placeholder="value"
+    :name-placeholder="t('common.field.key.label')"
+    :value-placeholder="t('common.field.value.label')"
     testid-prefix="http-urlencoded"
     container-testid="http-urlencoded-table"
     :value-variable-support="variables"

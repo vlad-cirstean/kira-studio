@@ -197,7 +197,7 @@ const BODY_MODE_ITEMS = BODY_MODE_OPTIONS.map((opt) => ({
       <TooltipIconButton
         v-if="tab.state.bodyMode === 'code' && beautifyFormat"
         icon="expand-all"
-        label="Beautify"
+        :label="t('studio.api.common.beautify.label')"
         data-testid="http-body-beautify"
         @click="onBeautifyBody"
       />

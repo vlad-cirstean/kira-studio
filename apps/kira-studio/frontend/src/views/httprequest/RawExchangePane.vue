@@ -5,7 +5,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { type MessageKey, t } from '@theme/i18n';
 import { copyText } from '@workbench/behaviour/clipboard';
+import { formatBytes } from '@workbench/behaviour/format';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { computed, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -79,14 +81,12 @@ const requestFieldsElided = computed(
   () => viewingStored.value?.snapshot.requestFieldsElided ?? false,
 );
 
-const FIDELITY_TEXT: Readonly<Record<HttpWireFidelity, string>> = {
-  exact: 'These are the exact bytes this app wrote to the connection.',
-  http2:
-    'This exchange used HTTP/2 — its wire form is binary HPACK frames on a multiplexed connection. Shown here is the equivalent HTTP/1.1 form.',
-  proxied:
-    'This request went through an HTTP proxy, so its request line carried the absolute URL rather than the path shown. Everything else is exact.',
+const FIDELITY_KEYS: Readonly<Record<HttpWireFidelity, MessageKey>> = {
+  exact: 'studio.http.raw.exact.description',
+  http2: 'studio.http.raw.http2.description',
+  proxied: 'studio.http.raw.proxied.description',
 };
-const fidelityText = computed(() => (wire.value ? FIDELITY_TEXT[wire.value.fidelity] : ''));
+const fidelityText = computed(() => (wire.value ? t(FIDELITY_KEYS[wire.value.fidelity]) : ''));
 // D3 calls for an "info" tone on 'exact' — MessageStrip's own vocabulary (warn/err/note, no
 // separate info) makes 'info' its informational tone (the same one the history viewing band uses),
 // so 'exact' reuses it rather than widening a shared primitive for this one caller (§0.2/§3).
@@ -97,13 +97,16 @@ const fidelityTone = computed<'info' | 'warn'>(() =>
 const maskingNote = computed(() => {
   const n = wire.value?.maskedSecrets ?? 0;
   if (n === 0) return '';
-  const label = n === 1 ? 'value is' : 'values are';
-  return `${n} secret ${label} shown as {{name}}. Use Copy as curl for a command with real values (authentication required).`;
+  return t('studio.http.raw.masked.description', {
+    count: n,
+    placeholder: '{{name}}',
+    copyAsCurl: t('studio.api.copyAsCurl.title'),
+  });
 });
 
 const elisionNote = computed(() =>
   wire.value?.requestBodyElided
-    ? 'The request body is shown in part — Content-Length above is the real one.'
+    ? t('studio.http.raw.elided.description')
     : '',
 );
 
@@ -111,14 +114,14 @@ const elisionNote = computed(() =>
 // now that a stored entry always gets the reconstruction (F7: the request side is always stored).
 const emptyLabel = computed(() => {
   if (!response.value || wire.value || showReconstructed.value) return '';
-  return 'The raw exchange could not be rendered';
+  return t('studio.http.raw.unavailable.empty');
 });
 
 const requestCaption = computed(() => {
   const e = viewingStored.value?.snapshot.entry;
-  if (e) return `→ ${e.method} ${e.url}`;
+  if (e) return t('studio.http.raw.requestCaption.label', { method: e.method, url: e.url });
   const r = rt.value;
-  return r ? '→ request' : '';
+  return r ? `→ ${t('studio.http.raw.requestPending.label')}` : '';
 });
 
 // D8: the unified document each editor renders — the live wire's own text, or the reconstruction,
@@ -173,7 +176,7 @@ const rawSections = computed<RawSection[]>(() => [
     key: 'request',
     caption: requestCaption.value,
     captionTestid: 'http-wire-request-caption',
-    copyLabel: 'Copy request',
+    copyLabel: t('studio.http.raw.copyRequest.label'),
     copyTestid: 'http-wire-request-copy',
     onCopy: onCopyRequest,
     doc: requestText.value,
@@ -186,7 +189,7 @@ const rawSections = computed<RawSection[]>(() => [
   {
     key: 'response',
     caption: '←',
-    copyLabel: 'Copy response',
+    copyLabel: t('studio.http.raw.copyResponse.label'),
     copyTestid: 'http-wire-response-copy',
     onCopy: onCopyResponse,
     doc: responseText.value,
@@ -194,7 +197,7 @@ const rawSections = computed<RawSection[]>(() => [
     editorTestid: 'http-wire-response-editor',
     noteBefore: '',
     noteAfter: wire.value
-      ? "Response headers are shown alphabetised and in canonical case — Go's HTTP client does not expose them in received order."
+      ? t('studio.http.raw.headerOrder.description')
       : '',
     noteAfterTestid: 'http-wire-order-note',
   },
@@ -225,17 +228,17 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
       <template v-else>
         <Alert variant="info" data-testid="http-raw-reconstructed">
           <AlertDescription>
-            Reconstructed from what this request was recorded as — not the exact bytes on the wire.
+            {{ t('studio.http.raw.reconstructed.description') }}
           </AlertDescription>
         </Alert>
         <Alert v-if="requestBodyStorageTruncated" variant="info" data-testid="http-history-request-truncated">
           <AlertDescription>
-            Only the first 256 KB of this request's body was kept in history.
+            {{ t('studio.http.raw.bodyKept.description', { size: formatBytes(256 * 1024) }) }}
           </AlertDescription>
         </Alert>
         <Alert v-if="requestFieldsElided" variant="info" data-testid="http-history-request-fields-elided">
           <AlertDescription>
-            Request field values were not stored — too large for history.
+            {{ t('studio.http.history.fieldsElided.description') }}
           </AlertDescription>
         </Alert>
       </template>
@@ -282,7 +285,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
     </template>
     <Empty v-else>
       <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-      <EmptyTitle>Send a request to see the response</EmptyTitle>
+      <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
     </Empty>
   </div>
 </template>

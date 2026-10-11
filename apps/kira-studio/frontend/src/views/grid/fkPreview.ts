@@ -1,5 +1,6 @@
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import { cellText, isNull, isTruncated, type TypeClass } from '@shared/protocol/page';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { data } from '../../bridge/data';
 
@@ -65,7 +66,10 @@ export async function fetchReferencedRow(
     if (signal.cancelled) return { status: 'loading' };
     const page = response.page;
     if (page.kind !== 'tabular') {
-      return { status: 'error', message: `unexpected page kind for a preview: ${page.kind}` };
+      return {
+        status: 'error',
+        message: t('studio.grid.fkPreview.unexpectedPage.error', { kind: page.kind }),
+      };
     }
     const targetColumns = new Set(entry.referencedColumns);
     const columns: PreviewColumn[] = page.columns.map((c) => ({

@@ -123,7 +123,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       : {
           type: 'item',
           id: 'connect',
-          label: t('studio.project.menu.connect.label'),
+          label: t('common.action.connect.label'),
           icon: 'plug',
           run: () => useConnectionsStore().connectConnection(row.connectionId),
         },

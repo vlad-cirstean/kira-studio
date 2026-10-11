@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { headerValueCompletions, WELL_KNOWN_REQUEST_HEADERS } from '@kira/api-core';
 import type { HttpHeaderState } from '@shared/domain/http';
+import { t } from '@theme/i18n';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
@@ -33,8 +34,8 @@ function onUpdateRows(headers: HttpHeaderState[]): void {
     :rows="tab.state.headers"
     :blank-row="blankHeader"
     show-enabled
-    name-placeholder="Header-Name"
-    value-placeholder="value"
+    :name-placeholder="t('studio.http.headers.name.placeholder')"
+    :value-placeholder="t('common.field.value.label')"
     testid-prefix="http-header"
     container-testid="http-headers-table"
     :name-candidates="WELL_KNOWN_REQUEST_HEADERS"

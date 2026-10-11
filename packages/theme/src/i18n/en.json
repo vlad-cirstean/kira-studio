@@ -818,6 +818,9 @@
       "checkOut": {
         "label": "Check out"
       },
+      "choose": {
+        "label": "Choose…"
+      },
       "clear": {
         "label": "Clear"
       },
@@ -850,6 +853,9 @@
       },
       "collapseAll": {
         "label": "Collapse all"
+      },
+      "connect": {
+        "label": "Connect"
       },
       "copy": {
         "label": "Copy"
@@ -934,6 +940,9 @@
       },
       "openTerminal": {
         "label": "Open terminal"
+      },
+      "paste": {
+        "label": "Paste"
       },
       "previous": {
         "label": "Previous"
@@ -1066,6 +1075,9 @@
       },
       "email": {
         "label": "Email"
+      },
+      "file": {
+        "label": "File"
       },
       "key": {
         "label": "Key"
@@ -7254,6 +7266,18 @@
         }
       },
       "common": {
+        "beautify": {
+          "label": "Beautify"
+        },
+        "descriptions": {
+          "aria": "Descriptions"
+        },
+        "descriptionsHide": {
+          "tooltip": "Hide descriptions"
+        },
+        "descriptionsShow": {
+          "tooltip": "Show descriptions"
+        },
         "environments": {
           "label": "Environments"
         },
@@ -7266,11 +7290,40 @@
         "importCurl": {
           "label": "Import from curl…"
         },
+        "incognitoChip": {
+          "tooltip": "Nothing from this tab is saved"
+        },
+        "incognitoOff": {
+          "tooltip": "Incognito. Turn off to resume saving this tab"
+        },
+        "incognitoOn": {
+          "tooltip": "Incognito. Nothing from this tab is saved from here on"
+        },
         "newRequest": {
           "label": "New request"
         },
         "reorderBlocked": {
           "hint": "Clear the filter to reorder."
+        },
+        "resizeRequest": {
+          "aria": "Resize request pane"
+        },
+        "save": {
+          "checking": {
+            "tooltip": "Checking whether this request is still saved…"
+          },
+          "incognito": {
+            "tooltip": "Saving is off in an incognito tab"
+          },
+          "toCollection": {
+            "tooltip": "Save request to a collection"
+          }
+        },
+        "unknownDynamic": {
+          "tooltip": "{name} is an unknown dynamic value"
+        },
+        "unresolved": {
+          "status": "{count} unresolved"
         }
       },
       "copyAsCurl": {
@@ -7578,6 +7631,9 @@
       "fields": {
         "label": "Fields"
       },
+      "filterHistory": {
+        "placeholder": "Filter history"
+      },
       "grpc": {
         "label": "gRPC"
       },
@@ -7628,8 +7684,14 @@
           "label": "Topic"
         }
       },
+      "noRows": {
+        "empty": "No rows"
+      },
       "nullValue": {
         "label": "NULL"
+      },
+      "raw": {
+        "label": "Raw"
       },
       "reconnectAndLoad": {
         "label": "Reconnect and load"
@@ -7640,11 +7702,20 @@
       "resizeList": {
         "aria": "Resize list"
       },
+      "responseEmpty": {
+        "empty": "Send a request to see the response"
+      },
       "savedAndRecentFilters": {
         "label": "Saved and recent filters"
       },
       "searchPage": {
         "label": "Search this page"
+      },
+      "tls": {
+        "label": "TLS"
+      },
+      "truncated": {
+        "status": "Truncated"
       },
       "writeUnsupported": {
         "tooltip": "Connection doesn’t support this action"
@@ -7861,7 +7932,6 @@
         },
         "raw": {
           "aria": "Show raw EXPLAIN output",
-          "label": "Raw",
           "tooltip": "Show the raw EXPLAIN output the server returned"
         },
         "root": {
@@ -7882,9 +7952,6 @@
         },
         "noMatchingRows": {
           "empty": "No matching rows"
-        },
-        "noRows": {
-          "empty": "No rows"
         },
         "rows": {
           "aria": "Result rows"
@@ -7944,6 +8011,10 @@
         "announce": "Copied column name",
         "label": "Copy column name"
       },
+      "columnValues": {
+        "announce": "Copied column values",
+        "label": "Copy column values"
+      },
       "csv": {
         "announce": "Copied CSV"
       },
@@ -7960,6 +8031,10 @@
         "tsv": {
           "label": "TSV"
         }
+      },
+      "insert": {
+        "announce": "Copied insert statements",
+        "label": "Insert statements"
       },
       "plainJson": {
         "announce": "Copied plain JSON",
@@ -8159,6 +8234,90 @@
         "tooltip": "Sort document: 1 is ascending, -1 is descending"
       }
     },
+    "generateData": {
+      "recipe": {
+        "binaryHex": {
+          "label": "Binary (hex)"
+        },
+        "companyName": {
+          "label": "Company name"
+        },
+        "datatypeBoolean": {
+          "label": "Boolean"
+        },
+        "dateBirthdate": {
+          "label": "Birthdate"
+        },
+        "datePast": {
+          "label": "Past date and time"
+        },
+        "dateRecent": {
+          "label": "Recent date and time"
+        },
+        "financeAmount": {
+          "label": "Amount"
+        },
+        "internetUrl": {
+          "label": "URL"
+        },
+        "jsonObject": {
+          "label": "JSON object"
+        },
+        "locationCity": {
+          "label": "City"
+        },
+        "locationCountry": {
+          "label": "Country"
+        },
+        "locationState": {
+          "label": "State or province"
+        },
+        "locationStreetAddress": {
+          "label": "Street address"
+        },
+        "locationZipCode": {
+          "label": "Postal code"
+        },
+        "loremSentence": {
+          "label": "Sentence"
+        },
+        "loremSlug": {
+          "label": "Slug"
+        },
+        "loremWords": {
+          "label": "Words"
+        },
+        "numberInt": {
+          "label": "Integer"
+        },
+        "personFirstName": {
+          "label": "First name"
+        },
+        "personFullName": {
+          "label": "Full name"
+        },
+        "personLastName": {
+          "label": "Last name"
+        },
+        "phoneNumber": {
+          "label": "Phone number"
+        },
+        "stringUuid": {
+          "label": "UUID"
+        }
+      },
+      "warning": {
+        "requiredForeignKey": {
+          "hint": "{column} is a required foreign key, so no value can be generated for it safely. The insert fails unless one is set."
+        },
+        "requiredNoValue": {
+          "hint": "{column} is required but has no value. The insert fails."
+        },
+        "uniqueIndex": {
+          "hint": "{column} is covered by a unique index. A generated value may collide with an existing row."
+        }
+      }
+    },
     "grid": {
       "addRow": {
         "label": "Add a row"
@@ -8211,6 +8370,23 @@
       "discardPending": {
         "label": "Discard pending changes"
       },
+      "editNotStaged": {
+        "error": "Edit not staged because the page reloaded."
+      },
+      "fkPreview": {
+        "manyRows": {
+          "status": "{count} of many matching rows"
+        },
+        "noMatch": {
+          "empty": "No matching row in {table}"
+        },
+        "noValue": {
+          "error": "No value to filter on."
+        },
+        "unexpectedPage": {
+          "error": "Unexpected page kind for a preview: {kind}."
+        }
+      },
       "generateUnsupported": {
         "tooltip": "This connection doesn’t support generating rows"
       },
@@ -8230,6 +8406,55 @@
           "tooltip": "Commit or discard pending changes first"
         }
       },
+      "menu": {
+        "clearSort": {
+          "label": "Clear sort"
+        },
+        "duplicateRows": {
+          "label": "Duplicate {count} row | Duplicate {count} rows"
+        },
+        "editReferenced": {
+          "label": "Edit referenced row ({table})"
+        },
+        "filterByValue": {
+          "label": "Filter by this value"
+        },
+        "goToReferenced": {
+          "label": "Go to referenced row ({table})"
+        },
+        "hideColumn": {
+          "label": "Hide column"
+        },
+        "markedSensitive": {
+          "error": "Marked as sensitive. Commit or discard pending changes to preview it."
+        },
+        "markSensitive": {
+          "label": "Mark column as sensitive"
+        },
+        "notSensitive": {
+          "label": "Not sensitive"
+        },
+        "revertRows": {
+          "label": "Revert {count} row | Revert {count} rows"
+        },
+        "setNull": {
+          "label": "Set NULL"
+        },
+        "showAllColumns": {
+          "label": "Show all columns"
+        },
+        "sortAsc": {
+          "label": "Sort ascending"
+        },
+        "sortDesc": {
+          "label": "Sort descending"
+        }
+      },
+      "nav": {
+        "goTo": {
+          "aria": "Go to referenced row"
+        }
+      },
       "noPrimaryKey": {
         "tooltip": "This table has no primary key, so a row can’t be addressed"
       },
@@ -8247,7 +8472,9 @@
         }
       },
       "previewCommand": {
-        "label": "Preview the SQL for pending changes"
+        "empty": "No pending changes",
+        "label": "Preview the SQL for pending changes",
+        "title": "Preview SQL"
       },
       "primaryKey": {
         "status": "PK {names}"
@@ -8255,17 +8482,164 @@
       "rowCount": {
         "status": "Σ {count} row | Σ {count} rows"
       },
+      "selectAll": {
+        "aria": "Select all cells"
+      },
+      "selectColumn": {
+        "aria": "Select column"
+      },
       "selectRowsFirst": {
         "tooltip": "Select one or more rows first"
+      },
+      "sortBy": {
+        "aria": "Sort by {name}"
       },
       "writable": {
         "status": "Read-write"
       }
     },
     "grpc": {
+      "call": {
+        "label": "Call",
+        "methodUnresolved": {
+          "error": "Method not resolved yet. The schema is still loading."
+        },
+        "waitingSchema": {
+          "tooltip": "Waiting on the schema…"
+        }
+      },
+      "history": {
+        "capNote": {
+          "hint": "Only the last {limit} are kept. Older calls are removed automatically."
+        },
+        "clearConfirm": {
+          "body": "Every past call of this request is removed.",
+          "title": "Clear call history?"
+        },
+        "empty": "No past calls yet",
+        "incognito": {
+          "empty": "Calls aren’t recorded in an incognito tab"
+        },
+        "list": {
+          "aria": "Call history"
+        }
+      },
       "message": {
         "beautifyFailed": {
           "error": "Couldn’t format this message."
+        }
+      },
+      "metadata": {
+        "name": {
+          "placeholder": "Key (lowercase, hyphen, underscore, dot)"
+        }
+      },
+      "method": {
+        "choose": {
+          "placeholder": "Choose a method"
+        }
+      },
+      "pane": {
+        "message": {
+          "option": "Message"
+        },
+        "metadata": {
+          "option": "Metadata"
+        }
+      },
+      "response": {
+        "backToLatest": {
+          "label": "Back to latest"
+        },
+        "empty": "Call this method to see its response",
+        "find": {
+          "label": "Find in message"
+        },
+        "firstMessages": {
+          "description": "Showing the first {shown} of {total} messages."
+        },
+        "header": {
+          "label": "Header"
+        },
+        "messageCut": {
+          "tooltip": "Stored copy cut at {size}, not the full message"
+        },
+        "metadataElided": {
+          "description": "Metadata, headers and trailers weren’t stored because they were too large for history."
+        },
+        "noHeader": {
+          "empty": "No header metadata"
+        },
+        "noTrailer": {
+          "empty": "No trailer metadata"
+        },
+        "offset": {
+          "status": "At {duration}"
+        },
+        "pane": {
+          "messages": {
+            "option": "Messages"
+          }
+        },
+        "recentMessages": {
+          "description": "Showing the most recent {shown} of {total} messages."
+        },
+        "requestCut": {
+          "description": "The stored request message was cut at {size} and is not shown."
+        },
+        "stopped": {
+          "description": "Stopped after {count} message. | Stopped after {count} messages."
+        },
+        "summary": {
+          "status": "{count} message · {size} | {count} messages · {size}"
+        },
+        "trailer": {
+          "label": "Trailer"
+        },
+        "viewHistory": {
+          "label": "View history ({count} past call) | View history ({count} past calls)"
+        },
+        "viewing": {
+          "status": "Viewing the call from {time} · {method}"
+        }
+      },
+      "schema": {
+        "addImportPath": {
+          "placeholder": "Add an import path"
+        },
+        "chooseProto": {
+          "title": "Choose a proto file"
+        },
+        "chooseSource": {
+          "empty": "Choose a source above to browse this server’s services"
+        },
+        "filter": {
+          "placeholder": "Filter services and methods"
+        },
+        "importPaths": {
+          "label": "Import paths"
+        },
+        "noImportPaths": {
+          "empty": "No import paths. The proto file’s own folder is used"
+        },
+        "noProto": {
+          "placeholder": "No proto file chosen"
+        },
+        "source": {
+          "proto": {
+            "option": "Proto file"
+          },
+          "reflection": {
+            "option": "Reflection"
+          }
+        }
+      },
+      "target": {
+        "example": "api.example.com:443"
+      },
+      "tls": {
+        "plaintext": {
+          "option": "Plaintext"
         }
       }
     },
@@ -8273,6 +8647,384 @@
       "body": {
         "beautifyFailed": {
           "error": "Couldn’t format this body."
+        },
+        "chooseFile": {
+          "label": "Choose file…"
+        },
+        "clearFile": {
+          "label": "Clear file"
+        },
+        "contentType": {
+          "placeholder": "Content type"
+        }
+      },
+      "cookies": {
+        "clearConfirm": {
+          "body": "Every cookie for every host is removed.",
+          "title": "Clear all cookies?"
+        },
+        "count": {
+          "status": "{shown} of {count} cookie | {shown} of {count} cookies"
+        },
+        "filter": {
+          "placeholder": "Filter cookies"
+        },
+        "hop": {
+          "label": "Hop {hop}"
+        },
+        "jarOff": {
+          "empty": "The cookie jar is off for this request"
+        },
+        "none": {
+          "empty": "No cookies for this request’s URL"
+        },
+        "noneReceived": {
+          "empty": "This response carries no cookies"
+        },
+        "received": {
+          "label": "Received"
+        },
+        "remove": {
+          "aria": "Remove cookie"
+        },
+        "sent": {
+          "label": "Sent"
+        }
+      },
+      "diff": {
+        "added": {
+          "status": "Added"
+        },
+        "after": {
+          "label": "After"
+        },
+        "before": {
+          "label": "Before"
+        },
+        "changed": {
+          "status": "Changed"
+        },
+        "loadingMerge": {
+          "loading": "Loading the compare view…"
+        },
+        "notKept": {
+          "description": "At least one response’s body wasn’t kept in history, so it can’t be compared."
+        },
+        "rawBytes": {
+          "description": "Comparing raw bytes because the two bodies aren’t both JSON or both XML."
+        },
+        "removed": {
+          "status": "Removed"
+        },
+        "title": "Compare responses",
+        "unchanged": {
+          "status": "{count} unchanged"
+        },
+        "unchangedRow": {
+          "status": "Unchanged"
+        }
+      },
+      "editRaw": {
+        "unavailable": {
+          "tooltip": "A form-data or binary body has no text form that can be edited and parsed back, because a file part is bytes on disk. Its wire form is in the raw view of the response pane"
+        }
+      },
+      "headers": {
+        "name": {
+          "placeholder": "Header name"
+        }
+      },
+      "history": {
+        "capNote": {
+          "hint": "Only the last {limit} are kept. Older responses are removed automatically."
+        },
+        "clearConfirm": {
+          "body": "Every past response of this request is removed.",
+          "title": "Clear response history?"
+        },
+        "compare": {
+          "label": "Compare"
+        },
+        "empty": "No past responses yet",
+        "fieldsElided": {
+          "description": "Request field values weren’t stored because they were too large for history."
+        },
+        "incognito": {
+          "description": "Responses aren’t recorded in an incognito tab."
+        },
+        "list": {
+          "aria": "Response history"
+        },
+        "recordHint": {
+          "description": "Sending this request records one."
+        },
+        "scratchHint": {
+          "description": "Scratch requests keep their history until the tab is closed. Save this request to keep it."
+        }
+      },
+      "pane": {
+        "body": {
+          "label": "Body"
+        },
+        "bodyCode": {
+          "label": "Body (code)"
+        },
+        "bodyCount": {
+          "label": "Body ({count})"
+        },
+        "bodyFile": {
+          "label": "Body (1 file)"
+        },
+        "bodyJson": {
+          "label": "Body (JSON)"
+        },
+        "bodyRaw": {
+          "label": "Body (raw)"
+        },
+        "cookies": {
+          "label": "Cookies"
+        },
+        "cookiesCount": {
+          "label": "Cookies ({count})"
+        },
+        "headers": {
+          "label": "Headers"
+        },
+        "headersCount": {
+          "label": "Headers ({count})"
+        },
+        "params": {
+          "label": "Params"
+        },
+        "paramsCount": {
+          "label": "Params ({count})"
+        },
+        "settingsCount": {
+          "label": "Settings ({count})"
+        },
+        "timeline": {
+          "label": "Timeline"
+        }
+      },
+      "raw": {
+        "bodyKept": {
+          "description": "Only the first {size} of this request’s body was kept in history."
+        },
+        "copyRequest": {
+          "label": "Copy request"
+        },
+        "copyResponse": {
+          "label": "Copy response"
+        },
+        "elided": {
+          "description": "The request body is shown in part. The real length is in the headers above."
+        },
+        "exact": {
+          "description": "These are the exact bytes this app wrote to the connection."
+        },
+        "headerOrder": {
+          "description": "Response headers are shown alphabetised and in canonical case, because the HTTP client doesn’t expose them in received order."
+        },
+        "http2": {
+          "description": "This exchange used HTTP/2. Its wire form is binary frames on a multiplexed connection. Shown here is the equivalent HTTP/1.1 form."
+        },
+        "masked": {
+          "description": "{count} secret value is shown as {placeholder}. Use {copyAsCurl} for a command with real values (authentication required). | {count} secret values are shown as {placeholder}. Use {copyAsCurl} for a command with real values (authentication required)."
+        },
+        "proxied": {
+          "description": "This request went through an HTTP proxy, so its request line carried the absolute URL rather than the path shown. Everything else is exact."
+        },
+        "reconstructed": {
+          "description": "Reconstructed from what this request was recorded as. Not the exact bytes on the wire."
+        },
+        "requestCaption": {
+          "label": "→ {method} {url}"
+        },
+        "requestPending": {
+          "label": "Request"
+        },
+        "unavailable": {
+          "empty": "The raw exchange couldn’t be rendered"
+        }
+      },
+      "request": {
+        "find": {
+          "label": "Find in the request body"
+        }
+      },
+      "response": {
+        "binary": {
+          "status": "{count} byte of binary data | {count} bytes of binary data"
+        },
+        "binaryNotKept": {
+          "description": "This response’s body was binary and wasn’t kept ({size})."
+        },
+        "bodyKept": {
+          "description": "Only the first {size} of this response was kept in history."
+        },
+        "find": {
+          "label": "Find in response"
+        },
+        "formatting": {
+          "loading": "Formatting response…"
+        },
+        "headersCount": {
+          "status": "{shown} of {count} header | {shown} of {count} headers"
+        },
+        "headersFilter": {
+          "placeholder": "Filter headers"
+        },
+        "timeTooltip": {
+          "tooltip": "See where the time went"
+        },
+        "truncated": {
+          "description": "Response truncated at {size}. The server sent more than that."
+        },
+        "viewHistory": {
+          "label": "View history ({count} past response) | View history ({count} past responses)"
+        },
+        "viewing": {
+          "status": "Viewing the response from {time} · {method} {url}"
+        }
+      },
+      "settings": {
+        "disableJar": {
+          "label": "Disable cookie jar"
+        },
+        "editGlobal": {
+          "label": "Edit global defaults…"
+        },
+        "followRedirects": {
+          "label": "Follow redirects"
+        },
+        "global": {
+          "status": "The global default is {value}"
+        },
+        "globalNoTimeout": {
+          "status": "The global default is no timeout"
+        },
+        "globalOff": {
+          "status": "The global default is off"
+        },
+        "globalOn": {
+          "status": "The global default is on"
+        },
+        "globalUnlimited": {
+          "status": "The global default is unlimited"
+        },
+        "maxRedirects": {
+          "label": "Max redirects"
+        },
+        "maxResponse": {
+          "label": "Max response size in megabytes"
+        },
+        "redirectsOff": {
+          "description": "Follow redirects is off, so this has no effect."
+        },
+        "timeout": {
+          "label": "Request timeout (ms)"
+        },
+        "verifySsl": {
+          "label": "Verify SSL certificates"
+        },
+        "version": {
+          "label": "HTTP version"
+        },
+        "versionOption": {
+          "option": "HTTP/{version}"
+        }
+      },
+      "sslOff": {
+        "tooltip": "Certificate verification is off for this request"
+      },
+      "timeline": {
+        "attempts": {
+          "hint": "{count} connection attempts. The first pooled connection was no longer usable."
+        },
+        "failed": {
+          "empty": "This request failed before any timeline was captured"
+        },
+        "failedConnect": {
+          "description": "The request failed while connecting to the server. The steps below are what completed before it did."
+        },
+        "failedDownload": {
+          "description": "The request failed during the download. The steps below are what completed before it did."
+        },
+        "failedTls": {
+          "description": "The request failed during the TLS handshake. The steps below are what completed before it did."
+        },
+        "failedWait": {
+          "description": "The request failed while waiting for a response. The steps below are what completed before it did."
+        },
+        "headersElided": {
+          "hint": "Some response headers for this hop are not shown."
+        },
+        "info1xx": {
+          "hint": "The server sent {codes} before the final response. The wait figure ends at the first of those."
+        },
+        "noConnect": {
+          "tooltip": "No connect step because the connection was reused"
+        },
+        "noDnsIp": {
+          "tooltip": "No DNS lookup because the URL names an IP address"
+        },
+        "noDnsReused": {
+          "tooltip": "No DNS lookup because the connection was reused"
+        },
+        "noDownload": {
+          "tooltip": "No download because no response bytes ever arrived"
+        },
+        "none": {
+          "empty": "No timeline for this response"
+        },
+        "noTlsPlain": {
+          "tooltip": "No TLS handshake because the request used plain HTTP"
+        },
+        "noTlsReused": {
+          "tooltip": "No TLS handshake because the connection was reused"
+        },
+        "noWait": {
+          "tooltip": "The server began responding before the request was fully sent, so there is no wait interval to report"
+        },
+        "phase": {
+          "dns": {
+            "label": "DNS"
+          },
+          "wait": {
+            "label": "Wait"
+          }
+        },
+        "recorded": {
+          "description": "This timeline was recorded when the response was received."
+        },
+        "residue": {
+          "hint": "{duration} of this hop is not attributed to a phase. For a request through an HTTP proxy this is the tunnel setup, which isn’t reported separately."
+        },
+        "responseHeaders": {
+          "label": "Response headers"
+        },
+        "reused": {
+          "hint": "Reused an existing connection. No DNS lookup, connect step or TLS handshake was needed."
+        },
+        "reusedIdle": {
+          "hint": "Reused an existing connection (idle {idle}). No DNS lookup, connect step or TLS handshake was needed."
+        },
+        "summary": {
+          "status": "{count} hop · {total} total | {count} hops · {total} total"
+        },
+        "summaryReused": {
+          "status": "{count} hop · {total} total · connection reused | {count} hops · {total} total · connection reused"
+        },
+        "unattributed": {
+          "label": "Unattributed"
+        }
+      },
+      "url": {
+        "example": "https://api.example.com/users"
+      },
+      "view": {
+        "pretty": {
+          "label": "Pretty"
         }
       }
     },
@@ -8797,9 +9549,6 @@
         },
         "browseObjects": {
           "label": "Browse objects"
-        },
-        "connect": {
-          "label": "Connect"
         },
         "copyQualifiedName": {
           "announce": "Copied qualified name",

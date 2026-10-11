@@ -11,6 +11,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -30,10 +31,10 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ reload: [] }>();
 
-const SOURCE_OPTIONS = [
-  { value: 'reflection' as const, label: 'Reflection', testid: 'grpc-source-reflection' },
-  { value: 'proto' as const, label: '.proto file', testid: 'grpc-source-proto' },
-];
+const SOURCE_OPTIONS = computed(() => [
+  { value: 'reflection' as const, label: t('studio.grpc.schema.source.reflection.option'), testid: 'grpc-source-reflection' },
+  { value: 'proto' as const, label: t('studio.grpc.schema.source.proto.option'), testid: 'grpc-source-proto' },
+]);
 
 function setDescriptorMode(mode: 'reflection' | 'proto'): void {
   patchGrpcRequestTabState(props.tab.id, { descriptorMode: mode });
@@ -45,7 +46,7 @@ function onTargetInput(value: string): void {
 
 async function chooseProtoFile(): Promise<void> {
   const chosen = await control.filesChooseOpen({
-    title: 'Choose a .proto file',
+    title: t('studio.grpc.schema.chooseProto.title'),
     filters: [{ name: 'Protocol Buffers', extensions: ['proto'] }],
   });
   if (chosen.canceled || !chosen.file) return;
@@ -109,7 +110,7 @@ function selectMethod(service: string, method: string): void {
         <Input
           size="kira"
           :model-value="tab.state.target"
-          placeholder="api.example.com:443"
+          :placeholder="t('studio.grpc.target.example')"
           class="flex-1"
           data-testid="grpc-schema-target"
           @update:model-value="onTargetInput($event.toString())"
@@ -119,13 +120,13 @@ function selectMethod(service: string, method: string): void {
         <Input
           size="kira"
           :model-value="tab.state.protoPath"
-          placeholder="No .proto file chosen"
+          :placeholder="t('studio.grpc.schema.noProto.placeholder')"
           readonly
           class="flex-1"
           data-testid="grpc-proto-path"
         />
         <Button variant="toolbar" size="kira" data-testid="grpc-choose-proto" @click="chooseProtoFile">
-          Choose…
+          {{ t('common.action.choose.label') }}
         </Button>
       </template>
       <Button
@@ -136,12 +137,12 @@ function selectMethod(service: string, method: string): void {
         @click="emit('reload')"
       >
         <CodiconIcon name="refresh" :size="13" />
-        Reload
+        {{ t('common.action.refresh.label') }}
       </Button>
     </ViewToolbar>
 
     <div v-if="tab.state.descriptorMode === 'proto'" class="flex flex-col gap-0.5 border-b border-border px-1.5 py-1" data-testid="grpc-import-paths">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Import paths</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.grpc.schema.importPaths.label') }}</span>
       <!-- D14: a real cap + scroll, so a large .proto tree's import list can never push the
            source row and the whole service browser off the pane. -->
       <div class="flex max-h-32 flex-col overflow-auto">
@@ -154,25 +155,25 @@ function selectMethod(service: string, method: string): void {
           </Tooltip>
           <TooltipIconButton
             icon="close"
-            label="Remove"
+            :label="t('common.action.remove.label')"
             class="ml-auto"
             @click="removeImportPath(i)"
           />
         </div>
         <div v-if="tab.state.importPaths.length === 0" class="text-kira-sm text-subtle">
-          No import paths — the .proto file's own directory is used
+          {{ t('studio.grpc.schema.noImportPaths.empty') }}
         </div>
       </div>
       <div class="flex items-center gap-1">
         <Input
           v-model="newImportPath"
           size="kira"
-          placeholder="Add an import path…"
+          :placeholder="t('studio.grpc.schema.addImportPath.placeholder')"
           data-testid="grpc-new-import-path"
           @keydown.enter="addImportPath"
         />
         <Button variant="toolbar" size="kira" data-testid="grpc-add-import-path" @click="addImportPath">
-          Add
+          {{ t('common.action.add.label') }}
         </Button>
       </div>
     </div>
@@ -181,7 +182,7 @@ function selectMethod(service: string, method: string): void {
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
-    <SearchField v-if="schema && schema.services.length > 0" v-model="filterQuery" placeholder="Filter services and methods" data-testid="grpc-schema-filter" />
+    <SearchField v-if="schema && schema.services.length > 0" v-model="filterQuery" :placeholder="t('studio.grpc.schema.filter.placeholder')" data-testid="grpc-schema-filter" />
     <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
       <template v-if="schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.fullName" class="mb-1.5">
@@ -203,9 +204,9 @@ function selectMethod(service: string, method: string): void {
               variant="ok"
               data-testid="grpc-method-streaming-badge"
             >
-              STREAM
+              {{ t('shared.grpc.streaming.stream.label') }}
             </Badge>
-            <Badge v-else variant="info" data-testid="grpc-method-streaming-badge">UNARY</Badge>
+            <Badge v-else variant="info" data-testid="grpc-method-streaming-badge">{{ t('shared.grpc.streaming.unary.label') }}</Badge>
           </button>
         </div>
       </template>
@@ -214,11 +215,11 @@ function selectMethod(service: string, method: string): void {
         data-testid="grpc-schema-filter-empty"
       >
         <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>No matches</EmptyTitle>
+        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
       </Empty>
       <Empty v-else-if="!loading">
         <EmptyMedia><CodiconIcon name="symbol-interface" :size="24" /></EmptyMedia>
-        <EmptyTitle>Choose a source above to browse this server's services</EmptyTitle>
+        <EmptyTitle>{{ t('studio.grpc.schema.chooseSource.empty') }}</EmptyTitle>
       </Empty>
     </div>
   </div>

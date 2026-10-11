@@ -5,6 +5,7 @@ import type {
   GrpcMessageWire,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import { t } from '@theme/i18n';
 import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
@@ -185,7 +186,7 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
       rt.status = 'error';
       rt.error = {
         code: 'client',
-        message: 'Method not resolved yet — the schema is still loading.',
+        message: t('studio.grpc.call.methodUnresolved.error'),
       };
       return;
     }

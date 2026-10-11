@@ -7,6 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { formatDuration } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
@@ -39,42 +40,44 @@ const failedTimeline = computed(() => {
 });
 const activeTimeline = computed(() => timeline.value ?? failedTimeline.value);
 
-// D13: "The request failed during {phase}." — inferred from which of the send's own measured
+// D13: the failure sentence — inferred from which of the send's own measured
 // phases the failed hop actually has, the same evidence the hop's own phase list already shows.
-function failurePhaseText(hop: HttpTimelineHop): string {
-  if (!hop.dns && !hop.connect) return 'connecting to the server';
-  if (hop.connect && !hop.tls && hop.url.startsWith('https:')) return 'the TLS handshake';
-  if (!hop.wait && !hop.download) return 'waiting for a response';
-  return 'the download';
+function failureText(hop: HttpTimelineHop): string {
+  if (!hop.dns && !hop.connect) return t('studio.http.timeline.failedConnect.description');
+  if (hop.connect && !hop.tls && hop.url.startsWith('https:'))
+    return t('studio.http.timeline.failedTls.description');
+  if (!hop.wait && !hop.download) return t('studio.http.timeline.failedWait.description');
+  return t('studio.http.timeline.failedDownload.description');
 }
 
 // F18's one extension to RunState.vue's own ms/s convention: a sub-millisecond figure keeps two
 // decimals rather than rounding to "0 ms" — the reused-connection case this pane exists to explain
 // is exactly the sub-millisecond one (D4).
 function formatHopMs(ms: number): string {
-  return ms < 1 ? `${ms.toFixed(2)} ms` : formatDuration(ms);
+  return ms < 1 ? t('format.duration.ms', { value: ms.toFixed(2) }) : formatDuration(ms);
 }
 
 const summary = computed(() => {
   const tl = timeline.value;
   if (!tl) return '';
   const n = tl.hops.length;
-  let text = `${n} hop${n === 1 ? '' : 's'} · ${formatHopMs(tl.totalMs)} total`;
-  if (tl.hops[0]?.reused) text += ' · connection reused';
-  return text;
+  const key = tl.hops[0]?.reused
+    ? 'studio.http.timeline.summaryReused.status'
+    : 'studio.http.timeline.summary.status';
+  return t(key, { count: n, total: formatHopMs(tl.totalMs) });
 });
 
 interface PhaseSegment {
   key: 'dns' | 'connect' | 'tls' | 'wait' | 'download';
-  label: string;
+  labelKey: MessageKey;
   bgClass: string;
 }
 const PHASE_SEGMENTS: readonly PhaseSegment[] = [
-  { key: 'dns', label: 'DNS', bgClass: 'bg-conn-violet' },
-  { key: 'connect', label: 'Connect', bgClass: 'bg-conn-blue' },
-  { key: 'tls', label: 'TLS', bgClass: 'bg-conn-teal' },
-  { key: 'wait', label: 'Wait', bgClass: 'bg-conn-amber' },
-  { key: 'download', label: 'Download', bgClass: 'bg-conn-green' },
+  { key: 'dns', labelKey: 'studio.http.timeline.phase.dns.label', bgClass: 'bg-conn-violet' },
+  { key: 'connect', labelKey: 'common.action.connect.label', bgClass: 'bg-conn-blue' },
+  { key: 'tls', labelKey: 'studio.common.tls.label', bgClass: 'bg-conn-teal' },
+  { key: 'wait', labelKey: 'studio.http.timeline.phase.wait.label', bgClass: 'bg-conn-amber' },
+  { key: 'download', labelKey: 'common.action.download.label', bgClass: 'bg-conn-green' },
 ];
 // D12: a hop whose own total is a rounding sliver of the send still renders a visible bar, so a
 // sub-millisecond reused hop is seen rather than a hairline.
@@ -125,45 +128,50 @@ function residueIsNotable(hop: HttpTimelineHop): boolean {
 // measurements it cites.
 function phaseTooltip(hop: HttpTimelineHop, key: PhaseSegment['key']): string {
   if (key === 'dns') {
-    return hop.reused
-      ? 'No DNS lookup — the connection was reused.'
-      : 'No DNS lookup — the URL names an IP address.';
+    return t(
+      hop.reused
+        ? 'studio.http.timeline.noDnsReused.tooltip'
+        : 'studio.http.timeline.noDnsIp.tooltip',
+    );
   }
-  if (key === 'connect') return 'No TCP connect — the connection was reused.';
+  if (key === 'connect') return t('studio.http.timeline.noConnect.tooltip');
   if (key === 'tls') {
-    return hop.reused
-      ? 'No TLS handshake — the connection was reused.'
-      : 'No TLS handshake — the request used plain HTTP.';
+    return t(
+      hop.reused
+        ? 'studio.http.timeline.noTlsReused.tooltip'
+        : 'studio.http.timeline.noTlsPlain.tooltip',
+    );
   }
   if (key === 'download') {
-    return 'No download — no response bytes ever arrived.';
+    return t('studio.http.timeline.noDownload.tooltip');
   }
   // wait
-  return 'The server began responding before the request was fully sent, so there is no wait interval to report.';
+  return t('studio.http.timeline.noWait.tooltip');
 }
 
 function reuseNote(hop: HttpTimelineHop): string {
   if (!hop.reused) {
-    if (!hop.dns && !hop.connect) return 'No DNS lookup — the URL names an IP address.';
+    if (!hop.dns && !hop.connect) return t('studio.http.timeline.noDnsIp.tooltip');
     return '';
   }
-  const idle = hop.idleMs !== undefined ? ` (idle ${formatHopMs(hop.idleMs)})` : '';
-  return `Reused an existing connection${idle} — no DNS lookup, TCP connect or TLS handshake was needed.`;
+  return hop.idleMs !== undefined
+    ? t('studio.http.timeline.reusedIdle.hint', { idle: formatHopMs(hop.idleMs) })
+    : t('studio.http.timeline.reused.hint');
 }
 
 function attemptsNote(hop: HttpTimelineHop): string {
   if (hop.connAttempts <= 1) return '';
-  return `${hop.connAttempts} connection attempts — the first pooled connection was no longer usable.`;
+  return t('studio.http.timeline.attempts.hint', { count: hop.connAttempts });
 }
 
 function info1xxNote(hop: HttpTimelineHop): string {
   if (!hop.info1xx || hop.info1xx.length === 0) return '';
-  return `The server sent ${hop.info1xx.join(', ')} before the final response; the wait figure ends at the first of those.`;
+  return t('studio.http.timeline.info1xx.hint', { codes: hop.info1xx.join(', ') });
 }
 
 function residueNote(hop: HttpTimelineHop): string {
   if (!residueIsNotable(hop)) return '';
-  return `${formatHopMs(residueMs(hop))} of this hop is not attributed to a phase — for a request through an HTTP proxy this is the CONNECT tunnel setup, which Go does not report separately.`;
+  return t('studio.http.timeline.residue.hint', { duration: formatHopMs(residueMs(hop)) });
 }
 
 // D11: a "note" that fires on the common case (a reused connection is the common case) is a
@@ -187,7 +195,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
   if (hop.headersElided) {
     notes.push({
       testid: 'http-timeline-headers-elided-note',
-      text: 'Some response headers for this hop are not shown.',
+      text: t('studio.http.timeline.headersElided.hint'),
     });
   }
   return notes;
@@ -201,13 +209,12 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
            request never got past, from the same measured phases the hop below already shows. -->
       <Alert v-if="failedTimeline" variant="error" data-testid="http-timeline-failure-note">
         <AlertDescription>
-          The request failed during {{ failurePhaseText(failedTimeline.hops[failedTimeline.hops.length - 1]) }}.
-          The steps below are what completed before it did.
+          {{ failureText(failedTimeline.hops[failedTimeline.hops.length - 1]) }}
         </AlertDescription>
       </Alert>
       <Alert v-else-if="viewingStored" variant="info" data-testid="http-timeline-stored-note">
         <AlertDescription>
-          This timeline was recorded when the response was received.
+          {{ t('studio.http.timeline.recorded.description') }}
         </AlertDescription>
       </Alert>
 
@@ -217,10 +224,10 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
         </div>
         <div class="flex flex-wrap gap-1.5 px-0.5 text-kira-sm text-subtle" data-testid="http-timeline-legend">
           <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="inline-flex items-center gap-0.5">
-            <span class="inline-block h-2 w-2 rounded-kira-sm" :class="seg.bgClass" />{{ seg.label }}
+            <span class="inline-block h-2 w-2 rounded-kira-sm" :class="seg.bgClass" />{{ t(seg.labelKey) }}
           </span>
           <span class="inline-flex items-center gap-0.5">
-            <span class="inline-block h-2 w-2 rounded-kira-sm bg-conn-grey" />Unattributed
+            <span class="inline-block h-2 w-2 rounded-kira-sm bg-conn-grey" />{{ t('studio.http.timeline.unattributed.label') }}
           </span>
         </div>
       </div>
@@ -265,13 +272,13 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
                   <span class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="false">
-                    {{ seg.label }} —
+                    {{ t(seg.labelKey) }} —
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>{{ phaseTooltip(hop, seg.key) }}</TooltipContent>
               </Tooltip>
               <span v-else class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="true">
-                {{ seg.label }} {{ formatHopMs(hop[seg.key]!.durationMs) }}
+                {{ t(seg.labelKey) }} {{ formatHopMs(hop[seg.key]!.durationMs) }}
               </span>
             </template>
           </div>
@@ -284,7 +291,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <summary
               class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
             >
-              Response headers
+              {{ t('studio.http.timeline.responseHeaders.label') }}
             </summary>
             <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-sm py-0.5">
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
@@ -298,7 +305,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <summary
               class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
             >
-              Response headers
+              {{ t('studio.http.timeline.responseHeaders.label') }}
             </summary>
             <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-sm py-0.5">
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
@@ -311,15 +318,15 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 
     <Empty v-else-if="response" data-testid="http-timeline-empty">
       <EmptyMedia><CodiconIcon name="watch" :size="24" /></EmptyMedia>
-      <EmptyTitle>No timeline for this response</EmptyTitle>
+      <EmptyTitle>{{ t('studio.http.timeline.none.empty') }}</EmptyTitle>
     </Empty>
     <Empty v-else-if="rt?.status === 'error'" data-testid="http-timeline-empty">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This request failed before any timeline was captured</EmptyTitle>
+      <EmptyTitle>{{ t('studio.http.timeline.failed.empty') }}</EmptyTitle>
     </Empty>
     <Empty v-else>
       <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-      <EmptyTitle>Send a request to see the response</EmptyTitle>
+      <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
     </Empty>
     <!-- P110 I2-17: `.hop-phase[data-present='false']` moved onto the span's own
          `data-[present=false]:opacity-60` (compile-verified) -- no test locates by `.hop-phase`. -->

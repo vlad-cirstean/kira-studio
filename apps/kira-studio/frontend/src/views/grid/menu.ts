@@ -1,7 +1,8 @@
 import type { MaskKind, MaskRule } from '@shared/domain/mask';
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
-import { copyAnnounced } from '@workbench/behaviour/clipboard';
+import { type MessageKey, t } from '@theme/i18n';
+import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { maskRulesFor, removeMaskRule, upsertMaskRule } from '../../state/maskRules';
 import { useTabsStore } from '../../state/tabs';
@@ -148,7 +149,7 @@ function fkNavItem(idPrefix: string, entry: ForeignKeyMeta, ctx: FkNavContext): 
     id: `${idPrefix}-${entry.name}`,
     label:
       idPrefix === 'go-to-referenced'
-        ? `Go to referenced row (${label})`
+        ? t('studio.grid.menu.goToReferenced.label', { table: label })
         : `${label}.${entry.referencedColumns.join(', ')}`,
     icon: idPrefix === 'go-to-referenced' ? 'arrow-right' : 'references',
     disabled:
@@ -179,7 +180,7 @@ function fkEditItem(entry: ForeignKeyMeta, ctx: FkNavContext): MenuItem {
   return {
     type: 'item',
     id: `edit-referenced-${entry.name}`,
-    label: `Edit referenced row (${label})`,
+    label: t('studio.grid.menu.editReferenced.label', { table: label }),
     icon: 'edit',
     disabled:
       foreignKeyValueFilter(ctx.dialect, entry.columns, entry.referencedColumns, ctx.rowValues) ===
@@ -224,7 +225,13 @@ function referencedByMenuItems(
   const items = referencedByItems(columnName, meta, ctx);
   if (items.length === 0) return [];
   return [
-    { type: 'submenu', id: 'referenced-by', label: 'Referenced by', icon: 'references', items },
+    {
+      type: 'submenu',
+      id: 'referenced-by',
+      label: t('studio.definition.constraint.type.referencedBy.label'),
+      icon: 'references',
+      items,
+    },
   ];
 }
 
@@ -299,7 +306,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'copy',
-      label: 'Copy',
+      label: t('common.action.copy.label'),
       icon: 'copy',
       // P21 D5: display-only — DataGrid.vue's onKeydown already binds Cmd/Ctrl+C, but its
       // behavior branches on selection kind (cell/range/row/column) in a way one menu row can't
@@ -308,27 +315,35 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       // F5 (P108 Part 10): through tsvField, same as SlickGridHost.vue's own onCopy cell-kind
       // branch — the same "copy this one cell" action must produce the same clipboard text
       // regardless of which of the two paths (keyboard vs. this menu item) ran it.
-      run: () => void copyAnnounced(ctx.isNull ? '' : tsvField(ctx.text), 'cell'),
+      run: () =>
+        void copyAndAnnounce(ctx.isNull ? '' : tsvField(ctx.text), t('studio.copy.cell.announce')),
     },
     {
       type: 'item',
       id: 'copy-with-header',
-      label: 'Copy with header',
+      label: t('studio.copy.withHeader.label'),
       icon: 'copy',
       run: () =>
-        void copyAnnounced(`${ctx.columnName}\n${ctx.isNull ? '' : ctx.text}`, 'with header'),
+        void copyAndAnnounce(
+          `${ctx.columnName}\n${ctx.isNull ? '' : ctx.text}`,
+          t('studio.copy.withHeader.announce'),
+        ),
     },
     {
       type: 'item',
       id: 'copy-as-json',
-      label: 'Copy as JSON',
+      label: t('common.action.copyAsJson.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(JSON.stringify(ctx.isNull ? null : ctx.text), 'as JSON'),
+      run: () =>
+        void copyAndAnnounce(
+          JSON.stringify(ctx.isNull ? null : ctx.text),
+          t('common.copy.copiedJson.announce'),
+        ),
     },
     {
       type: 'item',
       id: 'paste',
-      label: 'Paste',
+      label: t('common.action.paste.label'),
       icon: 'clippy',
       disabled: !ctx.canEdit,
       shortcut: 'grid.paste',
@@ -338,7 +353,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'edit',
-      label: 'Edit',
+      label: t('common.action.edit.label'),
       icon: 'edit',
       disabled: editDisabled,
       shortcut: 'grid.edit',
@@ -347,7 +362,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'set-null',
-      label: 'Set NULL',
+      label: t('studio.grid.menu.setNull.label'),
       disabled: editDisabled,
       run: () => usePendingChangesStore().stageNull(ctx.tabId, ctx.row, ctx.columnName),
     },
@@ -358,7 +373,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       // key and DataGrid.vue's D32 keyboard handler can't drift apart.
       type: 'item',
       id: 'delete-row',
-      label: 'Delete row',
+      label: t('studio.grid.deleteRows.label', { count: 1 }),
       icon: 'trash',
       danger: true,
       disabled: !ctx.canDelete,
@@ -368,7 +383,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'filter-by-value',
-      label: 'Filter by this value',
+      label: t('studio.grid.menu.filterByValue.label'),
       icon: 'filter',
       disabled: filterDisabled,
       // Replaces (not appends to) the current filter — a deliberate narrowing action, not an
@@ -421,38 +436,39 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
     {
       type: 'submenu',
       id: 'copy-rows',
-      label: 'Copy row(s)',
+      label: t('studio.copy.rows.label'),
       icon: 'copy',
       items: [
         {
           type: 'item',
           id: 'copy-rows-tsv',
-          label: 'TSV',
+          label: t('studio.copy.format.tsv.label'),
           // Display-only (P21 D5) — the row-selection branch of DataGrid.vue's onCopy already
           // produces this exact TSV output on Cmd/Ctrl+C.
           shortcut: 'grid.copy',
-          run: () => void copyAnnounced(rowsToTsv(snapshots()), 'as TSV'),
+          run: () => void copyAndAnnounce(rowsToTsv(snapshots()), t('studio.copy.tsv.announce')),
         },
         {
           type: 'item',
           id: 'copy-rows-csv',
-          label: 'CSV',
-          run: () => void copyAnnounced(rowsToCsv(snapshots()), 'as CSV'),
+          label: t('studio.copy.format.csv.label'),
+          run: () => void copyAndAnnounce(rowsToCsv(snapshots()), t('studio.copy.csv.announce')),
         },
         {
           type: 'item',
           id: 'copy-rows-json',
-          label: 'JSON',
-          run: () => void copyAnnounced(rowsToJson(snapshots()), 'as JSON'),
+          label: t('studio.copy.format.json.label'),
+          run: () =>
+            void copyAndAnnounce(rowsToJson(snapshots()), t('common.copy.copiedJson.announce')),
         },
         {
           type: 'item',
           id: 'copy-rows-insert',
-          label: 'INSERT',
+          label: t('studio.copy.insert.label'),
           run: () =>
-            void copyAnnounced(
+            void copyAndAnnounce(
               rowsToInsert(ctx.qualifiedName, snapshots(), ctx.dialect),
-              'as INSERT',
+              t('studio.copy.insert.announce'),
             ),
         },
       ],
@@ -460,7 +476,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'duplicate-row',
-      label: 'Duplicate row(s)',
+      label: t('studio.grid.menu.duplicateRows.label', { count: ctx.rows.length }),
       icon: 'copy',
       disabled: !ctx.canEdit,
       shortcut: 'grid.duplicateRows',
@@ -472,7 +488,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'revert-row',
-      label: 'Revert row(s)',
+      label: t('studio.grid.menu.revertRows.label', { count: ctx.rows.length }),
       icon: 'discard',
       // Only offered when at least one row in the selection actually has something staged
       // (an edit and/or a pending delete) — otherwise "Revert" would be a no-op every time.
@@ -485,7 +501,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'delete-row',
-      label: 'Delete row(s)',
+      label: t('studio.grid.deleteRows.label', { count: ctx.rows.length }),
       icon: 'trash',
       danger: true,
       disabled: !ctx.canDelete,
@@ -513,13 +529,13 @@ export interface HeaderMenuContext {
 // table uses. Deliberately not exhaustive of every field a rule carries (keepHint/correlate stay
 // at their sensible defaults here — the Privacy tab, §7.4, is where those get tuned) — "mark this
 // column PII" is meant to be one click, not a form.
-const MASK_KIND_CHOICES: { kind: MaskKind; label: string }[] = [
-  { kind: 'name', label: 'Name' },
-  { kind: 'email', label: 'Email' },
-  { kind: 'text', label: 'Text' },
-  { kind: 'number', label: 'Number' },
-  { kind: 'date', label: 'Date' },
-  { kind: 'redact', label: 'Redact' },
+const MASK_KIND_CHOICES: { kind: MaskKind; labelKey: MessageKey }[] = [
+  { kind: 'name', labelKey: 'common.field.name.label' },
+  { kind: 'email', labelKey: 'common.field.email.label' },
+  { kind: 'text', labelKey: 'common.field.text.label' },
+  { kind: 'number', labelKey: 'common.field.number.label' },
+  { kind: 'date', labelKey: 'common.field.date.label' },
+  { kind: 'redact', labelKey: 'studio.project.connectionDialog.redact.label' },
 ];
 
 // §2.3: number never correlates (a bucket is many-to-one); date defaults off ("a masked date is a
@@ -561,10 +577,7 @@ async function markColumnMaskKind(ctx: HeaderMenuContext, kind: MaskKind): Promi
   // rule itself is still saved either way, so say why the preview did not also turn on rather than
   // leaving it looking like the menu action had no effect (M7 finding).
   if (!useGridViewStore().setMaskPreview(ctx.tabId, true)) {
-    useGridViewStore().setActionError(
-      ctx.tabId,
-      'Marked as PII. Commit or discard pending changes to preview it.',
-    );
+    useGridViewStore().setActionError(ctx.tabId, t('studio.grid.menu.markedSensitive.error'));
   }
 }
 
@@ -583,7 +596,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'sort-asc',
-      label: 'Sort asc',
+      label: t('studio.grid.menu.sortAsc.label'),
       run: () =>
         void useGridViewStore().setSort(ctx.tabId, {
           kind: 'structured',
@@ -593,7 +606,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'sort-desc',
-      label: 'Sort desc',
+      label: t('studio.grid.menu.sortDesc.label'),
       run: () =>
         void useGridViewStore().setSort(ctx.tabId, {
           kind: 'structured',
@@ -603,7 +616,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'clear-sort',
-      label: 'Clear sort',
+      label: t('studio.grid.menu.clearSort.label'),
       disabled: ctx.currentSort === null,
       run: () => void useGridViewStore().setSort(ctx.tabId, null),
     },
@@ -611,7 +624,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'hide-column',
-      label: 'Hide column',
+      label: t('studio.grid.menu.hideColumn.label'),
       // D8: reuses the same setProjection() ColumnsMenu.vue calls — no second, competing
       // "which columns are shown" mechanism. F1/P21 round 1 note: this deliberately does not lock
       // out every primary-key column the way ColumnsMenu.vue's own checkbox does — hiding one
@@ -633,40 +646,41 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'show-all-columns',
-      label: 'Show all columns',
+      label: t('studio.grid.menu.showAllColumns.label'),
       run: () => void useGridViewStore().setProjection(ctx.tabId, null),
     },
     { type: 'separator' },
     {
       type: 'item',
       id: 'copy-column-name',
-      label: 'Copy column name',
+      label: t('studio.copy.columnName.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(ctx.columnName, 'column name'),
+      run: () => void copyAndAnnounce(ctx.columnName, t('studio.copy.columnName.announce')),
     },
     {
       type: 'item',
       id: 'copy-column-values',
-      label: 'Copy column values',
+      label: t('studio.copy.columnValues.label'),
       icon: 'copy',
       // Display-only (P21 D5): onHeaderContextMenu sets a `column` selection before this menu
       // opens, and onCopy's final branch already copies that column's loaded values on
       // Cmd/Ctrl+C — a binding that worked before this phase but was never shown anywhere.
       shortcut: 'grid.copy',
-      run: () => void copyAnnounced(ctx.columnValues().join('\n'), 'column values'),
+      run: () =>
+        void copyAndAnnounce(ctx.columnValues().join('\n'), t('studio.copy.columnValues.announce')),
     },
     { type: 'separator' },
     {
       type: 'submenu',
       id: 'mark-pii',
-      label: 'Mark column as PII',
+      label: t('studio.grid.menu.markSensitive.label'),
       icon: 'shield',
       items: [
         ...MASK_KIND_CHOICES.map(
-          ({ kind, label }): MenuItem => ({
+          ({ kind, labelKey }): MenuItem => ({
             type: 'item',
             id: `mask-${kind}`,
-            label,
+            label: t(labelKey),
             checked: currentMaskRule?.kind === kind,
             run: () => markColumnMaskKind(ctx, kind),
           }),
@@ -675,7 +689,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
         {
           type: 'item',
           id: 'mask-none',
-          label: 'Not PII',
+          label: t('studio.grid.menu.notSensitive.label'),
           checked: !currentMaskRule,
           run: () => clearColumnMask(ctx),
         },

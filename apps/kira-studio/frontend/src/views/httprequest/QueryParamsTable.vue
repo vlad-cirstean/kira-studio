@@ -6,6 +6,7 @@ import {
   reconcileParamDescriptions,
   splitUrl,
 } from '@kira/api-core';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -60,8 +61,8 @@ function onUpdateRows(next: ParamRow[]): void {
   <FieldRowsTable
     :rows="pairs"
     :blank-row="blankParam"
-    name-placeholder="key"
-    value-placeholder="value"
+    :name-placeholder="t('common.field.key.label')"
+    :value-placeholder="t('common.field.value.label')"
     testid-prefix="http-param"
     container-testid="http-params-table"
     :value-variable-support="variables"

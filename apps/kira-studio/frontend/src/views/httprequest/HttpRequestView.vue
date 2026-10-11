@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  bodyBadgeLabel,
   canEditAsRaw,
   defaultContentTypeFor,
   generateRawRequest,
@@ -25,6 +24,7 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
 import { refDebounced } from '@vueuse/core';
@@ -54,6 +54,7 @@ import ResponseFindBar, {
 } from '../shared/ResponseFindBar.vue';
 import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
+import { bodyTabLabel } from './bodyTabLabel';
 import CookiesPane from './CookiesPane.vue';
 import { useJarCookies } from './cookies';
 import QueryParamsTable from './QueryParamsTable.vue';
@@ -231,8 +232,8 @@ async function onCopyAsCurl(): Promise<void> {
 const canEditRaw = computed(() => canEditAsRaw(props.tab.state.bodyMode));
 const editRawTooltip = computed(() =>
   canEditRaw.value
-    ? 'Edit as raw HTTP…'
-    : 'A form-data or binary body has no text form that can be edited and parsed back — a file part is bytes on disk, not text. Its wire form is in the response pane’s Raw view.',
+    ? t('studio.api.editRaw.title')
+    : t('studio.http.editRaw.unavailable.tooltip'),
 );
 
 // P9 D9: the buffer is generated pre-substitution, from the tab's own text — {{variables}} appear
@@ -298,9 +299,14 @@ const unresolvedRefs = computed(() => {
   );
   return [...byName.values()];
 });
+const saveTooltip = computed(() => {
+  if (incognito.value) return t('studio.api.common.save.incognito.tooltip');
+  if (unresolved.value) return t('studio.api.common.save.checking.tooltip');
+  return t(canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip');
+});
 const unresolvedTooltip = computed(() =>
   unresolvedRefs.value
-    .map((r) => (r.kind === 'dynamic' ? `${r.name} — unknown dynamic value` : r.name))
+    .map((r) => (r.kind === 'dynamic' ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name }) : r.name))
     .join(', '),
 );
 
@@ -325,28 +331,39 @@ const requestCookiesCount = computed(() => jarCookies.data.value?.length ?? 0);
 const REQUEST_PANE_OPTIONS = computed(() => [
   {
     value: 'params' as const,
-    label: paramsCount.value > 0 ? `Params (${paramsCount.value})` : 'Params',
+    label:
+      paramsCount.value > 0
+        ? t('studio.http.pane.paramsCount.label', { count: paramsCount.value })
+        : t('studio.http.pane.params.label'),
     testid: 'http-request-pane-params',
   },
   {
     value: 'headers' as const,
-    label: headersCount.value > 0 ? `Headers (${headersCount.value})` : 'Headers',
+    label:
+      headersCount.value > 0
+        ? t('studio.http.pane.headersCount.label', { count: headersCount.value })
+        : t('studio.http.pane.headers.label'),
     testid: 'http-request-pane-headers',
   },
   {
     value: 'body' as const,
-    label: bodyBadgeLabel(props.tab.state),
+    label: bodyTabLabel(props.tab.state),
     testid: 'http-request-pane-body',
   },
   {
     value: 'settings' as const,
     label:
-      settingsOverrideCount.value > 0 ? `Settings (${settingsOverrideCount.value})` : 'Settings',
+      settingsOverrideCount.value > 0
+        ? t('studio.http.pane.settingsCount.label', { count: settingsOverrideCount.value })
+        : t('common.module.settings.label'),
     testid: 'http-request-pane-settings',
   },
   {
     value: 'cookies' as const,
-    label: requestCookiesCount.value > 0 ? `Cookies (${requestCookiesCount.value})` : 'Cookies',
+    label:
+      requestCookiesCount.value > 0
+        ? t('studio.http.pane.cookiesCount.label', { count: requestCookiesCount.value })
+        : t('studio.http.pane.cookies.label'),
     testid: 'http-request-pane-cookies',
   },
 ]);
@@ -473,22 +490,22 @@ onUnmounted(() => {
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="http-dirty" aria-label="Unsaved changes">•</span>
+          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="http-dirty" :aria-label="t('common.state.unsavedChanges.status')">•</span>
         </TooltipTrigger>
-        <TooltipContent>Unsaved changes</TooltipContent>
+        <TooltipContent>{{ t('common.state.unsavedChanges.status') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="http-unresolved-chip">{{ unresolvedRefs.length }} unresolved</Badge>
+          <Badge variant="warn" data-testid="http-unresolved-chip">{{ t('studio.api.common.unresolved.status', { count: unresolvedRefs.length }) }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P71 §5.1: the view head's own incognito chip, beside the tab strip's icon. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
-          <Badge variant="chip" data-testid="http-incognito-chip">Incognito</Badge>
+          <Badge variant="chip" data-testid="http-incognito-chip">{{ t('studio.tabs.incognito.label') }}</Badge>
         </TooltipTrigger>
-        <TooltipContent>Nothing from this tab is saved</TooltipContent>
+        <TooltipContent>{{ t('studio.api.common.incognitoChip.tooltip') }}</TooltipContent>
       </Tooltip>
       <!-- P22b D3: Save stays ahead of the push, so it shifts position whenever the dirty mark or
            unresolved chip changes width — P15 D7 (OQ-2)'s own "first control ever placed in a view
@@ -505,11 +522,11 @@ onUnmounted(() => {
                 @click="onSave"
               >
                 <CodiconIcon name="save" :size="13" />
-                Save
+                {{ t('common.action.save.label') }}
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : unresolved ? 'Checking whether this request is still saved…' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
+          <TooltipContent>{{ saveTooltip }}</TooltipContent>
         </Tooltip>
       </span>
     </ViewToolbar>
@@ -521,13 +538,13 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           data-testid="http-request-refresh"
           @click="onSend"
         />
         <TooltipIconButton
           icon="debug-stop"
-          label="Stop"
+          :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'is-live': running }"
           :disabled="!running"
@@ -544,7 +561,7 @@ onUnmounted(() => {
         <AutocompleteField
           class="w-full"
           :model-value="tab.state.url"
-          placeholder="https://api.example.com/users"
+          :placeholder="t('studio.http.url.example')"
           data-testid="http-url"
           :candidates="variables.candidates"
           :token-at="templateToken"
@@ -562,7 +579,7 @@ onUnmounted(() => {
             <CodiconIcon name="unverified" />
           </Badge>
         </TooltipTrigger>
-        <TooltipContent>Certificate verification is off for this request</TooltipContent>
+        <TooltipContent>{{ t('studio.http.sslOff.tooltip') }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -575,11 +592,11 @@ onUnmounted(() => {
               @click="onSend"
             >
               <CodiconIcon name="play" :size="13" />
-              Send
+              {{ t('common.action.send.label') }}
             </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>
-        <TooltipContent>Send</TooltipContent>
+        <TooltipContent>{{ t('common.action.send.label') }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto" />
       <!-- P22 D4: RunState stays ahead of the toolbar-end group so a consumer's own last control
@@ -593,15 +610,15 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="terminal"
-          label="Copy as curl…"
-          aria-label="Copy as curl"
+          :label="t('studio.api.copyAsCurl.title')"
+          :aria-label="t('studio.api.copyAsCurl.title')"
           data-testid="http-copy-as-curl"
           @click="onCopyAsCurl"
         />
         <TooltipIconButton
           icon="code"
           :label="editRawTooltip"
-          aria-label="Edit as raw HTTP"
+          :aria-label="t('studio.api.editRaw.title')"
           disabled-trigger
           :disabled="!canEditRaw"
           data-testid="http-edit-raw"
@@ -609,8 +626,8 @@ onUnmounted(() => {
         />
         <TooltipIconButton
           icon="eye-closed"
-          :label="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
-          aria-label="Incognito"
+          :label="incognito ? t('studio.api.common.incognitoOff.tooltip') : t('studio.api.common.incognitoOn.tooltip')"
+          :aria-label="t('studio.tabs.incognito.label')"
           :class="{ 'bg-field text-fg': incognito }"
           data-testid="http-incognito-toggle"
           @click="toggleIncognito"
@@ -623,7 +640,7 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="showFieldFilterToggle"
         icon="search"
-        label="Filter"
+        :label="t('common.action.filter.label')"
         :class="{ 'bg-field text-fg': fieldFilterOpen }"
         data-testid="http-field-filter-toggle"
         @click="toggleFieldFilter"
@@ -631,16 +648,16 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="showFieldFilterToggle"
         icon="note"
-        :label="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
-        aria-label="Descriptions"
+        :label="tab.state.fieldDescriptions ? t('studio.api.common.descriptionsHide.tooltip') : t('studio.api.common.descriptionsShow.tooltip')"
+        :aria-label="t('studio.api.common.descriptions.aria')"
         :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
         data-testid="http-field-descriptions-toggle"
         @click="toggleFieldDescriptions"
       />
       <TooltipIconButton
         icon="search"
-        label="Find in the request body"
-        aria-label="Find in request"
+        :label="t('studio.http.request.find.label')"
+        :aria-label="t('studio.http.request.find.label')"
         :class="{ 'bg-field text-fg': requestFindOpen }"
         data-testid="http-request-find-toggle"
         @click="toggleRequestFind"
@@ -649,7 +666,7 @@ onUnmounted(() => {
         <div ref="overviewAnchorRef" class="relative flex">
           <TooltipIconButton
             icon="variable-group"
-            label="Variables"
+            :label="t('common.module.variables.label')"
             :class="{ 'bg-field text-fg': overviewOpen }"
             data-testid="http-variables-overview-toggle"
             @click="overviewOpen = !overviewOpen"
@@ -682,7 +699,7 @@ onUnmounted(() => {
         data-testid="http-request-pane"
         :style="{ flex: `0 1 ${requestPane.size.value}px` }"
       >
-        <SearchField v-if="fieldFilterOpen && showFieldFilterToggle" v-model="fieldFilterQuery" placeholder="Filter" data-testid="http-field-filter" />
+        <SearchField v-if="fieldFilterOpen && showFieldFilterToggle" v-model="fieldFilterQuery" :placeholder="t('common.action.filter.label')" data-testid="http-field-filter" />
         <QueryParamsTable
           v-if="tab.state.requestPane === 'params'"
           :tab="tab"
@@ -720,7 +737,7 @@ onUnmounted(() => {
 
       <ResizeHandle
         class="request-splitter"
-        label="Resize request pane"
+        :label="t('studio.api.common.resizeRequest.aria')"
         axis="y"
         line
         :min="120"

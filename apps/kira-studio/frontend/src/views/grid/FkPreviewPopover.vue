@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
+import { t } from '@theme/i18n';
 import PointPopover from '@workbench/components/PointPopover.vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
@@ -48,7 +49,7 @@ async function load(): Promise<void> {
   // whose filter can't be built (cellNavEntry already filters those out) — this can't happen on a
   // real click, but a filter-less fetch would be meaningless if it somehow did.
   if (filter === null) {
-    state.value = { status: 'error', message: 'no value to filter on' };
+    state.value = { status: 'error', message: t('studio.grid.fkPreview.noValue.error') };
     return;
   }
   state.value = { status: 'loading' };
@@ -103,14 +104,14 @@ onUnmounted(() => {
           variant="info"
           data-testid="fk-preview-more"
         >
-          {{ state.rows.length }} of many matching rows
+          {{ t('studio.grid.fkPreview.manyRows.status', { count: state.rows.length }) }}
         </Badge>
       </div>
 
       <div class="flex border-b border-border-strong flex-none gap-1 p-1.5">
         <Button variant="toolbar" size="kira" data-testid="fk-preview-open" @click="onOpenClick">
           <CodiconIcon name="arrow-right" :size="13" />
-          Open in new tab
+          {{ t('common.action.openInNewTab.label') }}
         </Button>
       </div>
 
@@ -122,7 +123,7 @@ onUnmounted(() => {
         </div>
         <Badge v-else-if="state.status === 'error'" variant="error">{{ state.message }}</Badge>
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="info" data-testid="fk-preview-empty">
-          <AlertDescription>No matching row in {{ tableLabel }}</AlertDescription>
+          <AlertDescription>{{ t('studio.grid.fkPreview.noMatch.empty', { table: tableLabel }) }}</AlertDescription>
         </Alert>
         <!-- `header-key` marker; look matches SlickGridHost header badges. -->
         <Table v-else-if="state.status === 'ready'" columns>
@@ -130,18 +131,18 @@ onUnmounted(() => {
             <TableRow v-for="(col, i) in state.columns" :key="col.name">
               <TableCell class="whitespace-nowrap align-top font-medium" :class="typeClassTextClass(col.typeClass)">
                 {{ col.name }}
-                <span v-if="col.isPrimaryKey" class="header-key ml-1 shrink-0 text-warn">PK</span>
-                <span v-if="col.isTarget" class="header-key ml-1 shrink-0 text-info">FK</span>
+                <span v-if="col.isPrimaryKey" class="header-key ml-1 shrink-0 text-warn">{{ t('studio.definition.primaryKey.label') }}</span>
+                <span v-if="col.isTarget" class="header-key ml-1 shrink-0 text-info">{{ t('studio.definition.foreignKey.label') }}</span>
               </TableCell>
               <TableCell class="break-words">
                 <Badge
                   v-if="state.rows[0]?.values[i]?.isNull"
                   variant="info"
                   data-testid="fk-preview-null"
-                  >NULL</Badge
+                  >{{ t('studio.common.nullValue.label') }}</Badge
                 >
                 <span v-else>{{ state.rows[0]?.values[i]?.text }}</span>
-                <Badge v-if="state.rows[0]?.values[i]?.truncated" variant="warn">truncated</Badge>
+                <Badge v-if="state.rows[0]?.values[i]?.truncated" variant="warn">{{ t('studio.common.truncated.status') }}</Badge>
               </TableCell>
             </TableRow>
           </TableBody>

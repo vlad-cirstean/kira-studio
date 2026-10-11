@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
 import { copyText } from '@workbench/behaviour/clipboard';
@@ -42,6 +43,7 @@ import {
   rowsToTsv,
   tsvField,
 } from '../shared/clipboardFormats';
+import { nullCellText, truncatedCellTip } from '../shared/page/cellText';
 import {
   alignmentFor,
   columnHeaderTooltip,
@@ -224,7 +226,7 @@ function cellFormatter(
   const isFk = !view.isNull && navColumns.fk.has(name);
   const hasNav = isFk || (!view.isNull && navColumns.pk.has(name));
   const navClasses = hasNav ? (isFk ? 'fk has-nav' : 'has-nav') : '';
-  if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
+  if (view.isNull) return { text: nullCellText(), addClasses: 'cell-null' };
   // M5 §6.2: the one visual affordance keeping a user from misreading the preview as real data —
   // `.cell-masked` (slickTheme.css) styles the `#TAG` suffix muted. `view.masked` is only ever
   // true from maskPreview.ts's own transform, never from the plain decode path, so this is a no-op
@@ -235,7 +237,7 @@ function cellFormatter(
     return {
       text: view.text,
       addClasses: classes ? `cell-truncated ${classes}` : 'cell-truncated',
-      toolTip: 'value truncated at 64 KB',
+      toolTip: truncatedCellTip(),
     };
   }
   return classes ? { text: view.text, addClasses: classes } : view.text;
@@ -499,7 +501,7 @@ function buildColumns(
     gutterColumn(GUTTER_FIELD, gutterFormatter, 'grid-gutter-cell', {
       'data-testid': 'grid-select-all',
       role: 'button',
-      'aria-label': 'Select all cells',
+      'aria-label': t('studio.grid.selectAll.aria'),
     }),
   ];
   if (!page) return cols;
@@ -1074,7 +1076,7 @@ function placeNavButtonsForRenderedCells(): void {
     btn.className = NAV_BTN_CLASS;
     btn.dataset.testid = 'cell-nav-button';
     btn.dataset.navKind = isFk ? 'fk' : 'pk';
-    btn.setAttribute('aria-label', isFk ? 'Go to referenced row' : 'Referenced by');
+    btn.setAttribute('aria-label', isFk ? t('studio.grid.nav.goTo.aria') : t('studio.definition.constraint.type.referencedBy.label'));
     const icon = document.createElement('span');
     icon.setAttribute('aria-hidden', 'true');
     icon.style.fontSize = '13px';
@@ -1238,7 +1240,7 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   zone.dataset.column = name;
   zone.dataset.colIndex = args.node.dataset.colIndex ?? '';
   zone.setAttribute('role', 'button');
-  zone.setAttribute('aria-label', 'Select column');
+  zone.setAttribute('aria-label', t('studio.grid.selectColumn.aria'));
   zone.addEventListener('click', (ev) => {
     ev.stopPropagation();
     const displayCol = Number(zone.dataset.colIndex);
@@ -1259,7 +1261,7 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   if (sortIndicator) {
     sortIndicator.dataset.testid = 'grid-header-sort';
     sortIndicator.setAttribute('role', 'button');
-    sortIndicator.setAttribute('aria-label', `Sort by ${name}`);
+    sortIndicator.setAttribute('aria-label', t('studio.grid.sortBy.aria', { name }));
     sortIndicator.tabIndex = 0;
     sortIndicator.addEventListener('click', (ev) => {
       ev.stopPropagation();
@@ -1622,7 +1624,7 @@ function insertInputTarget(
 // The dock stages by page-row index; after a reload that index names a different record.
 function dockPageStale(published: ReturnType<typeof getPage>): boolean {
   if (getPage(props.tabId) === published) return false;
-  gridViewStore.setActionError(props.tabId, 'Edit not staged: the page reloaded');
+  gridViewStore.setActionError(props.tabId, t('studio.grid.editNotStaged.error'));
   return true;
 }
 
@@ -2709,7 +2711,7 @@ defineExpose({
     <Empty v-if="showNoRows" class="no-rows absolute inset-0" data-testid="grid-no-rows">
       <EmptyHeader>
         <EmptyMedia><CodiconIcon name="table" :size="24" /></EmptyMedia>
-        <EmptyTitle>No rows</EmptyTitle>
+        <EmptyTitle>{{ t('studio.common.noRows.empty') }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
     <SearchFilterNotice

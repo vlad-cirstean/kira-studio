@@ -1,30 +1,4 @@
 # Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue
-apps/kira-studio/frontend/src/views/grid/PreviewCommandPanel.vue
-apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue
-apps/kira-studio/frontend/src/views/grid/fakeData/recipes.ts
-apps/kira-studio/frontend/src/views/grid/fkPreview.ts
-apps/kira-studio/frontend/src/views/grid/menu.ts
-apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue
-apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue
-apps/kira-studio/frontend/src/views/grpcrequest/GrpcRequestView.vue
-apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
-apps/kira-studio/frontend/src/views/grpcrequest/state.ts
-apps/kira-studio/frontend/src/views/httprequest/BinaryBodyPicker.vue
-apps/kira-studio/frontend/src/views/httprequest/CookiesPane.vue
-apps/kira-studio/frontend/src/views/httprequest/FormDataTable.vue
-apps/kira-studio/frontend/src/views/httprequest/HttpRequestView.vue
-apps/kira-studio/frontend/src/views/httprequest/QueryParamsTable.vue
-apps/kira-studio/frontend/src/views/httprequest/RawExchangePane.vue
-apps/kira-studio/frontend/src/views/httprequest/RequestBodyPane.vue
-apps/kira-studio/frontend/src/views/httprequest/RequestHeadersTable.vue
-apps/kira-studio/frontend/src/views/httprequest/RequestSettingsPane.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/httprequest/TimelinePane.vue
-apps/kira-studio/frontend/src/views/httprequest/UrlEncodedTable.vue
 apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue
 apps/kira-studio/frontend/src/views/shared/EditBufferActions.vue
 apps/kira-studio/frontend/src/views/shared/FilterHistoryMenu.vue
@@ -70,3 +44,4 @@ apps/kira-studio/frontend/src/workbench/settings/DataPane.vue
 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue
 permanent U67 apps/kira-studio/frontend/src/fonts.ts # font family names (system and installed typefaces are proper names, not wording)
 permanent U67 apps/kira-studio/frontend/src/views/console/completion.ts # Redis command syntax hints (command grammar, not wording)
+permanent U67 apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue # HTTP auth scheme tokens inserted verbatim (protocol vocabulary, not wording)

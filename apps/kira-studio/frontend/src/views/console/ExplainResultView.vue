@@ -173,7 +173,7 @@ const rawLanguage = computed(() =>
           data-testid="explain-raw-toggle"
           @click="showRaw = !showRaw"
         />
-        <span class="text-muted-foreground text-kira-sm">{{ t('studio.console.plan.raw.label') }}</span>
+        <span class="text-muted-foreground text-kira-sm">{{ t('studio.common.raw.label') }}</span>
       </div>
       <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />

@@ -1,10 +1,11 @@
 import type { ObjectMeta } from '@shared/domain/tree';
 import type { ColumnDescriptor, TypeClass } from '@shared/protocol/page';
+import { type MessageKey, t } from '@theme/i18n';
 import type { ColumnPlan, GeneratorId, Recipe } from './types';
 
 export interface RecipeOption {
   id: GeneratorId;
-  label: string;
+  labelKey: MessageKey;
   /** Which `typeClass`es this generator is offerable for — both the recipe picker's own filtered
    *  option list and D4 rule 6's own "does the name heuristic agree with the real type" gate. */
   typeClasses: TypeClass[];
@@ -14,30 +15,122 @@ export interface RecipeOption {
 // only the options whose typeClasses include the column's own, and the name-heuristic table below
 // only ever proposes an id whose typeClasses agree.
 export const RECIPE_CATALOG: RecipeOption[] = [
-  { id: 'person.fullName', label: 'Full name', typeClasses: ['text'] },
-  { id: 'person.firstName', label: 'First name', typeClasses: ['text'] },
-  { id: 'person.lastName', label: 'Last name', typeClasses: ['text'] },
-  { id: 'internet.email', label: 'Email', typeClasses: ['text'] },
-  { id: 'internet.url', label: 'URL', typeClasses: ['text'] },
-  { id: 'phone.number', label: 'Phone number', typeClasses: ['text'] },
-  { id: 'location.city', label: 'City', typeClasses: ['text'] },
-  { id: 'location.country', label: 'Country', typeClasses: ['text'] },
-  { id: 'location.state', label: 'State / province', typeClasses: ['text'] },
-  { id: 'location.zipCode', label: 'Postal code', typeClasses: ['text'] },
-  { id: 'location.streetAddress', label: 'Street address', typeClasses: ['text'] },
-  { id: 'company.name', label: 'Company name', typeClasses: ['text'] },
-  { id: 'finance.amount', label: 'Amount', typeClasses: ['text', 'number'] },
-  { id: 'date.recent', label: 'Recent date/time', typeClasses: ['temporal'] },
-  { id: 'date.birthdate', label: 'Birthdate', typeClasses: ['temporal'] },
-  { id: 'date.past', label: 'Past date/time', typeClasses: ['temporal'] },
-  { id: 'lorem.sentence', label: 'Sentence', typeClasses: ['text'] },
-  { id: 'lorem.words', label: 'Words', typeClasses: ['text'] },
-  { id: 'lorem.slug', label: 'Slug', typeClasses: ['text'] },
-  { id: 'string.uuid', label: 'UUID', typeClasses: ['text'] },
-  { id: 'datatype.boolean', label: 'Boolean', typeClasses: ['boolean'] },
-  { id: 'number.int', label: 'Integer', typeClasses: ['number'] },
-  { id: 'json.object', label: 'JSON object', typeClasses: ['json'] },
-  { id: 'binary.hex', label: 'Binary (hex)', typeClasses: ['binary'] },
+  {
+    id: 'person.fullName',
+    labelKey: 'studio.generateData.recipe.personFullName.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'person.firstName',
+    labelKey: 'studio.generateData.recipe.personFirstName.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'person.lastName',
+    labelKey: 'studio.generateData.recipe.personLastName.label',
+    typeClasses: ['text'],
+  },
+  { id: 'internet.email', labelKey: 'common.field.email.label', typeClasses: ['text'] },
+  {
+    id: 'internet.url',
+    labelKey: 'studio.generateData.recipe.internetUrl.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'phone.number',
+    labelKey: 'studio.generateData.recipe.phoneNumber.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'location.city',
+    labelKey: 'studio.generateData.recipe.locationCity.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'location.country',
+    labelKey: 'studio.generateData.recipe.locationCountry.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'location.state',
+    labelKey: 'studio.generateData.recipe.locationState.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'location.zipCode',
+    labelKey: 'studio.generateData.recipe.locationZipCode.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'location.streetAddress',
+    labelKey: 'studio.generateData.recipe.locationStreetAddress.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'company.name',
+    labelKey: 'studio.generateData.recipe.companyName.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'finance.amount',
+    labelKey: 'studio.generateData.recipe.financeAmount.label',
+    typeClasses: ['text', 'number'],
+  },
+  {
+    id: 'date.recent',
+    labelKey: 'studio.generateData.recipe.dateRecent.label',
+    typeClasses: ['temporal'],
+  },
+  {
+    id: 'date.birthdate',
+    labelKey: 'studio.generateData.recipe.dateBirthdate.label',
+    typeClasses: ['temporal'],
+  },
+  {
+    id: 'date.past',
+    labelKey: 'studio.generateData.recipe.datePast.label',
+    typeClasses: ['temporal'],
+  },
+  {
+    id: 'lorem.sentence',
+    labelKey: 'studio.generateData.recipe.loremSentence.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'lorem.words',
+    labelKey: 'studio.generateData.recipe.loremWords.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'lorem.slug',
+    labelKey: 'studio.generateData.recipe.loremSlug.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'string.uuid',
+    labelKey: 'studio.generateData.recipe.stringUuid.label',
+    typeClasses: ['text'],
+  },
+  {
+    id: 'datatype.boolean',
+    labelKey: 'studio.generateData.recipe.datatypeBoolean.label',
+    typeClasses: ['boolean'],
+  },
+  {
+    id: 'number.int',
+    labelKey: 'studio.generateData.recipe.numberInt.label',
+    typeClasses: ['number'],
+  },
+  {
+    id: 'json.object',
+    labelKey: 'studio.generateData.recipe.jsonObject.label',
+    typeClasses: ['json'],
+  },
+  {
+    id: 'binary.hex',
+    labelKey: 'studio.generateData.recipe.binaryHex.label',
+    typeClasses: ['binary'],
+  },
 ];
 
 const RECIPE_BY_ID = new Map(RECIPE_CATALOG.map((o) => [o.id, o]));
@@ -175,20 +268,16 @@ export function planWarnings(plans: ColumnPlan[], meta: ObjectMeta | null): stri
 
     if (fkColumns.has(column.name) && !column.nullable && recipe.kind === 'skip') {
       warnings.push(
-        `${column.name} is a required foreign key — no value can be generated for it safely; the insert will fail unless one is set`,
+        t('studio.generateData.warning.requiredForeignKey.hint', { column: column.name }),
       );
     }
     if (uniqueColumns.has(column.name)) {
       // F11: even a unique-by-construction recipe (sequence/string.uuid) is only unique within
       // this run — nothing client-side can know what the table already holds.
-      warnings.push(
-        `${column.name} is covered by a unique index — a generated value may collide with a row that already exists`,
-      );
+      warnings.push(t('studio.generateData.warning.uniqueIndex.hint', { column: column.name }));
     }
     if (!column.nullable && recipe.kind === 'skip' && !isIntentionalSkip) {
-      warnings.push(
-        `${column.name} is required (NOT NULL) but has no value — the insert will fail`,
-      );
+      warnings.push(t('studio.generateData.warning.requiredNoValue.hint', { column: column.name }));
     }
   }
   return warnings;

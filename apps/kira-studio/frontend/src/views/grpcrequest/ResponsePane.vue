@@ -14,8 +14,9 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
-import { formatBytes, formatClockTime } from '@workbench/behaviour/format';
+import { formatBytes, formatClockTime, formatDuration } from '@workbench/behaviour/format';
 import { useVirtualRows } from '@workbench/behaviour/virtualRows';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
@@ -128,11 +129,11 @@ const hasCode = computed(() => !!liveResult.value || !!viewing.value);
 // keeps its own line — that is a message from the server, not a restatement of the code.
 const codeHint = computed(() => (hasCode.value ? grpcCodeHint(code.value) : ''));
 
-const RESPONSE_PANE_OPTIONS = [
-  { value: 'messages' as const, label: 'Messages', testid: 'grpc-response-pane-messages' },
-  { value: 'metadata' as const, label: 'Metadata', testid: 'grpc-response-pane-metadata' },
-  { value: 'history' as const, label: 'History', testid: 'grpc-response-pane-history' },
-];
+const RESPONSE_PANE_OPTIONS = computed(() => [
+  { value: 'messages' as const, label: t('studio.grpc.response.pane.messages.option'), testid: 'grpc-response-pane-messages' },
+  { value: 'metadata' as const, label: t('studio.grpc.pane.metadata.option'), testid: 'grpc-response-pane-metadata' },
+  { value: 'history' as const, label: t('common.module.history.label'), testid: 'grpc-response-pane-history' },
+]);
 
 function setResponsePane(pane: GrpcResponsePane): void {
   patchGrpcRequestTabState(props.tab.id, { responsePane: pane });
@@ -289,9 +290,9 @@ onUnmounted(() => {
           {{ codeName }} ({{ code }})
         </Badge>
         <span class="ml-auto" />
-        <span class="text-kira-sm text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
+        <span class="text-kira-sm text-subtle" data-testid="grpc-elapsed">{{ formatDuration(elapsedMs) }}</span>
         <span class="text-kira-sm text-subtle" data-testid="grpc-message-summary">
-          {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
+          {{ t('studio.grpc.response.summary.status', { count: messageCount, size: formatBytes(messageBytes) }) }}
         </span>
       </template>
       <span v-else class="ml-auto" />
@@ -300,7 +301,7 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="tab.state.responsePane === 'messages'"
         icon="search"
-        label="Find in message"
+        :label="t('studio.grpc.response.find.label')"
         :class="{ 'bg-field text-fg': findOpen }"
         data-testid="grpc-find-toggle"
         @click="toggleFind"
@@ -313,7 +314,7 @@ onUnmounted(() => {
     <div v-if="statusMessage" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
     <Alert strip v-if="viewing" variant="info" data-testid="grpc-history-band">
-      <AlertDescription>Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}</AlertDescription>
+      <AlertDescription>{{ t('studio.grpc.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.method ?? '' }) }}</AlertDescription>
       <AlertAction>
         <Button
           variant="toolbar"
@@ -321,7 +322,7 @@ onUnmounted(() => {
           data-testid="grpc-history-back"
           @click="onBackToLatest"
         >
-          {{ rt?.result ? 'Back to latest' : 'Close' }}
+          {{ rt?.result ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label') }}
         </Button>
       </AlertAction>
     </Alert>
@@ -335,7 +336,7 @@ onUnmounted(() => {
       data-testid="grpc-history-messages-elided"
     >
       <AlertDescription>
-        Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
+        {{ t('studio.grpc.response.firstMessages.description', { shown: messages.length, total: viewing.snapshot.entry.messageCount }) }}
       </AlertDescription>
     </Alert>
 
@@ -348,46 +349,46 @@ onUnmounted(() => {
       data-testid="grpc-request-message-truncated"
     >
       <AlertDescription>
-        The stored request message was cut at 256 KB and is not shown.
+        {{ t('studio.grpc.response.requestCut.description', { size: formatBytes(256 * 1024) }) }}
       </AlertDescription>
     </Alert>
 
     <Alert strip v-if="metadataElided" variant="info" data-testid="grpc-history-metadata-elided">
       <AlertDescription>
-        Metadata, headers and trailers were not stored — too large for history.
+        {{ t('studio.grpc.response.metadataElided.description') }}
       </AlertDescription>
     </Alert>
 
     <Alert strip v-if="rt?.status === 'cancelled'" variant="warn" data-testid="grpc-stopped-strip">
       <AlertDescription>
-        Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
+        {{ t('studio.grpc.response.stopped.description', { count: messages.length }) }}
       </AlertDescription>
     </Alert>
 
     <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
     <Alert strip v-if="liveMessagesElided" variant="info" data-testid="grpc-live-messages-elided">
       <AlertDescription>
-        Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
+        {{ t('studio.grpc.response.recentMessages.description', { shown: messages.length, total: rt?.trueMessageCount ?? 0 }) }}
       </AlertDescription>
     </Alert>
 
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
     <div v-else-if="tab.state.responsePane === 'metadata'" class="flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5" data-testid="grpc-response-metadata">
       <div class="metadata-group">
-        <div class="mb-0.5 text-kira-sm text-muted-foreground">Header</div>
+        <div class="mb-0.5 text-kira-sm text-muted-foreground">{{ t('studio.grpc.response.header.label') }}</div>
         <div v-for="(h, i) in header" :key="`h${i}`" class="flex gap-1.5 text-kira-sm">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
           <span class="wrap-anywhere font-data">{{ h.value }}</span>
         </div>
-        <div v-if="header.length === 0" class="text-kira-sm text-subtle">No header metadata</div>
+        <div v-if="header.length === 0" class="text-kira-sm text-subtle">{{ t('studio.grpc.response.noHeader.empty') }}</div>
       </div>
       <div class="metadata-group">
-        <div class="mb-0.5 text-kira-sm text-muted-foreground">Trailer</div>
-        <div v-for="(t, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-sm">
-          <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ t.name }}</span>
-          <span class="wrap-anywhere font-data">{{ t.value }}</span>
+        <div class="mb-0.5 text-kira-sm text-muted-foreground">{{ t('studio.grpc.response.trailer.label') }}</div>
+        <div v-for="(tr, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-sm">
+          <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ tr.name }}</span>
+          <span class="wrap-anywhere font-data">{{ tr.value }}</span>
         </div>
-        <div v-if="trailer.length === 0" class="text-kira-sm text-subtle">No trailer metadata</div>
+        <div v-if="trailer.length === 0" class="text-kira-sm text-subtle">{{ t('studio.grpc.response.noTrailer.empty') }}</div>
       </div>
     </div>
     <div v-else class="flex flex-1 min-h-0 flex-col" data-testid="grpc-message-list">
@@ -412,7 +413,7 @@ onUnmounted(() => {
                  --kira-h-sm here) — VirtualList positions every row assuming that exact height,
                  border included via box-sizing. -->
             <button type="button" :class="cn(rowVariants(), 'box-border h-5.5 w-full rounded-none border-0 border-b border-border bg-none px-1.5')" @click="toggleExpanded(entry.m.seq)">
-              <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
+              <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">{{ t('studio.grpc.response.offset.status', { duration: formatDuration(entry.m.offsetMs) }) }}</span>
               <span class="text-kira-sm text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
                 <TooltipTrigger as-child>
@@ -422,7 +423,7 @@ onUnmounted(() => {
                     data-testid="grpc-message-truncated"
                   />
                 </TooltipTrigger>
-                <TooltipContent>Stored copy cut at 64 KB — not the full message</TooltipContent>
+                <TooltipContent>{{ t('studio.grpc.response.messageCut.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
               </Tooltip>
               <span class="ml-auto" />
               <span class="text-kira-sm text-subtle">#{{ entry.m.seq }}</span>
@@ -445,7 +446,7 @@ onUnmounted(() => {
       </div>
       <Empty v-if="messages.length === 0">
         <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-        <EmptyTitle>Call this method to see its response</EmptyTitle>
+        <EmptyTitle>{{ t('studio.grpc.response.empty') }}</EmptyTitle>
         <button
           v-if="hasHistory"
           type="button"
@@ -453,7 +454,7 @@ onUnmounted(() => {
           data-testid="grpc-history-hint"
           @click="viewHistory"
         >
-          {{ historyCount }} past call{{ historyCount === 1 ? '' : 's' }} · View history
+          {{ t('studio.grpc.response.viewHistory.label', { count: historyCount }) }}
         </button>
       </Empty>
     </div>

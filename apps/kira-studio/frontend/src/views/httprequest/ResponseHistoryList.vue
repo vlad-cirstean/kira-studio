@@ -14,9 +14,10 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
-import { formatBytes, formatRelative } from '@workbench/behaviour/format';
+import { formatBytes, formatDuration, formatRelative } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -116,7 +117,12 @@ function onCompare(): void {
 }
 
 async function onClear(): Promise<void> {
-  const ok = await confirmDialogStore.confirm({ message: 'Clear this request’s response history? This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' });
+  const ok = await confirmDialogStore.confirm({
+    title: t('studio.http.history.clearConfirm.title'),
+    message: [t('studio.http.history.clearConfirm.body'), t('common.confirm.irreversible.body')].join(' '),
+    confirmLabel: t('common.action.clear.label'),
+    tone: 'danger',
+  });
   if (ok) await httpHistoryStore.clearHistory(props.tab.id);
 }
 </script>
@@ -133,7 +139,7 @@ async function onClear(): Promise<void> {
         data-testid="http-history-compare"
         @click="onCompare"
       >
-        Compare
+        {{ t('studio.http.history.compare.label') }}
       </Button>
       <Button
         variant="toolbar"
@@ -143,7 +149,7 @@ async function onClear(): Promise<void> {
         @click="onClear"
       >
         <CodiconIcon name="trash" :size="13" />
-        Clear history
+        {{ t('common.action.clearHistory.label') }}
       </Button>
     </ViewToolbar>
     <Alert v-if="errorMessage" variant="error" data-testid="http-history-error">
@@ -152,27 +158,26 @@ async function onClear(): Promise<void> {
 
     <Empty v-if="entries.length === 0" data-testid="http-history-empty">
       <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
-      <EmptyTitle>No past responses yet</EmptyTitle>
+      <EmptyTitle>{{ t('studio.http.history.empty') }}</EmptyTitle>
       <EmptyDescription>
-        <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
+        <template v-if="incognito">{{ t('studio.http.history.incognito.description') }}</template>
         <template v-else>
-          Sending this request will record one.
+          {{ t('studio.http.history.recordHint.description') }}
           <template v-if="isScratch">
-            Scratch requests keep their history until the tab is closed — save this request to
-            keep it.
+            {{ t('studio.http.history.scratchHint.description') }}
           </template>
         </template>
       </EmptyDescription>
     </Empty>
 
     <template v-else>
-      <SearchField v-model="filterQuery" placeholder="Filter history" data-testid="http-history-filter" />
+      <SearchField v-model="filterQuery" :placeholder="t('studio.common.filterHistory.placeholder')" data-testid="http-history-filter" />
       <Empty
         v-if="isFiltered && filteredEntries.length === 0"
         data-testid="http-history-filter-empty"
       >
         <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>No matches</EmptyTitle>
+        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
       </Empty>
     </template>
 
@@ -181,7 +186,7 @@ async function onClear(): Promise<void> {
       class="flex flex-1 min-h-0 flex-col overflow-auto"
       ref="listEl"
       role="listbox"
-      aria-label="Response history"
+      :aria-label="t('studio.http.history.list.aria')"
     >
       <div
         v-for="(entry, i) in filteredEntries"
@@ -219,13 +224,13 @@ async function onClear(): Promise<void> {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="text-kira-sm text-subtle">{{ entry.elapsedMs }} ms</span>
+            <span class="text-kira-sm text-subtle">{{ formatDuration(entry.elapsedMs) }}</span>
             <span class="text-kira-sm text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
             <span v-if="entry.environment" class="text-kira-sm text-subtle">{{ entry.environment }}</span>
             <span class="ml-auto" />
             <TooltipIconButton
               icon="trash"
-              label="Delete"
+              :label="t('common.action.delete.label')"
               data-testid="http-history-delete"
               @click.stop="onDelete(entry.id)"
             />
@@ -236,8 +241,7 @@ async function onClear(): Promise<void> {
     </div>
 
     <div v-if="atCap" class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="http-history-cap-note">
-      Only the last {{ HISTORY_PER_SCOPE_LIMIT }} are kept — older responses are removed
-      automatically.
+      {{ t('studio.http.history.capNote.hint', { limit: HISTORY_PER_SCOPE_LIMIT }) }}
     </div>
     <!-- P110 I2-17: `.history-row:hover`/`.history-row.is-viewing` (same background either way)
          folded into one ternary -- no test locates by either class (http-history-row is the real

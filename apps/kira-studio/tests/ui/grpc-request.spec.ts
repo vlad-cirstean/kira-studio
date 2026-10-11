@@ -152,11 +152,11 @@ test('gRPC request — open a tab and browse a schema', async ({ relaunch }) => 
   await expect(methodRows).toHaveCount(2);
   await expect(methodRows.nth(0)).toContainText('SayHello');
   await expect(methodRows.nth(0).locator('[data-testid="grpc-method-streaming-badge"]')).toHaveText(
-    'UNARY',
+    'Unary',
   );
   await expect(methodRows.nth(1)).toContainText('ListItems');
   await expect(methodRows.nth(1).locator('[data-testid="grpc-method-streaming-badge"]')).toHaveText(
-    'STREAM',
+    'Stream',
   );
 });
 

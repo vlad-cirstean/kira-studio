@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -62,20 +63,20 @@ function close(): void {
     <div class="max-h-96 flex flex-col">
       <div class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
-        <span>Preview SQL</span>
+        <span>{{ t('studio.grid.previewCommand.title') }}</span>
         <TooltipIconButton
           icon="close"
-          label="Close"
+          :label="t('common.action.close.label')"
           class="ml-auto"
           data-testid="preview-command-close"
           @click="close"
         />
       </div>
-      <InlineState v-if="isLoading" kind="loading">Loading…</InlineState>
+      <InlineState v-if="isLoading" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
       <InlineState v-else-if="errorMessage" kind="error" data-testid="preview-command-error">
         {{ errorMessage }}
       </InlineState>
-      <InlineState v-else-if="statements.length === 0" kind="empty">No pending changes.</InlineState>
+      <InlineState v-else-if="statements.length === 0" kind="empty">{{ t('studio.grid.previewCommand.empty') }}</InlineState>
       <div v-else class="h-60">
         <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>

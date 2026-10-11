@@ -7,7 +7,8 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { displayValue, formatBytes, formatRelative } from '@workbench/behaviour/format';
+import { type MessageKey, t } from '@theme/i18n';
+import { displayValue, formatBytes, formatDuration, formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
 import { monacoLanguageIdFor } from '@workbench/editor/monacoLanguages';
@@ -133,6 +134,15 @@ interface HeaderRow {
   b: string | null;
   status: 'added' | 'removed' | 'changed' | 'unchanged';
 }
+const HEADER_STATUS_KEYS: Record<HeaderRow['status'], MessageKey> = {
+  added: 'studio.http.diff.added.status',
+  removed: 'studio.http.diff.removed.status',
+  changed: 'studio.http.diff.changed.status',
+  unchanged: 'studio.http.diff.unchangedRow.status',
+};
+function headerStatusText(status: HeaderRow['status']): string {
+  return t(HEADER_STATUS_KEYS[status]);
+}
 const HEADER_STATUS_CLASS: Record<HeaderRow['status'], string> = {
   added: 'text-ok',
   removed: 'text-error',
@@ -230,10 +240,10 @@ onUnmounted(() => {
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="2xl" fixed-height data-testid="http-diff-dialog">
       <DialogHeader close-testid="http-diff-close">
-        <DialogTitle>Compare responses</DialogTitle>
+        <DialogTitle>{{ t('studio.http.diff.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody flush>
-    <InlineState v-if="loadingSnapshots" kind="loading">Loading…</InlineState>
+    <InlineState v-if="loadingSnapshots" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
     <Alert v-else-if="loadError" variant="error"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="flex h-full min-h-0 flex-col">
       <div class="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5" data-testid="http-diff-summary">
@@ -253,7 +263,7 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapA.entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="text-kira-sm text-subtle">{{ snapA.entry.elapsedMs }} ms</span>
+            <span class="text-kira-sm text-subtle">{{ formatDuration(snapA.entry.elapsedMs) }}</span>
             <span class="text-kira-sm text-subtle">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
           </div>
         </div>
@@ -274,7 +284,7 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapB.entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="text-kira-sm text-subtle">{{ snapB.entry.elapsedMs }} ms</span>
+            <span class="text-kira-sm text-subtle">{{ formatDuration(snapB.entry.elapsedMs) }}</span>
             <span class="text-kira-sm text-subtle">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
           </div>
         </div>
@@ -287,8 +297,8 @@ onUnmounted(() => {
         <div class="grid gap-1 py-0.5 text-kira-sm grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider">
           <span></span>
           <span></span>
-          <span>before</span>
-          <span>after</span>
+          <span>{{ t('studio.http.diff.before.label') }}</span>
+          <span>{{ t('studio.http.diff.after.label') }}</span>
         </div>
         <div
           v-for="row in changedHeaderRows"
@@ -296,7 +306,7 @@ onUnmounted(() => {
           class="grid gap-1 py-0.5 text-kira-md grid-cols-[72px_160px_1fr_1fr]"
           data-testid="http-diff-header-row"
         >
-          <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
+          <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ headerStatusText(row.status) }}</span>
           <span class="font-data text-muted-foreground">{{ row.name }}</span>
           <span class="font-data wrap-anywhere">{{ displayValue(row.a) }}</span>
           <span class="font-data wrap-anywhere">{{ displayValue(row.b) }}</span>
@@ -305,7 +315,7 @@ onUnmounted(() => {
           <summary
             class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
           >
-            {{ unchangedHeaderRows.length }} unchanged
+            {{ t('studio.http.diff.unchanged.status', { count: unchangedHeaderRows.length }) }}
           </summary>
           <div
             v-for="row in unchangedHeaderRows"
@@ -313,7 +323,7 @@ onUnmounted(() => {
             class="grid gap-1 py-0.5 text-kira-md grid-cols-[72px_160px_1fr_1fr]"
             data-testid="http-diff-header-row-unchanged"
           >
-            <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
+            <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ headerStatusText(row.status) }}</span>
             <span class="font-data text-muted-foreground">{{ row.name }}</span>
             <span class="font-data wrap-anywhere">{{ row.a }}</span>
             <span class="font-data wrap-anywhere">{{ row.b }}</span>
@@ -323,21 +333,21 @@ onUnmounted(() => {
 
       <Alert v-if="!bothStored" variant="info" data-testid="http-diff-not-comparable">
         <AlertDescription>
-          At least one response's body was not kept in history, so it can't be compared.
+          {{ t('studio.http.diff.notKept.description') }}
         </AlertDescription>
       </Alert>
       <template v-else>
         <div v-if="!commonFormat" class="text-kira-sm text-subtle shrink-0 px-2 py-1">
-          Comparing raw bytes — the two bodies aren't both JSON or both XML.
+          {{ t('studio.http.diff.rawBytes.description') }}
         </div>
-        <InlineState v-if="mergeLoading" kind="loading">Loading the compare view…</InlineState>
+        <InlineState v-if="mergeLoading" kind="loading">{{ t('studio.http.diff.loadingMerge.loading') }}</InlineState>
         <div ref="mergeHostRef" class="diff-merge-host flex-1 min-h-0 overflow-auto" data-testid="http-diff-merge"></div>
       </template>
     </div>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="http-diff-close" @click="emit('close')">Close</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="http-diff-close" @click="emit('close')">{{ t('common.action.close.label') }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

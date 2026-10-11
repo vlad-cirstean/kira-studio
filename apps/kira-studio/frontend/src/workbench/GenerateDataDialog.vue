@@ -8,6 +8,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatCount } from '@workbench/behaviour/format';
@@ -278,7 +279,7 @@ function onSequenceStartChange(index: number, start: number): void {
             <option value="constant">Constant</option>
             <option v-if="plan.column.typeClass === 'number'" value="sequence">Sequence</option>
             <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
-              {{ opt.label }}
+              {{ t(opt.labelKey) }}
             </option>
           </NativeSelect>
           <Input

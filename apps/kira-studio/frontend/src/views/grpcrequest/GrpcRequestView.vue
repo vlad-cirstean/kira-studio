@@ -75,10 +75,10 @@ const { railColor, runState, incognito, toggleIncognito, envId } = useRequestChr
   () => props.tab,
 );
 
-const TLS_OPTIONS = [
-  { value: 'tls' as const, label: 'TLS', testid: 'grpc-tls-tls' },
-  { value: 'plaintext' as const, label: 'Plaintext', testid: 'grpc-tls-plaintext' },
-];
+const TLS_OPTIONS = computed(() => [
+  { value: 'tls' as const, label: t('studio.common.tls.label'), testid: 'grpc-tls-tls' },
+  { value: 'plaintext' as const, label: t('studio.grpc.tls.plaintext.option'), testid: 'grpc-tls-plaintext' },
+]);
 function setTlsMode(mode: 'plaintext' | 'tls'): void {
   patchGrpcRequestTabState(props.tab.id, { tlsMode: mode });
 }
@@ -189,17 +189,22 @@ const unresolvedRefs = computed(() => {
   );
   return [...byName.values()];
 });
+const saveTooltip = computed(() => {
+  if (incognito.value) return t('studio.api.common.save.incognito.tooltip');
+  if (unresolved.value) return t('studio.api.common.save.checking.tooltip');
+  return t(canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip');
+});
 const unresolvedTooltip = computed(() =>
   unresolvedRefs.value
-    .map((r) => (r.kind === 'dynamic' ? `${r.name} — unknown dynamic value` : r.name))
+    .map((r) => (r.kind === 'dynamic' ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name }) : r.name))
     .join(', '),
 );
 
-const REQUEST_PANE_OPTIONS = [
-  { value: 'message' as const, label: 'Message', testid: 'grpc-request-pane-message' },
-  { value: 'metadata' as const, label: 'Metadata', testid: 'grpc-request-pane-metadata' },
-  { value: 'schema' as const, label: 'Schema', testid: 'grpc-request-pane-schema' },
-];
+const REQUEST_PANE_OPTIONS = computed(() => [
+  { value: 'message' as const, label: t('studio.grpc.pane.message.option'), testid: 'grpc-request-pane-message' },
+  { value: 'metadata' as const, label: t('studio.grpc.pane.metadata.option'), testid: 'grpc-request-pane-metadata' },
+  { value: 'schema' as const, label: t('studio.common.nodeKind.schema.label'), testid: 'grpc-request-pane-schema' },
+]);
 function setRequestPane(pane: 'message' | 'metadata' | 'schema'): void {
   patchGrpcRequestTabState(props.tab.id, { requestPane: pane });
 }
@@ -288,22 +293,22 @@ onUnmounted(() => {
       </Badge>
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
+          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="grpc-dirty" :aria-label="t('common.state.unsavedChanges.status')">•</span>
         </TooltipTrigger>
-        <TooltipContent>Unsaved changes</TooltipContent>
+        <TooltipContent>{{ t('common.state.unsavedChanges.status') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{ unresolvedRefs.length }} unresolved</Badge>
+          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{ t('studio.api.common.unresolved.status', { count: unresolvedRefs.length }) }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
-          <Badge variant="chip" data-testid="grpc-incognito-chip">Incognito</Badge>
+          <Badge variant="chip" data-testid="grpc-incognito-chip">{{ t('studio.tabs.incognito.label') }}</Badge>
         </TooltipTrigger>
-        <TooltipContent>Nothing from this tab is saved</TooltipContent>
+        <TooltipContent>{{ t('studio.api.common.incognitoChip.tooltip') }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto flex items-center gap-1">
         <!-- P22b D3 (HttpRequestView.vue's own sibling): Save stays ahead of the push, same as the
@@ -319,11 +324,11 @@ onUnmounted(() => {
                 @click="onSave"
               >
                 <CodiconIcon name="save" :size="13" />
-                Save
+                {{ t('common.action.save.label') }}
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : unresolved ? 'Checking whether this request is still saved…' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
+          <TooltipContent>{{ saveTooltip }}</TooltipContent>
         </Tooltip>
       </span>
     </ViewToolbar>
@@ -332,13 +337,13 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           data-testid="grpc-request-refresh"
           @click="onCall"
         />
         <TooltipIconButton
           icon="debug-stop"
-          label="Stop"
+          :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'is-live': running }"
           :disabled="!running"
@@ -358,7 +363,7 @@ onUnmounted(() => {
         <AutocompleteField
           class="w-full"
           :model-value="tab.state.target"
-          placeholder="api.example.com:443"
+          :placeholder="t('studio.grpc.target.example')"
           data-testid="grpc-target"
           :candidates="variables.candidates"
           :token-at="templateToken"
@@ -383,7 +388,7 @@ onUnmounted(() => {
           :disabled="methodOptions.length === 0"
           @update:model-value="onMethodSelect"
         >
-          <option value="" disabled>Choose a method…</option>
+          <option value="" disabled>{{ t('studio.grpc.method.choose.placeholder') }}</option>
           <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </NativeSelect>
       </div>
@@ -398,11 +403,11 @@ onUnmounted(() => {
               @click="onCall"
             >
               <CodiconIcon name="play" :size="13" />
-              Call
+              {{ t('studio.grpc.call.label') }}
             </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>
-        <TooltipContent>{{ !running && tab.state.service && tab.state.method && !methodResolved ? 'Waiting on the schema…' : 'Call' }}</TooltipContent>
+        <TooltipContent>{{ !running && tab.state.service && tab.state.method && !methodResolved ? t('studio.grpc.call.waitingSchema.tooltip') : t('studio.grpc.call.label') }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto" />
       <RunState :state="runState" />
@@ -411,8 +416,8 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="eye-closed"
-          :label="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
-          aria-label="Incognito"
+          :label="incognito ? t('studio.api.common.incognitoOff.tooltip') : t('studio.api.common.incognitoOn.tooltip')"
+          :aria-label="t('studio.tabs.incognito.label')"
           :class="{ 'bg-field text-fg': incognito }"
           data-testid="grpc-incognito-toggle"
           @click="toggleIncognito"
@@ -425,14 +430,14 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="tab.state.requestPane === 'message'"
         icon="expand-all"
-        label="Beautify"
+        :label="t('studio.api.common.beautify.label')"
         data-testid="grpc-beautify"
         @click="onBeautify"
       />
       <TooltipIconButton
         v-if="tab.state.requestPane === 'metadata'"
         icon="search"
-        label="Filter"
+        :label="t('common.action.filter.label')"
         :class="{ 'bg-field text-fg': fieldFilterOpen }"
         data-testid="grpc-field-filter-toggle"
         @click="toggleFieldFilter"
@@ -440,8 +445,8 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="tab.state.requestPane === 'metadata'"
         icon="note"
-        :label="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
-        aria-label="Descriptions"
+        :label="tab.state.fieldDescriptions ? t('studio.api.common.descriptionsHide.tooltip') : t('studio.api.common.descriptionsShow.tooltip')"
+        :aria-label="t('studio.api.common.descriptions.aria')"
         :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
         data-testid="grpc-field-descriptions-toggle"
         @click="toggleFieldDescriptions"
@@ -450,7 +455,7 @@ onUnmounted(() => {
         <div ref="overviewAnchorRef" class="relative flex">
           <TooltipIconButton
             icon="variable-group"
-            label="Variables"
+            :label="t('common.module.variables.label')"
             :class="{ 'bg-field text-fg': overviewOpen }"
             data-testid="grpc-variables-overview-toggle"
             @click="overviewOpen = !overviewOpen"
@@ -491,7 +496,7 @@ onUnmounted(() => {
           @update:doc="onMessageInput"
         />
         <template v-else-if="tab.state.requestPane === 'metadata'">
-          <SearchField v-if="fieldFilterOpen" v-model="fieldFilterQuery" placeholder="Filter" data-testid="grpc-field-filter" />
+          <SearchField v-if="fieldFilterOpen" v-model="fieldFilterQuery" :placeholder="t('common.action.filter.label')" data-testid="grpc-field-filter" />
           <GrpcMetadataTable
             :tab="tab"
             :filter-query="fieldFilterQuery"
@@ -504,7 +509,7 @@ onUnmounted(() => {
 
       <ResizeHandle
         class="request-splitter"
-        label="Resize request pane"
+        :label="t('studio.api.common.resizeRequest.aria')"
         axis="y"
         line
         :min="120"
