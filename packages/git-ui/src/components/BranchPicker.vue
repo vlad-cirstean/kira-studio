@@ -10,7 +10,7 @@
  * `StashList`/`GlobalStashList`/`WorktreeList`/`StackList` render their own tab's rows from an
  * already filtered/ordered/capped prop, the same contract `TagList.vue` has had since P6.
  *
- * Every row also carries `RowContextMenu.vue`'s ref-scoped menu (W14: "every row also carries the
+ * Every row also carries the ref-scoped menu (`useSectionMenu`) (W14: "every row also carries the
  * context menu W14 builds, which is where the destructive actions live") — a kebab button (mouse
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
@@ -22,19 +22,18 @@ import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
-import { useEventListener } from '@vueuse/core';
+import { useEventListener, useFocus } from '@vueuse/core';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
-import { enabledNeighbour, firstEnabled, type MenuItem } from '../lib/menuModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
@@ -52,7 +51,6 @@ import {
   type PickerTab,
 } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
-import RowContextMenu from './RowContextMenu.vue';
 import {
   formatTrack,
   localNameForRemoteBranch,
@@ -65,7 +63,8 @@ import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import { childOf, parentOf } from './stackListModel.ts';
 import TagList from './TagList.vue';
-import { useRowMenu } from './useRowMenu.ts';
+import { useFieldFocus } from './useFieldFocus.ts';
+import { useSectionMenu } from './useSectionMenu.ts';
 import WorktreeList from './WorktreeList.vue';
 
 const props = defineProps<{
@@ -133,14 +132,18 @@ const TAB_LABELS: Readonly<Record<PickerTab, string>> = {
 
 const isOpen = ref(false);
 const triggerEl = useTemplateRef<{ $el: HTMLElement }>('triggerEl');
-const panelEl = ref<HTMLElement | null>(null);
-const filterEl = useTemplateRef<{ focus: () => void }>('filterEl');
+const { focused: triggerFocused } = useFocus(computed(() => triggerEl.value?.$el));
+function focusTrigger(): void {
+  triggerFocused.value = true;
+}
+const filterEl = useTemplateRef<{ $el: Element }>('filterEl');
+const focusFilter = useFieldFocus(filterEl);
 const filter = ref('');
 const activeTab = ref<PickerTab>('branches');
 // P77 §7.3: the roving-tabindex list's own "current" row — `undefined` until the user presses an
 // arrow key, at which point `activeRowId` below still resolves it (falls back to the first
 // enabled row), so a fresh tab/query always has exactly one tabbable row.
-const focusedRowId = ref<string | undefined>(undefined);
+const focusedRowId = ref<string | null>(null);
 // P77 §6.3: one list's own step count for the current panel-open — reset on close and on a filter
 // change (a new query is a new list, §6.3's own words), never persisted.
 const capSteps = ref<Partial<Record<PickerListKey, number>>>({});
@@ -187,115 +190,50 @@ watch(filter, () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// §7.3: roving focus over the active tab's own rows, via this package's own `lib/menuModel.ts`
-// `enabledNeighbour`/`firstEnabled` — the same wrap-around neighbour walk kira-ui's own
-// (now-deleted) KuiMenuList used. Those take `MenuItem[]`; `model.rowIds` is the narrower
-// `{id, disabled}[]` §9 already produces as a by-product, so `toMenuItems` pads it with the
-// fields neither function actually reads.
+// §7.3: roving focus over the active tab's own rows through `useListNavigation`. The rows live in
+// this picker's child lists, so the roving stop is tracked from `focusin` on the shared container.
+// `branch-row`/`branch-row-main` stay as bare query hooks for `closest()`/`querySelector()`.
 // ---------------------------------------------------------------------------------------
-function toMenuItems(rowIds: PickerModel['rowIds']): MenuItem[] {
-  return rowIds.map((r) => ({
-    id: r.id,
-    label: '',
-    disabled: r.disabled,
-    disabledReason: undefined,
-  }));
-}
+const rowsScrollEl = ref<HTMLElement | null>(null);
+type PickerRow = PickerModel['rowIds'][number];
 
-function lastEnabled(items: readonly MenuItem[]): string | undefined {
-  for (let i = items.length - 1; i >= 0; i--) {
-    const item = items[i];
-    if (item && !item.disabled) return item.id;
-  }
-  return undefined;
-}
-
-/** The row every tab's rows currently treat as "current" for `tabindex` purposes — resolves to
- *  the first enabled row whenever `focusedRowId` is unset or belongs to a row set the active tab/
- *  filter has since replaced (every row id is prefixed by kind, so a stale id from another tab can
- *  never collide with a real one in the new set — no explicit reset needed on tab/filter change). */
 const activeRowId = computed<string | undefined>(() => {
-  const items = toMenuItems(model.value.rowIds);
-  if (focusedRowId.value !== undefined && items.some((item) => item.id === focusedRowId.value)) {
+  const rows = model.value.rowIds;
+  if (focusedRowId.value !== null && rows.some((r) => r.id === focusedRowId.value)) {
     return focusedRowId.value;
   }
-  return firstEnabled(items);
+  return rows.find((r) => !r.disabled)?.id;
 });
 
-async function focusRow(id: string | undefined): Promise<void> {
-  if (id === undefined) return;
-  await nextTick();
-  panelEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)?.focus();
+function rowEl(id: string): HTMLElement | null {
+  return rowsScrollEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`) ?? null;
 }
 
-/** §7.2: `ArrowDown` from the filter box moves into the list — bound directly on
- *  `InputGroupInput`'s own `@keydown`, which falls through to the real `<input>`. */
-function onFilterKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'ArrowDown') return;
-  const items = toMenuItems(model.value.rowIds);
-  if (items.length === 0) return;
+const nav = useListNavigation<PickerRow>({
+  container: rowsScrollEl,
+  items: () => model.value.rowIds,
+  key: (row) => row.id,
+  isDisabled: (row) => row.disabled,
+  activeKey: focusedRowId,
+  rowSelector: (key) => `[data-row-id="${CSS.escape(key)}"]`,
+  // Worktree/stack rows have no main button, so Enter does nothing there.
+  onOpen: (row) => rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="branch-row-main"]')?.click(),
+  onMenu: (row) => rowEl(row.id)?.querySelector<HTMLElement>('button[aria-label="More actions"]')?.click(),
+  onExitTop: () => focusFilter(),
+});
+
+useEventListener(rowsScrollEl, 'focusin', (event: FocusEvent) => {
+  const id = (event.target as HTMLElement).closest<HTMLElement>('[data-row-id]')?.dataset.rowId;
+  if (id !== undefined) focusedRowId.value = id;
+});
+
+/** §7.2: `ArrowDown` from the filter box moves into the list. */
+function onFilterDown(event: KeyboardEvent): void {
+  const first = model.value.rowIds.find((row) => !row.disabled);
+  if (first === undefined) return;
   event.preventDefault();
-  focusedRowId.value = firstEnabled(items);
-  void focusRow(focusedRowId.value);
+  void nav.focusKey(first.id);
 }
-
-/** §7.3: `ArrowDown`/`ArrowUp` step through the active tab's rows (`ArrowUp` from the first row
- *  returns to the filter); `Home`/`End` jump to the ends; `Enter` runs the focused row's own main
- *  action where it has one (`branch-row-main` is a `<button>` for branch/tag/stash rows and a
- *  plain, unclickable `<div>` for worktree/stack rows — one selector does both without a per-kind
- *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons.
- *
- *  P110 A18: `branch-row`/`branch-row-main` carry no CSS any more (every row's own styling
- *  moved to utilities, here and in TagList/StashRows/WorktreeList/StackList) — both class
- *  names stay as bare query-selector hooks for `closest()`/`querySelector()` below, the same
- *  "functional, not stylistic" reason `branch-rename-input` (line ~636) stays a literal class
- *  for its own `querySelector(...).focus()` call. */
-const rowsScrollEl = ref<HTMLElement | null>(null);
-function onRowsKeydown(event: KeyboardEvent): void {
-  const rowEl = (event.target as HTMLElement).closest<HTMLElement>('[data-testid="branch-row"][data-row-id]');
-  if (rowEl === null) return;
-  const items = toMenuItems(model.value.rowIds);
-  const currentId = rowEl.dataset.rowId;
-
-  switch (event.key) {
-    case 'ArrowDown':
-      event.preventDefault();
-      focusedRowId.value = enabledNeighbour(items, currentId, 1);
-      void focusRow(focusedRowId.value);
-      return;
-    case 'ArrowUp':
-      event.preventDefault();
-      if (currentId === firstEnabled(items)) {
-        filterEl.value?.focus();
-        return;
-      }
-      focusedRowId.value = enabledNeighbour(items, currentId, -1);
-      void focusRow(focusedRowId.value);
-      return;
-    case 'Home':
-      event.preventDefault();
-      focusedRowId.value = firstEnabled(items);
-      void focusRow(focusedRowId.value);
-      return;
-    case 'End':
-      event.preventDefault();
-      focusedRowId.value = lastEnabled(items);
-      void focusRow(focusedRowId.value);
-      return;
-    case 'Enter':
-      // Only the row itself: Enter on an inner button (actions, PR badge, main) activates natively.
-      if (event.target !== rowEl) return;
-      event.preventDefault();
-      rowEl.querySelector<HTMLElement>('[data-testid="branch-row-main"]')?.click();
-      return;
-    default:
-      return;
-  }
-}
-
-// P105 §5.1: the row-scroll div carries no interactive role of its own -- binds via VueUse
-// instead of a raw @keydown on it.
-useEventListener(rowsScrollEl, 'keydown', onRowsKeydown);
 
 // P131 Part 2 §5.2: KuiSegmentedOption goes with KuiSegmented -- this is the same shape, inlined
 // as a local type instead of importing one from kira-ui.
@@ -349,12 +287,12 @@ const knownRemotes = computed(() =>
 
 // P131 Part 2 §5.2: reka's own PopoverContent Escape/outside-click dismissal replaces the
 // rootEl keydown listener and onClickOutside call this file used to own -- close()'s resets
-// (refMenu, renaming, forceDeleteCandidate, filter, capSteps) now run from the Popover's own
+// (row menu, renaming, forceDeleteCandidate, filter, capSteps) now run from the Popover's own
 // @update:open(false), reached either way (trigger click, Escape, outside click, or this file's
 // own explicit close() calls below).
 function close(): void {
   isOpen.value = false;
-  refMenu.value = undefined;
+  rowMenu.close();
   renaming.value = undefined;
   forceDeleteCandidate.value = undefined;
   filter.value = '';
@@ -386,7 +324,7 @@ function onOpenChange(value: boolean): void {
  *  filter input wins regardless of where it sits in the panel. */
 function onOpenAutoFocus(e: Event): void {
   e.preventDefault();
-  filterEl.value?.focus();
+  focusFilter();
 }
 
 /** W20: reka's own close-auto-focus fires after the panel's exit animation, which could steal
@@ -408,7 +346,7 @@ function onCloseAutoFocus(e: Event): void {
  *  stops reka's own close-auto-focus (which fires after the exit animation) from firing later and
  *  stealing focus back from whatever dialog `runCheckout` opened in the meantime. */
 function closeForCheckout(): void {
-  triggerEl.value?.$el.focus();
+  focusTrigger();
   suppressCloseAutoFocus = true;
   close();
 }
@@ -427,50 +365,39 @@ async function checkoutRemote(row: RefRow): Promise<void> {
 // The ref-scoped context menu (W14) — one instance, shared by every branch/remote row (TagList
 // opens its own for tag rows, since its rows are not in this file's own DOM).
 // ---------------------------------------------------------------------------------------
-const { menu: refMenu, open: openRefMenu, openFromButton: openRefMenuFromButton } = useRowMenu<RefRow>();
-const renaming = ref<{ name: string; value: string } | undefined>(undefined);
+const rowMenu = useSectionMenu();
+const renaming = ref<string | undefined>(undefined);
 const forceDeleteCandidate = ref<string | undefined>(undefined);
 
-const refMenuSections = computed(() => {
-  const entry = refMenu.value;
-  if (!entry) return [];
+function menuFor(row: RefRow) {
   // G26 D-4.14: the stack section is present only for a local branch row — a tag/remoteBranch is
   // never a stack member (buildRefMenu itself already returns before reading `stack` for those
   // two kinds, but computing it only for `branch` here keeps `parentOf`/`childOf` from ever
   // running against a row that could not possibly answer anything).
   const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
   return buildRefMenu({
-    kind: entry.row.kind,
-    shortName: entry.row.shortName,
-    isHead: entry.row.isHead,
-    knownRemotes: entry.row.kind === 'tag' ? knownRemotes.value : [],
+    kind: row.kind,
+    shortName: row.shortName,
+    isHead: row.isHead,
+    knownRemotes: row.kind === 'tag' ? knownRemotes.value : [],
     inProgress: props.ops.statusSummary.value?.inProgress ?? null,
     stack:
-      entry.row.kind === 'branch'
+      row.kind === 'branch'
         ? {
-            hasParent: parentOf(stackResult, entry.row.shortName) !== undefined,
-            hasChild: childOf(stackResult, entry.row.shortName) !== undefined,
+            hasParent: parentOf(stackResult, row.shortName) !== undefined,
+            hasChild: childOf(stackResult, row.shortName) !== undefined,
           }
         : undefined,
   });
-});
+}
 
-async function onRefMenuSelect(id: string): Promise<void> {
-  const entry = refMenu.value;
-  refMenu.value = undefined;
-  if (!entry) return;
-  const { row } = entry;
+async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
   if (id === 'checkoutRef') {
     await (row.kind === 'remoteBranch' ? checkoutRemote(row) : checkoutBranch(row));
     return;
   }
   if (id === 'renameRef') {
-    renaming.value = { name: row.shortName, value: row.shortName };
-    // P105 §8: not the panel's own open-auto-focus moment (the panel is already open, mid-row-
-    // menu-selection here) — focused explicitly once the rename input renders.
-    void nextTick(() => {
-      panelEl.value?.querySelector<HTMLInputElement>('[data-testid="branch-rename-input"]')?.focus();
-    });
+    renaming.value = row.shortName;
     return;
   }
   if (id === 'reviewBranch') {
@@ -554,13 +481,9 @@ async function confirmForceDelete(): Promise<void> {
   if (name !== undefined) await props.ops.branchDelete(name, true);
 }
 
-async function submitRename(): Promise<void> {
-  const pending = renaming.value;
+async function submitRename(from: string, to: string): Promise<void> {
   renaming.value = undefined;
-  if (!pending) return;
-  const to = pending.value.trim();
-  if (to === '' || to === pending.name) return;
-  await props.ops.branchRename(pending.name, to);
+  await props.ops.branchRename(from, to);
 }
 
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
@@ -613,7 +536,6 @@ watch(visibleBranchNames, (names) => {
         @close-auto-focus="onCloseAutoFocus"
       >
         <div
-          ref="panelEl"
           class="flex flex-col min-h-0 max-h-[min(520px,var(--reka-popover-content-available-height))]"
         >
           <SecondaryTabs
@@ -637,7 +559,7 @@ watch(visibleBranchNames, (names) => {
               v-model="filter"
               :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
               :aria-label="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
-              @keydown="onFilterKeydown"
+              @keydown.down="onFilterDown"
             />
           </div>
 
@@ -657,17 +579,14 @@ watch(visibleBranchNames, (names) => {
             :data-row-id="`branch:${row.refname}`"
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
-            <template v-if="renaming?.name === row.shortName">
-              <Input data-testid="branch-rename-input"
-                v-model="renaming.value"
-                size="kira"
-                class="flex-1"
-                aria-label="Rename branch"
-                @keydown.enter="submitRename"
-                @keydown.escape="renaming = undefined"
-              />
-              <TooltipIconButton icon="check" label="Rename branch" @click="submitRename" />
-            </template>
+            <InlineEditInput
+              v-if="renaming === row.shortName"
+              data-testid="branch-rename-input"
+              aria-label="Rename branch"
+              :name="row.shortName"
+              @commit="(to) => submitRename(row.shortName, to)"
+              @cancel="renaming = undefined"
+            />
             <template v-else>
               <button data-testid="branch-row-main"
                 type="button"
@@ -693,8 +612,8 @@ watch(visibleBranchNames, (names) => {
                 @click.stop="openPullRequest(prFor(row.shortName)!.number)"
               >#{{ prFor(row.shortName)!.number }}</button>
               <RowActionsButton
-                @click="openRefMenuFromButton(row, $event)"
-                @contextmenu="openRefMenu(row, $event)"
+                @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
               />
             </template>
           </div>
@@ -728,8 +647,8 @@ watch(visibleBranchNames, (names) => {
               <span class="text-kira-sm text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </button>
             <RowActionsButton
-              @click="openRefMenuFromButton(row, $event)"
-              @contextmenu="openRefMenu(row, $event)"
+              @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+              @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
             />
           </div>
           <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
@@ -806,15 +725,6 @@ watch(visibleBranchNames, (names) => {
       </PopoverContent>
     </Popover>
 
-    <RowContextMenu
-      v-if="refMenu"
-      :sections="refMenuSections"
-      :x="refMenu.x"
-      :y="refMenu.y"
-      :label="`${refMenu.row.shortName} actions`"
-      @select="onRefMenuSelect"
-      @close="refMenu = undefined"
-    />
   </div>
 </template>
 

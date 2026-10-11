@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * `docs/plans/P7.md` W14: "Rename branch…" from the graph's own ref-badge context menu
- * (`App.vue`'s second `RowContextMenu`). `BranchPicker.vue`'s own rename swaps its dropdown row
+ * (`App.vue`'s ref menu). `BranchPicker.vue`'s own rename swaps its dropdown row
  * for an inline text field — there is no comparable row here (the badge is a DOM fragment inside
  * a commit's message cell, not a list item with room to become an input), so this is a small
  * modal instead: `BranchDialog.vue`'s own "no comparable hazard" judgment call (git never

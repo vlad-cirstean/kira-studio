@@ -25,6 +25,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { onClickOutside, useEventListener, useResizeObserver } from '@vueuse/core';
 import { useLiveRegion } from '@workbench/behaviour/liveRegion';
+import { compareNatural } from '@workbench/behaviour/match';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -56,13 +57,11 @@ import GitBlockedPanel from './components/GitBlockedPanel.vue';
 import GitViewHead, { type RepoHead } from './components/GitViewHead.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
 import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
-import RowContextMenu from './components/RowContextMenu.vue';
 import { localNameForRemoteBranch, remoteCheckoutTarget } from './components/refListModel.ts';
 import {
   buildRefMenu,
   buildRowMenu,
   buildStashMenu,
-  type MenuSection,
 } from './components/rowMenuModel.ts';
 // The template instantiates this (InstanceType<typeof SearchBox> is the script's only other
 // reference) — see AppToolbar.vue's own note on this exact pattern; `biome.json`'s own `**/*.vue`
@@ -72,6 +71,7 @@ import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
+import { useSectionMenu } from './components/useSectionMenu.ts';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { useGraphVisible } from './graphVisibility.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
@@ -261,9 +261,10 @@ watch(graphView.generation, () => {
   // P108 F2: a re-walk (auto-refresh restart, repo switch, reconnect) invalidates any row a menu
   // captured before this point — close both context menus rather than let a select act on
   // whatever now happens to sit at the old row/sha.
-  contextMenuState.value = undefined;
-  stashContextMenuState.value = undefined;
+  rowMenu.close();
 });
+
+const rowMenu = useSectionMenu();
 
 const { text: liveAnnouncement, announce } = useLiveRegion();
 
@@ -360,15 +361,15 @@ function buildGraphTips(): TipRef[] {
     .sort(
       (a, b) =>
         b.committerDate - a.committerDate ||
-        a.kind.localeCompare(b.kind) ||
-        a.refname.localeCompare(b.refname),
+        compareNatural(a.kind, b.kind) ||
+        compareNatural(a.refname, b.refname),
     );
   for (const row of branchesAndRemotes) {
     tips.push({ sha: row.objectId, key: `ref:${row.refname}`, label: row.shortName });
   }
 
   const tags = [...refsState.tags.value].sort(
-    (a, b) => b.committerDate - a.committerDate || a.refname.localeCompare(b.refname),
+    (a, b) => b.committerDate - a.committerDate || compareNatural(a.refname, b.refname),
   );
   for (const row of tags) {
     tips.push({
@@ -486,12 +487,10 @@ function applyRepoIdToStates(repoId: string | undefined): void {
     // a captured commit/stash entry stale; closing both here, at the one lifecycle point both a
     // repo switch and a reconnect always run through, catches a reconnect that never bumps
     // `graphView.generation` (the other closing point, above) on its own.
-    contextMenuState.value = undefined;
-    stashContextMenuState.value = undefined;
+    rowMenu.close();
     // P108 F3: every dialog/menu ref below names a branch/tag/worktree/stash target (or an open
     // flag) from the *old* repo — same stale-ref hazard as the context menus above, same fix,
     // same lifecycle point.
-    refContextMenuState.value = undefined;
     forceDeleteRefCandidate.value = undefined;
     tagDialogState.value = { open: false, target: '' };
     branchDialogState.value = { open: false, startPoint: '' };
@@ -608,11 +607,11 @@ const searchRowEl = ref<HTMLDivElement | null>(null);
 const searchBoxRef = ref<InstanceType<typeof SearchBox> | null>(null);
 
 /** G-UX D9: opens the search row and focuses it on the next tick (`SearchBox.vue`'s own exposed
- *  `focus()`) — a tick is needed since the row (and the input inside it) do not exist in the DOM
+ *  `focusInput()`) — a tick is needed since the row (and the input inside it) do not exist in the DOM
  *  until this reactive change renders. */
 function openSearch(): void {
   searchOpen.value = true;
-  void nextTick(() => searchBoxRef.value?.focus());
+  void nextTick(() => searchBoxRef.value?.focusInput());
 }
 
 /** Closing clears the query (`SearchState.clear()`) — a hidden row holding a live query that
@@ -638,7 +637,6 @@ function toggleSearchRow(): void {
 // about "whichever commit sits there right now". `commit` is `CommitStore.commitAt`'s own plain,
 // immutable snapshot (P108 F2's own doc comment on `CommitRecord`), so `commitMenuSections`/
 // `onCommitMenuSelect` below never re-resolve `state.row` against a store that may have moved on.
-const contextMenuState = ref<{ commit: CommitRecord; x: number; y: number } | undefined>(undefined);
 const tagDialogState = ref<{ open: boolean; target: string }>({ open: false, target: '' });
 const branchDialogState = ref<{ open: boolean; startPoint: string }>({
   open: false,
@@ -648,7 +646,18 @@ const branchDialogState = ref<{ open: boolean; startPoint: string }>({
 function handleGridContextMenu(detail: { row: number; x: number; y: number }): void {
   // P108 F2: resolved once, here, at the real click — `CommitGrid.vue`'s own emit fires
   // synchronously off a real DOM event, so the store is exactly as fresh as the click itself.
-  contextMenuState.value = { commit: graphView.store.commitAt(detail.row), x: detail.x, y: detail.y };
+  const commit = graphView.store.commitAt(detail.row);
+  rowMenu.openAtPoint(
+    detail.x,
+    detail.y,
+    buildRowMenu({
+      sha: commit.sha,
+      decorations: commit.decoration,
+      inProgress: opsState.statusSummary.value?.inProgress ?? null,
+    }),
+    (id) => onCommitMenuSelect(commit, id),
+    { onRestoreFocus: () => commitGridRef.value?.focusGrid() },
+  );
 }
 
 function handleGridOpenPullRequest(number: number): void {
@@ -657,23 +666,9 @@ function handleGridOpenPullRequest(number: number): void {
     .catch((err: unknown) => reportAsyncError(err, "Couldn't open the pull request"));
 }
 
-const commitMenuSections = computed<MenuSection[]>(() => {
-  const state = contextMenuState.value;
-  if (!state) return [];
-  return buildRowMenu({
-    sha: state.commit.sha,
-    decorations: state.commit.decoration,
-    inProgress: opsState.statusSummary.value?.inProgress ?? null,
-  });
-});
-
-async function onCommitMenuSelect(id: string): Promise<void> {
-  const state = contextMenuState.value;
-  contextMenuState.value = undefined;
-  if (!state) return;
-  // P108 F2: the commit captured when the menu opened, not re-resolved by row — see
-  // `contextMenuState`'s own doc comment above.
-  const commit = state.commit;
+// P108 F2: the commit captured when the menu opened, not re-resolved by row — see the doc comment
+// above.
+async function onCommitMenuSelect(commit: CommitRecord, id: string): Promise<void> {
   switch (id) {
     case 'checkoutDetached':
       await opsState.runCheckout(commit.sha, 'detach');
@@ -724,35 +719,30 @@ async function onCommitMenuSelect(id: string): Promise<void> {
 // time. A stash drop/pop between open and select (auto-refresh, another action) must not let a
 // stale row resolve to whatever stash now sits there; capturing `entry` itself makes a vanished
 // stash simply not found by `onStashMenuSelect`; further re-checked against `stashState.entries` there.
-const stashContextMenuState = ref<{ entry: StashEntry; x: number; y: number } | undefined>(
-  undefined,
-);
 const stashBranchTarget = ref<StashEntry | undefined>(undefined);
 
 function handleStashContextMenu(detail: { row: number; x: number; y: number }): void {
   const commit = graphView.store.commitAt(detail.row);
   const entry = stashState.entries.value.find((e) => e.sha === commit.sha);
   if (!entry) return; // nothing resolvable at the real click target — no menu, as before.
-  stashContextMenuState.value = { entry, x: detail.x, y: detail.y };
+  const captured = entry;
+  rowMenu.openAtPoint(
+    detail.x,
+    detail.y,
+    buildStashMenu(
+      opsState.statusSummary.value?.inProgress ?? null,
+      entry,
+      refsState.currentBranchName.value,
+    ),
+    (id) => onStashMenuSelect(captured, id),
+    { onRestoreFocus: () => commitGridRef.value?.focusGrid() },
+  );
 }
 
-const stashMenuSections = computed<MenuSection[]>(() => {
-  const state = stashContextMenuState.value;
-  if (!state) return [];
-  return buildStashMenu(
-    opsState.statusSummary.value?.inProgress ?? null,
-    state.entry,
-    refsState.currentBranchName.value,
-  );
-});
-
-async function onStashMenuSelect(id: string): Promise<void> {
-  const state = stashContextMenuState.value;
-  stashContextMenuState.value = undefined;
-  if (!state) return;
+async function onStashMenuSelect(captured: StashEntry, id: string): Promise<void> {
   // P108 F2: re-check the captured entry still exists — it may have been dropped/popped while
   // the menu was open (auto-refresh between open and select).
-  const entry = stashState.entries.value.find((e) => e.sha === state.entry.sha);
+  const entry = stashState.entries.value.find((e) => e.sha === captured.sha);
   if (!entry) return;
   switch (id) {
     case 'stashApply':
@@ -896,9 +886,6 @@ const toolbarBindings = computed(() => ({
 // badge is a DOM fragment inside a commit's message cell, not a list item), so it opens
 // `RenameRefDialog.vue` instead of `BranchPicker.vue`'s own inline field.
 // ---------------------------------------------------------------------------------------
-const refContextMenuState = ref<
-  { kind: 'branch' | 'remoteBranch'; name: string; x: number; y: number } | undefined
->(undefined);
 const renameRefDialogState = ref<{ open: boolean; currentName: string }>({
   open: false,
   currentName: '',
@@ -911,28 +898,28 @@ function handleGridRefContextMenu(detail: {
   x: number;
   y: number;
 }): void {
-  refContextMenuState.value = detail;
+  const isHead =
+    detail.kind === 'branch' &&
+    refsState.branches.value.some((row) => row.shortName === detail.name && row.isHead);
+  rowMenu.openAtPoint(
+    detail.x,
+    detail.y,
+    buildRefMenu({
+      kind: detail.kind,
+      shortName: detail.name,
+      isHead,
+      knownRemotes: [],
+      inProgress: opsState.statusSummary.value?.inProgress ?? null,
+    }),
+    (id) => onRefMenuSelect(detail, id),
+    { title: detail.name, onRestoreFocus: () => commitGridRef.value?.focusGrid() },
+  );
 }
 
-const refMenuSections = computed<MenuSection[]>(() => {
-  const state = refContextMenuState.value;
-  if (!state) return [];
-  const isHead =
-    state.kind === 'branch' &&
-    refsState.branches.value.some((row) => row.shortName === state.name && row.isHead);
-  return buildRefMenu({
-    kind: state.kind,
-    shortName: state.name,
-    isHead,
-    knownRemotes: [],
-    inProgress: opsState.statusSummary.value?.inProgress ?? null,
-  });
-});
-
-async function onRefMenuSelect(id: string): Promise<void> {
-  const state = refContextMenuState.value;
-  refContextMenuState.value = undefined;
-  if (!state) return;
+async function onRefMenuSelect(
+  state: { kind: 'branch' | 'remoteBranch'; name: string; x: number; y: number },
+  id: string,
+): Promise<void> {
   if (id === 'checkoutRef') {
     const remoteRow =
       state.kind === 'remoteBranch'
@@ -1877,37 +1864,6 @@ onBeforeUnmount(() => {
           </aside>
         </div>
 
-        <RowContextMenu
-          v-if="contextMenuState"
-          :sections="commitMenuSections"
-          :x="contextMenuState.x"
-          :y="contextMenuState.y"
-          label="Commit actions"
-          @select="onCommitMenuSelect"
-          @close="contextMenuState = undefined"
-          @restore-focus="commitGridRef?.focusGrid()"
-        />
-        <RowContextMenu
-          v-if="refContextMenuState"
-          :sections="refMenuSections"
-          :x="refContextMenuState.x"
-          :y="refContextMenuState.y"
-          :label="`${refContextMenuState.name} actions`"
-          :title="refContextMenuState.name"
-          @select="onRefMenuSelect"
-          @close="refContextMenuState = undefined"
-          @restore-focus="commitGridRef?.focusGrid()"
-        />
-        <RowContextMenu
-          v-if="stashContextMenuState"
-          :sections="stashMenuSections"
-          :x="stashContextMenuState.x"
-          :y="stashContextMenuState.y"
-          label="Stash actions"
-          @select="onStashMenuSelect"
-          @close="stashContextMenuState = undefined"
-          @restore-focus="commitGridRef?.focusGrid()"
-        />
           <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
                (G20 D4) — reka's own flip/shift positioning, plus outside-click and Escape
                dismissal it did not have before. Open auto-focus lands on Cancel, never on the

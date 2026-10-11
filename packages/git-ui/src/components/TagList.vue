@@ -12,14 +12,12 @@ import { rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { cn } from '@theme/lib/utils';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
-import { computed } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowActionsButton from './RowActionsButton.vue';
-import RowContextMenu from './RowContextMenu.vue';
 import type { RefListSection } from './refListModel.ts';
 import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildRefMenu } from './rowMenuModel.ts';
-import { useRowMenu } from './useRowMenu.ts';
+import { useSectionMenu } from './useSectionMenu.ts';
 
 const props = defineProps<{
   section: RefListSection;
@@ -50,25 +48,19 @@ function targetCommit(row: RefRow): string {
   return (row.peeledObjectId ?? row.objectId).slice(0, 7);
 }
 
-const { menu: refMenu, open: openRefMenu, openFromButton: openRefMenuFromButton } = useRowMenu<RefRow>();
+const rowMenu = useSectionMenu();
 
-const refMenuSections = computed(() => {
-  const entry = refMenu.value;
-  if (!entry) return [];
+function menuFor(row: RefRow) {
   return buildRefMenu({
     kind: 'tag',
-    shortName: entry.row.shortName,
+    shortName: row.shortName,
     isHead: false,
     knownRemotes: props.knownRemotes,
     inProgress: props.inProgress,
   });
-});
+}
 
-async function onRefMenuSelect(id: string): Promise<void> {
-  const entry = refMenu.value;
-  refMenu.value = undefined;
-  if (!entry) return;
-  const { row } = entry;
+async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
   if (id === 'checkoutRef') {
     await checkout(row);
     return;
@@ -119,22 +111,13 @@ async function onRefMenuSelect(id: string): Promise<void> {
         <span class="font-data text-kira-sm text-muted-foreground">{{ targetCommit(row) }}</span>
       </button>
       <RowActionsButton
-        @click="openRefMenuFromButton(row, $event)"
-        @contextmenu="openRefMenu(row, $event)"
+        @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+        @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
       />
     </div>
     <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No tags</div>
 
-    <RowContextMenu
-      v-if="refMenu"
-      :sections="refMenuSections"
-      :x="refMenu.x"
-      :y="refMenu.y"
-      :label="`${refMenu.row.shortName} actions`"
-      @select="onRefMenuSelect"
-      @close="refMenu = undefined"
-    />
   </section>
 </template>
 

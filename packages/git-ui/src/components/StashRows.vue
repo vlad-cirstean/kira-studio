@@ -4,8 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * I2-21: `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
  * open/select were byte-identical apart from each row's own label fields (badge/origin/message,
- * `rowModel`), the menu the write-capable branch builds (`menuFor`) and the context menu's own
- * `aria-label` (`menuLabel`, per-entry for `StashList.vue`, static for `GlobalStashList.vue`).
+ * `rowModel`) and the menu the write-capable branch builds (`menuFor`).
  * The menu id itself is not dispatched here — each caller's own action set genuinely differs
  * (Pop/Drop/`stashSaveGlobal` exist only on a real stack entry), so a selected id is bubbled up
  * via `menuSelect` for the caller's own `switch`.
@@ -15,14 +14,13 @@ import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
-import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
-import RowContextMenu from './RowContextMenu.vue';
 import { REF_LIST_SECTION_CAP } from './refListModel.ts';
+import { useSectionMenu } from './useSectionMenu.ts';
 
 export interface StashRowModel {
   /** `data-row-id`/roving-tabindex key — `stash:<sha>` or `global:<sha>`, distinguishing the two
@@ -50,7 +48,6 @@ const props = defineProps<{
   rowModel: (entry: StashEntry) => StashRowModel;
   /** The row menu's sections for each bucket. */
   menuFor: (entry: StashEntry) => MenuSection[];
-  menuLabel: (entry: StashEntry) => string;
 }>();
 
 const emit = defineEmits<{
@@ -63,28 +60,9 @@ function select(entry: StashEntry): void {
   emit('selected');
 }
 
-const stashMenu = ref<{ entry: StashEntry; x: number; y: number } | undefined>(undefined);
+const rowMenu = useSectionMenu();
 
-function openMenu(entry: StashEntry, event: MouseEvent): void {
-  event.preventDefault();
-  stashMenu.value = { entry, x: event.clientX, y: event.clientY };
-}
-
-function openMenuFromButton(entry: StashEntry, event: MouseEvent): void {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  stashMenu.value = { entry, x: rect.left, y: rect.bottom };
-}
-
-const stashMenuSections = computed(() => {
-  const entry = stashMenu.value?.entry;
-  if (!entry) return [];
-  return props.menuFor(entry);
-});
-
-function onMenuSelect(id: string): void {
-  const entry = stashMenu.value?.entry;
-  stashMenu.value = undefined;
-  if (!entry) return;
+function onMenuSelect(entry: StashEntry, id: string): void {
   emit('menuSelect', id, entry);
 }
 </script>
@@ -120,20 +98,11 @@ function onMenuSelect(id: string): void {
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </button>
     <RowActionsButton
-      @click="openMenuFromButton(entry, $event)"
-      @contextmenu="openMenu(entry, $event)"
+      @click="rowMenu.openFromButton($event, menuFor(entry), (id) => onMenuSelect(entry, id))"
+      @contextmenu="rowMenu.openAt($event, menuFor(entry), (id) => onMenuSelect(entry, id))"
     />
   </div>
   <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
   <InlineState v-if="section.visible.length === 0" kind="empty">{{ emptyMessage }}</InlineState>
 
-  <RowContextMenu
-    v-if="stashMenu"
-    :sections="stashMenuSections"
-    :x="stashMenu.x"
-    :y="stashMenu.y"
-    :label="menuLabel(stashMenu.entry)"
-    @select="onMenuSelect"
-    @close="stashMenu = undefined"
-  />
 </template>

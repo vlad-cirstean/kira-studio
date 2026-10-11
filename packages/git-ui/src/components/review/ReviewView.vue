@@ -38,7 +38,10 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import { formatCount } from '@workbench/behaviour/format';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useLiveRegion } from '@workbench/behaviour/liveRegion';
+import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -56,6 +59,7 @@ import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
 import { buildRefListSections } from '../refListModel.ts';
+import { useFieldFocus } from '../useFieldFocus.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';
@@ -281,16 +285,29 @@ function onSwapBaseAndBranch(): void {
 // is applied *or* revealed, so an applied-but-collapsed filter still visibly signals itself.
 const filterVisible = ref(false);
 // Focus is explicit: `autofocus` is a11y-linted outside modals and fires only on first render.
-const toolbarFilter = useTemplateRef<{ focus: () => void }>('toolbarFilter');
+const toolbarFilter = useTemplateRef<{ $el: Element }>('toolbarFilter');
+const focusToolbarFilter = useFieldFocus(toolbarFilter);
 watch(filterVisible, (visible) => {
   if (!visible) return;
-  void nextTick(() => {
-    toolbarFilter.value?.focus();
-  });
+  void nextTick(focusToolbarFilter);
 });
 function toggleFilterVisible(): void {
   filterVisible.value = !filterVisible.value;
 }
+
+// Type to search: a printable key in the commit list reveals the file filter and starts it.
+const { showSearch } = usePanelHeaderSearch(rootEl, {
+  searchable: () => review.value?.phase.value === 'listing',
+  getSearch: () => filter.value,
+  setSearch: (value) => {
+    filter.value = value;
+    if (value !== '') filterVisible.value = true;
+  },
+  searchTestid: 'review-file-filter',
+});
+watch(filterVisible, (visible) => {
+  if (!visible) showSearch.value = false;
+});
 
 function onUiAction(action: UiActionKind): void {
   switch (action) {
@@ -491,7 +508,8 @@ watch(
 // rule on the row menu's "Review branch changes" entry).
 // ---------------------------------------------------------------------------------------
 const branchFilter = ref('');
-const branchFilterInputRef = useTemplateRef<{ focus: () => void }>('branchFilter');
+const branchFilterInputRef = useTemplateRef<{ $el: Element }>('branchFilter');
+const focusBranchFilter = useFieldFocus(branchFilterInputRef);
 const branchSections = computed(() =>
   buildRefListSections(
     {
@@ -508,7 +526,7 @@ const branchSections = computed(() =>
 watch(
   () => !bootError.value && !!review.value && !noActiveRepo.value && !review.value.branch.value,
   (showingPicker) => {
-    if (showingPicker) void nextTick(() => branchFilterInputRef.value?.focus());
+    if (showingPicker) void nextTick(focusBranchFilter);
   },
 );
 
@@ -536,12 +554,11 @@ const shas = computed<readonly string[]>(() => {
 
 // The list is virtualized (`useVirtualRows` below): only rows near the viewport mount, however many
 // are loaded.
-const commitCountFormatter = new Intl.NumberFormat();
 const commitCountLabel = computed(() => {
   const resolution = review.value?.resolution.value;
   if (resolution?.range.kind !== 'ready') return '';
   const count = resolution.range.commitCount;
-  return `${commitCountFormatter.format(count)} ${count === 1 ? 'commit' : 'commits'}`;
+  return `${formatCount(count)} ${count === 1 ? 'commit' : 'commits'}`;
 });
 
 // G14 D8 row 3/4: bare counts for the comparison summary node and the pane-toggle badges — the
@@ -606,7 +623,7 @@ const comparisonSummaryLabel = computed(() => {
   const commits = commitCountLabel.value;
   if (!commits) return '';
   const files = filesChangedCount.value;
-  return `${commits} · ${commitCountFormatter.format(files)} ${files === 1 ? 'file' : 'files'} changed`;
+  return `${commits} · ${formatCount(files)} ${files === 1 ? 'file' : 'files'} changed`;
 });
 
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
@@ -617,8 +634,8 @@ function loadMoreLabel(): string {
   if (r.isLoadingMore.value) return 'Loading…';
   const remaining = r.remaining.value;
   return remaining < FALLBACK_PAGE_SIZE
-    ? `Load the last ${commitCountFormatter.format(remaining)}`
-    : `Load more (${commitCountFormatter.format(remaining)} remaining)`;
+    ? `Load the last ${formatCount(remaining)}`
+    : `Load more (${formatCount(remaining)} remaining)`;
 }
 
 function handleLoadMore(): void {
@@ -632,7 +649,11 @@ function handleLoadMore(): void {
 // each guessing whether it is the innermost.
 // ---------------------------------------------------------------------------------------
 const rowsEl = ref<HTMLDivElement | null>(null);
-const focusedRow = ref(0);
+const focusedSha = ref<string | null>(null);
+const focusedRow = computed(() => {
+  const index = focusedSha.value === null ? -1 : shas.value.indexOf(focusedSha.value);
+  return index === -1 ? 0 : index;
+});
 
 // Collapsed rows are two lines; an expanded row's real height is measured (`measureRow`). Rows
 // position with `top`, not `transform`: a row's context menu is `position: fixed` and a transformed
@@ -645,69 +666,34 @@ const { virtualizer, virtualItems, totalSize, onScroll } = useVirtualRows({
   pinned: () => focusedRow.value,
 });
 
-function measureRow(el: unknown): void {
-  if (el instanceof HTMLElement) virtualizer.value.measureElement(el);
-}
-
-watch(shas, (list) => {
-  if (focusedRow.value >= list.length) focusedRow.value = Math.max(0, list.length - 1);
-});
-
-function rowElId(sha: string): string {
-  return `git-review-row-${sha}`;
-}
-
 const focusedRowMounted = computed(() =>
   virtualItems.value.some((item) => item.index === focusedRow.value),
 );
 
-// Keyboard nav can target a row that is not mounted: scroll it in, then focus it once it renders.
-const pendingFocus = ref<number | null>(null);
-watch(
-  [pendingFocus, virtualItems],
-  () => {
-    const index = pendingFocus.value;
-    const sha = index === null ? undefined : shas.value[index];
-    if (!sha) return;
-    const el = rowsEl.value?.querySelector<HTMLElement>(`#${rowElId(sha)}`);
-    if (!el) return;
-    pendingFocus.value = null;
-    el.focus({ preventScroll: true });
+function measureRow(el: unknown): void {
+  if (el instanceof HTMLElement) virtualizer.value.measureElement(el);
+}
+
+const nav = useListNavigation<string>({
+  container: rowsEl,
+  items: () => shas.value,
+  key: (sha) => sha,
+  activeKey: focusedSha,
+  onOpen: toggleRow,
+  tree: {
+    depth: () => 0,
+    isExpanded: (sha) => review.value?.expandedShas.value.has(sha) ?? false,
+    hasChildren: () => true,
+    expand: (sha) => {
+      if (!review.value?.expandedShas.value.has(sha)) toggleRow(sha);
+    },
+    collapse: (sha) => {
+      if (review.value?.expandedShas.value.has(sha)) toggleRow(sha);
+    },
   },
-  { flush: 'post' },
-);
-
-function focusRow(index: number): void {
-  focusedRow.value = index;
-  if (!shas.value[index]) return;
-  pendingFocus.value = index;
-  virtualizer.value.scrollToIndex(index);
-}
-
-function onRowsKeydown(event: KeyboardEvent): void {
-  const list = shas.value;
-  if (list.length === 0) return;
-  switch (event.key) {
-    case 'ArrowDown':
-      event.preventDefault();
-      focusRow(Math.min(focusedRow.value + 1, list.length - 1));
-      break;
-    case 'ArrowUp':
-      event.preventDefault();
-      focusRow(Math.max(focusedRow.value - 1, 0));
-      break;
-    case 'Home':
-      event.preventDefault();
-      focusRow(0);
-      break;
-    case 'End':
-      event.preventDefault();
-      focusRow(list.length - 1);
-      break;
-    default:
-      break;
-  }
-}
+  scrollToIndex: (index) => virtualizer.value.scrollToIndex(index),
+  rendered: () => virtualItems.value,
+});
 
 function toggleRow(sha: string): void {
   review.value?.toggle(sha);
@@ -935,6 +921,7 @@ watch(
         <div v-if="filterVisible" class="min-w-0 flex-1">
           <SearchField
             ref="toolbarFilter"
+            data-testid="review-file-filter"
             placeholder="Filter files"
             aria-label="Filter files"
             :model-value="filter"
@@ -1019,7 +1006,6 @@ watch(
             role="tree"
             aria-label="Commits"
             :tabindex="focusedRowMounted ? -1 : 0"
-            @keydown="onRowsKeydown"
             @scroll="onScroll"
           >
             <div class="relative w-full" :style="{ height: `${totalSize}px` }">
@@ -1033,7 +1019,7 @@ watch(
                 :style="{ top: `${item.start}px` }"
               >
                 <ReviewCommitRow
-                  :id="rowElId(shas[item.index] as string)"
+                  v-bind="nav.rowProps(shas[item.index] as string)"
                   :sha="shas[item.index] as string"
                   :store="review.store"
                   :expanded="review.expandedShas.value.has(shas[item.index] as string)"
@@ -1045,7 +1031,7 @@ watch(
                   :list-mode="listMode"
                   :filter="filter"
                   @toggle="toggleRow(shas[item.index] as string)"
-                  @focus-row="focusRow(item.index)"
+                  @focus-row="focusedSha = shas[item.index] as string"
                 />
               </div>
             </div>

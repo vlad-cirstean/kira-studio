@@ -17,6 +17,7 @@ import type {
   ResetMode,
   StashEntry,
 } from '@kira/git-ipc';
+import { formatCount } from '@workbench/behaviour/format';
 import { customRef, type Ref } from 'vue';
 import { originLabel, stashLabel } from '../components/stashListModel.ts';
 
@@ -35,16 +36,6 @@ export function createAnnouncementRef(): Ref<string> {
       trigger();
     },
   }));
-}
-
-const COUNT_FORMATTER = new Intl.NumberFormat();
-
-/** `LoadMoreButton.vue`'s own `fmt` helper, duplicated rather than imported: that one is a private
- *  detail of a `.vue` SFC's `<script setup>` block, not an exported function, and both call sites
- *  want the same "grouped thousands" formatting the plan's own example ("5,000 more loaded,
- *  122,400 remaining") shows. */
-function formatCount(count: number): string {
-  return COUNT_FORMATTER.format(count);
 }
 
 /** The plan's own worked example, generalized: "N more loaded, M remaining" — or, once the

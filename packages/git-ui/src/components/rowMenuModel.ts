@@ -1,5 +1,5 @@
 /**
- * `docs/plans/P6.md` W14: `RowContextMenu.vue`'s pure half. What is present, what is absent, and
+ * `docs/plans/P6.md` W14: the row context menus' pure half. What is present, what is absent, and
  * what is present-but-disabled-with-a-reason is exactly the thing a later phase edits (§10's
  * exit table grows this same menu at P9/P10), so it lives as one testable table
  * (`buildRowMenu`/`buildRefMenu`) rather than template `v-if` conditionals.

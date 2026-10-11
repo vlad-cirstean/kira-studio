@@ -22,6 +22,7 @@ import { computed, ref, useTemplateRef } from 'vue';
 import { codiconName, STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
 import { buildRefListSections } from '../refListModel.ts';
+import { useFieldFocus } from '../useFieldFocus.ts';
 
 const props = defineProps<{
   resolution: BaseResolution | undefined;
@@ -57,7 +58,8 @@ const filter = ref('');
 // P131 Part 3 §5.2: reka's modal Popover owns focus trap, outside-click and Escape, and returns
 // focus to the trigger on close — the same contract `useModalFocus`/`onClickOutside`/the rootEl
 // Escape listener existed to provide by hand.
-const filterEl = useTemplateRef<{ focus: () => void }>('filterEl');
+const filterEl = useTemplateRef<{ $el: Element }>('filterEl');
+const focusFilter = useFieldFocus(filterEl);
 
 function open(): void {
   isOpen.value = true;
@@ -106,7 +108,7 @@ function pick(ref: string): void {
  *  explicitly, mirroring BranchPicker.vue's own `onOpenAutoFocus`. */
 function onOpenAutoFocus(e: Event): void {
   e.preventDefault();
-  filterEl.value?.focus();
+  focusFilter();
 }
 </script>
 

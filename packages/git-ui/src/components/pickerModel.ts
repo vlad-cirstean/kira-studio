@@ -31,6 +31,7 @@
  */
 import { worktreeLabel } from '@kira/git-core';
 import type { RefRow, StackBranch, StackSummary, StashEntry, WorktreeEntry } from '@kira/git-ipc';
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import { capItems, filterRefs, REF_LIST_SECTION_CAP, sortTags } from './refListModel.ts';
 import { stashLabel } from './stashListModel.ts';
 
@@ -102,7 +103,7 @@ function groupStacks(stacks: readonly StackSummary[]): PickerStackGroup[] {
  *  already apply to this module family. `needle` is pre-trimmed/lowered by the caller once per
  *  call rather than per row. */
 function matchesText(haystack: string, needle: string): boolean {
-  return haystack.toLowerCase().includes(needle);
+  return matchesQuery(haystack, needle);
 }
 
 function filterStashes(entries: readonly StashEntry[], needle: string): StashEntry[] {
@@ -145,7 +146,7 @@ function filterOrphans(orphans: readonly StackBranch[], needle: string): StackBr
  *  ties by name — used for local branches' own unpinned tail and for remote branches outright
  *  (a remote-tracking ref can never be HEAD or `checkedOutIn`, so it never has a pin step). */
 function byRecencyThenName(a: RefRow, b: RefRow): number {
-  return b.committerDate - a.committerDate || a.shortName.localeCompare(b.shortName);
+  return b.committerDate - a.committerDate || compareNatural(a.shortName, b.shortName);
 }
 
 /** §6.1/§6.2: HEAD first, then a branch checked out in another worktree, then everything else by
@@ -155,7 +156,9 @@ function orderLocalBranches(rows: readonly RefRow[]): { rows: RefRow[]; pinned: 
   const isPinned = (r: RefRow) => r.isHead || r.checkedOutIn !== undefined;
   const pinned = rows
     .filter(isPinned)
-    .sort((a, b) => Number(b.isHead) - Number(a.isHead) || a.shortName.localeCompare(b.shortName));
+    .sort(
+      (a, b) => Number(b.isHead) - Number(a.isHead) || compareNatural(a.shortName, b.shortName),
+    );
   const rest = rows.filter((r) => !isPinned(r)).sort(byRecencyThenName);
   return { rows: [...pinned, ...rest], pinned: pinned.length };
 }
@@ -179,7 +182,7 @@ function orderGlobalStash(entries: readonly StashEntry[]): StashEntry[] {
 /** §6.1: current, then main, then the rest by path — today's order is whatever `worktree.list`
  *  returned. */
 function orderWorktrees(entries: readonly WorktreeEntry[]): WorktreeEntry[] {
-  const byPath = (a: WorktreeEntry, b: WorktreeEntry) => a.path.localeCompare(b.path);
+  const byPath = (a: WorktreeEntry, b: WorktreeEntry) => compareNatural(a.path, b.path);
   const current = entries.filter((e) => e.isCurrent).sort(byPath);
   const main = entries.filter((e) => !e.isCurrent && e.isMain).sort(byPath);
   const rest = entries.filter((e) => !e.isCurrent && !e.isMain).sort(byPath);

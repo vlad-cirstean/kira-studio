@@ -11,6 +11,7 @@
  */
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { formatCount } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import type { GraphViewState } from '../state/graphView.ts';
 
@@ -20,23 +21,17 @@ const props = defineProps<{
   reportError: (err: unknown, prefix: string) => void;
 }>();
 
-const formatter = new Intl.NumberFormat();
-
-function fmt(n: number): string {
-  return formatter.format(n);
-}
-
 const isLoading = computed(() => props.graphView.loading.value !== 'idle');
 
 const buttonLabel = computed(() => {
   const remaining = props.graphView.remaining.value;
   if (isLoading.value) {
-    return `Loading… (${fmt(remaining)} remaining)`;
+    return `Loading… (${formatCount(remaining)} remaining)`;
   }
   if (remaining < props.pageSize) {
-    return `Load the last ${fmt(remaining)}`;
+    return `Load the last ${formatCount(remaining)}`;
   }
-  return `Load ${fmt(props.pageSize)} more (${fmt(remaining)} remaining)`;
+  return `Load ${formatCount(props.pageSize)} more (${formatCount(remaining)} remaining)`;
 });
 
 function handlePress(event: MouseEvent): void {

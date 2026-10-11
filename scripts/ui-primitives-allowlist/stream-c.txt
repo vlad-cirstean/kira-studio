@@ -6,6 +6,10 @@ permanent U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron
 permanent U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
 permanent U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
 permanent U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+permanent U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
+permanent U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
+permanent U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
+permanent U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
 packages/docker-ui/src/components/ContainerDetail.vue
 packages/docker-ui/src/components/ContainerList.vue
 packages/docker-ui/src/components/ContainerOverview.vue
@@ -22,25 +26,8 @@ packages/docker-ui/src/components/VolumeList.vue
 packages/docker-ui/src/lib/format.ts
 packages/docker-ui/src/queries.ts
 packages/docker-ui/src/state/useStatsSubscription.ts
-packages/git-ui/src/App.vue
-packages/git-ui/src/components/BranchPicker.vue
-packages/git-ui/src/components/FileTree.vue
-packages/git-ui/src/components/LoadMoreButton.vue
-packages/git-ui/src/components/RowContextMenu.vue
-packages/git-ui/src/components/SearchBox.vue
-packages/git-ui/src/components/SearchResults.vue
-packages/git-ui/src/components/StashRows.vue
-packages/git-ui/src/components/TagList.vue
-packages/git-ui/src/components/fileTreeModel.ts
-packages/git-ui/src/components/gridKeyboard.ts
-packages/git-ui/src/components/pickerModel.ts
-packages/git-ui/src/components/refListModel.ts
-packages/git-ui/src/components/review/BaseSelector.vue
-packages/git-ui/src/components/review/ReviewCommitRow.vue
-packages/git-ui/src/components/review/ReviewView.vue
 packages/git-ui/src/graph/layoutClient.ts
 packages/git-ui/src/state/graphView.ts
-packages/git-ui/src/state/liveAnnouncements.ts
 packages/git-ui/src/state/pr.ts
 packages/git-ui/src/state/search.ts
 packages/workbench/src/automations/AutomationsPanel.vue

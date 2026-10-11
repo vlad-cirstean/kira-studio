@@ -6,7 +6,7 @@ import { TransportError } from '@kira/git-ipc';
  * subject, short sha (`§6.4`'s "clicking a sha copies it"), author, relative date. Expanded:
  * `FileTree.vue` over this row's own `DetailState` (`ReviewSessionState.expand` fetches
  * `commit.detail` on first expansion and keeps it for the session — this component never fetches
- * anything itself). `→`/`←`/`Enter` toggle expansion (§6.8 step 2); the row's own context menu is
+ * anything itself). `→`/`←`/`Enter` toggle expansion (§6.8 step 2, `ReviewView`'s `useListNavigation`); the row's own context menu is
  * copy-sha/copy-message only (`rowMenuModel.ts`'s `buildReadOnlyRowMenu`, not `buildRowMenu` — this
  * row offers no checkout/branch/tag/revert).
  *
@@ -24,15 +24,15 @@ import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
 import { formatRelativeDate } from '../dateFormat.ts';
 import FileTree from '../FileTree.vue';
 import { openAllChangesAnnounced } from '../openAllChangesAnnounced.ts';
-import RowContextMenu from '../RowContextMenu.vue';
 import { buildReadOnlyRowMenu } from '../rowMenuModel.ts';
+import { useSectionMenu } from '../useSectionMenu.ts';
 
 const props = defineProps<{
   sha: string;
@@ -81,35 +81,11 @@ function onRowClick(event: MouseEvent): void {
 const headerEl = useTemplateRef<HTMLElement>('headerEl');
 useEventListener(headerEl, 'click', onRowClick);
 
-function onKeydown(event: KeyboardEvent): void {
-  switch (event.key) {
-    case 'ArrowRight':
-      if (!props.expanded) {
-        event.preventDefault();
-        emit('toggle');
-      }
-      break;
-    case 'ArrowLeft':
-      if (props.expanded) {
-        event.preventDefault();
-        emit('toggle');
-      }
-      break;
-    case 'Enter':
-      event.preventDefault();
-      emit('toggle');
-      break;
-    default:
-      break;
-  }
-}
-
-const menuState = ref<{ x: number; y: number } | undefined>(undefined);
+const rowMenu = useSectionMenu();
 
 function onContextMenu(event: MouseEvent): void {
   emit('focus-row');
-  event.preventDefault();
-  menuState.value = { x: event.clientX, y: event.clientY };
+  rowMenu.openAt(event, buildReadOnlyRowMenu(), onMenuSelect);
 }
 
 // P108 F9: `props.actions` (the session-level `rowActions` bundle, see this component's own doc
@@ -117,10 +93,7 @@ function onContextMenu(event: MouseEvent): void {
 // is `undefined` until the row has been expanded at least once, so building this menu from
 // `expansion?.actions` left Copy SHA/Copy message disabled (or a no-op) on every never-expanded
 // row, the same bug `openAllChanges` above was already fixed for.
-const menuSections = computed(() => buildReadOnlyRowMenu());
-
 function onMenuSelect(id: string): void {
-  menuState.value = undefined;
   const c = commit.value;
   if (!c) return;
   if (id === 'copySha') props.actions.copy(c.sha, 'full SHA');
@@ -206,7 +179,6 @@ function onOpenFile(index: number, pinned: boolean): void {
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"
     :data-testid="`review-row-${sha}`"
-    @keydown="onKeydown"
     @contextmenu="onContextMenu"
   >
     <!-- G19 D10: the click-to-toggle listener moved here, off the whole row (F10's root cause —
@@ -292,15 +264,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       <InlineState v-else kind="loading">Loading…</InlineState>
     </div>
 
-    <RowContextMenu
-      v-if="menuState"
-      :sections="menuSections"
-      :x="menuState.x"
-      :y="menuState.y"
-      label="Commit actions"
-      @select="onMenuSelect"
-      @close="menuState = undefined"
-    />
   </div>
 </template>
 

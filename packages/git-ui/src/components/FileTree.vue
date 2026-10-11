@@ -30,11 +30,15 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { cn } from '@theme/lib/utils';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed, nextTick, ref, useId, watch } from 'vue';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { computed, ref, useId, watch } from 'vue';
 import { ACTION_ICONS, codiconName } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
+import { sectionsToMenuItems } from '../lib/menuModel.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import {
@@ -49,7 +53,6 @@ import {
   STATUS_COLOR_CLASS,
   STATUS_LETTERS,
 } from './fileTreeModel.ts';
-import RowContextMenu from './RowContextMenu.vue';
 import { buildFileRowMenu } from './rowMenuModel.ts';
 
 const props = defineProps<{
@@ -192,7 +195,16 @@ const capped = computed(() =>
 );
 
 const treeEl = ref<HTMLDivElement | null>(null);
-const focusedRow = ref(0);
+const rootEl = ref<HTMLElement | null>(null);
+const activeKey = ref<string | null>(null);
+
+// Type to search: a printable key on the tree redirects into the filter field.
+usePanelHeaderSearch(rootEl, {
+  searchable: () => props.showToolbar !== false,
+  getSearch: () => filterInput.value,
+  setSearch: onFilterInput,
+  searchTestid: 'file-filter',
+});
 
 /** Keeps the keyboard cursor in step with `selectedFile` however it changed — a mouse click on a
  *  row (handled locally, below), or `selectedFile` being driven from outside this component
@@ -202,34 +214,16 @@ watch(
   [() => props.selectedFile, capped],
   ([selectedFile]) => {
     const rowsNow = capped.value.visible;
-    const index = rowsNow.findIndex(
+    const selected = rowsNow.find(
       (row) => row.kind === 'file' && row.node.fileIndex === selectedFile,
     );
-    if (index !== -1) focusedRow.value = index;
-    else if (focusedRow.value >= rowsNow.length) focusedRow.value = Math.max(0, rowsNow.length - 1);
+    if (selected) activeKey.value = rowKey(selected);
+    else if (!rowsNow.some((row) => rowKey(row) === activeKey.value)) {
+      activeKey.value = rowsNow[0] ? rowKey(rowsNow[0]) : null;
+    }
   },
   { immediate: true },
 );
-
-/** P5 W14: a single roving `tabindex` on the file cursor (`focusedRow`'s own row) rather than the
- *  container — the same real-DOM-focus roving pattern `CommitGrid.vue`'s own rows use, not
- *  `aria-activedescendant` (a screen reader tracks whichever DOM node actually has focus, and this
- *  keeps every row a genuinely reachable `Tab` stop). */
-const rowIdPrefix = useId();
-function rowId(index: number): string {
-  return `${rowIdPrefix}-row-${index}`;
-}
-function focusRowEl(index: number): void {
-  void nextTick(() => {
-    treeEl.value?.querySelector<HTMLElement>(`[id="${rowId(index)}"]`)?.focus({ preventScroll: true });
-  });
-}
-watch(focusedRow, (index) => {
-  // Only follow the cursor with *real* focus when the tree already holds it — otherwise a
-  // `selectedFile` sync driven from outside (the `watch` just above, on a fresh mount or a
-  // parent-commit pick) would steal focus into the tree uninvited.
-  if (treeEl.value?.contains(document.activeElement)) focusRowEl(index);
-});
 
 /** P5 W14: announces §8's render cap once per boundary crossing (a fresh commit whose file count
  *  is over the cap, or the filter narrowing back above it after being below) — not on every
@@ -252,15 +246,13 @@ function rowKey(row: FileTreeRow): string {
 
 /** Theme `rowVariants` tree layout (`data` keeps the Git graph font reaching rows); indent comes
  *  from `rowIndent`. The focus ring is `group-focus-within` (the container carries `group`) on the
- *  one row `index === focusedRow` names. `data-testid="file-tree-row"` is selected by several
+ *  roving-stop row. `data-testid="file-tree-row"` is selected by several
  *  Playwright specs. */
-function rowClass(row: FileTreeRow, index: number): string {
+function rowClass(row: FileTreeRow): string {
   const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
   return cn(
     rowVariants({ layout: 'tree', selected, data: true }),
-    index === focusedRow.value
-      ? 'group-focus-within:focus-ring'
-      : '',
+    nav.tabindexFor(rowKey(row)) === 0 ? 'group-focus-within:focus-ring' : '',
   );
 }
 
@@ -273,7 +265,7 @@ function rowClass(row: FileTreeRow, index: number): string {
 function selectRow(index: number, options: { follow?: boolean } = {}): void {
   const row = capped.value.visible[index];
   if (!row) return;
-  focusedRow.value = index;
+  activeKey.value = rowKey(row);
   if (row.kind === 'directory') return;
   if (options.follow === false) return;
   emit('selectFile', row.node.fileIndex);
@@ -284,19 +276,11 @@ function onRowClick(index: number): void {
   const row = capped.value.visible[index];
   if (!row) return;
   if (row.kind === 'directory') {
-    focusedRow.value = index;
+    activeKey.value = rowKey(row);
     toggleDir(row.node.path);
     return;
   }
   selectRow(index);
-}
-
-/** Space selects the row only when the row itself has focus: from the review checkbox (or any
- *  inner control) it must reach the control, or `preventDefault` cancels the activation. */
-function onRowSpace(event: KeyboardEvent, index: number): void {
-  if (event.target !== event.currentTarget) return;
-  event.preventDefault();
-  onRowClick(index);
 }
 
 /** G21 D13: the explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
@@ -310,68 +294,39 @@ function onRowDblClick(index: number): void {
   emit('openFile', row.node.fileIndex, true);
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  const visible = capped.value.visible;
-  if (visible.length === 0) return;
-  switch (event.key) {
-    case 'ArrowDown':
-      event.preventDefault();
-      selectRow(Math.min(focusedRow.value + 1, visible.length - 1));
-      break;
-    case 'ArrowUp':
-      event.preventDefault();
-      selectRow(Math.max(focusedRow.value - 1, 0));
-      break;
-    case 'Home':
-      event.preventDefault();
-      selectRow(0);
-      break;
-    case 'End':
-      event.preventDefault();
-      selectRow(visible.length - 1);
-      break;
-    case 'ArrowRight': {
-      const row = visible[focusedRow.value];
-      if (row?.kind === 'directory') {
-        event.preventDefault();
-        expandDir(row.node.path);
-      }
-      break;
-    }
-    case 'ArrowLeft': {
-      const row = visible[focusedRow.value];
-      if (row?.kind === 'directory') {
-        event.preventDefault();
-        collapseDir(row.node.path);
-      }
-      break;
-    }
-    case 'ContextMenu':
-    case 'F10': {
-      if (event.key === 'F10' && !event.shiftKey) break;
-      const row = visible[focusedRow.value];
-      if (row?.kind !== 'file') break;
-      const rowEl = treeEl.value?.querySelector<HTMLElement>(`[id="${rowId(focusedRow.value)}"]`);
-      if (!rowEl) break;
-      event.preventDefault();
-      const rect = rowEl.getBoundingClientRect();
-      fileMenuState.value = { x: rect.left, y: rect.bottom, path: row.node.change.path };
-      break;
-    }
-    case 'Enter': {
-      const row = visible[focusedRow.value];
-      if (!row) break;
-      event.preventDefault();
-      // G21 D13: the keyboard equivalent of a double click — pins, rather than re-emitting the
-      // same navigational open `selectRow` (arrow-key nav) already fired for this row.
-      if (row.kind === 'directory') toggleDir(row.node.path);
-      else emit('openFile', row.node.fileIndex, true);
-      break;
-    }
-    default:
-      break;
-  }
+function indexOfKey(key: string): number {
+  return capped.value.visible.findIndex((row) => rowKey(row) === key);
 }
+
+const nav = useListNavigation<FileTreeRow>({
+  container: treeEl,
+  items: () => capped.value.visible,
+  key: rowKey,
+  activeKey,
+  selectOnMove: true,
+  // Arrow moves preview the file; Space acts as a click (toggle a directory, select a file).
+  onSelect: (row, { reason }) => {
+    const index = indexOfKey(rowKey(row));
+    if (reason === 'key') onRowClick(index);
+    else selectRow(index);
+  },
+  // G21 D13: the keyboard equivalent of a double click — pins, rather than re-emitting the same
+  // navigational open `selectRow` (arrow-key nav) already fired for this row.
+  onOpen: (row) => {
+    if (row.kind === 'directory') toggleDir(row.node.path);
+    else emit('openFile', row.node.fileIndex, true);
+  },
+  onMenu: (row, rect) => {
+    if (row.kind === 'file') openFileMenu(rect.left, rect.bottom, row.node.change.path);
+  },
+  tree: {
+    depth: (row) => row.depth,
+    isExpanded: (row) => row.kind === 'directory' && row.expanded,
+    hasChildren: (row) => row.kind === 'directory',
+    expand: (row) => expandDir(row.node.path),
+    collapse: (row) => collapseDir(row.node.path),
+  },
+});
 
 interface ParentOption {
   readonly sha: string;
@@ -431,19 +386,26 @@ function copyPath(path: string): void {
 
 // G19 D7 / G21 D11: a right-click "Copy path" menu — the one copy-path affordance in every tree
 // now (the inline button below it used to gate on is gone).
-const fileMenuState = ref<{ x: number; y: number; path: string } | undefined>(undefined);
+const contextMenu = useContextMenuStore();
 
-function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
+function openFileMenu(x: number, y: number, path: string): void {
+  contextMenu.openContextMenuAt(
+    x,
+    y,
+    sectionsToMenuItems(buildFileRowMenu(props.sha !== undefined), (id) => onFileMenuSelect(path, id)),
+  );
+}
+
+function onRowContextMenu(event: MouseEvent, row: FileTreeRow, index: number): void {
   if (row.kind !== 'file') return;
   event.preventDefault();
   // G34 D17: without this, the same `contextmenu` event also reaches `ReviewCommitRow.vue`'s own
   // handler (a file row here can sit inside an expanded review row) and a second menu — that
   // row's "Commit actions" menu — opens underneath this one from a single right-click.
   event.stopPropagation();
-  fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
+  selectRow(index, { follow: false });
+  openFileMenu(event.clientX, event.clientY, row.node.change.path);
 }
-
-const fileMenuSections = computed(() => buildFileRowMenu(props.sha !== undefined));
 
 // P74 §7.4: line 1 — a tree row has no cursor, so "go to file" is the row's own job; "go to
 // line" is the editor's (RepoDiffView.vue's own `repo.goToFileFromDiff` command). Announces
@@ -469,10 +431,7 @@ async function goToFile(path: string): Promise<void> {
   }
 }
 
-function onFileMenuSelect(id: string): void {
-  const path = fileMenuState.value?.path;
-  fileMenuState.value = undefined;
-  if (path === undefined) return;
+function onFileMenuSelect(path: string, id: string): void {
   if (id === 'copyPath') copyPath(path);
   else if (id === 'goToFile') void goToFile(path);
 }
@@ -508,7 +467,7 @@ const parentSelectId = useId();
 </script>
 
 <template>
-  <div class="flex flex-col min-h-0 flex-1" data-testid="file-tree">
+  <div ref="rootEl" class="flex flex-col min-h-0 flex-1" data-testid="file-tree">
     <!-- G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
          text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
          defeats Vue's single-root detection for THIS toolchain (Vue 3.5.42 /
@@ -537,6 +496,7 @@ const parentSelectId = useId();
     <div v-if="showToolbar !== false" class="flex gap-1 px-2 pb-1">
       <div class="min-w-0 flex-1">
         <SearchField
+          data-testid="file-filter"
           :model-value="filterInput"
           placeholder="Filter files"
           aria-label="Filter files"
@@ -563,24 +523,23 @@ const parentSelectId = useId();
       class="flex-1 min-h-0 overflow-auto group"
       aria-label="File tree"
       role="tree"
-      @keydown="onKeydown"
     >
+      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from nav.rowProps. -->
       <div
         v-for="(row, index) in capped.visible"
-        :id="rowId(index)"
         :key="rowKey(row)"
         data-testid="file-tree-row"
-        :class="rowClass(row, index)"
+        :class="rowClass(row)"
         role="treeitem"
         :aria-level="row.depth + 1"
         :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
-        :tabindex="index === focusedRow ? 0 : -1"
+        v-bind="nav.rowProps(rowKey(row))"
         :style="rowIndent(row.depth)"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
-        @contextmenu="onRowContextMenu($event, row)"
-        @keydown.space="onRowSpace($event, index)"
+        @contextmenu="onRowContextMenu($event, row, index)"
       >
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
@@ -659,22 +618,21 @@ const parentSelectId = useId();
       class="flex-1 min-h-0 overflow-auto group"
       aria-label="File list"
       role="listbox"
-      @keydown="onKeydown"
     >
+      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from nav.rowProps. -->
       <div
         v-for="(row, index) in capped.visible"
-        :id="rowId(index)"
         :key="rowKey(row)"
         data-testid="file-tree-row"
-        :class="rowClass(row, index)"
+        :class="rowClass(row)"
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
-        :tabindex="index === focusedRow ? 0 : -1"
+        v-bind="nav.rowProps(rowKey(row))"
         :style="rowIndent(row.depth)"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
-        @contextmenu="onRowContextMenu($event, row)"
-        @keydown.space="onRowSpace($event, index)"
+        @contextmenu="onRowContextMenu($event, row, index)"
       >
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
@@ -762,15 +720,6 @@ const parentSelectId = useId();
       Show all {{ rows.length }} files
     </Button>
 
-    <RowContextMenu
-      v-if="fileMenuState"
-      :sections="fileMenuSections"
-      :x="fileMenuState.x"
-      :y="fileMenuState.y"
-      label="File actions"
-      @select="onFileMenuSelect"
-      @close="fileMenuState = undefined"
-    />
   </div>
 </template>
 

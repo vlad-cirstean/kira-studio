@@ -6,50 +6,22 @@
  * DOM-touching renderer.
  */
 import type { RefRow, RefTrack } from '@kira/git-ipc';
-
-/** §7.9: "in a dedicated tags list… tags sort `v10` after `v9`" — a plain `localeCompare` puts
- *  `"v10"` before `"v9"` (lexicographic: `"1" < "9"`), so this splits each name into alternating
- *  digit/non-digit runs and compares digit runs numerically. `"v10.1"` sorts after `"v10"` the
- *  same way: their shared `"v10"` prefix compares equal, and the run `undefined` (nothing left)
- *  vs `".1"` (something left) makes the shorter name sort first. */
-function naturalCompare(a: string, b: string): number {
-  const partsA = a.match(/\d+|\D+/g) ?? [];
-  const partsB = b.match(/\d+|\D+/g) ?? [];
-  const len = Math.max(partsA.length, partsB.length);
-  for (let i = 0; i < len; i++) {
-    const partA = partsA[i];
-    const partB = partsB[i];
-    if (partA === undefined) return -1;
-    if (partB === undefined) return 1;
-    const isNumA = /^\d+$/.test(partA);
-    const isNumB = /^\d+$/.test(partB);
-    if (isNumA && isNumB) {
-      const numA = Number(partA);
-      const numB = Number(partB);
-      if (numA !== numB) return numA - numB;
-    } else {
-      const cmp = partA.localeCompare(partB);
-      if (cmp !== 0) return cmp;
-    }
-  }
-  return 0;
-}
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 
 /** §7.8's own rule reused verbatim (`fileTreeModel.ts`'s `filterFiles`): case-insensitive
  *  substring over the display name, not fuzzy, not regex. An empty (or all-whitespace) filter
  *  matches everything. */
 export function filterRefs(rows: readonly RefRow[], filter: string): RefRow[] {
-  const needle = filter.trim().toLowerCase();
-  if (needle === '') return [...rows];
-  return rows.filter((row) => row.shortName.toLowerCase().includes(needle));
+  return rows.filter((row) => matchesQuery(row.shortName, filter));
 }
 
 function sortByName(rows: readonly RefRow[]): RefRow[] {
-  return [...rows].sort((a, b) => a.shortName.localeCompare(b.shortName));
+  return [...rows].sort((a, b) => compareNatural(a.shortName, b.shortName));
 }
 
+/** §7.9: tags sort `v10` after `v9` (`compareNatural` is numeric). */
 export function sortTags(rows: readonly RefRow[]): RefRow[] {
-  return [...rows].sort((a, b) => naturalCompare(a.shortName, b.shortName));
+  return sortByName(rows);
 }
 
 /** The picker's own "N more" cap, kept well under `FILE_TREE_ROW_CAP` — a repo with more local

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // P131 Part 2 §3.6: a model renderer, not a wrapper around a shadcn component -- the same role
-// KuiMenuList held for its three consumers (RowContextMenu, AppToolbar's push menu,
+// KuiMenuList held for its consumers (AppToolbar's push menu,
 // PullStrategyPicker), now rendering a MenuSection[] as DropdownMenuItems instead of building its
 // own row/keyboard-nav machinery (reka's DropdownMenuContent already owns that).
 import CodiconIcon from '@theme/CodiconIcon.vue';

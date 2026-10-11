@@ -6,6 +6,7 @@
  * pure model from its DOM-touching renderer (`refBadges.ts`).
  */
 import type { FileChange, FileChangeKind } from '@kira/git-ipc';
+import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 
 /** §6.4's per-file status letter — the letter is always shown (§6.1: no colour-only meaning). */
 export const STATUS_LETTERS: Readonly<Record<FileChangeKind, string>> = {
@@ -68,10 +69,9 @@ interface IndexedFileChange {
 /** §7.8: "case-insensitive substring, not fuzzy, not regex" over the *full path*. An empty
  *  (or all-whitespace) filter matches everything, preserving each change's original index. */
 export function filterFiles(files: readonly FileChange[], filter: string): IndexedFileChange[] {
-  const needle = filter.trim().toLowerCase();
-  const indexed = files.map((change, fileIndex) => ({ change, fileIndex }));
-  if (needle === '') return indexed;
-  return indexed.filter(({ change }) => change.path.toLowerCase().includes(needle));
+  return files
+    .map((change, fileIndex) => ({ change, fileIndex }))
+    .filter(({ change }) => matchesQuery(change.path, filter));
 }
 
 /** Flat-mode's own ordering: alphabetical by full path — the same order a fully-expanded,
@@ -79,7 +79,7 @@ export function filterFiles(files: readonly FileChange[], filter: string): Index
  *  reshuffle. */
 export function buildFlatList(files: readonly IndexedFileChange[]): FileTreeFileNode[] {
   return [...files]
-    .sort((a, b) => a.change.path.localeCompare(b.change.path))
+    .sort((a, b) => compareNatural(a.change.path, b.change.path))
     .map(({ change, fileIndex }) => ({
       kind: 'file',
       name: baseName(change.path),
@@ -128,8 +128,8 @@ function insertFile(root: DirBuilder, file: FileTreeFileNode): void {
 function finalize(builder: DirBuilder, pathPrefix: string): FileTreeNode[] {
   const childDirs = [...builder.children.values()]
     .map((child) => finalizeOne(child, joinPath(pathPrefix, child.name)))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const files = [...builder.files].sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => compareNatural(a.name, b.name));
+  const files = [...builder.files].sort((a, b) => compareNatural(a.name, b.name));
   return [...childDirs, ...files];
 }
 

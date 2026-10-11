@@ -73,6 +73,7 @@ import SearchResults from './SearchResults.vue';
 import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
 import type { SearchOption } from './searchResultsModel.ts';
 import { buildSearchResultsModel } from './searchResultsModel.ts';
+import { useFieldFocus } from './useFieldFocus.ts';
 
 const props = defineProps<{ search: SearchState }>();
 const emit = defineEmits<{
@@ -85,7 +86,7 @@ const emit = defineEmits<{
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
-const searchInputEl = useTemplateRef<{ $el: HTMLElement }>('searchInputEl');
+const searchInputEl = useTemplateRef<{ $el: Element }>('searchInputEl');
 
 const ERROR_ID = 'git-search-error';
 
@@ -133,7 +134,7 @@ const popoverOpen = computed(() => !!props.search.error.value || dropdownVisible
 function onPopoverOpenChange(value: boolean): void {
   if (value) return;
   // The error is passive and clears only when the query changes (not on dismissal) -- ignore a
-  // reka-driven close while it is showing, matching the old computeFloatPosition treatment's own
+  // reka-driven close while it is showing, matching the old hand-positioned popup's own
   // "no Escape/click-outside handling of its own" for this element.
   if (props.search.error.value) return;
   dropdownDismissed.value = true;
@@ -232,7 +233,8 @@ function onScopeChange(value: string): void {
   props.search.scope.value = value as SearchScope;
 }
 
-defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
+const focusInput = useFieldFocus(searchInputEl);
+defineExpose({ focusInput });
 </script>
 
 <template>

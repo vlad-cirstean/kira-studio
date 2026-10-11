@@ -1,8 +1,8 @@
 /**
  * `MenuItem`/`MenuSection`, the shape every menu-building function (`rowMenuModel.ts`) produces,
- * plus the roving-focus helpers (`enabledNeighbour`, `firstEnabled`) for
- * `BranchPicker.vue`'s row list. Framework-agnostic so they test on their own.
+ * plus `sectionsToMenuItems`, which hands them to the shared context menu store.
  */
+import type { MenuItem as StoreMenuItem } from '@workbench/state/contextMenu';
 
 export interface MenuItem {
   readonly id: string;
@@ -53,4 +53,29 @@ export function enabledNeighbour(
 /** The first enabled item overall — what a freshly-opened menu focuses. */
 export function firstEnabled(items: readonly MenuItem[]): string | undefined {
   return items.find((item) => !item.disabled)?.id;
+}
+
+/** Sections to the shared context menu's item model: a separator between sections, the disabled
+ *  reason as the item's hint, `onSelect` called with the git item id. */
+export function sectionsToMenuItems(
+  sections: readonly MenuSection[],
+  onSelect: (id: string) => void | Promise<void>,
+): StoreMenuItem[] {
+  const out: StoreMenuItem[] = [];
+  sections.forEach((section, index) => {
+    if (index > 0 && section.items.length > 0) out.push({ type: 'separator' });
+    for (const item of section.items) {
+      out.push({
+        type: 'item',
+        id: item.id,
+        label: item.label,
+        icon: item.icon?.replace(/^codicon-/, ''),
+        danger: item.danger,
+        disabled: item.disabled,
+        hint: item.disabled ? item.disabledReason : undefined,
+        run: () => onSelect(item.id),
+      });
+    }
+  });
+  return out;
 }

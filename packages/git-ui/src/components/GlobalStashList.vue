@@ -61,10 +61,6 @@ function menuFor(entry: StashEntry) {
   return buildGlobalStashMenu(props.inProgress, entry, props.currentBranch ?? null);
 }
 
-function menuLabel(): string {
-  return 'Global stash entry actions';
-}
-
 async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
   switch (id) {
     case 'stashApply':
@@ -99,7 +95,6 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
       empty-message="No saved entries"
       :row-model="globalStashRowModel"
       :menu-for="menuFor"
-      :menu-label="menuLabel"
       @selected="emit('selected')"
       @menu-select="onMenuSelect"
     />

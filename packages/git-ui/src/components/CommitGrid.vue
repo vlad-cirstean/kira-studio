@@ -103,7 +103,7 @@ const emit = defineEmits<{
   /** `F5` or `Ctrl/Cmd+R` while this grid has focus. W10 owns the Refresh action itself. */
   (e: 'refresh'): void;
   /** `docs/plans/P6.md` W14: a right-click, `Shift+F10`, or the Menu key on a row — `App.vue`
-   *  owns the actual `RowContextMenu.vue` instance (it is the one place with both `ops` and the
+   *  owns the actual menu (`useSectionMenu`) (it is the one place with both `ops` and the
    *  commit store's decorations at hand), so this only ever reports which row and where to open
    *  it, exactly as `scroll`/`toggleDetail` report rather than acting on them. */
   (e: 'contextMenu', detail: { row: number; x: number; y: number }): void;
@@ -482,7 +482,7 @@ function prNumberFromClick(event: MouseEvent | undefined): number | undefined {
   return raw !== undefined ? Number(raw) : undefined;
 }
 
-/** §6.4: "right-click selects the row [first]", then (P6 W14) opens `RowContextMenu.vue` at the
+/** §6.4: "right-click selects the row [first]", then (P6 W14) opens the shared context menu at the
  *  click point — the browser's own native menu is suppressed now that there is a real one to
  *  show instead of P4's "nothing else". `docs/plans/P7.md` W14 adds one hit-test ahead of that:
  *  a click landing on a ref badge (`refBadges.ts`'s `data-ref-kind`) opens the branch-scoped menu
