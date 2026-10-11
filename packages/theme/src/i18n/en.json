@@ -7191,8 +7191,641 @@
     }
   },
   "studio": {
+    "api": {
+      "bulk": {
+        "applyConfirm": {
+          "title": "Apply changes?"
+        },
+        "changedNote": {
+          "body": "Variables changed since you opened bulk edit; applying overwrites those changes."
+        },
+        "hint": "Bulk edit can’t create or remove a row’s secret flag. A new {newLine} line always creates a non-secret variable, and a secret’s own line stays {secretLine} with its value left unchanged unless you type one. Use the row’s own toggle to change a variable’s secret flag.",
+        "removeConfirm": {
+          "body": "This also deletes the value history of {names}.",
+          "title": "Remove {count} variable? | Remove {count} variables?"
+        },
+        "renameWarning": {
+          "body": "Renaming a key here removes the old one and its value history. Rename in the table to keep it."
+        },
+        "summary": {
+          "status": "{added} added · {updated} updated · {removed} removed"
+        },
+        "summaryReordered": {
+          "status": "{added} added · {updated} updated · {removed} removed · reordered"
+        }
+      },
+      "collections": {
+        "deleteCollectionConfirm": {
+          "title": "Delete collection?"
+        },
+        "deleteFolderConfirm": {
+          "title": "Delete folder?"
+        },
+        "deleteRequestConfirm": {
+          "body": "“{name}” will be deleted.",
+          "title": "Delete request?"
+        },
+        "deleteTreeConfirm": {
+          "body": "“{name}” and everything inside it will be deleted."
+        },
+        "empty": "No collections yet",
+        "emptyHint": "Create one from the {plus} above, or import a Postman collection.",
+        "export": {
+          "label": "Export collection…"
+        },
+        "import": {
+          "title": "Import Postman collection"
+        },
+        "new": {
+          "label": "New collection"
+        },
+        "newFolder": {
+          "label": "New folder"
+        },
+        "postmanFilter": {
+          "label": "Postman collection"
+        },
+        "requestGone": {
+          "error": "This request no longer exists."
+        },
+        "title": "Collections",
+        "tree": {
+          "aria": "Collections tree"
+        }
+      },
+      "common": {
+        "environments": {
+          "label": "Environments"
+        },
+        "filterByName": {
+          "placeholder": "Filter by name"
+        },
+        "importCollection": {
+          "label": "Import collection…"
+        },
+        "importCurl": {
+          "label": "Import from curl…"
+        },
+        "newRequest": {
+          "label": "New request"
+        },
+        "reorderBlocked": {
+          "hint": "Clear the filter to reorder."
+        }
+      },
+      "copyAsCurl": {
+        "reveal": {
+          "label": "Show secret values"
+        },
+        "title": "Copy as curl"
+      },
+      "dynamicValues": {
+        "loadError": {
+          "error": "Couldn’t load sample values: {error}"
+        },
+        "title": "Dynamic values"
+      },
+      "editRaw": {
+        "hint": "This is the request as you authored it. {variables} are resolved when you send. To see what actually went out, use the raw view of the response pane.",
+        "modeChanged": {
+          "body": "The body mode changes from {from} to {to}. The bytes and headers this sends are unchanged; only the body editor is."
+        },
+        "title": "Edit as raw HTTP"
+      },
+      "environments": {
+        "active": {
+          "aria": "Active environment: {name}",
+          "tooltip": "Active"
+        },
+        "activeGroup": {
+          "aria": "Active environment"
+        },
+        "deleteConfirm": {
+          "body": "“{name}” and its variables will be deleted.",
+          "title": "Delete environment?"
+        },
+        "description": {
+          "aria": "Environment description"
+        },
+        "editVariables": {
+          "label": "Edit variables"
+        },
+        "empty": "No environments yet",
+        "manage": {
+          "label": "Manage environments"
+        },
+        "name": {
+          "aria": "Environment name"
+        },
+        "new": {
+          "label": "New environment"
+        },
+        "none": {
+          "option": "No environment"
+        }
+      },
+      "hover": {
+        "badTransform": {
+          "hint": "“{name}” is not a transform. Try {transforms}."
+        },
+        "collectionVariable": {
+          "label": "Collection variable"
+        },
+        "dynamic": {
+          "hint": "Generated fresh on every send."
+        },
+        "environmentVariable": {
+          "label": "Environment variable"
+        },
+        "secret": {
+          "hint": "Secret. Resolved when the request is sent."
+        },
+        "secretPiped": {
+          "hint": "Secret. Resolved when the request is sent, then transformed: {transforms}."
+        },
+        "undefined": {
+          "hint": "Not defined in this collection or environment."
+        },
+        "unknownDynamic": {
+          "hint": "Unknown dynamic value."
+        }
+      },
+      "importCurl": {
+        "example": "curl -X POST https://api.example.com/orders -H 'Content-Type: application/json' -d '{json}'",
+        "title": "Import curl command"
+      },
+      "importReport": {
+        "folders": {
+          "label": "{count} folder | {count} folders"
+        },
+        "requests": {
+          "label": "{count} request | {count} requests"
+        },
+        "summary": {
+          "description": "Imported “{name}”: {requests}, {folders}."
+        }
+      },
+      "reveal": {
+        "failed": {
+          "error": "Couldn’t reveal the value."
+        },
+        "history": {
+          "body": "This prior value will be displayed in plain text."
+        },
+        "revealConfirm": {
+          "title": "Show value?"
+        },
+        "variable": {
+          "body": "This variable’s value will be displayed in plain text."
+        }
+      },
+      "saveRequest": {
+        "collectionRoot": {
+          "option": "Collection root"
+        },
+        "noTarget": {
+          "body": "Create a collection first. A request needs somewhere to live."
+        },
+        "target": {
+          "label": "Save to"
+        },
+        "title": "Save request"
+      },
+      "start": {
+        "empty": "No request open",
+        "emptyHint": "Send a request and see its response here."
+      },
+      "variableCompletion": {
+        "base64": {
+          "label": "Base64 encode"
+        },
+        "base64decode": {
+          "label": "Base64 decode"
+        },
+        "dynamic": {
+          "label": "Dynamic"
+        },
+        "lower": {
+          "label": "Lowercase"
+        },
+        "upper": {
+          "label": "Uppercase"
+        },
+        "urldecode": {
+          "label": "URL-decode (query form)"
+        },
+        "urlencode": {
+          "label": "URL-encode (query form)"
+        },
+        "variable": {
+          "label": "Variable"
+        }
+      },
+      "variableHistory": {
+        "empty": "No previous values"
+      },
+      "variableSet": {
+        "bulkToggle": {
+          "label": "Edit as dotenv text"
+        },
+        "colour": {
+          "aria": "Environment colour"
+        },
+        "orphan": {
+          "empty": "This variable set no longer exists"
+        }
+      },
+      "variables": {
+        "duplicate": {
+          "status": "Duplicate name"
+        },
+        "hideValue": {
+          "label": "Hide value"
+        },
+        "secret": {
+          "label": "Secret"
+        },
+        "secretsUnavailable": {
+          "tooltip": "Secret storage is unavailable"
+        },
+        "showValue": {
+          "label": "Show value"
+        }
+      },
+      "variablesOverview": {
+        "editCollection": {
+          "label": "Edit collection variables"
+        },
+        "editEnvironment": {
+          "label": "Edit environment variables"
+        },
+        "empty": "No variables in scope",
+        "shadowed": {
+          "hint": "Shadowed by an environment variable of the same name."
+        }
+      }
+    },
+    "beautify": {
+      "failed": {
+        "error": "Couldn’t format the text."
+      },
+      "invalidDocument": {
+        "error": "Invalid document text at offset {offset}."
+      },
+      "invalidJson": {
+        "error": "Invalid JSON at offset {offset}."
+      },
+      "malformedClosingTag": {
+        "error": "Malformed closing tag at offset {offset}."
+      },
+      "malformedTag": {
+        "error": "Malformed tag at offset {offset}."
+      },
+      "mismatchedClose": {
+        "error": "Expected a closing tag for {expected}, found {found} at offset {offset}."
+      },
+      "nestedTooDeep": {
+        "error": "Nested too deep."
+      },
+      "noFormatter": {
+        "error": "The {format} format has no lossless formatter."
+      },
+      "unclosedTag": {
+        "error": "Unclosed tag {tag} at offset {offset}."
+      },
+      "unmatchedClose": {
+        "error": "Closing tag {tag} at offset {offset} has no matching opener."
+      },
+      "unterminatedComment": {
+        "error": "Unterminated comment at offset {offset}."
+      },
+      "unterminatedDeclaration": {
+        "error": "Unterminated {keyword} at offset {offset}."
+      },
+      "unterminatedInstruction": {
+        "error": "Unterminated processing instruction at offset {offset}."
+      },
+      "unterminatedSection": {
+        "error": "Unterminated {keyword} section at offset {offset}."
+      },
+      "unterminatedTag": {
+        "error": "Unterminated tag at offset {offset}."
+      }
+    },
+    "common": {
+      "allFiles": {
+        "label": "All files"
+      },
+      "browse": {
+        "label": "Browse…"
+      },
+      "continue": {
+        "label": "Continue"
+      },
+      "copiedUrl": {
+        "announce": "Copied URL"
+      },
+      "copyUrl": {
+        "label": "Copy URL"
+      },
+      "grpc": {
+        "label": "gRPC"
+      },
+      "import": {
+        "label": "Import"
+      },
+      "regenerate": {
+        "label": "Regenerate"
+      }
+    },
+    "grpc": {
+      "message": {
+        "beautifyFailed": {
+          "error": "Couldn’t format this message."
+        }
+      }
+    },
+    "http": {
+      "body": {
+        "beautifyFailed": {
+          "error": "Couldn’t format this body."
+        }
+      }
+    },
     "module": {
       "title": "Kira Studio"
+    },
+    "project": {
+      "connectionDialog": {
+        "autoExplain": {
+          "description": "Runs the database’s own EXPLAIN before each SELECT this connection issues from a query console, and warns when a query is estimated to read more than the configured row threshold. EXPLAIN only plans the query and never runs it, so this costs one extra planning round trip, not a second execution.",
+          "label": "Auto-explain SELECT queries"
+        },
+        "awsProfile": {
+          "label": "AWS profile (optional)"
+        },
+        "changeEngine": {
+          "title": "Change engine",
+          "tooltip": "Choose a different engine"
+        },
+        "colour": {
+          "aria": "Connection colour"
+        },
+        "column": {
+          "placeholder": "Column"
+        },
+        "correlate": {
+          "label": "Correlate"
+        },
+        "credentials": {
+          "encrypted": {
+            "hint": "Credentials are encrypted with the macOS keychain."
+          },
+          "fallback": {
+            "body": "Development fallback. Credentials on this platform are obfuscated with a built-in key, not a real keychain."
+          },
+          "unavailable": {
+            "body": "The macOS keychain is unavailable, so passwords can’t be saved. Everything else about this connection can be."
+          }
+        },
+        "database": {
+          "label": "Database"
+        },
+        "databaseFile": {
+          "label": "Database file"
+        },
+        "databasePicker": {
+          "title": "Choose a database file"
+        },
+        "editTitle": {
+          "title": "Edit {kind} connection"
+        },
+        "engineSearch": {
+          "placeholder": "Search engines"
+        },
+        "hidePassword": {
+          "label": "Hide password"
+        },
+        "hideUri": {
+          "label": "Hide URI"
+        },
+        "host": {
+          "label": "Host"
+        },
+        "keep": {
+          "domain": {
+            "label": "Keep domain"
+          },
+          "initials": {
+            "label": "Keep initials"
+          },
+          "year": {
+            "label": "Keep year"
+          }
+        },
+        "kind": {
+          "aria": "Connection kind",
+          "unsupported": {
+            "tooltip": "{kind} isn’t supported yet"
+          }
+        },
+        "maskKind": {
+          "date": {
+            "description": "Keeps the year and destroys the month, day and time."
+          },
+          "email": {
+            "description": "Keeps the domain and the local part’s first letter and length."
+          },
+          "name": {
+            "description": "Keeps initials and word lengths, with the remaining letters replaced by dots."
+          },
+          "number": {
+            "description": "Shows an order of magnitude, never a joinable key. For a value that must join, use a text or redact rule, or mark a numeric identifier column with a kind other than number."
+          },
+          "redact": {
+            "description": "Keeps nothing at all. The right default when unsure, or when the shape itself is sensitive."
+          },
+          "text": {
+            "description": "Keeps nothing but a bucketed length, with no first character and no exact length."
+          }
+        },
+        "mcp": {
+          "allow": {
+            "label": "Allow"
+          },
+          "ddl": {
+            "label": "DDL"
+          },
+          "ddlNote": {
+            "label": "CREATE, ALTER, DROP, TRUNCATE and equivalents, SQL engines only"
+          },
+          "descriptionNote": {
+            "label": "What this database is for, read verbatim by MCP clients"
+          },
+          "expose": {
+            "description": "Nothing is exposed by default. The same switch lives in the database MCP section of settings; either one toggles the other.",
+            "label": "Expose to the database MCP server"
+          },
+          "plan": {
+            "description": "This engine has no query plan this app can read.",
+            "label": "Plan queries before running them"
+          },
+          "prompt": {
+            "label": "Ask me"
+          },
+          "read": {
+            "label": "Read"
+          },
+          "readNote": {
+            "label": "SELECT and its engine equivalents"
+          },
+          "strictest": {
+            "description": "A statement this app can’t classify is treated as whichever of the three is strictest. These settings govern the MCP server only. The read-only flag on the {tab} tab governs this app’s own console."
+          },
+          "write": {
+            "label": "Write"
+          },
+          "writeNote": {
+            "label": "INSERT, UPDATE, DELETE and equivalents"
+          }
+        },
+        "mode": {
+          "fields": {
+            "label": "Fields"
+          },
+          "label": "Mode",
+          "uri": {
+            "label": "Connection URI"
+          }
+        },
+        "newConnection": {
+          "title": "New connection"
+        },
+        "newKindTitle": {
+          "title": "New {kind} connection"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "pasteCredentials": {
+          "label": "Paste credentials…"
+        },
+        "port": {
+          "label": "Port"
+        },
+        "preconnect": {
+          "description": "Runs in your shell before connecting, for example a port-forward or a single sign-on session keeper.",
+          "label": "Pre-connect command",
+          "warning": {
+            "body": "This command runs on your machine with your permissions every time this connection connects."
+          }
+        },
+        "privacy": {
+          "intro": {
+            "description": "Rules redact values for the MCP clients of this connection and for the masking preview of the data viewer. They never change stored data."
+          },
+          "keyFallback": {
+            "body": "Development fallback. The correlation key is obfuscated with a built-in key on this platform, not a real keychain, so an attacker with filesystem access could recover it. The redaction itself is unaffected and stays uninvertible."
+          },
+          "noRules": {
+            "emptyHint": "No masking rules yet on this connection."
+          },
+          "saveFirst": {
+            "hint": "Save this connection first to manage masking rules."
+          }
+        },
+        "readOnly": {
+          "description": "Blocks every mutation path for this connection. That covers grid edits, DDL and console writes."
+        },
+        "redact": {
+          "label": "Redact"
+        },
+        "regenerate": {
+          "label": "Regenerate correlation key"
+        },
+        "regenerateConfirm": {
+          "body": "Regenerating the correlation key changes every masked correlation tag for this connection. Masked results already given to a client, or saved anywhere outside this app, will no longer correlate with results produced after the change. The real values are not affected.",
+          "title": "Regenerate correlation key?"
+        },
+        "region": {
+          "label": "Region"
+        },
+        "removeRule": {
+          "tooltip": "Remove rule"
+        },
+        "showPassword": {
+          "label": "Show password"
+        },
+        "showUri": {
+          "label": "Show URI"
+        },
+        "sidecar": {
+          "description": "When on, the command stays alive for the whole session, for example a port-forward, and this connection drops the moment it exits. When off (default), a fresh instance runs each time you connect and its exit is never monitored, which suits a one-off prep script.",
+          "label": "Keep it running, disconnect if it dies"
+        },
+        "sqliteFilter": {
+          "label": "SQLite database"
+        },
+        "tab": {
+          "advanced": {
+            "label": "Advanced"
+          },
+          "general": {
+            "label": "General"
+          },
+          "mcp": {
+            "label": "MCP"
+          },
+          "preconnect": {
+            "label": "Pre-connect"
+          },
+          "privacy": {
+            "label": "Privacy"
+          }
+        },
+        "tabs": {
+          "aria": "Connection detail tabs"
+        },
+        "test": {
+          "label": "Test connection",
+          "ok": {
+            "status": "Connected: {message}"
+          },
+          "testing": {
+            "loading": "Testing…"
+          }
+        },
+        "throttle": {
+          "description": "A value of 0 disables the limit. Reads served from cache are never throttled, and connecting is never throttled. Applies immediately to a connected connection.",
+          "label": "Throttle commands"
+        },
+        "unchanged": {
+          "placeholder": "Unchanged; click the eye to reveal"
+        },
+        "uriNote": {
+          "hidden": {
+            "hint": "Show the URI first to switch it to fields."
+          },
+          "notRepresentable": {
+            "hint": "This URI can’t be represented as fields (multi-host, socket path or unsafe characters). Staying in URI mode."
+          },
+          "secretParam": {
+            "hint": "This URI holds a secret parameter ({param}) that fields mode can’t store. Staying in URI mode."
+          },
+          "unparsable": {
+            "hint": "Can’t parse this URI into fields. It will be used as is."
+          }
+        },
+        "user": {
+          "label": "User"
+        }
+      },
+      "credentialsDialog": {
+        "liveNote": {
+          "hint": "Reconnects the live connection."
+        },
+        "title": "Edit credentials for “{name}”"
+      }
     }
   },
   "theme": {

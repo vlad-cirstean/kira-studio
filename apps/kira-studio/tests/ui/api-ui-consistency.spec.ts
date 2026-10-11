@@ -375,7 +375,7 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
   if (!secretBox) throw new Error('secret reference span has no box');
   await page.mouse.move(secretBox.x + secretBox.width / 2, secretBox.y + secretBox.height / 2);
   await expect(hover).toBeVisible();
-  await expect(hover).toContainText('resolved when the request is sent');
+  await expect(hover).toContainText('Resolved when the request is sent');
   // The security property, not a UX one: the secret's plaintext (empty in this fixture, but the
   // point stands architecturally — mergedValuesAndSecrets never hands a secret's value to
   // variableCompletion.ts at all, F5) never appears, and neither does the word "value".
@@ -904,7 +904,9 @@ test("hovering a piped secret names the transform and shows no value (§5's UI-h
   await page.mouse.move(secretBox.x + secretBox.width / 2, secretBox.y + secretBox.height / 2);
   const hover = page.locator('[data-testid="autocomplete-hover"]');
   await expect(hover).toBeVisible();
-  await expect(hover).toContainText('secret — base64-encoded when the request is sent');
+  await expect(hover).toContainText(
+    'Secret. Resolved when the request is sent, then transformed: base64.',
+  );
   // The security assertion: no value, transformed or not, and the name isn't repeated either.
   await expect(hover).not.toContainText('api_key');
 });

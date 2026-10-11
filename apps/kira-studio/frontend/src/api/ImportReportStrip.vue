@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
-import { plural } from '@workbench/behaviour/format';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useCollectionsStore } from './state/collections';
 
@@ -27,7 +27,11 @@ const tone = computed(() => ((report.value?.warnings.length ?? 0) > 0 ? 'warn' :
 const summary = computed(() => {
   const r = report.value;
   if (!r) return '';
-  return `Imported ${r.name} — ${plural(r.requests, 'request')}, ${plural(r.folders, 'folder')}.`;
+  return t('studio.api.importReport.summary.description', {
+    name: r.name,
+    requests: t('studio.api.importReport.requests.label', { count: r.requests }),
+    folders: t('studio.api.importReport.folders.label', { count: r.folders }),
+  });
 });
 </script>
 
@@ -44,7 +48,7 @@ const summary = computed(() => {
     <AlertAction>
       <TooltipIconButton
         icon="close"
-        label="Dismiss"
+        :label="t('common.action.dismiss.label')"
         data-testid="import-report-dismiss"
         @click="collectionsStore.dismissReport"
       />
@@ -57,7 +61,7 @@ const summary = computed(() => {
     <AlertAction>
       <TooltipIconButton
         icon="close"
-        label="Dismiss"
+        :label="t('common.action.dismiss.label')"
         data-testid="export-warning-dismiss"
         @click="collectionsStore.dismissExportWarning"
       />
@@ -71,7 +75,7 @@ const summary = computed(() => {
     <AlertAction>
       <TooltipIconButton
         icon="close"
-        label="Dismiss"
+        :label="t('common.action.dismiss.label')"
         data-testid="collections-error-dismiss"
         @click="collectionsStore.dismissError"
       />

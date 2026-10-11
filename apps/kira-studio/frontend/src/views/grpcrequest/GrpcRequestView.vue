@@ -14,6 +14,7 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -37,6 +38,7 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { INLINE_CHARS } from '../../workers/parse/client';
 import { useParseWorker } from '../../workers/parse/useParseWorker';
+import { reasonText } from '../shared/reasonText';
 import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import GrpcMetadataTable from './GrpcMetadataTable.vue';
@@ -250,7 +252,9 @@ async function onBeautify(): Promise<void> {
     patchGrpcRequestTabState(props.tab.id, { message: result.text });
     beautifyError.value = null;
   } else {
-    beautifyError.value = result.reason ?? 'could not format this message';
+    beautifyError.value = result.reason
+      ? reasonText(result.reason)
+      : t('studio.grpc.message.beautifyFailed.error');
   }
 }
 

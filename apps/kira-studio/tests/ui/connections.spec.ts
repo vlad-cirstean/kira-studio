@@ -431,7 +431,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
   await expect(uriField).toHaveValue('');
   await expect(uriField).toHaveAttribute('type', 'password');
-  await expect(uriField).toHaveAttribute('placeholder', 'Unchanged — click the eye to reveal');
+  await expect(uriField).toHaveAttribute('placeholder', 'Unchanged; click the eye to reveal');
   await page.click('[data-testid="mode-fields"]');
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
   await expect(page.locator('.uri-note')).toContainText('Show the URI first');

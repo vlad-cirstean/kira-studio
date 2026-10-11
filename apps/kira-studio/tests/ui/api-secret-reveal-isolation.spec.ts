@@ -336,7 +336,7 @@ test('the variables filter matches a secret’s name, never its plaintext, and d
   // and Alt+↑ is a no-op.
   await variableRow(page, 'var-apikey').locator('[data-testid="variable-grip"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    'Clear the filter to reorder',
+    'Clear the filter to reorder.',
   );
   await variableRow(page, 'var-apikey').locator('[data-testid="variable-name"]').focus();
   await page.keyboard.press('Alt+ArrowUp');

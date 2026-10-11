@@ -4,6 +4,7 @@ import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { CatalogText, t } from '@theme/i18n';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -127,25 +128,25 @@ onUnmounted(() => {
   <!-- P104 §3: PanelShell inlined (no library counterpart). -->
   <div ref="rootEl" class="flex h-full min-h-0 flex-col">
     <PanelHeader>
-      Collections
+      {{ t('studio.api.collections.title') }}
       <template #actions>
       <TooltipIconButton
         icon="search"
-        :label="showSearch ? 'Hide search' : 'Search'"
-        aria-label="Search"
+        :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
+        :aria-label="t('common.action.search.label')"
         :pressed="showSearch"
         data-testid="toggle-search"
         @click="toggleSearch"
       />
       <TooltipIconButton
         icon="add"
-        label="New request"
+        :label="t('studio.api.common.newRequest.label')"
         data-testid="new-request"
         @click="openApiRequestTab"
       />
       <TooltipIconButton
         icon="new-folder"
-        label="New collection"
+        :label="t('studio.api.collections.new.label')"
         data-testid="new-collection"
         @click="onNewCollection"
       />
@@ -157,8 +158,7 @@ onUnmounted(() => {
            independently of collections, so this lives in the panel's header, not the tree. -->
       <TooltipIconButton
         icon="server-environment"
-        label="Environments…"
-        aria-label="Environments"
+        :label="t('studio.api.common.environments.label')"
         data-testid="api-environments"
         @click="onEnvironments"
       />
@@ -180,7 +180,7 @@ onUnmounted(() => {
                environments-category's fixed 40% cap below for space. -->
           <div class="flex flex-1 min-h-0 flex-col" :class="{ collapsed: !collectionsExpanded }">
             <SectionHeading
-              label="Collections"
+              :label="t('studio.api.collections.title')"
               collapsible
               :expanded="collectionsExpanded"
               data-testid="collections-category-toggle"
@@ -201,8 +201,10 @@ onUnmounted(() => {
       <Empty class="h-full" data-testid="collections-empty">
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="folder-library" :size="24" /></EmptyMedia>
-          <EmptyTitle>No collections yet</EmptyTitle>
-          <EmptyDescription>Create one from the <b>+</b> above, or import a Postman collection.</EmptyDescription>
+          <EmptyTitle>{{ t('studio.api.collections.empty') }}</EmptyTitle>
+          <EmptyDescription>
+            <CatalogText k="studio.api.collections.emptyHint"><template #plus><b>+</b></template></CatalogText>
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
     </div>

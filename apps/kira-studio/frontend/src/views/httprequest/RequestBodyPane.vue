@@ -12,6 +12,7 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { computed, ref } from 'vue';
@@ -26,6 +27,7 @@ import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { INLINE_CHARS } from '../../workers/parse/client';
 import { useParseWorker } from '../../workers/parse/useParseWorker';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
+import { reasonText } from '../shared/reasonText';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
@@ -144,7 +146,9 @@ async function onBeautifyBody(): Promise<void> {
     patchHttpRequestTabState(props.tab.id, { code: result.text });
     beautifyError.value = null;
   } else {
-    beautifyError.value = result.reason ?? 'could not format this body';
+    beautifyError.value = result.reason
+      ? reasonText(result.reason)
+      : t('studio.http.body.beautifyFailed.error');
   }
 }
 

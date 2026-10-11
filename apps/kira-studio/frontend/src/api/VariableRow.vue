@@ -7,8 +7,9 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
-import { ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
@@ -62,6 +63,10 @@ watch(
 );
 
 const notYetRevealed = () => props.row.isSecret && props.row.value === '';
+const valueToggleLabel = computed(() => {
+  if (notYetRevealed()) return t('common.action.reveal.label');
+  return visible.value ? t('studio.api.variables.hideValue.label') : t('studio.api.variables.showValue.label');
+});
 
 function onEyeClick(): void {
   if (notYetRevealed()) {
@@ -137,7 +142,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
           <CodiconIcon name="gripper" :size="13" />
         </span>
       </TooltipTrigger>
-      <TooltipContent>Clear the filter to reorder</TooltipContent>
+      <TooltipContent>{{ t('studio.api.common.reorderBlocked.hint') }}</TooltipContent>
     </Tooltip>
     <span
       v-else
@@ -152,12 +157,12 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <Input
         size="kira"
         :model-value="row.name"
-        placeholder="name"
+        :placeholder="t('common.field.name.label')"
         data-testid="variable-name"
         @update:model-value="onNameInput(String($event))"
         @blur="emit('blur')"
       />
-      <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">duplicate</Badge>
+      <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">{{ t('studio.api.variables.duplicate.status') }}</Badge>
     </div>
     <div class="flex min-w-0 items-center gap-1 value-cell">
       <!-- tracking-widest (0.1em) is the widest step Tailwind's default scale has; at this row's
@@ -169,7 +174,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
         size="kira"
         :type="row.isSecret && !visible ? 'password' : 'text'"
         :model-value="row.value"
-        placeholder="value"
+        :placeholder="t('common.field.value.label')"
         data-testid="variable-value"
         @update:model-value="onValueInput(String($event))"
         @blur="emit('blur')"
@@ -177,8 +182,8 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <TooltipIconButton
         v-if="row.isSecret"
         icon="eye"
-        :label="notYetRevealed() ? 'Reveal' : 'Toggle visibility'"
-        aria-label="Reveal"
+        :label="valueToggleLabel"
+        :aria-label="t('common.action.reveal.label')"
         :class="{ 'bg-field text-fg': visible }"
         data-testid="variable-reveal"
         @click="onEyeClick"
@@ -188,7 +193,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <Input
         size="kira"
         :model-value="row.description"
-        placeholder="description"
+        :placeholder="t('common.field.description.label')"
         data-testid="variable-description"
         @update:model-value="onDescriptionInput(String($event))"
         @blur="emit('blur')"
@@ -207,7 +212,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
           </Checkbox>
         </TooltipDisabledTrigger>
       </TooltipTrigger>
-      <TooltipContent>{{ secretsUnavailable ? 'Secret storage is unavailable' : 'Secret' }}</TooltipContent>
+      <TooltipContent>{{ secretsUnavailable ? t('studio.api.variables.secretsUnavailable.tooltip') : t('studio.api.variables.secret.label') }}</TooltipContent>
     </Tooltip>
     <Popover
       :open="showHistory && variableSetStore.variableId === row.id"
@@ -216,7 +221,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <div class="relative flex">
         <TooltipIconButton
           icon="history"
-          label="History"
+          :label="t('common.module.history.label')"
           ref="historyAnchorRef"
           disabled-trigger
           :disabled="trailing"
@@ -229,7 +234,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
     </Popover>
     <TooltipIconButton
       icon="trash"
-      label="Remove"
+      :label="t('common.action.remove.label')"
       disabled-trigger
       :disabled="props.trailing"
       data-testid="variable-remove"

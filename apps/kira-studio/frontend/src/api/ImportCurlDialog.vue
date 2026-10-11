@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -33,6 +34,8 @@ function onImport(): void {
   importCurlStore.submitImportCurl(text.value);
 }
 
+const curlExample = t('studio.api.importCurl.example', { json: '{"id": 1}' });
+
 function close(): void {
   importCurlStore.closeImportCurlDialog();
 }
@@ -46,7 +49,7 @@ useFocusOnMount(curlEl);
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="lg" data-testid="import-curl-dialog">
       <DialogHeader close-testid="import-curl-dialog-close">
-        <DialogTitle>Import from curl</DialogTitle>
+        <DialogTitle>{{ t('studio.api.importCurl.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
       <Textarea
@@ -54,7 +57,7 @@ useFocusOnMount(curlEl);
         v-model="text"
         class="font-data curl-textarea min-h-32"
         rows="6"
-        placeholder="curl -X POST https://api.example.com/orders -H 'Content-Type: application/json' -d '{&quot;id&quot;: 1}'"
+        :placeholder="curlExample"
         data-testid="import-curl-textarea"
       />
 
@@ -78,7 +81,7 @@ useFocusOnMount(curlEl);
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">{{ t('common.action.cancel.label') }}</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -86,7 +89,7 @@ useFocusOnMount(curlEl);
             :disabled="text.trim() === '' || preview.error !== null"
             @click="onImport"
           >
-            Import
+            {{ t('studio.common.import.label') }}
           </Button>
       </DialogFooter>
     </DialogContent>

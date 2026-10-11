@@ -155,7 +155,7 @@ test('a secret is masked, and revealing it is gated', async ({ relaunch }) => {
   // confirmed: true, and the value now renders.
   await variableRow(page, 'var-secret-ok').locator('[data-testid="variable-reveal"]').click();
   await expect(page.locator('[data-testid="confirm-dialog-message"]')).toHaveText(
-    'Show this variable’s value? It will be displayed in plain text.',
+    'This variable’s value will be displayed in plain text.',
   );
   await acceptConfirm(page);
   await expect(

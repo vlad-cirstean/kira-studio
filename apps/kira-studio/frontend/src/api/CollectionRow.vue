@@ -5,6 +5,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
@@ -131,7 +132,7 @@ function onKeydown(e: KeyboardEvent): void {
       :variant="grpcMethodClass(row.method)"
       data-testid="grpc-collection-chip"
     >
-      gRPC
+      {{ t('studio.common.grpc.label') }}
     </Badge>
     <Badge
       v-else-if="row.kind === 'request'"

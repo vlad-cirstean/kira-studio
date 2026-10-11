@@ -11,6 +11,7 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useVariablesStore } from './state/variables';
 
@@ -86,7 +87,7 @@ function manage(): void {
             :class="colorMarkClass('dot', activeEnvironment?.color)"
             data-testid="conn-dot"
           />
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ activeEnvironment?.name ?? 'No environment' }}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ activeEnvironment?.name ?? t('studio.api.environments.none.option') }}</span>
           <CodiconIcon name="chevron-down" :size="12" />
         </button>
       </DropdownMenuTrigger>
@@ -99,7 +100,7 @@ function manage(): void {
           data-value=""
         >
           <span :class="colorMarkClass('dot', 'none')" data-testid="conn-dot" />
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">No environment</span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('studio.api.environments.none.option') }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem
@@ -119,7 +120,7 @@ function manage(): void {
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem data-testid="api-environment-manage" @select="manage">
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Manage environments…</span>
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('studio.api.environments.manage.label') }}</span>
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

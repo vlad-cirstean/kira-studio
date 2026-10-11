@@ -2,6 +2,7 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { CatalogText, t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -49,8 +50,7 @@ const preview = computed(() => editRawStore.previewRaw(debouncedText.value));
 // Built in script rather than the template: a literal '{{variables}}' inside a template mustache
 // would be misread by the Vue compiler as the interpolation's own closing '}}' — CopyAsCurlDialog.vue's
 // own dynamicNote hit the identical parse error and states the same fix.
-const hint =
-  'This is the request as you authored it — {{variables}} are resolved when you send. To see what actually went out, use the response pane’s Raw view.';
+const hint = t('studio.api.editRaw.hint', { variables: '{{variables}}' });
 
 function onDocChange(value: string): void {
   text.value = value;
@@ -69,7 +69,7 @@ function close(): void {
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="xl" data-testid="edit-raw-dialog">
       <DialogHeader close-testid="edit-raw-dialog-close">
-        <DialogTitle>Edit as raw HTTP</DialogTitle>
+        <DialogTitle>{{ t('studio.api.editRaw.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
       <div class="text-kira-sm text-muted-foreground" data-testid="edit-raw-hint">{{ hint }}</div>
@@ -90,9 +90,10 @@ function close(): void {
       <template v-else>
         <Alert v-if="preview.modeChanged" variant="warn" data-testid="edit-raw-mode-changed">
           <AlertDescription>
-            The body mode changes from <strong>{{ preview.modeChanged.from }}</strong> to
-            <strong>{{ preview.modeChanged.to }}</strong> — the bytes and headers this sends are
-            unchanged, only the editor for the body is.
+            <CatalogText k="studio.api.editRaw.modeChanged.body">
+              <template #from><strong>{{ preview.modeChanged.from }}</strong></template>
+              <template #to><strong>{{ preview.modeChanged.to }}</strong></template>
+            </CatalogText>
           </AlertDescription>
         </Alert>
         <Alert v-if="preview.warnings.length > 0" variant="warn" data-testid="edit-raw-warnings">
@@ -108,7 +109,7 @@ function close(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">{{ t('common.action.cancel.label') }}</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -116,7 +117,7 @@ function close(): void {
             :disabled="preview.error !== null"
             @click="onApply"
           >
-            Apply
+            {{ t('common.action.apply.label') }}
           </Button>
       </DialogFooter>
     </DialogContent>

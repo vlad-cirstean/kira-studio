@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
@@ -83,7 +84,7 @@ const actions: CollectionMenuActions = {
       (message) => {
         collectionsStore.error = message;
       },
-      () => announceApp('Copied URL'),
+      () => announceApp(t('studio.common.copiedUrl.announce')),
     ),
   importCollection: () => void collectionsStore.importCollection(),
   importCurl: () => importCurlStore.openImportCurlDialog(),
@@ -98,12 +99,32 @@ function folderTarget(row: CollectionRowVm): string | null {
   return row.kind === 'collection' ? null : row.id;
 }
 
+const DELETE_CONFIRM = {
+  collection: {
+    title: 'studio.api.collections.deleteCollectionConfirm.title',
+    body: 'studio.api.collections.deleteTreeConfirm.body',
+  },
+  folder: {
+    title: 'studio.api.collections.deleteFolderConfirm.title',
+    body: 'studio.api.collections.deleteTreeConfirm.body',
+  },
+  request: {
+    title: 'studio.api.collections.deleteRequestConfirm.title',
+    body: 'studio.api.collections.deleteRequestConfirm.body',
+  },
+} as const;
+
 async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
-  const what = row.kind === 'collection' ? 'collection' : row.kind;
   // A folder and a collection take their whole subtree with them (the migration's own cascade),
   // which the prompt says out loud rather than leaving to be discovered.
-  const suffix = row.kind === 'request' ? '' : ' and everything inside it';
-  if (!(await confirmDialogStore.confirm({ message: `Delete ${what} "${row.name}"${suffix}?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
+  const keys = DELETE_CONFIRM[row.kind];
+  const confirmed = await confirmDialogStore.confirm({
+    title: t(keys.title),
+    message: [t(keys.body, { name: row.name }), t('common.confirm.irreversible.body')].join(' '),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   await collectionsStore.deleteRow(row);
 }
 
@@ -187,7 +208,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         class="virtual-list h-full overflow-auto"
         data-testid="virtual-list"
         role="tree"
-        aria-label="Collections tree"
+        :aria-label="t('studio.api.collections.tree.aria')"
         @scroll="onScroll"
       >
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">

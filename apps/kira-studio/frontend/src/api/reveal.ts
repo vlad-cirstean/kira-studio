@@ -1,4 +1,5 @@
 import type { RevealResult } from '@shared/domain/variables';
+import { t } from '@theme/i18n';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 
 // P12 D13 (closing P5 OQ-2 + P9 OQ-4): the one reveal loop the module's three call sites share —
@@ -29,14 +30,15 @@ export async function runReveal(
         return undefined;
       case 'confirmation-required': {
         const ok = await useConfirmDialogStore().confirm({
+          title: t('studio.api.reveal.revealConfirm.title'),
           message: prompt,
-          confirmLabel: 'Continue',
+          confirmLabel: t('common.action.show.label'),
           tone: 'primary',
         });
         return ok ? await handle(await call(true)) : undefined;
       }
       default:
-        onError(result.error ?? 'Could not reveal the value.');
+        onError(result.error ?? t('studio.api.reveal.failed.error'));
         return undefined;
     }
   };

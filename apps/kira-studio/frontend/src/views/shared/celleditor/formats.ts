@@ -94,5 +94,9 @@ export function canBeautify(format: CellFormat): boolean {
 export function beautifyFor(format: CellFormat, text: string, mode: BeautifyMode): BeautifyResult {
   if (format === 'json') return beautifyJson(text, mode);
   if (format === 'xml') return beautifyXml(text, mode);
-  return { text, ok: false, reason: `${format} has no lossless formatter` };
+  return {
+    text,
+    ok: false,
+    reason: { key: 'studio.beautify.noFormatter.error', params: { format } },
+  };
 }

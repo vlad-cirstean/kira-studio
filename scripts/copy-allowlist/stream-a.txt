@@ -1,28 +1,4 @@
 # Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-studio/frontend/src/api/ApiStart.vue
-apps/kira-studio/frontend/src/api/BulkVariablesEditor.vue
-apps/kira-studio/frontend/src/api/CollectionRow.vue
-apps/kira-studio/frontend/src/api/CollectionsPanel.vue
-apps/kira-studio/frontend/src/api/CollectionsTree.vue
-apps/kira-studio/frontend/src/api/CopyAsCurlDialog.vue
-apps/kira-studio/frontend/src/api/DynamicValuesDialog.vue
-apps/kira-studio/frontend/src/api/EditRawRequestDialog.vue
-apps/kira-studio/frontend/src/api/EnvironmentSelect.vue
-apps/kira-studio/frontend/src/api/EnvironmentsView.vue
-apps/kira-studio/frontend/src/api/ImportCurlDialog.vue
-apps/kira-studio/frontend/src/api/ImportReportStrip.vue
-apps/kira-studio/frontend/src/api/SaveRequestDialog.vue
-apps/kira-studio/frontend/src/api/VariableHistoryMenu.vue
-apps/kira-studio/frontend/src/api/VariableRow.vue
-apps/kira-studio/frontend/src/api/VariableSetView.vue
-apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue
-apps/kira-studio/frontend/src/api/menus.ts
-apps/kira-studio/frontend/src/api/reveal.ts
-apps/kira-studio/frontend/src/api/state/collections.ts
-apps/kira-studio/frontend/src/beautify.ts
-apps/kira-studio/frontend/src/fonts.ts
-apps/kira-studio/frontend/src/project/ConnectionDialog.vue
-apps/kira-studio/frontend/src/project/CredentialsUpdateDialog.vue
 apps/kira-studio/frontend/src/project/DataGripImportDialog.vue
 apps/kira-studio/frontend/src/project/ErrorPopover.vue
 apps/kira-studio/frontend/src/project/FiltersDialog.vue
@@ -112,7 +88,6 @@ apps/kira-studio/frontend/src/views/shared/celleditor/validate.ts
 apps/kira-studio/frontend/src/views/shared/document/DocumentRow.vue
 apps/kira-studio/frontend/src/views/shared/document/DocumentTree.vue
 apps/kira-studio/frontend/src/views/shared/document/ejson.ts
-apps/kira-studio/frontend/src/views/shared/document/rawTree.ts
 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue
 apps/kira-studio/frontend/src/views/shared/keyvalue/KeyValuePane.vue
 apps/kira-studio/frontend/src/views/shared/keyvalue/menu.ts
@@ -141,3 +116,4 @@ apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue
 apps/kira-studio/frontend/src/workbench/settings/CachePane.vue
 apps/kira-studio/frontend/src/workbench/settings/DataPane.vue
 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue
+permanent U67 apps/kira-studio/frontend/src/fonts.ts # font family names (system and installed typefaces are proper names, not wording)

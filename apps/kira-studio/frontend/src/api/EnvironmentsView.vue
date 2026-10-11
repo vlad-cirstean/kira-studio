@@ -10,6 +10,7 @@ import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -157,7 +158,7 @@ async function onFieldBlur(id: string): Promise<void> {
 }
 
 async function onNewEnvironment(): Promise<void> {
-  await variablesStore.createEnvironment('New environment');
+  await variablesStore.createEnvironment(t('studio.api.environments.new.label'));
 }
 
 // P17 D16: opens that environment's own variable-set tab. It no longer has a dialog to close
@@ -174,7 +175,13 @@ async function onSetActive(id: string): Promise<void> {
 }
 
 async function onDelete(id: string, name: string): Promise<void> {
-  if (!(await confirmDialogStore.confirm({ message: `Delete environment "${name}"? Its variables go with it.`, confirmLabel: 'Delete', tone: 'danger' }))) return;
+  const confirmed = await confirmDialogStore.confirm({
+    title: t('studio.api.environments.deleteConfirm.title'),
+    message: [t('studio.api.environments.deleteConfirm.body', { name }), t('common.confirm.irreversible.body')].join(' '),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   await variablesStore.deleteEnvironment(id);
 }
 
@@ -229,17 +236,17 @@ useEventListener(listEl, 'keydown', (e) => {
         :class="colorMarkClass('dot', railColor)"
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="server-environment" :size="13" /></span>
-      <span class="text-kira-md text-fg truncate" data-testid="environments-target">Environments</span>
+      <span class="text-kira-md text-fg truncate" data-testid="environments-target">{{ t('studio.api.common.environments.label') }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
     <ViewToolbar border="none">
-      <div v-if="variablesStore.environments.length > 0" class="w-64"><SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" /></div>
+      <div v-if="variablesStore.environments.length > 0" class="w-64"><SearchField v-model="filterQuery" :placeholder="t('studio.api.common.filterByName.placeholder')" data-testid="environments-filter" /></div>
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 shrink-0">
         <Button variant="toolbar-primary" size="kira" data-testid="new-environment" @click="onNewEnvironment">
-          New environment
+          {{ t('studio.api.environments.new.label') }}
         </Button>
       </div>
     </ViewToolbar>
@@ -250,7 +257,7 @@ useEventListener(listEl, 'keydown', (e) => {
         <Button
           variant="toolbar"
           size="kira-icon"
-          aria-label="Dismiss"
+          :aria-label="t('common.action.dismiss.label')"
           data-testid="environments-error-dismiss"
           @click="variablesStore.dismissError"
         >
@@ -261,7 +268,7 @@ useEventListener(listEl, 'keydown', (e) => {
 
     <RadioGroup
       class="contents"
-      aria-label="Active environment"
+      :aria-label="t('studio.api.environments.activeGroup.aria')"
       :model-value="activeEnvironmentId"
       @update:model-value="(id) => onSetActive(String(id))"
     >
@@ -283,7 +290,7 @@ useEventListener(listEl, 'keydown', (e) => {
                 <CodiconIcon name="gripper" :size="13" />
               </span>
             </TooltipTrigger>
-            <TooltipContent>Clear the filter to reorder</TooltipContent>
+            <TooltipContent>{{ t('studio.api.common.reorderBlocked.hint') }}</TooltipContent>
           </Tooltip>
           <span v-else class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="environment-grip">
             <CodiconIcon name="gripper" :size="13" />
@@ -292,17 +299,17 @@ useEventListener(listEl, 'keydown', (e) => {
             <TooltipTrigger as-child>
               <RadioGroupItem
                 :value="env.id"
-                :aria-label="`Active environment: ${env.name}`"
+                :aria-label="t('studio.api.environments.active.aria', { name: env.name })"
                 data-testid="environment-active"
               />
             </TooltipTrigger>
-            <TooltipContent>Active</TooltipContent>
+            <TooltipContent>{{ t('studio.api.environments.active.tooltip') }}</TooltipContent>
           </Tooltip>
           <div class="min-w-0 flex-1">
             <Input
               v-model="nameDrafts[env.id]"
               size="kira"
-              aria-label="Environment name"
+              :aria-label="t('studio.api.environments.name.aria')"
               data-testid="environment-name"
               @blur="onFieldBlur(env.id)"
             />
@@ -310,8 +317,8 @@ useEventListener(listEl, 'keydown', (e) => {
           <div class="min-w-0 flex-1">
             <Input
               v-model="descriptionDrafts[env.id]"
-              placeholder="description"
-              aria-label="Environment description"
+              :placeholder="t('common.field.description.label')"
+              :aria-label="t('studio.api.environments.description.aria')"
               size="kira"
               data-testid="environment-description"
               @blur="onFieldBlur(env.id)"
@@ -323,31 +330,31 @@ useEventListener(listEl, 'keydown', (e) => {
             data-testid="environment-edit-variables"
             @click="onEditVariables(env.id, env.name)"
           >
-            Edit variables…
+            {{ t('studio.api.environments.editVariables.label') }}
           </Button>
           <TooltipIconButton
             icon="copy"
-            label="Duplicate"
+            :label="t('common.action.duplicate.label')"
             data-testid="environment-duplicate"
             @click="onDuplicate(env.id)"
           />
           <TooltipIconButton
             icon="trash"
-            label="Delete"
+            :label="t('common.action.delete.label')"
             data-testid="environment-remove"
             @click="onDelete(env.id, env.name)"
           />
         </div>
         <Empty v-if="variablesStore.environments.length === 0" data-testid="environments-empty">
           <EmptyMedia><CodiconIcon name="server-environment" :size="24" /></EmptyMedia>
-          <EmptyTitle>No environments yet</EmptyTitle>
+          <EmptyTitle>{{ t('studio.api.environments.empty') }}</EmptyTitle>
         </Empty>
         <Empty
           v-else-if="isFiltered && displayEnvironments.length === 0"
           data-testid="environments-filter-empty"
         >
           <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-          <EmptyTitle>No matches</EmptyTitle>
+          <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
         </Empty>
       </div>
     </RadioGroup>

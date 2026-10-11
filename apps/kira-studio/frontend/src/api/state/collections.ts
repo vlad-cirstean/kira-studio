@@ -9,6 +9,7 @@ import type {
 } from '@shared/domain/collections';
 import { defaultGrpcSavedRequest, defaultHttpSavedRequest } from '@shared/domain/collections';
 import { useMutation, useQuery } from '@tanstack/vue-query';
+import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -550,7 +551,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         });
       } else if (row.protocol === 'grpc') {
         const saved = await loadSavedGrpcRequest(row.id);
-        if (!saved) throw new Error('This request no longer exists.');
+        if (!saved) throw new Error(t('studio.api.collections.requestGone.error'));
         await control.collectionsCreateGrpcItem({
           collectionId: row.collectionId,
           parentId: row.parentId,
@@ -559,7 +560,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         });
       } else {
         const saved = await loadSavedRequest(row.id);
-        if (!saved) throw new Error('This request no longer exists.');
+        if (!saved) throw new Error(t('studio.api.collections.requestGone.error'));
         await control.collectionsCreateItem({
           collectionId: row.collectionId,
           parentId: row.parentId,
@@ -714,8 +715,8 @@ export const useCollectionsStore = defineStore('collections', () => {
     // afterTreeListChange()/report writes.
     if (state.busy) return false;
     const chosen = await control.filesChooseOpen({
-      title: 'Import Postman collection',
-      filters: [{ name: 'Postman collection', extensions: ['json'] }],
+      title: t('studio.api.collections.import.title'),
+      filters: [{ name: t('studio.api.collections.postmanFilter.label'), extensions: ['json'] }],
     });
     if (chosen.canceled || !chosen.file) return false;
 

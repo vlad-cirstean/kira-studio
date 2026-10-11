@@ -8,6 +8,7 @@ import type {
   VariableScope,
 } from '@shared/domain/variables';
 import { useMutation, useQuery } from '@tanstack/vue-query';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
@@ -687,7 +688,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
         revealedValuesExpiry.schedule(id);
       },
       onError,
-      'Show this variable’s value? It will be displayed in plain text.',
+      t('studio.api.reveal.variable.body'),
     );
   }
 
@@ -786,7 +787,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       (message) => {
         if (historyMenuState.tabId) setVariableSetError(historyMenuState.tabId, message);
       },
-      'Show this prior value? It will be displayed in plain text.',
+      t('studio.api.reveal.history.body'),
     );
   }
 

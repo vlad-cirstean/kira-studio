@@ -663,5 +663,5 @@ const shellKeyText = (raw: string): string => JSON.stringify(raw.replace(/^['"]|
  * a hand edit gone wrong — reports the same shape `beautify.ts`'s JSON formatter does.
  */
 export function beautifyShellText(text: string, mode: BeautifyMode): BeautifyResult {
-  return beautifyWith(text, mode, tryParseShellText, 'document text', shellKeyText);
+  return beautifyWith(text, mode, tryParseShellText, 'document', shellKeyText);
 }

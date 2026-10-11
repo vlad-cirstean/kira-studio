@@ -3,6 +3,7 @@ import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useCopyAsCurlStore } from './state/curl';
 
@@ -67,7 +68,7 @@ function close(): void {
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="xl" data-testid="copy-as-curl-dialog">
       <DialogHeader close-testid="copy-as-curl-dialog-close">
-        <DialogTitle>Copy as curl</DialogTitle>
+        <DialogTitle>{{ t('studio.api.copyAsCurl.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
       <Textarea
@@ -92,7 +93,7 @@ function close(): void {
             data-testid="copy-as-curl-reveal"
             @click="onReveal"
           >
-            Show secret values
+            {{ t('studio.api.copyAsCurl.reveal.label') }}
           </Button>
         </AlertAction>
       </Alert>
@@ -107,14 +108,14 @@ function close(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">{{ t('common.action.close.label') }}</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
             data-testid="copy-as-curl-copy"
             @click="onCopy"
           >
-            Copy
+            {{ t('common.action.copy.label') }}
           </Button>
       </DialogFooter>
     </DialogContent>

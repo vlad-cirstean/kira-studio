@@ -89,7 +89,7 @@ test('opening Edit… does not fetch or show the secret', async ({ relaunch }) =
 
   const passwordField = page.locator('[data-testid="connection-password"]');
   await expect(passwordField).toHaveValue('');
-  await expect(passwordField).toHaveAttribute('placeholder', 'Unchanged — click the eye to reveal');
+  await expect(passwordField).toHaveAttribute('placeholder', 'Unchanged; click the eye to reveal');
   expect(control.log().filter((e) => e.channel === IPC.connectionsReveal)).toHaveLength(0);
 });
 
@@ -283,7 +283,7 @@ test('a URI-mode connection reveals its URI, not a password', async ({ relaunch 
   await openEdit(page);
   const uriField = page.locator('[data-testid="connection-uri"]');
   await expect(uriField).toHaveValue('');
-  await expect(uriField).toHaveAttribute('placeholder', 'Unchanged — click the eye to reveal');
+  await expect(uriField).toHaveAttribute('placeholder', 'Unchanged; click the eye to reveal');
 
   await page.click('[aria-label="Show URI"]');
   await expect(uriField).toHaveValue('postgresql://u:hunter2@h:5432/db');

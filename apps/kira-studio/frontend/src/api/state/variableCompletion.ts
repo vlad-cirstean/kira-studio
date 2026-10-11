@@ -11,6 +11,7 @@ import {
   type TransformName,
 } from '@kira/api-core';
 import type { ApiVariable } from '@shared/domain/variables';
+import { t } from '@theme/i18n';
 import { compareNatural } from '@workbench/behaviour/match';
 import { type Completion, templateToken } from '@workbench/editor/fieldCompletion';
 import type { RangeHighlight } from '@workbench/editor/ranges';
@@ -56,23 +57,6 @@ function classFor(name: string, kind: ReferenceKind): string {
   }
 }
 
-// P17 D13(c): the hover's own past-participle phrasing for a transform, used only for a
-// *deferred* (secret) reference — "secret — base64-encoded when the request is sent" never shows
-// a value, transformed or not, but naming the transform itself is not a leak (P15b §4's security
-// assertion, extended).
-const TRANSFORM_VERBS: Record<TransformName, string> = {
-  base64: 'base64-encoded',
-  base64decode: 'base64-decoded',
-  upper: 'upper-cased',
-  lower: 'lower-cased',
-  urlencode: 'URL-encoded',
-  urldecode: 'URL-decoded',
-};
-
-function describePipelineVerbs(pipeline: readonly TransformName[]): string {
-  return pipeline.map((t) => TRANSFORM_VERBS[t]).join(', then ');
-}
-
 // D3 rule 4's own fallback, made legible: a name that contains `|` but never parsed as a pipeline
 // (`classifyReference` sees the whole `token | base46` string as the name) means at least one
 // segment after the first is not a recognised transform. Names the first offending one, or the
@@ -81,7 +65,10 @@ function badTransformMessage(fullName: string): string {
   const segments = fullName.split('|').map((s) => s.trim());
   const rest = segments.slice(1);
   const bad = rest.find((s) => !isTransformName(s)) ?? (segments[0] === '' ? '' : rest.at(-1));
-  return `"${bad ?? ''}" is not a transform — try ${TRANSFORM_NAMES.join(', ')}`;
+  return t('studio.api.hover.badTransform.hint', {
+    name: bad ?? '',
+    transforms: TRANSFORM_NAMES.join(', '),
+  });
 }
 
 /** Which scope a resolved name came from, for the hover's second line (D4) — tests membership in
@@ -180,7 +167,12 @@ export function variableSupport(
             : formatted;
         return {
           value: truncated,
-          lines: [`${scopeOf(span.name, environmentRows)} variable`, ...chainLine],
+          lines: [
+            scopeOf(span.name, environmentRows) === 'environment'
+              ? t('studio.api.hover.environmentVariable.label')
+              : t('studio.api.hover.collectionVariable.label'),
+            ...chainLine,
+          ],
         };
       }
       case 'deferred':
@@ -190,8 +182,8 @@ export function variableSupport(
         return {
           lines:
             pipeline.length > 0
-              ? [`secret — ${describePipelineVerbs(pipeline)} when the request is sent`]
-              : ['secret — resolved when the request is sent'],
+              ? [t('studio.api.hover.secretPiped.hint', { transforms: pipeline.join(', ') })]
+              : [t('studio.api.hover.secret.hint')],
         };
       case 'dynamic': {
         // D4's table also wants "the catalogue's own description" as a second line here — the
@@ -203,8 +195,8 @@ export function variableSupport(
         const catalogued = isDynamicName(span.name) || isFakeName(span.name);
         return {
           lines: catalogued
-            ? ['generated fresh on every send', ...chainLine]
-            : ['unknown dynamic value'],
+            ? [t('studio.api.hover.dynamic.hint'), ...chainLine]
+            : [t('studio.api.hover.unknownDynamic.hint')],
         };
       }
       case 'unknown':
@@ -212,8 +204,8 @@ export function variableSupport(
         // gets a second line naming exactly which segment isn't a real transform.
         return {
           lines: span.name.includes('|')
-            ? ['not defined in this collection or environment', badTransformMessage(span.name)]
-            : ['not defined in this collection or environment'],
+            ? [t('studio.api.hover.undefined.hint'), badTransformMessage(span.name)]
+            : [t('studio.api.hover.undefined.hint')],
         };
     }
   }
@@ -230,10 +222,14 @@ export function variableSupport(
   const varCandidates: Completion[] = [
     ...Object.keys(values).map((name) => ({
       label: name,
-      detail: 'variable',
+      detail: t('studio.api.variableCompletion.variable.label'),
       icon: 'symbol-variable',
     })),
-    ...secretNames.map((name) => ({ label: name, detail: 'secret', icon: 'symbol-variable' })),
+    ...secretNames.map((name) => ({
+      label: name,
+      detail: t('studio.api.variables.secret.label'),
+      icon: 'symbol-variable',
+    })),
   ].sort((a, b) => compareNatural(a.label, b.label));
   // P28 D15(b): `fake.` is now the only dynamic vocabulary this app *offers*. D12/D13(b) used to
   // list the 58 Postman `$name` spellings right after it, tagged 'postman alias'. An already-stored
@@ -242,18 +238,18 @@ export function variableSupport(
   // its `fake.` equivalent up front (api/state/collections.ts).
   const fakeCandidates: Completion[] = FAKE_NAMES.map((name) => ({
     label: name,
-    detail: 'dynamic',
+    detail: t('studio.api.variableCompletion.dynamic.label'),
     icon: 'symbol-variable',
   }));
   // D7's table, as a completion detail — a one-line reminder of what each transform does, shown
   // to the right of its name exactly where `variable`/`secret`/`dynamic` show for the other list.
   const TRANSFORM_DETAILS: Record<TransformName, string> = {
-    base64: 'base64 encode',
-    base64decode: 'base64 decode',
-    upper: 'upper-case',
-    lower: 'lower-case',
-    urlencode: 'URL-encode (query form)',
-    urldecode: 'URL-decode (query form)',
+    base64: t('studio.api.variableCompletion.base64.label'),
+    base64decode: t('studio.api.variableCompletion.base64decode.label'),
+    upper: t('studio.api.variableCompletion.upper.label'),
+    lower: t('studio.api.variableCompletion.lower.label'),
+    urlencode: t('studio.api.variableCompletion.urlencode.label'),
+    urldecode: t('studio.api.variableCompletion.urldecode.label'),
   };
   const transformCandidates: Completion[] = TRANSFORM_NAMES.map((name) => ({
     label: name,

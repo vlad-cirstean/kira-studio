@@ -2,6 +2,7 @@ import {
   type BeautifyMode,
   type BeautifyResult,
   beautifyWith,
+  type CatalogReason,
   type Cursor,
   type ParseResult,
   parseContainer,
@@ -129,7 +130,7 @@ export function scanJson(text: string): { ok: boolean; offset?: number } {
 const jsonKeyText = (raw: string): string => raw;
 
 export function beautifyJson(text: string, mode: BeautifyMode): BeautifyResult {
-  return beautifyWith(text, mode, tryParseJson, 'JSON', jsonKeyText);
+  return beautifyWith(text, mode, tryParseJson, 'json', jsonKeyText);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -154,8 +155,8 @@ const VOID_ELEMENTS = new Set([
 ]);
 
 class XmlScanError extends Error {
-  constructor(readonly reason: string) {
-    super(reason);
+  constructor(readonly reason: CatalogReason) {
+    super(reason.key);
   }
 }
 
@@ -181,19 +182,31 @@ function scanXmlTextRun(text: string, i: number, n: number): XmlScanStep {
 
 function scanXmlComment(text: string, i: number, start: number): XmlScanStep {
   const end = text.indexOf('-->', i + 4);
-  if (end < 0) throw new XmlScanError(`unterminated comment at offset ${start}`);
+  if (end < 0)
+    throw new XmlScanError({
+      key: 'studio.beautify.unterminatedComment.error',
+      params: { offset: start },
+    });
   return { token: { kind: 'comment', raw: text.slice(i, end + 3), offset: start }, next: end + 3 };
 }
 
 function scanXmlCdata(text: string, i: number, start: number): XmlScanStep {
   const end = text.indexOf(']]>', i + 9);
-  if (end < 0) throw new XmlScanError(`unterminated CDATA section at offset ${start}`);
+  if (end < 0)
+    throw new XmlScanError({
+      key: 'studio.beautify.unterminatedSection.error',
+      params: { keyword: 'CDATA', offset: start },
+    });
   return { token: { kind: 'cdata', raw: text.slice(i, end + 3), offset: start }, next: end + 3 };
 }
 
 function scanXmlPi(text: string, i: number, start: number): XmlScanStep {
   const end = text.indexOf('?>', i + 2);
-  if (end < 0) throw new XmlScanError(`unterminated processing instruction at offset ${start}`);
+  if (end < 0)
+    throw new XmlScanError({
+      key: 'studio.beautify.unterminatedInstruction.error',
+      params: { offset: start },
+    });
   return { token: { kind: 'pi', raw: text.slice(i, end + 2), offset: start }, next: end + 2 };
 }
 
@@ -212,7 +225,12 @@ function scanXmlDoctype(text: string, i: number, start: number, n: number): XmlS
     }
     j++;
   }
-  if (!closed) throw new XmlScanError(`unterminated DOCTYPE at offset ${start}`);
+  if (!closed) {
+    throw new XmlScanError({
+      key: 'studio.beautify.unterminatedDeclaration.error',
+      params: { keyword: 'DOCTYPE', offset: start },
+    });
+  }
   return { token: { kind: 'doctype', raw: text.slice(start, j), offset: start }, next: j };
 }
 
@@ -264,13 +282,25 @@ function scanXmlTag(text: string, i: number, start: number, n: number): XmlScanS
   const nameStart = j;
   while (j < n && /[^\s/>]/.test(text[j])) j++;
   const name = text.slice(nameStart, j);
-  if (name.length === 0) throw new XmlScanError(`malformed tag at offset ${start}`);
+  if (name.length === 0)
+    throw new XmlScanError({
+      key: 'studio.beautify.malformedTag.error',
+      params: { offset: start },
+    });
 
   const body = scanXmlTagBody(text, j, n);
-  if (!body.closed) throw new XmlScanError(`unterminated tag at offset ${start}`);
+  if (!body.closed)
+    throw new XmlScanError({
+      key: 'studio.beautify.unterminatedTag.error',
+      params: { offset: start },
+    });
   const raw = text.slice(start, body.next);
   if (closing) {
-    if (body.selfClosing) throw new XmlScanError(`malformed closing tag at offset ${start}`);
+    if (body.selfClosing)
+      throw new XmlScanError({
+        key: 'studio.beautify.malformedClosingTag.error',
+        params: { offset: start },
+      });
     return { token: { kind: 'close', raw, name, offset: start }, next: body.next };
   }
   return {
@@ -344,15 +374,17 @@ function buildXmlTree(tokens: XmlToken[], sourceLength: number): XmlNode[] {
       if (!(t.selfClosing || isVoid)) stack.push({ name: t.name, el, children: el.children });
     } else if (t.kind === 'close') {
       if (stack.length <= 1) {
-        throw new XmlScanError(
-          `closing tag </${t.name}> at offset ${t.offset} has no matching opener`,
-        );
+        throw new XmlScanError({
+          key: 'studio.beautify.unmatchedClose.error',
+          params: { tag: `</${t.name}>`, offset: t.offset },
+        });
       }
       const entry = stack[stack.length - 1];
       if (entry.name !== t.name) {
-        throw new XmlScanError(
-          `expected a closing tag for <${entry.name}>, found </${t.name}> at offset ${t.offset}`,
-        );
+        throw new XmlScanError({
+          key: 'studio.beautify.mismatchedClose.error',
+          params: { expected: `<${entry.name}>`, found: `</${t.name}>`, offset: t.offset },
+        });
       }
       if (entry.el) entry.el.close = t.raw;
       stack.pop();
@@ -361,21 +393,25 @@ function buildXmlTree(tokens: XmlToken[], sourceLength: number): XmlNode[] {
     }
   }
   if (stack.length !== 1) {
-    throw new XmlScanError(
-      `unclosed tag <${stack[stack.length - 1].name}> at offset ${sourceLength}`,
-    );
+    throw new XmlScanError({
+      key: 'studio.beautify.unclosedTag.error',
+      params: { tag: `<${stack[stack.length - 1].name}>`, offset: sourceLength },
+    });
   }
   return root;
 }
 
-function tryParseXml(text: string): { ok: true; nodes: XmlNode[] } | { ok: false; reason: string } {
+function tryParseXml(
+  text: string,
+): { ok: true; nodes: XmlNode[] } | { ok: false; reason: CatalogReason } {
   try {
     const tokens = tokenizeXml(text);
     const nodes = buildXmlTree(tokens, text.length);
     return { ok: true, nodes };
   } catch (err) {
     if (err instanceof XmlScanError) return { ok: false, reason: err.reason };
-    if (err instanceof RangeError) return { ok: false, reason: 'nested too deep' };
+    if (err instanceof RangeError)
+      return { ok: false, reason: { key: 'studio.beautify.nestedTooDeep.error' } };
     throw err;
   }
 }
@@ -441,7 +477,8 @@ export function beautifyXml(text: string, mode: BeautifyMode): BeautifyResult {
     renderXmlCompact(r.nodes, out);
     return { text: out.join(''), ok: true };
   } catch (err) {
-    if (err instanceof RangeError) return { text, ok: false, reason: 'nested too deep' };
+    if (err instanceof RangeError)
+      return { text, ok: false, reason: { key: 'studio.beautify.nestedTooDeep.error' } };
     throw err;
   }
 }

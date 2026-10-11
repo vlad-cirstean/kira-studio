@@ -8,6 +8,7 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
@@ -43,7 +44,7 @@ onMounted(async () => {
       samples[entry.name] = generate(entry.name) ?? '';
     }
   } catch (err) {
-    error.value = `Could not load sample values: ${errorText(err)}`;
+    error.value = t('studio.api.dynamicValues.loadError.error', { error: errorText(err) });
   }
 });
 
@@ -77,10 +78,10 @@ function close(): void {
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="md" data-testid="dynamic-values-dialog">
       <DialogHeader close-testid="dynamic-values-dialog-close">
-        <DialogTitle>Dynamic values</DialogTitle>
+        <DialogTitle>{{ t('studio.api.dynamicValues.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody class="gap-1.5">
-      <SearchField v-model="filterQuery" size="kira-lg" placeholder="Filter" data-testid="dynamic-values-filter" />
+      <SearchField v-model="filterQuery" size="kira-lg" :placeholder="t('common.action.filter.label')" data-testid="dynamic-values-filter" />
       <Alert v-if="error" variant="error" data-testid="dynamic-values-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
@@ -89,7 +90,7 @@ function close(): void {
         data-testid="dynamic-values-filter-empty"
       >
         <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>No matches</EmptyTitle>
+        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
       </Empty>
       <Tooltip v-for="entry in filteredEntries" :key="entry.name">
         <TooltipTrigger as-child>
@@ -109,12 +110,12 @@ function close(): void {
             }}</Badge>
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Copy</TooltipContent>
+        <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
       </Tooltip>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">{{ t('common.action.close.label') }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

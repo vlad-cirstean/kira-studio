@@ -6,6 +6,7 @@ import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
@@ -75,19 +76,19 @@ function splitTarget(value: string): [string, string | null] {
   <Dialog :open="true" @update:open="(v) => !v && saveDialogStore.closeSaveDialog()">
     <DialogContent size="md" data-testid="save-request-dialog">
       <DialogHeader close-testid="save-request-close">
-        <DialogTitle>Save request</DialogTitle>
+        <DialogTitle>{{ t('studio.api.saveRequest.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
       <Field>
-        <Label class="text-muted-foreground">Name</Label>
+        <Label class="text-muted-foreground">{{ t('common.field.name.label') }}</Label>
         <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
       </Field>
 
       <Field>
-        <Label class="text-muted-foreground">Save to</Label>
+        <Label class="text-muted-foreground">{{ t('studio.api.saveRequest.target.label') }}</Label>
         <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
           <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
-            <option :value="`${c.id}:`">(collection root)</option>
+            <option :value="`${c.id}:`">{{ t('studio.api.saveRequest.collectionRoot.option') }}</option>
             <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{ f.label }}</option>
           </optgroup>
         </NativeSelect>
@@ -95,7 +96,7 @@ function splitTarget(value: string): [string, string | null] {
 
       <Alert v-if="collectionTargets.length === 0" variant="warn" data-testid="save-request-no-target">
         <AlertDescription>
-          Create a collection first — a request needs somewhere to live.
+          {{ t('studio.api.saveRequest.noTarget.body') }}
         </AlertDescription>
       </Alert>
       <Alert v-if="error" variant="error" data-testid="save-request-error">
@@ -104,7 +105,7 @@ function splitTarget(value: string): [string, string | null] {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">{{ t('common.action.cancel.label') }}</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -112,7 +113,7 @@ function splitTarget(value: string): [string, string | null] {
             :disabled="!name.trim() || !target || saving"
             @click="onSave"
           >
-            Save
+            {{ t('common.action.save.label') }}
           </Button>
       </DialogFooter>
     </DialogContent>

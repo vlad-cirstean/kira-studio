@@ -9,6 +9,7 @@ import { PopoverContent } from '@theme/components/ui/popover';
 import { tableCellClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { computed, ref } from 'vue';
@@ -94,7 +95,7 @@ function editEnvironmentVariables(): void {
 <template>
   <PopoverContent align="start" class="w-96 gap-0 p-0" data-testid="variables-overview">
     <div class="flex max-h-105 flex-col">
-      <SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="variables-overview-filter" />
+      <SearchField v-model="filterQuery" :placeholder="t('studio.api.common.filterByName.placeholder')" data-testid="variables-overview-filter" />
 
       <Alert v-if="copyError" variant="error" data-testid="variables-overview-copy-error">
         <AlertDescription>{{ copyError }}</AlertDescription>
@@ -106,14 +107,14 @@ function editEnvironmentVariables(): void {
           data-testid="variables-overview-empty"
         >
           <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-          <EmptyTitle>No matches</EmptyTitle>
+          <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
         </Empty>
         <Empty
           v-else-if="rows.length === 0"
           data-testid="variables-overview-empty"
         >
           <EmptyMedia><CodiconIcon name="symbol-variable" :size="24" /></EmptyMedia>
-          <EmptyTitle>No variables in scope</EmptyTitle>
+          <EmptyTitle>{{ t('studio.api.variablesOverview.empty') }}</EmptyTitle>
         </Empty>
         <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
              has no use for (handle, secret toggle, history, remove) -- name, value, scope,
@@ -144,9 +145,9 @@ function editEnvironmentVariables(): void {
                 >{{ reference(row.name) }}</Button
               >
             </TooltipTrigger>
-            <TooltipContent>Copy</TooltipContent>
+            <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
           </Tooltip>
-          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">secret</Badge>
+          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">{{ t('studio.api.variables.secret.label') }}</Badge>
           <span v-else class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle" data-testid="variables-overview-value">{{ row.value }}</span>
           <Tooltip v-if="row.shadowed">
             <TooltipTrigger as-child>
@@ -157,7 +158,7 @@ function editEnvironmentVariables(): void {
                 >{{ row.scope }}</Badge
               >
             </TooltipTrigger>
-            <TooltipContent>Shadowed by an environment variable of the same name</TooltipContent>
+            <TooltipContent>{{ t('studio.api.variablesOverview.shadowed.hint') }}</TooltipContent>
           </Tooltip>
           <Badge
             v-else
@@ -181,7 +182,7 @@ function editEnvironmentVariables(): void {
           data-testid="variables-overview-edit-collection"
           @click="editCollectionVariables"
         >
-          Edit collection variables…
+          {{ t('studio.api.variablesOverview.editCollection.label') }}
         </Button>
         <Button
           v-if="canEdit"
@@ -196,7 +197,7 @@ function editEnvironmentVariables(): void {
             :class="colorMarkClass('dot', environmentColor)"
             data-testid="variables-overview-environment-dot"
           />
-          Edit environment variables…
+          {{ t('studio.api.variablesOverview.editEnvironment.label') }}
         </Button>
       </div>
     </div>

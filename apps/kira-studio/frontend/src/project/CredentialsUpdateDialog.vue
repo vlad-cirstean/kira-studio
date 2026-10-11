@@ -2,6 +2,7 @@
 import { useMutation } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import CredentialPastePanel from './credentialPaste/CredentialPastePanel.vue';
@@ -40,7 +41,7 @@ function onOpenChange(open: boolean): void {
   <Dialog :open="true" @update:open="onOpenChange">
     <DialogContent size="md" data-testid="credentials-update-dialog">
       <DialogHeader>
-        <DialogTitle>Update credentials — {{ record?.name }}</DialogTitle>
+        <DialogTitle>{{ t('studio.project.credentialsDialog.title', { name: record?.name ?? '' }) }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <CredentialPastePanel
@@ -52,7 +53,7 @@ function onOpenChange(open: boolean): void {
           @cancel="dialogStore.close()"
         />
         <p v-if="live" class="m-0 text-kira-sm text-muted-foreground" data-testid="credentials-update-live-note">
-          Reconnects the live connection.
+          {{ t('studio.project.credentialsDialog.liveNote.hint') }}
         </p>
         <Alert v-if="update.error.value" variant="error" data-testid="credentials-update-error">
           <AlertDescription>{{ update.error.value.message }}</AlertDescription>

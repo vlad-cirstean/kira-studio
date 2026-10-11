@@ -1,6 +1,8 @@
+import { t } from '@theme/i18n';
 import { formatBytes } from '@workbench/behaviour/format';
 import { type ComputedRef, computed, type Ref, ref } from 'vue';
 import type { BeautifyMode, BeautifyResult } from '../../beautify';
+import { reasonText } from './reasonText';
 
 export interface EditBufferOptions {
   /** The stored value the buffer seeds from and Revert returns to. */
@@ -77,7 +79,9 @@ export function useEditBuffer(opts: EditBufferOptions): EditBuffer {
       beautifyFailure.value = null;
     } else {
       // A failed beautify leaves the buffer and `formatted` alone.
-      beautifyFailure.value = result.reason ?? 'beautify failed';
+      beautifyFailure.value = result.reason
+        ? reasonText(result.reason)
+        : t('studio.beautify.failed.error');
     }
   }
 

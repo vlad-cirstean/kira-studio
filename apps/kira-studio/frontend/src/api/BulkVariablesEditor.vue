@@ -3,6 +3,7 @@ import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-cor
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { CatalogText, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
@@ -59,7 +60,11 @@ const diff = computed(() => {
 const summary = computed(() => {
   const d = diff.value;
   if (!d) return '';
-  return `${d.added.length} added · ${d.updated.length} updated · ${d.removed.length} removed${d.reordered ? ' · reordered' : ''}`;
+  return t(d.reordered ? 'studio.api.bulk.summaryReordered.status' : 'studio.api.bulk.summary.status', {
+    added: d.added.length,
+    updated: d.updated.length,
+    removed: d.removed.length,
+  });
 });
 
 const applying = ref(false);
@@ -106,17 +111,24 @@ async function onApply(): Promise<void> {
   const changedSinceOpen = !sameRows(baseline, liveRows);
   if (live.removed.length > 0 || changedSinceOpen) {
     const parts: string[] = [];
-    if (changedSinceOpen) {
-      parts.push('Variables changed since you opened bulk edit; applying overwrites those changes.');
-    }
+    if (changedSinceOpen) parts.push(t('studio.api.bulk.changedNote.body'));
     if (live.removed.length > 0) {
-      const names = live.removed.map((r) => `"${r.name}"`).join(', ');
       parts.push(
-        `Remove ${live.removed.length === 1 ? 'variable' : 'variables'} ${names}? Its value history goes with it.`,
+        t('studio.api.bulk.removeConfirm.body', {
+          names: live.removed.map((r) => `“${r.name}”`).join(', '),
+        }),
       );
     }
-    const confirmLabel = live.removed.length > 0 ? 'Remove' : 'Apply';
-    if (!(await confirmDialogStore.confirm({ message: parts.join(' '), confirmLabel, tone: 'danger' }))) return;
+    const removing = live.removed.length > 0;
+    const confirmed = await confirmDialogStore.confirm({
+      title: removing
+        ? t('studio.api.bulk.removeConfirm.title', { count: live.removed.length })
+        : t('studio.api.bulk.applyConfirm.title'),
+      message: parts.join(' '),
+      confirmLabel: removing ? t('common.action.remove.label') : t('common.action.apply.label'),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
   }
   applying.value = true;
   applyError.value = null;
@@ -144,10 +156,10 @@ function onCancel(): void {
   <div class="flex h-full min-h-0 flex-col gap-1 px-1.5 py-1" data-testid="variables-bulk-editor">
     <Alert variant="info" data-testid="variables-bulk-hint">
       <AlertDescription>
-        Bulk edit cannot create or remove the secret flag on a row — a new <code>KEY=value</code>
-        line always creates a non-secret variable, and a secret's own line stays
-        <code>KEY=</code> with its value left unchanged unless you type one. Use the row's own
-        toggle to change a variable's secret flag.
+        <CatalogText k="studio.api.bulk.hint">
+          <template #newLine><code>KEY=value</code></template>
+          <template #secretLine><code>KEY=</code></template>
+        </CatalogText>
       </AlertDescription>
     </Alert>
 
@@ -168,8 +180,7 @@ function onCancel(): void {
       <div class="text-subtle text-kira-sm" data-testid="variables-bulk-summary">{{ summary }}</div>
       <Alert v-if="diff.hasRenameRisk" variant="warn" data-testid="variables-bulk-rename-warning">
         <AlertDescription>
-          Renaming a key here removes the old one and its value history. Rename in the table to
-          keep it.
+          {{ t('studio.api.bulk.renameWarning.body') }}
         </AlertDescription>
       </Alert>
     </template>
@@ -179,7 +190,7 @@ function onCancel(): void {
     </Alert>
 
     <div class="flex justify-end gap-1">
-      <Button variant="toolbar" size="kira" data-testid="variables-bulk-cancel" @click="onCancel">Cancel</Button>
+      <Button variant="toolbar" size="kira" data-testid="variables-bulk-cancel" @click="onCancel">{{ t('common.action.cancel.label') }}</Button>
       <Button
         variant="toolbar-primary"
         size="kira"
@@ -187,7 +198,7 @@ function onCancel(): void {
         :disabled="parseError !== null || applying"
         @click="onApply"
       >
-        Apply
+        {{ t('common.action.apply.label') }}
       </Button>
     </div>
   </div>

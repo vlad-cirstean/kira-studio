@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
+import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
 import { useVariableSetStore } from './state/variables';
 
@@ -39,7 +40,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
         data-testid="variable-history-empty"
       >
         <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
-        <EmptyTitle>No previous values</EmptyTitle>
+        <EmptyTitle>{{ t('studio.api.variableHistory.empty') }}</EmptyTitle>
       </Empty>
       <div
         v-for="entry in variableSetStore.entries"
@@ -65,13 +66,13 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
         <TooltipIconButton
           v-if="notYetRevealed(entry)"
           icon="eye"
-          label="Reveal"
+          :label="t('common.action.reveal.label')"
           data-testid="variable-history-reveal"
           @click="onReveal(entry.id)"
         />
         <TooltipIconButton
           icon="reply"
-          label="Restore"
+          :label="t('common.action.restore.label')"
           data-testid="variable-history-restore"
           @click="onRestore(entry)"
         />

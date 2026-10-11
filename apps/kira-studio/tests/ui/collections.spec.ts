@@ -317,7 +317,7 @@ test('collections — import reports what it did, and no file contents cross the
   const strip = page.locator('[data-testid="import-report"]');
   await expect(strip).toBeVisible();
   await expect(page.locator('[data-testid="import-report-summary"]')).toHaveText(
-    'Imported Orders API — 2 requests, 1 folder.',
+    'Imported “Orders API”: 2 requests, 1 folder.',
   );
   await expect(strip.locator('li[data-kind="scripts_inert"]')).toContainText('are not run');
   await expect(strip.locator('li[data-kind="auth_inert"]')).toContainText('not applied');
@@ -522,7 +522,7 @@ test('collections — Postman import builds the contract tree and export asks fo
 
   await emitWailsEvent(page, CHANNEL.importPostman, undefined);
   await expect(page.locator('[data-testid="import-report-summary"]')).toHaveText(
-    `Imported ${report.name} — ${report.requests} requests, ${report.folders} folder.`,
+    `Imported “${report.name}”: ${report.requests} requests, ${report.folders} folder.`,
   );
   const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
   expect(importCalls).toHaveLength(1);

@@ -1,3 +1,4 @@
+import type { MessageKey } from '@theme/i18n';
 // P107 I2-17: beautify.ts's JSON scanner and ejson.ts's Mongo-shell-literal scanner each hand-
 // rolled the same object/array node shape, the same object/array parse loop (open bracket,
 // empty-container check, key/value/comma loop, close bracket) and the same indented/compact
@@ -227,34 +228,46 @@ export function tryParse<C extends Cursor, E extends Error & { offset: number }>
 
 export type BeautifyMode = 'indented' | 'compact';
 
+/** A failure message as catalog key plus params: text is resolved on the main thread, so a
+ *  worker never loads the catalog runtime. */
+export interface CatalogReason {
+  key: MessageKey;
+  params?: Record<string, string | number>;
+}
+
 export interface BeautifyResult {
   /** The reformatted text, or the input unchanged when `ok` is false. */
   text: string;
   ok: boolean;
-  /** Present only when `ok` is false: 'invalid JSON at offset 4021'. Shown on the status line. */
-  reason?: string;
+  /** Present only when `ok` is false ('Invalid JSON at offset 4021.'). Shown on the status line. */
+  reason?: CatalogReason;
 }
 
 /** Beautify/Minify for a `tryParse`-shaped scanner: parse, then reindent (`indented`) or flatten
- *  (`compact`) the result with `keyText`. `errorLabel` fills the one thing beautify.ts's and
- *  ejson.ts's own error message differed on — 'invalid JSON at offset 4' vs 'invalid document text
- *  at offset 4'. */
+ *  (`compact`) the result with `keyText`. `errorKind` picks the one thing beautify.ts's and
+ *  ejson.ts's own error message differed on — invalid JSON vs invalid document text. */
 export function beautifyWith(
   text: string,
   mode: BeautifyMode,
   tryParseText: (text: string) => ParseResult,
-  errorLabel: string,
+  errorKind: 'json' | 'document',
   keyText: (raw: string) => string,
 ): BeautifyResult {
   const r = tryParseText(text);
-  if (!r.ok) return { text, ok: false, reason: `invalid ${errorLabel} at offset ${r.offset}` };
+  if (!r.ok) {
+    const key =
+      errorKind === 'json'
+        ? 'studio.beautify.invalidJson.error'
+        : 'studio.beautify.invalidDocument.error';
+    return { text, ok: false, reason: { key, params: { offset: r.offset } } };
+  }
   try {
     const rendered =
       mode === 'indented' ? renderIndented(r.node, keyText) : renderCompact(r.node, keyText);
     return { text: rendered, ok: true };
   } catch (err) {
     if (err instanceof RangeError)
-      return { text, ok: false, reason: `${errorLabel} nested too deep` };
+      return { text, ok: false, reason: { key: 'studio.beautify.nestedTooDeep.error' } };
     throw err;
   }
 }

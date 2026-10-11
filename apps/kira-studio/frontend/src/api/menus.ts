@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { type CollectionChoice, moveToCollectionMenu } from '@workbench/util/collectionMenu';
 import type { CollectionRowVm } from './state/collections';
@@ -62,7 +63,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       {
         type: 'item',
         id: 'open',
-        label: 'Open',
+        label: t('common.action.open.label'),
         icon: 'go-to-file',
         shortcut: 'tree.open',
         run: () => actions.open(row),
@@ -71,7 +72,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       {
         type: 'item',
         id: 'rename',
-        label: 'Rename',
+        label: t('common.action.rename.label'),
         icon: 'edit',
         shortcut: 'tree.rename',
         run: () => actions.rename(row),
@@ -79,7 +80,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       {
         type: 'item',
         id: 'duplicate',
-        label: 'Duplicate',
+        label: t('common.action.duplicate.label'),
         icon: 'copy',
         shortcut: 'tree.duplicate',
         run: () => actions.duplicate(row),
@@ -87,7 +88,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       {
         type: 'item',
         id: 'copy-url',
-        label: 'Copy URL',
+        label: t('studio.common.copyUrl.label'),
         icon: 'link',
         disabled: !row.url,
         run: () => actions.copyUrl(row),
@@ -97,7 +98,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       {
         type: 'item',
         id: 'delete',
-        label: 'Delete',
+        label: t('common.action.delete.label'),
         icon: 'trash',
         danger: true,
         shortcut: 'tree.delete',
@@ -110,21 +111,21 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
     {
       type: 'item',
       id: 'new-request',
-      label: 'New request',
+      label: t('studio.api.common.newRequest.label'),
       icon: 'add',
       run: () => actions.newRequest(row),
     },
     {
       type: 'item',
       id: 'new-grpc-request',
-      label: 'New gRPC request',
+      label: t('shared.grpc.newRequest.title'),
       icon: 'symbol-interface',
       run: () => actions.newGrpcRequest(row),
     },
     {
       type: 'item',
       id: 'new-folder',
-      label: 'New folder',
+      label: t('studio.api.collections.newFolder.label'),
       icon: 'new-folder',
       run: () => actions.newFolder(row),
     },
@@ -132,7 +133,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
     {
       type: 'item',
       id: 'rename',
-      label: 'Rename',
+      label: t('common.action.rename.label'),
       icon: 'edit',
       shortcut: 'tree.rename',
       run: () => actions.rename(row),
@@ -146,14 +147,14 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
     items.push({
       type: 'item',
       id: 'variables',
-      label: 'Variables…',
+      label: t('common.module.variables.label'),
       icon: 'symbol-variable',
       run: () => actions.variables(row),
     });
     items.push({
       type: 'item',
       id: 'export',
-      label: 'Export collection…',
+      label: t('studio.api.collections.export.label'),
       icon: 'export',
       run: () => actions.exportCollection(row),
     });
@@ -161,7 +162,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
     items.push({
       type: 'item',
       id: 'duplicate',
-      label: 'Duplicate',
+      label: t('common.action.duplicate.label'),
       icon: 'copy',
       shortcut: 'tree.duplicate',
       run: () => actions.duplicate(row),
@@ -174,7 +175,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
     {
       type: 'item',
       id: 'delete',
-      label: 'Delete',
+      label: t('common.action.delete.label'),
       icon: 'trash',
       danger: true,
       shortcut: 'tree.delete',
@@ -189,21 +190,21 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
     {
       type: 'item',
       id: 'new-collection',
-      label: 'New collection',
+      label: t('studio.api.collections.new.label'),
       icon: 'add',
       run: () => actions.newCollection(),
     },
     {
       type: 'item',
       id: 'import-collection',
-      label: 'Import collection…',
+      label: t('studio.api.common.importCollection.label'),
       icon: 'cloud-download',
       run: () => actions.importCollection(),
     },
     {
       type: 'item',
       id: 'import-curl',
-      label: 'Import from curl…',
+      label: t('studio.api.common.importCurl.label'),
       icon: 'terminal',
       run: () => actions.importCurl(),
     },
@@ -211,14 +212,14 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
     {
       type: 'item',
       id: 'environments',
-      label: 'Environments…',
+      label: t('studio.api.common.environments.label'),
       icon: 'settings-gear',
       run: () => actions.environments(),
     },
     {
       type: 'item',
       id: 'dynamic-values',
-      label: 'Dynamic values…',
+      label: t('studio.api.dynamicValues.title'),
       icon: 'symbol-variable',
       run: () => actions.dynamicValues(),
     },

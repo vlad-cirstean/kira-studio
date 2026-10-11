@@ -11,6 +11,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { revealElement } from '@workbench/behaviour/focus';
@@ -500,7 +501,7 @@ function onBulkClose(): void {
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon :name="scope === 'environment' ? 'server-environment' : 'symbol-variable'" :size="13" />
       </span>
-      <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
+      <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || t('common.module.variables.label') }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
@@ -509,14 +510,14 @@ function onBulkClose(): void {
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
     <ViewToolbar border="none">
-      <div v-if="!bulkMode" class="w-64"><SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" /></div>
+      <div v-if="!bulkMode" class="w-64"><SearchField v-model="filterQuery" :placeholder="t('studio.api.common.filterByName.placeholder')" data-testid="variables-filter" /></div>
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 shrink-0">
         <TooltipIconButton
           v-if="ownerExists"
           icon="code"
-          label="Edit as .env text"
+          :label="t('studio.api.variableSet.bulkToggle.label')"
           :class="{ 'bg-field text-fg': bulkMode }"
           data-testid="variables-bulk-toggle"
           @click="bulkMode = !bulkMode"
@@ -526,7 +527,7 @@ function onBulkClose(): void {
 
     <Empty v-if="ownersLoaded && !ownerExists" data-testid="variable-set-orphan">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This variable set no longer exists</EmptyTitle>
+      <EmptyTitle>{{ t('studio.api.variableSet.orphan.empty') }}</EmptyTitle>
     </Empty>
     <BulkVariablesEditor
       v-else-if="bulkMode"
@@ -565,20 +566,20 @@ function onBulkClose(): void {
              moment either has a value, which is most of the time. Same .cell label convention
              the variable table's own header row below uses. -->
         <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-sm text-subtle">Name</span>
+          <span class="pl-0.5 text-kira-sm text-subtle">{{ t('common.field.name.label') }}</span>
           <Input
             v-model="envNameDraft"
-            placeholder="name"
+            :placeholder="t('common.field.name.label')"
             size="kira"
             data-testid="environment-name"
             @blur="onEnvFieldBlur"
           />
         </Label>
         <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-sm text-subtle">Description</span>
+          <span class="pl-0.5 text-kira-sm text-subtle">{{ t('common.field.description.label') }}</span>
           <Input
             v-model="envDescriptionDraft"
-            placeholder="description"
+            :placeholder="t('common.field.description.label')"
             size="kira"
             data-testid="environment-description"
             @blur="onEnvFieldBlur"
@@ -596,7 +597,7 @@ function onBulkClose(): void {
              both for a person and for a test, same as a custom file-input skin. -->
         <fieldset
           class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
-          aria-label="Environment color"
+          :aria-label="t('studio.api.variableSet.colour.aria')"
           data-testid="environment-color-picker"
         >
           <Tooltip v-for="color in PALETTE_COLOR_CHOICES" :key="color">
@@ -609,11 +610,11 @@ function onBulkClose(): void {
                 @change="onEnvColorChange(color)"
               />
             </TooltipTrigger>
-            <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
+            <TooltipContent>{{ color === 'none' ? t('common.field.noColour.label') : color }}</TooltipContent>
           </Tooltip>
         </fieldset>
         <Button variant="toolbar" size="kira" data-testid="environment-duplicate" @click="onDuplicateEnvironment">
-          Duplicate
+          {{ t('common.action.duplicate.label') }}
         </Button>
       </div>
 
@@ -625,9 +626,9 @@ function onBulkClose(): void {
            a pre-existing value relocated, not a new one. -->
       <div class="grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]">
         <span class="cell"></span>
-        <span class="cell">Name</span>
-        <span class="cell">Value</span>
-        <span class="cell">Description</span>
+        <span class="cell">{{ t('common.field.name.label') }}</span>
+        <span class="cell">{{ t('common.field.value.label') }}</span>
+        <span class="cell">{{ t('common.field.description.label') }}</span>
         <span class="cell"></span>
         <span class="cell"></span>
         <span class="cell"></span>

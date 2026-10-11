@@ -3,6 +3,7 @@ import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import { errorText } from '@workbench/bridge/codedError';
 import { beautifyShellText } from '../shared/document/ejson';
+import { reasonText } from '../shared/reasonText';
 import { hashCommentsFor, lexOptionsFor, sqlDialectFor } from '../shared/sqlIdent';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 
@@ -97,7 +98,8 @@ function formatMongoStatement(
   const args: string[] = [];
   for (const raw of rawArgs) {
     const result = beautifyShellText(raw, 'indented');
-    if (!result.ok) return { reason: result.reason ?? 'invalid argument' };
+    if (!result.ok)
+      return { reason: result.reason ? reasonText(result.reason) : 'invalid argument' };
     args.push(result.text);
   }
 
