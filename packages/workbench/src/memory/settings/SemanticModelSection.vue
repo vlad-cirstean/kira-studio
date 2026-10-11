@@ -3,14 +3,16 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Progress } from '@theme/components/ui/progress';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
+import { formatBytes } from '../../behaviour/format';
 import { errorText } from '../../bridge/codedError';
 import { useInstallSemanticModel, useMemorySemanticStatus, useRetrySemantic } from '../queries';
 import { useModelDownloadsStore } from './modelDownloads';
 
 // P210: semantic-search model — download prompt, download and indexing progress, or the failure
 // with a retry. Hidden when the host provides no embedder.
-const MB = 1024 * 1024;
+const MODEL_BYTES = 35 * 1024 * 1024;
 
 const status = useMemorySemanticStatus();
 const install = useInstallSemanticModel();
@@ -31,18 +33,18 @@ function download(): void {
 
 <template>
   <FieldSet v-if="data && data.state !== 'off'" data-testid="memory-semantic" :data-state="data.state">
-    <FieldLegend>Semantic search</FieldLegend>
+    <FieldLegend>{{ t('memory.semantic.title') }}</FieldLegend>
     <template v-if="data.state === 'notInstalled'">
-      <FieldDescription>Finds memories by meaning. Runs a local embedding model.</FieldDescription>
+      <FieldDescription>{{ t('memory.semantic.description') }}</FieldDescription>
       <Alert v-if="installError" variant="error" data-testid="memory-semantic-error">
         <AlertDescription>{{ installError }}</AlertDescription>
       </Alert>
       <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-download" @click="download">
-        Download model (35 MB)
+        {{ t('memory.semantic.download.label', { size: formatBytes(MODEL_BYTES) }) }}
       </Button>
     </template>
     <template v-else-if="data.state === 'downloading'">
-      <FieldDescription>Downloading {{ (data.done / MB).toFixed(0) }} / {{ (data.total / MB).toFixed(0) }} MB</FieldDescription>
+      <FieldDescription>{{ t('memory.semantic.downloading.status', { done: formatBytes(data.done), total: formatBytes(data.total) }) }}</FieldDescription>
       <Progress :model-value="percent" />
       <Button
         variant="dialog"
@@ -51,21 +53,21 @@ function download(): void {
         data-testid="memory-semantic-cancel"
         @click="downloads.cancel()"
       >
-        Cancel
+        {{ t('common.action.cancel.label') }}
       </Button>
     </template>
     <template v-else-if="data.state === 'indexing'">
-      <FieldDescription>Indexing {{ data.done }} / {{ data.total }}</FieldDescription>
+      <FieldDescription>{{ t('memory.semantic.indexing.status', { done: data.done, total: data.total }) }}</FieldDescription>
       <Progress :model-value="percent" />
     </template>
     <template v-else-if="data.state === 'unavailable'">
       <Alert variant="error" data-testid="memory-semantic-error">
-        <AlertDescription>Semantic search unavailable: {{ data.message }}</AlertDescription>
+        <AlertDescription>{{ t('memory.semantic.unavailable.error', { message: data.message }) }}</AlertDescription>
       </Alert>
       <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-retry" @click="retry.mutate()">
-        Retry
+        {{ t('common.action.retry.label') }}
       </Button>
     </template>
-    <FieldDescription v-else>On{{ data.model ? ` (${data.model})` : '' }}</FieldDescription>
+    <FieldDescription v-else>{{ data.model ? t('memory.semantic.onWithModel.status', { model: data.model }) : t('memory.semantic.on.status') }}</FieldDescription>
   </FieldSet>
 </template>

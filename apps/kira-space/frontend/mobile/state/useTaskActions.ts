@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { newIntentKey, useAdeWrites } from './useAdeWrites';
@@ -14,7 +15,7 @@ export function useTaskActions(card: () => PlanCard) {
   const error = ref('');
   let key = newIntentKey();
 
-  const stageName = computed(() => card().progress.stage?.name ?? 'this stage');
+  const stageName = computed(() => card().progress.stage?.name ?? '');
   /** Start maps to the same two calls the desktop's action makes; other actions stay desktop only. */
   const startKind = computed<'run' | 'launch' | null>(() => {
     const kind = card().action?.kind;
@@ -33,29 +34,47 @@ export function useTaskActions(card: () => PlanCard) {
     switch (intent.value) {
       case 'back':
         return {
-          title: 'Move back?',
-          text: `Move "${c.title}" back to ${c.moves.prev?.name ?? ''}. Its earlier runs stay as history.`,
-          confirmLabel: 'Move back',
+          title: t('mobile.plan.moveBackConfirm.title'),
+          text: t('mobile.plan.moveBackConfirm.body', {
+            title: c.title,
+            stage: c.moves.prev?.name ?? '',
+          }),
+          confirmLabel: t('mobile.plan.moveBackConfirm.confirm'),
         };
-      case 'next':
+      case 'next': {
+        const done = c.moves.next?.name === 'Done';
         return {
-          title: c.moves.next?.name === 'Done' ? 'Mark done?' : 'Move forward?',
-          text: `Move "${c.title}" on to ${c.moves.next?.name ?? ''}.`,
-          confirmLabel: 'Move on',
+          title: t(
+            done ? 'mobile.plan.markDoneConfirm.title' : 'mobile.plan.moveForwardConfirm.title',
+          ),
+          text: t('mobile.plan.moveForwardConfirm.body', {
+            title: c.title,
+            stage: c.moves.next?.name ?? '',
+          }),
+          confirmLabel: t(
+            done ? 'mobile.plan.markDoneConfirm.confirm' : 'mobile.plan.moveForwardConfirm.confirm',
+          ),
         };
+      }
       case 'start':
         return {
-          title: `Start ${stageName.value}?`,
-          text:
-            startKind.value === 'run'
-              ? `Agents start now in the worktrees of "${c.title}".`
-              : `A Claude Code session for ${stageName.value} opens on your computer.`,
-          confirmLabel: 'Start',
+          title: stageName.value
+            ? t('mobile.plan.startConfirm.title', { stage: stageName.value })
+            : t('mobile.plan.startThisStageConfirm.title'),
+          text: startText(c.title),
+          confirmLabel: t('common.action.start.label'),
         };
       default:
         return { title: '', text: '', confirmLabel: '' };
     }
   });
+
+  function startText(title: string): string {
+    if (startKind.value === 'run') return t('mobile.plan.startRunConfirm.body', { title });
+    return stageName.value
+      ? t('mobile.plan.startSessionConfirm.body', { stage: stageName.value })
+      : t('mobile.plan.startThisStageSessionConfirm.body');
+  }
 
   function ask(next: TaskIntent): void {
     error.value = '';

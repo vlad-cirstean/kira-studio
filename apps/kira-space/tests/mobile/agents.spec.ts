@@ -2,7 +2,7 @@ import type { Locator } from '@playwright/test';
 import { expect, test } from './fixtures';
 import type { MobileServer } from './support/mockServer';
 
-// Replying to an agent and taking over a run, from the Need You tab.
+// Replying to an agent and taking over a run, from the Need you tab.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 

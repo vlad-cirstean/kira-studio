@@ -3,6 +3,7 @@ import { TONE_TAG_CLASS } from '@ade/tones';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
@@ -60,13 +61,13 @@ const stopFirst = computed(() => props.card.moves.live);
     </button>
 
     <ol v-if="open" class="m-0 flex list-none flex-col gap-2 px-3 pb-3 pl-8" data-testid="plan-stages">
-      <li v-if="!card.blocks.length" class="text-kira-sm text-subtle">No workflow.</li>
+      <li v-if="!card.blocks.length" class="text-kira-sm text-subtle">{{ t('mobile.plan.noWorkflow.empty') }}</li>
       <li v-for="block in card.blocks" :key="block.stage.id" class="flex flex-col gap-0.5" :data-state="block.state">
         <span class="flex items-center gap-2 text-kira-md" :class="block.state === 'now' ? 'font-medium text-fg' : 'text-muted-foreground'">
           <span aria-hidden="true">{{ block.state === 'done' ? '✓' : block.state === 'now' ? '▸' : '○' }}</span>
           {{ block.stage.name }}
           <span v-if="block.count" class="text-kira-sm text-subtle">{{ block.count }}</span>
-          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">skipped</span>
+          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">{{ t('space.common.skipped.status') }}</span>
         </span>
         <ul v-if="block.steps.length" class="m-0 flex list-none flex-col gap-0.5 p-0 pl-5">
           <li v-for="view in block.steps" :key="view.step.id" class="flex items-center gap-2 text-kira-sm">
@@ -86,7 +87,7 @@ const stopFirst = computed(() => props.card.moves.live);
         data-testid="plan-stage-back"
         @click="actions.ask('back')"
       >
-        Back
+        {{ t('common.action.back.label') }}
       </Button>
       <Button size="kira"
         variant="dialog"
@@ -95,7 +96,7 @@ const stopFirst = computed(() => props.card.moves.live);
         data-testid="plan-stage-next"
         @click="actions.ask('next')"
       >
-        Next
+        {{ t('common.action.next.label') }}
       </Button>
       <Button size="kira"
         v-if="actions.startKind.value"
@@ -104,14 +105,14 @@ const stopFirst = computed(() => props.card.moves.live);
         data-testid="plan-start"
         @click="actions.ask('start')"
       >
-        Start
+        {{ t('common.action.start.label') }}
       </Button>
-      <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">Stop its running agents first to move it.</p>
+      <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">{{ t('mobile.plan.stopFirst.hint') }}</p>
     </div>
 
     <div v-if="open && permissions.agentInput && card.tuiSessions.length" class="flex flex-col gap-1 px-3 pb-3 pl-8">
       <Button v-for="session in card.tuiSessions" :key="session.id" as-child size="kira" variant="dialog" class="h-11 px-3 no-underline">
-        <RouterLink :to="{ name: 'terminal', params: { sessionId: session.id } }" data-testid="plan-terminal">Terminal</RouterLink>
+        <RouterLink :to="{ name: 'terminal', params: { sessionId: session.id } }" data-testid="plan-terminal">{{ t('common.module.terminal.label') }}</RouterLink>
       </Button>
     </div>
     <ConfirmDialogView

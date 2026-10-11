@@ -10,6 +10,7 @@ import { localIso } from '@ade/localDay';
 import { taskColor } from '@ade/palette';
 import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
 import type { Branch, Session, Task, Workflow } from '@ade/wire';
+import { t } from '@theme/i18n';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { formatWeekdayDate } from '@workbench/behaviour/format';
 import { compareNatural } from '@workbench/behaviour/match';
@@ -45,10 +46,11 @@ export interface PlanGroup {
 const DAY_MS = 86_400_000;
 
 function dayLabel(iso: string, today: string): string {
-  if (iso < today) return 'Earlier';
-  if (iso === today) return 'Today';
+  if (iso < today) return t('space.common.day.earlier.label');
+  if (iso === today) return t('space.common.day.today.label');
   const date = new Date(`${iso}T00:00:00`);
-  if (localIso(new Date(date.getTime() - DAY_MS)) === today) return 'Tomorrow';
+  if (localIso(new Date(date.getTime() - DAY_MS)) === today)
+    return t('space.common.day.tomorrow.label');
   return formatWeekdayDate(date);
 }
 
@@ -144,7 +146,7 @@ export const useAgentsModel = createSharedComposable(() => {
       const day = b.plan.day[card.task.id] ?? '';
       const group = groups.get(day) ?? {
         key: day || 'later',
-        label: day ? dayLabel(day, today) : 'Later',
+        label: day ? dayLabel(day, today) : t('space.common.day.later.label'),
         cards: [],
       };
       group.cards.push(card);

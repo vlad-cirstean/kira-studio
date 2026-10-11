@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { t } from '@theme/i18n';
 import { useDebounceFn, useEventListener, useResizeObserver } from '@vueuse/core';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -23,10 +24,10 @@ const props = defineProps<{ sessionId: string }>();
 const FONT_MIN = 8;
 const FONT_MAX = 20;
 const STATUS_LABEL = {
-  connecting: 'Connecting',
-  live: 'Live',
-  reconnecting: 'Reconnecting',
-  ended: 'Ended',
+  connecting: 'mobile.terminal.status.connecting.status',
+  live: 'mobile.terminal.status.live.status',
+  reconnecting: 'mobile.terminal.status.reconnecting.status',
+  ended: 'mobile.terminal.status.ended.status',
 } as const;
 
 type Renderer = Awaited<ReturnType<typeof loadTerminalRenderer>>;
@@ -135,19 +136,19 @@ function leave(): void {
     data-testid="terminal-screen"
   >
     <header class="flex items-center gap-2 border-b border-border bg-chrome px-2 py-1">
-      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Back" data-testid="term-back" @click="leave">
+      <Button variant="ghost" size="kira-icon" class="size-11" :aria-label="t('common.action.back.label')" data-testid="term-back" @click="leave">
         <CodiconIcon name="chevron-left" :size="16" />
       </Button>
-      <h1 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium">Terminal</h1>
+      <h1 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium">{{ t('common.module.terminal.label') }}</h1>
       <span class="text-kira-sm text-muted-foreground" role="status" data-testid="term-status">
-        {{ STATUS_LABEL[remote.status.value] }}
+        {{ t(STATUS_LABEL[remote.status.value]) }}
       </span>
-      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Smaller text" data-testid="term-font-down" :disabled="fontSize <= FONT_MIN" @click="step(-1)">A-</Button>
-      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Larger text" data-testid="term-font-up" :disabled="fontSize >= FONT_MAX" @click="step(1)">A+</Button>
-      <Button size="kira" variant="dialog" class="h-11 px-3" data-testid="term-release" @click="leave">Release</Button>
+      <Button variant="ghost" size="kira-icon" class="size-11" :aria-label="t('mobile.terminal.fontDown.aria')" data-testid="term-font-down" :disabled="fontSize <= FONT_MIN" @click="step(-1)">{{ t('mobile.terminal.fontDown.label') }}</Button>
+      <Button variant="ghost" size="kira-icon" class="size-11" :aria-label="t('mobile.terminal.fontUp.aria')" data-testid="term-font-up" :disabled="fontSize >= FONT_MAX" @click="step(1)">{{ t('mobile.terminal.fontUp.label') }}</Button>
+      <Button size="kira" variant="dialog" class="h-11 px-3" data-testid="term-release" @click="leave">{{ t('mobile.terminal.release.label') }}</Button>
     </header>
 
-    <PermissionHint v-if="!permissions.agentInput" what="Controlling terminals is off for this phone." />
+    <PermissionHint v-if="!permissions.agentInput" :what="t('mobile.terminal.controlOff.hint')" />
     <template v-else>
       <Alert v-if="remote.status.value === 'ended'" variant="info" strip data-testid="term-ended">
         <AlertDescription>{{ remote.endReason.value }}</AlertDescription>
@@ -163,14 +164,14 @@ function leave(): void {
         <Input
           :model-value="compose"
           class="h-11 flex-1 text-kira-touch"
-          placeholder="Type a message"
+          :placeholder="t('mobile.terminal.compose.placeholder')"
           enterkeyhint="send"
           autocapitalize="off"
           autocomplete="off"
           data-testid="term-compose"
           @update:model-value="(v) => (compose = String(v))"
         />
-        <Button size="kira" type="submit" variant="dialog-primary" class="h-11 px-4" :disabled="!compose" data-testid="term-compose-send">Send</Button>
+        <Button size="kira" type="submit" variant="dialog-primary" class="h-11 px-4" :disabled="!compose" data-testid="term-compose-send">{{ t('common.action.send.label') }}</Button>
       </form>
     </template>
   </section>

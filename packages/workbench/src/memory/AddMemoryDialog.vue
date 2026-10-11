@@ -6,6 +6,7 @@ import { Card } from '@theme/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { computed, reactive, ref } from 'vue';
 import { errorText } from '../bridge/codedError';
 import { useStoreMemory } from './queries';
@@ -66,13 +67,13 @@ function cancel(): void {
 function actionLabel(o: MemoryStoreResult['outcomes'][number]): string {
   switch (o.action) {
     case 'add':
-      return 'Added';
+      return t('memory.add.outcome.added.status');
     case 'update':
-      return `Updated v${o.version - 1} to v${o.version}`;
+      return t('memory.add.outcome.updated.status', { from: o.version - 1, to: o.version });
     case 'noop':
-      return 'Already known';
+      return t('memory.add.outcome.known.status');
     default:
-      return `Failed: ${o.error}`;
+      return t('memory.add.outcome.failed.error', { error: o.error });
   }
 }
 
@@ -87,7 +88,7 @@ function select(id: string): void {
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="lg" data-testid="add-memory-dialog">
       <DialogHeader>
-        <DialogTitle>Add memory</DialogTitle>
+        <DialogTitle>{{ t('memory.add.label') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <Alert v-if="storeError" variant="error" data-testid="add-memory-error">
@@ -113,13 +114,13 @@ function select(id: string): void {
 
         <template v-else>
           <div class="flex flex-col gap-1">
-            <Label for="memory-text">What should be remembered?</Label>
+            <Label for="memory-text">{{ t('memory.add.text.label') }}</Label>
             <Textarea
               id="memory-text"
               v-model="text"
               :disabled="busy"
               :maxlength="MAX_TEXT"
-              placeholder="Facts in your own words; Claude splits and checks them"
+              :placeholder="t('memory.add.text.placeholder')"
               data-testid="add-memory-text"
             />
             <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count">{{ text.length }} / {{ MAX_TEXT }}</span>
@@ -133,23 +134,23 @@ function select(id: string): void {
               >
                 <div v-for="(question, q) in c.questions" :key="q" class="flex flex-col gap-0.5">
                   <Label :for="`memory-answer-${q}`">{{ question }}</Label>
-                  <Textarea :id="`memory-answer-${q}`" v-model="answers[answerKey(c.index, q)]" :disabled="busy" placeholder="Your answer" data-testid="add-memory-answer" />
+                  <Textarea :id="`memory-answer-${q}`" v-model="answers[answerKey(c.index, q)]" :disabled="busy" :placeholder="t('memory.add.answer.placeholder')" data-testid="add-memory-answer" />
                 </div>
               </Alert>
             </template>
           </div>
-          <p v-if="busy" class="m-0 text-kira-sm text-muted-foreground" data-testid="add-memory-busy">Checking with Claude…</p>
+          <p v-if="busy" class="m-0 text-kira-sm text-muted-foreground" data-testid="add-memory-busy">{{ t('memory.add.checking.loading') }}</p>
         </template>
       </DialogBody>
       <DialogFooter>
         <template v-if="stored">
-          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">Done</Button>
+          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">{{ t('memory.common.done.label') }}</Button>
         </template>
         <template v-else>
-          <Button v-if="busy" variant="dialog" size="kira-lg" data-testid="add-memory-cancel" @click="cancel">Cancel</Button>
-          <Button v-else variant="dialog" size="kira-lg" @click="emit('close')">Close</Button>
+          <Button v-if="busy" variant="dialog" size="kira-lg" data-testid="add-memory-cancel" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+          <Button v-else variant="dialog" size="kira-lg" @click="emit('close')">{{ t('common.action.close.label') }}</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" data-testid="add-memory-submit" @click="submit">
-            {{ challenged ? 'Resubmit' : 'Add' }}
+            {{ challenged ? t('memory.add.resubmit.label') : t('common.action.add.label') }}
           </Button>
         </template>
       </DialogFooter>

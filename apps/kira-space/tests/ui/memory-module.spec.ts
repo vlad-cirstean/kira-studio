@@ -109,7 +109,7 @@ test('Memory mode lists recent memories, searches, and flags history', async ({ 
   const rows = page.locator('[data-testid^="memory-row-"]');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('port 9090');
-  await expect(rows.first()).toContainText('agent');
+  await expect(rows.first()).toContainText('Agent');
   await expect(page.locator('[data-testid="memory-detail-empty"]')).toBeVisible();
 
   await page.locator('[data-testid="memory-search"]').fill('billing');
@@ -119,8 +119,8 @@ test('Memory mode lists recent memories, searches, and flags history', async ({ 
 
   await page.locator('[data-testid="memory-include-history"]').click();
   await expect(rows).toHaveCount(2);
-  await expect(page.locator('[data-testid="memory-row-m1"]')).toContainText('historical');
-  await expect(page.locator('[data-testid="memory-row-m2"]')).not.toContainText('historical');
+  await expect(page.locator('[data-testid="memory-row-m1"]')).toContainText('Historical');
+  await expect(page.locator('[data-testid="memory-row-m2"]')).not.toContainText('Historical');
 });
 
 test('selecting a memory shows its reason and version trail', async ({ relaunch }) => {
@@ -131,7 +131,7 @@ test('selecting a memory shows its reason and version trail', async ({ relaunch 
   const detail = page.locator('[data-testid="memory-detail"]');
   await expect(detail).toContainText('Manifest changed in March.');
   const trail = page.locator('[data-testid="memory-trail"]');
-  await expect(trail.locator('[data-testid="memory-version-1"]')).toContainText('historical');
+  await expect(trail.locator('[data-testid="memory-version-1"]')).toContainText('Historical');
   await expect(trail.locator('[data-testid="memory-version-2"]')).toContainText('Port corrected.');
 });
 

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { type CodedError, toCodedError } from '@workbench/bridge/codedError';
 
 // The phone's one transport: same-origin fetch with the device cookie. A 401 reports to the
@@ -11,7 +12,7 @@ export function setUnauthorizedHandler(fn: UnauthorizedHandler): void {
 }
 
 function networkError(): CodedError {
-  const err: CodedError = new Error('Cannot reach Kira Space');
+  const err: CodedError = new Error(t('mobile.http.unreachable.error'));
   err.code = 'E_NETWORK';
   return err;
 }

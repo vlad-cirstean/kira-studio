@@ -4003,13 +4003,563 @@
     }
   },
   "memory": {
+    "add": {
+      "answer": {
+        "placeholder": "Your answer"
+      },
+      "checking": {
+        "loading": "Checking with Claude…"
+      },
+      "label": "Add memory",
+      "outcome": {
+        "added": {
+          "status": "Added"
+        },
+        "failed": {
+          "error": "Couldn’t add: {error}"
+        },
+        "known": {
+          "status": "Already known"
+        },
+        "updated": {
+          "status": "Updated v{from} to v{to}"
+        }
+      },
+      "resubmit": {
+        "label": "Resubmit"
+      },
+      "text": {
+        "label": "What to remember",
+        "placeholder": "Facts in your own words; Claude splits and checks them"
+      }
+    },
+    "common": {
+      "author": {
+        "agent": {
+          "label": "Agent"
+        },
+        "user": {
+          "label": "User"
+        }
+      },
+      "done": {
+        "label": "Done"
+      },
+      "historical": {
+        "status": "Historical"
+      },
+      "pause": {
+        "label": "Pause"
+      },
+      "resume": {
+        "label": "Resume"
+      },
+      "version": {
+        "label": "Version {version}"
+      }
+    },
+    "import": {
+      "back": {
+        "label": "Back to memories"
+      },
+      "confirm": {
+        "calls": {
+          "label": "{count} Claude call | {count} Claude calls"
+        },
+        "chunks": {
+          "label": "{count} chunk | {count} chunks"
+        },
+        "cost": {
+          "description": "Runs on your Claude subscription. {skipped}, {ignored}."
+        },
+        "estimate": {
+          "description": "{files}, {chunks}, {calls}, {duration}."
+        },
+        "files": {
+          "label": "{count} file | {count} files"
+        },
+        "ignored": {
+          "label": "{count} file or folder ignored | {count} files and folders ignored"
+        },
+        "nothing": {
+          "description": "No importable files found."
+        },
+        "nothingSkipped": {
+          "description": "No importable files found. {count} skipped."
+        },
+        "scanning": {
+          "loading": "Scanning files…"
+        },
+        "skipped": {
+          "label": "{count} file skipped | {count} files skipped"
+        },
+        "truncated": {
+          "description": "Too many files. Only the first file is included. | Too many files. Only the first {count} files are included."
+        }
+      },
+      "discardConfirm": {
+        "body": "Remove this import and its progress. Memories already stored stay.",
+        "title": "Discard import?"
+      },
+      "documents": {
+        "label": "Import documents"
+      },
+      "file": {
+        "dropped": {
+          "label": "Dropped: {why}"
+        }
+      },
+      "fileState": {
+        "extracted": {
+          "status": "Extracted"
+        },
+        "extracting": {
+          "status": "Extracting"
+        },
+        "finalizing": {
+          "status": "Finalising"
+        },
+        "pending": {
+          "status": "Pending"
+        },
+        "skipped": {}
+      },
+      "files": {
+        "label": "Import files…"
+      },
+      "folder": {
+        "label": "Import folder…"
+      },
+      "list": {
+        "empty": "No imports",
+        "emptyHint": "Import files or a folder from the panel header."
+      },
+      "retryFailed": {
+        "label": "Retry failed"
+      },
+      "start": {
+        "label": "Start import"
+      },
+      "state": {
+        "awaiting": {
+          "status": "Awaiting"
+        },
+        "cancelled": {
+          "status": "Cancelled"
+        },
+        "paused": {
+          "status": "Paused"
+        },
+        "scanning": {
+          "status": "Scanning"
+        }
+      },
+      "status": {
+        "paused": {
+          "label": "Import paused: {title} · {done} / {count} file | Import paused: {title} · {done} / {count} files"
+        },
+        "ready": {
+          "label": "Import ready: {title} · {done} / {count} file | Import ready: {title} · {done} / {count} files"
+        },
+        "running": {
+          "label": "Importing: {title} · {done} / {count} file | Importing: {title} · {done} / {count} files"
+        },
+        "view": {
+          "label": "View"
+        }
+      },
+      "totals": {
+        "added": {
+          "label": "{count} added"
+        },
+        "failed": {
+          "label": "{count} failed"
+        },
+        "files": {
+          "label": "{done} / {count} file | {done} / {count} files"
+        },
+        "known": {
+          "label": "{count} known"
+        },
+        "skipped": {
+          "label": "{count} skipped"
+        },
+        "unresolved": {
+          "label": "{count} unresolved"
+        },
+        "updated": {
+          "label": "{count} updated"
+        }
+      }
+    },
+    "mcp": {
+      "command": {
+        "hint": "The server runs this app’s executable with {command}. Install again if the app moves."
+      },
+      "connect": {
+        "description": "Registers the kira-memory MCP server. Claude Code then gets the store_memory, search_memories and memory_history tools and the /mcp__kira-memory__remember command. The Claude Code CLI must be installed for the store check to run.",
+        "title": "Connect Claude Code"
+      },
+      "copyCommand": {
+        "label": "Copy command"
+      },
+      "install": {
+        "installed": {
+          "description": "Registered with Claude Code."
+        },
+        "notFound": {
+          "error": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
+        },
+        "refused": {
+          "error": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
+        }
+      },
+      "register": {
+        "label": "Register with Claude Code"
+      }
+    },
     "module": {
       "title": "Memory"
+    },
+    "panel": {
+      "connectClaude": {
+        "hint": "Connect Claude Code in the settings to let it store memories."
+      },
+      "includeHistory": {
+        "label": "Include history"
+      },
+      "list": {
+        "empty": "No memories yet",
+        "emptyHint": "Add one, or let Claude Code store them.",
+        "loading": "Loading memories…"
+      },
+      "search": {
+        "placeholder": "Search memories"
+      },
+      "semantic": {
+        "status": "Semantic"
+      },
+      "semanticOff": {
+        "hint": "Semantic search is off."
+      },
+      "semanticUnavailable": {
+        "hint": "Semantic search unavailable."
+      }
+    },
+    "semantic": {
+      "description": "Finds memories by meaning. Runs a local embedding model.",
+      "download": {
+        "label": "Download model ({size})"
+      },
+      "downloading": {
+        "status": "Downloading {done} / {total}"
+      },
+      "indexing": {
+        "status": "Indexing {done} / {total}"
+      },
+      "on": {
+        "status": "On"
+      },
+      "onWithModel": {
+        "status": "On ({model})"
+      },
+      "title": "Semantic search",
+      "unavailable": {
+        "error": "Semantic search unavailable: {message}"
+      }
+    },
+    "start": {
+      "empty": "Search or add a memory",
+      "emptyHint": "Select a result to see its reason and history.",
+      "event": {
+        "action": {
+          "added": {},
+          "reconfirmed": {
+            "status": "Reconfirmed"
+          },
+          "updated": {
+            "status": "Updated"
+          }
+        },
+        "plain": {
+          "label": "{action} · {author} · {source}"
+        },
+        "source": {
+          "import": {
+            "label": "Import"
+          },
+          "mcp": {
+            "label": "MCP"
+          },
+          "ui": {
+            "label": "App"
+          }
+        },
+        "withBoth": {
+          "label": "{action} · {author} · {source} ({label}) — {rationale}"
+        },
+        "withLabel": {
+          "label": "{action} · {author} · {source} ({label})"
+        },
+        "withRationale": {
+          "label": "{action} · {author} · {source} — {rationale}"
+        }
+      },
+      "reason": {
+        "label": "Reason:"
+      },
+      "versions": {
+        "label": "Versions"
+      }
     }
   },
   "mobile": {
+    "backlog": {
+      "add": {
+        "placeholder": "Add to the backlog"
+      },
+      "handle": {
+        "aria": "Drag to reorder"
+      },
+      "list": {
+        "empty": "No backlog items yet",
+        "emptyHint": "Items added here or in Kira Space appear here."
+      },
+      "loadError": {
+        "error": "Couldn’t load the backlog."
+      },
+      "notes": {
+        "empty": "No notes"
+      },
+      "writeOff": {
+        "hint": "Adding and reordering are off for this phone."
+      }
+    },
+    "http": {
+      "unreachable": {
+        "error": "Can’t reach Kira Space."
+      }
+    },
     "module": {
       "title": "Kira Space"
+    },
+    "needs": {
+      "list": {
+        "empty": "Nothing needs you"
+      },
+      "loadError": {
+        "error": "Couldn’t load the board."
+      },
+      "replyOff": {
+        "hint": "Replying to agents is off for this phone."
+      },
+      "takeOverConfirm": {
+        "body": "{what}. Taking over stops the background run and continues it in Claude Code on your computer.",
+        "title": "Take over run?"
+      }
+    },
+    "pair": {
+      "device": {
+        "android": {
+          "label": "Android phone"
+        },
+        "phone": {
+          "label": "Phone"
+        }
+      },
+      "intro": {
+        "description": "View your agents from this phone. The computer must approve this phone first."
+      },
+      "name": {
+        "label": "Name this phone"
+      },
+      "notice": {
+        "denied": {
+          "error": "Access was denied on the computer."
+        },
+        "expired": {
+          "error": "Access for this phone expired. Request access again."
+        },
+        "revoked": {
+          "error": "This phone was removed in Kira Space. Request access again to reconnect."
+        },
+        "timedOut": {
+          "error": "Nobody answered on the computer in time."
+        },
+        "unreachable": {
+          "error": "Can’t reach Kira Space. Check that the computer is awake and on this network."
+        }
+      },
+      "request": {
+        "label": "Request access"
+      },
+      "unencrypted": {
+        "description": "This connection isn’t encrypted. Use it only on your home network."
+      },
+      "waiting": {
+        "hint": "Check this code in Kira Space on the computer."
+      }
+    },
+    "permission": {
+      "allow": {
+        "hint": "To allow it, turn on mobile access in the settings of Kira Space on the computer."
+      }
+    },
+    "plan": {
+      "list": {
+        "empty": "No tasks planned",
+        "emptyHint": "Tasks added in Kira Space appear here."
+      },
+      "loadError": {
+        "error": "Couldn’t load the plan."
+      },
+      "markDoneConfirm": {
+        "confirm": "Mark done",
+        "title": "Mark done?"
+      },
+      "moveBackConfirm": {
+        "body": "Move “{title}” back to {stage}. Its earlier runs stay as history.",
+        "confirm": "Move back",
+        "title": "Move back?"
+      },
+      "moveForwardConfirm": {
+        "body": "Move “{title}” forward to {stage}.",
+        "confirm": "Move forward",
+        "title": "Move forward?"
+      },
+      "noWorkflow": {
+        "empty": "No workflow"
+      },
+      "startConfirm": {
+        "title": "Start {stage}?"
+      },
+      "startRunConfirm": {
+        "body": "Agents start now in the worktrees of “{title}”."
+      },
+      "startSessionConfirm": {
+        "body": "A Claude Code session for {stage} opens on your computer."
+      },
+      "startThisStageConfirm": {
+        "title": "Start this stage?"
+      },
+      "startThisStageSessionConfirm": {
+        "body": "A Claude Code session for this stage opens on your computer."
+      },
+      "stopFirst": {
+        "hint": "Stop its running agents first to move it."
+      },
+      "thisStage": {}
+    },
+    "reply": {
+      "dialog": {
+        "title": "Reply to the agent"
+      }
+    },
+    "shell": {
+      "connection": {
+        "live": {
+          "aria": "Connection live"
+        },
+        "offline": {
+          "aria": "Connection offline"
+        },
+        "reconnecting": {
+          "aria": "Connection reconnecting"
+        }
+      },
+      "heading": {
+        "title": "Agents"
+      },
+      "offline": {
+        "description": "You are offline. Showing what was last loaded."
+      }
+    },
+    "tabs": {
+      "nav": {
+        "aria": "Sections"
+      }
+    },
+    "terminal": {
+      "compose": {
+        "placeholder": "Type a message"
+      },
+      "controlOff": {
+        "hint": "Controlling terminals is off for this phone."
+      },
+      "end": {
+        "accessOff": {
+          "description": "Terminal access for this phone was turned off."
+        },
+        "otherConnection": {
+          "description": "This terminal was opened on another connection."
+        },
+        "released": {
+          "description": "You released the terminal."
+        },
+        "sessionEnded": {
+          "description": "The agent session ended."
+        },
+        "timedOut": {
+          "description": "The terminal timed out after a while without input."
+        },
+        "tookBack": {
+          "description": "The computer took the terminal back."
+        },
+        "unreachable": {
+          "error": "Couldn’t reach the terminal. It may be busy on another phone, or the session ended."
+        }
+      },
+      "fontDown": {
+        "aria": "Smaller text",
+        "label": "A-"
+      },
+      "fontUp": {
+        "aria": "Larger text",
+        "label": "A+"
+      },
+      "keys": {
+        "ctrl": {
+          "label": "Ctrl"
+        },
+        "ctrlC": {
+          "label": "^C"
+        },
+        "down": {
+          "label": "Down"
+        },
+        "left": {
+          "label": "Left"
+        },
+        "right": {
+          "label": "Right"
+        },
+        "shiftTab": {
+          "label": "Shift Tab"
+        },
+        "up": {
+          "label": "Up"
+        }
+      },
+      "release": {
+        "label": "Release"
+      },
+      "status": {
+        "connecting": {
+          "status": "Connecting"
+        },
+        "ended": {
+          "status": "Ended"
+        },
+        "live": {
+          "status": "Live"
+        },
+        "reconnecting": {
+          "status": "Reconnecting"
+        }
+      },
+      "throttled": {
+        "hint": "Typing too fast, some input was dropped."
+      }
     }
   },
   "shared": {
@@ -4093,6 +4643,132 @@
     }
   },
   "space": {
+    "ade": {
+      "needs": {
+        "action": {
+          "reMerge": {
+            "label": "Re-merge"
+          },
+          "seeError": {
+            "label": "See error"
+          }
+        },
+        "backgroundRuns": {
+          "label": "{count} background run | {count} background runs"
+        },
+        "detail": {
+          "setupTook": {
+            "label": "Took {duration}"
+          }
+        },
+        "footer": {
+          "label": "{runs} · {sessions}"
+        },
+        "interactiveSessions": {
+          "label": "{count} interactive session | {count} interactive sessions"
+        },
+        "kind": {
+          "approval": {
+            "label": "Approval"
+          },
+          "question": {
+            "label": "Question"
+          },
+          "rebase": {
+            "label": "Rebase"
+          },
+          "setupFailed": {
+            "label": "Setup failed"
+          },
+          "staleMerge": {
+            "label": "Stale merge"
+          },
+          "stuckRun": {
+            "label": "Stuck run"
+          }
+        },
+        "scope": {
+          "spec": {
+            "label": "Spec"
+          }
+        },
+        "what": {
+          "approval": {
+            "label": "Approve step “{name}”"
+          },
+          "question": {
+            "label": "Claude Code is waiting for your answer on {branch}"
+          },
+          "questionSpec": {
+            "label": "Claude Code is waiting for your answer (spec)"
+          },
+          "rebaseFailed": {
+            "label": "Rebase of {branch} failed"
+          },
+          "rebaseNeedsYou": {
+            "label": "Rebase of {branch} needs you"
+          },
+          "rebasePending": {
+            "label": "Rebase of {branch} pending"
+          },
+          "setupFailed": {
+            "label": "Worktree setup failed for {branch}"
+          },
+          "staleMerge": {
+            "label": "{branch} is stale in {target}"
+          },
+          "stepEnded": {
+            "label": "Step “{name}” ended {result}"
+          },
+          "stepFailed": {
+            "label": "Step “{name}” failed"
+          },
+          "stuck": {
+            "label": "Step “{name}” is stuck on {branch}"
+          }
+        }
+      }
+    },
+    "common": {
+      "backlog": {
+        "label": "Backlog"
+      },
+      "day": {
+        "earlier": {
+          "label": "Earlier"
+        },
+        "later": {
+          "label": "Later"
+        },
+        "today": {
+          "label": "Today"
+        },
+        "tomorrow": {
+          "label": "Tomorrow"
+        }
+      },
+      "githubIssue": {
+        "label": "Issue {ref}"
+      },
+      "githubPr": {
+        "label": "PR {ref}"
+      },
+      "needYou": {
+        "label": "Need you"
+      },
+      "newBranch": {
+        "label": "New branch"
+      },
+      "plan": {
+        "label": "Plan"
+      },
+      "reply": {
+        "label": "Reply"
+      },
+      "skipped": {
+        "status": "Skipped"
+      }
+    },
     "module": {
       "title": "Kira Space"
     }

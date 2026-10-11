@@ -2,6 +2,7 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { formatDuration } from '../../behaviour/format';
@@ -53,38 +54,51 @@ async function dismiss(): Promise<void> {
   <Dialog :open="true" @update:open="(v) => !v && dismiss()">
     <DialogContent size="md" data-testid="import-confirm-dialog">
       <DialogHeader>
-        <DialogTitle>Import documents</DialogTitle>
+        <DialogTitle>{{ t('memory.import.documents.label') }}</DialogTitle>
       </DialogHeader>
       <DialogBody class="text-kira-md">
         <Alert v-if="actError" variant="error" data-testid="import-confirm-error">
           <AlertDescription>{{ actError }}</AlertDescription>
         </Alert>
-        <p v-if="scanning" class="m-0 text-muted-foreground" data-testid="import-scanning">Scanning…</p>
+        <p v-if="scanning" class="m-0 text-muted-foreground" data-testid="import-scanning">{{ t('memory.import.confirm.scanning.loading') }}</p>
         <Alert v-else-if="failed" variant="error">
           <AlertDescription>{{ job?.reason }}</AlertDescription>
         </Alert>
         <p v-else-if="empty" class="m-0" data-testid="import-nothing">
-          No importable files found.
-          <template v-if="job && job.totals.skippedFiles > 0">{{ job.totals.skippedFiles }} skipped.</template>
+          {{
+            job && job.totals.skippedFiles > 0
+              ? t('memory.import.confirm.nothingSkipped.description', { count: job.totals.skippedFiles })
+              : t('memory.import.confirm.nothing.description')
+          }}
         </p>
         <template v-else-if="ready && job">
           <p class="m-0" data-testid="import-estimate">
-            {{ job.estimate.files }} files, {{ job.estimate.chunks }} chunks,
-            {{ job.estimate.calls }} Claude calls, {{ formatDuration(job.estimate.seconds * 1000) }}.
+            {{
+              t('memory.import.confirm.estimate.description', {
+                files: t('memory.import.confirm.files.label', { count: job.estimate.files }),
+                chunks: t('memory.import.confirm.chunks.label', { count: job.estimate.chunks }),
+                calls: t('memory.import.confirm.calls.label', { count: job.estimate.calls }),
+                duration: formatDuration(job.estimate.seconds * 1000),
+              })
+            }}
           </p>
           <p class="m-0 text-muted-foreground">
-            Runs on your Claude subscription. {{ job.totals.skippedFiles }} files skipped,
-            {{ job.ignoredCount }} files and folders ignored.
+            {{
+              t('memory.import.confirm.cost.description', {
+                skipped: t('memory.import.confirm.skipped.label', { count: job.totals.skippedFiles }),
+                ignored: t('memory.import.confirm.ignored.label', { count: job.ignoredCount }),
+              })
+            }}
           </p>
           <p v-if="job.truncated" class="m-0 text-warn" data-testid="import-truncated">
-            Too many files: only the first {{ job.estimate.files }} are included.
+            {{ t('memory.import.confirm.truncated.description', { count: job.estimate.files }) }}
           </p>
         </template>
       </DialogBody>
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="import-confirm-cancel" @click="dismiss">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="import-confirm-cancel" @click="dismiss">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!ready || act.isPending.value" data-testid="import-confirm-start" @click="start">
-          Start import
+          {{ t('memory.import.start.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

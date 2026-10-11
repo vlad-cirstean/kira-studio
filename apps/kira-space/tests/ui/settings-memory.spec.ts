@@ -58,7 +58,7 @@ for (const key of ['not-installed', 'cancelled'] as const) {
     });
     await openMemorySettings(page);
     const download = page.locator('[data-testid="memory-semantic-download"]');
-    await expect(download).toContainText('35 MB');
+    await expect(download).toContainText('35.0 MB');
     await download.click();
     await expect
       .poll(() => control.log().some((e) => e.channel === IPC.memorySemanticInstall))

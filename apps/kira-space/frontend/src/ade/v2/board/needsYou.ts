@@ -1,3 +1,4 @@
+import { type MessageKey, t } from '@theme/i18n';
 import { formatDuration } from '@workbench/behaviour/format';
 import type { Board, Branch, Run, Session } from '../wire';
 import type { TaskProgress } from './progress';
@@ -36,6 +37,35 @@ const ACTION: Record<
   'setup failed': 'See error',
   'stale merge': 'Re-merge',
 };
+
+const KIND_LABEL = {
+  'stuck run': 'space.ade.needs.kind.stuckRun.label',
+  failed: 'common.state.failed.status',
+  rebase: 'space.ade.needs.kind.rebase.label',
+  question: 'space.ade.needs.kind.question.label',
+  approval: 'space.ade.needs.kind.approval.label',
+  'setup failed': 'space.ade.needs.kind.setupFailed.label',
+  'stale merge': 'space.ade.needs.kind.staleMerge.label',
+} as const satisfies Record<NeedsKind, MessageKey>;
+
+const ACTION_LABEL = {
+  'Take over': 'common.action.takeOver.label',
+  Retry: 'common.action.retry.label',
+  Open: 'common.action.open.label',
+  Approve: 'common.action.approve.label',
+  'See error': 'space.ade.needs.action.seeError.label',
+  'Re-merge': 'space.ade.needs.action.reMerge.label',
+} as const satisfies Record<(typeof ACTION)[NeedsKind], MessageKey>;
+
+/** Shown name of a kind; the kind itself stays the id. */
+export function needsKindLabel(kind: NeedsKind): string {
+  return t(KIND_LABEL[kind]);
+}
+
+/** Shown name of an item's action; the action itself stays the id. */
+export function needsActionLabel(action: NeedsItem['action']): string {
+  return t(ACTION_LABEL[action]);
+}
 
 const TONE: Record<NeedsKind, 'red' | 'amber' | 'grey'> = {
   'stuck run': 'red',
@@ -122,8 +152,8 @@ interface Ctx {
 /** `Step "x" failed`, or `ended <result>` when the step declared its own result. */
 function failedWhat(name: string, result: string): string {
   return result && result !== 'failed' && result !== 'done'
-    ? `Step "${name}" ended ${result}`
-    : `Step "${name}" failed`;
+    ? t('space.ade.needs.what.stepEnded.label', { name, result })
+    : t('space.ade.needs.what.stepFailed.label', { name });
 }
 
 function stepItems(c: Ctx): NeedsItem[] {
@@ -142,7 +172,10 @@ function stepItems(c: Ctx): NeedsItem[] {
             action: r.sessionId ? 'Take over' : 'Retry',
             runIds: r.runId ? [r.runId] : [],
             scope: c.nick(r.branchId),
-            what: `Step "${step.name}" is stuck on ${c.nameOf(r.branchId)}`,
+            what: t('space.ade.needs.what.stuck.label', {
+              name: step.name,
+              branch: c.nameOf(r.branchId),
+            }),
             detail: r.note,
             ageMs: c.age(c.sessionsById.get(r.sessionId)?.lastActiveAt ?? r.finishedAt),
           }),
@@ -168,7 +201,7 @@ function stepItems(c: Ctx): NeedsItem[] {
             ...base,
             id: `approval:${task.id}:${step.id}`,
             stageId: c.i.progress.get(task.id)?.stage?.id ?? '',
-            what: `Approve step "${step.name}"`,
+            what: t('space.ade.needs.what.approval.label', { name: step.name }),
           }),
         );
       }
@@ -193,8 +226,10 @@ function questionItems(c: Ctx): NeedsItem[] {
         taskId: s.taskId,
         branchId: s.branchId,
         sessionId: s.id,
-        scope: s.branchId ? c.nick(s.branchId) : 'spec',
-        what: `Claude Code is waiting for your answer${s.branchId ? ` on ${c.nameOf(s.branchId)}` : ' (spec)'}`,
+        scope: s.branchId ? c.nick(s.branchId) : t('space.ade.needs.scope.spec.label'),
+        what: s.branchId
+          ? t('space.ade.needs.what.question.label', { branch: c.nameOf(s.branchId) })
+          : t('space.ade.needs.what.questionSpec.label'),
         ageMs: c.age(s.lastActiveAt),
       }),
     );
@@ -217,13 +252,18 @@ function rebaseItem(c: Ctx, b: Branch, run: Run | undefined): NeedsItem | null {
   if (running) return null;
   const failed = run?.state === 'failed' || run?.state === 'stuck';
   if (!failed && b.basePendingFrom === '') return null;
-  const verb = run?.state === 'stuck' ? 'needs you' : failed ? 'failed' : 'pending';
+  const what =
+    run?.state === 'stuck'
+      ? 'space.ade.needs.what.rebaseNeedsYou.label'
+      : failed
+        ? 'space.ade.needs.what.rebaseFailed.label'
+        : 'space.ade.needs.what.rebasePending.label';
   return item('rebase', {
     id: `rebase:${b.id}`,
     taskId: b.taskId,
     branchId: b.id,
     scope: c.nick(b.id),
-    what: `Rebase of ${c.nameOf(b.id)} ${verb}`,
+    what: t(what, { branch: c.nameOf(b.id) }),
     detail: run?.outcome?.reason ?? '',
     ageMs: c.age(run?.finishedAt),
   });
@@ -242,11 +282,13 @@ function branchItems(c: Ctx): NeedsItem[] {
           taskId: b.taskId,
           branchId: b.id,
           scope: c.nick(b.id),
-          what: `Worktree setup failed for ${c.nameOf(b.id)}`,
+          what: t('space.ade.needs.what.setupFailed.label', { branch: c.nameOf(b.id) }),
           detail:
             b.setup.note ||
             (b.setup.finishedAt
-              ? `took ${formatDuration(b.setup.finishedAt - b.setup.startedAt)}`
+              ? t('space.ade.needs.detail.setupTook.label', {
+                  duration: formatDuration(b.setup.finishedAt - b.setup.startedAt),
+                })
               : ''),
           ageMs: c.age(b.setup.finishedAt),
         }),
@@ -260,7 +302,10 @@ function branchItems(c: Ctx): NeedsItem[] {
           taskId: b.taskId,
           branchId: b.id,
           scope: c.nick(b.id),
-          what: `${c.nameOf(b.id)} is stale in ${g.target}`,
+          what: t('space.ade.needs.what.staleMerge.label', {
+            branch: c.nameOf(b.id),
+            target: g.target,
+          }),
         }),
       );
     }
@@ -273,7 +318,7 @@ export function buildNeedsYou(i: NeedsYouInput): NeedsYou {
   const c: Ctx = {
     i,
     nick: (id) => i.repoNick(branches.get(id)?.codeRepoId ?? ''),
-    nameOf: (id) => branches.get(id)?.name || 'new branch',
+    nameOf: (id) => branches.get(id)?.name || t('space.common.newBranch.label'),
     age: (at) => (at ? Math.max(0, i.nowMs - at) : null),
     sessionsById: new Map(i.sessions.map((s) => [s.id, s])),
   };
@@ -290,6 +335,9 @@ export function buildNeedsYou(i: NeedsYouInput): NeedsYou {
     badge: items.length,
     backgroundRuns,
     interactiveSessions,
-    footer: `${backgroundRuns} background runs · ${interactiveSessions} interactive sessions`,
+    footer: t('space.ade.needs.footer.label', {
+      runs: t('space.ade.needs.backgroundRuns.label', { count: backgroundRuns }),
+      sessions: t('space.ade.needs.interactiveSessions.label', { count: interactiveSessions }),
+    }),
   };
 }

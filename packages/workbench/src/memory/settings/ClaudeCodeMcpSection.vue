@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
+import { CatalogText, t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useCopy } from '../../behaviour/clipboard';
 import QueryState from '../../components/QueryState.vue';
@@ -20,23 +21,19 @@ const message = computed(() => {
   if (!r) return null;
   switch (r.outcome) {
     case 'installed':
-      return 'Registered with Claude Code.';
+      return t('memory.mcp.install.installed.description');
     case 'notFound':
-      return "Claude Code's CLI isn't available. Copy the command above and run it yourself once it is installed.";
+      return t('memory.mcp.install.notFound.error');
     default:
-      return `Claude Code refused the registration: ${r.detail}. Copy the command above and run it yourself.`;
+      return t('memory.mcp.install.refused.error', { detail: r.detail });
   }
 });
 </script>
 
 <template>
   <FieldSet data-testid="memory-mcp-section">
-    <FieldLegend>Connect Claude Code</FieldLegend>
-    <FieldDescription>
-      Registers the kira-memory MCP server. Claude Code then gets the store_memory, search_memories and
-      memory_history tools and the /mcp__kira-memory__remember command. The Claude Code CLI must be on
-      PATH for the store check to run.
-    </FieldDescription>
+    <FieldLegend>{{ t('memory.mcp.connect.title') }}</FieldLegend>
+    <FieldDescription>{{ t('memory.mcp.connect.description') }}</FieldDescription>
     <QueryState :query="status" variant="inline" :is-empty="() => false">
       <template #error="{ message: statusMessage }">
         <Alert variant="error">
@@ -50,12 +47,14 @@ const message = computed(() => {
       >{{ command }}</Card>
     </QueryState>
     <p v-if="command" class="m-0 text-kira-sm text-muted-foreground">
-      The server runs this app's executable with <code class="font-data">memory-mcp</code>. Install again if the app moves.
+      <CatalogText k="memory.mcp.command.hint">
+        <template #command><code class="font-data">memory-mcp</code></template>
+      </CatalogText>
     </p>
     <p v-if="message" class="m-0 text-kira-sm text-muted-foreground" data-testid="memory-mcp-install-outcome">{{ message }}</p>
     <div class="flex items-center gap-1">
       <Button variant="dialog" size="kira-lg" :disabled="!command" data-testid="memory-mcp-copy" @click="copy(command)">
-        {{ copied ? 'Copied' : 'Copy command' }}
+        {{ copied ? t('common.copy.copied.announce') : t('memory.mcp.copyCommand.label') }}
       </Button>
       <Button
         variant="dialog-primary"
@@ -64,7 +63,7 @@ const message = computed(() => {
         data-testid="memory-mcp-install"
         @click="install.mutate()"
       >
-        <CodiconIcon name="plug" :size="12" /> Register with Claude Code
+        <CodiconIcon name="plug" :size="12" /> {{ t('memory.mcp.register.label') }}
       </Button>
     </div>
   </FieldSet>

@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
+import { t } from '@theme/i18n';
 import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { errorText } from '@workbench/bridge/codedError';
 import QueryState from '@workbench/components/QueryState.vue';
@@ -31,7 +32,10 @@ const ids = computed(() => backlog.data.value?.items.map((i) => i.id) ?? []);
 
 function facts(item: BacklogItem): string {
   const gh = parseGithub(item.githubUrl);
-  return [item.jira?.key ?? '', gh ? `${gh.kind === 'PR' ? 'PR' : 'issue'} ${gh.ref}` : '']
+  return [
+    item.jira?.key ?? '',
+    gh ? t(gh.kind === 'PR' ? 'space.common.githubPr.label' : 'space.common.githubIssue.label', { ref: gh.ref }) : '',
+  ]
     .filter(Boolean)
     .join(' · ');
 }
@@ -72,12 +76,12 @@ useSortableReorder(
 
 <template>
   <section class="flex flex-col" data-testid="backlog-screen">
-    <PermissionHint v-if="!canWrite" what="Adding and reordering are off for this phone." />
+    <PermissionHint v-if="!canWrite" :what="t('mobile.backlog.writeOff.hint')" />
     <form v-else class="flex gap-2 border-b border-border p-3" @submit.prevent="add">
       <Input
         :model-value="text"
         class="h-11 flex-1"
-        placeholder="Add to the backlog"
+        :placeholder="t('mobile.backlog.add.placeholder')"
         enterkeyhint="done"
         @update:model-value="(v) => (text = String(v))"
         data-testid="backlog-add"
@@ -89,22 +93,22 @@ useSortableReorder(
         :disabled="!text.trim() || writes.addBacklogItem.isPending.value"
         data-testid="backlog-add-submit"
       >
-        Add
+        {{ t('common.action.add.label') }}
       </Button>
     </form>
     <Alert v-if="error" variant="error" strip data-testid="backlog-write-error">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
     <QueryState :query="backlog" :is-empty="(d) => d.items.length === 0">
-    <template #loading><p class="m-0 p-4 text-muted-foreground">Loading</p></template>
+    <template #loading><p class="m-0 p-4 text-muted-foreground">{{ t('common.state.loading.loading') }}</p></template>
     <template #error>
-      <Alert variant="error" strip data-testid="backlog-error">Could not load the backlog.</Alert>
+      <Alert variant="error" strip data-testid="backlog-error">{{ t('mobile.backlog.loadError.error') }}</Alert>
     </template>
     <template #empty>
       <Empty class="py-10" data-testid="backlog-empty">
         <EmptyHeader>
-          <EmptyTitle>The backlog is empty</EmptyTitle>
-          <EmptyDescription>Items added here or in Kira Space appear here.</EmptyDescription>
+          <EmptyTitle>{{ t('mobile.backlog.list.empty') }}</EmptyTitle>
+          <EmptyDescription>{{ t('mobile.backlog.list.emptyHint') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     </template>
@@ -136,7 +140,7 @@ useSortableReorder(
             v-if="canWrite"
             class="flex size-11 shrink-0 touch-none items-center justify-center text-subtle"
             role="img"
-            aria-label="Drag to reorder"
+            :aria-label="t('mobile.backlog.handle.aria')"
             data-drag-handle
             data-testid="backlog-handle"
           >
@@ -148,7 +152,7 @@ useSortableReorder(
           class="m-0 whitespace-pre-wrap px-3 pb-3 pl-11 text-kira-md text-muted-foreground"
           data-testid="backlog-notes"
         >
-          {{ item.notes || 'No notes.' }}
+          {{ item.notes || t('mobile.backlog.notes.empty') }}
         </p>
       </li>
     </ol>

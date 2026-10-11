@@ -12,7 +12,7 @@ test.beforeEach(async ({ app, server }, info) => {
   await app();
 });
 
-test('Need You is the landing tab: urgent items first, badge and footer', async ({ page }) => {
+test('Need you is the landing tab: urgent items first, badge and footer', async ({ page }) => {
   await expect(page.locator(t('needs-screen'))).toBeVisible();
   const kinds = await page
     .locator(t('needs-item'))
@@ -32,7 +32,7 @@ test('Backlog lists items in priority order and expands notes', async ({ page })
   await expect(items.first()).toContainText('Rate limit the export endpoint per workspace');
   await expect(items.first()).toContainText('PAY-140');
   await items.first().locator('button').click();
-  await expect(page.locator(t('backlog-notes'))).toHaveText('No notes.');
+  await expect(page.locator(t('backlog-notes'))).toHaveText('No notes');
 });
 
 test('contract: Backlog lists what the backend returns', async ({ page }) => {

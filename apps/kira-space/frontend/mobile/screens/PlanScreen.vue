@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Alert } from '@theme/components/ui/alert';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import QueryState from '@workbench/components/QueryState.vue';
 import { ref } from 'vue';
 import { useAgentsModel } from '../state/useAgentsModel';
@@ -14,14 +15,14 @@ const open = ref<string | null>(null);
 <template>
   <section class="flex flex-col" data-testid="plan-screen">
     <QueryState :query="boardQuery" :is-empty="() => false">
-    <template #loading><p class="m-0 p-4 text-muted-foreground">Loading</p></template>
+    <template #loading><p class="m-0 p-4 text-muted-foreground">{{ t('common.state.loading.loading') }}</p></template>
     <template #error>
-      <Alert variant="error" strip data-testid="plan-error">Could not load the plan.</Alert>
+      <Alert variant="error" strip data-testid="plan-error">{{ t('mobile.plan.loadError.error') }}</Alert>
     </template>
     <Empty v-if="model && !model.plan.length" class="py-10" data-testid="plan-empty">
       <EmptyHeader>
-        <EmptyTitle>No tasks planned</EmptyTitle>
-        <EmptyDescription>Tasks added in Kira Space appear here.</EmptyDescription>
+        <EmptyTitle>{{ t('mobile.plan.list.empty') }}</EmptyTitle>
+        <EmptyDescription>{{ t('mobile.plan.list.emptyHint') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
     <template v-else-if="model">

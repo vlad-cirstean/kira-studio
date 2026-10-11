@@ -4,8 +4,10 @@ import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
+import { FILE_STATE_LABEL } from './importFormat';
 
 // P211: one file of an import — fixed height, the virtualized list's row.
 const props = defineProps<{ file: ImportFile; selected: boolean }>();
@@ -49,7 +51,7 @@ const variant = computed(() => {
       <span v-else-if="file.chunkCount > 0" class="shrink-0 text-kira-sm text-muted-foreground">
         {{ file.chunksDone }} / {{ file.chunkCount }}
       </span>
-      <Badge :variant="variant">{{ file.state }}</Badge>
+      <Badge :variant="variant">{{ t(FILE_STATE_LABEL[file.state]) }}</Badge>
     </button>
     <Button
       v-if="file.state === 'failed'"
@@ -58,7 +60,7 @@ const variant = computed(() => {
       :data-testid="`import-retry-file-${file.relPath}`"
       @click="emit('retry')"
     >
-      Retry
+      {{ t('common.action.retry.label') }}
     </Button>
   </div>
 </template>

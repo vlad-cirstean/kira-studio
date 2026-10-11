@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useMemoryModule } from './module';
 
 // P221: the module hosts no setup actions; it points to the host's settings.
@@ -11,7 +12,7 @@ const { openSettings } = useMemoryModule();
   <div class="flex items-center gap-1 text-kira-sm text-muted-foreground">
     <span class="min-w-0">{{ message }}</span>
     <Button variant="link" size="kira" class="h-auto p-0" data-testid="memory-open-settings" @click="openSettings()">
-      Open Settings
+      {{ t('common.action.openSettings.label') }}
     </Button>
   </div>
 </template>

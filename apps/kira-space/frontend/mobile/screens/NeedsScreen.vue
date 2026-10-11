@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { needsKindLabel } from '@ade/board/needsYou';
 import { TONE_TAG_CLASS } from '@ade/tones';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Alert } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
@@ -62,19 +64,19 @@ async function confirmTakeOver(): Promise<void> {
 <template>
   <section class="flex flex-col" data-testid="needs-screen">
     <QueryState :query="boardQuery" :is-empty="() => false">
-    <template #loading><p class="m-0 p-4 text-muted-foreground">Loading</p></template>
+    <template #loading><p class="m-0 p-4 text-muted-foreground">{{ t('common.state.loading.loading') }}</p></template>
     <template #error>
-      <Alert variant="error" strip data-testid="needs-error">Could not load the board.</Alert>
+      <Alert variant="error" strip data-testid="needs-error">{{ t('mobile.needs.loadError.error') }}</Alert>
     </template>
     <template v-if="model">
       <Empty v-if="model.needs.empty" class="py-10" data-testid="needs-empty">
         <EmptyHeader>
-          <EmptyTitle>Nothing needs you</EmptyTitle>
+          <EmptyTitle>{{ t('mobile.needs.list.empty') }}</EmptyTitle>
           <EmptyDescription>{{ model.needs.footer }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
       <template v-else>
-        <PermissionHint v-if="needsAgentInput" what="Replying to agents is off for this phone." />
+        <PermissionHint v-if="needsAgentInput" :what="t('mobile.needs.replyOff.hint')" />
         <ul class="m-0 flex list-none flex-col p-0">
           <li
             v-for="item in model.needs.items"
@@ -84,7 +86,7 @@ async function confirmTakeOver(): Promise<void> {
             :data-kind="item.kind"
           >
             <span class="flex items-center gap-2">
-              <Badge variant="chip" :class="TONE_TAG_CLASS[item.tone]">{{ item.kind }}</Badge>
+              <Badge variant="chip" :class="TONE_TAG_CLASS[item.tone]">{{ needsKindLabel(item.kind) }}</Badge>
               <span class="text-kira-sm text-subtle">{{ item.ageMs === null ? '' : formatRelative(0, item.ageMs) }}</span>
               <span class="ml-auto flex min-w-0 items-center gap-1.5 text-kira-sm text-subtle">
                 <StatusDot :color="model.cards.get(item.taskId)?.color" />
@@ -102,11 +104,11 @@ async function confirmTakeOver(): Promise<void> {
                 data-testid="needs-reply"
                 @click="replying = { sessionId: item.sessionId, context: item.what }"
               >
-                Reply
+                {{ t('space.common.reply.label') }}
               </Button>
               <Button v-if="item.kind === 'question'" as-child size="kira" variant="dialog" class="h-11 px-4 no-underline">
                 <RouterLink :to="{ name: 'terminal', params: { sessionId: item.sessionId } }" data-testid="needs-terminal">
-                  Terminal
+                  {{ t('common.module.terminal.label') }}
                 </RouterLink>
               </Button>
               <Button size="kira"
@@ -116,7 +118,7 @@ async function confirmTakeOver(): Promise<void> {
                 data-testid="needs-take-over"
                 @click="askTakeOver(item.sessionId, item.what)"
               >
-                Take over
+                {{ t('common.action.takeOver.label') }}
               </Button>
             </span>
           </li>
@@ -135,9 +137,9 @@ async function confirmTakeOver(): Promise<void> {
       touch
       tone="primary"
       :open="takingOver !== null"
-      title="Take over?"
-      :message="`${takingOver?.what ?? ''} Taking over stops the background run and continues it in Claude Code on your computer.`"
-      confirm-label="Take over"
+      :title="t('mobile.needs.takeOverConfirm.title')"
+      :message="t('mobile.needs.takeOverConfirm.body', { what: takingOver?.what ?? '' })"
+      :confirm-label="t('common.action.takeOver.label')"
       :busy="writes.takeOver.isPending.value"
       :error="takeOverError"
       :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"

@@ -1,15 +1,16 @@
+import { type MessageKey, t } from '@theme/i18n';
 import { useTimeoutFn, useWebSocket } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { readonly, ref } from 'vue';
 
 // Close codes the server sends when it ends a hold on purpose; the phone must not reconnect.
-const END_REASON: Record<number, string> = {
-  4000: 'You released the terminal.',
-  4001: 'The computer took the terminal back.',
-  4002: 'This terminal was opened on another connection.',
-  4003: 'The agent session ended.',
-  4004: 'The terminal timed out after a while without input.',
-  4005: 'Terminal access for this phone was turned off.',
+const END_REASON: Record<number, MessageKey> = {
+  4000: 'mobile.terminal.end.released.description',
+  4001: 'mobile.terminal.end.tookBack.description',
+  4002: 'mobile.terminal.end.otherConnection.description',
+  4003: 'mobile.terminal.end.sessionEnded.description',
+  4004: 'mobile.terminal.end.timedOut.description',
+  4005: 'mobile.terminal.end.accessOff.description',
 };
 
 export type RemoteStatus = 'connecting' | 'live' | 'reconnecting' | 'ended';
@@ -60,8 +61,7 @@ export function useRemoteTerminal(sessionId: string, handlers: Handlers) {
       delay: (n) => Math.min(500 * 2 ** (n - 1), 8000),
       onFailed: () => {
         status.value = 'ended';
-        endReason.value =
-          'Could not reach the terminal. It may be busy on another phone, or the session ended.';
+        endReason.value = t('mobile.terminal.end.unreachable.error');
       },
     },
     heartbeat: false,
@@ -72,7 +72,7 @@ export function useRemoteTerminal(sessionId: string, handlers: Handlers) {
     onDisconnected: (_ws, ev) => {
       const reason = END_REASON[ev.code];
       if (reason) {
-        endReason.value = reason;
+        endReason.value = t(reason);
         status.value = 'ended';
         socket.close();
       } else if (status.value !== 'ended') {
@@ -97,7 +97,7 @@ export function useRemoteTerminal(sessionId: string, handlers: Handlers) {
         offset = frame.offset ?? 0;
         known = true;
       } else if (frame.type === 'throttled') {
-        notice.value = 'Typing too fast, some input was dropped.';
+        notice.value = t('mobile.terminal.throttled.hint');
         hideNotice.start();
       }
     },

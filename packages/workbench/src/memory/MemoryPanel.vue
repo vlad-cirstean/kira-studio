@@ -7,6 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { refDebounced } from '@vueuse/core';
 import PanelBar from '@workbench/components/PanelBar.vue';
@@ -24,6 +25,7 @@ import ImportMenu from './import/ImportMenu.vue';
 import ImportStatus from './import/ImportStatus.vue';
 import { useImportChangeSync } from './import/importQueries';
 import { useImportUiStore } from './import/importStore';
+import { AUTHOR_LABEL } from './labels';
 import MemorySetupHint from './MemorySetupHint.vue';
 import { useMemoryChangeSync, useMemorySearch, useMemorySemanticStatus } from './queries';
 import { useMemoryUiStore } from './store';
@@ -84,11 +86,11 @@ const historyToggleId = useId();
 <template>
   <div ref="root" class="flex h-full flex-col" data-testid="memory-panel">
     <PanelHeader>
-      Memory
+      {{ t('common.module.memory.label') }}
       <template #actions>
         <TooltipIconButton
           icon="add"
-          label="Add memory"
+          :label="t('memory.add.label')"
           data-testid="memory-add"
           @click="addOpen = true"
         />
@@ -96,20 +98,20 @@ const historyToggleId = useId();
       </template>
     </PanelHeader>
     <PanelBar>
-      <SearchField v-model="query" placeholder="Search memories" data-testid="memory-search" />
+      <SearchField v-model="query" :placeholder="t('memory.panel.search.placeholder')" data-testid="memory-search" />
       <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
         <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
-        <Label :for="historyToggleId">Include history</Label>
+        <Label :for="historyToggleId">{{ t('memory.panel.includeHistory.label') }}</Label>
       </div>
       <MemorySetupHint
         v-if="semanticNeedsSetup"
-        :message="semanticState === 'notInstalled' ? 'Semantic search is off.' : 'Semantic search unavailable.'"
+        :message="semanticState === 'notInstalled' ? t('memory.panel.semanticOff.hint') : t('memory.panel.semanticUnavailable.hint')"
         data-testid="memory-setup-hint-semantic"
       />
       <ImportStatus />
     </PanelBar>
     <div ref="resultsEl" class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
-      <QueryState :query="search" loading-label="Loading memories…">
+      <QueryState :query="search" :loading-label="t('memory.panel.list.loading')">
         <template #error="{ message }">
           <Alert variant="error" strip data-testid="memory-error">
             <AlertDescription>{{ message }}</AlertDescription>
@@ -118,12 +120,12 @@ const historyToggleId = useId();
         <template #empty>
           <Empty class="h-full" data-testid="memory-empty">
             <EmptyHeader>
-              <EmptyTitle>{{ query.trim() === '' ? 'No memories yet' : 'No matching memories' }}</EmptyTitle>
-              <EmptyDescription v-if="query.trim() !== ''">Add one, or let Claude Code store them.</EmptyDescription>
+              <EmptyTitle>{{ query.trim() === '' ? t('memory.panel.list.empty') : t('common.state.noMatches.empty') }}</EmptyTitle>
+              <EmptyDescription v-if="query.trim() !== ''">{{ t('memory.panel.list.emptyHint') }}</EmptyDescription>
             </EmptyHeader>
             <MemorySetupHint
               v-if="query.trim() === ''"
-              message="Connect Claude Code in Settings to let it store memories."
+              :message="t('memory.panel.connectClaude.hint')"
               data-testid="memory-setup-hint-claude"
             />
           </Empty>
@@ -148,10 +150,10 @@ const historyToggleId = useId();
         >
           <span class="line-clamp-2 text-kira-md">{{ memory.fact }}</span>
           <span class="flex items-center gap-1">
-            <Badge :variant="memory.author === 'user' ? 'info' : 'default'">{{ memory.author }}</Badge>
-            <Badge v-if="memory.historical" variant="warn">historical</Badge>
-            <Badge v-if="memory.match === 'semantic'" variant="info" data-testid="memory-match-semantic">semantic</Badge>
-            <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">v{{ memory.version }}</span>
+            <Badge :variant="memory.author === 'user' ? 'info' : 'default'">{{ t(AUTHOR_LABEL[memory.author]) }}</Badge>
+            <Badge v-if="memory.historical" variant="warn">{{ t('memory.common.historical.status') }}</Badge>
+            <Badge v-if="memory.match === 'semantic'" variant="info" data-testid="memory-match-semantic">{{ t('memory.panel.semantic.status') }}</Badge>
+            <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">{{ t('memory.common.version.label', { version: memory.version }) }}</span>
           </span>
         </button>
         </div>

@@ -3,12 +3,14 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { formatDateTime as when } from '../behaviour/format';
 import QueryState from '../components/QueryState.vue';
 import ImportView from './import/ImportView.vue';
 import { useImportUiStore } from './import/importStore';
+import { AUTHOR_LABEL, eventText } from './labels';
 import { useMemoryHistory } from './queries';
 import { useMemoryUiStore } from './store';
 
@@ -32,8 +34,8 @@ function eventsFor(id: string) {
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
     <Empty v-if="!selectedId" class="h-full" data-testid="memory-detail-empty">
       <EmptyHeader>
-        <EmptyTitle>Search or add a memory</EmptyTitle>
-        <EmptyDescription>Select a result to see its reason and history.</EmptyDescription>
+        <EmptyTitle>{{ t('memory.start.empty') }}</EmptyTitle>
+        <EmptyDescription>{{ t('memory.start.emptyHint') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
     <QueryState v-else :query="history" :is-empty="() => false">
@@ -45,20 +47,20 @@ function eventsFor(id: string) {
     <div v-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center gap-1">
-          <Badge :variant="selected.author === 'user' ? 'info' : 'default'">{{ selected.author }}</Badge>
-          <Badge v-if="selected.historical" variant="warn">historical</Badge>
-          <span class="text-kira-sm text-muted-foreground">v{{ selected.version }} · {{ when(selected.createdAt) }}</span>
+          <Badge :variant="selected.author === 'user' ? 'info' : 'default'">{{ t(AUTHOR_LABEL[selected.author]) }}</Badge>
+          <Badge v-if="selected.historical" variant="warn">{{ t('memory.common.historical.status') }}</Badge>
+          <span class="text-kira-sm text-muted-foreground">{{ t('memory.common.version.label', { version: selected.version }) }} · {{ when(selected.createdAt) }}</span>
         </div>
         <p class="m-0 text-kira-md whitespace-pre-wrap" data-testid="memory-detail-fact">{{ selected.fact }}</p>
         <p class="m-0 text-kira-md text-muted-foreground whitespace-pre-wrap">
-          <span class="font-medium">Reason: </span>{{ selected.reason }}
+          <span class="font-medium">{{ t('memory.start.reason.label') }}</span> {{ selected.reason }}
         </p>
         <div v-if="selected.keywords.length" class="flex flex-wrap gap-1">
           <Badge v-for="k in selected.keywords" :key="k">{{ k }}</Badge>
         </div>
       </div>
       <div v-if="trail.length > 1" class="flex flex-col gap-1.5" data-testid="memory-trail">
-        <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">Versions</span>
+        <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{ t('memory.start.versions.label') }}</span>
         <Card
           v-for="version in trail"
           :key="version.id"
@@ -67,13 +69,12 @@ function eventsFor(id: string) {
           :data-testid="`memory-version-${version.version}`"
         >
           <div class="flex items-center gap-1">
-            <span class="text-kira-sm text-muted-foreground">v{{ version.version }} · {{ when(version.createdAt) }}</span>
-            <Badge v-if="version.historical" variant="warn">historical</Badge>
+            <span class="text-kira-sm text-muted-foreground">{{ t('memory.common.version.label', { version: version.version }) }} · {{ when(version.createdAt) }}</span>
+            <Badge v-if="version.historical" variant="warn">{{ t('memory.common.historical.status') }}</Badge>
           </div>
           <span class="text-kira-md whitespace-pre-wrap">{{ version.fact }}</span>
           <span v-for="event in eventsFor(version.id)" :key="event.seq" class="text-kira-sm text-muted-foreground">
-            {{ event.action === 'noop' ? 'Reconfirmed' : event.action === 'add' ? 'Added' : 'Updated' }}
-            by {{ event.author }} via {{ event.source }}<template v-if="event.source === 'import'"> ({{ event.sourceLabel ?? event.sourceRef }})</template><template v-if="event.rationale"> — {{ event.rationale }}</template>
+            {{ eventText(event) }}
           </span>
         </Card>
       </div>

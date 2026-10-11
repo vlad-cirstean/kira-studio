@@ -5,13 +5,14 @@ import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { Progress } from '@theme/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { storeToRefs } from 'pinia';
 import { computed, useTemplateRef } from 'vue';
 import { useVirtualRows } from '../../behaviour/virtualRows';
 import { errorText } from '../../bridge/codedError';
 import ImportFileRow from './ImportFileRow.vue';
-import { jobTitle } from './importFormat';
+import { JOB_STATE_LABEL, jobTitle } from './importFormat';
 import { useImportAction, useImportJob, useRetryImportFile } from './importQueries';
 import { useImportUiStore } from './importStore';
 
@@ -46,7 +47,12 @@ function run(action: ImportAction): void {
 }
 
 async function discard(): Promise<void> {
-  const ok = await confirm({ message: 'Remove this import and its progress? Memories already stored stay.', confirmLabel: 'Discard', tone: 'danger' });
+  const ok = await confirm({
+    title: t('memory.import.discardConfirm.title'),
+    message: t('memory.import.discardConfirm.body'),
+    confirmLabel: t('common.action.discard.label'),
+    tone: 'danger',
+  });
   if (ok) run('discard');
 }
 </script>
@@ -61,11 +67,11 @@ async function discard(): Promise<void> {
           </TooltipTrigger>
           <TooltipContent>{{ job.roots.join(', ') }}</TooltipContent>
         </Tooltip>
-        <span class="text-kira-sm uppercase tracking-wider text-muted-foreground" data-testid="import-job-state">{{ job.state }}</span>
-        <Button v-if="job.state === 'awaiting'" variant="toolbar" size="kira" data-testid="import-start" @click="run('start')">Start</Button>
-        <Button v-if="job.state === 'running'" variant="toolbar" size="kira" data-testid="import-pause" @click="run('pause')">Pause</Button>
-        <Button v-if="job.state === 'paused'" variant="toolbar" size="kira" data-testid="import-resume" @click="run('resume')">Resume</Button>
-        <Button v-if="job.state === 'running' || job.state === 'paused'" variant="toolbar" size="kira" data-testid="import-cancel" @click="run('cancel')">Cancel</Button>
+        <span class="text-kira-sm uppercase tracking-wider text-muted-foreground" data-testid="import-job-state">{{ t(JOB_STATE_LABEL[job.state]) }}</span>
+        <Button v-if="job.state === 'awaiting'" variant="toolbar" size="kira" data-testid="import-start" @click="run('start')">{{ t('common.action.start.label') }}</Button>
+        <Button v-if="job.state === 'running'" variant="toolbar" size="kira" data-testid="import-pause" @click="run('pause')">{{ t('memory.common.pause.label') }}</Button>
+        <Button v-if="job.state === 'paused'" variant="toolbar" size="kira" data-testid="import-resume" @click="run('resume')">{{ t('memory.common.resume.label') }}</Button>
+        <Button v-if="job.state === 'running' || job.state === 'paused'" variant="toolbar" size="kira" data-testid="import-cancel" @click="run('cancel')">{{ t('common.action.cancel.label') }}</Button>
         <Button
           v-if="job.totals.failedFiles > 0 && job.state !== 'running'"
           size="kira"
@@ -73,10 +79,10 @@ async function discard(): Promise<void> {
           data-testid="import-retry-failed"
           @click="run('retryFailed')"
         >
-          Retry failed
+          {{ t('memory.import.retryFailed.label') }}
         </Button>
-        <Button v-if="job.state === 'done' || job.state === 'cancelled' || job.state === 'failed'" variant="toolbar" size="kira" data-testid="import-dismiss" @click="run('dismiss')">Dismiss</Button>
-        <Button v-if="job.state !== 'running'" variant="toolbar" size="kira" data-testid="import-discard" @click="discard">Discard</Button>
+        <Button v-if="job.state === 'done' || job.state === 'cancelled' || job.state === 'failed'" variant="toolbar" size="kira" data-testid="import-dismiss" @click="run('dismiss')">{{ t('common.action.dismiss.label') }}</Button>
+        <Button v-if="job.state !== 'running'" variant="toolbar" size="kira" data-testid="import-discard" @click="discard">{{ t('common.action.discard.label') }}</Button>
       </div>
       <Alert v-if="job.reason && (job.state === 'paused' || job.state === 'failed')" variant="error" data-testid="import-reason">
         <AlertDescription>{{ job.reason }}</AlertDescription>
@@ -86,13 +92,13 @@ async function discard(): Promise<void> {
       </Alert>
       <Progress v-if="job.state === 'running' || job.state === 'paused'" :model-value="percent" />
       <div class="flex flex-wrap gap-x-3 text-kira-sm text-muted-foreground" data-testid="import-totals">
-        <span>{{ job.progress.filesDone }} / {{ job.progress.filesTotal }} files</span>
-        <span>{{ job.totals.added }} added</span>
-        <span>{{ job.totals.updated }} updated</span>
-        <span>{{ job.totals.noop }} known</span>
-        <span v-if="job.totals.unresolved > 0">{{ job.totals.unresolved }} unresolved</span>
-        <span v-if="job.totals.failedFiles > 0">{{ job.totals.failedFiles }} failed</span>
-        <span v-if="job.totals.skippedFiles > 0">{{ job.totals.skippedFiles }} skipped</span>
+        <span>{{ t('memory.import.totals.files.label', { done: job.progress.filesDone, count: job.progress.filesTotal }) }}</span>
+        <span>{{ t('memory.import.totals.added.label', { count: job.totals.added }) }}</span>
+        <span>{{ t('memory.import.totals.updated.label', { count: job.totals.updated }) }}</span>
+        <span>{{ t('memory.import.totals.known.label', { count: job.totals.noop }) }}</span>
+        <span v-if="job.totals.unresolved > 0">{{ t('memory.import.totals.unresolved.label', { count: job.totals.unresolved }) }}</span>
+        <span v-if="job.totals.failedFiles > 0">{{ t('memory.import.totals.failed.label', { count: job.totals.failedFiles }) }}</span>
+        <span v-if="job.totals.skippedFiles > 0">{{ t('memory.import.totals.skipped.label', { count: job.totals.skippedFiles }) }}</span>
       </div>
     </div>
     <div ref="scroll" class="min-h-0 flex-1 overflow-y-auto" data-testid="import-files">
@@ -122,7 +128,7 @@ async function discard(): Promise<void> {
       </Alert>
       <Card v-for="(d, i) in selectedFile.dropped" :key="`d${i}`" class="gap-0">
         <span>{{ d.fact }}</span>
-        <span class="text-kira-sm text-muted-foreground">Dropped: {{ d.why }}</span>
+        <span class="text-kira-sm text-muted-foreground">{{ t('memory.import.file.dropped.label', { why: d.why }) }}</span>
       </Card>
     </div>
   </div>

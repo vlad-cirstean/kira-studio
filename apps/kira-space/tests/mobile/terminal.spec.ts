@@ -101,6 +101,8 @@ test('without agent input the screen shows the hint and never connects', async (
   const socket = await scriptSocket(page);
   await app();
   await page.goto(`${server.url}terminal/9ab0`);
-  await expect(page.locator(t('permission-hint'))).toContainText('Settings > Mobile access');
+  await expect(page.locator(t('permission-hint'))).toContainText(
+    'turn on mobile access in the settings of Kira Space',
+  );
   expect(socket.connections).toBe(0);
 });

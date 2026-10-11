@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { ref, watch } from 'vue';
 import { newIntentKey, useAdeWrites } from '../state/useAdeWrites';
@@ -52,7 +53,7 @@ async function send(): Promise<void> {
   <Dialog :open="open" @update:open="(v) => !v && emit('close')">
     <DialogContent size="sm" data-testid="reply-sheet">
       <DialogHeader>
-        <DialogTitle>Reply to the agent</DialogTitle>
+        <DialogTitle>{{ t('mobile.reply.dialog.title') }}</DialogTitle>
         <DialogDescription>{{ context }}</DialogDescription>
       </DialogHeader>
       <DialogBody>
@@ -68,7 +69,7 @@ async function send(): Promise<void> {
         </Alert>
       </DialogBody>
       <DialogFooter>
-        <Button size="kira" variant="dialog" class="h-11 flex-1" data-testid="reply-cancel" @click="emit('close')">Cancel</Button>
+        <Button size="kira" variant="dialog" class="h-11 flex-1" data-testid="reply-cancel" @click="emit('close')">{{ t('common.action.cancel.label') }}</Button>
         <Button size="kira"
           variant="dialog-primary"
           class="h-11 flex-1"
@@ -76,7 +77,7 @@ async function send(): Promise<void> {
           data-testid="reply-send"
           @click="send"
         >
-          Send
+          {{ t('common.action.send.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>
