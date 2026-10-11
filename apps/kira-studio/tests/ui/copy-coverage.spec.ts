@@ -40,10 +40,9 @@ import { openSettings } from './support/settings';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // P265: with the pseudo-locale on, every catalog message shows wrapped in ⟦…⟧, so any letter
-// outside a marker is a literal that skipped t(). Fixture names and section ids that the shared
-// SettingsShell prints raw go through `allow`. Surfaces reuse the fixtures of the existing UI specs.
+// outside a marker is a literal that skipped t(). Fixture names go through `allow`. Surfaces reuse the fixtures of the existing UI specs.
 
-const ALLOW: RegExp[] = [...PG_ALLOW, /^(Api|Database MCP)$/];
+const ALLOW: RegExp[] = [...PG_ALLOW];
 const loc = (page: Page, testid: string) => page.locator(`[data-testid="${testid}"]`);
 
 async function pseudo(page: Page): Promise<void> {

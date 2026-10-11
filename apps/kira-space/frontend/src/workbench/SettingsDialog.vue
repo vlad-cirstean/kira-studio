@@ -4,7 +4,8 @@ import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
-import { sections, useSettingsStore } from '../state/settings';
+import { computed } from 'vue';
+import { type Section, sections, useSettingsStore } from '../state/settings';
 import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
@@ -26,6 +27,15 @@ const emit = defineEmits<{ close: [] }>();
 
 const settingsStore = useSettingsStore();
 
+const sectionLabels = computed<Record<Section, string>>(() => ({
+  Appearance: t('common.appearance.label'),
+  Git: t('common.module.git.label'),
+  'Mobile access': t('space.workbench.settingsNav.mobileAccess.label'),
+  'Claude Code': t('common.product.claudeCode.label'),
+  Memory: t('common.module.memory.label'),
+  Advanced: t('common.advanced.label'),
+}));
+
 // §10.1: a later plain open (TitleBar.vue's gear icon) must not inherit a deep link this instance
 // was opened with.
 useSettingsDeepLinkReset(settingsStore);
@@ -37,6 +47,7 @@ async function save(patch: SettingsPatch): Promise<void> {
 
 <template>
   <SettingsShell
+    :section-labels="sectionLabels"
     :sections="sections"
     :initial-section="settingsStore.settingsSection ?? undefined"
     :defaults="{

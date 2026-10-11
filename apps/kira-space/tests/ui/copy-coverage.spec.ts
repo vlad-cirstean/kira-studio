@@ -37,8 +37,6 @@ function fixtureData(): RegExp[] {
   ];
 }
 
-const SECTION_NAMES = /^(Appearance|Git|Mobile access|Claude Code|Memory|Advanced)$/;
-
 async function pseudo(page: Page): Promise<void> {
   await setPseudoLocale(page);
 }
@@ -190,8 +188,7 @@ test('settings dialog, every pane', async ({ relaunch }) => {
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-dialog')).waitFor();
   await pseudo(page);
-  // The section names are data ids in the nav until SettingsShell takes labels (findings file).
-  const allow = [SECTION_NAMES, ...fixtureData()];
+  const allow = fixtureData();
   for (const section of [
     'Appearance',
     'Git',

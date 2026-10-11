@@ -69,6 +69,8 @@ type SectionPatch = { [K in keyof T]?: Partial<T[K]> };
 
 const props = defineProps<{
   sections: readonly string[];
+  /** Display label per section id; the id stays the test hook and deep-link key. */
+  sectionLabels: Readonly<Record<string, string>>;
   initialSection?: string;
   defaults: T;
   current: T;
@@ -201,7 +203,7 @@ async function onSave(): Promise<void> {
             :data-testid="`settings-section-${section}`"
             @click="activeSection = section"
           >
-            {{ section }}
+            {{ sectionLabels[section] }}
           </button>
         </nav>
 

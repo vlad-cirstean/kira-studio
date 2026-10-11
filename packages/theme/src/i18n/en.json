@@ -966,6 +966,12 @@
     "added": {
       "status": "Added"
     },
+    "advanced": {
+      "label": "Advanced"
+    },
+    "appearance": {
+      "label": "Appearance"
+    },
     "body": {
       "label": "Body"
     },
@@ -7048,7 +7054,12 @@
           "hint": "Clears this window’s list only. The log resets when Kira Space quits."
         }
       },
-      "settings": {}
+      "settings": {},
+      "settingsNav": {
+        "mobileAccess": {
+          "label": "Mobile access"
+        }
+      }
     }
   },
   "studio": {
@@ -9693,9 +9704,6 @@
           "label": "SQLite database"
         },
         "tab": {
-          "advanced": {
-            "label": "Advanced"
-          },
           "general": {
             "label": "General"
           },
@@ -10308,6 +10316,17 @@
       "footer": {
         "stored": {
           "status": "Stored in {path}"
+        }
+      },
+      "nav": {
+        "cache": {
+          "label": "Cache"
+        },
+        "data": {
+          "label": "Data"
+        },
+        "databaseMcp": {
+          "label": "Database MCP"
         }
       },
       "range": {

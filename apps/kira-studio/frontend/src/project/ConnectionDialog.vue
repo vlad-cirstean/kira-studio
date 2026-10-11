@@ -165,7 +165,7 @@ watch(step, (s) => {
 
 const DETAIL_TABS = computed<readonly { value: DetailTab; label: string; testid: string }[]>(() => [
   { value: 'General', label: t('studio.project.connectionDialog.tab.general.label'), testid: 'connection-tab-general' },
-  { value: 'Advanced', label: t('studio.project.connectionDialog.tab.advanced.label'), testid: 'connection-tab-advanced' },
+  { value: 'Advanced', label: t('common.advanced.label'), testid: 'connection-tab-advanced' },
   { value: 'Pre-connect', label: t('studio.project.connectionDialog.tab.preconnect.label'), testid: 'connection-tab-preconnect' },
   { value: 'MCP', label: t('common.mcp.label'), testid: 'connection-tab-mcp' },
   { value: 'Privacy', label: t('studio.project.connectionDialog.tab.privacy.label'), testid: 'connection-tab-privacy' },
@@ -1086,7 +1086,7 @@ const preconnectText = computed({
             />
           </Field>
           <p class="text-subtle text-kira-sm leading-normal w-full">
-            {{ t('studio.project.connectionDialog.mcp.strictest.description', { tab: t('studio.project.connectionDialog.tab.advanced.label') }) }}
+            {{ t('studio.project.connectionDialog.mcp.strictest.description', { tab: t('common.advanced.label') }) }}
           </p>
           </TabsContent>
 
