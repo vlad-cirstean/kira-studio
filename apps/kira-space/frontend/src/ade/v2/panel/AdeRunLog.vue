@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import InlineState from '@theme/components/InlineState.vue';
+import { Card } from '@theme/components/ui/card';
 import { useScroll } from '@vueuse/core';
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, useTemplateRef, watch } from 'vue';
 import { useLog } from '../readQueries';
 import type { LogChunk, LogKind } from '../wire';
 
@@ -12,7 +14,8 @@ const log = useLog(
   () => props.kind,
   () => props.id,
 );
-const el = ref<HTMLElement | null>(null);
+const card = useTemplateRef<InstanceType<typeof Card>>('card');
+const el = computed<HTMLElement | null>(() => (card.value?.$el as HTMLElement | undefined) ?? null);
 const { arrivedState } = useScroll(el);
 
 function failed(c: LogChunk): boolean {
@@ -30,18 +33,18 @@ watch(
 </script>
 
 <template>
-  <div
-    ref="el"
-    class="overflow-auto rounded-kira border border-border bg-bg px-2.5 py-2 font-data text-kira-sm leading-relaxed"
+  <Card
+    ref="card"
+    class="gap-0 overflow-auto font-data text-kira-sm leading-relaxed"
     :class="maxHeight ? undefined : 'max-h-60'"
     :style="maxHeight ? { maxHeight } : undefined"
     data-testid="ade-run-log"
     :data-log-id="id"
   >
-    <div v-if="log.isPending.value" class="text-subtle">Loading…</div>
-    <div v-else-if="log.isError.value" class="text-error" data-testid="ade-run-log-error">
+    <InlineState v-if="log.isPending.value" kind="loading">Loading…</InlineState>
+    <InlineState v-else-if="log.isError.value" kind="error" data-testid="ade-run-log-error">
       {{ log.error.value instanceof Error ? log.error.value.message : String(log.error.value) }}
-    </div>
+    </InlineState>
     <template v-else-if="log.data.value">
       <div v-if="log.data.value.truncated" class="text-subtle">… earlier output dropped</div>
       <div v-if="log.data.value.chunks.length === 0" class="text-subtle">No output yet.</div>
@@ -55,5 +58,5 @@ watch(
         >{{ c.text.replace(/\n$/, '') }}</div
       >
     </template>
-  </div>
+  </Card>
 </template>

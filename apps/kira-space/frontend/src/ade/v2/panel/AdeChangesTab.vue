@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import AdeTip from '../AdeTip.vue';
 import { TONE_TAG_CLASS } from '../tones';
 import type { Branch, Commit, DirtyEntry } from '../wire';
 
@@ -79,7 +80,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
         data-testid="ade-changes-commit-row"
       >
         <span class="font-data text-kira-sm text-tone-amber-solid">{{ c.sha }}</span>
-        <span class="truncate" :title="commitTitle(c)">{{ c.message }}</span>
+        <AdeTip :text="commitTitle(c)"><span class="truncate">{{ c.message }}</span></AdeTip>
       </div>
       <div v-if="branch.commitCount > branch.commits.length" class="text-kira-sm text-muted-foreground">
         + {{ branch.commitCount - branch.commits.length }} more

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
+import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -77,7 +79,7 @@ function onMenu(ev: MouseEvent): void {
 }
 const boxClass = computed(() => {
   if (current.value) return 'border-tone-amber-solid/40 bg-tone-amber-solid/5';
-  return 'border-border bg-elevated';
+  return '';
 });
 /** The row of a run line held back by its branch's prepare script. */
 // A failed step that reported detail (reason, conflicted files, last git error) shows it.
@@ -143,8 +145,9 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
 </script>
 
 <template>
-  <div
-    class="flex flex-col gap-1 rounded-kira border px-2.5 py-2"
+  <Card
+    variant="section"
+    class="gap-1 px-2.5 py-2"
     :class="[skipped ? 'opacity-60' : '', boxClass]"
     data-testid="ade-stage-block"
     :data-stage-id="block.stage.id"
@@ -288,7 +291,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     <div
       v-for="row in reviewRows"
       :key="`review-${row.id}`"
-      class="flex h-7 items-center gap-2 rounded-kira-sm bg-bg px-1.5"
+      class="flex min-h-row items-center gap-2 rounded-kira-sm bg-bg px-1.5"
       data-testid="ade-review-row"
       :data-branch-id="row.id"
     >
@@ -309,6 +312,6 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         </TooltipDisabledTrigger>
       </AdeTip>
     </div>
-    <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-stage-block-error">{{ error }}</p>
-  </div>
+    <FieldError v-if="error" data-testid="ade-stage-block-error">{{ error }}</FieldError>
+  </Card>
 </template>

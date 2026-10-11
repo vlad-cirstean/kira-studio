@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { useClipboard } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -240,10 +241,10 @@ function deployNote(d: Deployment): string {
         </h3>
       </div>
       <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
-      <p v-if="setupError" class="m-0 text-kira-sm text-error" data-testid="ade-panel-setup-error">{{ setupError }}</p>
-      <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
+      <FieldError v-if="setupError" data-testid="ade-panel-setup-error">{{ setupError }}</FieldError>
+      <FieldError v-if="ui.actionError[card.task.id]" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
-      </p>
+      </FieldError>
       <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-1">
         <Button variant="dialog"
           v-if="setupFailed"
@@ -317,7 +318,7 @@ function deployNote(d: Deployment): string {
     >
       <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
         <span class="text-kira-sm text-muted-foreground">Branch</span>
-        <div class="flex h-7 min-w-0 items-center gap-2">
+        <div class="flex min-h-row min-w-0 items-center gap-2">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" wide />
           <template v-if="branch.name">
             <a
@@ -338,7 +339,7 @@ function deployNote(d: Deployment): string {
           </template>
         </div>
         <span class="text-kira-sm text-muted-foreground">PR</span>
-        <div class="flex h-7 min-w-0 items-center gap-2" data-testid="ade-branch-pr">
+        <div class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
           <AdeChip :label="pr ? pr.state : 'none'" :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'" wide />
           <template v-if="pr">
             <a
@@ -367,7 +368,7 @@ function deployNote(d: Deployment): string {
         <div
           v-for="i in intoRows"
           :key="i.target"
-          class="flex h-8 items-center gap-2 rounded-kira bg-elevated px-1.5"
+          class="flex min-h-row items-center gap-2 rounded-kira bg-elevated px-1.5"
           data-testid="ade-branch-into"
           :data-target="i.target"
         >
@@ -396,7 +397,7 @@ function deployNote(d: Deployment): string {
         <div
           v-for="d in deployRows"
           :key="d.env"
-          class="flex h-8 items-center gap-2 rounded-kira bg-elevated px-1.5"
+          class="flex min-h-row items-center gap-2 rounded-kira bg-elevated px-1.5"
           data-testid="ade-branch-deploy"
           :data-env="d.env"
         >

@@ -15,7 +15,7 @@ const phones = useMobileTerminalsStore();
 </script>
 
 <template>
-  <div class="flex shrink-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] border-b border-border bg-chrome px-1.5 py-1" data-testid="ade-session-strip">
+  <div class="flex shrink-0 items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-border bg-chrome px-1.5 py-1" data-testid="ade-session-strip">
     <Button
       v-for="v in views"
       :key="v.session.id"

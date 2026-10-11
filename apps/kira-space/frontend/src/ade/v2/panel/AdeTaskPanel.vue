@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed, ref } from 'vue';
@@ -143,9 +144,9 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         </AdeTip>
       </div>
       <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
-      <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
+      <FieldError v-if="ui.actionError[card.task.id]" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
-      </p>
+      </FieldError>
       <AdeAutomationsBlock :task-id="card.task.id" />
       <div
         v-if="card.review"
@@ -160,7 +161,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
     <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
     <div v-else class="flex min-h-0 flex-1 flex-col p-3" data-testid="ade-notes-tab">
       <AdeNotesEditor :notes="card.task.notes" :item-id="card.task.id" @save="saveNotes" />
-      <p v-if="notesError" class="pt-1 text-kira-sm text-error" data-testid="ade-notes-error">{{ notesError }}</p>
+      <FieldError v-if="notesError" class="pt-1" data-testid="ade-notes-error">{{ notesError }}</FieldError>
     </div>
   </AdePanelFrame>
 </template>

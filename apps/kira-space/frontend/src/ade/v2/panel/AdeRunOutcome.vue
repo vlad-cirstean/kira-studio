@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
+import { FieldError } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
 import { copyOrReportError } from '@workbench/util/clipboard';
 import { computed, ref, watch } from 'vue';
@@ -138,7 +140,9 @@ async function copy(): Promise<void> {
     <ul v-if="files.length" class="m-0 flex list-none flex-col gap-0.5 p-0 font-data text-kira-sm" data-testid="ade-outcome-files">
       <li v-for="f in files" :key="f" class="truncate text-tone-red">{{ f }}</li>
     </ul>
-    <pre v-if="outcome?.report?.lastGitError" class="m-0 whitespace-pre-wrap rounded-kira bg-bg px-2 py-1 font-data text-kira-sm text-error" data-testid="ade-outcome-git-error">{{ outcome.report.lastGitError }}</pre>
+    <Card v-if="outcome?.report?.lastGitError" data-testid="ade-outcome-git-error">
+      <FieldError class="whitespace-pre-wrap font-data">{{ outcome.report.lastGitError }}</FieldError>
+    </Card>
     <p v-if="outcome?.report?.tried" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-outcome-tried">
       Tried: {{ outcome.report.tried }}
     </p>
@@ -147,7 +151,7 @@ async function copy(): Promise<void> {
       <span class="text-subtle">{{ short(b.before) }} → {{ short(b.after) }}</span>
       <span v-if="!b.onBase" class="text-tone-amber">not on its base</span>
     </div>
-    <p v-if="copyError" class="m-0 text-kira-sm text-error">{{ copyError }}</p>
+    <FieldError v-if="copyError">{{ copyError }}</FieldError>
     <div v-if="acts?.length" class="flex flex-wrap gap-1.5">
       <AdeTip v-for="a in acts" :key="a.id" :parts="a.tip">
         <Button variant="dialog"

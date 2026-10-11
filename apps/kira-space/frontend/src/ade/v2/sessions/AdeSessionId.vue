@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useClipboard } from '@vueuse/core';
 
 // The Claude session id of a session, full and copyable, for `claude --resume <id>`.
@@ -10,7 +11,12 @@ const { copy, copied } = useClipboard({ copiedDuring: 1500 });
 <template>
   <span class="flex min-w-0 items-center gap-1" data-testid="ade-session-id">
     <template v-if="id">
-      <span class="min-w-0 truncate font-data text-kira-sm" :title="id" data-testid="ade-session-id-text">{{ id }}</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="min-w-0 truncate font-data text-kira-sm" data-testid="ade-session-id-text">{{ id }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ id }}</TooltipContent>
+      </Tooltip>
       <TooltipIconButton
         :icon="copied ? 'check' : 'copy'"
         :label="copied ? 'Copied' : 'Copy session id'"

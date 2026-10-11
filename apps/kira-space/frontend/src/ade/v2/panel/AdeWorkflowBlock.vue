@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -76,7 +77,7 @@ function edit(): void {
         Edit workflows ↗
       </Button>
     </div>
-    <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-workflow-error">{{ error }}</p>
+    <FieldError v-if="error" data-testid="ade-workflow-error">{{ error }}</FieldError>
     <AdeStageMover :card="card" />
     <AdeStageBlock v-for="b in card.blocks" :key="b.stage.id" :block="b" :card="card">
       <template #action>

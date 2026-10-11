@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { useClipboard } from '@vueuse/core';
@@ -41,7 +42,7 @@ function openLink(e: MouseEvent): void {
 <template>
   <span class="text-kira-sm text-muted-foreground">{{ label }}</span>
   <div class="flex min-w-0 flex-col justify-center">
-    <div class="flex h-7 min-w-0 items-center gap-2">
+    <div class="flex min-h-row min-w-0 items-center gap-2">
       <template v-if="text">
         <AdeChip v-if="chip" :label="chip" tone="grey" wide />
         <a
@@ -91,6 +92,6 @@ function openLink(e: MouseEvent): void {
         </Button>
       </template>
     </div>
-    <span v-if="error" class="text-kira-sm text-error" :data-testid="`${id}-error`">{{ error }}</span>
+    <FieldError v-if="error" :data-testid="`${id}-error`">{{ error }}</FieldError>
   </div>
 </template>

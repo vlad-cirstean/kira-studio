@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { computed, ref } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { setupStatus } from '../board/setupStatus';
@@ -56,6 +57,6 @@ async function onRetry(): Promise<void> {
         max-height="160px"
       />
     </ScriptProgress>
-    <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-setup-error">{{ error }}</p>
+    <FieldError v-if="error" data-testid="ade-setup-error">{{ error }}</FieldError>
   </div>
 </template>

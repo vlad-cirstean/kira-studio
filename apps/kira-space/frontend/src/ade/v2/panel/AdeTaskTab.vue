@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -132,7 +133,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         @keydown.enter="commitName"
       />
       <span class="text-kira-sm text-muted-foreground">Status</span>
-      <div class="flex h-7 items-center gap-2">
+      <div class="flex min-h-row items-center gap-2">
         <AdeChip :label="statusLabel" :tone="statusTone" />
         <span class="text-kira-sm text-subtle" data-testid="ade-task-status-why">follows the workflow: {{ why }}</span>
       </div>
@@ -162,7 +163,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
       <AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" />
       <template v-if="!review">
         <span />
-        <div class="flex h-7 items-center gap-2">
+        <div class="flex min-h-row items-center gap-2">
           <Switch
             id="ade-task-parked"
             :model-value="card.parked"
@@ -174,7 +175,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         </div>
       </template>
     </div>
-    <p v-if="fieldError" class="text-kira-sm text-error" data-testid="ade-task-error">{{ fieldError }}</p>
+    <FieldError v-if="fieldError" data-testid="ade-task-error">{{ fieldError }}</FieldError>
 
     <AdeWorkflowBlock v-if="!review && !card.parked" :card="card" />
 
@@ -212,7 +213,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         v-for="row in card.rows"
         :key="row.id"
         variant="ghost"
-        class="h-8 w-full justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
+        class="min-h-row w-full justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
         data-testid="ade-task-branch"
         :data-branch-id="row.id"
         @click="ui.selectBranch(task.id, row.id)"

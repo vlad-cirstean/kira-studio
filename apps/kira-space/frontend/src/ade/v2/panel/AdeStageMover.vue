@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
+import { FieldError } from '@theme/components/ui/field';
 import { computed, ref } from 'vue';
 import { stageMoves } from '../board/stageMoves';
 import type { CardModel } from '../plan/usePlanModel';
@@ -80,6 +81,6 @@ async function move(stageId: string): Promise<void> {
         @click="move(next?.id ?? '')"
       />
     </div>
-    <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-stage-error">{{ error }}</p>
+    <FieldError v-if="error" data-testid="ade-stage-error">{{ error }}</FieldError>
   </div>
 </template>

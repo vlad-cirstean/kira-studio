@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
@@ -132,9 +133,16 @@ function short(sha: string): string {
             {{ result.marked.length + result.unmarked.length === 1 ? 'file' : 'files' }}
             <template v-if="result.failed.length"> · {{ result.failed.length }} failed</template>
           </p>
-          <p v-if="result.status !== 'ok'" class="m-0 text-error">{{ result.message }}</p>
+          <FieldError v-if="result.status !== 'ok'">{{ result.message }}</FieldError>
           <ul v-if="result.failed.length" class="m-0 list-none p-0 text-kira-sm text-error">
-            <li v-for="f in result.failed" :key="f.path" class="truncate" :title="f.error">{{ f.path }} — {{ f.error }}</li>
+            <li v-for="f in result.failed" :key="f.path" class="truncate">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span>{{ f.path }} — {{ f.error }}</span>
+                </TooltipTrigger>
+                <TooltipContent>{{ f.error }}</TooltipContent>
+              </Tooltip>
+            </li>
           </ul>
         </template>
 
@@ -150,14 +158,24 @@ function short(sha: string): string {
           <ul v-else class="m-0 flex max-h-40 list-none flex-col gap-0.5 overflow-auto p-0" data-testid="ade-review-sync-rows">
             <li v-for="f in [...marks, ...unmarks]" :key="f.path" class="flex gap-2">
               <span class="shrink-0 text-muted-foreground">{{ f.action }}</span>
-              <span class="truncate font-data" :title="f.path">{{ f.path }}</span>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span class="truncate font-data">{{ f.path }}</span>
+                </TooltipTrigger>
+                <TooltipContent>{{ f.path }}</TooltipContent>
+              </Tooltip>
             </li>
           </ul>
           <details v-if="skipped.length" data-testid="ade-review-sync-skipped">
             <summary class="cursor-pointer text-kira-sm text-muted-foreground">{{ skipped.length }} skipped</summary>
             <ul class="m-0 mt-1 flex max-h-32 list-none flex-col gap-0.5 overflow-auto p-0 text-kira-sm">
               <li v-for="f in skipped" :key="f.path" class="flex gap-2">
-                <span class="truncate font-data" :title="f.path">{{ f.path }}</span>
+                <Tooltip>
+                <TooltipTrigger as-child>
+                  <span class="truncate font-data">{{ f.path }}</span>
+                </TooltipTrigger>
+                <TooltipContent>{{ f.path }}</TooltipContent>
+              </Tooltip>
                 <span class="shrink-0 text-muted-foreground">{{ REASON[f.reason] ?? f.reason }}</span>
               </li>
             </ul>
@@ -173,7 +191,7 @@ function short(sha: string): string {
             {{ confirmLabel }}
           </Button>
         </template>
-        <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-review-sync-error">{{ error }}</p>
+        <FieldError v-if="error" data-testid="ade-review-sync-error">{{ error }}</FieldError>
       </div>
     </PopoverContent>
   </Popover>

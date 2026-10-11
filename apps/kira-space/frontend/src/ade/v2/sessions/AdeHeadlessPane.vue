@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { useTimeAgo } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
@@ -74,7 +75,7 @@ async function onStop(): Promise<void> {
       <span class="min-w-0 truncate" data-testid="ade-headless-label">{{ status }}</span>
       <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
-    <p v-if="error" class="m-0 px-3 py-1 text-kira-sm text-error" data-testid="ade-session-error">{{ error }}</p>
+    <FieldError v-if="error" class="px-3 py-1" data-testid="ade-session-error">{{ error }}</FieldError>
     <div class="min-h-0 flex-1 overflow-auto p-2">
       <AdeRunLog v-if="view.session.runId" kind="run" :id="view.session.runId" max-height="100%" />
     </div>

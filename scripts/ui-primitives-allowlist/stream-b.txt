@@ -9,23 +9,6 @@ apps/kira-space/frontend/mobile/screens/PlanScreen.vue
 apps/kira-space/frontend/mobile/screens/PlanTaskCard.vue
 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue
 apps/kira-space/frontend/mobile/terminal/KeyBar.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeChangesTab.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeEstimateField.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeLinkRow.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeRunOutcome.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeSetupProgress.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeStageBlock.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeStageMover.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeTaskPanel.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeTaskTab.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdeWorkflowBlock.vue
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewAgentPanel.vue
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewSync.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeHeadlessPane.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeSessionId.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeSessionStrip.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeResultEdge.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeStageGroupNode.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeStageInspector.vue
@@ -48,3 +31,4 @@ permanent U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-rela
 permanent U38 apps/kira-space/frontend/src/ade/v2/plan/AdeActionCell.vue # plan board row geometry (40px / 68px tall) shared with AdeBranchRow and AdeTaskCard, P129 board visual
 permanent U38 apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue # plan board row geometry (40px) shared with AdeActionCell, P129 board visual
 permanent U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
+permanent U25 apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue # failed log line colours run output (stderr), not an error sentence

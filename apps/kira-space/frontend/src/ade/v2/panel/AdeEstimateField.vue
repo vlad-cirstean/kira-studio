@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { computed, ref, watch } from 'vue';
@@ -62,7 +63,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
 
 <template>
   <div class="flex flex-col gap-0.5">
-    <div v-if="locked" class="flex h-7 items-center gap-1.5">
+    <div v-if="locked" class="flex min-h-row items-center gap-1.5">
       <span class="text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
       <Label for="ade-estimate-extend" class="sr-only">Extend estimate</Label>
       <Input
@@ -87,7 +88,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
       </Button>
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
-    <div v-else class="flex h-7 items-center gap-1.5">
+    <div v-else class="flex min-h-row items-center gap-1.5">
       <Label for="ade-est-num" class="sr-only">Estimate</Label>
       <Input
         id="ade-est-num"
@@ -126,6 +127,6 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
       </fieldset>
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
-    <span v-if="error" class="text-kira-sm text-error" data-testid="ade-estimate-error">{{ error }}</span>
+    <FieldError v-if="error" data-testid="ade-estimate-error">{{ error }}</FieldError>
   </div>
 </template>

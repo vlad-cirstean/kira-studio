@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import { useAgentSessionsStore } from '../../state/agentSessions';
@@ -85,7 +86,7 @@ async function focus(): Promise<void> {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="ade-review-agent">
-    <Alert v-if="note" variant="info" class="m-2" data-testid="ade-review-note">
+    <Alert v-if="note" variant="info" strip data-testid="ade-review-note">
       <AlertDescription>{{ note }}</AlertDescription>
     </Alert>
     <template v-if="session && running && view">
@@ -117,6 +118,6 @@ async function focus(): Promise<void> {
         {{ waitingSetup ? 'Starts when ready…' : session ? 'Resume review agent' : 'Start review agent' }}
       </Button>
     </div>
-    <p v-if="error" class="m-0 px-3 pb-2 text-kira-sm text-error" data-testid="ade-review-start-error">{{ error }}</p>
+    <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-review-start-error">{{ error }}</FieldError>
   </div>
 </template>

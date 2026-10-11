@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { onKeyStroke, useTimeoutFn } from '@vueuse/core';
@@ -144,7 +145,7 @@ onUnmounted(() => {
         <TooltipContent>Claude Code is waiting for an answer in its terminal.</TooltipContent>
       </Tooltip>
       <span v-if="status" class="text-kira-sm text-muted-foreground" data-testid="ade-review-status">{{ STATUS_TEXT[status] }}</span>
-      <span v-else-if="error" class="text-kira-sm text-error" data-testid="ade-review-error">{{ error }}</span>
+      <FieldError v-else-if="error" data-testid="ade-review-error">{{ error }}</FieldError>
     </div>
   </div>
 </template>
