@@ -261,13 +261,13 @@ useEventListener(listEl, 'keydown', (e) => {
       </AlertAction>
     </Alert>
 
-    <div ref="listEl" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
-      <RadioGroup
-        class="contents"
-        aria-label="Active environment"
-        :model-value="activeEnvironmentId"
-        @update:model-value="(id) => onSetActive(String(id))"
-      >
+    <RadioGroup
+      class="contents"
+      aria-label="Active environment"
+      :model-value="activeEnvironmentId"
+      @update:model-value="(id) => onSetActive(String(id))"
+    >
+      <div ref="listEl" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
         <div
           v-for="env in displayEnvironments"
           :key="env.id"
@@ -294,6 +294,7 @@ useEventListener(listEl, 'keydown', (e) => {
             <TooltipTrigger as-child>
               <RadioGroupItem
                 :value="env.id"
+                class="after:inset-0"
                 :aria-label="`Active environment: ${env.name}`"
                 data-testid="environment-active"
               />
@@ -351,7 +352,7 @@ useEventListener(listEl, 'keydown', (e) => {
           <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
           <EmptyTitle>No matches</EmptyTitle>
         </Empty>
-      </RadioGroup>
-    </div>
+      </div>
+    </RadioGroup>
   </div>
 </template>

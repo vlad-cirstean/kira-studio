@@ -562,5 +562,5 @@ test('collections — after a restart the tree and the active environment come b
   const active = envs.find((e) => e.isActive);
   expect(active).toBeDefined();
   const activeRow = page.locator(`[data-testid="environment-row"][data-id="${active?.id}"]`);
-  await expect(activeRow.locator('input[type="radio"]')).toBeChecked();
+  await expect(activeRow.locator('[role="radio"]')).toBeChecked();
 });
