@@ -294,7 +294,6 @@ useEventListener(listEl, 'keydown', (e) => {
             <TooltipTrigger as-child>
               <RadioGroupItem
                 :value="env.id"
-                class="after:inset-0"
                 :aria-label="`Active environment: ${env.name}`"
                 data-testid="environment-active"
               />

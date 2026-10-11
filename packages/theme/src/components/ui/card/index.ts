@@ -8,8 +8,9 @@ export { default as CardFooter } from './CardFooter.vue';
 export { default as CardHeader } from './CardHeader.vue';
 export { default as CardTitle } from './CardTitle.vue';
 
-// P263 §2.10. `inset`: a box inside a form, dialog or pane. `section`: a titled block in a detail
-// pane. Children read the variant through the `group/card` data attribute.
+// P263 §2.10. `inset`: a box inside a form, dialog or pane; holds text only, its `bg-field` fill
+// hides an Input, Select or Checkbox. `section`: a titled block in a detail pane; holds controls.
+// Children read the variant through the `group/card` data attribute.
 export const cardVariants = cva('group/card min-w-0', {
   variants: {
     variant: {

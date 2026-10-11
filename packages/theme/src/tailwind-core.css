@@ -87,6 +87,8 @@
   --spacing-control-sm: var(--kira-control-h-sm);
   --spacing-row: var(--kira-row-height);
   --spacing-control-inline: var(--kira-control-inline-h);
+  --spacing-board-row: var(--kira-board-row-h);
+  --spacing-board-row-tall: var(--kira-board-row-h-tall);
   --spacing-bar: var(--kira-bar-h);
   /* P110 B6: deliberate per-bar seams (tokens.css:94-105) -- a plain h-bar would collapse them onto
      one measurement and lose the ability for a single bar to diverge later. */
@@ -107,6 +109,7 @@
   --text-kira-md: var(--kira-t-md);
   --text-kira-lg: var(--kira-t-lg);
   --text-kira-xl: var(--kira-t-xl);
+  --text-kira-touch: var(--kira-t-touch);
 
   --font-data: var(--kira-font-data);
   --font-ui: var(--kira-font-ui);

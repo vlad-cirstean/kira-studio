@@ -73,7 +73,7 @@ const detail = computed(() => {
       <Button
         variant="toolbar"
         size="kira"
-        class="h-control-sm gap-1 px-1.5 text-kira-sm"
+        class="h-control-sm gap-1 px-1.5 text-kira-sm font-normal"
         :class="tone"
         data-testid="claude-usage-status"
       >

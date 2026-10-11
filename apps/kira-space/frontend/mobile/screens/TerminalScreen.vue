@@ -160,7 +160,7 @@ function leave(): void {
       <form class="flex gap-2 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" @submit.prevent="sendCompose">
         <Input
           :model-value="compose"
-          class="h-11 flex-1 text-base"
+          class="h-11 flex-1 text-kira-touch"
           placeholder="Type a message"
           enterkeyhint="send"
           autocapitalize="off"

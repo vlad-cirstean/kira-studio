@@ -106,7 +106,7 @@ export const GRPC_CODE_NAMES: Readonly<Record<number, string>> = {
 /** D14: the status chip's colour — OK is 'ok', a handful of "try again"-shaped codes are 'warn',
  *  everything else (including Canceled, which the app itself only ever produces via Stop) is
  *  'error'. Mirrors statusClass's own four-value vocabulary (domain/http.ts) over .p-chip's existing
- *  ok/warn/err/info variants (P2 F17) — no new colour token (F23). */
+ *  ok/warn/error/info variants (P2 F17) — no new colour token (F23). */
 export function grpcCodeClass(code: number): 'info' | 'ok' | 'warn' | 'error' {
   if (code === 0) return 'ok';
   if (code === 4 || code === 8 || code === 14) return 'warn'; // DeadlineExceeded/ResourceExhausted/Unavailable

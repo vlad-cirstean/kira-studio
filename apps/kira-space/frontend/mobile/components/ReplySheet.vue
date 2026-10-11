@@ -58,7 +58,7 @@ async function send(): Promise<void> {
         <Textarea
           :model-value="message"
           rows="4"
-          class="text-base"
+          class="text-kira-touch"
           data-testid="reply-input"
           @update:model-value="(v) => (message = String(v))"
         />

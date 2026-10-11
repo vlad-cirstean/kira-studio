@@ -45,7 +45,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
 <template>
   <div
     class="flex min-w-0 items-center justify-end gap-1.5"
-    :class="tall ? 'h-17' : 'h-10'"
+    :class="tall ? 'h-board-row-tall' : 'h-board-row'"
     data-testid="ade-action-cell"
   >
     <AdeTip :text="tag.tip" :parts="tag.tipParts">

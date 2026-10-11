@@ -120,7 +120,7 @@ const rowBgClass = computed(() => {
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
   <div
     ref="rowEl"
-    class="group box-border flex h-10 w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
+    class="group box-border flex h-board-row w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
     :class="[
       rowBgClass,
       selected ? 'border-l-focus' : 'border-l-transparent',

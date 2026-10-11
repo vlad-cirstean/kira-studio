@@ -8,9 +8,6 @@
 # Named exemptions (PERMANENT below) cover a real requirement a primitive cannot meet. One that no
 # longer exempts anything fails the run, so the list only shrinks.
 #
-# P263 allowlists (scripts/ui-primitives-allowlist/stream-*.txt): a bare `path` line exempts that file
-# from U22 and later while it is unmigrated; `permanent U<n> path # reason` exempts one guard for
-# good. An entry that exempts nothing fails the run, so each list only shrinks.
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
 
@@ -29,8 +26,6 @@ if [ -z "$GNU_GREP" ]; then
 fi
 
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
-
-ALLOW_DIR=scripts/ui-primitives-allowlist
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -94,6 +89,25 @@ U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px 
 U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
 U27 packages/workbench/src/components/ContextMenu.vue # 10px colour swatch marks a Color submenu choice, it is not a status dot
 U31 packages/workbench/src/components/WorkbenchShell.vue # row-resize cursor held shell-wide while the dock drag runs, the pointer leaves the 2px handle
+U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
+U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
+U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
+U36 apps/kira-studio/frontend/src/project/FiltersDialog.vue # bordered scroll list box (input-like), rows own the look
+U36 apps/kira-studio/frontend/src/views/console/ExplainResultView.vue # bordered plan-tree list container, rows own the look
+U37 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # DOM-built grid cell navigation button hover, no Vue Button
+U36 apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue # SQL statement is a code block (pre), not a content card
+U36 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue # command code block and a bordered connection list item, not content cards
+U37 apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue # density preview renders the unsaved draft; useRowHeight reads the applied CSS var
+U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-zone DOM built outside Vue cannot render Alert, banner tint matches Alert error
+U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
+U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-relative markdown heading scale tracks the Appearance font size, counted anchor in check-theme-classes
+U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
+U25 apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue # failed log line colours run output (stderr), not an error sentence
+U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
+U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
+U25 packages/workbench/src/automations/runs/RunLog.vue # stderr line colour is log data, not chrome
+U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
+U36 packages/workbench/src/components/InlineRenameInput.vue # bare rename input, not a card
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not
@@ -195,36 +209,13 @@ sort -u "$TMP/hits" -o "$TMP/hits"
 sed 's/[[:space:]]*#.*$//' "$TMP/perm" | sort -u >"$TMP/perm_ids"
 mv "$TMP/perm_ids" "$TMP/perm"
 
-# allowlists: `path` (whole file, U22 and later) or `permanent U<n> path # reason`
-: >"$TMP/whole"
-if [ -d "$ALLOW_DIR" ]; then
-  for list in "$ALLOW_DIR"/*.txt; do
-    [ -f "$list" ] || continue
-    while IFS= read -r raw; do
-      entry=$(printf '%s' "$raw" | sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//')
-      if [ -z "$entry" ]; then continue; fi
-      case "$entry" in
-        permanent\ *)
-          # shellcheck disable=SC2086
-          set -- $entry
-          echo "$2 $3" >>"$TMP/perm" ;;
-        *) echo "$entry" >>"$TMP/whole" ;;
-      esac
-    done <"$list"
-  done
-fi
-sort -u "$TMP/whole" -o "$TMP/whole"
 sort -u "$TMP/perm" -o "$TMP/perm"
 
 STATUS=0
 : >"$TMP/used_perm"
-: >"$TMP/used_whole"
 while read -r id f; do
-  num=${id#U}
   if grep -qxF "$id $f" "$TMP/perm"; then
     echo "$id $f" >>"$TMP/used_perm"
-  elif [ "$num" -ge 22 ] && grep -qxF "$f" "$TMP/whole"; then
-    echo "$f" >>"$TMP/used_whole"
   else
     msg=$(grep "^$id@@" "$TMP/guards" | head -1 | awk -F'@@' '{print $4}')
     echo "check-ui-primitives: $f: $id $msg" >&2
@@ -233,19 +224,12 @@ while read -r id f; do
 done <"$TMP/hits"
 
 sort -u "$TMP/used_perm" -o "$TMP/used_perm"
-sort -u "$TMP/used_whole" -o "$TMP/used_whole"
 while read -r id f; do
   if ! grep -qxF "$id $f" "$TMP/used_perm"; then
     echo "check-ui-primitives: stale exemption: $id $f" >&2
     STATUS=1
   fi
 done <"$TMP/perm"
-while read -r f; do
-  if ! grep -qxF "$f" "$TMP/used_whole"; then
-    echo "check-ui-primitives: stale allowlist entry (file passes U22-U38 or is gone): $f" >&2
-    STATUS=1
-  fi
-done <"$TMP/whole"
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md and P263-ui-unification-2.md §2." >&2
