@@ -886,7 +886,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   // status badge above still carries it.
   await expect(page.locator('[data-testid="cell-editor-byte-badge"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText(
-    /\d+( bytes|\.\d+ (KB|MB))/,
+    /\d+( B|\.\d+ (KB|MB))/,
   );
 
   // --- timestamp translate pane (P24 D14/D15/D18/D19) --------------------------------------

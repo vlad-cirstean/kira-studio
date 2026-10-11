@@ -249,10 +249,13 @@ test('a submenu near the right edge flips to open on the left instead of running
   // The bug: the submenu's right edge used to run past the viewport's own right edge here.
   expect(submenuBox.x + submenuBox.width).toBeLessThanOrEqual(viewport.width);
   expect(submenuBox.x).toBeGreaterThanOrEqual(0);
-  // The fix is flip(), not just a clamp: the submenu opens to the trigger's *left*, not merely
-  // squeezed to still fit on the right.
-  expect(submenuBox.x + submenuBox.width).toBeLessThanOrEqual(triggerBox.x + 1);
-  // Every item in the flipped submenu is still reachable, not just its container box.
+  // P264: the top-level menu flips first (prioritize-position), so the submenu now has room on the
+  // trigger's right; either side is fine as long as the menu and submenu stay on-screen.
+  const menuBox = await page.locator('[data-testid="context-menu"]').boundingBox();
+  if (!menuBox) throw new Error('expected a bounding box for the context menu');
+  expect(menuBox.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
+  // Every item in the submenu is still reachable, not just its container box.
   await expect(page.locator('[data-testid="menu-item-color-magenta"]')).toBeVisible();
 });
 
