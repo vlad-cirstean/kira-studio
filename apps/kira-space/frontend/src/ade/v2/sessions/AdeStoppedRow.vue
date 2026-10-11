@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { ref } from 'vue';
 import AdeRunLog from '../panel/AdeRunLog.vue';
@@ -26,7 +27,7 @@ const open = ref(false);
       data-testid="ade-stopped-takeover"
       @click="takeOver.request(view.session.id)"
     >
-      Take over
+      {{ t('common.action.takeOver.label') }}
     </Button>
     <Button
       v-if="view.headless && view.session.runId"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { useConfirmRun } from '../useConfirmRun';
@@ -14,9 +15,9 @@ const { busy, error, confirm } = useConfirmRun(
 <template>
   <ConfirmDialogView
     :open="takeOver.confirm !== null"
-    title="Take over a running run?"
+    :title="t('mobile.needs.takeOverConfirm.title')"
     :message="takeOver.confirm?.text ?? ''"
-    confirm-label="Stop and take over"
+    :confirm-label="t('common.action.takeOver.label')"
     tone="danger"
     :busy="busy"
     :error="error ?? ''"

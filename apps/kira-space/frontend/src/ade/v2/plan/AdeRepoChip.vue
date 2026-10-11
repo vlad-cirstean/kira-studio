@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Toggle } from '@theme/components/ui/toggle';
+import { t } from '@theme/i18n';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useRepoLinksStore } from '../../../repo/state/repoLinks';
@@ -25,11 +26,16 @@ const emit = defineEmits<{ toggle: []; refresh: [] }>();
 
 const ago = useRelativeTime(() => props.lastFetchAt ?? 0);
 const note = computed(() => {
-  if (props.busy) return 'fetching…';
+  if (props.busy) return t('space.ade.plan.repoChip.fetching.loading');
   if (props.error) return props.error;
-  if (props.remote === '') return props.summary ? `no remote · ${props.summary}` : 'no remote';
-  if (props.lastFetchAt === null) return 'never fetched';
-  return props.summary ? `${ago.value} · ${props.summary}` : String(ago.value);
+  if (props.remote === '') {
+    const none = t('space.ade.plan.repoChip.noRemote.status');
+    return props.summary ? t('space.common.dotPair.label', { first: none, second: props.summary }) : none;
+  }
+  if (props.lastFetchAt === null) return t('space.ade.plan.repoChip.neverFetched.status');
+  return props.summary
+    ? t('space.common.dotPair.label', { first: String(ago.value), second: props.summary })
+    : String(ago.value);
 });
 const repoLinks = useRepoLinksStore();
 const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
@@ -43,7 +49,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
     data-testid="ade-repo-chip"
     :data-repo-id="codeRepoId"
   >
-    <AdeTip text="Show or hide this repo">
+    <AdeTip :text="t('space.ade.plan.repoChip.toggle.tooltip')">
       <Toggle
         size="kira"
         class="shrink-0 px-1.5 font-medium"
@@ -62,12 +68,12 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
       data-testid="ade-repo-note"
       >{{ note }}</span
     >
-    <AdeTip :text="remote === '' ? `Rescan ${label} (no remote to fetch)` : `Fetch ${label}`">
+    <AdeTip :text="remote === '' ? t('space.ade.plan.repoChip.rescan.tooltip', { label }) : t('space.ade.plan.repoChip.fetch.tooltip', { label })">
       <Button
         variant="toolbar"
         size="kira-icon"
         :disabled="busy"
-        :aria-label="`Refresh ${label}`"
+        :aria-label="t('space.ade.plan.repoChip.refresh.aria', { label })"
         data-testid="ade-repo-refresh"
         @click="emit('refresh')"
       >

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import AdeStoppedRow from './AdeStoppedRow.vue';
 import type { SessionView } from './sessionView';
 
@@ -12,7 +13,7 @@ defineProps<{ views: SessionView[]; archived?: boolean }>();
     class="flex max-h-37.5 shrink-0 flex-col gap-1 overflow-auto border-t border-border bg-elevated px-3 pb-2.5 pt-2"
     data-testid="ade-stopped-list"
   >
-    <div class="text-kira-sm text-muted-foreground">Finished / stopped</div>
+    <div class="text-kira-sm text-muted-foreground">{{ t('space.ade.sessionList.stopped.label') }}</div>
     <AdeStoppedRow v-for="v in views" :key="v.session.id" :view="v" :archived="archived" />
   </div>
 </template>

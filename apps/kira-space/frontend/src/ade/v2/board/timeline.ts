@@ -22,7 +22,7 @@ import {
 // hours, bands) on the wire types. No clock read: `today` and `localDayOf` are inputs.
 
 /** SPEC2 §4: only the first 10 work items are shown until the user loads the rest. */
-const ITEM_LIMIT = 10;
+export const ITEM_LIMIT = 10;
 
 type TimelineBoard = Pick<Board, 'tasks' | 'branches' | 'plan' | 'pairs' | 'history'>;
 
@@ -459,18 +459,17 @@ export function buildTimeline(input: TimelineInput): TimelineView {
     branchRows,
     bands,
     historyCount,
-    historyButtonLabel: `Load history · ${historyCount} archived ${historyCount === 1 ? 'task' : 'tasks'} in the last ${windowLabel(settings.historyDays)}`,
-    moreButtonLabel: `Load all items · ${hiddenCount} more`,
+    historyButtonLabel: historyLabel(historyCount, settings.historyDays),
+    moreButtonLabel: t('space.ade.plan.view.loadAll.label', { count: hiddenCount }),
     graph,
   };
 }
 
-function windowLabel(days: number): string {
-  if (days % 7 === 0) {
-    const w = days / 7;
-    return w === 1 ? 'week' : `${w} weeks`;
-  }
-  return days === 1 ? 'day' : `${days} days`;
+function historyLabel(count: number, days: number): string {
+  const tasks = t('space.ade.plan.view.archivedTasks.label', { count });
+  return days % 7 === 0
+    ? t('space.ade.plan.view.loadHistoryWeeks.label', { tasks, count: days / 7 })
+    : t('space.ade.plan.view.loadHistoryDays.label', { tasks, count: days });
 }
 
 function historyItems(

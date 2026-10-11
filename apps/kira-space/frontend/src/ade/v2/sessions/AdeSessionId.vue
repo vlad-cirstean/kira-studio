@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 
 // The Claude session id of a session, full and copyable, for `claude --resume <id>`.
@@ -19,11 +20,11 @@ const { copy, copied } = useCopy();
       </Tooltip>
       <TooltipIconButton
         :icon="copied ? 'check' : 'copy'"
-        :label="copied ? 'Copied' : 'Copy session id'"
+        :label="copied ? t('common.copy.copied.announce') : t('common.action.copyId.label')"
         data-testid="ade-session-id-copy"
         @click="copy(props.id)"
       />
     </template>
-    <span v-else class="text-kira-sm text-subtle">waiting for session id</span>
+    <span v-else class="text-kira-sm text-subtle">{{ t('space.ade.sessionList.waitingId.status') }}</span>
   </span>
 </template>

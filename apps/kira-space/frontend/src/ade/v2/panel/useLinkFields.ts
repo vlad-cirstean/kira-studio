@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import { parseGithub } from '../board/panelFacts';
 import { parseJira } from '../jira';
@@ -21,12 +22,12 @@ export function useLinkFields(
 
   async function saveJira(raw: string): Promise<void> {
     const j = parseJira(raw);
-    jiraError.value = j.key ? '' : 'Not a Jira key or link';
+    jiraError.value = j.key ? '' : t('space.ade.link.notJira.error');
     if (j.key) jiraError.value = (await write({ jira: j })) ?? '';
   }
 
   async function saveGithub(raw: string): Promise<void> {
-    githubError.value = parseGithub(raw) ? '' : 'Not a GitHub PR or issue link';
+    githubError.value = parseGithub(raw) ? '' : t('space.ade.link.notGithub.error');
     if (!githubError.value) githubError.value = (await write({ githubUrl: raw })) ?? '';
   }
 

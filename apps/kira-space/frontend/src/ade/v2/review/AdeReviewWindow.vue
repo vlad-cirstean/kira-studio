@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
+import { t } from '@theme/i18n';
 import { tryOnScopeDispose } from '@vueuse/core';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import MainView from '@workbench/components/MainView.vue';
@@ -57,39 +58,39 @@ const right = useLiveSize(
 <template>
   <div v-if="target" class="flex h-full flex-col" data-testid="ade-review-window">
     <TitleBarBase>
-      <span class="truncate text-kira-md text-muted-foreground">Review · {{ target.branch }}</span>
+      <span class="truncate text-kira-md text-muted-foreground">{{ t('space.ade.review.window.title.title', { branch: target.branch }) }}</span>
     </TitleBarBase>
     <AdeReviewHeader :target="target" />
     <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
       <section
         class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${left.size.value}px` }"
-        aria-label="Files to review"
+        :aria-label="t('space.ade.review.window.files.aria')"
         data-testid="ade-review-left"
       >
         <AdeReviewFiles :target="target" @marked="refreshSyncPlan" />
       </section>
       <ResizeHandle
-        label="Resize panel"
+        :label="t('space.ade.panel.resize.label')"
         data-testid="ade-panel-resize-handle"
         :min="LEFT_MIN"
         :max="LEFT_MAX"
         v-bind="left.bind"
       />
-      <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" aria-label="Diffs" data-testid="ade-review-centre">
+      <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" :aria-label="t('space.ade.review.window.diffs.aria')" data-testid="ade-review-centre">
         <div class="h-tabbar min-h-0 shrink-0 overflow-hidden border-b border-border bg-chrome" data-testid="ade-review-tabs">
           <TabStrip />
         </div>
         <div class="min-h-0 flex-1">
           <MainView>
             <template #empty>
-              <p class="m-0 p-4 text-muted-foreground" data-testid="ade-review-empty">Pick a file to see its diff.</p>
+              <p class="m-0 p-4 text-muted-foreground" data-testid="ade-review-empty">{{ t('space.ade.review.window.emptyHint.emptyHint') }}</p>
             </template>
           </MainView>
         </div>
       </section>
       <ResizeHandle
-        label="Resize panel"
+        :label="t('space.ade.panel.resize.label')"
         data-testid="ade-panel-resize-handle"
         direction="reverse"
         :min="RIGHT_MIN"
@@ -99,7 +100,7 @@ const right = useLiveSize(
       <section
         class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${right.size.value}px` }"
-        aria-label="Review agent"
+        :aria-label="t('space.ade.review.agent.label')"
         data-testid="ade-review-right"
       >
         <AdeReviewAgentPanel :target="target" :repo-label="repoLabel" />

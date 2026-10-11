@@ -8,6 +8,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref, watch } from 'vue';
@@ -116,14 +117,14 @@ const send = sending.run;
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
           </svg>
-          Run {{ stage?.name ?? '' }} in the background
+          {{ t('space.ade.runDialog.title.title', { stage: stage?.name ?? '' }) }}
         </DialogTitle>
       </DialogHeader>
       <DialogBody class="flex flex-col gap-3 text-kira-md">
         <div v-if="named.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
           <div v-for="r in named" :key="r.id" class="flex items-center gap-2.5">
             <AdeRepoTag :code-repo-id="r.branch.codeRepoId" :label="r.repo" />
-            <Label :for="`ade-run-branch-${r.id}`" class="whitespace-nowrap text-muted-foreground">branch</Label>
+            <Label :for="`ade-run-branch-${r.id}`" class="whitespace-nowrap text-muted-foreground">{{ t('common.field.branch.label') }}</Label>
             <Input
               :id="`ade-run-branch-${r.id}`"
               v-model="names[r.id]"
@@ -148,12 +149,12 @@ const send = sending.run;
           <Card v-if="smartBody" class="whitespace-pre-wrap font-data text-kira-sm" data-testid="ade-run-smart-body">
             <VarText :parts="smartBody" />
           </Card>
-          <FieldError v-else data-testid="ade-run-smart-missing">This smart script was not found.</FieldError>
+          <FieldError v-else data-testid="ade-run-smart-missing">{{ t('space.ade.runDialog.smartMissing.error') }}</FieldError>
           <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ suffix }}</p>
         </div>
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <Label for="ade-run-message" class="flex-1 text-muted-foreground">Message to Claude</Label>
+            <Label for="ade-run-message" class="flex-1 text-muted-foreground">{{ t('space.ade.claudeDialog.message.label') }}</Label>
             <Button
               v-if="edited"
               variant="toolbar"
@@ -161,7 +162,7 @@ const send = sending.run;
               data-testid="ade-run-reset"
               @click="message = initial"
             >
-              Reset
+              {{ t('common.action.reset.label') }}
             </Button>
           </div>
           <div class="flex flex-col gap-1">
@@ -184,7 +185,7 @@ const send = sending.run;
         </Alert>
       </DialogBody>
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="ade-run-cancel" @click="close">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="ade-run-cancel" @click="close">{{ t('common.action.cancel.label') }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
@@ -193,7 +194,7 @@ const send = sending.run;
           data-testid="ade-run-send"
           @click="send"
         >
-          Run in background
+          {{ t('space.ade.claudeDialog.runInBackground.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

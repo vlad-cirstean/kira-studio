@@ -21,7 +21,7 @@ test('Enter in the capture box files a backlog item and confirms it', async ({ r
   const input = page.locator('[data-testid="ade-capture"]');
   await input.fill('Rate limit exports');
   await input.press('Enter');
-  await expect(page.locator('[data-testid="ade-capture-note"]')).toHaveText('added to backlog');
+  await expect(page.locator('[data-testid="ade-capture-note"]')).toHaveText('Added to backlog');
   await expect(input).toHaveValue('');
   expect(control.log().find((e) => e.channel === IPC.adeTaskAddBacklogItem)?.args).toEqual({
     text: 'Rate limit exports',

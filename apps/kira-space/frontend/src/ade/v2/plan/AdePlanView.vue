@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useElementSize, useScroll } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
@@ -13,7 +14,7 @@ import { dayLabel, firstWork, isoToOffset, nextWork, offsetToIso } from '../boar
 import { dayMenuFor } from '../board/dayMenu';
 import { dropVerdict, shiftPlanArgs } from '../board/dropPlan';
 import { refreshNote, remoteErrorText } from '../board/panelFacts';
-import type { TimelineBand } from '../board/timeline';
+import { ITEM_LIMIT, type TimelineBand } from '../board/timeline';
 import { useRefresh, useSetPlan } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useConfirmRun } from '../useConfirmRun';
@@ -95,9 +96,12 @@ function bandSpans(band: TimelineBand) {
       taskId: s.taskId,
       title: card.title,
       color: card.color,
-      note: `day ${s.dayNumber}/${s.dayCount}${s.merges ? ' · merges' : ''}`,
+      note: t(s.merges ? 'space.ade.plan.view.spanNoteMerges.label' : 'space.ade.plan.view.spanNote.label', {
+        day: s.dayNumber,
+        count: s.dayCount,
+      }),
       merges: s.merges,
-      tip: `continues from ${dayLabel(m.cal, s.startDay)}; click to open`,
+      tip: t('space.ade.plan.view.spanTip.tooltip', { day: dayLabel(m.cal, s.startDay) }),
     };
   });
 }
@@ -105,27 +109,31 @@ function bandSpans(band: TimelineBand) {
 function bandHistory(band: TimelineBand) {
   return band.history.map((h) => ({
     key: h.taskId,
-    how: h.mergedAt ? 'merged · archived' : 'archived',
+    how: h.mergedAt ? t('space.ade.plan.view.mergedArchived.status') : t('space.ade.panel.archived.label'),
     repos: h.codeRepoIds.map(repoLabel).join(' · '),
     title: h.title,
   }));
 }
 
 function overdueNote(band: TimelineBand): string {
-  const n = band.overdueTaskIds.length;
-  return `${n} ${n === 1 ? 'task' : 'tasks'} not merged`;
+  return t('space.ade.plan.view.overdue.status', { count: band.overdueTaskIds.length });
 }
 
 function overflowNote(band: TimelineBand): string {
-  return `${band.overflowHours}h over ${settings.value.workdayHours}h`;
+  return t('space.ade.plan.view.overflow.status', {
+    hours: band.overflowHours,
+    limit: settings.value.workdayHours,
+  });
 }
 
 function overflowLabel(band: TimelineBand): string {
   const m = model.value;
   if (!m) return '';
   const ids = band.overflowTaskIds;
-  const what = ids.length === 1 ? (m.cards.get(ids[0] as string)?.title ?? '') : `${ids.length} tasks`;
-  return `Move to ${dayLabel(m.cal, band.overflowMoveTo)} · ${what}`;
+  const day = dayLabel(m.cal, band.overflowMoveTo);
+  return ids.length === 1
+    ? t('space.ade.plan.view.overflowOne.label', { day, title: m.cards.get(ids[0] as string)?.title ?? '' })
+    : t('space.ade.plan.view.overflowMany.label', { day, count: ids.length });
 }
 
 // ---- plan writes
@@ -183,9 +191,9 @@ function onDayMenu(band: TimelineBand, ev: MouseEvent): void {
         const n = starts.length;
         const toLabel = dayLabel(m.cal, to);
         dayOff.value = {
-          title: `${band.label} is a day off`,
-          text: `Move ${n} ${n === 1 ? 'task' : 'tasks'} planned for that day to ${toLabel}?`,
-          yes: `Move to ${toLabel}`,
+          title: t('space.ade.dayOffConfirm.title'),
+          text: t('space.ade.dayOffConfirm.body', { day: band.label, count: n, to: toLabel }),
+          yes: t('space.common.move.label'),
           ids: starts,
           to,
         };
@@ -288,7 +296,7 @@ function onForcePush(row: BranchRowModel): void {
 
 <template>
   <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg" data-testid="ade-plan">
-    <QueryState :query="boardQuery" :is-empty="() => false" loading-label="Loading board…">
+    <QueryState :query="boardQuery" :is-empty="() => false" :loading-label="t('space.ade.plan.view.loading.loading')">
     <template v-if="model">
       <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
         <AdePlanHeader
@@ -306,7 +314,7 @@ function onForcePush(row: BranchRowModel): void {
         <Alert variant="error" data-testid="ade-plan-error">
           <AlertDescription>{{ planError }}</AlertDescription>
           <AlertAction>
-            <Button variant="link" size="kira" @click="setPlan.reset()">Dismiss</Button>
+            <Button variant="link" size="kira" @click="setPlan.reset()">{{ t('common.action.dismiss.label') }}</Button>
           </AlertAction>
         </Alert>
       </div>
@@ -360,7 +368,7 @@ function onForcePush(row: BranchRowModel): void {
           data-testid="ade-collapse"
           @click="ui.showAllItems = false"
         >
-          Show only the first 10 again
+          {{ t('space.ade.plan.view.collapse.label', { count: ITEM_LIMIT }) }}
         </Button>
       </div>
       </div>
@@ -371,7 +379,6 @@ function onForcePush(row: BranchRowModel): void {
       :title="dayOff?.title ?? ''"
       :message="dayOff?.text ?? ''"
       :confirm-label="dayOff?.yes ?? ''"
-      cancel-label="Leave it"
       tone="primary"
       :busy="dayOffRun.busy.value"
       :error="dayOffRun.error.value ?? ''"

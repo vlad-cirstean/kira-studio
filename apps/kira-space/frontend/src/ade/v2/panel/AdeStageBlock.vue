@@ -152,6 +152,12 @@ const onReview = (branchId: string): void => {
   error.value = '';
   reviewCode.open(props.card.task.id, branchId, null, { onError: (msg) => (error.value = msg) });
 };
+const mainBadge = (b: CardModel['rows'][number]['branch']): string => {
+  const main = mainNameOf(b.codeRepoId);
+  return b.mergedIntoMain
+    ? t('space.ade.progress.stageDone.label', { name: main })
+    : t('space.ade.stageBlock.mainOpen.status', { main });
+};
 const chipClass = (tone: 'muted' | 'stale' | 'unknown'): string => (tone === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
 function logToggleLabel(runId: string): string {
   const open = openLog.value === runId;
@@ -297,11 +303,7 @@ function logToggleLabel(runId: string): string {
       :data-branch-id="row.id"
       @click="ui.selectBranch(card.task.id, row.id)"
     >
-      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-medium" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{
-        t(row.branch.mergedIntoMain ? 'space.ade.stageBlock.mainMerged.status' : 'space.ade.stageBlock.mainOpen.status', {
-          main: mainNameOf(row.branch.codeRepoId),
-        })
-      }}</span>
+      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-medium" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{ mainBadge(row.branch) }}</span>
       <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
         <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{ c.label }}</span>
       </AdeTip>

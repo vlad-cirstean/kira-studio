@@ -90,7 +90,7 @@ describe('step targets and percent', () => {
     expect(p.percent).toBe(50);
     expect(p.label).toBe('Implement 1/3');
     expect(p.barTip).toBe(
-      '1. plan: api ✓\n2. code: api ✓, web-app running\n3. pr: api pending, web-app pending',
+      '1. plan: api ✓\n2. code: api ✓, web-app Running\n3. pr: api Pending, web-app Pending',
     );
   });
 

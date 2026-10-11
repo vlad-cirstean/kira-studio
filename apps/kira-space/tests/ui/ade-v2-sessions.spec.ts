@@ -78,7 +78,7 @@ test('a headless run shows its status bar and log, and Stop sends the run id', a
   const { window: page, control } = await openPlan(relaunch);
   await openSessions(page, 'T_bill');
   await page.locator(t('ade-session-tab-b1c2')).click();
-  await expect(page.locator(t('ade-headless-label'))).toContainText('headless run · step');
+  await expect(page.locator(t('ade-headless-label'))).toContainText('Background run · step');
   await expect(page.locator(t('ade-run-log-line')).first()).toBeVisible();
   await page.locator(t('ade-session-stop')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStopRun)).toHaveLength(1);
@@ -93,14 +93,14 @@ test('Take over of a running run confirms, stops it and selects the resumed sess
   await page.locator(t('ade-session-tab-9d10')).click();
   await page.locator(t('ade-session-takeover')).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('Take over a running run?');
+  await expect(dialog).toContainText('Take over run?');
   await expect(dialog).toContainText(
     'is still running on feat/billing-dashboard. Taking over stops it first; it becomes stuck and continues in Claude Code.',
   );
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   expect(calls(control, IPC.adeTaskTakeOver)).toHaveLength(0);
   await page.locator(t('ade-session-takeover')).click();
-  await page.getByRole('button', { name: 'Stop and take over' }).click();
+  await page.locator(t('ade-confirm-yes')).click();
   await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskTakeOver)[0]?.args).toEqual({
     sessionId: '9d10',
@@ -161,6 +161,6 @@ test('Show focuses the window holding the terminal, or says none does', async ({
   await expect.poll(() => calls(control, IPC.adeTaskFocusSession)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskFocusSession)[0]?.args).toMatchObject({ sessionId: 'tk01' });
   await expect(page.locator(t('ade-tui-missing'))).toHaveText(
-    "This session's terminal is not open in any window.",
+    'This session’s terminal is not open in any window.',
   );
 });

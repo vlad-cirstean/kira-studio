@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { useFocus, useTimeoutFn } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
@@ -50,11 +51,11 @@ const { start: armHint, stop: stopHint } = useTimeoutFn(
   { immediate: false },
 );
 
-const STATUS_TEXT: Record<Exclude<Status, ''>, string> = {
-  sent: 'Sent',
-  answering: 'Answering…',
-  noSubmit: 'Claude Code did not take the message; press Enter in its terminal.',
-};
+const STATUS_TEXT = {
+  sent: 'space.ade.review.compose.sent.status',
+  answering: 'space.ade.review.compose.answering.loading',
+  noSubmit: 'space.ade.review.compose.noSubmit.hint',
+} as const satisfies Record<Exclude<Status, ''>, MessageKey>;
 
 async function send(): Promise<void> {
   if (!canSend.value) return;
@@ -117,7 +118,7 @@ onUnmounted(() => {
         v-if="store.asked"
         variant="toolbar"
         size="kira"
-        aria-label="Drop the code reference"
+        :aria-label="t('space.ade.review.compose.dropReference.aria')"
         data-testid="ade-review-reference-clear"
         @click="store.asked = null"
       >
@@ -128,20 +129,20 @@ onUnmounted(() => {
       ref="box"
       v-model="store.draft"
       rows="3"
-      placeholder="Ask about this branch"
-      aria-label="Question for the review agent"
+      :placeholder="t('space.ade.review.compose.question.placeholder')"
+      :aria-label="t('space.ade.review.compose.question.aria')"
       data-testid="ade-review-question"
     />
     <div class="flex items-center gap-2">
       <Tooltip :disabled="!blocked">
         <TooltipTrigger as-child>
           <span>
-            <Button variant="dialog" size="kira" :disabled="!canSend" data-testid="ade-review-send" @click="send">Send</Button>
+            <Button variant="dialog" size="kira" :disabled="!canSend" data-testid="ade-review-send" @click="send">{{ t('common.action.send.label') }}</Button>
           </span>
         </TooltipTrigger>
-        <TooltipContent>Claude Code is waiting for an answer in its terminal.</TooltipContent>
+        <TooltipContent>{{ t('space.ade.review.compose.blocked.tooltip') }}</TooltipContent>
       </Tooltip>
-      <span v-if="status" class="text-kira-sm text-muted-foreground" data-testid="ade-review-status">{{ STATUS_TEXT[status] }}</span>
+      <span v-if="status" class="text-kira-sm text-muted-foreground" data-testid="ade-review-status">{{ t(STATUS_TEXT[status]) }}</span>
       <FieldError v-else-if="error" data-testid="ade-review-error">{{ error }}</FieldError>
     </div>
   </div>

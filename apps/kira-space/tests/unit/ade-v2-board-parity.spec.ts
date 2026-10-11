@@ -219,8 +219,8 @@ describe('per task', () => {
     for (const t of tasks().filter((x) => x.kind === 'task')) {
       const p = progress.get(t.id) as TaskProgress;
       const phase = boxOf(t.id).rows[0].phase;
-      expect([t.id, p.workflowTip]).toEqual([t.id, phase.tip]);
-      if (p.showBar) expect([t.id, p.barTip]).toEqual([t.id, phase.barTip]);
+      expect([t.id, lc(p.workflowTip)]).toEqual([t.id, lc(phase.tip)]);
+      if (p.showBar) expect([t.id, lc(p.barTip)]).toEqual([t.id, lc(phase.barTip)]);
     }
   });
 });

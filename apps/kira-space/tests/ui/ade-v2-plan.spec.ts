@@ -126,9 +126,9 @@ test('a repo without a remote reads no remote, never an error', async ({ relaunc
   ]);
   const chip = page.locator('[data-testid="ade-repo-chip"][data-repo-id="repo-mobile"]');
   const note = chip.locator('[data-testid="ade-repo-note"]');
-  await expect(note).toHaveText('no remote');
+  await expect(note).toHaveText('No remote');
   await chip.locator('[data-testid="ade-repo-refresh"]').click();
-  await expect(note).toHaveText('no remote · no changes');
+  await expect(note).toHaveText('No remote · No changes');
   await expect(note).not.toHaveClass(/text-tone-red/);
 });
 
@@ -156,7 +156,7 @@ test('dragging a card to another day writes the plan once, with no dialog', asyn
   await expect(page.locator('[data-testid="ade-confirm-dialog"]')).toHaveCount(0);
 });
 
-test('the day-off confirm names its cancel button "Leave it" and Escape leaves the plan alone', async ({
+test('the day-off confirm says what moves, offers Cancel and Escape leaves the plan alone', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openPlan(relaunch);
@@ -165,7 +165,9 @@ test('the day-off confirm names its cancel button "Leave it" and Escape leaves t
   await bandOf(page, 0).locator('[data-testid="ade-band-label"]').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-ade-day-toggle"]').click();
   const dialog = page.locator('[data-testid="ade-confirm-dialog"]');
-  await expect(dialog.locator('[data-testid="ade-confirm-no"]')).toHaveText('Leave it');
+  await expect(dialog).toContainText('Move tasks?');
+  await expect(dialog.locator('[data-testid="ade-confirm-no"]')).toHaveText('Cancel');
+  await expect(dialog.locator('[data-testid="ade-confirm-yes"]')).toHaveText('Move');
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   expect(control.log().filter((e) => e.channel === IPC.adeTaskSetPlan)).toHaveLength(0);
@@ -278,8 +280,8 @@ test('contract: before a refresh the repo with a remote was never fetched, the o
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: boardWithStates('before') },
   ]);
-  await expect(repoNote(page, 'repo-api')).toHaveText('never fetched');
-  await expect(repoNote(page, 'repo-mobile')).toHaveText('no remote');
+  await expect(repoNote(page, 'repo-api')).toHaveText('Never fetched');
+  await expect(repoNote(page, 'repo-mobile')).toHaveText('No remote');
 });
 
 test('contract: Refresh all fetches a repo with a remote and rescans one without', async ({
@@ -298,6 +300,6 @@ test('contract: Refresh all fetches a repo with a remote and rescans one without
   ]);
   await page.locator('[data-testid="ade-refresh-all"]').click();
   await expect(repoNote(page, 'repo-api')).toContainText('1 ref');
-  await expect(repoNote(page, 'repo-mobile')).toHaveText('no remote · no changes');
+  await expect(repoNote(page, 'repo-mobile')).toHaveText('No remote · No changes');
   await expect(page.locator('[data-testid="ade-repo-note"].text-tone-red')).toHaveCount(0);
 });

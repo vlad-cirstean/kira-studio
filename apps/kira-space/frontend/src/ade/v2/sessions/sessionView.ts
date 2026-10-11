@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { type ActivityKind, activityKind, shortId } from '../activity';
 import type { Branch, Run, Session, Task, Workflow } from '../wire';
 
@@ -62,16 +63,20 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const workflow = task?.workflow ?? look.workflow(task?.workflowId ?? '');
   const step = headless ? stepNameOf(workflow, s.stepId) : '';
   const run = task?.runs.find((r) => r.id === s.runId) ?? null;
-  const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : 'spec';
+  const specLabel = t('space.ade.needs.scope.spec.label');
+  const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : specLabel;
   const id = shortId(s.id);
   const review = s.purpose === 'review';
   const stage = stageNameOf(workflow, task, s.stageId);
   const named = (...parts: string[]): string => parts.filter(Boolean).join(' · ');
+  const reviewAgent = t('space.ade.review.agent.label');
+  const resumed = (name: string): string =>
+    s.resumes ? t('space.ade.sessionList.resumed.label', { name }) : name;
   const tabName = review
-    ? 'Review agent'
+    ? reviewAgent
     : headless
       ? named(stage, step, repo)
-      : named(stage || `claude ${id}`, repo || 'spec') + (s.resumes ? ' (resumed)' : '');
+      : resumed(named(stage || t('space.common.claudeSession.label', { id }), repo || specLabel));
   return {
     session: s,
     kind: activityKind(s),
@@ -84,15 +89,15 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     tabName,
     badge: headless ? 'claude -p' : 'TUI',
     stoppedLabel: review
-      ? `TUI · review agent · ${id}`
+      ? `TUI · ${reviewAgent} · ${id}`
       : `${headless ? named(stage, step) : named('TUI', stage)} · ${scope} · ${id}`,
     allLabel: review
-      ? 'TUI · review agent'
+      ? `TUI · ${reviewAgent}`
       : headless
         ? named('claude -p', stage, step)
         : s.branchId
-          ? named('TUI', stage, 'interactive')
-          : named('TUI', stage, 'spec session'),
+          ? named('TUI', stage, t('space.ade.sessionList.interactive.label'))
+          : named('TUI', stage, t('space.ade.sessionList.specSession.label')),
   };
 }
 

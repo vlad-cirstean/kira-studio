@@ -335,9 +335,9 @@ export function buildNeedsYou(i: NeedsYouInput): NeedsYou {
     badge: items.length,
     backgroundRuns,
     interactiveSessions,
-    footer: t('space.ade.needs.footer.label', {
-      runs: t('space.ade.needs.backgroundRuns.label', { count: backgroundRuns }),
-      sessions: t('space.ade.needs.interactiveSessions.label', { count: interactiveSessions }),
+    footer: t('space.common.dotPair.label', {
+      first: t('space.ade.needs.backgroundRuns.label', { count: backgroundRuns }),
+      second: t('space.ade.needs.interactiveSessions.label', { count: interactiveSessions }),
     }),
   };
 }

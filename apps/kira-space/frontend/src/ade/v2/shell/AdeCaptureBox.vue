@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { useTimeoutFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
@@ -25,7 +26,7 @@ async function onEnter(): Promise<void> {
   try {
     await add.mutateAsync({ text: value });
     text.value = '';
-    note.value = 'added to backlog';
+    note.value = t('space.ade.backlog.added.announce');
   } catch (err) {
     note.value = errorText(err);
   }
@@ -35,11 +36,11 @@ async function onEnter(): Promise<void> {
 
 <template>
   <div class="flex items-center gap-2">
-    <Label for="ade-capture" class="sr-only">Add to backlog</Label>
+    <Label for="ade-capture" class="sr-only">{{ t('space.ade.backlog.add.label') }}</Label>
     <Input
       id="ade-capture"
       v-model="text"
-      placeholder="+ Add to backlog… (Enter)"
+      :placeholder="t('space.ade.backlog.add.placeholder')"
       size="kira-lg"
       class="w-72"
       data-testid="ade-capture"

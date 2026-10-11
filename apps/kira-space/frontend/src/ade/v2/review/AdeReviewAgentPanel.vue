@@ -2,6 +2,7 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
@@ -93,14 +94,14 @@ async function focus(): Promise<void> {
     <template v-if="session && running && view">
       <AdeTuiPane v-if="here" :view="view" class="min-h-0 flex-1" />
       <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-review-elsewhere">
-        <p class="m-0">Review agent is open in another window</p>
-        <Button variant="dialog" size="kira" data-testid="ade-review-focus" @click="focus">Focus</Button>
-        <p v-if="missing" class="m-0 text-muted-foreground">That window is gone.</p>
+        <p class="m-0">{{ t('space.ade.review.agent.elsewhere.hint') }}</p>
+        <Button variant="dialog" size="kira" data-testid="ade-review-focus" @click="focus">{{ t('space.ade.review.agent.focus.label') }}</Button>
+        <p v-if="missing" class="m-0 text-muted-foreground">{{ t('space.ade.review.agent.gone.hint') }}</p>
       </div>
       <AdeReviewCompose :target="target" :repo-label="repoLabel" :session="session" />
     </template>
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-review-start-box">
-      <p class="m-0 text-muted-foreground">Ask questions about this branch in a Claude Code session.</p>
+      <p class="m-0 text-muted-foreground">{{ t('space.ade.review.agent.intro.hint') }}</p>
       <AdeSetupProgress
         v-for="b in setups"
         :key="b.id"
@@ -116,7 +117,7 @@ async function focus(): Promise<void> {
         data-testid="ade-review-start"
         @click="start"
       >
-        {{ waitingSetup ? 'Starts when ready…' : session ? 'Resume review agent' : 'Start review agent' }}
+        {{ waitingSetup ? t('space.ade.claudeDialog.startsWhenReady.loading') : session ? t('space.ade.review.agent.resume.label') : t('space.ade.review.agent.start.label') }}
       </Button>
     </div>
     <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-review-start-error">{{ error }}</FieldError>

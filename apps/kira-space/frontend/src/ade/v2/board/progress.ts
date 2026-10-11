@@ -1,3 +1,5 @@
+import { type MessageKey, t } from '@theme/i18n';
+import { runStateLabel } from '../runState';
 import type {
   Branch,
   OnFailure,
@@ -291,7 +293,7 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
   });
   const label =
     finished || !stage
-      ? 'Done'
+      ? t('space.common.status.done.status')
       : stage.name + (stage.kind === 'agent' ? ` ${doneSteps}/${steps.length}` : '');
   const nick = (id: string): string => i.repoNick(i.branch(id)?.codeRepoId ?? '');
   return {
@@ -308,21 +310,36 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
     percent: Math.round(frac * 100),
     tone: finished ? 'green' : bad ? 'red' : 'amber',
     barTip: steps
-      .map(
-        (s) =>
-          `${s.n}. ${s.name}: ${s.runs
-            .map((r) => {
-              const mid = r.state === 'done' ? '✓' : r.state;
-              return `${nick(r.branchId)} ${mid}`;
-            })
-            .join(', ')}`,
+      .map((s) =>
+        t('space.ade.progress.tipLine.tooltip', {
+          n: s.n,
+          name: s.name,
+          detail: s.runs
+            .map((r) =>
+              t('space.ade.progress.barTipRun.label', {
+                nick: nick(r.branchId),
+                state: r.state === 'done' ? '✓' : runStateLabel(r.state),
+              }),
+            )
+            .join(', '),
+        }),
       )
       .join('\n'),
-    workflowTip: `${workflow?.name ?? task.workflowId}: ${stages
-      .map((s, k) => `${k < idx ? '✓ ' : k === idx ? '▸ ' : ''}${s.name} (${s.kind})`)
-      .join(' › ')}`,
+    workflowTip: t('theme.varText.aria', {
+      name: workflow?.name ?? task.workflowId,
+      value: stages
+        .map((s, k) => `${k < idx ? '✓ ' : k === idx ? '▸ ' : ''}${stageKindLabel(s)}`)
+        .join(' › '),
+    }),
   };
 }
+
+const STAGE_KIND = {
+  agent: 'space.ade.progress.stageAgent.label',
+  script: 'space.ade.progress.stageScript.label',
+  user: 'space.ade.progress.stageUser.label',
+} as const satisfies Record<Stage['kind'], MessageKey>;
+const stageKindLabel = (s: Stage): string => t(STAGE_KIND[s.kind], { name: s.name });
 
 export type BranchSegState = 'done' | 'running' | 'bad' | 'pending';
 
@@ -354,28 +371,39 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
   let label: string;
   let tone: BranchProgress['tone'] = 'amber';
   if (!pos) {
-    label = `${stage.name} ✓`;
+    label = t('space.ade.progress.stageDone.label', { name: stage.name });
     tone = 'green';
   } else if (pos.run.state === 'back') {
     label =
       pos.run.route === 'retry'
-        ? `${pos.step.name} · ${pos.run.note}`
-        : `${pos.step.name} ↩ sent back`;
+        ? t('space.common.dotPair.label', { first: pos.step.name, second: pos.run.note })
+        : t('space.ade.progress.sentBack.label', { step: pos.step.name });
   } else {
-    const suffix = { stuck: ' · stuck', failed: ' · failed', pending: ' · waiting' } as Record<
-      string,
-      string
-    >;
-    label =
-      pos.step.name +
-      (pos.run.loops ? ` · fix ${pos.run.loops}` : '') +
-      (suffix[pos.run.state] ?? '');
+    const base = pos.run.loops
+      ? t('space.ade.progress.fix.label', { step: pos.step.name, count: pos.run.loops })
+      : pos.step.name;
+    if (pos.run.state === 'stuck') label = t('space.ade.progress.stuck.label', { step: base });
+    else if (pos.run.state === 'failed') label = t('space.common.nameFailed.label', { name: base });
+    else if (pos.run.state === 'pending')
+      label = t('space.ade.progress.waiting.label', { step: base });
+    else label = base;
     if (pos.run.state === 'stuck' || pos.run.state === 'failed') tone = 'red';
     else if (pos.run.state === 'pending') tone = 'grey';
   }
   const tip = own
-    .map(
-      ({ step, run }) => `${step.n}. ${step.name}: ${run.state}${run.note ? ` (${run.note})` : ''}`,
+    .map(({ step, run }) =>
+      run.note
+        ? t('space.ade.progress.tipLineNote.tooltip', {
+            n: step.n,
+            name: step.name,
+            state: runStateLabel(run.state),
+            note: run.note,
+          })
+        : t('space.ade.progress.tipLine.tooltip', {
+            n: step.n,
+            name: step.name,
+            detail: runStateLabel(run.state),
+          }),
     )
     .join('\n');
   return { segments, label, tone, tip };

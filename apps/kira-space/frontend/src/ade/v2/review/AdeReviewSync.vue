@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { remoteErrorText } from '../board/panelFacts';
@@ -22,13 +23,21 @@ const open = ref(false);
 const result = ref<GhSyncResult | null>(null);
 const error = ref('');
 
-const REASON: Record<string, string> = {
-  notReviewed: 'not reviewed',
-  partial: 'partly reviewed',
-  changedSinceReview: 'changed since review',
-  differsFromPrHead: 'differs from the PR head',
-  notInPr: 'not in the PR',
-};
+const REASON = {
+  notReviewed: 'space.ade.review.sync.notReviewed.status',
+  partial: 'space.ade.review.sync.partial.status',
+  changedSinceReview: 'space.ade.review.sync.changedSinceReview.status',
+  differsFromPrHead: 'space.ade.review.sync.differsFromPrHead.status',
+  notInPr: 'space.ade.review.sync.notInPr.status',
+} as const satisfies Record<string, MessageKey>;
+const reasonText = (reason: string): string =>
+  reason in REASON ? t(REASON[reason as keyof typeof REASON]) : reason;
+const ACTION = {
+  mark: 'space.ade.review.sync.mark.label',
+  unmark: 'space.ade.review.sync.unmark.label',
+} as const satisfies Record<string, MessageKey>;
+const actionText = (action: string): string =>
+  action in ACTION ? t(ACTION[action as keyof typeof ACTION]) : action;
 
 const data = computed(() => plan.data.value);
 const status = computed(() => data.value?.status);
@@ -45,13 +54,13 @@ const prNumber = computed(() => data.value?.pr?.number ?? 0);
 const blockedMessage = computed(() => {
   if (loadFailed.value) {
     const e = plan.error.value;
-    return `Could not load the sync plan: ${errorText(e)}`;
+    return t('space.ade.review.sync.loadFailed.error', { error: errorText(e) });
   }
   switch (status.value) {
     case 'prClosed':
-      return data.value?.message ?? `PR #${prNumber.value} is closed`;
+      return data.value?.message ?? t('space.ade.review.sync.prClosed.tooltip', { number: prNumber.value });
     case 'ghMissing':
-      return 'Install the GitHub CLI (gh)';
+      return t('space.ade.review.sync.ghMissing.tooltip');
     case 'unauthenticated':
     case 'unavailable':
       return data.value?.message ?? '';
@@ -67,8 +76,10 @@ const headDiffers = computed(
 const confirmLabel = computed(() => {
   const m = marks.value.length;
   const u = unmarks.value.length;
-  const markPart = `Mark ${m} ${m === 1 ? 'file' : 'files'} viewed on PR #${prNumber.value}`;
-  return u > 0 ? `${markPart}, unmark ${u}` : markPart;
+  const pr = prNumber.value;
+  return u > 0
+    ? t('space.ade.review.sync.confirmUnmark.label', { count: m, pr, unmarked: u })
+    : t('space.ade.review.sync.confirm.label', { count: m, pr });
 });
 
 async function confirm(): Promise<void> {
@@ -112,7 +123,7 @@ function short(sha: string): string {
         <span>
           <PopoverTrigger as-child>
             <Button variant="dialog" size="kira" :disabled="blocked" data-testid="ade-review-sync">
-              Sync to GitHub{{ loadFailed ? '' : ` · ${count}` }}
+              {{ loadFailed ? t('space.ade.review.sync.button.label') : t('space.ade.review.sync.buttonCount.label', { count }) }}
             </Button>
           </PopoverTrigger>
         </span>
@@ -122,24 +133,26 @@ function short(sha: string): string {
     <PopoverContent class="w-96 text-kira-md" align="end" data-testid="ade-review-sync-popover">
       <div class="flex flex-col gap-2">
         <p v-if="data?.account" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-account">
-          Syncing as {{ data.account }}
+          {{ t('space.ade.review.sync.account.label', { account: data.account }) }}
         </p>
         <p v-if="headDiffers && data" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-head">
-          PR head {{ short(data.headSha) }} ≠ local {{ short(data.localTip) }}
+          {{ t('space.ade.review.sync.headDiffers.label', { head: short(data.headSha), local: short(data.localTip) }) }}
         </p>
 
         <template v-if="result">
           <p class="m-0" data-testid="ade-review-sync-result">
-            Synced {{ result.marked.length + result.unmarked.length }}
-            {{ result.marked.length + result.unmarked.length === 1 ? 'file' : 'files' }}
-            <template v-if="result.failed.length"> · {{ result.failed.length }} failed</template>
+            {{
+              result.failed.length
+                ? t('space.ade.review.sync.syncedFailed.status', { count: result.marked.length + result.unmarked.length, failed: result.failed.length })
+                : t('space.ade.review.sync.synced.status', { count: result.marked.length + result.unmarked.length })
+            }}
           </p>
           <FieldError v-if="result.status !== 'ok'">{{ result.message }}</FieldError>
           <ul v-if="result.failed.length" class="m-0 list-none p-0 text-kira-sm text-error">
             <li v-for="f in result.failed" :key="f.path" class="truncate">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span>{{ f.path }} — {{ f.error }}</span>
+                  <span>{{ t('space.common.dashPair.label', { first: f.path, second: f.error }) }}</span>
                 </TooltipTrigger>
                 <TooltipContent>{{ f.error }}</TooltipContent>
               </Tooltip>
@@ -150,15 +163,15 @@ function short(sha: string): string {
         <template v-else-if="status === 'headNotFetched'">
           <p class="m-0" data-testid="ade-review-sync-message">{{ data?.message }}</p>
           <Button variant="dialog" size="kira" :disabled="refresh.isPending.value" data-testid="ade-review-sync-refresh" @click="refreshRepo">
-            Refresh repo
+            {{ t('space.ade.review.sync.refreshRepo.label') }}
           </Button>
         </template>
 
         <template v-else>
-          <p v-if="count === 0" class="m-0" data-testid="ade-review-sync-nothing">Nothing to sync</p>
+          <p v-if="count === 0" class="m-0" data-testid="ade-review-sync-nothing">{{ t('space.ade.review.sync.nothing.empty') }}</p>
           <ul v-else class="m-0 flex max-h-40 list-none flex-col gap-0.5 overflow-auto p-0" data-testid="ade-review-sync-rows">
             <li v-for="f in [...marks, ...unmarks]" :key="f.path" class="flex gap-2">
-              <span class="shrink-0 text-muted-foreground">{{ f.action }}</span>
+              <span class="shrink-0 text-muted-foreground">{{ actionText(f.action) }}</span>
               <Tooltip>
                 <TooltipTrigger as-child>
                   <span class="truncate font-data">{{ f.path }}</span>
@@ -168,7 +181,7 @@ function short(sha: string): string {
             </li>
           </ul>
           <details v-if="skipped.length" data-testid="ade-review-sync-skipped">
-            <summary class="cursor-pointer text-kira-sm text-muted-foreground">{{ skipped.length }} skipped</summary>
+            <summary class="cursor-pointer text-kira-sm text-muted-foreground">{{ t('memory.import.totals.skipped.label', { count: skipped.length }) }}</summary>
             <ul class="m-0 mt-1 flex max-h-32 list-none flex-col gap-0.5 overflow-auto p-0 text-kira-sm">
               <li v-for="f in skipped" :key="f.path" class="flex gap-2">
                 <Tooltip>
@@ -177,7 +190,7 @@ function short(sha: string): string {
                 </TooltipTrigger>
                 <TooltipContent>{{ f.path }}</TooltipContent>
               </Tooltip>
-                <span class="shrink-0 text-muted-foreground">{{ REASON[f.reason] ?? f.reason }}</span>
+                <span class="shrink-0 text-muted-foreground">{{ reasonText(f.reason) }}</span>
               </li>
             </ul>
           </details>

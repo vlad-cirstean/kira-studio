@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import type { Ripple } from '../board/timeline';
 import AdeRepoChip from './AdeRepoChip.vue';
@@ -24,7 +25,7 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
 <template>
   <div data-testid="ade-plan-header">
     <PanelHeader>
-      Plan
+      {{ t('space.common.plan.label') }}
       <template #actions>
         <Button
           variant="dialog"
@@ -34,7 +35,7 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
           @click="emit('refreshAll')"
         >
           <CodiconIcon name="refresh" :size="12" />
-          {{ allBusy ? 'Refreshing…' : 'Refresh all' }}
+          {{ allBusy ? t('space.ade.plan.header.refreshing.loading') : t('space.ade.plan.header.refreshAll.label') }}
         </Button>
       </template>
     </PanelHeader>
@@ -47,7 +48,7 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
         @refresh="emit('refreshOne', r.codeRepoId)"
       />
       <span v-if="ripple" class="flex items-center gap-1.5 text-kira-sm" data-testid="ade-ripple">
-        <span class="text-muted-foreground">On merge</span>
+        <span class="text-muted-foreground">{{ t('space.ade.plan.header.onMerge.label') }}</span>
         <span
 :class="ripple.tone === 'amber' ? 'text-tone-amber' : 'text-subtle'"
           >{{ ripple.text }}</span

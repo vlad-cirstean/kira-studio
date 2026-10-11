@@ -277,7 +277,7 @@ describe('ripple', () => {
     const r = rippleOf(v, { kind: 'task', id: 'a' });
     expect(r.branchIds.sort()).toEqual(['b_kid', 'b_sharer']);
     expect(r.taskIds.sort()).toEqual(['kid', 'sharer']);
-    expect(r.text).toBe('rebase b_kid, b_sharer');
+    expect(r.text).toBe('Rebase b_kid, b_sharer');
     expect(rippleOf(v, { kind: 'task', id: 'sharer' }).text).toBe('Nothing to rebase');
   });
 

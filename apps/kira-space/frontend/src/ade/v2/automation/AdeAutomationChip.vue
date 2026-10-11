@@ -25,7 +25,7 @@ const tone = computed(() => {
 const label = computed(() => {
   const name = run.value?.scriptName ?? '';
   const state = run.value?.state;
-  if (state === 'failed') return t('space.ade.automation.chipFailed.label', { name });
+  if (state === 'failed') return t('space.common.nameFailed.label', { name });
   return state === 'blocked' ? t('space.ade.automation.chipBlocked.label', { name }) : name;
 });
 const tip = computed(() => (run.value ? runReason(run.value) || run.value.scriptName : ''));

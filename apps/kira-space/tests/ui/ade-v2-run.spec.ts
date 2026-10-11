@@ -142,10 +142,10 @@ test('a pushed runs event updates the step line', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_bill');
   const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
-  await expect(line.locator(t('ade-run-status'))).toHaveText('running');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('Running');
   await emitRuns(page, [{ ...ev.runs[0], state: 'done' }]);
   await expect(line.locator(t('ade-run-glyph'))).toHaveText('✓');
-  await expect(line.locator(t('ade-run-status'))).toHaveText('done');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('Done');
 });
 
 test('Approve sends the gated step', async ({ relaunch }) => {
@@ -337,7 +337,7 @@ test('contract: a run without claude on PATH shows its reason', async ({ relaunc
   const line = stage(page, 'impl')
     .locator(`${t('ade-run-line')}[data-branch-id="b_push"]`)
     .filter({ has: page.locator(t('ade-run-retry')) });
-  await expect(line.locator(t('ade-run-status'))).toHaveText('failed');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('Failed');
   await expect(line.locator(t('ade-run-note'))).toHaveText(failed.outcome.reason as string);
   await expect(line.locator(t('ade-run-retry'))).toBeVisible();
 });
@@ -393,7 +393,7 @@ test('contract: a finished step run shows done', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_bill');
   const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
-  await expect(line.locator(t('ade-run-status'))).toHaveText('running');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('Running');
   await emitRuns(page, [
     {
       ...one,
@@ -407,7 +407,7 @@ test('contract: a finished step run shows done', async ({ relaunch }) => {
     },
   ]);
   await expect(line.locator(t('ade-run-glyph'))).toHaveText('✓');
-  await expect(line.locator(t('ade-run-status'))).toHaveText(String(one.state));
+  await expect(line.locator(t('ade-run-status'))).toHaveText('Done');
 });
 
 test('contract: Approve sends the arguments the backend takes', async ({ relaunch }) => {

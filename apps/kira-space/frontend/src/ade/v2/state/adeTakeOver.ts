@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
@@ -81,7 +82,9 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
     if (v?.headless && v.run?.state === 'running') {
       confirm.value = {
         sessionId,
-        text: `${v.step} is still running on ${v.branch || 'its task'}. Taking over stops it first; it becomes stuck and continues in Claude Code.`,
+        text: v.branch
+          ? t('space.ade.takeOverConfirm.body', { step: v.step, branch: v.branch })
+          : t('space.ade.takeOverTaskConfirm.body', { step: v.step }),
       };
       return;
     }
@@ -91,7 +94,7 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
     if (err && taskId) ui.actionError[taskId] = err;
   }
 
-  /** The confirm's `Stop and take over`: an error keeps the dialog open. */
+  /** The confirm's `Take over`: an error keeps the dialog open. */
   async function confirmYes(): Promise<string | null> {
     const c = confirm.value;
     return c ? launch(c.sessionId) : null;

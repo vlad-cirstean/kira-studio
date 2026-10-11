@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { taskTitle } from '../board/labels';
@@ -25,7 +26,7 @@ const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
       <span class="line-clamp-2 min-w-0 text-kira-lg font-medium" data-testid="ade-review-title">{{ title }}</span>
       <AdeRepoTag :code-repo-id="target.codeRepoId" :label="repoLabel" />
       <span class="truncate font-data text-kira-sm" data-testid="ade-review-branch">{{ target.branch }}</span>
-      <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="ade-review-base">base {{ target.base }}</span>
+      <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="ade-review-base">{{ t('space.ade.review.header.base.label', { base: target.base }) }}</span>
       <div class="ml-auto flex items-center gap-2">
         <AdeReviewSync :target="target" />
       </div>
@@ -35,7 +36,7 @@ const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
       class="m-0 border-t border-border px-3 py-1 text-kira-sm text-muted-foreground"
       data-testid="ade-review-uncommitted"
     >
-      {{ dirtyCount }} uncommitted {{ dirtyCount === 1 ? 'change' : 'changes' }} in the worktree {{ dirtyCount === 1 ? 'is' : 'are' }} not in this review
+      {{ t('space.ade.review.header.uncommitted.hint', { count: dirtyCount }) }}
     </p>
   </header>
 </template>

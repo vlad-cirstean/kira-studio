@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, watch } from 'vue';
@@ -55,7 +56,7 @@ export function useReviewCode() {
       return;
     }
     const items: MenuItem[] = [
-      { type: 'label', label: 'Review which branch?' },
+      { type: 'label', label: t('space.ade.board.reviewChoice.pick.tooltip') },
       ...choices.map(
         (c): MenuItem => ({
           type: 'item',

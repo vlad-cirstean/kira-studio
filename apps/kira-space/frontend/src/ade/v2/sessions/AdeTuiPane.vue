@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useDateFormat } from '@vueuse/core';
 import { useAutomationsModule } from '@workbench/automations/module';
 import { useRelativeTime } from '@workbench/behaviour/format';
@@ -57,7 +58,7 @@ async function show(): Promise<void> {
       :class="needsYou ? 'bg-tone-amber-solid/8 text-tone-amber' : 'text-muted-foreground'"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
-      <span class="truncate" data-testid="ade-tui-label">interactive · {{ activityLabel(view.kind) }} · {{ ago }}</span>
+      <span class="truncate" data-testid="ade-tui-label">{{ t('space.ade.tui.status.label', { activity: activityLabel(view.kind), ago }) }}</span>
       <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
     <div v-if="held" class="relative flex min-h-0 flex-1 flex-col">
@@ -67,21 +68,21 @@ async function show(): Promise<void> {
         class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-bg/90 p-4 text-center text-kira-md"
         data-testid="ade-tui-phone-overlay"
       >
-        <p class="m-0">Controlled from {{ hold.label }}</p>
+        <p class="m-0">{{ t('space.ade.tui.controlled.label', { device: hold.label }) }}</p>
         <p v-if="!hold.connected" class="m-0 text-muted-foreground" data-testid="ade-tui-phone-offline">
-          Phone offline, returns here at {{ returnsAt }}
+          {{ t('space.ade.tui.offline.status', { time: returnsAt }) }}
         </p>
         <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-reconnect" @click="phones.reclaim(view.session.terminalId)">
-          Reconnect here
+          {{ t('space.ade.tui.reconnect.label') }}
         </Button>
       </div>
     </div>
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-tui-elsewhere">
       <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-show" @click="show">
-        Show
+        {{ t('common.action.show.label') }}
       </Button>
       <p v-if="missing" class="m-0 text-muted-foreground" data-testid="ade-tui-missing">
-        This session's terminal is not open in any window.
+        {{ t('space.ade.tui.missing.hint') }}
       </p>
     </div>
   </div>

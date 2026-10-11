@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@theme/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { computed, useTemplateRef } from 'vue';
@@ -84,7 +85,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           :class="tabChipVariants({ active: ui.view === 'backlog', size: 'wide' })"
           data-testid="ade-tab-backlog"
         >
-          Backlog
+          {{ t('space.common.backlog.label') }}
           <span class="text-kira-sm tabular-nums text-muted-foreground" data-testid="ade-backlog-count">{{ count }}</span>
         </TabsTrigger>
         <TabsTrigger
@@ -92,7 +93,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           :class="tabChipVariants({ active: ui.view === 'needs', size: 'wide' })"
           data-testid="ade-tab-needs"
         >
-          Needs you
+          {{ t('space.common.needsYou.label') }}
           <Badge v-if="needsCount > 0" variant="count" data-testid="ade-needs-count">{{ needsCount }}</Badge>
         </TabsTrigger>
         <TabsTrigger
@@ -100,7 +101,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           :class="tabChipVariants({ active: ui.view === 'plan', size: 'wide' })"
           data-testid="ade-tab-plan"
         >
-          Plan
+          {{ t('space.common.plan.label') }}
         </TabsTrigger>
       </TabsList>
       <span class="flex-1" />
@@ -114,7 +115,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           :class="tabChipVariants({ active: ui.view === 'workflows', size: 'wide' })"
           data-testid="ade-tab-workflows"
         >
-          Workflows
+          {{ t('space.common.workflows.label') }}
         </TabsTrigger>
       </TabsList>
     </nav>

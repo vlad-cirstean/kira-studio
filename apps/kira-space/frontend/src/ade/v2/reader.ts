@@ -30,6 +30,7 @@ export const adeReaderKey: InjectionKey<AdeReader> = Symbol('adeReader');
 
 export function useAdeReader(): AdeReader {
   const reader = inject(adeReaderKey, null);
-  if (!reader) throw new Error('AdeReader not provided: app.provide(adeReaderKey, ...) is missing');
+  if (!reader)
+    throw new Error('useAdeReader: reader not provided; app.provide(adeReaderKey, ...) is missing');
   return reader;
 }

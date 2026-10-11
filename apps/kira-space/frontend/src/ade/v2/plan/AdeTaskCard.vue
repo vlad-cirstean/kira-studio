@@ -10,6 +10,7 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
@@ -194,13 +195,13 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
             >
           </AdeTip>
           <DropdownMenu v-if="baseChoices.length > 1">
-            <AdeTip text="Change the base of a branch">
+            <AdeTip :text="t('space.ade.plan.card.changeBase.tooltip')">
               <DropdownMenuTrigger as-child>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
                   class="size-4.5 shrink-0"
-                  aria-label="Change base"
+                  :aria-label="t('space.ade.rebase.changeBase.label')"
                   data-testid="ade-card-change-base"
                   @click.stop
                 >
@@ -223,7 +224,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
           <TooltipIconButton
             v-else-if="baseChoices.length === 1"
             icon="git-branch"
-            label="Change base"
+            :label="t('space.ade.rebase.changeBase.label')"
             class="size-4.5 shrink-0"
             disabled-trigger
             :disabled="baseChoices[0].disabled"
@@ -235,7 +236,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
           <TooltipIconButton
             v-if="choices.length"
             icon="git-compare"
-            label="Review code"
+            :label="t('space.ade.board.taskMenu.reviewCode.label')"
             class="size-4.5 shrink-0"
             disabled-trigger
             :disabled="reviewCode.pending.value || choices.every((c) => c.disabled)"
@@ -252,7 +253,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
             variant="link"
             class="line-clamp-2 block h-auto justify-start whitespace-normal break-words rounded-none border-0 p-0 text-left text-kira-lg leading-4"
             :class="card.parked ? 'text-muted-foreground' : 'text-fg'"
-            :aria-label="`Open ${card.title}`"
+            :aria-label="t('space.ade.plan.card.open.aria', { title: card.title })"
             data-testid="ade-card-title"
             @click.stop="emit('select')"
           >

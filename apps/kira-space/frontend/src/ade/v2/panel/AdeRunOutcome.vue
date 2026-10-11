@@ -3,13 +3,14 @@ import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
-import { type MessageKey, t } from '@theme/i18n';
+import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import type { RebaseAct } from '../board/rebaseActions';
+import { runStateLabel } from '../runState';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS } from '../tones';
@@ -55,18 +56,7 @@ const STATE_TONE: Record<string, Tone> = {
   running: 'blue',
   pending: 'grey',
 };
-const STATE_LABEL: Record<string, MessageKey> = {
-  done: 'space.common.status.done.status',
-  failed: 'common.state.failed.status',
-  stuck: 'space.common.needsYou.label',
-  back: 'space.ade.outcome.back.status',
-  running: 'common.state.running.status',
-  pending: 'space.common.pending.status',
-};
-const state = computed(() => {
-  const key = STATE_LABEL[props.run.state];
-  return key ? t(key) : props.run.state;
-});
+const state = computed(() => runStateLabel(props.run.state));
 
 // A step's own result, shown next to the state; the implicit done and failed say nothing more.
 const result = computed(() => {

@@ -60,7 +60,7 @@ export function taskFacts(i: {
 /** A remote operation's failure as one line: the remote's own words when it sent any. */
 export function remoteErrorText(e: RemoteOpError): string {
   return e.remoteMessage
-    ? t('space.ade.remoteOp.failure.status', { message: e.message, remoteMessage: e.remoteMessage })
+    ? t('space.common.dashPair.label', { first: e.message, second: e.remoteMessage })
     : e.message;
 }
 

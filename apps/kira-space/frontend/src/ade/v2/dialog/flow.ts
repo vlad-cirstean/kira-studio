@@ -1,3 +1,4 @@
+import { type MessageKey, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { isPreparing } from '../state/useSetupWait';
 import type {
@@ -48,13 +49,15 @@ export interface FlowDeps {
   opened: (e: OpenSessionEvent) => void;
 }
 
-const BLOCKED_REASON: Record<string, string> = {
-  notAWorktree: 'not a worktree',
-  mainWorktree: 'the main worktree',
-  currentWorktree: 'the worktree Space itself is open in',
-  openInAnotherWindow: 'open in another window',
-  locked: 'locked',
-};
+const BLOCKED_REASON = {
+  notAWorktree: 'space.ade.flow.notAWorktree.status',
+  mainWorktree: 'space.ade.flow.mainWorktree.status',
+  currentWorktree: 'space.ade.flow.currentWorktree.status',
+  openInAnotherWindow: 'space.ade.flow.openElsewhere.status',
+  locked: 'space.ade.flow.locked.status',
+} as const satisfies Record<string, MessageKey>;
+const blockedReason = (reason: string): string =>
+  reason in BLOCKED_REASON ? t(BLOCKED_REASON[reason as keyof typeof BLOCKED_REASON]) : reason;
 
 const errMessage = (err: unknown): string => errorText(err);
 
@@ -155,10 +158,7 @@ async function sendMerge(deps: FlowDeps, spec: DialogSpec, state: DialogState): 
     void (watch as TurnWatch | null)?.done.then(async (outcome: TurnOutcome) => {
       try {
         if (outcome === 'ended') {
-          deps.setActionError(
-            taskId,
-            'the session ended before the merge finished; nothing recorded',
-          );
+          deps.setActionError(taskId, t('space.ade.flow.mergeEnded.error'));
         } else {
           await deps.recordMerge({ branchId, target });
         }
@@ -251,7 +251,11 @@ async function sendArchive(deps: FlowDeps, spec: DialogSpec, state: DialogState)
     // Some branches already have the prompt: close, so Send cannot repeat it to them.
     deps.setActionError(
       taskId,
-      `Archive prompt sent to ${sent} of ${spec.targets.length} branches: ${errMessage(err)}. Archive again when ready`,
+      t('space.ade.flow.archivePartial.error', {
+        sent,
+        count: spec.targets.length,
+        error: errMessage(err),
+      }),
     );
     deps.closeDialog();
     return;
@@ -267,9 +271,9 @@ function blockedText(deps: FlowDeps, risk: ArchiveRisk): string {
     .filter((r) => r.blocked !== '')
     .map((r) => {
       const name = deps.ctx.graph.byBranch.get(r.branchId)?.name ?? r.branchId;
-      return `${name}: ${BLOCKED_REASON[r.blocked] ?? r.blocked}`;
+      return t('theme.varText.aria', { name, value: blockedReason(r.blocked) });
     });
-  return `Can't archive: ${parts.join('; ')}`;
+  return t('space.ade.flow.cantArchive.error', { parts: parts.join('; ') });
 }
 
 /** Reads the risk and archives when clear. A blocked branch is an action error; work at risk opens

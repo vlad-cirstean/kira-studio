@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeHeadlessPane from './AdeHeadlessPane.vue';
@@ -47,7 +48,7 @@ const current = computed(() => running.value.find((v) => v.session.id === ui.ses
       <AdeHeadlessPane v-if="current.headless" :key="current.session.id" :view="current" :archived="archived" />
       <AdeTuiPane v-else :key="current.session.id" :view="current" />
     </template>
-    <div v-else class="flex-1 p-3.5 text-kira-md text-muted-foreground" data-testid="ade-sessions-empty">Nothing running.</div>
+    <div v-else class="flex-1 p-3.5 text-kira-md text-muted-foreground" data-testid="ade-sessions-empty">{{ t('space.ade.sessionList.empty.empty') }}</div>
     <AdeStoppedList :views="stopped" :archived="archived" />
   </div>
 </template>

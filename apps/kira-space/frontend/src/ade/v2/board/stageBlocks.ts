@@ -1,3 +1,5 @@
+import { t } from '@theme/i18n';
+import { runStateLabel } from '../runState';
 import type { Stage, Workflow } from '../wire';
 import type { Tone } from './actions';
 import {
@@ -65,9 +67,9 @@ const STEP_TONE: Record<StepState, Tone> = {
 };
 
 function stepStatusText(s: StepProgress): string {
-  if (s.state === 'stuck') return 'stuck · needs you';
-  if (s.state === 'pending' && s.approval) return 'waiting for approval';
-  return s.state;
+  if (s.state === 'stuck') return t('space.ade.allSessions.stuck.status');
+  if (s.state === 'pending' && s.approval) return t('space.ade.stage.waitingApproval.status');
+  return runStateLabel(s.state);
 }
 
 /** The step's non-default routes, `changes ↩ Implement (max 3)`, `trivial → end`; '' when it has none. */
@@ -76,19 +78,29 @@ function routeText(s: StepProgress, stage: Stage): string {
   const parts: string[] = [];
   for (const r of s.results) {
     if (r.next === defaultRoute(r.ok)) continue;
-    if (r.next === 'end') parts.push(`${r.id} → end`);
-    else if (r.next === 'stop') parts.push(`${r.id} → stop`);
-    else if (r.max > 0 && r.next === s.id) parts.push(`${r.id} ↻ retry (max ${r.max})`);
-    else if (r.max > 0) parts.push(`${r.id} ↩ ${nameOf(r.next)} (max ${r.max})`);
-    else parts.push(`${r.id} → ${nameOf(r.next)}`);
+    if (r.next === 'end') parts.push(t('space.ade.stage.routeEnd.label', { id: r.id }));
+    else if (r.next === 'stop') parts.push(t('space.ade.stage.routeStop.label', { id: r.id }));
+    else if (r.max > 0 && r.next === s.id) {
+      parts.push(t('space.ade.stage.routeRetry.label', { id: r.id, max: r.max }));
+    } else if (r.max > 0) {
+      parts.push(
+        t('space.ade.stage.routeBack.label', { id: r.id, step: nameOf(r.next), max: r.max }),
+      );
+    } else parts.push(t('space.ade.stage.routeGoto.label', { id: r.id, step: nameOf(r.next) }));
   }
   return parts.join(' · ');
 }
 
 function runStatus(r: StepRun): string {
-  if (r.state === 'done') return r.ok === false ? 'failed, continued' : 'done';
-  if (r.state === 'back') return r.route === 'retry' ? 'retry' : 'sent back';
-  return r.state;
+  if (r.state === 'done') {
+    return r.ok === false ? t('space.ade.stage.failedContinued.status') : runStateLabel('done');
+  }
+  if (r.state === 'back') {
+    return r.route === 'retry'
+      ? t('common.action.retry.label')
+      : t('space.ade.outcome.back.status');
+  }
+  return runStateLabel(r.state);
 }
 
 /** Loop budget of the results that send the stage back to step `id`: the largest `max`, 0 when none. */
@@ -101,6 +113,13 @@ function backMax(steps: readonly StepProgress[], id: string): number {
   return max;
 }
 
+function fixRound(loops: number, max: number): string {
+  if (!loops) return '';
+  return max
+    ? t('space.ade.stage.fixRoundMax.status', { count: loops, max })
+    : t('space.ade.stage.fixRound.status', { count: loops });
+}
+
 function runLine(r: StepRun, max: number): RunLine {
   const g = RUN_GLYPH[r.state];
   const started = r.state !== 'pending' && r.runId !== '';
@@ -109,7 +128,7 @@ function runLine(r: StepRun, max: number): RunLine {
     glyph: g.glyph,
     tone: g.tone,
     status: runStatus(r),
-    note: r.reason || r.note || (r.loops ? `fix round ${r.loops}${max ? ` of ${max}` : ''}` : ''),
+    note: r.reason || r.note || fixRound(r.loops, max),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
   };
@@ -126,9 +145,11 @@ function showRuns(s: StepProgress, script: boolean): boolean {
 }
 
 function modeText(stage: Stage): string {
-  if (stage.kind === 'agent') return 'agent · background claude -p';
-  if (stage.kind === 'script') return 'script';
-  return stage.session ? 'user · interactive Claude Code' : 'user';
+  if (stage.kind === 'agent') return t('space.ade.stage.modeAgent.label');
+  if (stage.kind === 'script') return t('space.ade.stage.modeScript.label');
+  return stage.session
+    ? t('space.ade.stage.modeUserSession.label')
+    : t('memory.common.author.user.label');
 }
 
 /** One block per workflow stage. Without the workflow file only the current stage is known. */

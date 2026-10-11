@@ -4720,9 +4720,7 @@
         "chipBlocked": {
           "label": "{name} · needs you"
         },
-        "chipFailed": {
-          "label": "{name} · failed"
-        },
+        "chipFailed": {},
         "none": {
           "empty": "No automations yet"
         }
@@ -4731,6 +4729,9 @@
         "add": {
           "label": "Add to backlog",
           "placeholder": "Type a thought and press Enter"
+        },
+        "added": {
+          "announce": "Added to backlog"
         },
         "captured": {
           "label": "Captured {ago}"
@@ -5319,6 +5320,10 @@
           "label": "Undo override"
         }
       },
+      "dayOffConfirm": {
+        "body": "{day} is now a day off. This moves {count} task planned for it to {to}. | {day} is now a day off. This moves {count} tasks planned for it to {to}.",
+        "title": "Move tasks?"
+      },
       "estimate": {
         "days": {
           "option": "Days"
@@ -5341,6 +5346,32 @@
           "aria": "Estimate unit"
         }
       },
+      "flow": {
+        "archivePartial": {
+          "error": "Archive prompt sent to {sent} of {count} branch: {error}. Archive again when ready. | Archive prompt sent to {sent} of {count} branches: {error}. Archive again when ready."
+        },
+        "cantArchive": {
+          "error": "Can’t archive: {parts}"
+        },
+        "currentWorktree": {
+          "status": "The worktree Kira Space is open in"
+        },
+        "locked": {
+          "status": "Locked"
+        },
+        "mainWorktree": {
+          "status": "The main worktree"
+        },
+        "mergeEnded": {
+          "error": "The session ended before the merge finished; nothing recorded."
+        },
+        "notAWorktree": {
+          "status": "Not a worktree"
+        },
+        "openElsewhere": {
+          "status": "Open in another window"
+        }
+      },
       "forcePushConfirm": {
         "body": "Replaces the remote branch “{branch}” in {repo} with your local one. Refused when someone else pushed since your last fetch.",
         "title": "Force push?"
@@ -5353,12 +5384,35 @@
           "label": "▶ Start agent"
         }
       },
+      "headless": {
+        "footer": {
+          "hint": "Read-only log of a background run. Take it over to continue it yourself in Claude Code."
+        },
+        "status": {
+          "label": "Background run · step {step} · {state} · {ago}"
+        },
+        "statusNeedsYou": {
+          "label": "Background run · step {step} · {state}, needs you · {ago}"
+        },
+        "stop": {
+          "tooltip": "Stop this run; it becomes stuck"
+        },
+        "takeOver": {
+          "tooltip": "Continue this run yourself in an interactive Claude Code session"
+        }
+      },
       "link": {
         "copy": {
           "tooltip": "Copy {label} link"
         },
         "field": {
           "label": "{label} link"
+        },
+        "notGithub": {
+          "error": "Not a GitHub PR or issue link."
+        },
+        "notJira": {
+          "error": "Not a Jira key or link."
         },
         "remove": {
           "tooltip": "Remove {label} link"
@@ -5381,9 +5435,7 @@
             "label": "Took {duration}"
           }
         },
-        "footer": {
-          "label": "{runs} · {sessions}"
-        },
+        "footer": {},
         "interactiveSessions": {
           "label": "{count} interactive session | {count} interactive sessions"
         },
@@ -5589,6 +5641,149 @@
           "review": {
             "tooltip": "Someone else’s branch, read-only here"
           }
+        },
+        "card": {
+          "changeBase": {
+            "tooltip": "Change the base of a branch"
+          },
+          "open": {
+            "aria": "Open {title}"
+          }
+        },
+        "dayControls": {
+          "addDay": {
+            "label": "Or choose a date"
+          },
+          "moreWeek": {
+            "label": "Add week"
+          }
+        },
+        "header": {
+          "onMerge": {
+            "label": "On merge"
+          },
+          "refreshAll": {
+            "label": "Refresh all"
+          },
+          "refreshing": {
+            "loading": "Refreshing…"
+          }
+        },
+        "history": {
+          "current": {
+            "label": "Current work ↓"
+          },
+          "goTo": {
+            "label": "Go to"
+          },
+          "hide": {
+            "label": "Hide history"
+          },
+          "title": {}
+        },
+        "repoChip": {
+          "fetch": {
+            "tooltip": "Fetch {label}"
+          },
+          "fetching": {
+            "loading": "Fetching…"
+          },
+          "neverFetched": {
+            "status": "Never fetched"
+          },
+          "noRemote": {
+            "status": "No remote"
+          },
+          "refresh": {
+            "aria": "Refresh {label}"
+          },
+          "rescan": {
+            "tooltip": "Rescan {label} (no remote to fetch)"
+          },
+          "toggle": {
+            "tooltip": "Show or hide this repository"
+          }
+        },
+        "view": {
+          "archivedTasks": {
+            "label": "{count} archived task | {count} archived tasks"
+          },
+          "collapse": {
+            "label": "Show only the first {count} again"
+          },
+          "loadAll": {
+            "label": "Load all items · {count} more"
+          },
+          "loadHistoryDays": {
+            "label": "Load history · {tasks} in the last day | Load history · {tasks} in the last {count} days"
+          },
+          "loadHistoryWeeks": {
+            "label": "Load history · {tasks} in the last week | Load history · {tasks} in the last {count} weeks"
+          },
+          "loading": {
+            "loading": "Loading board…"
+          },
+          "mergedArchived": {
+            "status": "Merged and archived"
+          },
+          "overdue": {
+            "status": "{count} task not merged | {count} tasks not merged"
+          },
+          "overflow": {
+            "status": "{hours}h over {limit}h"
+          },
+          "overflowMany": {
+            "label": "Move to {day} · {count} tasks"
+          },
+          "overflowOne": {
+            "label": "Move to {day} · {title}"
+          },
+          "spanNote": {
+            "label": "Day {day}/{count}"
+          },
+          "spanNoteMerges": {
+            "label": "Day {day}/{count}, merges"
+          },
+          "spanTip": {
+            "tooltip": "Continues from {day}; click to open"
+          }
+        }
+      },
+      "progress": {
+        "barTipRun": {
+          "label": "{nick} {state}"
+        },
+        "barTipStep": {},
+        "failed": {},
+        "fix": {
+          "label": "{step} · fix {count}"
+        },
+        "sentBack": {
+          "label": "{step} ↩ sent back"
+        },
+        "stageAgent": {
+          "label": "{name} (agent)"
+        },
+        "stageDone": {
+          "label": "{name} ✓"
+        },
+        "stageScript": {
+          "label": "{name} (script)"
+        },
+        "stageUser": {
+          "label": "{name} (user)"
+        },
+        "stuck": {
+          "label": "{step} · stuck"
+        },
+        "tipLine": {
+          "tooltip": "{n}. {name}: {detail}"
+        },
+        "tipLineNote": {
+          "tooltip": "{n}. {name}: {state} ({note})"
+        },
+        "waiting": {
+          "label": "{step} · waiting"
         }
       },
       "rebase": {
@@ -5643,9 +5838,143 @@
           "status": "{count} ref changed | {count} refs changed"
         }
       },
-      "remoteOp": {
-        "failure": {
-          "status": "{message} — {remoteMessage}"
+      "review": {
+        "agent": {
+          "elsewhere": {
+            "hint": "The review agent is open in another window."
+          },
+          "focus": {
+            "label": "Focus"
+          },
+          "gone": {
+            "hint": "That window is gone."
+          },
+          "intro": {
+            "hint": "Ask questions about this branch in a Claude Code session."
+          },
+          "label": "Review agent",
+          "panel": {},
+          "resume": {
+            "label": "Resume review agent"
+          },
+          "start": {
+            "label": "Start review agent"
+          },
+          "waiting": {}
+        },
+        "compose": {
+          "answering": {
+            "loading": "Answering…"
+          },
+          "blocked": {
+            "tooltip": "Claude Code is waiting for an answer in its terminal"
+          },
+          "dropReference": {
+            "aria": "Drop the code reference"
+          },
+          "noSubmit": {
+            "hint": "Claude Code did not take the message; press Enter in its terminal."
+          },
+          "question": {
+            "aria": "Question for the review agent",
+            "placeholder": "Ask about this branch"
+          },
+          "sent": {
+            "status": "Sent"
+          }
+        },
+        "header": {
+          "base": {
+            "label": "Base {base}"
+          },
+          "uncommitted": {
+            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review."
+          }
+        },
+        "sync": {
+          "account": {
+            "label": "Syncing as {account}"
+          },
+          "button": {
+            "label": "Sync to GitHub"
+          },
+          "buttonCount": {
+            "label": "Sync to GitHub · {count}"
+          },
+          "changedSinceReview": {
+            "status": "Changed since review"
+          },
+          "confirm": {
+            "label": "Mark {count} file viewed on PR #{pr} | Mark {count} files viewed on PR #{pr}"
+          },
+          "confirmUnmark": {
+            "label": "Mark {count} file viewed on PR #{pr}, unmark {unmarked} | Mark {count} files viewed on PR #{pr}, unmark {unmarked}"
+          },
+          "differsFromPrHead": {
+            "status": "Differs from the PR head"
+          },
+          "ghMissing": {
+            "tooltip": "Install the GitHub CLI (gh)"
+          },
+          "headDiffers": {
+            "label": "PR head {head} ≠ local {local}"
+          },
+          "loadFailed": {
+            "error": "Couldn’t load the sync plan: {error}"
+          },
+          "mark": {
+            "label": "Mark"
+          },
+          "nothing": {
+            "empty": "Nothing to sync"
+          },
+          "notInPr": {
+            "status": "Not in the PR"
+          },
+          "notReviewed": {
+            "status": "Not reviewed"
+          },
+          "partial": {
+            "status": "Partly reviewed"
+          },
+          "prClosed": {
+            "tooltip": "PR #{number} is closed"
+          },
+          "refreshRepo": {
+            "label": "Refresh repository"
+          },
+          "skipped": {},
+          "synced": {
+            "status": "Synced {count} file | Synced {count} files"
+          },
+          "syncedFailed": {
+            "status": "Synced {count} file · {failed} failed | Synced {count} files · {failed} failed"
+          },
+          "unmark": {
+            "label": "Unmark"
+          }
+        },
+        "window": {
+          "diffs": {
+            "aria": "Diffs"
+          },
+          "emptyHint": {
+            "emptyHint": "Select a file to see its diff."
+          },
+          "files": {
+            "aria": "Files to review"
+          },
+          "title": {
+            "title": "Review · {branch}"
+          }
+        }
+      },
+      "runDialog": {
+        "smartMissing": {
+          "error": "This smart script was not found."
+        },
+        "title": {
+          "title": "Run {stage} in the background"
         }
       },
       "runLog": {
@@ -5656,6 +5985,26 @@
           "status": "Earlier output dropped"
         }
       },
+      "sessionList": {
+        "empty": {
+          "empty": "Nothing running"
+        },
+        "interactive": {
+          "label": "Interactive"
+        },
+        "resumed": {
+          "label": "{name} (resumed)"
+        },
+        "specSession": {
+          "label": "Spec session"
+        },
+        "stopped": {
+          "label": "Finished or stopped"
+        },
+        "waitingId": {
+          "status": "Waiting for session ID"
+        }
+      },
       "setup": {
         "retry": {
           "label": "Retry setup"
@@ -5664,13 +6013,50 @@
           "label": "Worktree setup"
         }
       },
+      "stage": {
+        "failedContinued": {
+          "status": "Failed, continued"
+        },
+        "fixRound": {
+          "status": "Fix round {count}"
+        },
+        "fixRoundMax": {
+          "status": "Fix round {count} of {max}"
+        },
+        "modeAgent": {
+          "label": "Agent · background claude -p"
+        },
+        "modeScript": {
+          "label": "Script"
+        },
+        "modeUser": {},
+        "modeUserSession": {
+          "label": "User · interactive Claude Code"
+        },
+        "routeBack": {
+          "label": "{id} ↩ {step} (max {max})"
+        },
+        "routeEnd": {
+          "label": "{id} → end"
+        },
+        "routeGoto": {
+          "label": "{id} → {step}"
+        },
+        "routeRetry": {
+          "label": "{id} ↻ retry (max {max})"
+        },
+        "routeStop": {
+          "label": "{id} → stop"
+        },
+        "waitingApproval": {
+          "status": "Waiting for approval"
+        }
+      },
       "stageBlock": {
         "hideOutput": {
           "label": "Hide output"
         },
-        "mainMerged": {
-          "status": "{main} ✓"
-        },
+        "mainMerged": {},
         "mainOpen": {
           "status": "{main} —"
         },
@@ -5703,6 +6089,12 @@
         "next": {
           "tooltip": "Next stage"
         }
+      },
+      "takeOverConfirm": {
+        "body": "“{step}” is still running on {branch}. Taking over stops it, marks it stuck and continues it in Claude Code."
+      },
+      "takeOverTaskConfirm": {
+        "body": "“{step}” is still running. Taking over stops it, marks it stuck and continues it in Claude Code."
       },
       "taskPanel": {
         "more": {
@@ -5740,6 +6132,23 @@
           "hint": "Stays on the plan; never merged."
         }
       },
+      "tui": {
+        "controlled": {
+          "label": "Controlled from {device}"
+        },
+        "missing": {
+          "hint": "This session’s terminal is not open in any window."
+        },
+        "offline": {
+          "status": "Phone offline, returns here at {time}"
+        },
+        "reconnect": {
+          "label": "Reconnect here"
+        },
+        "status": {
+          "label": "Interactive · {activity} · {ago}"
+        }
+      },
       "view": {
         "empty": {
           "hint": "Add repositories from the Git module to start planning agent work.",
@@ -5768,6 +6177,10 @@
         "spaceToolsHint": {
           "hint": "Agents in this workflow can declare repositories and request branches."
         }
+      },
+      "workflowDiscardConfirm": {
+        "body": "Your unsaved changes to this workflow are lost.",
+        "title": "Discard changes?"
       }
     },
     "common": {
@@ -5789,6 +6202,9 @@
       "claudeSession": {
         "label": "Claude {id}"
       },
+      "dashPair": {
+        "label": "{first} — {second}"
+      },
       "day": {
         "earlier": {
           "label": "Earlier"
@@ -5803,6 +6219,9 @@
           "label": "Tomorrow"
         }
       },
+      "dotPair": {
+        "label": "{first} · {second}"
+      },
       "forcePush": {
         "label": "Force push"
       },
@@ -5814,6 +6233,12 @@
       },
       "hideLog": {
         "label": "Hide log"
+      },
+      "move": {
+        "label": "Move"
+      },
+      "nameFailed": {
+        "label": "{name} · failed"
       },
       "needsYou": {
         "label": "Needs you"
@@ -5870,6 +6295,9 @@
       },
       "workflow": {
         "label": "Workflow"
+      },
+      "workflows": {
+        "label": "Workflows"
       },
       "worktree": {
         "label": "Worktree"

@@ -1,31 +1,5 @@
 # Stream B (Kira Space, mobile, memory). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
 permanent U64 apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue # `z` is the waiting-on-monitor glyph, not text
-apps/kira-space/frontend/src/ade/v2/panel/useLinkFields.ts
-apps/kira-space/frontend/src/ade/v2/plan/AdeDayControls.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeHistoryBar.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdePlanHeader.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdePlanView.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeRepoChip.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue
-apps/kira-space/frontend/src/ade/v2/reader.ts
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewAgentPanel.vue
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewCompose.vue
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewHeader.vue
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewSync.vue
-apps/kira-space/frontend/src/ade/v2/review/AdeReviewWindow.vue
-apps/kira-space/frontend/src/ade/v2/review/useReviewCode.ts
-apps/kira-space/frontend/src/ade/v2/run/AdeRunDialog.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeHeadlessPane.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeSessionId.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeSessionsTab.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedList.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedRow.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeTakeOverDialog.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeTuiPane.vue
-apps/kira-space/frontend/src/ade/v2/shell/AdeCaptureBox.vue
-apps/kira-space/frontend/src/ade/v2/shell/AdeShell.vue
-apps/kira-space/frontend/src/ade/v2/state/adeTakeOver.ts
-apps/kira-space/frontend/src/ade/v2/state/adeWorkflowsUi.ts
 apps/kira-space/frontend/src/ade/v2/workflows/AdeEndNode.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeStageInspector.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeStepInspector.vue

@@ -75,7 +75,7 @@ async function openReview(
 reviewTest('a review window boots three panes for its branch', async ({ relaunch }) => {
   const page = await openReview(relaunch);
   await expect(page.locator(t('ade-review-branch'))).toHaveText('feat/billing-dashboard');
-  await expect(page.locator(t('ade-review-base'))).toHaveText('base main');
+  await expect(page.locator(t('ade-review-base'))).toHaveText('Base main');
   await expect(page.locator(t('ade-review-left'))).toBeVisible();
   await expect(page.locator(t('ade-review-centre'))).toBeVisible();
   await expect(page.locator(t('ade-review-right'))).toBeVisible();

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
@@ -15,8 +16,9 @@ export const useAdeWorkflowsUiStore = defineStore('adeWorkflowsUi', () => {
   async function leave(): Promise<boolean> {
     if (!dirty.value) return true;
     const discard = await useConfirmDialogStore().confirm({
-      message: 'Discard unsaved workflow changes?',
-      confirmLabel: 'Discard',
+      title: t('space.ade.workflowDiscardConfirm.title'),
+      message: t('space.ade.workflowDiscardConfirm.body'),
+      confirmLabel: t('common.action.discard.label'),
       tone: 'danger',
     });
     if (discard) dirty.value = false;
