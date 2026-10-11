@@ -1334,6 +1334,19 @@ holds the side-panel file list and the named exemptions (CommandPalette, LogsVie
 `AdeBacklogRow` inline edit, mobile 44px touch inputs, git-ui `SearchBox` two-stage Escape), and an
 exemption that stops matching fails the run. Full rules: `docs/v2.2/plans/P262-ui-unification.md` §2.
 
+**Element families (P263, in progress).** One tone vocabulary: `ok`, `warn`, `error`, `info` (Badge,
+Alert, `StatusDot`); neutral is muted text. Chips tint `/16`, banners `/10` with `/20` border; app code
+never writes a tone alpha. `Alert` takes `icon` and `strip`, no layout classes; error sentences are
+`FieldError`, list/popover lines `InlineState`. A boolean that applies on flip is `Switch`; an option in
+a form committed by a button is `Checkbox` (14px box). Hints are `Tooltip` (theme provider owns the
+400ms delay, never native `title`), shortcuts `Kbd`. Loading is `Spinner` (`Skeleton` only where the
+layout is known). Boxes are `Card` (`inset`/`section`), tables `Table` or the exported `table*Class`
+strings. `DropdownMenuContent` is content-sized (`min-w-45`, `max-w-80`). Every pane resize handle
+binds `resizeHandleVariants` (2px bar, 4px/8px hit area, `bg-focus` on hover, focus and drag, 10px
+arrow step, Home/End). Scrollbars follow `base.css` behind `@media (pointer: fine)`. Guards U22-U38
+in `scripts/check-ui-primitives.sh`, with per-stream allowlists in `scripts/ui-primitives-allowlist/`
+until close-out. Full rules: `docs/v2.2/plans/P263-ui-unification-2.md` §2.
+
 **A view is chosen by page kind, never by database type.** `Page` is a discriminated union
 (`TabularPage`, `DocumentPage`, `KeyValuePage`, `StreamPage`); UI reads the page's own `kind`
 to decide grid vs. document view vs. key/value view vs. stream view. This is why a Postgres
