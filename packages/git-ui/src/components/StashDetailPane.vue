@@ -15,9 +15,10 @@
  * composition against it when `path` is not among the primary sha's changed files.
  */
 import type { CommitStore } from '@kira/git-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
@@ -62,9 +63,9 @@ function onOpenFile(index: number, pinned: boolean): void {
 
 <template>
   <div class="flex flex-col min-h-0 h-full">
-    <p v-if="stash.error.value" class="m-0 p-3 text-error">
+    <FieldError v-if="stash.error.value" class="p-3">
       Couldn't load this stash — {{ stash.error.value }}
-    </p>
+    </FieldError>
 
     <template v-if="entry">
       <ViewToolbar data-testid="detail-head">
@@ -101,7 +102,7 @@ function onOpenFile(index: number, pinned: boolean): void {
     </template>
 
     <Empty v-else-if="!stash.error.value" class="p-6">
-      <EmptyMedia><CodiconIcon name="loading" :size="24" /></EmptyMedia>
+      <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
       <EmptyTitle>Loading…</EmptyTitle>
     </Empty>
   </div>

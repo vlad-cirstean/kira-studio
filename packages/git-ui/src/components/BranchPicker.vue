@@ -17,6 +17,7 @@
 import type { RefRow, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -697,13 +698,15 @@ watch(visibleBranchNames, (names) => {
               />
             </template>
           </div>
-          <Alert v-if="forceDeleteCandidate" variant="warn" class="flex items-center gap-1 rounded-none border-x-0">
+          <Alert v-if="forceDeleteCandidate" variant="warn" strip>
             <AlertDescription>“{{ forceDeleteCandidate }}” is not fully merged.</AlertDescription>
-            <Button variant="danger" size="kira" @click="confirmForceDelete">Force delete</Button>
-            <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
+            <div class="flex items-center gap-1">
+              <Button variant="danger" size="kira" @click="confirmForceDelete">Force delete</Button>
+              <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
+            </div>
           </Alert>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <div v-if="model.branchesLocal.visible.length === 0" class="px-1.5 py-1 text-kira-sm text-subtle">No branches</div>
+          <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">No branches</InlineState>
         </section>
 
         <section aria-label="Remote branches">
@@ -730,9 +733,9 @@ watch(visibleBranchNames, (names) => {
             />
           </div>
           <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
-          <div v-if="model.branchesRemote.visible.length === 0" class="px-1.5 py-1 text-kira-sm text-subtle">
+          <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
             No remote branches
-          </div>
+          </InlineState>
         </section>
         </template>
 

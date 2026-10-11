@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
 } from '@theme/components/ui/dropdown-menu';
 import { codiconName } from '../icons/index.ts';
 import type { MenuSection } from '../lib/menuModel.ts';
@@ -44,7 +45,7 @@ const emit = defineEmits<(e: 'select', id: string) => void>();
         />
       </span>
       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ item.label }}</span>
-      <span v-if="item.detail" class="ml-auto pl-2 text-kira-sm text-muted-foreground whitespace-nowrap">{{ item.detail }}</span>
+      <DropdownMenuShortcut v-if="item.detail" class="whitespace-nowrap">{{ item.detail }}</DropdownMenuShortcut>
       <span v-if="item.disabled && item.disabledReason" :id="`${item.id}-reason`" class="sr-only">
         {{ item.disabledReason }}
       </span>

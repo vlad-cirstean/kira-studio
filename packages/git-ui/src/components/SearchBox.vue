@@ -55,6 +55,7 @@
  */
 import type { SearchScope } from '@kira/git-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import {
   InputGroup,
@@ -302,15 +303,14 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
       @interact-outside="ignoreOwnRow"
       @focus-outside="ignoreOwnRow"
     >
-      <div
+      <InlineState
         v-if="search.error.value"
         :id="ERROR_ID"
-        role="alert"
+        kind="error"
         data-testid="search-error"
-        class="py-0.5 px-1 text-error text-kira-sm"
       >
         {{ errorText }}
-      </div>
+      </InlineState>
       <SearchResults
         v-else
         :model="resultsModel"

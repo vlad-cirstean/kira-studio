@@ -28,15 +28,15 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
 </script>
 
 <template>
-  <div class="shrink-0 p-1.5">
   <!-- biome-ignore lint/a11y/useSemanticElements: Alert's root is a themed div; role="region" only replaces its role="alert" -->
   <Alert
     variant="error"
+    strip
+    class="shrink-0"
     role="region"
     aria-label="Last failure"
     data-testid="failure-banner"
   >
-    <CodiconIcon name="warning" :size="16" />
     <AlertTitle>{{ notice.title }}</AlertTitle>
     <AlertDescription v-if="detail" class="whitespace-pre-wrap">{{ detail }}</AlertDescription>
     <AlertDescription data-testid="failure-banner-hint">{{ hint }}</AlertDescription>
@@ -70,5 +70,4 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
       </Button>
     </AlertAction>
   </Alert>
-  </div>
 </template>

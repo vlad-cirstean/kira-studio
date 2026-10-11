@@ -24,6 +24,7 @@ import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
@@ -558,7 +559,7 @@ const parentSelectId = useId();
     <div
       v-if="listMode === 'tree'"
       ref="treeEl"
-      class="flex-1 min-h-0 overflow-auto outline-none group"
+      class="flex-1 min-h-0 overflow-auto group"
       aria-label="File tree"
       role="tree"
       @keydown="onKeydown"
@@ -642,19 +643,19 @@ const parentSelectId = useId();
               >{{ statusLetter(row.node.change) }}</span
             >
           </span>
-          <span
+          <StatusDot
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="shrink-0 size-1 rounded-full bg-warn"
+            tone="warn"
             data-kira-tip="Changed since you reviewed it"
             aria-hidden="true"
-          ></span>
+          />
         </template>
       </div>
     </div>
     <div
       v-else
       ref="treeEl"
-      class="flex-1 min-h-0 overflow-auto outline-none group"
+      class="flex-1 min-h-0 overflow-auto group"
       aria-label="File list"
       role="listbox"
       @keydown="onKeydown"
@@ -739,12 +740,12 @@ const parentSelectId = useId();
               >{{ statusLetter(row.node.change) }}</span
             >
           </span>
-          <span
+          <StatusDot
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="shrink-0 size-1 rounded-full bg-warn"
+            tone="warn"
             data-kira-tip="Changed since you reviewed it"
             aria-hidden="true"
-          ></span>
+          />
         </template>
       </div>
     </div>

@@ -20,7 +20,6 @@
  * still announces on appearance (the whole point) without demanding attention indefinitely.
  */
 import { describeInProgress } from '@kira/git-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
@@ -74,14 +73,15 @@ const PATH_DISPLAY_CAP = 20;
 <template>
   <!-- W20: an opaque Alert surface: a translucent modal-backdrop scrim fails
        contrast over a light theme. -->
-  <div v-if="inProgress" class="shrink-0 p-1.5">
   <Alert
+    v-if="inProgress"
     variant="warn"
+    strip
+    class="shrink-0"
     role="status"
     data-testid="conflict-banner"
   >
     <div class="flex items-center gap-1">
-      <CodiconIcon name="warning" :size="16" />
       <span>{{ describeInProgress(inProgress) }}</span>
       <span v-if="inProgress.unmergedCount > 0" class="text-muted-foreground text-kira-sm">
         {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
@@ -147,5 +147,4 @@ const PATH_DISPLAY_CAP = 20;
       </li>
     </ul>
   </Alert>
-  </div>
 </template>

@@ -166,7 +166,7 @@ defineExpose({ run: runDefault });
           <CodiconIcon name="chevron-down" :size="13" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" class="w-65" aria-label="Pull strategy">
+      <DropdownMenuContent align="start" aria-label="Pull strategy">
         <MenuSections :sections="menuSections" @select="onMenuSelect" />
       </DropdownMenuContent>
     </DropdownMenu>

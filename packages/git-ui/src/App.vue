@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 /**
  * `docs/plans/P4.md` W11: the real shell. P0 sketched two empty regions and P3 hung a live-data
@@ -1702,23 +1703,26 @@ onBeforeUnmount(() => {
            surface here regardless of which sub-branch below ends up rendering (GitBlockedPanel,
            NoRepositoryPanel, the unborn-head empty state, or the full graph), not only the last of
            them. One banner, above all of them, rather than duplicated into just one branch. -->
-      <div
+      <Alert
         v-if="bootError"
-        class="flex items-center gap-1 py-1 px-1.5 bg-hover border-b border-border shrink-0 font-ui text-error"
+        variant="error"
+        strip
+        class="shrink-0"
         role="status"
         data-testid="boot-error-banner"
       >
-        <span>Couldn't load the repository — {{ bootError }}</span>
-        <Button
-          variant="dialog"
-          size="kira"
-          class="ml-auto"
-          data-testid="boot-error-banner-retry"
-          @click="retryBootstrap"
-        >
-          Retry
-        </Button>
-      </div>
+        <AlertDescription>Couldn't load the repository — {{ bootError }}</AlertDescription>
+        <AlertAction class="top-1/2 -translate-y-1/2">
+          <Button
+            variant="dialog"
+            size="kira"
+            data-testid="boot-error-banner-retry"
+            @click="retryBootstrap"
+          >
+            Retry
+          </Button>
+        </AlertAction>
+      </Alert>
 
       <GitBlockedPanel
         v-if="repoState.git.value.kind !== 'ok'"

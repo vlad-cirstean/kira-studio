@@ -22,8 +22,9 @@
  * `<FileTree>` here is `flex-auto` and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
 import { computed } from 'vue';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -68,9 +69,9 @@ function onOpenFile(index: number, pinned: boolean): void {
 
 <template>
   <div data-testid="detail-pane" class="flex flex-col min-h-0 h-full">
-    <p v-if="detailState.error.value" class="m-0 p-3 text-error">
+    <FieldError v-if="detailState.error.value" class="p-3">
       Couldn't load this commit — {{ detailState.error.value }}
-    </p>
+    </FieldError>
 
     <template v-if="detail">
       <CommitMeta
@@ -99,7 +100,7 @@ function onOpenFile(index: number, pinned: boolean): void {
     </template>
 
     <Empty v-else-if="!detailState.error.value" class="h-full p-6">
-      <EmptyMedia><CodiconIcon name="loading" :size="24" /></EmptyMedia>
+      <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
       <EmptyTitle>Loading…</EmptyTitle>
     </Empty>
   </div>

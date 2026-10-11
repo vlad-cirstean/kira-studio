@@ -30,7 +30,9 @@
  * `select`, which `App.vue` routes to `WorkingDetailState.select(true)` — the IPC method the
  * original v1 note said this needed, `working.detail`, now exists.
  */
+import { rowVariants } from '@theme/components/rowVariants';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { GEOMETRY } from '../graph/geometry.ts';
 import { laneClass } from '../graph/palette.ts';
@@ -133,7 +135,7 @@ const tooltipText = computed(() => {
   <button
     v-if="visible"
     type="button"
-    class="shrink-0 flex items-center w-full h-graph-row-compact border-0 border-b border-border bg-bg text-inherit text-left cursor-pointer hover:bg-hover focus-visible:focus-ring"
+    :class="cn(rowVariants({ layout: 'tree' }), 'shrink-0 w-full min-h-0 h-graph-row-compact border-0 border-b border-border bg-bg text-inherit text-left cursor-pointer')"
     data-testid="uncommitted-strip"
     @click="emit('select')"
   >
@@ -168,7 +170,7 @@ const tooltipText = computed(() => {
           {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}
         </span>
       </TooltipTrigger>
-      <TooltipContent class="whitespace-pre-line">{{ tooltipText }}</TooltipContent>
+      <TooltipContent>{{ tooltipText }}</TooltipContent>
     </Tooltip>
   </button>
 </template>

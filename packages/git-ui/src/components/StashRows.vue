@@ -10,6 +10,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * (Pop/Drop/`stashSaveGlobal` exist only on a real stack entry), so a selected id is bubbled up
  * via `menuSelect` for the caller's own `switch`.
  */
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
@@ -92,14 +93,13 @@ function onMenuSelect(id: string): void {
     v-for="entry in section.visible"
     :key="entry.sha"
     class="flex items-center gap-0.5 px-1"
-    :class="{ 'bg-hover': stash.selectedSha.value === entry.sha }"
     :data-kira-tip="rowModel(entry).rowTooltip"
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
     <button data-testid="branch-row-main"
       type="button"
-      :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
+      :class="cn(rowVariants({ selected: stash.selectedSha.value === entry.sha }), 'flex-1 min-w-0 text-left')"
       @click="select(entry)"
     >
       <CodiconIcon name="archive" :size="13" />
@@ -124,7 +124,7 @@ function onMenuSelect(id: string): void {
     />
   </div>
   <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-  <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptyMessage }}</div>
+  <InlineState v-if="section.visible.length === 0" kind="empty">{{ emptyMessage }}</InlineState>
 
   <RowContextMenu
     v-if="stashMenu"

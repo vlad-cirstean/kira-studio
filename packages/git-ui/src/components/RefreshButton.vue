@@ -20,6 +20,8 @@
  * one `hasPendingChange` state.
  */
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
@@ -71,9 +73,6 @@ defineExpose({ refresh: doRefresh });
 </script>
 
 <template>
-  <!-- The icon is now a direct Button child, so the spin class goes straight on it — no more
-       arbitrary descendant-selector workaround. Pre-approved spinner change (§1.4/§6.4): the
-       stepped 1.5s rotation becomes Tailwind's smooth 1s `animate-spin`. -->
   <Tooltip>
     <TooltipTrigger as-child>
       <Button
@@ -84,12 +83,14 @@ defineExpose({ refresh: doRefresh });
         aria-label="Refresh"
         @click="doRefresh"
       >
-        <CodiconIcon name="refresh" :size="13" :class="{ 'animate-spin': isRefreshing }" />
-        <span
+        <Spinner v-if="isRefreshing" icon="refresh" label="" />
+        <CodiconIcon v-else name="refresh" :size="13" />
+        <StatusDot
           v-if="hasPendingChange"
-          class="absolute top-0.75 right-0.75 size-1.5 rounded-full bg-focus"
+          class="absolute top-0.5 right-0.5"
+          color="var(--kira-focus)"
           aria-hidden="true"
-        ></span>
+        />
       </Button>
     </TooltipTrigger>
     <TooltipContent>{{ tooltip }}</TooltipContent>

@@ -52,9 +52,8 @@ const isEmpty = computed(() => props.model.sections.length === 0);
  *  same property; §1.3). */
 function optionClass(option: SearchOption): string {
   return cn(
-    rowVariants({ layout: 'tree', data: true }),
+    rowVariants({ layout: 'tree', data: true, selected: option.id === props.highlightedId }),
     'pl-2',
-    option.id === props.highlightedId ? 'bg-hover' : '',
   );
 }
 </script>

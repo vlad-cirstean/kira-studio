@@ -23,6 +23,7 @@
  */
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -307,9 +308,7 @@ const stashDisabled = computed(
       role="status"
       aria-live="polite"
     >
-      <!-- Pre-approved spinner change (P110 I2-35, §1.4/§3.11.1): codicon's own stepped 1.5s
-           spin -> Tailwind's smooth 1s `animate-spin`, the same change already made just below. -->
-      <CodiconIcon name="sync" :size="13" class="animate-spin" />
+      <Spinner icon="sync" label="" />
       Restacking…
     </span>
     <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
@@ -377,7 +376,7 @@ const stashDisabled = computed(
               <CodiconIcon name="chevron-down" :size="13" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-40" aria-label="Push options">
+          <DropdownMenuContent align="end" aria-label="Push options">
             <MenuSections :sections="pushMenuSections" @select="onPushMenuSelect" />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -448,9 +447,7 @@ const stashDisabled = computed(
       class="inline-flex items-center h-control-sm px-1.5 rounded-kira-sm gap-1 text-muted-foreground text-kira-sm"
       data-testid="remote-progress"
     >
-      <!-- Pre-approved spinner change (§1.4/§6.4): stepped 1.5s rotation -> Tailwind's smooth 1s
-           `animate-spin`. -->
-      <CodiconIcon name="loading" :size="13" class="animate-spin" />
+      <Spinner label="" />
       <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65">{{ progressText }}</span>
       <TooltipIconButton
         icon="close"
