@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
+import { t } from '@theme/i18n';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import { useConnectionsStore } from '../state/connections';
 import { isVisible, toSets } from './filter';
@@ -114,9 +115,12 @@ export function nodeRows(
   function reasonFor(node: TreeNode, ancestorHiddenName: string | null): string | null {
     if (hiddenKinds.has(node.kind)) {
       const label = connectionKind ? labelForKind(node.kind, connectionKind) : node.kind;
-      return `Hidden by the "${label}" type filter`;
+      return t('studio.project.filtersDialog.reason.kindHidden.tooltip', { label });
     }
-    if (ancestorHiddenName) return `Hidden because "${ancestorHiddenName}" is hidden`;
+    if (ancestorHiddenName)
+      return t('studio.project.filtersDialog.reason.ancestorHidden.tooltip', {
+        name: ancestorHiddenName,
+      });
     return null;
   }
 

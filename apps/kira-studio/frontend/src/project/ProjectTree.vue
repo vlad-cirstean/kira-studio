@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
@@ -230,7 +231,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         class="virtual-list h-full overflow-auto"
         data-testid="virtual-list"
         role="tree"
-        aria-label="Project tree"
+        :aria-label="t('studio.project.tree.aria')"
         @scroll="onScroll"
       >
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
@@ -271,7 +272,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
       data-testid="search-incomplete-note"
     >
       <AlertDescription>
-        Searching cached nodes only — expand more of the tree to include it.
+        {{ t('studio.project.tree.searchIncomplete.body') }}
       </AlertDescription>
     </Alert>
   </div>

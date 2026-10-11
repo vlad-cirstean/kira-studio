@@ -2,6 +2,7 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { CatalogText, t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
@@ -30,6 +31,12 @@ import {
 // document is now a deliberate override for what that cache cannot serve: a schema that doesn't
 // exist yet, an engine with no SchemaColumns capability, or a connection this app cannot
 // introspect. The dialog, saveDdl/ensureDdl and the connection-row menu entry are unchanged.
+
+const DDL_SOURCES = {
+  pgDump: 'pg_dump --schema-only',
+  showCreate: 'SHOW CREATE TABLE',
+  sqliteSchema: '.schema',
+};
 
 const connectionsStore = useConnectionsStore();
 const schemaDialogStore = useSchemaDialogStore();
@@ -118,16 +125,16 @@ async function onSave(): Promise<void> {
   <Dialog :open="true" @update:open="(v) => !v && schemaDialogStore.closeSchemaDialog()">
     <DialogContent size="xl" data-testid="schema-dialog">
       <DialogHeader close-testid="schema-dialog-close">
-        <DialogTitle
-          >Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
-        >
+        <DialogTitle>{{
+          connectionName
+            ? t('studio.project.schemaDialog.dialog.named.title', { connectionName })
+            : t('studio.project.schemaDialog.dialog.title')
+        }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody class="h-[60vh] flex-none">
       <span class="help text-subtle text-kira-sm leading-normal">
-        Table and column completion for this connection normally fills in on its own from the
-        connection's own cached schema metadata — no setup needed. Paste a schema here only to
-        override that: a schema that doesn't exist yet, or a connection this app can't introspect.
+        {{ t('studio.project.schemaDialog.intro.body') }}
       </span>
       <div class="flex-1 min-h-0 overflow-hidden rounded-kira-sm border border-border">
         <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
@@ -149,9 +156,11 @@ async function onSave(): Promise<void> {
         <AlertDescription>
           <span v-if="parseSummary">{{ parseSummary }}</span>
           <span v-else class="text-subtle text-kira-sm">
-            Paste output from <span class="font-data">pg_dump --schema-only</span>,
-            <span class="font-data">SHOW CREATE TABLE</span> or <span class="font-data">.schema</span> —
-            whichever your connection's own engine gives you.
+            <CatalogText k="studio.project.schemaDialog.pasteHint.hint">
+              <template #pgDump><span class="font-data">{{ DDL_SOURCES.pgDump }}</span></template>
+              <template #showCreate><span class="font-data">{{ DDL_SOURCES.showCreate }}</span></template>
+              <template #sqliteSchema><span class="font-data">{{ DDL_SOURCES.sqliteSchema }}</span></template>
+            </CatalogText>
           </span>
         </AlertDescription>
       </Alert>
@@ -160,11 +169,13 @@ async function onSave(): Promise<void> {
       <DialogFooter>
         <template #start>
           <FieldError v-if="saveError" data-testid="schema-save-error">{{ saveError }}</FieldError>
-          <span v-else class="help text-subtle text-kira-sm leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+          <span v-else class="help text-subtle text-kira-sm leading-normal"><CatalogText k="studio.project.connectionScope.hint">
+              <template #connectionName><span class="font-data">{{ connectionName }}</span></template>
+            </CatalogText></span>
         </template>
-        <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
-          Save schema
+          {{ t('common.action.save.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

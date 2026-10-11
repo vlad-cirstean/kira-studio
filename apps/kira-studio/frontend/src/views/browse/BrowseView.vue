@@ -13,6 +13,7 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -148,8 +149,8 @@ const selectedNode = computed<TreeNode | null>(() => {
 const previewable = computed(() => !!selectedNode.value && !selectedNode.value.hasChildren);
 const emptyPreviewLabel = computed(() =>
   targetTail.value?.kind === 'bucket'
-    ? 'Select an object to view it'
-    : 'Select a key to view its value',
+    ? t('studio.browse.detail.selectObject.empty')
+    : t('studio.browse.detail.selectKey.empty'),
 );
 const emptyPreviewIcon = computed(() => (targetTail.value?.kind === 'bucket' ? 'file' : 'tag'));
 
@@ -333,7 +334,7 @@ onMounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           data-testid="browse-refresh"
           @click="onReload"
         />
@@ -343,7 +344,7 @@ onMounted(() => {
              only what is view-scoped: filter, upload, and the refresh/stop group above. -->
         <TooltipIconButton
           icon="search"
-          label="Filter"
+          :label="t('common.action.filter.label')"
           :class="{ 'bg-field text-fg': filterOpen }"
           data-testid="browse-filter-toggle"
           @click="toggleFilter"
@@ -351,7 +352,7 @@ onMounted(() => {
         <TooltipIconButton
           v-if="canUpload"
           icon="cloud-upload"
-          label="Upload file…"
+          :label="t('studio.browse.upload.label')"
           data-testid="browse-upload"
           @click="onUploadClick"
         />
@@ -365,7 +366,7 @@ onMounted(() => {
     </ViewToolbar>
 
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
-          <div class="flex w-full font-ui"><SearchField :model-value="filterText" placeholder="Filter" data-testid="browse-filter" @update:model-value="(v: string | number) => (filterText = String(v))" /></div>
+          <div class="flex w-full font-ui"><SearchField :model-value="filterText" :placeholder="t('studio.browse.filter.placeholder')" data-testid="browse-filter" @update:model-value="(v: string | number) => (filterText = String(v))" /></div>
         </div>
         <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="browse-error">
           <AlertDescription>{{ rt.error.message }}</AlertDescription>
@@ -378,7 +379,7 @@ onMounted(() => {
              nothing failed, the listing is real, it's just incomplete. -->
         <Alert strip v-if="rt?.truncated" variant="warn" data-testid="browse-truncated">
           <AlertDescription>
-            This level stopped short of the full listing — Refresh to try again.
+            {{ t('studio.browse.truncated.body') }}
           </AlertDescription>
         </Alert>
 
@@ -390,7 +391,7 @@ onMounted(() => {
            just the list — a disconnected connection means neither side has anything live to show. -->
       <Empty v-if="needsReconnect" data-testid="browse-reconnect">
         <Button variant="dialog-primary" size="kira-lg" data-testid="browse-reconnect-load" @click="onReconnectAndLoad">
-          Reconnect & load
+          {{ t('studio.browse.reconnectAndLoad.label') }}
         </Button>
       </Empty>
       <div v-else class="flex flex-row flex-1 min-h-0">
@@ -402,7 +403,7 @@ onMounted(() => {
           <ViewToolbar data-testid="browse-list-head">
             <TooltipIconButton
               icon="chevron-left"
-              label="Back"
+              :label="t('common.action.back.label')"
               disabled-trigger
               :disabled="atRoot"
               data-testid="browse-up"
@@ -431,17 +432,17 @@ onMounted(() => {
           <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
             <Empty v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full">
               <EmptyMedia><Spinner :size="24" /></EmptyMedia>
-              <EmptyTitle>Loading…</EmptyTitle>
+              <EmptyTitle>{{ t('common.state.loading.loading') }}</EmptyTitle>
             </Empty>
             <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-md text-muted-foreground" data-testid="browse-empty">
-              No items
+              {{ t('studio.browse.items.empty') }}
             </div>
             <div
               v-else-if="filteredNodes.length === 0"
               class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
               data-testid="browse-empty"
             >
-              No matching items
+              {{ t('common.state.noMatches.empty') }}
             </div>
             <div
               v-else
@@ -449,7 +450,7 @@ onMounted(() => {
               class="h-full overflow-auto"
               data-testid="virtual-list"
               role="listbox"
-              aria-label="Keys"
+              :aria-label="t('studio.browse.list.aria')"
               @scroll="onScroll"
             >
               <div class="relative" :style="{ height: `${totalSize}px` }">
@@ -510,7 +511,7 @@ onMounted(() => {
         </div>
 
         <ResizeHandle
-          label="Resize list"
+          :label="t('studio.common.resizeList.aria')"
           line
           :min="220"
           :max="900"

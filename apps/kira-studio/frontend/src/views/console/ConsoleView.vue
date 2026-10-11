@@ -18,9 +18,9 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
-import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -38,6 +38,7 @@ import { INLINE_CHARS } from '../../workers/parse/client';
 import { useParseWorker } from '../../workers/parse/useParseWorker';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import { reasonText } from '../shared/reasonText';
 import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
@@ -267,10 +268,10 @@ const canExplain = computed(
     isExplainable(statementAtCursorText.value),
 );
 const explainTooltip = computed(() => {
-  if (running.value) return 'A run is already in progress';
+  if (running.value) return t('studio.console.explain.running.tooltip');
   return canExplain.value
-    ? 'Explain the statement under the cursor'
-    : 'Put the cursor in a SELECT or WITH statement to explain it';
+    ? t('studio.console.explain.ready.tooltip')
+    : t('studio.console.explain.blocked.tooltip');
 });
 // D9's own precedent: a component-local strip, not a runtime-shape change (the manual button's
 // own failure is shown; auto-explain's failure path — C14 — degrades silently instead, D19 rule 6).
@@ -285,17 +286,17 @@ const autoExplainMessage = computed(() => {
   const state = rt.value?.autoExplain;
   if (!state) return '';
   if (state.kind === 'truncated') {
-    return "This query's plan was too large to check for problems — it will still run normally.";
+    return t('studio.console.autoExplain.truncated.body');
   }
   const worst = state.plans[state.worstIndex]?.plan;
   if (!worst) return '';
   const parts: string[] = [];
   if (worst.estimatedRowsRead !== undefined) {
-    parts.push(`Estimated to read ${formatCount(worst.estimatedRowsRead)} rows`);
+    parts.push(t('studio.console.plan.estimatedRows.status', { count: worst.estimatedRowsRead }));
   }
   const firstWarning = worst.issues.find((i) => i.severity === 'warn');
   if (firstWarning) parts.push(firstWarning.message);
-  return parts.join(' · ') || 'This query may be expensive to run';
+  return parts.join(' · ') || t('studio.console.autoExplain.expensive.status');
 });
 const canShowAutoExplainPlan = computed(() => rt.value?.autoExplain?.kind === 'plans');
 
@@ -378,7 +379,7 @@ async function ensureConnectedForRun(): Promise<boolean> {
     if (await onReconnectAndLoad()) return true;
     const id = props.tab.connectionId;
     connectError.value =
-      (id ? connectionsStore.states[id]?.error : undefined) ?? 'Could not connect.';
+      (id ? connectionsStore.states[id]?.error : undefined) ?? t('studio.console.connectFailed.error');
   } catch (e) {
     connectError.value = errorText(e);
   }
@@ -462,7 +463,7 @@ function onFormat(): void {
     } catch (e) {
       // AbortError: the view unmounted mid-run.
       if (!(e instanceof DOMException && e.name === 'AbortError')) {
-        formatError.value = e instanceof Error ? e.message : 'could not format this query';
+        formatError.value = e instanceof Error ? e.message : t('studio.console.format.failed.error');
       }
       return;
     } finally {
@@ -475,7 +476,7 @@ function onFormat(): void {
     // success to react to (resetStalePreviewState/setText/the cursor remap/the warning-or-note
     // strips below all assume `result` describes the document currently on screen).
     if (props.tab.state.text !== originalText) {
-      formatNote.value = 'Text changed while formatting — press Format again.';
+      formatNote.value = t('studio.console.format.stale.body');
       return;
     }
     // Explicit, not left to the watch() above alone: an already-formatted document formats to
@@ -484,7 +485,7 @@ function onFormat(): void {
     // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
     resetStalePreviewState();
     if (!result.ok) {
-      formatError.value = result.reason ?? 'could not format this query';
+      formatError.value = result.reason ? reasonText(result.reason) : t('studio.console.format.failed.error');
       return;
     }
     setText(props.tab.id, result.text);
@@ -513,7 +514,12 @@ function onFormat(): void {
         const first = result.failures[0];
         if (first) {
           const formattedCount = before.length - result.failures.length;
-          formatWarning.value = `Formatted ${formattedCount} of ${before.length} statements — statement ${first.index + 1} could not be parsed: ${first.reason}`;
+          formatWarning.value = t('studio.console.format.partial.error', {
+            formatted: formattedCount,
+            count: before.length,
+            index: first.index + 1,
+            reason: reasonText(first.reason),
+          });
         }
       } else if (result.text === originalText) {
         // F19's other silent no-op: keywordCase: 'preserve' (P13 D4) means Format only ever
@@ -525,8 +531,8 @@ function onFormat(): void {
         // and there was nothing to change".
         formatNote.value =
           kind === 'clickhouse'
-            ? 'Already formatted — indentation only; keywords keep the case you typed (ClickHouse identifiers).'
-            : 'Already formatted — indentation only; keywords keep the case you typed.';
+            ? t('studio.console.format.alreadyClickhouse.body')
+            : t('studio.console.format.already.body');
       }
     });
   })();
@@ -632,21 +638,21 @@ function onResultContextMenu(e: MouseEvent, key: string, index: number): void {
     {
       type: 'item',
       id: 'close',
-      label: 'Close',
+      label: t('common.action.close.label'),
       icon: 'close',
       run: () => consoleViewStore.closeResult(props.tab.id, key),
     },
     {
       type: 'item',
       id: 'close-other-results',
-      label: 'Close others',
+      label: t('common.action.closeOthers.label'),
       disabled: total <= 1,
       run: () => consoleViewStore.closeOtherResults(props.tab.id, key),
     },
     {
       type: 'item',
       id: 'close-results-to-the-right',
-      label: 'Close to the right',
+      label: t('common.action.closeToTheRight.label'),
       disabled: index >= total - 1,
       run: () => consoleViewStore.closeResultsToTheRight(props.tab.id, key),
     },
@@ -685,7 +691,7 @@ const statusLine = computed(() => {
         <CodiconIcon name="terminal" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="console-target">{{
-        targetTail?.name ?? tab.path ?? 'Console'
+        targetTail?.name ?? tab.path ?? t('studio.console.target.fallback.label')
       }}</span>
       <span class="ml-auto flex items-center gap-1"></span>
     </ViewToolbar>
@@ -702,7 +708,7 @@ const statusLine = computed(() => {
              permanently-grey button sitting in the rail for no reason a user can see. -->
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           disabled-trigger
           data-testid="console-refresh"
           :disabled="!needsReconnect"
@@ -710,7 +716,7 @@ const statusLine = computed(() => {
         />
         <TooltipIconButton
           icon="debug-stop"
-          label="Stop"
+          :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': running }"
           data-testid="console-stop"
@@ -729,11 +735,11 @@ const statusLine = computed(() => {
                 @click="runStatement"
               >
                 <CodiconIcon name="play" :size="13" />
-                Run
+                {{ t('common.action.run.label') }}
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>Run the statement under the cursor</TooltipContent>
+          <TooltipContent>{{ t('studio.console.run.tooltip') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -746,11 +752,11 @@ const statusLine = computed(() => {
                 @click="runAll"
               >
                 <CodiconIcon name="run-all" :size="13" />
-                Run all
+                {{ t('common.action.runAll.label') }}
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>Run every statement in the editor</TooltipContent>
+          <TooltipContent>{{ t('studio.console.runAll.tooltip') }}</TooltipContent>
         </Tooltip>
         <Tooltip v-if="canFormat">
           <TooltipTrigger as-child>
@@ -763,11 +769,11 @@ const statusLine = computed(() => {
                 @click="onFormat"
               >
                 <CodiconIcon name="indent" :size="13" />
-                Format
+                {{ t('studio.console.format.label') }}
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>Format the query text</TooltipContent>
+          <TooltipContent>{{ t('studio.console.format.tooltip') }}</TooltipContent>
         </Tooltip>
         <!-- P18 D12: SQL-only (unlike Format, which also covers the Mongo console) — absent, not
              disabled, on a non-SQL console; disabled-with-tooltip (not hidden) on a SQL console
@@ -784,7 +790,7 @@ const statusLine = computed(() => {
                 @click="onExplain"
               >
                 <CodiconIcon name="list-tree" :size="13" />
-                Explain
+                {{ t('studio.console.explain.label') }}
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
@@ -798,9 +804,9 @@ const statusLine = computed(() => {
         <TooltipIconButton
           icon="layers"
           :label="tab.state.newResultSet
-              ? 'Running adds a new result set — click to replace instead'
-              : 'Running replaces the current result sets — click to add a new one instead'"
-          aria-label="New result set toggle"
+              ? t('studio.console.newResultSet.add.tooltip')
+              : t('studio.console.newResultSet.replace.tooltip')"
+          :aria-label="t('studio.console.newResultSet.toggle.aria')"
           :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
           data-testid="console-new-result-toggle"
           @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
@@ -817,10 +823,10 @@ const statusLine = computed(() => {
                 @click="savedMenuOpen = !savedMenuOpen"
               >
                 <CodiconIcon name="bookmark" :size="13" />
-                Saved queries
+                {{ t('studio.console.savedMenu.title') }}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Saved queries</TooltipContent>
+            <TooltipContent>{{ t('studio.console.savedMenu.title') }}</TooltipContent>
           </Tooltip>
           <Popover :open="savedMenuOpen" @update:open="(v) => (savedMenuOpen = v)">
             <PopoverAnchor :reference="(savedMenuTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
@@ -833,7 +839,7 @@ const statusLine = computed(() => {
         <TooltipIconButton
           v-if="!activeResultIsPlan"
           icon="search"
-          label="Find in the active result set"
+          :label="t('studio.console.findInResult.label')"
           :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
           data-testid="console-search"
           @click="onToggleSearch"
@@ -879,7 +885,7 @@ const statusLine = computed(() => {
           data-testid="console-auto-explain-show-plan"
           @click="onShowAutoExplainPlan"
         >
-          Show plan
+          {{ t('studio.console.autoExplain.showPlan.label') }}
         </button>
       </AlertAction>
     </Alert>
@@ -942,14 +948,14 @@ const statusLine = computed(() => {
                 @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
               >
                 <CodiconIcon :name="iconForResult(result.key)" :size="13" class="shrink-0" />
-                <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">Result {{ i + 1 }}</span>
+                <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">{{ t('studio.console.result.tab.label', { n: i + 1 }) }}</span>
               </button>
               <Button
                 variant="toolbar"
                 size="kira-icon"
                 class="size-4"
                 :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
-                aria-label="Close result"
+                :aria-label="t('studio.console.result.close.aria')"
                 data-testid="console-result-close"
                 @click="consoleViewStore.closeResult(tab.id, result.key)"
               >
@@ -965,13 +971,13 @@ const statusLine = computed(() => {
           <template v-if="activeResultIsDocument">
             <TooltipIconButton
               icon="expand-all"
-              label="Expand all"
+              :label="t('common.action.expandAll.label')"
               data-testid="console-expand-all"
               @click="onExpandAllResults"
             />
             <TooltipIconButton
               icon="collapse-all"
-              label="Collapse all"
+              :label="t('common.action.collapseAll.label')"
               data-testid="console-collapse-all"
               @click="onCollapseAllResults"
             />
@@ -988,7 +994,7 @@ const statusLine = computed(() => {
         />
         <Alert strip v-if="activeResultTruncated?.truncated" variant="warn" data-testid="console-result-truncated">
           <AlertDescription>
-            Result stopped at {{ formatCount(activeResultTruncated.rows) }} rows (console limit). Narrow the query to see the rest.
+            {{ t('studio.console.result.truncated.body', { count: activeResultTruncated.rows }) }}
           </AlertDescription>
         </Alert>
         <div class="flex-1 min-h-0">

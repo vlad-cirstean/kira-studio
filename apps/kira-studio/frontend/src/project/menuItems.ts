@@ -1,5 +1,6 @@
 import { decodePath } from '@shared/domain/tree';
-import { copyAnnounced } from '@workbench/behaviour/clipboard';
+import { t } from '@theme/i18n';
+import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
@@ -65,7 +66,7 @@ export function openItems(
     {
       type: 'item',
       id: `${opts.idBase}-new-tab`,
-      label: `${opts.label} in new tab`,
+      label: t('common.action.openInNewTab.label'),
       icon: opts.icon,
       run: () => {
         opts.openTab(row.connectionId, row.path, { newTab: true });
@@ -81,7 +82,7 @@ export function definitionItem(row: MenuRowLike): MenuItem[] {
     {
       type: 'item',
       id: 'open-definition',
-      label: 'Open definition',
+      label: t('studio.project.menu.openDefinition.label'),
       icon: 'file-code',
       run: () => {
         useTabsStore().openDefinitionTab(row.connectionId, row.path);
@@ -95,19 +96,23 @@ export function copyNameItems(row: MenuRowLike, qualified = false): MenuItem[] {
     {
       type: 'item',
       id: 'copy-name',
-      label: 'Copy name',
+      label: t('common.action.copyName.label'),
       icon: 'copy',
       shortcut: 'tree.copyName',
-      run: () => void copyAnnounced(row.name, 'name'),
+      run: () => void copyAndAnnounce(row.name, t('common.copy.copiedName.announce')),
     },
   ];
   if (qualified) {
     items.push({
       type: 'item',
       id: 'copy-qualified-name',
-      label: 'Copy qualified name',
+      label: t('studio.project.menu.copyQualifiedName.label'),
       icon: 'copy',
-      run: () => void copyAnnounced(qualifiedNameFor(row), 'qualified name'),
+      run: () =>
+        void copyAndAnnounce(
+          qualifiedNameFor(row),
+          t('studio.project.menu.copyQualifiedName.announce'),
+        ),
     });
   }
   return items;
@@ -119,7 +124,7 @@ export function refreshItem(row: MenuRowLike): MenuItem {
   return {
     type: 'item',
     id: 'refresh',
-    label: 'Refresh',
+    label: t('common.action.refresh.label'),
     icon: 'refresh',
     run: () => useTreeStore().refreshObject(row.connectionId, row.path),
   };

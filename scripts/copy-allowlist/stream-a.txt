@@ -1,27 +1,4 @@
 # Stream A (Kira Studio): apps/kira-studio/frontend/src/**. Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-studio/frontend/src/project/DataGripImportDialog.vue
-apps/kira-studio/frontend/src/project/ErrorPopover.vue
-apps/kira-studio/frontend/src/project/FiltersDialog.vue
-apps/kira-studio/frontend/src/project/ProjectTree.vue
-apps/kira-studio/frontend/src/project/SchemaDialog.vue
-apps/kira-studio/frontend/src/project/credentialPaste/CredentialPastePanel.vue
-apps/kira-studio/frontend/src/project/credentialPaste/parse.ts
-apps/kira-studio/frontend/src/project/menuItems.ts
-apps/kira-studio/frontend/src/project/menus.ts
-apps/kira-studio/frontend/src/project/state/connectionReveal.ts
-apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue
-apps/kira-studio/frontend/src/shortcuts/state.ts
-apps/kira-studio/frontend/src/state/objectStore.ts
-apps/kira-studio/frontend/src/state/tabKinds.ts
-apps/kira-studio/frontend/src/views/browse/BrowseView.vue
-apps/kira-studio/frontend/src/views/browse/menu.ts
-apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue
-apps/kira-studio/frontend/src/views/console/ConsoleSavedMenu.vue
-apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue
-apps/kira-studio/frontend/src/views/console/ConsoleView.vue
-apps/kira-studio/frontend/src/views/console/ExplainResultView.vue
-apps/kira-studio/frontend/src/views/console/completion.ts
-apps/kira-studio/frontend/src/views/console/format.ts
 apps/kira-studio/frontend/src/views/console/lint.ts
 apps/kira-studio/frontend/src/views/console/plan.ts
 apps/kira-studio/frontend/src/views/console/planIssues.ts
@@ -117,3 +94,4 @@ apps/kira-studio/frontend/src/workbench/settings/CachePane.vue
 apps/kira-studio/frontend/src/workbench/settings/DataPane.vue
 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue
 permanent U67 apps/kira-studio/frontend/src/fonts.ts # font family names (system and installed typefaces are proper names, not wording)
+permanent U67 apps/kira-studio/frontend/src/views/console/completion.ts # Redis command syntax hints (command grammar, not wording)

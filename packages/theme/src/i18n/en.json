@@ -7512,12 +7512,47 @@
         "error": "Unterminated tag at offset {offset}."
       }
     },
+    "browse": {
+      "deleteObjectConfirm": {
+        "body": "“{name}” will be removed from the bucket.",
+        "title": "Delete object?"
+      },
+      "detail": {
+        "selectKey": {
+          "empty": "Select a key to view its value"
+        },
+        "selectObject": {
+          "empty": "Select an object to view it"
+        }
+      },
+      "filter": {
+        "placeholder": "Filter items"
+      },
+      "items": {
+        "empty": "No items"
+      },
+      "list": {
+        "aria": "Keys"
+      },
+      "reconnectAndLoad": {
+        "label": "Reconnect and load"
+      },
+      "truncated": {
+        "body": "This level stopped short of the full listing. Refresh it to load the rest."
+      },
+      "upload": {
+        "label": "Upload file…"
+      }
+    },
     "common": {
       "allFiles": {
         "label": "All files"
       },
       "browse": {
         "label": "Browse…"
+      },
+      "cellTruncated": {
+        "tooltip": "Value truncated at {size}"
       },
       "continue": {
         "label": "Continue"
@@ -7534,8 +7569,185 @@
       "import": {
         "label": "Import"
       },
+      "nullValue": {
+        "label": "NULL"
+      },
       "regenerate": {
         "label": "Regenerate"
+      },
+      "resizeList": {
+        "aria": "Resize list"
+      }
+    },
+    "console": {
+      "autoExplain": {
+        "expensive": {
+          "status": "This query may be expensive to run"
+        },
+        "showPlan": {
+          "label": "Show plan"
+        },
+        "truncated": {
+          "body": "This query’s plan was too large to check for problems. It still runs normally."
+        }
+      },
+      "connectFailed": {
+        "error": "Couldn’t connect."
+      },
+      "explain": {
+        "blocked": {
+          "tooltip": "Put the cursor in a read query to explain it"
+        },
+        "label": "Explain",
+        "ready": {
+          "tooltip": "Explain the statement under the cursor"
+        },
+        "running": {
+          "tooltip": "A run is already in progress"
+        }
+      },
+      "findInResult": {
+        "label": "Find in the active result set"
+      },
+      "format": {
+        "already": {
+          "body": "Already formatted. Format only changes indentation; keywords keep the case you typed."
+        },
+        "alreadyClickhouse": {
+          "body": "Already formatted. Format only changes indentation; keywords keep the case you typed (ClickHouse identifiers)."
+        },
+        "engine": {
+          "error": "{message}"
+        },
+        "failed": {
+          "error": "Couldn’t format this query."
+        },
+        "invalidArgument": {
+          "error": "Invalid argument."
+        },
+        "label": "Format",
+        "mongoMethod": {
+          "error": "Unsupported console method: {method}"
+        },
+        "mongoShape": {
+          "error": "Expected {pattern}"
+        },
+        "nothingToFormat": {
+          "error": "This console has nothing to format."
+        },
+        "partial": {
+          "error": "Formatted {formatted} of {count} statement. Statement {index} couldn’t be parsed: {reason} | Formatted {formatted} of {count} statements. Statement {index} couldn’t be parsed: {reason}"
+        },
+        "stale": {
+          "body": "Text changed while formatting. Format it again."
+        },
+        "tooltip": "Format the query text",
+        "trailing": {
+          "error": "Unexpected trailing content after statement."
+        }
+      },
+      "newResultSet": {
+        "add": {
+          "tooltip": "Running adds a new result set; click to replace instead"
+        },
+        "replace": {
+          "tooltip": "Running replaces the current result sets; click to add a new one instead"
+        },
+        "toggle": {
+          "aria": "New result set toggle"
+        }
+      },
+      "plan": {
+        "cost": {
+          "generic": {
+            "label": "Cost {value}"
+          },
+          "mariadb": {
+            "label": "MariaDB cost {value}"
+          },
+          "mysql": {
+            "label": "MySQL cost {value}"
+          },
+          "postgres": {
+            "label": "PostgreSQL planner cost {value}"
+          }
+        },
+        "empty": {
+          "empty": "No plan"
+        },
+        "estimatedRows": {
+          "status": "Estimated to read {count} row | Estimated to read {count} rows"
+        },
+        "nativeCost": {
+          "tooltip": "Cost units differ between engines, so this figure isn’t comparable to another engine’s"
+        },
+        "nodeRows": {
+          "label": "~{count} row | ~{count} rows"
+        },
+        "noEstimate": {
+          "body": "No row estimate available for this plan."
+        },
+        "noIssues": {
+          "empty": "No issues found"
+        },
+        "overThreshold": {
+          "status": "Estimated to read {count} row, at or above the {threshold}-row threshold | Estimated to read {count} rows, at or above the {threshold}-row threshold"
+        },
+        "raw": {
+          "aria": "Show raw EXPLAIN output",
+          "label": "Raw",
+          "tooltip": "Show the raw EXPLAIN output the server returned"
+        },
+        "sqliteNoEstimate": {
+          "body": "SQLite’s query planner reports no row estimates, so the expensive-query threshold doesn’t apply here."
+        }
+      },
+      "result": {
+        "close": {
+          "aria": "Close result"
+        },
+        "documents": {
+          "aria": "Documents"
+        },
+        "noMatchingRows": {
+          "empty": "No matching rows"
+        },
+        "noRows": {
+          "empty": "No rows"
+        },
+        "rows": {
+          "aria": "Result rows"
+        },
+        "tab": {
+          "label": "Result {n}"
+        },
+        "truncated": {
+          "body": "Result stopped at {count} row, the console limit. Narrow the query to see the rest. | Result stopped at {count} rows, the console limit. Narrow the query to see the rest."
+        }
+      },
+      "run": {
+        "tooltip": "Run the statement under the cursor"
+      },
+      "runAll": {
+        "tooltip": "Run every statement in the editor"
+      },
+      "savedMenu": {
+        "empty": "No saved queries",
+        "nameTitle": {
+          "title": "Name this query"
+        },
+        "renameTitle": {
+          "title": "Rename saved query"
+        },
+        "saveCurrent": {
+          "label": "Save current query…"
+        },
+        "title": "Saved queries"
+      },
+      "target": {
+        "fallback": {
+          "label": "Console"
+        }
       }
     },
     "grpc": {
@@ -7820,11 +8032,399 @@
           "label": "User"
         }
       },
+      "connectionScope": {
+        "hint": "Applies to {connectionName} only."
+      },
+      "credentialPaste": {
+        "alsoFound": {
+          "hint": "Also found: {fields}. Edit them in the connection form."
+        },
+        "empty": {
+          "empty": "No credentials recognised"
+        },
+        "field": {
+          "authSource": {
+            "label": "Auth source"
+          },
+          "awsProfile": {
+            "label": "AWS profile"
+          }
+        },
+        "guessed": {
+          "label": "Guessed"
+        },
+        "heading": {
+          "label": "Pasted credentials"
+        },
+        "hideText": {
+          "tooltip": "Hide text"
+        },
+        "input": {
+          "example": "user: …  password: …\\nPGPASSWORD=…\\nmysql -u … -p…"
+        },
+        "label": {
+          "positional": {
+            "label": "Positional"
+          },
+          "unlabelled": {
+            "label": "Unlabelled"
+          }
+        },
+        "reason": {
+          "authSourceMongo": {
+            "error": "Only MongoDB has an auth source."
+          },
+          "awsKeys": {
+            "error": "AWS keys are not stored. Use a named AWS profile."
+          },
+          "awsNoSuchField": {
+            "error": "AWS kinds have no such field."
+          },
+          "awsOnly": {
+            "error": "Only AWS kinds have this field."
+          },
+          "extraBrokers": {
+            "error": "Extra brokers ignored (one seed broker supported)."
+          },
+          "kafkaNoDatabase": {
+            "error": "Kafka has no database field."
+          },
+          "noSchema": {
+            "error": "No schema field."
+          },
+          "port": {
+            "error": "Port must be 1-65535."
+          },
+          "redisDatabase": {
+            "error": "Redis database must be a number."
+          },
+          "uri": {
+            "error": "URIs are not parsed here. Paste the URI into the connection URI field."
+          }
+        },
+        "showText": {
+          "tooltip": "Show text"
+        },
+        "tooLong": {
+          "error": "Too long to be credentials."
+        },
+        "unrecognised": {
+          "body": "{count} line not recognised. | {count} lines not recognised."
+        }
+      },
       "credentialsDialog": {
         "liveNote": {
           "hint": "Reconnects the live connection."
         },
         "title": "Edit credentials for “{name}”"
+      },
+      "dataGripImport": {
+        "badge": {
+          "duplicate": {
+            "label": "Looks like it’s already imported",
+            "tooltip": "A connection with this name, host, port and database already exists"
+          }
+        },
+        "chooseAnother": {
+          "label": "Choose another folder"
+        },
+        "dialog": {
+          "title": "DataGrip import"
+        },
+        "import": {
+          "label": "Import {count} connection | Import {count} connections"
+        },
+        "outcome": {
+          "created": {
+            "label": "Created"
+          },
+          "createdWithNote": {
+            "label": "Created. {reason}"
+          },
+          "createdWithPassword": {
+            "label": "Created with password"
+          },
+          "notCreated": {
+            "label": "Not created. {reason}"
+          }
+        },
+        "outlook": {
+          "fromUrl": {
+            "label": "Password came from the connection URL"
+          },
+          "notSaved": {
+            "label": "DataGrip didn’t save a password"
+          },
+          "storeUnsupported": {
+            "label": "Password store isn’t supported here"
+          },
+          "willAttempt": {
+            "label": "Password will be imported"
+          }
+        },
+        "reason": {
+          "noUrl": {
+            "label": "No usable connection URL for this data source"
+          },
+          "passwordNotFound": {
+            "label": "No password is stored for this data source"
+          },
+          "secretStorageUnavailable": {
+            "label": "Can’t save passwords on this machine"
+          },
+          "sqlitePathNotAbsolute": {
+            "label": "Database path didn’t resolve to an absolute path"
+          },
+          "storeLocked": {
+            "label": "The credential store is locked"
+          },
+          "storeNotFound": {
+            "label": "Couldn’t find the credential store"
+          },
+          "unrepresentableUrl": {
+            "label": "Can’t be represented as host, port and database fields"
+          },
+          "unsupportedEngine": {
+            "label": "No adapter for this engine"
+          },
+          "withDetail": {
+            "label": "{reason} ({detail})"
+          }
+        },
+        "report": {
+          "title": "DataGrip import results"
+        },
+        "rows": {
+          "empty": "No data sources found in this project"
+        },
+        "secretsUnavailable": {
+          "body": "Passwords can’t be saved on this machine, so every connection imports without one."
+        },
+        "skip": {
+          "notImportable": {
+            "label": "Not importable"
+          },
+          "unsupportedDriver": {
+            "label": "DataGrip driver “{driver}” has no adapter for this engine"
+          }
+        },
+        "summary": {
+          "created": {
+            "body": "{created} of {count} connection created. | {created} of {count} connections created."
+          },
+          "failed": {
+            "body": "{count} failed."
+          },
+          "passwords": {
+            "body": "{count} password imported. | {count} passwords imported."
+          }
+        },
+        "warning": {
+          "nameTruncated": {
+            "label": "Name was over 120 characters and was shortened"
+          },
+          "sshTunnelDropped": {
+            "label": "This data source has an SSH tunnel, which isn’t imported"
+          }
+        }
+      },
+      "deleteConnectionConfirm": {
+        "body": "“{name}” will be removed.",
+        "title": "Delete connection?"
+      },
+      "errorPopover": {
+        "aria": "Show full error: {message}"
+      },
+      "filtersDialog": {
+        "cache": {
+          "empty": "No cached objects yet"
+        },
+        "cachedNote": {
+          "hint": "Only cached nodes are listed here. Expand more of the tree to include them."
+        },
+        "dialog": {
+          "named": {
+            "title": "Tree filters: {connectionName}"
+          },
+          "title": "Tree filters"
+        },
+        "intro": {
+          "body": "Ticked types and objects are shown. Unticking one hides it and everything under it. Anything you haven’t unticked stays visible, including objects created later."
+        },
+        "kinds": {
+          "heading": {
+            "label": "Object types"
+          }
+        },
+        "loadFailed": {
+          "error": "Couldn’t load saved filters."
+        },
+        "nameFilter": {
+          "placeholder": "Filter objects by name"
+        },
+        "objects": {
+          "heading": {
+            "label": "Objects"
+          }
+        },
+        "preview": {
+          "body": "Will show {shown} of {total} cached nodes."
+        },
+        "reason": {
+          "ancestorHidden": {
+            "tooltip": "Hidden because “{name}” is hidden"
+          },
+          "kindHidden": {
+            "tooltip": "Hidden by the “{label}” type filter"
+          }
+        },
+        "truncated": {
+          "hint": "Showing the first 500 rows. Type to narrow."
+        }
+      },
+      "menu": {
+        "browseKeys": {
+          "label": "Browse keys"
+        },
+        "browseObjects": {
+          "label": "Browse objects"
+        },
+        "connect": {
+          "label": "Connect"
+        },
+        "copyQualifiedName": {
+          "announce": "Copied qualified name",
+          "label": "Copy qualified name"
+        },
+        "copyUri": {
+          "announce": "Copied connection URI",
+          "label": "Copy URI"
+        },
+        "countDocuments": {
+          "label": "Count documents"
+        },
+        "countRows": {
+          "label": "Count rows"
+        },
+        "disconnect": {
+          "label": "Disconnect"
+        },
+        "editSchema": {
+          "label": "Edit schema (DDL)…"
+        },
+        "filters": {
+          "label": "Filters…"
+        },
+        "noStoredUri": {
+          "error": "This connection has no stored URI."
+        },
+        "openConsole": {
+          "label": "Open query console"
+        },
+        "openData": {
+          "label": "Open data"
+        },
+        "openDefinition": {
+          "label": "Open definition"
+        },
+        "refreshAll": {
+          "label": "Refresh all"
+        },
+        "savedFilters": {
+          "empty": "No saved filters",
+          "label": "Saved filters"
+        },
+        "setDefault": {
+          "label": "Set as default"
+        },
+        "updateCredentials": {
+          "label": "Update credentials…"
+        }
+      },
+      "passwordRevealConfirm": {
+        "body": "“{name}” displays the password in plain text.",
+        "title": "Show saved password?"
+      },
+      "passwordRevealFailed": {
+        "error": "Couldn’t reveal the saved password."
+      },
+      "readOnlyConfirm": {
+        "body": "This connection is live. Changing read-only mode reconnects it.",
+        "title": "Change read-only mode?"
+      },
+      "schemaDialog": {
+        "dialog": {
+          "named": {
+            "title": "Schema (DDL): {connectionName}"
+          },
+          "title": "Schema (DDL)"
+        },
+        "intro": {
+          "body": "Table and column completion normally fills in on its own from the connection’s cached schema metadata. No setup needed. Paste a schema here only to override that. Use it for a schema that doesn’t exist yet, or a connection this app can’t introspect."
+        },
+        "pasteHint": {
+          "hint": "Paste output from {pgDump}, {showCreate} or {sqliteSchema}. Use whichever your connection’s engine gives you."
+        }
+      },
+      "tree": {
+        "aria": "Project tree",
+        "searchIncomplete": {
+          "body": "Searching cached nodes only. Expand more of the tree to include it."
+        }
+      },
+      "uriRevealConfirm": {
+        "body": "“{name}” displays the URI in plain text.",
+        "title": "Show saved URI?"
+      },
+      "uriRevealFailed": {
+        "error": "Couldn’t reveal the saved URI."
+      }
+    },
+    "shortcuts": {
+      "palette": {
+        "closeTab": {
+          "label": "Close tab"
+        },
+        "empty": "No matching commands",
+        "explainQuery": {
+          "label": "Explain query"
+        },
+        "formatQuery": {
+          "label": "Format query"
+        },
+        "generateData": {
+          "label": "Generate data…"
+        },
+        "nextTab": {
+          "label": "Next tab"
+        },
+        "placeholder": "Type a command",
+        "previousTab": {
+          "label": "Previous tab"
+        },
+        "runStatement": {
+          "label": "Run statement"
+        },
+        "toggleOperationsPanel": {
+          "label": "Toggle operations panel"
+        },
+        "toggleProjectPanel": {
+          "label": "Toggle project panel"
+        }
+      }
+    },
+    "tabs": {
+      "incognito": {
+        "label": "Incognito"
+      },
+      "incognitoOff": {
+        "label": "Turn off incognito"
+      },
+      "requestHasBody": {
+        "tooltip": "This request has a body"
+      },
+      "revealInProject": {
+        "label": "Reveal in project panel"
       }
     }
   },

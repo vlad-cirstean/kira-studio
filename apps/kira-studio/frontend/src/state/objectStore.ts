@@ -4,6 +4,7 @@ import {
   OBJECT_KEY_SENTINEL,
 } from '@shared/domain/object-store';
 import { decodePath, encodePath, pathTail } from '@shared/domain/tree';
+import { t } from '@theme/i18n';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -42,7 +43,7 @@ export const useObjectStoreStore = defineStore('objectStore', () => {
       {
         type: 'item',
         id: 'upload-file',
-        label: 'Upload file…',
+        label: t('studio.browse.upload.label'),
         icon: 'cloud-upload',
         run: () => openUploadDialog(connectionId, containerPath),
       },

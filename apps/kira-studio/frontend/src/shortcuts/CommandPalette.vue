@@ -6,6 +6,7 @@ import {
   CommandItem,
   CommandList,
 } from '@theme/components/ui/command';
+import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { usePaletteStore } from './state';
 
@@ -34,18 +35,16 @@ function onOpenChange(open: boolean): void {
 <template>
   <CommandDialog
     :open="paletteStore.open"
-    title="Command Palette"
-    description="Search for a command to run…"
     class="w-105"
     @update:open="onOpenChange"
   >
     <CommandInput
       data-testid="command-palette-input"
-      placeholder="Type a command…"
+      :placeholder="t('studio.shortcuts.palette.placeholder')"
       @keydown="wrapSelectionOnType"
     />
     <CommandList class="max-h-72">
-      <CommandEmpty class="text-subtle" data-testid="command-palette-empty">No matching commands</CommandEmpty>
+      <CommandEmpty class="text-subtle" data-testid="command-palette-empty">{{ t('studio.shortcuts.palette.empty') }}</CommandEmpty>
       <CommandItem
         v-for="command in paletteStore.paletteCommands"
         :key="command.id"

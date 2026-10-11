@@ -1,7 +1,8 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { AWS_STYLE_KINDS, CONNECTION_COLOR_CHOICES, FILE_KINDS } from '@shared/domain/connection';
 import { formatConnectionUri } from '@shared/domain/uri';
-import { copyAnnounced } from '@workbench/behaviour/clipboard';
+import { t } from '@theme/i18n';
+import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { control } from '../bridge/control';
@@ -85,7 +86,7 @@ function consoleMenuItem(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'open-console',
-      label: 'Open query console',
+      label: t('studio.project.menu.openConsole.label'),
       icon: 'terminal',
       run: () => {
         useTabsStore().openConsoleTab(row.connectionId, row.path);
@@ -115,28 +116,28 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       ? {
           type: 'item',
           id: 'disconnect',
-          label: 'Disconnect',
+          label: t('studio.project.menu.disconnect.label'),
           icon: 'debug-disconnect',
           run: () => useConnectionsStore().disconnectConnection(row.connectionId),
         }
       : {
           type: 'item',
           id: 'connect',
-          label: 'Connect',
+          label: t('studio.project.menu.connect.label'),
           icon: 'plug',
           run: () => useConnectionsStore().connectConnection(row.connectionId),
         },
     {
       type: 'item',
       id: 'refresh',
-      label: 'Refresh',
+      label: t('common.action.refresh.label'),
       icon: 'refresh',
       run: () => useTreeStore().refreshConnection(row.connectionId),
     },
     {
       type: 'item',
       id: 'edit',
-      label: 'Edit…',
+      label: t('common.action.edit.label'),
       icon: 'edit',
       shortcut: 'tree.rename',
       run: () => useConnectionDialogStore().openEditDialog(row.connectionId),
@@ -146,7 +147,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
           {
             type: 'item' as const,
             id: 'update-credentials',
-            label: 'Update credentials…',
+            label: t('studio.project.menu.updateCredentials.label'),
             icon: 'key',
             run: () => useCredentialsDialogStore().openFor(row.connectionId),
           },
@@ -155,7 +156,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'duplicate',
-      label: 'Duplicate',
+      label: t('common.action.duplicate.label'),
       icon: 'copy',
       shortcut: 'tree.duplicate',
       run: async () => {
@@ -166,7 +167,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'copy-uri',
-      label: 'Copy URI',
+      label: t('studio.project.menu.copyUri.label'),
       icon: 'link',
       shortcut: 'tree.copyUri',
       // Fields mode has no stored URI: one is synthesised from the fields, passwordless. A URI-mode
@@ -174,21 +175,21 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       run: async () => {
         if (!record) return;
         if (record.mode !== 'uri')
-          return void copyAnnounced(
+          return void copyAndAnnounce(
             formatConnectionUri({ ...record, password: null }),
-            'connection URI',
+            t('studio.project.menu.copyUri.announce'),
           );
         const result = await revealConnectionSecret(record.id, record.name, 'uri', () => true);
         if (!result) return;
         if (result.outcome === 'error') throw new Error(result.error);
-        if (result.uri === null) throw new Error('This connection has no stored URI.');
-        return void copyAnnounced(result.uri, 'connection URI');
+        if (result.uri === null) throw new Error(t('studio.project.menu.noStoredUri.error'));
+        return void copyAndAnnounce(result.uri, t('studio.project.menu.copyUri.announce'));
       },
     },
     {
       type: 'item',
       id: 'filters',
-      label: 'Filters…',
+      label: t('studio.project.menu.filters.label'),
       icon: 'filter',
       run: () => useFiltersDialogStore().openFiltersDialog(row.connectionId, row.path),
     },
@@ -198,7 +199,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
           {
             type: 'item' as const,
             id: 'schema',
-            label: 'Schema (DDL)…',
+            label: t('studio.project.menu.editSchema.label'),
             icon: 'symbol-structure',
             run: () => useSchemaDialogStore().openSchemaDialog(row.connectionId),
           },
@@ -208,7 +209,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'submenu',
       id: 'color',
-      label: 'Color',
+      label: t('common.field.colour.label'),
       icon: 'symbol-color',
       // P42 D34: the offered subset — a connection already stored with a retired colour is
       // untouched and still checked correctly if `record.color` happens to be one (checked below
@@ -225,14 +226,15 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'readonly',
-      label: 'Read-only',
+      label: t('common.state.readOnly.status'),
       checked: record?.readOnly ?? false,
       run: async () => {
         if (
           isLive &&
           !(await useConfirmDialogStore().confirm({
-            message: 'This connection is live — changing read-only will reconnect it. Continue?',
-            confirmLabel: 'Continue',
+            title: t('studio.project.readOnlyConfirm.title'),
+            message: t('studio.project.readOnlyConfirm.body'),
+            confirmLabel: t('studio.common.continue.label'),
             tone: 'primary',
           }))
         ) {
@@ -248,15 +250,19 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'delete',
-      label: 'Delete',
+      label: t('common.action.delete.label'),
       icon: 'trash',
       danger: true,
       shortcut: 'tree.delete',
       run: async () => {
         if (
           !(await useConfirmDialogStore().confirm({
-            message: `Delete connection "${row.name}"?`,
-            confirmLabel: 'Delete',
+            title: t('studio.project.deleteConnectionConfirm.title'),
+            message: [
+              t('studio.project.deleteConnectionConfirm.body', { name: row.name }),
+              t('common.confirm.irreversible.body'),
+            ].join(' '),
+            confirmLabel: t('common.action.delete.label'),
             tone: 'danger',
           }))
         )
@@ -277,7 +283,7 @@ function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'set-as-default',
-      label: 'Set as default',
+      label: t('studio.project.menu.setDefault.label'),
       icon: 'star',
       checked: useConsoleDefaultsStore().consoleDefaultFor(row.connectionId) === row.path,
       run: () => useConsoleDefaultsStore().setConsoleDefault(row.connectionId, row.path),
@@ -295,7 +301,10 @@ function browseMenuItem(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'browse',
-      label: row.kind === 'bucket' ? 'Browse objects' : 'Browse keys',
+      label:
+        row.kind === 'bucket'
+          ? t('studio.project.menu.browseObjects.label')
+          : t('studio.project.menu.browseKeys.label'),
       icon: 'list-tree',
       shortcut: 'tree.open',
       run: () => {
@@ -311,7 +320,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'refresh',
-      label: 'Refresh',
+      label: t('common.action.refresh.label'),
       icon: 'refresh',
       run: () => useTreeStore().refresh(row.connectionId, row.path),
     },
@@ -319,7 +328,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'filters',
-      label: 'Filters…',
+      label: t('studio.project.menu.filters.label'),
       icon: 'filter',
       run: () => useFiltersDialogStore().openFiltersDialog(row.connectionId, row.path),
     },
@@ -344,7 +353,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
   return [
     ...openItems(row, {
       idBase: 'open-data',
-      label: 'Open data',
+      label: t('studio.project.menu.openData.label'),
       icon: 'table',
       openTab: (connectionId, path, opts) => useTabsStore().openDataTab(connectionId, path, opts),
     }),
@@ -354,14 +363,14 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
     ...copyNameItems(row, true),
     countItem(row, {
       id: 'count-rows',
-      label: 'Count rows',
+      label: t('studio.project.menu.countRows.label'),
       kind: 'data',
       openTab: (connectionId, path) => useTabsStore().openDataTab(connectionId, path),
     }),
     {
       type: 'submenu',
       id: 'saved-filters',
-      label: 'Saved filters',
+      label: t('studio.project.menu.savedFilters.label'),
       icon: 'bookmark',
       items: savedFiltersSubmenu(row),
     },
@@ -376,7 +385,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
   return [
     ...openItems(row, {
       idBase: 'open-document',
-      label: 'Open',
+      label: t('common.action.open.label'),
       icon: 'json',
       openTab: (connectionId, path, opts) =>
         useTabsStore().openDocumentTab(connectionId, path, opts),
@@ -387,7 +396,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
     ...copyNameItems(row, true),
     countItem(row, {
       id: 'count-documents',
-      label: 'Count documents',
+      label: t('studio.project.menu.countDocuments.label'),
       kind: 'document',
       openTab: (connectionId, path) => useTabsStore().openDocumentTab(connectionId, path),
     }),
@@ -404,14 +413,14 @@ function groupMenu(row: TreeRowVm): MenuItem[] {
     {
       type: 'item',
       id: 'refresh',
-      label: 'Refresh',
+      label: t('common.action.refresh.label'),
       icon: 'refresh',
       run: () => useTreeStore().refresh(row.connectionId, groupParentPath(row.path)),
     },
     {
       type: 'item',
       id: 'collapse-all',
-      label: 'Collapse all',
+      label: t('common.action.collapseAll.label'),
       icon: 'collapse-all',
       run: () => useTreeStore().collapseAll(),
     },
@@ -432,7 +441,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
   return [
     ...openItems(row, {
       idBase: 'open-stream',
-      label: 'Open',
+      label: t('common.action.open.label'),
       icon: nodeIcon(row.kind),
       openTab: (connectionId, path, opts) => useTabsStore().openStreamTab(connectionId, path, opts),
     }),
@@ -460,7 +469,7 @@ function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
       {
         type: 'item',
         id: 'saved-filters-empty',
-        label: 'No saved filters',
+        label: t('studio.project.menu.savedFilters.empty'),
         disabled: true,
         run: () => {},
       },
@@ -486,7 +495,7 @@ export function emptyBackgroundMenu(): MenuItem[] {
     {
       type: 'item',
       id: 'new-connection',
-      label: 'New connection',
+      label: t('studio.project.connectionDialog.newConnection.title'),
       icon: 'add',
       shortcut: 'app.newConnection',
       run: () => useConnectionDialogStore().openCreateDialog(),
@@ -494,14 +503,14 @@ export function emptyBackgroundMenu(): MenuItem[] {
     {
       type: 'item',
       id: 'refresh-all',
-      label: 'Refresh all',
+      label: t('studio.project.menu.refreshAll.label'),
       icon: 'refresh',
       run: () => useTreeStore().refreshAllConnections(),
     },
     {
       type: 'item',
       id: 'collapse-all',
-      label: 'Collapse all',
+      label: t('common.action.collapseAll.label'),
       icon: 'collapse-all',
       run: () => useTreeStore().collapseAll(),
     },

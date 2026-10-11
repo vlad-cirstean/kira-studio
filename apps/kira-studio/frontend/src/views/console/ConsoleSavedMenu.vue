@@ -6,6 +6,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
@@ -63,7 +64,7 @@ const togglePin = (entry: SavedConsoleQuery): Promise<void> =>
   });
 const rename = (entry: SavedConsoleQuery): Promise<void> =>
   attempt(async () => {
-    const name = await promptText('Rename saved query', entry.name);
+    const name = await promptText(t('studio.console.savedMenu.renameTitle.title'), entry.name);
     if (!name || name.trim() === '') return;
     await control.queriesUpdate(entry.id, { name: name.trim() });
     await load();
@@ -76,15 +77,15 @@ const remove = (entry: SavedConsoleQuery): Promise<void> =>
 
 const saveCurrent = (): Promise<void> =>
   attempt(async () => {
-    const t = tab();
-    if (!t?.connectionId) return;
-    const name = await promptText('Name this query', '');
+    const current = tab();
+    if (!current?.connectionId) return;
+    const name = await promptText(t('studio.console.savedMenu.nameTitle.title'), '');
     if (!name || name.trim() === '') return;
     await control.queriesSaveConsole({
-      connectionId: t.connectionId,
-      path: t.path,
+      connectionId: current.connectionId,
+      path: current.path,
       name: name.trim(),
-      body: { text: t.state.text },
+      body: { text: current.state.text },
       pinned: false,
     });
     await load();
@@ -93,11 +94,11 @@ const saveCurrent = (): Promise<void> =>
 
 <template>
   <SavedListMenu
-    title="Saved queries"
+    :title="t('studio.console.savedMenu.title')"
     :saved="saved"
     panel-test-id="console-saved-menu"
     saved-entry-test-id="console-saved-entry"
-    empty-saved-text="No saved queries"
+    :empty-saved-text="t('studio.console.savedMenu.empty')"
     :entry-text="(entry) => entry.name"
     @apply="apply"
     @toggle-pin="togglePin"
@@ -118,7 +119,7 @@ const saveCurrent = (): Promise<void> =>
     <template #entry-actions="{ entry }">
       <TooltipIconButton
         icon="edit"
-        label="Rename"
+        :label="t('common.action.rename.label')"
         @click.stop="rename(entry)"
       />
     </template>
@@ -133,7 +134,7 @@ const saveCurrent = (): Promise<void> =>
            I2-37 replacement name. -->
       <button type="button" :class="cn(rowVariants(), 'w-full text-primary')" data-testid="console-save-current" @click="saveCurrent">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
-        Save current query…
+        {{ t('studio.console.savedMenu.saveCurrent.label') }}
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
            (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own

@@ -9,6 +9,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { CatalogText, t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { revealElement } from '@workbench/behaviour/focus';
 import { computed, nextTick, ref, watch } from 'vue';
@@ -76,7 +77,7 @@ watch(
     if (filtersDialogStore.connectionId !== connectionId) return;
     const existing = treeStore.visibility[connectionId];
     if (!existing) {
-      loadError.value ??= 'Saved filters could not be loaded.';
+      loadError.value ??= t('studio.project.filtersDialog.loadFailed.error');
       return;
     }
     draft.value = {
@@ -175,23 +176,24 @@ const connectionName = computed(
   <Dialog v-if="filtersDialogStore.open" :open="true" @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()">
     <DialogContent size="lg" data-testid="filters-dialog">
       <DialogHeader icon="filter" close-testid="filters-dialog-close">
-        <DialogTitle
-          >Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
-        >
+        <DialogTitle>{{
+          connectionName
+            ? t('studio.project.filtersDialog.dialog.named.title', { connectionName })
+            : t('studio.project.filtersDialog.dialog.title')
+        }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody>
       <span class="help text-kira-sm leading-normal text-subtle">
-        Ticked types and objects are shown; unticking one hides it and everything under it.
-        Nothing you have not unticked is ever hidden — an object created later shows up too.
+        {{ t('studio.project.filtersDialog.intro.body') }}
       </span>
 
       <section class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
-          <span class="font-medium text-kira-lg text-fg">Object types</span>
+          <span class="font-medium text-kira-lg text-fg">{{ t('studio.project.filtersDialog.kinds.heading.label') }}</span>
           <span class="flex gap-1">
-            <Button variant="link" size="kira" class="h-auto p-0" @click="allKinds">All</Button>
-            <Button variant="link" size="kira" class="h-auto p-0" @click="noneKinds">None</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="allKinds">{{ t('common.state.all.option') }}</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="noneKinds">{{ t('common.state.none.option') }}</Button>
           </span>
         </div>
         <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-kind-list">
@@ -212,22 +214,22 @@ const connectionName = computed(
             <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.label }}</span>
             <span class="text-kira-sm text-subtle">{{ row.count }}</span>
           </Label>
-          <span v-if="kinds.length === 0" class="text-kira-sm text-subtle p-1">Nothing cached yet.</span>
+          <span v-if="kinds.length === 0" class="text-kira-sm text-subtle p-1">{{ t('studio.project.filtersDialog.cache.empty') }}</span>
         </div>
       </section>
 
       <section class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
-          <span class="font-medium text-kira-lg text-fg">Objects</span>
+          <span class="font-medium text-kira-lg text-fg">{{ t('studio.project.filtersDialog.objects.heading.label') }}</span>
           <span class="flex gap-1">
-            <Button variant="link" size="kira" class="h-auto p-0" @click="allObjects">All</Button>
-            <Button variant="link" size="kira" class="h-auto p-0" @click="noneObjects">None</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="allObjects">{{ t('common.state.all.option') }}</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="noneObjects">{{ t('common.state.none.option') }}</Button>
           </span>
         </div>
         <SearchField
           v-model="nameFilter"
           size="kira-lg"
-          placeholder="Filter objects by name"
+          :placeholder="t('studio.project.filtersDialog.nameFilter.placeholder')"
           data-testid="filter-name-input"
         />
         <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-object-list">
@@ -244,7 +246,7 @@ const connectionName = computed(
               v-if="row.hasChildren"
               type="button"
               class="twisty-btn flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer text-muted-foreground"
-              :aria-label="expandedPaths.has(row.path) ? 'Collapse' : 'Expand'"
+              :aria-label="expandedPaths.has(row.path) ? t('common.action.collapse.label') : t('common.action.expand.label')"
               @click="onToggleExpand(row.path)"
             >
               <CodiconIcon :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'" :size="12" />
@@ -270,21 +272,24 @@ const connectionName = computed(
             </Tooltip>
             <span v-if="row.hasChildren" class="text-kira-sm text-subtle">{{ row.childCount }}</span>
           </div>
-          <span v-if="objects.rows.length === 0" class="text-kira-sm text-subtle p-1">Nothing cached yet.</span>
+          <span v-if="objects.rows.length === 0" class="text-kira-sm text-subtle p-1">{{ t('studio.project.filtersDialog.cache.empty') }}</span>
           <span v-if="objects.truncated" class="text-kira-sm text-subtle p-1 italic" data-testid="filter-object-truncated">
-            Showing the first 500 rows — type to narrow.
+            {{ t('studio.project.filtersDialog.truncated.hint') }}
           </span>
         </div>
       </section>
 
       <Alert variant="info" data-testid="filters-preview">
         <AlertDescription>
-          Will show <b>{{ preview.shown }}</b> of <b>{{ preview.total }}</b> cached nodes.
+          <CatalogText k="studio.project.filtersDialog.preview.body">
+            <template #shown><b>{{ preview.shown }}</b></template>
+            <template #total><b>{{ preview.total }}</b></template>
+          </CatalogText>
         </AlertDescription>
       </Alert>
 
       <span class="help cached-note text-kira-sm leading-normal text-subtle self-start">
-        Only cached nodes are listed here — expand more of the tree to include them.
+        {{ t('studio.project.filtersDialog.cachedNote.hint') }}
       </span>
 
       <Alert v-if="loadError || saveError" variant="error" data-testid="filters-error">
@@ -294,16 +299,18 @@ const connectionName = computed(
 
       <DialogFooter>
         <template #start>
-          <span class="help text-kira-sm leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+          <span class="help text-kira-sm leading-normal text-subtle"><CatalogText k="studio.project.connectionScope.hint">
+              <template #connectionName><span class="font-data">{{ connectionName }}</span></template>
+            </CatalogText></span>
         </template>
-        <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">{{ t('common.action.cancel.label') }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
           data-testid="filters-save"
           :disabled="loading || !!loadError || saving"
           @click="onSave"
-        >Save filters</Button>
+        >{{ t('common.action.save.label') }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

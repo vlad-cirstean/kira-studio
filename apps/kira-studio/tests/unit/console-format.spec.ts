@@ -109,8 +109,19 @@ describe('formatConsoleText — mongodb', () => {
     expect(await formatConsoleText('mongodb', input)).toEqual({
       text: input,
       ok: false,
-      reason: 'unsupported console method: db.c.frobnicate()',
-      failures: [{ index: 0, reason: 'unsupported console method: db.c.frobnicate()' }],
+      reason: {
+        key: 'studio.console.format.mongoMethod.error',
+        params: { method: 'db.c.frobnicate()' },
+      },
+      failures: [
+        {
+          index: 0,
+          reason: {
+            key: 'studio.console.format.mongoMethod.error',
+            params: { method: 'db.c.frobnicate()' },
+          },
+        },
+      ],
     });
   });
 
@@ -119,7 +130,9 @@ describe('formatConsoleText — mongodb', () => {
     const result = await formatConsoleText('mongodb', input);
     expect(result.ok).toBe(false);
     expect(result.text).toBe(input);
-    expect(result.failures).toEqual([{ index: 0, reason: expect.any(String) }]);
+    expect(result.failures).toEqual([
+      { index: 0, reason: expect.objectContaining({ key: expect.any(String) }) },
+    ]);
   });
 
   test('D13: one unparseable statement among three formats the other two, verbatim in place', async () => {
@@ -129,7 +142,13 @@ describe('formatConsoleText — mongodb', () => {
     );
     expect(result.ok).toBe(true);
     expect(result.failures).toEqual([
-      { index: 1, reason: 'unsupported console method: db.c.frobnicate()' },
+      {
+        index: 1,
+        reason: {
+          key: 'studio.console.format.mongoMethod.error',
+          params: { method: 'db.c.frobnicate()' },
+        },
+      },
     ]);
     expect(result.text).toBe(
       'db.a.find({\n  "x": 1\n});\n\ndb.c.frobnicate({y:2});\n\ndb.b.find({\n  "z": 3\n})',
@@ -251,7 +270,7 @@ describe('formatConsoleText — F9 end to end, real sql-formatter output', () =>
     expect(result.ok).toBe(false);
     expect(result.text).toBe(input); // verbatim — .limit(5) is never lost
     expect(result.failures).toEqual([
-      { index: 0, reason: 'unexpected trailing content after statement' },
+      { index: 0, reason: { key: 'studio.console.format.trailing.error' } },
     ]);
   });
 });

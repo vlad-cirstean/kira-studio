@@ -176,7 +176,7 @@ test('OS auth unavailable routes through the in-app confirmation', async ({ rela
   // makes no second Reveal call.
   await page.click('[aria-label="Show password"]');
   await expect(page.locator('[data-testid="confirm-dialog-message"]')).toHaveText(
-    `Show the saved password for "${CONN.name}"? It will be displayed in plain text.`,
+    `“${CONN.name}” displays the password in plain text.`,
   );
   await cancelConfirm(page);
   await expect(passwordField).toHaveValue('');

@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatCount } from '@workbench/behaviour/format';
 import { computed, reactive, ref } from 'vue';
@@ -21,16 +22,17 @@ const settingsStore = useSettingsStore();
 const result = computed(() => getPlan(props.pageKey));
 const plan = computed(() => result.value?.plan);
 
-const NATIVE_COST_LABEL: Record<string, string> = {
-  'postgres-planner': 'Postgres planner cost',
-  'mysql-cost': 'MySQL cost',
-  'mariadb-cost': 'MariaDB cost',
+const NATIVE_COST_KEY: Record<string, MessageKey> = {
+  'postgres-planner': 'studio.console.plan.cost.postgres.label',
+  'mysql-cost': 'studio.console.plan.cost.mysql.label',
+  'mariadb-cost': 'studio.console.plan.cost.mariadb.label',
 };
 const nativeCostLabel = computed(() => {
   const cost = plan.value?.nativeCost;
   if (!cost) return null;
-  const label = NATIVE_COST_LABEL[cost.unit] ?? 'cost';
-  return `${label} ${formatCount(cost.value)}`;
+  return t(NATIVE_COST_KEY[cost.unit] ?? 'studio.console.plan.cost.generic.label', {
+    value: formatCount(cost.value),
+  });
 });
 
 // D14: the threshold is an estimated-rows-read number, never a cost unit (F17) — sqlite reports
@@ -40,13 +42,15 @@ const verdict = computed(() => {
   if (!p) return '';
   if (p.estimatedRowsRead === undefined) {
     return p.kind === 'sqlite'
-      ? "SQLite's query planner reports no row estimates, so the expensive-query threshold does not apply here."
-      : 'No row estimate available for this plan.';
+      ? t('studio.console.plan.sqliteNoEstimate.body')
+      : t('studio.console.plan.noEstimate.body');
   }
-  const rows = formatCount(p.estimatedRowsRead);
   return p.overThreshold
-    ? `Estimated to read ${rows} rows — at or above the ${formatCount(settingsStore.advanced.expensiveQueryRows)}-row threshold`
-    : `Estimated to read ${rows} rows`;
+    ? t('studio.console.plan.overThreshold.status', {
+        count: p.estimatedRowsRead,
+        threshold: formatCount(settingsStore.advanced.expensiveQueryRows),
+      })
+    : t('studio.console.plan.estimatedRows.status', { count: p.estimatedRowsRead });
 });
 
 // D17: "tens of nodes" (Postgres's own parallel-worker plans top out in the low hundreds) — not
@@ -113,7 +117,7 @@ const rawLanguage = computed(() =>
           <TooltipTrigger as-child>
             <span class="text-muted-foreground text-kira-sm cursor-default" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
           </TooltipTrigger>
-          <TooltipContent>Not comparable to another engine’s own cost figure — see the plan doc’s F17.</TooltipContent>
+          <TooltipContent>{{ t('studio.console.plan.nativeCost.tooltip') }}</TooltipContent>
         </Tooltip>
       </div>
       <p class="text-muted-foreground text-kira-sm whitespace-pre-wrap break-words font-data" data-testid="explain-statement">{{ result.statement }}</p>
@@ -130,7 +134,7 @@ const rawLanguage = computed(() =>
           <span>{{ issue.message }}</span>
         </li>
       </ul>
-      <p v-else class="text-subtle m-0" data-testid="explain-no-issues">No issues found.</p>
+      <p v-else class="text-subtle m-0" data-testid="explain-no-issues">{{ t('studio.console.plan.noIssues.empty') }}</p>
 
       <div class="border border-border rounded-kira-sm py-1" data-testid="explain-tree">
         <div
@@ -144,7 +148,7 @@ const rawLanguage = computed(() =>
             v-if="row.hasChildren"
             type="button"
             class="inline-flex items-center w-3 shrink-0 cursor-pointer border-0 bg-transparent p-0"
-            :aria-label="collapsedIds.has(row.id) ? 'Expand' : 'Collapse'"
+            :aria-label="collapsedIds.has(row.id) ? t('common.action.expand.label') : t('common.action.collapse.label')"
             @click="toggleNode(row.id)"
           >
             <CodiconIcon :name="collapsedIds.has(row.id) ? 'chevron-right' : 'chevron-down'" :size="12" />
@@ -152,9 +156,9 @@ const rawLanguage = computed(() =>
           <span v-else class="inline-flex items-center w-3 shrink-0 cursor-pointer"></span>
           <span class="font-data">{{ row.node.label }}</span>
           <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-sm"
-            >~{{ formatCount(row.node.estimatedRows) }} rows</span
+            >{{ t('studio.console.plan.nodeRows.label', { count: row.node.estimatedRows }) }}</span
           >
-          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">cost {{ formatCount(row.node.cost.total) }}</span>
+          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">{{ t('studio.console.plan.cost.generic.label', { value: formatCount(row.node.cost.total) }) }}</span>
           <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{ row.node.detail }}</span>
           <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-sm">{{ metricsLine(row.node) }}</span>
         </div>
@@ -163,19 +167,19 @@ const rawLanguage = computed(() =>
       <div class="flex items-center gap-1">
         <TooltipIconButton
           icon="code"
-          label="Show the raw EXPLAIN output the server returned"
-          aria-label="Show the raw EXPLAIN output"
+          :label="t('studio.console.plan.raw.tooltip')"
+          :aria-label="t('studio.console.plan.raw.aria')"
           :class="{ 'bg-field text-fg': showRaw }"
           data-testid="explain-raw-toggle"
           @click="showRaw = !showRaw"
         />
-        <span class="text-muted-foreground text-kira-sm">Raw</span>
+        <span class="text-muted-foreground text-kira-sm">{{ t('studio.console.plan.raw.label') }}</span>
       </div>
       <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
       </div>
     </template>
-    <p v-else class="text-muted-foreground text-kira-sm m-0">No plan.</p>
+    <p v-else class="text-muted-foreground text-kira-sm m-0">{{ t('studio.console.plan.empty.empty') }}</p>
   </div>
   <!-- P110 I2-16: `.verdict.warn`/`.issue-list li[.warn/.info]`/`.plan-row:hover` all moved onto
        the template as ternaries/utilities -- `issue.severity` is exhaustively 'warn'/'info'

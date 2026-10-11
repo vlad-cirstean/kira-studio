@@ -2,6 +2,7 @@
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
@@ -393,11 +394,11 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
     <Alert strip v-if="copyError" variant="error" data-testid="console-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
-    <div v-if="!page || page.rowCount === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? 'No rows' : '' }}</div>
+    <div v-if="!page || page.rowCount === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? t('studio.console.result.noRows.empty') : '' }}</div>
     <!-- P31 D19/P24 D8 precedent: filtering to zero matches is a distinct empty state from "no
          data loaded" — same discipline as KeyValueView.vue's own EmptyState pair. -->
     <div v-else-if="rowIndices.length === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm" data-testid="console-no-matching-rows">
-      No matching rows
+      {{ t('studio.console.result.noMatchingRows.empty') }}
     </div>
     <ConsoleSlickGrid
       v-else-if="page.kind === 'tabular'"
@@ -416,7 +417,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       class="flex-1 min-h-0 p-1 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
-      aria-label="Documents"
+      :aria-label="t('studio.console.result.documents.aria')"
       @scroll="docVirtual.onScroll"
     >
       <div class="relative" :style="{ height: `${docVirtual.totalSize.value}px` }">
@@ -464,7 +465,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       class="flex-1 min-h-0 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
-      aria-label="Result rows"
+      :aria-label="t('studio.console.result.rows.aria')"
       @scroll="kvVirtual.onScroll"
     >
       <div class="relative" :style="{ height: `${kvVirtual.totalSize.value}px` }">

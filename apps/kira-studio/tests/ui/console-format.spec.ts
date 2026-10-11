@@ -239,7 +239,7 @@ test('Query console — one unparseable statement no longer blocks the rest (P19
   const warning = view.locator('[data-testid="console-format-warning"]');
   await expect(warning).toBeVisible();
   await expect(warning).toContainText('Formatted 1 of 2 statements');
-  await expect(warning).toContainText('statement 2');
+  await expect(warning).toContainText('Statement 2');
 
   const text = await consoleText(view);
   expect(text).toContain('\\dt'); // the broken statement, verbatim
@@ -286,7 +286,7 @@ test('Query console — pressing Format twice shows "Already formatted" the seco
   // P22b D13: reworded to name the reason (indentation-only, ClickHouse's own identifier
   // hazard) rather than assert a bare null result.
   await expect(note).toContainText(
-    'Already formatted — indentation only; keywords keep the case you typed',
+    'Already formatted. Format only changes indentation; keywords keep the case you typed',
   );
 });
 

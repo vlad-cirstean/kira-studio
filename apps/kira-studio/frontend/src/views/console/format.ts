@@ -3,7 +3,7 @@ import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import { errorText } from '@workbench/bridge/codedError';
 import { beautifyShellText } from '../shared/document/ejson';
-import { reasonText } from '../shared/reasonText';
+import type { CatalogReason } from '../shared/document/rawTree';
 import { hashCommentsFor, lexOptionsFor, sqlDialectFor } from '../shared/sqlIdent';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 
@@ -72,12 +72,23 @@ function firstLine(message: string): string {
 // wording so a diagnostic and a format refusal never contradict each other.
 function formatMongoStatement(
   stmt: string,
-): { text: string; reason?: undefined } | { reason: string } {
+): { text: string; reason?: undefined } | { reason: CatalogReason } {
   const match = MONGO_STATEMENT_RE.exec(stmt);
-  if (!match) return { reason: 'expected db.<collection>.<method>(...)' };
+  if (!match)
+    return {
+      reason: {
+        key: 'studio.console.format.mongoShape.error',
+        params: { pattern: 'db.<collection>.<method>(…)' },
+      },
+    };
   const [full, collection, method] = match;
   if (!MONGO_CONSOLE_METHODS.includes(method)) {
-    return { reason: `unsupported console method: db.${collection}.${method}()` };
+    return {
+      reason: {
+        key: 'studio.console.format.mongoMethod.error',
+        params: { method: `db.${collection}.${method}()` },
+      },
+    };
   }
 
   const openParen = match.index + full.length - 1;
@@ -89,7 +100,7 @@ function formatMongoStatement(
   // statement") — refusing here instead keeps the statement verbatim, the same D5 contract every
   // other refusal in this function already follows, rather than Format silently changing the query.
   if (stmt.slice(closeParen + 1).trim().length > 0) {
-    return { reason: 'unexpected trailing content after statement' };
+    return { reason: { key: 'studio.console.format.trailing.error' } };
   }
   const rawArgs = splitTopLevelArgs(stmt, openParen + 1, closeParen)
     .map((a) => a.text.trim())
@@ -99,7 +110,7 @@ function formatMongoStatement(
   for (const raw of rawArgs) {
     const result = beautifyShellText(raw, 'indented');
     if (!result.ok)
-      return { reason: result.reason ? reasonText(result.reason) : 'invalid argument' };
+      return { reason: result.reason ?? { key: 'studio.console.format.invalidArgument.error' } };
     args.push(result.text);
   }
 
@@ -150,7 +161,7 @@ interface FormatFailure {
   /** Which statement, 0-based — the same index D12's caret mapping walks the before/after split
    *  by. */
   index: number;
-  reason: string;
+  reason: CatalogReason;
 }
 
 export interface FormatResult {
@@ -162,7 +173,7 @@ export interface FormatResult {
   ok: boolean;
   /** Present only when `ok` is false, mirroring BeautifyResult's own `reason` — the P13-era
    *  single-statement callers (formatConsoleText's own unit tests) still read this. */
-  reason?: string;
+  reason?: CatalogReason;
   /** One entry per statement Format could not touch — empty when every statement formatted (the
    *  common case) or when the whole document is whitespace-only. */
   failures: FormatFailure[];
@@ -192,7 +203,9 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   // One statement's own text in, its formatted text or a failure reason out — resolved once,
   // outside the map below, so the SQL branch's mod/dialect lookup (an async import, a per-kind
   // table lookup) happens exactly once regardless of how many statements there are.
-  let formatOne: (stmtText: string) => { text: string; reason?: undefined } | { reason: string };
+  let formatOne: (
+    stmtText: string,
+  ) => { text: string; reason?: undefined } | { reason: CatalogReason };
   if (kind === 'mongodb') {
     formatOne = formatMongoStatement;
   } else {
@@ -202,10 +215,10 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
       return {
         text,
         ok: false,
-        reason: 'this console has nothing to format',
+        reason: { key: 'studio.console.format.nothingToFormat.error' },
         failures: statements.map((_, index) => ({
           index,
-          reason: 'this console has nothing to format',
+          reason: { key: 'studio.console.format.nothingToFormat.error' },
         })),
       };
     }
@@ -216,7 +229,12 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
         };
       } catch (err) {
         const message = errorText(err);
-        return { reason: firstLine(message) };
+        return {
+          reason: {
+            key: 'studio.console.format.engine.error',
+            params: { message: firstLine(message) },
+          },
+        };
       }
     };
   }

@@ -8,6 +8,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
@@ -32,11 +33,11 @@ const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {
   s3: 'text-conn-olive',
 };
 
-const OUTLOOK_LABEL: Record<string, string> = {
-  'will-attempt': 'password will be imported',
-  'from-url': 'password came from the JDBC URL',
-  'not-saved': 'DataGrip did not save a password',
-  'store-unsupported': 'password store not supported here',
+const OUTLOOK_KEY: Record<string, MessageKey> = {
+  'will-attempt': 'studio.project.dataGripImport.outlook.willAttempt.label',
+  'from-url': 'studio.project.dataGripImport.outlook.fromUrl.label',
+  'not-saved': 'studio.project.dataGripImport.outlook.notSaved.label',
+  'store-unsupported': 'studio.project.dataGripImport.outlook.storeUnsupported.label',
 };
 const OUTLOOK_TONE: Record<string, 'ok' | 'warn' | 'error'> = {
   'will-attempt': 'ok',
@@ -45,31 +46,25 @@ const OUTLOOK_TONE: Record<string, 'ok' | 'warn' | 'error'> = {
   'store-unsupported': 'error',
 };
 
-const SKIP_LABEL: Record<string, (row: DataGripPreviewRow) => string> = {
-  'unsupported-engine': (row) =>
-    `DataGrip driver “${row.skipDetail ?? '?'}” — no adapter for this engine`,
-  'unrepresentable-url': () => 'this connection cannot be represented as host/port/database fields',
-  'sqlite-path-not-absolute': (row) =>
-    `database path did not resolve to an absolute path (${row.skipDetail ?? ''})`,
-  'no-jdbc-url': () => 'no usable JDBC URL for this data source',
+// Every D11 reason code that can reach ReportRow.Error (a resolveFields skip quoted back with its
+// detail joined by ": ", or a bare password-only refusal code) maps to the same label the preview
+// step shows, so a report row reads like its preview row.
+const REASON_KEY: Record<string, MessageKey> = {
+  'unsupported-engine': 'studio.project.dataGripImport.reason.unsupportedEngine.label',
+  'unrepresentable-url': 'studio.project.dataGripImport.reason.unrepresentableUrl.label',
+  'sqlite-path-not-absolute': 'studio.project.dataGripImport.reason.sqlitePathNotAbsolute.label',
+  'no-jdbc-url': 'studio.project.dataGripImport.reason.noUrl.label',
+  'password-not-saved': 'studio.project.dataGripImport.outlook.notSaved.label',
+  'password-not-found': 'studio.project.dataGripImport.reason.passwordNotFound.label',
+  'credential-store-not-found': 'studio.project.dataGripImport.reason.storeNotFound.label',
+  'credential-store-unsupported': 'studio.project.dataGripImport.outlook.storeUnsupported.label',
+  'credential-store-locked': 'studio.project.dataGripImport.reason.storeLocked.label',
+  'secret-storage-unavailable': 'studio.project.dataGripImport.reason.secretStorageUnavailable.label',
 };
 
-// Every D11 reason code that can reach ReportRow.Error (either a resolveFields skip, quoted back
-// with its own detail joined by ": " — internal/datagrip/apply.go's applyOne — or a bare
-// password-only refusal code with no detail at all) gets the same plain-English label the preview
-// step already gives it elsewhere in this file, so a row's report reads the same way its preview
-// row did rather than surfacing a bare wire code.
-const REPORT_REASON_LABEL: Record<string, string> = {
-  'unsupported-engine': 'no adapter for this engine',
-  'unrepresentable-url': 'cannot be represented as host/port/database fields',
-  'sqlite-path-not-absolute': 'database path did not resolve to an absolute path',
-  'no-jdbc-url': 'no usable JDBC URL for this data source',
-  'password-not-saved': 'DataGrip did not save a password',
-  'password-not-found': 'no password is stored for this data source',
-  'credential-store-not-found': 'the credential store could not be found',
-  'credential-store-unsupported': 'password store not supported here',
-  'credential-store-locked': 'the credential store is locked',
-  'secret-storage-unavailable': 'passwords cannot be saved on this machine',
+const WARNING_KEY: Record<string, MessageKey> = {
+  'name-truncated': 'studio.project.dataGripImport.warning.nameTruncated.label',
+  'ssh-tunnel-dropped': 'studio.project.dataGripImport.warning.sshTunnelDropped.label',
 };
 
 const datagripImportStore = useDatagripImportStore();
@@ -86,46 +81,74 @@ const reportSummary = computed(() => {
   const failed = r.rows.length - created;
   const passwords = r.rows.filter((row) => row.passwordImported).length;
   const parts = [
-    `${created} of ${r.rows.length} connection${r.rows.length === 1 ? '' : 's'} created`,
+    t('studio.project.dataGripImport.summary.created.body', {
+      created,
+      count: r.rows.length,
+    }),
   ];
-  if (passwords > 0) parts.push(`${passwords} password${passwords === 1 ? '' : 's'} imported`);
-  if (failed > 0) parts.push(`${failed} failed`);
-  return parts.join(' — ');
+  if (passwords > 0)
+    parts.push(t('studio.project.dataGripImport.summary.passwords.body', { count: passwords }));
+  if (failed > 0) parts.push(t('studio.project.dataGripImport.summary.failed.body', { count: failed }));
+  return parts.join(' ');
 });
 const reportTone = computed<'info' | 'warn'>(() =>
   (report.value?.rows.some((row) => !row.created) ?? false) ? 'warn' : 'info',
 );
 
 function skipLabel(row: DataGripPreviewRow): string {
-  const fn = row.skipReason ? SKIP_LABEL[row.skipReason] : undefined;
-  return fn ? fn(row) : (row.skipDetail ?? 'not importable');
+  const reason = row.skipReason;
+  if (reason === 'unsupported-engine')
+    return t('studio.project.dataGripImport.skip.unsupportedDriver.label', {
+      driver: row.skipDetail ?? '?',
+    });
+  const key = reason ? REASON_KEY[reason] : undefined;
+  if (!key) return row.skipDetail ?? t('studio.project.dataGripImport.skip.notImportable.label');
+  const label = t(key);
+  return reason === 'sqlite-path-not-absolute'
+    ? t('studio.project.dataGripImport.reason.withDetail.label', {
+        reason: label,
+        detail: row.skipDetail ?? '',
+      })
+    : label;
 }
 
 function warningLabel(code: string): string {
-  if (code === 'name-truncated') return 'name was over 120 characters and was shortened';
-  if (code === 'ssh-tunnel-dropped')
-    return 'this data source has an SSH tunnel, which is not imported';
-  return code;
+  const key = WARNING_KEY[code];
+  return key ? t(key) : code;
 }
 
-// row.error is either "<code>: <detail>" (a resolveFields skip, D11) or a bare code/message —
-// only the leading segment is ever a known reason code, so an unmapped prefix (a Creator/Validate
-// error such as "name must be 1-120 characters") falls back to the raw text verbatim.
+// row.error is "<code>: <detail>" (a resolveFields skip, D11) or a bare code/message. Only the
+// leading segment is a known reason code; an unmapped prefix (a Creator/Validate error) falls
+// back to the raw text.
 function reportErrorLabel(row: DataGripReportRow): string {
   if (!row.error) return '';
   const sep = row.error.indexOf(': ');
   const code = sep === -1 ? row.error : row.error.slice(0, sep);
-  const label = REPORT_REASON_LABEL[code];
-  if (!label) return row.error;
+  const key = REASON_KEY[code];
+  if (!key) return row.error;
   const detail = sep === -1 ? '' : row.error.slice(sep + 2);
-  return detail ? `${label} (${detail})` : label;
+  const label = t(key);
+  return detail ? t('studio.project.dataGripImport.reason.withDetail.label', { reason: label, detail }) : label;
 }
 
 function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'warn' | 'error' } {
-  if (!row.created) return { label: `Not created — ${reportErrorLabel(row)}`, tone: 'error' };
-  if (row.passwordImported) return { label: 'Created — password imported', tone: 'ok' };
-  if (row.error) return { label: `Created — ${reportErrorLabel(row)}`, tone: 'warn' };
-  return { label: 'Created', tone: 'ok' };
+  if (!row.created)
+    return {
+      label: t('studio.project.dataGripImport.outcome.notCreated.label', {
+        reason: reportErrorLabel(row),
+      }),
+      tone: 'error',
+    };
+  if (row.passwordImported)
+    return { label: t('studio.project.dataGripImport.outcome.createdWithPassword.label'), tone: 'ok' };
+  if (row.error)
+    return {
+      label: t('studio.project.dataGripImport.outcome.createdWithNote.label', {
+        reason: reportErrorLabel(row),
+      }),
+      tone: 'warn',
+    };
+  return { label: t('studio.project.dataGripImport.outcome.created.label'), tone: 'ok' };
 }
 
 async function onConfirm(): Promise<void> {
@@ -140,7 +163,7 @@ async function onConfirm(): Promise<void> {
   <Dialog v-if="datagripImportStore.open" :open="true" @update:open="(v) => !v && datagripImportStore.closeDataGripImportDialog()">
     <DialogContent size="xl" fixed-height data-testid="datagrip-import-dialog">
       <DialogHeader icon="database" close-testid="datagrip-import-dialog-close">
-        <DialogTitle>{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
+        <DialogTitle>{{ report ? t('studio.project.dataGripImport.report.title') : t('studio.project.dataGripImport.dialog.title') }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody flush>
@@ -151,7 +174,7 @@ async function onConfirm(): Promise<void> {
         variant="warn"
       >
         <AlertDescription>
-          {{ secretStatus.reason ?? 'Passwords cannot be saved on this machine, so every connection will import without one.' }}
+          {{ secretStatus.reason ?? t('studio.project.dataGripImport.secretsUnavailable.body') }}
         </AlertDescription>
       </Alert>
       <Alert v-if="datagripImportStore.error" variant="error" data-testid="datagrip-import-error">
@@ -192,10 +215,10 @@ async function onConfirm(): Promise<void> {
             <Tooltip v-if="looksAlreadyImported(row)">
               <TooltipTrigger as-child>
                 <Badge variant="warn" data-testid="datagrip-row-duplicate">
-                  looks like it's already imported
+                  {{ t('studio.project.dataGripImport.badge.duplicate.label') }}
                 </Badge>
               </TooltipTrigger>
-              <TooltipContent>A connection with this name, host, port and database already exists.</TooltipContent>
+              <TooltipContent>{{ t('studio.project.dataGripImport.badge.duplicate.tooltip') }}</TooltipContent>
             </Tooltip>
             <Badge
               v-if="row.passwordOutlook"
@@ -203,7 +226,7 @@ async function onConfirm(): Promise<void> {
               :variant="OUTLOOK_TONE[row.passwordOutlook]"
               data-testid="datagrip-row-outlook"
             >
-              {{ OUTLOOK_LABEL[row.passwordOutlook] }}
+              {{ t(OUTLOOK_KEY[row.passwordOutlook] ?? 'studio.project.dataGripImport.outlook.notSaved.label') }}
             </Badge>
           </template>
           <template v-else>
@@ -221,7 +244,7 @@ async function onConfirm(): Promise<void> {
             </Tooltip>
           </span>
         </div>
-        <span v-if="rows.length === 0" class="text-center p-3 text-muted-foreground">No data sources found in this project.</span>
+        <span v-if="rows.length === 0" class="text-center p-3 text-muted-foreground">{{ t('studio.project.dataGripImport.rows.empty') }}</span>
       </div>
     </div>
 
@@ -271,10 +294,10 @@ async function onConfirm(): Promise<void> {
             :disabled="datagripImportStore.busy"
             @click="datagripImportStore.pickAndScanDataGripProject"
           >
-            Choose another folder
+            {{ t('studio.project.dataGripImport.chooseAnother.label') }}
           </Button>
           <Button variant="dialog" size="kira-lg" data-testid="datagrip-import-cancel" @click="datagripImportStore.closeDataGripImportDialog">
-            Cancel
+            {{ t('common.action.cancel.label') }}
           </Button>
           <Button
             variant="dialog-primary"
@@ -283,7 +306,7 @@ async function onConfirm(): Promise<void> {
             :disabled="checkedCount === 0 || datagripImportStore.busy"
             @click="onConfirm"
           >
-            Import {{ checkedCount }} connection{{ checkedCount === 1 ? '' : 's' }}
+            {{ t('studio.project.dataGripImport.import.label', { count: checkedCount }) }}
           </Button>
         </template>
         <Button
@@ -293,7 +316,7 @@ async function onConfirm(): Promise<void> {
           data-testid="datagrip-import-report-close"
           @click="datagripImportStore.closeDataGripImportDialog"
         >
-          Close
+          {{ t('common.action.close.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

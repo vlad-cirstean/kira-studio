@@ -1,5 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { AWS_STYLE_KINDS, FILE_KINDS } from '@shared/domain/connection';
+import { t } from '@theme/i18n';
 import { parse as shellParse } from 'shell-quote';
 
 export type PasteField =
@@ -432,13 +433,19 @@ function scanCli(rest: string, name: string | null, out: Raw[]): void {
   const tokens = tokenize(rest);
   let positional = 0;
   for (let i = name ? 1 : 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (t.startsWith('-') && t !== '-') {
+    const token = tokens[i];
+    if (token.startsWith('-') && token !== '-') {
       i += scanFlag(client, tokens, i, out);
       continue;
     }
     const slot = client.positional?.[positional++];
-    if (slot) out.push({ slot, value: t, guessed: true, label: '(positional)' });
+    if (slot)
+      out.push({
+        slot,
+        value: token,
+        guessed: true,
+        label: t('studio.project.credentialPaste.label.positional.label'),
+      });
   }
 }
 
@@ -471,16 +478,21 @@ function addCandidate(fields: PasteResult['fields'], slot: PasteField, c: PasteC
 // Why a field cannot be used for this kind, or null when it can.
 function unusableReason(slot: PasteField, kind: ConnectionKind, value: string): string | null {
   if (AWS_STYLE_KINDS.has(kind)) {
-    return slot === 'region' || slot === 'profile' ? null : 'AWS kinds have no such field.';
+    return slot === 'region' || slot === 'profile'
+      ? null
+      : t('studio.project.credentialPaste.reason.awsNoSuchField.error');
   }
-  if (slot === 'region' || slot === 'profile') return 'Only AWS kinds have this field.';
-  if (slot === 'authSource' && kind !== 'mongodb') return 'Only MongoDB has an auth source.';
-  if (slot === 'database' && kind === 'kafka') return 'Kafka has no database field.';
+  if (slot === 'region' || slot === 'profile')
+    return t('studio.project.credentialPaste.reason.awsOnly.error');
+  if (slot === 'authSource' && kind !== 'mongodb')
+    return t('studio.project.credentialPaste.reason.authSourceMongo.error');
+  if (slot === 'database' && kind === 'kafka')
+    return t('studio.project.credentialPaste.reason.kafkaNoDatabase.error');
   if ((slot === 'host' || slot === 'database') && URI_LIKE.test(value)) {
-    return 'URIs are not parsed here. Use the Connection URI field.';
+    return t('studio.project.credentialPaste.reason.uri.error');
   }
   if (slot === 'database' && kind === 'redis' && !/^\d+$/.test(value)) {
-    return 'Redis database must be a number.';
+    return t('studio.project.credentialPaste.reason.redisDatabase.error');
   }
   return null;
 }
@@ -492,7 +504,7 @@ function build(raws: Raw[], kind: ConnectionKind, unrecognised: number): PasteRe
   const addPort = (value: string, guessed: boolean, label: string): void => {
     const n = Number(value);
     if (!/^\d+$/.test(value) || n < 1 || n > 65535) {
-      notes.push({ label, reason: 'Port must be 1-65535.' });
+      notes.push({ label, reason: t('studio.project.credentialPaste.reason.port.error') });
       return;
     }
     add('port', { value: String(n), guessed, label });
@@ -506,7 +518,10 @@ function build(raws: Raw[], kind: ConnectionKind, unrecognised: number): PasteRe
         .filter(Boolean);
       value = parts[0] ?? '';
       if (parts.length > 1) {
-        notes.push({ label, reason: 'Extra brokers ignored (one seed broker supported).' });
+        notes.push({
+          label,
+          reason: t('studio.project.credentialPaste.reason.extraBrokers.error'),
+        });
       }
     }
     const m = /^\[([^\]]+)\](?::(\d+))?$/.exec(value) ?? /^([^:\s]+):(\d+)$/.exec(value);
@@ -520,11 +535,11 @@ function build(raws: Raw[], kind: ConnectionKind, unrecognised: number): PasteRe
   for (const r of raws) {
     const { label, value } = r;
     if (r.slot === 'awsSecret') {
-      notes.push({ label, reason: 'AWS keys are not stored. Use a named AWS profile.' });
+      notes.push({ label, reason: t('studio.project.credentialPaste.reason.awsKeys.error') });
       continue;
     }
     if (r.slot === 'schema') {
-      notes.push({ label, reason: 'No schema field.' });
+      notes.push({ label, reason: t('studio.project.credentialPaste.reason.noSchema.error') });
       continue;
     }
     if (FILE_KINDS.has(kind)) continue;
@@ -550,7 +565,7 @@ function unlabelledFallback(lines: string[], kind: ConnectionKind, result: Paste
   const tokens = lines.length === 1 ? lines[0].split(/[ \t]+/) : lines;
   const plain = tokens.every((t) => t !== '' && !/\s/.test(t));
   if (!plain || tokens.length === 0 || tokens.length > 2) return;
-  const label = '(unlabelled)';
+  const label = t('studio.project.credentialPaste.label.unlabelled.label');
   if (tokens.length === 2) {
     result.fields.username = [{ value: tokens[0], guessed: true, label }];
     result.fields.password = [{ value: tokens[1], guessed: true, label }];

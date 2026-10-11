@@ -7,6 +7,7 @@ import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
+import { type MessageKey, t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -23,16 +24,17 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-const FIELD_LABEL: Record<PasteField, string> = {
-  host: 'Host',
-  port: 'Port',
-  database: 'Database',
-  username: 'User',
-  password: 'Password',
-  region: 'Region',
-  profile: 'AWS profile',
-  authSource: 'Auth source',
+const FIELD_LABEL_KEY: Record<PasteField, MessageKey> = {
+  host: 'studio.project.connectionDialog.host.label',
+  port: 'studio.project.connectionDialog.port.label',
+  database: 'studio.project.connectionDialog.database.label',
+  username: 'studio.project.connectionDialog.user.label',
+  password: 'studio.project.connectionDialog.password.label',
+  region: 'studio.project.connectionDialog.region.label',
+  profile: 'studio.project.credentialPaste.field.awsProfile.label',
+  authSource: 'studio.project.credentialPaste.field.authSource.label',
 };
+const fieldLabel = (field: PasteField): string => t(FIELD_LABEL_KEY[field]);
 
 const text = ref('');
 const showText = ref(false);
@@ -88,7 +90,7 @@ const alsoFound = computed(() => {
   const fields = result.value?.fields ?? {};
   return (Object.keys(fields) as PasteField[])
     .filter((f) => !props.allowed.includes(f))
-    .map((f) => FIELD_LABEL[f].toLowerCase());
+    .map((f) => fieldLabel(f).toLowerCase());
 });
 
 function chosen(row: Row): PasteCandidate {
@@ -114,10 +116,10 @@ function onCancel(): void {
   <div class="flex flex-col gap-2 text-kira-md" data-testid="paste-credentials-panel">
     <div class="flex flex-col gap-1">
       <div class="flex items-center justify-between gap-1">
-        <Label class="leading-none text-muted-foreground">Paste credentials</Label>
+        <Label class="leading-none text-muted-foreground">{{ t('studio.project.credentialPaste.heading.label') }}</Label>
         <TooltipIconButton
           :icon="showText ? 'eye-closed' : 'eye'"
-          :label="showText ? 'Hide text' : 'Show text'"
+          :label="showText ? t('studio.project.credentialPaste.hideText.tooltip') : t('studio.project.credentialPaste.showText.tooltip')"
           data-testid="paste-credentials-toggle-text"
           @click="showText = !showText"
         />
@@ -126,7 +128,7 @@ function onCancel(): void {
         ref="input"
         v-model="text"
         :class="['font-data min-h-24 max-h-24 resize-none', showText ? '' : '[-webkit-text-security:disc]']"
-        placeholder="user: …  password: …&#10;PGPASSWORD=…&#10;mysql -u … -p…"
+        :placeholder="t('studio.project.credentialPaste.input.example')"
         autocomplete="off"
         autocapitalize="off"
         spellcheck="false"
@@ -139,7 +141,7 @@ function onCancel(): void {
     </div>
 
     <Alert v-if="result?.tooLong" variant="warn" data-testid="paste-credentials-too-long">
-      <AlertDescription>Too long to be credentials.</AlertDescription>
+      <AlertDescription>{{ t('studio.project.credentialPaste.tooLong.error') }}</AlertDescription>
     </Alert>
 
     <div v-if="rows.length > 0" class="flex flex-col gap-1">
@@ -149,7 +151,7 @@ function onCancel(): void {
         class="flex items-center gap-2"
         :data-testid="`paste-credentials-row-${row.field}`"
       >
-        <span class="w-20 shrink-0 text-muted-foreground">{{ FIELD_LABEL[row.field] }}</span>
+        <span class="w-20 shrink-0 text-muted-foreground">{{ fieldLabel(row.field) }}</span>
         <NativeSelect
           v-if="row.candidates.length > 1"
           :model-value="picks[row.field] ?? 0"
@@ -163,22 +165,22 @@ function onCancel(): void {
           <span class="min-w-0 flex-1 truncate font-data">{{ shown(row.field, chosen(row)) }}</span>
           <span class="shrink-0 text-kira-sm text-muted-foreground">{{ chosen(row).label }}</span>
         </template>
-        <Badge v-if="chosen(row).guessed" variant="warn">guessed</Badge>
+        <Badge v-if="chosen(row).guessed" variant="warn">{{ t('studio.project.credentialPaste.guessed.label') }}</Badge>
         <TooltipIconButton
           v-if="row.field === 'password'"
           :icon="showPassword ? 'eye-closed' : 'eye'"
-          :label="showPassword ? 'Hide password' : 'Show password'"
+          :label="showPassword ? t('studio.project.connectionDialog.hidePassword.label') : t('studio.project.connectionDialog.showPassword.label')"
           data-testid="paste-credentials-toggle-password"
           @click="showPassword = !showPassword"
         />
       </div>
     </div>
     <p v-else-if="result && !result.tooLong" class="m-0 text-muted-foreground" data-testid="paste-credentials-empty">
-      Nothing recognised.
+      {{ t('studio.project.credentialPaste.empty.empty') }}
     </p>
 
     <p v-if="alsoFound.length > 0" class="m-0 text-kira-sm text-muted-foreground" data-testid="paste-credentials-also-found">
-      Also found: {{ alsoFound.join(', ') }}. Use Edit… to change them.
+      {{ t('studio.project.credentialPaste.alsoFound.hint', { fields: alsoFound.join(', ') }) }}
     </p>
     <div
       v-if="result && (result.notes.length > 0 || result.unrecognised > 0)"
@@ -187,12 +189,12 @@ function onCancel(): void {
     >
       <span v-for="(n, i) in result.notes" :key="i">{{ n.label }}: {{ n.reason }}</span>
       <span v-if="result.unrecognised > 0">
-        {{ result.unrecognised }} {{ result.unrecognised === 1 ? 'line' : 'lines' }} not recognised.
+        {{ t('studio.project.credentialPaste.unrecognised.body', { count: result.unrecognised }) }}
       </span>
     </div>
 
     <div class="flex justify-end gap-1">
-      <Button variant="dialog" size="kira-lg" data-testid="paste-credentials-cancel" @click="onCancel">Cancel</Button>
+      <Button variant="dialog" size="kira-lg" data-testid="paste-credentials-cancel" @click="onCancel">{{ t('common.action.cancel.label') }}</Button>
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -200,7 +202,7 @@ function onCancel(): void {
         data-testid="paste-credentials-apply"
         @click="onApply"
       >
-        Apply
+        {{ t('common.action.apply.label') }}
       </Button>
     </div>
   </div>

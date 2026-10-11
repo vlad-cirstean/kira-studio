@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { control } from '../../bridge/control';
 
@@ -16,7 +17,6 @@ export async function revealConnectionSecret(
   isCurrent: () => boolean,
   confirmed = false,
 ): Promise<ConnectionRevealResult | undefined> {
-  const noun = mode === 'uri' ? 'URI' : 'password';
   const result = await control.connectionsReveal(id, confirmed);
   if (!isCurrent()) return undefined;
   switch (result.outcome) {
@@ -27,14 +27,33 @@ export async function revealConnectionSecret(
       return undefined;
     case 'confirmation-required': {
       const ok = await useConfirmDialogStore().confirm({
-        message: `Show the saved ${noun} for "${name}"? It will be displayed in plain text.`,
-        confirmLabel: 'Continue',
+        title: t(
+          mode === 'uri'
+            ? 'studio.project.uriRevealConfirm.title'
+            : 'studio.project.passwordRevealConfirm.title',
+        ),
+        message: t(
+          mode === 'uri'
+            ? 'studio.project.uriRevealConfirm.body'
+            : 'studio.project.passwordRevealConfirm.body',
+          { name },
+        ),
+        confirmLabel: t('common.action.reveal.label'),
         tone: 'primary',
       });
       if (!isCurrent() || !ok) return undefined;
       return revealConnectionSecret(id, name, mode, isCurrent, true);
     }
     default:
-      return { outcome: 'error', error: result.error ?? `Could not reveal the saved ${noun}.` };
+      return {
+        outcome: 'error',
+        error:
+          result.error ??
+          t(
+            mode === 'uri'
+              ? 'studio.project.uriRevealFailed.error'
+              : 'studio.project.passwordRevealFailed.error',
+          ),
+      };
   }
 }

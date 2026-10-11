@@ -1,4 +1,5 @@
 import type { TreeNode } from '@shared/domain/tree';
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import { errorText } from '@workbench/bridge/codedError';
@@ -22,21 +23,21 @@ function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): 
     {
       type: 'item',
       id: 'refresh',
-      label: 'Refresh',
+      label: t('common.action.refresh.label'),
       icon: 'refresh',
       run: () => void useBrowseViewStore().reload(tabId),
     },
     {
       type: 'item',
       id: 'copy-name',
-      label: 'Copy name',
+      label: t('common.action.copyName.label'),
       icon: 'copy',
       shortcut: 'tree.copyName',
       run: () =>
         copyOrReportError(
           node.name,
           (m) => useBrowseViewStore().setActionError(tabId, m),
-          () => announceApp('Copied name'),
+          () => announceApp(t('common.copy.copiedName.announce')),
         ),
     },
     // Gates itself on caps.fileTransfer/canInsert — a no-op list for redis's own 'namespace' rows
@@ -53,7 +54,7 @@ function keyRowMenu(connectionId: string, node: TreeNode): MenuItem[] {
   return [
     ...openItems(row, {
       idBase: 'open',
-      label: 'Open',
+      label: t('common.action.open.label'),
       icon: nodeIcon(node.kind),
       openTab: (cid, path, opts) => useTabsStore().openKeyValueTab(cid, path, opts),
     }),
@@ -72,7 +73,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
   const items: MenuItem[] = [
     ...openItems(row, {
       idBase: 'open',
-      label: 'Open',
+      label: t('common.action.open.label'),
       icon: nodeIcon(node.kind),
       openTab: (cid, path, opts) => useTabsStore().openKeyValueTab(cid, path, opts),
     }),
@@ -84,7 +85,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
     items.push({
       type: 'item',
       id: 'download-object',
-      label: 'Download…',
+      label: t('common.action.download.label'),
       icon: 'cloud-download',
       run: () => void useObjectStoreStore().downloadObject(connectionId, node.path, null),
     });
@@ -95,7 +96,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
     items.push({
       type: 'item',
       id: 'delete-object',
-      label: 'Delete',
+      label: t('common.action.delete.label'),
       icon: 'trash',
       danger: true,
       shortcut: 'tree.delete',
@@ -104,8 +105,12 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       run: async () => {
         if (
           !(await useConfirmDialogStore().confirm({
-            message: `Delete object "${node.name}"? This cannot be undone.`,
-            confirmLabel: 'Delete',
+            title: t('studio.browse.deleteObjectConfirm.title'),
+            message: [
+              t('studio.browse.deleteObjectConfirm.body', { name: node.name }),
+              t('common.confirm.irreversible.body'),
+            ].join(' '),
+            confirmLabel: t('common.action.delete.label'),
             tone: 'danger',
           }))
         )

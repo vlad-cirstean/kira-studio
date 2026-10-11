@@ -13,6 +13,7 @@ import {
 } from '@shared/domain/http';
 import { tabTitle } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { t } from '@theme/i18n';
 import { scriptRunState } from '@workbench/automations/runs/runStates';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { scriptRunTabKind } from '@workbench/tabs/scriptRunTabKind';
@@ -101,7 +102,9 @@ function incognitoMenuExtras(tab: TabRecord): MenuItem[] {
     {
       type: 'item',
       id: 'incognito',
-      label: tabIncognitoStore.isIncognito(tab.id) ? 'Turn off incognito' : 'Incognito',
+      label: tabIncognitoStore.isIncognito(tab.id)
+        ? t('studio.tabs.incognitoOff.label')
+        : t('studio.tabs.incognito.label'),
       icon: 'eye-closed',
       run: () => tabIncognitoStore.setIncognito(tab.id, !tabIncognitoStore.isIncognito(tab.id)),
     },
@@ -115,7 +118,7 @@ function revealInProjectPanel(tab: TabRecord): MenuItem[] {
     {
       type: 'item',
       id: 'reveal-in-project-panel',
-      label: 'Reveal in project panel',
+      label: t('studio.tabs.revealInProject.label'),
       icon: 'target',
       run: () => {
         if (!tab.connectionId) return;
@@ -264,7 +267,7 @@ export const TAB_KINDS: TabKindRegistry<
     // not information; §8 OQ-3).
     badge: (tab) =>
       hasRequestBody((tab as HttpRequestTabRecord).state)
-        ? { icon: 'symbol-namespace', tooltip: 'This request has a body' }
+        ? { icon: 'symbol-namespace', tooltip: t('studio.tabs.requestHasBody.tooltip') }
         : null,
   },
   'grpc-request': {

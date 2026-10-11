@@ -111,7 +111,7 @@ test('create: review shows masked password, guessed badge and a picker; Apply fi
   await page.click('[data-testid="paste-credentials-toggle-password"]');
   await expect(passwordRow).toContainText(PASSWORD);
   await expect(page.locator('[data-testid="paste-credentials-row-database"]')).toContainText(
-    'guessed',
+    'Guessed',
   );
 
   const pick = page.locator('[data-testid="paste-credentials-pick-username"]');

@@ -23,6 +23,7 @@ import {
   type RowSnapshot,
   rowsToTsv,
 } from '../shared/clipboardFormats';
+import { nullCellText, truncatedCellTip } from '../shared/page/cellText';
 import {
   alignmentFor,
   columnHeaderTooltip,
@@ -153,9 +154,9 @@ function cellFormatter(
   _dataContext: RowHandle,
 ): string | FormatterResultWithText {
   const view = value as { text: string; isNull: boolean; truncated: boolean };
-  if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
+  if (view.isNull) return { text: nullCellText(), addClasses: 'cell-null' };
   if (view.truncated) {
-    return { text: view.text, addClasses: 'cell-truncated', toolTip: 'value truncated at 64 KB' };
+    return { text: view.text, addClasses: 'cell-truncated', toolTip: truncatedCellTip() };
   }
   return view.text;
 }
