@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { useEditRawStore } from './state/raw';
@@ -20,14 +21,13 @@ const text = ref('');
 // import, worse here since this buffer is always the full generated request, not something
 // typically hand-pasted small): re-parsing the whole buffer on every single keystroke just to
 // update a preview has no business running that often — the editor itself (`text`) stays bound
-// immediately so typing never stutters; the preview below reads a debounced copy instead. 400ms
-// mirrors ImportCurlDialog.vue's own precedent for the identical shape. P99 Part 3: useDebounceFn
-// over refDebounced(text, 400) — an external open must write debouncedText immediately (below), not
-// 400ms later, matching project/SchemaDialog.vue's own identical-shape precedent (P99 Part 2).
+// immediately so typing never stutters; the preview below reads a debounced copy instead
+// (TIMING.preview). P99 Part 3: useDebounceFn over refDebounced(text) — an external open must write debouncedText immediately (below), not
+// a debounce later, matching project/SchemaDialog.vue's own identical-shape precedent (P99 Part 2).
 const debouncedText = ref('');
 const setDebouncedText = useDebounceFn((value: string) => {
   debouncedText.value = value;
-}, 400);
+}, TIMING.preview);
 onBeforeUnmount(() => setDebouncedText.cancel());
 
 watch(

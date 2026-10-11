@@ -61,7 +61,6 @@ export function createHistoryQueries<
     return {
       queryKey: listKey(itemId, tabId),
       queryFn: () => opts.list(itemId, tabId),
-      staleTime: Number.POSITIVE_INFINITY,
     };
   }
   function snapshotKey(id: string) {
@@ -71,7 +70,6 @@ export function createHistoryQueries<
     return {
       queryKey: snapshotKey(id),
       queryFn: () => opts.get(id),
-      staleTime: Number.POSITIVE_INFINITY,
     };
   }
   /** Null once the tab is closed. */

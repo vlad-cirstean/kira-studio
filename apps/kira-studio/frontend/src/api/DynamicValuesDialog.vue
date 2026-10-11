@@ -9,6 +9,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useDynamicValuesStore } from './state/dynamicValues';
@@ -54,11 +55,9 @@ function reference(name: string): string {
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredEntries = computed(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return ALL_ENTRIES;
+  const q = filterQuery.value;
   return ALL_ENTRIES.filter(
-    (entry) =>
-      entry.name.toLowerCase().includes(q) || (samples[entry.name] ?? '').toLowerCase().includes(q),
+    (entry) => matchesQuery(entry.name, q) || matchesQuery(samples[entry.name] ?? '', q),
   );
 });
 

@@ -11,6 +11,7 @@ import {
   type TransformName,
 } from '@kira/api-core';
 import type { ApiVariable } from '@shared/domain/variables';
+import { compareNatural } from '@workbench/behaviour/match';
 import { type Completion, templateToken } from '@workbench/editor/fieldCompletion';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import type { EditorCompletionSource } from '../../editor/completion';
@@ -233,7 +234,7 @@ export function variableSupport(
       icon: 'symbol-variable',
     })),
     ...secretNames.map((name) => ({ label: name, detail: 'secret', icon: 'symbol-variable' })),
-  ].sort((a, b) => a.label.localeCompare(b.label));
+  ].sort((a, b) => compareNatural(a.label, b.label));
   // P28 D15(b): `fake.` is now the only dynamic vocabulary this app *offers*. D12/D13(b) used to
   // list the 58 Postman `$name` spellings right after it, tagged 'postman alias'. An already-stored
   // `{{$randomEmail}}` keeps resolving, keeps painting as a catalogued reference (classFor, above)

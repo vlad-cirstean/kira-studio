@@ -7,6 +7,8 @@
 // (curl.ts) — both of which used to be cleared only by their own dialog's close path, with no
 // expiry at all — inherit the same grace instead of re-deriving it by hand.
 
+import { useTimeoutFn } from '@vueuse/core';
+
 /** Mirrors internal/localauth.GraceWindow: the reveal gate's own grace is fixed rather than
  *  sliding "so a long editing session can't hold one authentication open indefinitely". Keep in
  *  sync with GraceWindow by hand; there is no shared constant to import across the Go/TS boundary
@@ -23,16 +25,16 @@ const REVEAL_GRACE_WINDOW_MS = 5 * 60 * 1000;
  *  timers even if they happen to use overlapping key spaces (variable id vs. history id vs.
  *  secret name). */
 export function createRevealExpiry(map: Record<string, string>) {
-  const timers: Record<string, ReturnType<typeof setTimeout>> = {};
+  const timers: Record<string, ReturnType<typeof useTimeoutFn>> = {};
 
   function clear(key: string): void {
-    clearTimeout(timers[key]);
+    timers[key]?.stop();
     delete timers[key];
   }
 
   function schedule(key: string): void {
     clear(key);
-    timers[key] = setTimeout(() => {
+    timers[key] = useTimeoutFn(() => {
       delete timers[key];
       delete map[key];
     }, REVEAL_GRACE_WINDOW_MS);

@@ -6,6 +6,7 @@ import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
 import { useSaveRequestDialogStore } from './state/saveRequestDialog';
@@ -19,8 +20,14 @@ const saveDialogStore = useSaveRequestDialogStore();
 // component (the same shape state/objectStore.ts's own upload dialog uses).
 const name = ref('');
 const target = ref('');
-const saving = ref(false);
-const error = ref<string | null>(null);
+const {
+  run: runSave,
+  pending: saving,
+  error,
+} = useAsyncAction(async (collectionId: string, parentId: string | null, trimmed: string) => {
+  const failure = await collectionsStore.submitSaveDialog(collectionId, parentId, trimmed);
+  if (failure !== null) throw new Error(failure);
+});
 
 /** Every collection, each carrying its own folders as a real <optgroup> (F7) — the value encodes
  *  both halves because a folder id alone does not say which collection it belongs to. */
@@ -43,7 +50,6 @@ watch(
     if (!open) return;
     name.value = saveDialogStore.suggestedName;
     target.value = firstTargetValue.value;
-    saving.value = false;
     error.value = null;
   },
   { immediate: true },
@@ -54,13 +60,7 @@ async function onSave(): Promise<void> {
   const trimmed = name.value.trim();
   if (!trimmed || !target.value) return;
   const [collectionId, parentId] = splitTarget(target.value);
-  saving.value = true;
-  error.value = null;
-  const failure = await collectionsStore.submitSaveDialog(collectionId, parentId, trimmed);
-  if (failure !== null) {
-    error.value = failure;
-    saving.value = false;
-  }
+  await runSave(collectionId, parentId, trimmed);
 }
 
 function splitTarget(value: string): [string, string | null] {

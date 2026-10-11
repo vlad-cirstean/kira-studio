@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
+import { plural } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useCollectionsStore } from './state/collections';
 
@@ -28,10 +29,6 @@ const summary = computed(() => {
   if (!r) return '';
   return `Imported ${r.name} — ${plural(r.requests, 'request')}, ${plural(r.folders, 'folder')}.`;
 });
-
-function plural(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`;
-}
 </script>
 
 <template>

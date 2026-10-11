@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { useEventListener } from '@vueuse/core';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { computed, nextTick, ref, useTemplateRef } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
@@ -103,7 +104,9 @@ async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
 
 function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
   collectionsStore.selectRow(row.key);
-  contextMenuStore.openContextMenu(event, menuForRow(row, actions));
+  contextMenuStore.openContextMenu(event, menuForRow(row, actions), {
+    onRestoreFocus: () => void nav.focusKey(row.key),
+  });
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
@@ -115,68 +118,54 @@ function onRename(row: CollectionRowVm, name: string): void {
   void collectionsStore.renameRow(row, name);
 }
 
-// The same shape ProjectTree.vue has, over the existing tree.* shortcut ids (§3) — plus the
-// arrow keys, which are collapse/expand rather than a menu action and so dispatch directly.
+// Arrows, Home/End, Right/Left expand and parent, Enter (the row's primary action, the same one
+// double-click performs), Space and Shift+F10 come from the shared list navigation. The selection
+// is the roving stop. The tree.* chords dispatch through the menu builder a right-click would call,
+// so the printed shortcut and the executed action are the same object.
+const activeKey = computed({
+  get: () => collectionsStore.selected,
+  set: (key) => {
+    if (key) collectionsStore.selectRow(key);
+  },
+});
+const nav = useListNavigation<CollectionRowVm>({
+  container: scrollEl,
+  items: () => collectionsStore.visibleRows,
+  key: (row) => row.key,
+  activeKey,
+  tree: {
+    depth: (row) => row.depth,
+    isExpanded: (row) => row.expanded,
+    hasChildren: (row) => row.hasChildren,
+    expand: collectionsStore.expandRow,
+    collapse: collectionsStore.collapseRow,
+  },
+  onOpen,
+  onSelect,
+  onMenu: (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, menuForRow(row, actions), {
+      onRestoreFocus: () => void nav.focusKey(row.key),
+    }),
+  scrollToIndex: (_index, key) => revealKey(key),
+  rendered: () => virtualItems.value,
+  rowSelector: () => '[role="treeitem"][tabindex="0"]',
+});
+
 function onTreeKeydown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.isComposing) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  const rows = collectionsStore.visibleRows;
-  const selectedIndex = rows.findIndex((r) => r.key === collectionsStore.selected);
-  const moveTo = e.key === 'ArrowDown' ? selectedIndex + 1
-    : e.key === 'ArrowUp' ? Math.max(selectedIndex, 1) - 1
-    : e.key === 'Home' ? 0
-    : e.key === 'End' ? rows.length - 1
-    : null;
-  if (moveTo !== null) {
-    e.preventDefault();
-    void focusRow(rows[Math.min(moveTo, rows.length - 1)]);
-    return;
-  }
-  const row = rows[selectedIndex];
-  if (!row) return;
-
-  if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    collectionsStore.expandRow(row);
-    return;
-  }
-  if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    collectionsStore.collapseRow(row);
-    return;
-  }
-  // Enter is the row's primary action, not a menu item — the same action double-click performs,
-  // so it dispatches directly rather than through runMenuShortcut (ProjectTree.vue's own split).
   const id = shortcutFor(e, TREE_SHORTCUTS);
   if (!id) return;
-  if (id === 'tree.open') {
-    e.preventDefault();
-    void onOpen(row);
-    return;
-  }
-  // Everything else dispatches through the same menu builder a right-click would call, so the
-  // printed shortcut and the executed action are the same object and `disabled` gating is
-  // honoured for free (state/contextMenu.ts's own reasoning for runMenuShortcut).
-  if (runMenuShortcut(menuForRow(row, actions), id)) e.preventDefault();
+  const row = collectionsStore.visibleRows.find((r) => r.key === collectionsStore.selected);
+  if (row && runMenuShortcut(menuForRow(row, actions), id)) e.preventDefault();
 }
 
 const hasVisibleSelection = computed(() =>
   collectionsStore.visibleRows.some((r) => r.key === collectionsStore.selected),
 );
 
-// A virtualised row may not be mounted yet: scroll it into view, then focus its element.
-async function focusRow(row: CollectionRowVm | undefined): Promise<void> {
-  if (!row) return;
-  collectionsStore.selectRow(row.key);
-  await revealKey(row.key);
-  await nextTick();
-  scrollEl.value
-    ?.querySelector<HTMLElement>(`[data-testid="collection-row"][data-id="${CSS.escape(row.id)}"]`)
-    ?.focus();
-}
-
-const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplicate'] as const;
+const TREE_SHORTCUTS = ['tree.rename', 'tree.delete', 'tree.duplicate'] as const;
 
 // P105 §5.1: the tree background has no interactive role of its own -- both listeners bind here
 // via VueUse rather than as raw template attributes on a non-interactive div.

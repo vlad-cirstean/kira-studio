@@ -4,12 +4,12 @@
 // imperative loaders non-component code uses, the one invalidation helper (refreshApiQuery,
 // F2's successor) and the boot-time listener that turns a Go `kira:api:dataChanged` broadcast
 // into cache invalidation (initApiDataSync). Precedents: state/schemas.ts (options object,
-// staleTime: Infinity because Go pushes, broadcast → invalidateQueries) and state/maskRules.ts.
+// never stale because Go pushes, broadcast → invalidateQueries) and state/maskRules.ts.
 //
 // Query keys follow P99 §5.5's flat `[domain, ...ids]` convention (workbench/state/queryClient.ts).
 //
 // ---- reactivity rule (§3.5) — two reader kinds ----
-// notifyManager batches observer notifications with setTimeout(0), and vue-query never swaps the
+// notifyManager batches observer notifications on a zero-delay timer, and vue-query never swaps the
 // scheduler — a useQuery result's `.data` lags the cache by one macrotask after a fetch resolves.
 //   - Reactive readers (computeds, templates, watches) read a useQuery result's `data`.
 //   - Imperative code after an `await` (a mutation continuing on, send(), the reconcilers below)
@@ -59,14 +59,13 @@ export function apiCollectionsTreeQueryOptions() {
       const { collections, items } = await control.collectionsList();
       return { collections, items: items as CollectionItemSummary[] };
     },
-    staleTime: Number.POSITIVE_INFINITY,
   };
 }
 
 // `null` means "confirmed orphan" (GetRequest answered E_NOT_FOUND — the row was deleted, in this
 // window or another); `undefined` (no data) means "not loaded yet". Keeps P108 F4's
 // orphan/not-loaded split exactly, without two parallel maps. Any other failure rethrows, so a
-// transient error never caches as "deleted" under staleTime: Infinity (P175 D5).
+// transient error never caches as "deleted" under the never-stale default (P175 D5).
 function nullOnNotFound(err: unknown): null {
   if ((err as { code?: string }).code === 'E_NOT_FOUND') return null;
   throw err;
@@ -82,7 +81,6 @@ function apiSavedRequestQueryOptions(itemId: string) {
         return nullOnNotFound(err);
       }
     },
-    staleTime: Number.POSITIVE_INFINITY,
   };
 }
 
@@ -97,7 +95,6 @@ function apiSavedGrpcRequestQueryOptions(itemId: string) {
         return nullOnNotFound(err);
       }
     },
-    staleTime: Number.POSITIVE_INFINITY,
   };
 }
 
@@ -105,7 +102,6 @@ export function apiEnvironmentsQueryOptions() {
   return {
     queryKey: apiEnvironmentsKey,
     queryFn: (): Promise<ApiEnvironment[]> => control.variablesListEnvironments(),
-    staleTime: Number.POSITIVE_INFINITY,
   };
 }
 
@@ -113,14 +109,13 @@ function apiVariablesQueryOptions(scope: VariableScope, ownerId: string) {
   return {
     queryKey: apiVariablesKey(scope, ownerId),
     queryFn: (): Promise<ApiVariable[]> => control.variablesList(scope, ownerId),
-    staleTime: Number.POSITIVE_INFINITY,
   };
 }
 
 // ---- imperative loaders (non-component code) ----
 //
 // Cache-first, refetch when invalidated — exactly queryClient.query's own contract with
-// staleTime: Infinity. fetchQuery/ensureQueryData are deprecated in this app's TanStack Query
+// the never-stale default. fetchQuery/ensureQueryData are deprecated in this app's TanStack Query
 // version; query() is their replacement (query-core@5.103.2's own queryClient.js).
 
 export function loadCollectionsTree(): Promise<ApiCollectionsTree> {
@@ -161,7 +156,11 @@ export async function refreshApiQuery(queryKey: QueryKey): Promise<void> {
   const inFlight = queryClient.getQueryCache().find({ queryKey, exact: true })?.promise;
   await queryClient.invalidateQueries({ queryKey, exact: true });
   if (inFlight) {
-    await inFlight.catch(() => {});
+    // Settling is all that matters; the fetch's own caller reports a failure.
+    await inFlight.then(
+      () => undefined,
+      () => undefined,
+    );
     await queryClient.invalidateQueries({ queryKey, exact: true });
   }
 }

@@ -10,6 +10,7 @@ import { tableCellClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { computed, ref } from 'vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
@@ -50,9 +51,7 @@ const rows = computed<VariableOverviewRow[]>(() =>
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredRows = computed(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return rows.value;
-  return rows.value.filter((row) => row.name.toLowerCase().includes(q));
+  return rows.value.filter((row) => matchesQuery(row.name, filterQuery.value));
 });
 
 function reference(name: string): string {

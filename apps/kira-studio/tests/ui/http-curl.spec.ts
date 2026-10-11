@@ -128,9 +128,9 @@ test('warnings are shown before Import, and the coerced method sticks after impo
 // character-by-character (unlike .fill's single input event) is what actually exercises the
 // debounce this fix adds.
 test('the curl preview is debounced, not re-lexed on every keystroke', async ({ relaunch }) => {
-  // ImportCurlDialog.vue's own constant — restated here rather than imported across the web/node
+  // TIMING.preview — restated here rather than imported across the web/node
   // tsconfig boundary (this suite's existing convention, see `global.d.ts:1`-`5`).
-  const PREVIEW_DEBOUNCE_MS = 400;
+  const PREVIEW_DEBOUNCE_MS = 250;
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.collectionsList, response: { collections: [], items: [] } },
   ];

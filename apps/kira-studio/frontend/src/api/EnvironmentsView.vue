@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -104,10 +105,7 @@ const orderedEnvironments = computed<ApiEnvironment[]>(() => {
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const displayEnvironments = computed<ApiEnvironment[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  return q
-    ? orderedEnvironments.value.filter((env) => env.name.toLowerCase().includes(q))
-    : orderedEnvironments.value;
+  return orderedEnvironments.value.filter((env) => matchesQuery(env.name, filterQuery.value));
 });
 
 // D14: drag by the grip, or Alt+Arrow below. Declared ahead of the first syncDrafts run (the

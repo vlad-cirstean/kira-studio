@@ -4,7 +4,9 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
 import { refDebounced } from '@vueuse/core';
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
+import { useFocusOnMount } from '@workbench/behaviour/focus';
+import { TIMING } from '@workbench/behaviour/timing';
+import { computed, ref, useTemplateRef } from 'vue';
 import { useImportCurlStore } from './state/curl';
 
 const importCurlStore = useImportCurlStore();
@@ -20,11 +22,10 @@ const text = ref('');
 // Finding 15: for a large pasted curl command (a big JSON body, say), re-lexing the whole text on
 // every single keystroke just to update a one-line summary has no business running that often —
 // the textarea itself (`text`) stays bound immediately so typing never stutters; the preview below
-// reads a debounced copy instead. 400ms mirrors this app's own precedent for the identical
-// shape (project/SchemaDialog.vue's own parse-summary debounce). Unlike EditRawRequestDialog.vue's
+// reads a debounced copy instead (TIMING.preview, shared with every other parse preview). Unlike EditRawRequestDialog.vue's
 // own copy, this one has no external-open reset to preserve, so refDebounced (P99 Part 3) is a
 // direct fit — no manual watch/setTimeout needed.
-const debouncedText = refDebounced(text, 400);
+const debouncedText = refDebounced(text, TIMING.preview);
 
 const preview = computed(() => importCurlStore.previewCurl(debouncedText.value));
 
@@ -36,14 +37,9 @@ function close(): void {
   importCurlStore.closeImportCurlDialog();
 }
 
-// P105 §8: reka-ui's Dialog, unlike KuiDialog, auto-focuses nothing on its own — focus the textarea
-// explicitly once it renders.
-const bodyEl = useTemplateRef<{ $el: HTMLElement }>('bodyEl');
-onMounted(() => {
-  void nextTick(() => {
-    bodyEl.value?.$el.querySelector<HTMLTextAreaElement>('.curl-textarea')?.focus();
-  });
-});
+// P105 §8: reka-ui's Dialog, unlike KuiDialog, auto-focuses nothing on its own.
+const curlEl = useTemplateRef<HTMLElement>('curlEl');
+useFocusOnMount(curlEl);
 </script>
 
 <template>
@@ -52,8 +48,9 @@ onMounted(() => {
       <DialogHeader close-testid="import-curl-dialog-close">
         <DialogTitle>Import from curl</DialogTitle>
       </DialogHeader>
-      <DialogBody ref="bodyEl">
+      <DialogBody>
       <Textarea
+        ref="curlEl"
         v-model="text"
         class="font-data curl-textarea min-h-32"
         rows="6"

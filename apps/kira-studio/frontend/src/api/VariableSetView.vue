@@ -13,6 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
+import { revealElement } from '@workbench/behaviour/focus';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue';
@@ -265,10 +267,7 @@ const trailingRow = computed<ApiVariable>(() => ({
 }));
 
 const displayRows = computed<ApiVariable[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  const real = q
-    ? allRealRows.value.filter((row) => row.name.toLowerCase().includes(q))
-    : allRealRows.value;
+  const real = allRealRows.value.filter((row) => matchesQuery(row.name, filterQuery.value));
   return [...real, trailingRow.value];
 });
 
@@ -467,9 +466,8 @@ watch(
     hasLoadedOnce = true;
     if (isInitialLoad || next <= prev) return;
     void nextTick(() => {
-      listRef.value
-        ?.querySelector('.variable-row:last-child')
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const last = listRef.value?.querySelector('.variable-row:last-child');
+      if (last) revealElement(last);
     });
   },
 );

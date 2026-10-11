@@ -11,21 +11,8 @@ permanent U41 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorVi
 permanent U52 apps/kira-studio/frontend/src/views/shared/celleditor/timestamp.ts # spelling-preserving timestamp re-encoding
 permanent U42 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
 permanent U61 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
-apps/kira-studio/frontend/src/api/CollectionsTree.vue
-apps/kira-studio/frontend/src/api/DynamicValuesDialog.vue
-apps/kira-studio/frontend/src/api/EditRawRequestDialog.vue
-apps/kira-studio/frontend/src/api/EnvironmentsView.vue
-apps/kira-studio/frontend/src/api/ImportCurlDialog.vue
-apps/kira-studio/frontend/src/api/ImportReportStrip.vue
-apps/kira-studio/frontend/src/api/SaveRequestDialog.vue
-apps/kira-studio/frontend/src/api/VariableRow.vue
-apps/kira-studio/frontend/src/api/VariableSetView.vue
-apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue
-apps/kira-studio/frontend/src/api/state/apiQueries.ts
-apps/kira-studio/frontend/src/api/state/collections.ts
-apps/kira-studio/frontend/src/api/state/history.ts
-apps/kira-studio/frontend/src/api/state/revealExpiry.ts
-apps/kira-studio/frontend/src/api/state/variableCompletion.ts
+permanent U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Down row reorder chord, not list navigation
+permanent U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
 apps/kira-studio/frontend/src/bridge/port.ts
 apps/kira-studio/frontend/src/editor/MonacoHost.vue
 apps/kira-studio/frontend/src/project/ConnectionDialog.vue

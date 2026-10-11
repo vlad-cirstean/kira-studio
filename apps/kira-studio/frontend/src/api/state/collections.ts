@@ -10,6 +10,8 @@ import type {
 import { defaultGrpcSavedRequest, defaultHttpSavedRequest } from '@shared/domain/collections';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
+import { matchesQuery } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
@@ -81,7 +83,7 @@ function itemKey(id: string): string {
 
 function rowMatches(name: string, url: string, query: string): boolean {
   if (!query) return false;
-  return name.toLowerCase().includes(query) || url.toLowerCase().includes(query);
+  return matchesQuery(name, query) || matchesQuery(url, query);
 }
 
 // P112: state.requests/grpcRequests/orphanRequests/orphanGrpcRequests are gone — a saved request's
@@ -186,12 +188,11 @@ export const useCollectionsStore = defineStore('collections', () => {
   }
 
   // Finding 14: the same 150ms debounce this app already uses for a fast typist
-  // (project/state/tree.ts's own SEARCH_DEBOUNCE_MS) — state.search itself stays immediate (so the
+  // (TIMING.search) — state.search itself stays immediate (so the
   // input never stutters), and activeSearchQuery/visibleRows read the debounced value instead, so a
   // fast typist causes one recompute per pause rather than one per character.
-  const SEARCH_DEBOUNCE_MS = 150;
   // P99 §9.3: refDebounced replaces the watch+setTimeout pair this used to hand-roll.
-  const debouncedSearch = refDebounced(toRef(state, 'search'), SEARCH_DEBOUNCE_MS);
+  const debouncedSearch = refDebounced(toRef(state, 'search'), TIMING.search);
 
   /** Lower-cased once per render rather than per row. '' means "no search active". */
   const activeSearchQuery = computed(() => debouncedSearch.value.trim().toLowerCase());

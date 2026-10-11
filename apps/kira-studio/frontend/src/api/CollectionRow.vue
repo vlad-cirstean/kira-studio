@@ -83,8 +83,12 @@ function onTwistyClick(): void {
   emit('toggle', props.row);
 }
 
-// P105 §5.2(c): the container's own onTreeKeydown (CollectionsTree.vue) already claims Enter for
-// the row's primary action (the same one dblclick fires) — Space mirrors a single click instead.
+// A focused row is the roving stop, so Shift+F10 and arrows act on it.
+function onFocus(): void {
+  if (!props.sticky && !props.selected) emit('select', props.row);
+}
+
+// The container's useListNavigation claims Enter and the arrows; Space mirrors a single click.
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === ' ') {
     e.preventDefault();
@@ -110,6 +114,7 @@ function onKeydown(e: KeyboardEvent): void {
     :tabindex="sticky ? -1 : selected || tabbable ? 0 : -1"
     @click="emit('select', row)"
     @dblclick="emit('open', row)"
+    @focus="onFocus"
     @keydown="onKeydown"
     @contextmenu.prevent.stop="emit('contextmenu', row, $event)"
   >
