@@ -20,6 +20,8 @@ var (
 // wrappers take the key as a parameter by design; their callers name the literal key.
 var wrappers = map[string]bool{
 	"internal/ipcerr/text.go":                        true,
+	"internal/llmprompts/check.go":                   true,
+	"internal/llmprompts/validate.go":                true,
 	"apps/kira-studio/internal/adapters/errors.go":   true,
 	"apps/kira-studio/internal/httpclient/errors.go": true,
 	"apps/kira-space/internal/mobileweb/respond.go":  true,
