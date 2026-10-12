@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="M extends string">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import type { KeepAwakeStatus } from '../bridge/createCoreControl';
 import type { ModeRegistry } from '../modes';
 import ModeSwitcher from './ModeSwitcher.vue';
@@ -66,7 +67,7 @@ async function onSelect(mode: M): Promise<void> {
         @click="emit('toggle-operations')"
       />
       <TooltipIconButton
-        icon="settings-gear"
+        :icon="ICON.settings"
         :label="t('common.module.settings.label')"
         :icon-size="15"
         variant="title"

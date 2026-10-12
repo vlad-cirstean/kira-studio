@@ -289,7 +289,7 @@ const title = computed(() => {
 // A template literal would put two closing braces back to back, which the Vue parser reads as a
 // mustache delimiter in templates; building it here keeps the template clean.
 function stashRef(index: number | string): string {
-  return 'stash@{' + index + '}';
+  return `stash@{${index}}`;
 }
 
 function onClose(): void {

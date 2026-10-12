@@ -234,7 +234,7 @@ U61@@vt@@/behaviour/|/testing/@@empty catch (give a reason comment or surface th
 U62@@vt@@/behaviour/|/testing/@@manual focus() (use useFocusOnMount, useFocusReturn, useListNavigation)@@\.focus\(\)|nextTick\([^)]*\.focus
 U63@@s@@/behaviour/|/testing/@@side panel with SearchField and no usePanelHeaderSearch@@(?s)\A(?!.*usePanelHeaderSearch).*<SearchField
 U72@@vt@@@@@lucide/vue import outside the theme ui primitives (use CodiconIcon, ICON)@@['"]@lucide/vue
-U73@@vt@@CodiconIcon.vue|Spinner.vue@@retired icon name gear/settings/kebab-vertical, or a 'codicon-' string literal (use ICON)@@\b(?:name|icon)(?:=|:\s*)["']{1,2}(?:gear|settings|kebab-vertical)["']|['"\x60]codicon-
+U73@@vt@@CodiconIcon.vue|Spinner.vue@@retired icon name gear/settings/kebab-vertical, or a 'codicon-' string literal (use ICON)@@(?<!<slot )\b(?:name|icon)(?:=|:\s*)["']{1,2}(?:gear|settings|kebab-vertical)["']|['"\x60]codicon-
 U74@@v@@EmptyState.vue@@<Empty outside EmptyState.vue (use EmptyState)@@<Empty\b
 U75@@vt@@@@duration-, ease-, animate-in, animate-out outside theme (motion tokens own them)@@${TOK}(?:duration|ease)-[\w\[]|${TOK}animate-(?:in|out)(?![\w-])
 U76@@vt@@sortableReorder.ts@@ghostClass outside sortableReorder.ts (use SORTABLE_GHOST_CLASS)@@\bghostClass:

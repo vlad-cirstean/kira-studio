@@ -91,7 +91,6 @@ U73 packages/git-ui/src/icons/index.ts
 U73 packages/git-ui/src/icons/setiFileIcon.ts
 U73 packages/git-ui/src/lib/menuModel.ts
 U73 packages/workbench/src/components/SettingsShell.vue
-U73 packages/workbench/src/components/TitleBar.vue
 U74 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue
 U74 apps/kira-space/frontend/mobile/screens/NeedsScreen.vue
 U74 apps/kira-space/frontend/mobile/screens/PlanScreen.vue
