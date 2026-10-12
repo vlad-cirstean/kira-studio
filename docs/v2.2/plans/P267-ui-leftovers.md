@@ -934,3 +934,76 @@ Undone, not verifiable here:
 
 Checks green at close: `bun run lint`, `typecheck`, `lint:go`, `lint:dead`, `test:unit` (1902 pass),
 `go test` for `internal/shell` and `apps/kira-space/internal/appshell`.
+
+## Test and fix result
+
+Base `bb79625bf`. Serial run on one machine, no push.
+
+Commits:
+
+- `072553fa2` code fixes: find bar Esc captured before `SearchField`; `useFormErrors.submit` waits up to 5
+  frames for the invalid field; `AutocompleteField` hover panel opens above the field (Reka popover
+  intercepts the pointer below it); `CatalogText` groups numeric params through `formatCount`;
+  `useShortcut` gets a `capture` option, used by the cell editor save chord; `FiltersDialog` checkbox hit
+  area; `AdeAutomationsBlock` bare `<button>` is a `Button variant="toolbar" size="inline"`.
+- `932deaf48` Studio ui specs. WebKit on Linux reports a Mac UA, so `isMac` is true: new
+  `support/chord.ts` (`primaryChord`, `deleteChord`) presses Meta chords. Dirty dialog Esc/X specs click
+  `confirm-dialog-confirm`. Count, duration and percent text follows `formatCount` (`10,000`, `60ms`,
+  `60.0%`). `openHttpRequestView` regained the new-request click the N8 move dropped. Wrong-premise
+  assertions fixed: Redis key rows have no Delete; D9 elapsed caption is muted, not subtle; LAW-12 label
+  check is now stable left edges.
+- `2f9c07211` Space ui specs: Meta+Backspace workflow delete, `60.0%`, tag name error appears after a
+  change (fill then clear), tag fixture gets a first tag so v1 starts at tabindex -1, tooltip asserted by
+  `data-slot="tooltip-content"` (no `role=tooltip`), credential dialog dirty flow (clean outside click
+  closes by design), usage item is 18px (`control-sm`), heading link fixture gets tail content so the
+  heading can reach the pane top, Retry located by `button` text (Monaco view zones are aria-hidden),
+  sync disclosure opened by click.
+- `a11e5e6df`, `9a115d400` visual baselines and `schema-dialog.spec.ts` blur target (`.help` class is gone,
+  now `[data-slot="field-description"]`).
+- `d41a99379` `flowharness.WithSeed`: the retired-model sweep runs in a goroutine at first build and raced
+  the seed written after `New` (`TestStartupSweepsLeftovers` failed 1 in 2 runs).
+- `11964d03b` `go mod tidy` in both nested `tests/claude` modules (missing `renameio` go.sum entry; `go vet`
+  failed there).
+
+Suite results at tip:
+
+- `test:unit` 1902 pass.
+- `test:ui:studio` 532 pass.
+- `test:ui:space` 553 pass, 1 load flake (`ade-v2-dialogs` Merge from the fix menu): failed once at 3
+  workers, passes 3 of 3 alone.
+- `test:ui:space-mobile` 79 pass, 1 skipped.
+- `test:visual:studio` 13 pass, `test:visual:space` 13 pass, after the baselines below.
+- `test:flows:studio` pass. `test:flows:space` pass after the `WithSeed` fix.
+- `go test ./...` pass except `termflow` `TestScheduleHeadless/stop` and `internal/terminal`
+  `TestSessionClose*`, which fail under parallel package load and pass alone with `-p 1` (load-sensitive,
+  not P267).
+- `lint:go` 0 issues, `lint:dead` clean, `typecheck` clean, `lint` clean.
+- "Failed to resolve component": the prod test build strips the dev warning, so vue-tsc
+  `checkUnknownComponents` (inside `typecheck`) is the guard; it is clean.
+
+Visual baselines updated, every diff image viewed. Studio (11 changed plus schema): title bar icons 15 to
+16px (`workbench`, `console`, `data-grid`, `connection-dialog`); panel header `font-semibold` to
+`font-medium` (`CONNECTIONS`); EmptyState padding wraps "Everything you connect to shows up here"
+(`workbench`, `connection-dialog`); tree row counts spaced (`~1 rows`) (`data-grid`); loading spinner
+hidden for 300 ms (ring gone in `http-request-view`, `console`, `data-grid`); `42 ms` to `42ms`, method and
+environment selects on shared sizes (`http-request-view`); FK nav button on the borderless toolbar variant
+(`data-grid`); script dialog Add no longer disabled when empty (`useFormErrors`), Identifier chips 1-2px
+wider (`script-dialog`); dialog header icon gone and stepper chevrons 12px (`settings-*` x6,
+`connection-dialog`); `schema-dialog` uses `fixed-height` dialog (shorter editor), shadow and intro as
+`FieldDescription`. Space (11): dialog header icon gone and section headings as FieldLegend (`settings-*`,
+`git-repos-dialog`); spacing moved to the density scale (`workflow-graph`, `workflow-graph-branches`:
+inspector rows shift 2px); branch picker trigger on the shared picker trigger look (`git-graph`,
+`git-graph-detail`); branch picker tab counts plain, not pills (`git-branch-picker`); stepper chevron size
+(`git-repo-settings-dialog`, `settings-appearance`).
+
+Could not run or not proven:
+
+- `ui-timing`: fails here (console keystroke, scroll frame, tree expand p95) and fails the same, worse, at
+  `ae1bb8648`. Environmental, listed under Known open items; not run again.
+- Bindings: `apps/kira-studio/frontend/bindings` and `apps/kira-space/frontend/bindings` regenerated with
+  `wails3 generate bindings -clean=true -b -names -ts -i` (`go install ...wails3@v3.0.0-beta.28` to a temp
+  `GOBIN`; no `task` binary here). Gitignored, so nothing committed. Typecheck and `test:unit` pass on the
+  regenerated set.
+- Observation, not fixed: in `ade-v2-review` "sync button lists..." the sync popover content sat at
+  y=-274 (unpositioned) in WebKit while clicking inside it, so the spec clicks with `dispatchEvent`.
+  Other popovers position fine; not reproduced against the base (base worktree build did not run the spec).
