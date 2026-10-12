@@ -208,7 +208,7 @@ test('the card base button opens the dialog for one branch and a menu for severa
   const { window: page } = await open(relaunch, idleNotif);
   const notif = page.locator(`${t('ade-card')}[data-task-id="T_notif"]`);
   await notif.locator(t('ade-card-change-base')).click();
-  await expect(page.locator(t('ade-dialog-title'))).toHaveText('Change base');
+  await expect(page.locator(t('ade-dialog-title'))).toHaveText('Change the base');
   await page.locator(t('ade-dialog-cancel')).click();
   const auth = page.locator(`${t('ade-card')}[data-task-id="T_auth"]`);
   await auth.locator(t('ade-card-change-base')).click();

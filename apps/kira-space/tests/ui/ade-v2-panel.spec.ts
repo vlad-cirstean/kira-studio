@@ -201,10 +201,10 @@ test('a branch opens Details with merged and deployed rows; Changes; back to the
   await expect(details).toBeVisible();
   await expect(
     details.locator('[data-testid="ade-branch-into"][data-target="develop"]'),
-  ).toContainText('stale');
+  ).toContainText('Stale');
   await expect(
     details.locator('[data-testid="ade-branch-deploy"][data-env="preview"]'),
-  ).toContainText('unknown');
+  ).toContainText('Unknown');
   await page.locator('[data-testid="ade-panel-tab-changes"]').click();
   await expect(page.locator('[data-testid="ade-changes-tab"]')).toBeVisible();
   await page.locator('[data-testid="ade-panel-back"]').click();
@@ -249,7 +249,7 @@ test('a branch row on the Plan selects the branch', async ({ relaunch }) => {
   await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_cart"]').first().click();
   await expect(page.locator('[data-testid="ade-branch-details"]')).toBeVisible();
   await expect(page.locator('[data-testid="ade-branch-deploy"][data-env="prod"]')).toContainText(
-    'deployed',
+    'Deployed',
   );
 });
 
@@ -473,7 +473,7 @@ test('a started task on an older workflow version says so', async ({ relaunch })
   ]);
   await openTask(page, 'T_bill');
   await expect(page.locator('[data-testid="ade-workflow-outdated"]')).toHaveText(
-    'updated — applies to new work only',
+    'Updated, applies to new work only',
   );
   await openTask(page, 'T_auth');
   await expect(page.locator('[data-testid="ade-workflow-outdated"]')).toHaveCount(0);
@@ -494,7 +494,7 @@ test('a skipped stage is dimmed, cannot be entered, and Skip this stage jumps pa
   await openTask(page, 'T_alerts');
   const skipped = page.locator('[data-testid="ade-stage-block"][data-stage-id="impl"]');
   await expect(skipped).toHaveAttribute('data-state', 'skipped');
-  await expect(skipped).toContainText('skipped');
+  await expect(skipped).toContainText('Skipped');
 
   await page.locator('[data-testid="ade-stage-pick"]').click();
   await expect(page.locator('[data-testid="ade-stage-option-impl"]')).toHaveAttribute(

@@ -47,7 +47,7 @@ test('work at risk opens the dialog and Delete anyway archives', async ({ relaun
     { channel: IPC.adeTaskArchiveRisk, response: AT_RISK },
   ]);
   await openArchive(page);
-  await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive: work would be lost');
+  await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive would lose work');
   await expect(page.locator(t('ade-dialog-risk'))).toContainText(
     '1 uncommitted, 2 unmerged commits',
   );
@@ -71,7 +71,7 @@ test('send then archive re-reads the risk after the turn and reopens when still 
   expect(calls(control, IPC.adeTaskArchiveRisk)).toHaveLength(1);
   await emitAgentEvent(page, 'term-tk01', 'Stop');
   await expect.poll(() => calls(control, IPC.adeTaskArchiveRisk)).toHaveLength(2);
-  await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive: work would be lost');
+  await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive would lose work');
   expect(calls(control, IPC.adeTaskArchiveTask)).toHaveLength(0);
 });
 
@@ -80,8 +80,8 @@ test('a blocked worktree is an action error, not a dialog', async ({ relaunch })
     { channel: IPC.adeTaskArchiveRisk, response: risk([branchRisk({ blocked: 'locked' })]) },
   ]);
   await openArchive(page);
-  await expect(page.locator(t('ade-panel-action-error'))).toContainText("Can't archive:");
-  await expect(page.locator(t('ade-panel-action-error'))).toContainText('locked');
+  await expect(page.locator(t('ade-panel-action-error'))).toContainText('Can’t archive:');
+  await expect(page.locator(t('ade-panel-action-error'))).toContainText('Locked');
   await expect(page.locator(t('ade-dialog'))).toHaveCount(0);
   expect(calls(control, IPC.adeTaskArchiveTask)).toHaveLength(0);
 });
@@ -120,7 +120,7 @@ for (const [key, atRisk] of [
     ]);
     await openArchive(page);
     if (atRisk) {
-      await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive: work would be lost');
+      await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive would lose work');
       await expect(page.locator(t('ade-dialog-risk'))).toContainText(
         '1 uncommitted, 1 unmerged commit',
       );

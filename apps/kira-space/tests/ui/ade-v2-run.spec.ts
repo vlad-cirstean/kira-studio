@@ -356,7 +356,7 @@ test('contract: a spent loop shows the result and that the stage stopped', async
   await open(page, 'T_cart');
   const out = page.locator(t('ade-run-outcome'));
   await expect(out.locator(t('ade-outcome-result'))).toHaveText('changes');
-  await expect(out.locator(t('ade-outcome-route'))).toHaveText('stopped');
+  await expect(out.locator(t('ade-outcome-route'))).toHaveText('Stopped');
   await expect(out).toContainText(spent.note);
 });
 

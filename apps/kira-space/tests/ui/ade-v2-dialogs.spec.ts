@@ -142,7 +142,7 @@ test('a session that ends first records nothing and says so', async ({ relaunch 
   await openCard(page, 'T_auth');
   await emitAgentEvent(page, 'term-tk01', 'SessionEnd');
   await expect(page.locator(t('ade-panel-action-error'))).toContainText(
-    'the session ended before the merge finished; nothing recorded',
+    'The session ended before the merge finished; nothing recorded.',
   );
   expect(calls(control, IPC.adeTaskRecordMerge)).toHaveLength(0);
 });

@@ -142,8 +142,8 @@ test('contract: Choose folder… switches the script to a fixed folder', async (
   await expect(preview.locator('[data-testid="var-chip"][data-var="Kira home"]')).toContainText(
     '/kira',
   );
-  await expect(preview.locator('[data-testid="var-chip"][data-var="script id"]')).toContainText(
-    'set on save',
+  await expect(preview.locator('[data-testid="var-chip"][data-var="Script ID"]')).toContainText(
+    'Set on save',
   );
 
   await dialog.locator('[data-testid="script-dialog-dir-fixed"]').click();

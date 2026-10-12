@@ -137,9 +137,9 @@ reviewTest(
     await expect(popover.locator(t('ade-review-sync-rows'))).toContainText('src/a.ts');
     await popover.locator(t('ade-review-sync-skipped')).evaluate((d) => d.setAttribute('open', ''));
     await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText(
-      'changed since review',
+      'Changed since review',
     );
-    await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText('not in the PR');
+    await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText('Not in the PR');
   },
 );
 
@@ -218,6 +218,6 @@ reviewTest(
     const button = page.locator(t('ade-review-sync'));
     await expect(button).toBeDisabled();
     await button.locator('xpath=..').hover();
-    await expect(page.getByText('Could not load the sync plan: gh exploded').first()).toBeVisible();
+    await expect(page.getByText('Couldn’t load the sync plan: gh exploded').first()).toBeVisible();
   },
 );

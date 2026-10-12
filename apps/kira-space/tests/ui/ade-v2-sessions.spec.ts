@@ -95,7 +95,7 @@ test('Take over of a running run confirms, stops it and selects the resumed sess
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('Take over run?');
   await expect(dialog).toContainText(
-    'is still running on feat/billing-dashboard. Taking over stops it first; it becomes stuck and continues in Claude Code.',
+    'is still running on feat/billing-dashboard. Taking over stops it, marks it stuck and continues it in Claude Code.',
   );
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   expect(calls(control, IPC.adeTaskTakeOver)).toHaveLength(0);

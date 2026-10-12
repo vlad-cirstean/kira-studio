@@ -46,7 +46,7 @@ test('lists items with quiet link facts and selects the first', async ({ relaunc
     'PAY-140',
   );
   await expect(rows(page).nth(1).locator('[data-testid="ade-backlog-facts"]')).toHaveText(
-    'issue web-app#882',
+    'Issue web-app#882',
   );
   await expect(page.locator('[data-testid="ade-backlog-title"]')).toContainText('Rate limit');
 });

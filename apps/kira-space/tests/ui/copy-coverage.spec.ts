@@ -45,6 +45,8 @@ function fixtureData(): RegExp[] {
     /^(connecting|connected|error)$/,
     /^[BIH]$/,
     /^acme$/,
+    // Installed monospace families in the Appearance font picker are proper names.
+    /^(Courier New|Menlo|SF Mono|Monaco|Andale Mono|PT Mono|JetBrains Mono|Fira Code|Source Code Pro|IBM Plex Mono|Cascadia Code|Hack|Inconsolata|Roboto Mono)$/,
     /^\/?tmp\/$/,
   ];
 }
