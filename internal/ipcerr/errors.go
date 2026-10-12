@@ -40,12 +40,12 @@ func (e *Error) Error() string {
 
 func New(code, message string) *Error { return &Error{Code: code, Message: message} }
 
-func Internal(message string) *Error   { return New("E_INTERNAL", message) }
-func BadRequest(message string) *Error { return New("E_BAD_REQUEST", message) }
+func Internal(message string) *Error   { return New(string(CodeInternal), message) }
+func BadRequest(message string) *Error { return New(string(CodeBadRequest), message) }
 
 // NotFound reports an object the caller named that does not exist (a deleted item), so a renderer
 // can tell it from a transient E_INTERNAL failure.
-func NotFound(message string) *Error { return New("E_NOT_FOUND", message) }
+func NotFound(message string) *Error { return New(string(CodeNotFound), message) }
 
 // Disconnected reports a connection the caller named that is not currently connected.
 func Disconnected(name string) *Error {
@@ -58,7 +58,7 @@ func NotFoundNamed(name string) *Error {
 }
 
 // SecretStore mirrors secret-cipher.ts's SecretStoreError code.
-func SecretStore(message string) *Error { return New("E_SECRET_STORE", message) }
+func SecretStore(message string) *Error { return New(string(CodeSecretStore), message) }
 
 // Wrap returns err unchanged if it already carries a structured *Error (connections/service.go
 // and tree/service.go's own wrapErr), or folds any other error into Internal(err.Error()). Returns

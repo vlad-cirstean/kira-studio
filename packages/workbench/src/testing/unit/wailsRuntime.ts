@@ -75,7 +75,7 @@ export function getStream(name: string): FakeSocket {
 }
 
 // Deliberately never settles, rather than rejecting: state/tabs.ts's own module-scope code fires
-// a `void control.tabsSave(...)` on tab mutation with no `.catch`, and other state modules have
+// an unawaited `control.tabsSave(...)` on tab mutation with no `.catch`, and other state modules have
 // similar fire-and-forget calls no spec here is testing — a rejection would surface as an
 // unhandled promise rejection attributed to whatever spec happened to be running, even though
 // every spec that actually cares about a bound call's result overrides `control`'s or `data`'s
@@ -90,7 +90,7 @@ let callFactory: () => Promise<unknown> = () => notImplemented('Call');
 // bridge-unwrap.spec.ts is the one spec that drives a real bound call end to end (to prove every
 // control.ts method really does run its result through `unwrap`); it calls this before importing
 // control.ts and `resetCallFactory()` afterwards, so a later spec's own fire-and-forget calls
-// (state/tabs.ts's `void control.tabsSave(...)`) go back to hanging harmlessly instead of
+// (state/tabs.ts's unawaited `control.tabsSave(...)`) go back to hanging harmlessly instead of
 // rejecting into an unrelated spec.
 export function setCallFactory(f: () => Promise<unknown>): void {
   callFactory = f;
