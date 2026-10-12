@@ -5338,6 +5338,13 @@
           "body": "Returned from store_memory when the gate challenges an item."
         }
       },
+      "memoryMcpStorePrepared": {
+        "description": "Tells the agent that nothing was stored and to paste the comment that follows. The comment follows it.",
+        "title": "Store comment notice",
+        "usedBy": {
+          "body": "Returned from store_memory when it is called with asComment."
+        }
+      },
       "memoryReconcileSystem": {
         "description": "Compares new facts with similar stored memories and picks add, update or no change for each.",
         "title": "Memory reconcile",

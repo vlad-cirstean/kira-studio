@@ -206,8 +206,8 @@ Input: "items" (each a claimed fact with a reason, an origin, an optional source
 Origin, sourceTag and scope are metadata of the item. Never change them and never judge the item by them; every fact split from an item keeps them.
 
 For each item:
-1. Split it into atomic facts: one claim each. Rewrite a fact only to make it standalone. Resolve a pronoun or vague reference only when the item itself makes the referent certain. Otherwise keep the author's wording.
-2. Attach the reason that supports each fact.
+1. Split it into atomic facts: one claim each, one sentence of about 20 words at most. Rewrite each fact to the shortest plain form that keeps its meaning: active voice, present tense where true; cut filler, hedges (just, really, basically, actually, simply) and pleasantries; drop articles only where meaning stays clear. Keep exactly negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings and ids. When a shorter form could change the meaning, keep the original words. Make each fact standalone: resolve a pronoun or vague reference only when the item itself makes the referent certain. Write plain text only: no Markdown, no backticks, no line breaks. Cite another memory or document only by its id (km_... or kg_...), never by pasting its text.
+2. Attach the reason that supports each fact, in the same short plain style.
 3. For each fact give 3 to {{.MaxKeywords}} "keywords": synonyms, abbreviations, product, person and project names, related terms. They exist so a later search finds the fact.
 
 Challenge the item (verdict "challenge", no facts, specific questions answerable in one line) when:
@@ -264,7 +264,7 @@ For each fact choose exactly one action:
 - "noop" with "target": a candidate already states the same fact and its reason already covers the new one.
 - "update" with "target": a candidate is about the same subject and the new fact replaces, corrects or refines it, or adds to its reason. Return the full new "fact" and a merged "reason". The old memory stays as history.
 - "add": no candidate is about the same subject. Two facts on related topics that are both true are two memories, not an update.
-"why" is one sentence explaining the choice. "target" is "" for add. For noop copy the new fact and reason into "fact" and "reason". Answer every fact index exactly once.`,
+The "fact" and "reason" of an update follow the same short plain style as stored facts: plain text, no Markdown, no line breaks, and a merged reason stays one or two sentences. "why" is one sentence explaining the choice. "target" is "" for add. For noop copy the new fact and reason into "fact" and "reason". Answer every fact index exactly once.`,
 	Schema: `{
   "type": "object", "additionalProperties": false, "required": ["decisions"],
   "properties": {"decisions": {"type": "array", "items": {
@@ -369,7 +369,7 @@ Cite a memory by its fact id (km_...). Pass a fact id to memory_context to read 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store one or more facts, each with its reason. Every item names its origin and scope and is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored in the same scope updates it, unless the stored fact ranks higher by origin; the old version stays as history. Returns the fact id of each stored fact.`,
+	Default: `Store one or more facts, each with its reason. Every item names its origin and scope and is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored in the same scope updates it, unless the stored fact ranks higher by origin; the old version stays as history. Returns the fact id of each stored fact. With asComment, stores nothing and returns the facts as a kira-memory comment for that file.`,
 }, NoVars{})
 
 var (
@@ -385,6 +385,7 @@ var (
 	_ = arg(MemoryToolStoreMemory.id, "groups", spaceApp, NewSession, `up to 5 groups every item joins, besides the automatic session and request groups; memory_context reads a group's other facts`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "groups.kind", spaceApp, NewSession, `task, document or thread`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "groups.key", spaceApp, NewSession, `stable identifier: a task id such as PROJ-123, an absolute document path or a thread URL`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "asComment", spaceApp, NewSession, `path or extension of the file the comment goes in, such as internal/billing/api.go or py; when set, nothing is stored and the facts come back as a comment; groups are not allowed`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "groups.title", spaceApp, NewSession, `optional label shown to people`, NoVars{})
 )
 
@@ -445,6 +446,15 @@ var MemoryStoreChallenged = define(Entry{
 	PurposeKey: "llmPrompts.entry.memoryMcpStoreChallenged.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpStoreChallenged.usedBy.body",
 	Default:    `Nothing was stored. Ask the user these, or fix the items, then call store_memory again with clarifications:`,
+}, NoVars{})
+
+// MemoryStorePrepared heads the comment store_memory returns when called with asComment.
+var MemoryStorePrepared = define(Entry{
+	ID: "memory.mcp.store.prepared", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.memoryMcpStorePrepared.title",
+	PurposeKey: "llmPrompts.entry.memoryMcpStorePrepared.description",
+	UsedByKey:  "llmPrompts.entry.memoryMcpStorePrepared.usedBy.body",
+	Default:    `Nothing was stored. Paste this comment above the code it explains; keep every id as it is:`,
 }, NoVars{})
 
 // MemorySemanticNotInstalled is appended to search results while semantic search is not installed.
