@@ -25,6 +25,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -309,14 +310,9 @@ const prIcon = computed(() => {
     <AttributeTooltip :container="decorationEl" />
 
     <ViewToolbar data-testid="detail-head">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <span data-testid="meta-subject" class="min-w-0 truncate text-kira-md text-fg">{{
-            detail.subject
-          }}</span>
-        </TooltipTrigger>
-        <TooltipContent>{{ detail.subject }}</TooltipContent>
-      </Tooltip>
+      <span data-testid="meta-subject" class="min-w-0 text-kira-md text-fg"
+        ><TruncatedText :text="detail.subject" /></span
+      >
       <Tooltip v-if="prIcon">
         <TooltipTrigger as-child>
           <Button

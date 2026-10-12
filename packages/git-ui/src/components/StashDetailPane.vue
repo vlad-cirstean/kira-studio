@@ -2,6 +2,7 @@
 import type { CommitStore } from '@kira/git-core';
 import { shortSha } from '@kira/git-core';
 import EmptyState from '@theme/components/EmptyState.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -71,12 +72,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 
     <template v-if="entry">
       <ViewToolbar data-testid="detail-head">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <span class="min-w-0 truncate text-kira-md text-fg">{{ entry.message }}</span>
-          </TooltipTrigger>
-          <TooltipContent>{{ entry.message }}</TooltipContent>
-        </Tooltip>
+        <span class="min-w-0 text-kira-md text-fg"><TruncatedText :text="entry.message" /></span>
         <Badge><Identifier :value="entry.baseSha" :short="shortSha" /></Badge>
         <Badge v-if="entry.includedUntracked">{{ t('git.stash.untracked.example') }}</Badge>
         <Tooltip>
