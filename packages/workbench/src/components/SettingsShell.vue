@@ -160,8 +160,8 @@ const isValid = computed(() => {
 });
 
 // P17 D5 (both apps, identical): Cancel, Escape, the close button and the backdrop all route here —
-// the draft dies with the component, no IPC call, no confirmation (see the file-level comment
-// above).
+// the draft dies with the component, no IPC call. Esc, the close button and the backdrop ask
+// first while the draft is dirty (DialogContent `dirty`).
 function onDismiss(): void {
   emit('close');
 }
@@ -189,7 +189,7 @@ async function onSave(): Promise<void> {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onDismiss()">
-    <DialogContent size="xl" fixed-height data-testid="settings-dialog">
+    <DialogContent size="xl" fixed-height :dirty="isDirty" data-testid="settings-dialog">
       <DialogHeader close-testid="settings-dialog-close">
         <DialogTitle>{{ t('common.module.settings.label') }}</DialogTitle>
       </DialogHeader>
@@ -200,7 +200,7 @@ async function onSave(): Promise<void> {
             v-for="section in sections"
             :key="section"
             type="button"
-            class="text-left border-none cursor-pointer"
+            class="text-left border-none"
             :class="rowVariants({ layout: 'nav', selected: activeSection === section })"
             :aria-current="activeSection === section ? 'page' : undefined"
             :data-testid="`settings-section-${section}`"

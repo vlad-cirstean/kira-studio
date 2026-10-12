@@ -41,7 +41,7 @@ function onClick(e: MouseEvent): void {
     type="button"
     tabindex="-1"
     :class="cn(
-      'flex size-3.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground',
+      'flex size-3.5 shrink-0 items-center justify-center border-0 bg-transparent p-0 text-muted-foreground',
       !hasChildren && 'invisible',
       props.class,
     )"

@@ -25,8 +25,8 @@ interface Props {
 }
 const props = withDefaults(defineProps<Props>(), { tabStripVisible: true, mainFramed: true });
 const emit = defineEmits<{
-  'resize-project': [size: number];
-  'resize-ops': [size: number];
+  resizeProject: [size: number];
+  resizeOps: [size: number];
 }>();
 
 const PROJECT_MIN_PX = 180;
@@ -46,11 +46,11 @@ const dockHeight = computed(() => clamp(liveOps.value ?? props.opsHeight, OPS_MI
 
 function commitProject(size: number): void {
   liveProject.value = null;
-  emit('resize-project', size);
+  emit('resizeProject', size);
 }
 function commitOps(size: number): void {
   liveOps.value = null;
-  emit('resize-ops', size);
+  emit('resizeOps', size);
 }
 </script>
 

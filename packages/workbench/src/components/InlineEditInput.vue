@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue';
+import { Input } from '@theme/components/ui/input';
+import { type ComponentPublicInstance, useTemplateRef } from 'vue';
 import { useFocusOnMount } from '../behaviour/focus';
 import { useInlineEdit } from '../behaviour/inlineEdit';
 
@@ -11,7 +12,7 @@ const props = withDefaults(defineProps<{ name: string; selectOnFocus?: boolean }
 });
 const emit = defineEmits<{ commit: [name: string]; cancel: [] }>();
 
-const input = useTemplateRef<HTMLInputElement>('input');
+const input = useTemplateRef<ComponentPublicInstance>('input');
 useFocusOnMount(input, { select: props.selectOnFocus });
 
 const edit = useInlineEdit({
@@ -23,10 +24,12 @@ const edit = useInlineEdit({
 </script>
 
 <template>
-  <input
+  <Input
     ref="input"
-    :value="edit.text.value"
-    class="min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 text-fg bg-field outline-none border-primary"
+    :model-value="edit.text.value"
+    appearance="inline"
+    size="kira"
+    class="flex-1"
     :aria-invalid="edit.error.value ? true : undefined"
     :title="edit.error.value || undefined"
     @input="edit.onInput(($event.target as HTMLInputElement).value)"
@@ -34,5 +37,5 @@ const edit = useInlineEdit({
     @dblclick.stop
     @keydown="edit.onKeydown"
     @blur="edit.onCommit"
-  >
+  />
 </template>

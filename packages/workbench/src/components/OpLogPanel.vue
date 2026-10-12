@@ -112,11 +112,13 @@ const listItems = computed<OpsListItem[]>(() => {
 // P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
 // useVirtualRows composable -- every row here is a fixed 18px (the same JS/CSS-numeric
 // requirement the component's own comment below states).
+// Fixed rows, numerically equal to --kira-h-xs; the CSS height (h-4.5) must match.
+const OP_ROW_PX = 18;
 const scrollEl = ref<HTMLElement | null>(null);
 const activeId = ref<string | null>(null);
 const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => listItems.value.length,
-  rowHeight: () => 18,
+  rowHeight: () => OP_ROW_PX,
   scrollElement: scrollEl,
   // The roving row stays mounted when it scrolls away, so it keeps focus.
   pinned: () => {
@@ -149,6 +151,7 @@ const nav = useListNavigation<R>({
 });
 
 function onRowContextMenu(record: R, event: MouseEvent): void {
+  void nav.focusKey(record.id);
   contextMenuStore.openContextMenu(event, menuForRecord(record), {
     onRestoreFocus: () => void nav.focusKey(record.id),
   });
@@ -196,7 +199,7 @@ function durationText(ms: number | null): string | null {
 
     <EmptyState
       v-if="records.length === 0"
-      class="min-h-0 flex-1"
+      fill
       icon="checklist"
       :title="t('workbench.opLog.none.empty')"
     />
@@ -230,7 +233,7 @@ function durationText(ms: number | null): string | null {
             <li
               v-if="listItems[vi.index].kind === 'op'"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px`, gridTemplateColumns }"
-              :class="cn(VIRTUAL_ROW_CLASS, tableRowClass, 'grid items-center gap-2 px-2 cursor-pointer select-text h-4.5', listItems[vi.index].record.status === 'error' && 'text-error')"
+              :class="cn(VIRTUAL_ROW_CLASS, tableRowClass, 'grid items-center gap-2 px-2 select-text h-4.5', listItems[vi.index].record.status === 'error' && 'text-error')"
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
               :data-op-id="listItems[vi.index].record.id"
@@ -246,15 +249,15 @@ function durationText(ms: number | null): string | null {
                 <span v-else-if="column.id === 'status'" class="flex items-center gap-1">
                   <Spinner v-if="listItems[vi.index].record.status === 'running'" label="" />
                   {{ t(STATUS_LABEL[listItems[vi.index].record.status]) }}
-                  <button
+                  <Button
                     v-if="listItems[vi.index].record.status === 'running' && canCancelRecord(listItems[vi.index].record)"
-                    type="button"
-                    class="bg-transparent border-0 cursor-pointer p-0 flex text-muted-foreground"
+                    variant="toolbar"
+                    size="inline"
                     :aria-label="t('workbench.opLog.cancel.aria')"
                     @click.stop="emit('cancel', listItems[vi.index].record)"
                   >
                     <CodiconIcon name="debug-stop" :size="13" />
-                  </button>
+                  </Button>
                 </span>
                 <span v-else-if="column.id === 'duration'">{{
                   displayValue(durationText(listItems[vi.index].record.durationMs))
@@ -282,7 +285,7 @@ function durationText(ms: number | null): string | null {
             </li>
             <li
               v-else-if="listItems[vi.index].kind === 'detail-command'"
-              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0"
+              class="grid items-center grid-cols-1 truncate h-4.5 text-muted-foreground bg-elevated p-0"
               :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
@@ -294,7 +297,7 @@ function durationText(ms: number | null): string | null {
             </li>
             <li
               v-else
-              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0"
+              class="grid items-center grid-cols-1 truncate h-4.5 text-muted-foreground bg-elevated p-0"
               :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >

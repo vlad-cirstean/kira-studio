@@ -3,7 +3,7 @@ import type { AppMetricsSample } from '@shared/protocol/events';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatBytes } from '@workbench/behaviour/format';
+import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 
 // P116 H7: the status bar's CPU/memory readout, hoisted verbatim from Kira Studio's own
@@ -13,17 +13,7 @@ const props = defineProps<{ sample: AppMetricsSample | null }>();
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
 // a single app-wide figure, not a per-process breakdown.
-//
-// One decimal below 10% rather than Math.round: an idle app using e.g. 0.4% of the machine's whole
-// capacity (a real, non-zero reading) would otherwise round to a flat "0%" indistinguishable from
-// truly idle (P7 F6).
-const cpuLabel = computed(() => {
-  const sample = props.sample;
-  if (!sample) return '';
-  return sample.cpuPercent < 10
-    ? `${sample.cpuPercent.toFixed(1)}%`
-    : `${Math.round(sample.cpuPercent)}%`;
-});
+const cpuLabel = computed(() => (props.sample ? formatPercent(props.sample.cpuPercent) : ''));
 const memLabel = computed(() => {
   const sample = props.sample;
   return sample ? formatBytes(sample.memoryBytes) : '';
@@ -42,16 +32,10 @@ const metricsTooltip = computed(() => {
 <template>
   <Tooltip v-if="sample">
     <TooltipTrigger as-child>
-      <Button
-        as="span"
-        variant="toolbar"
-        size="kira"
-        class="h-control-sm gap-1 px-1.5 text-fg text-kira-sm font-normal"
-        data-testid="app-metrics"
-      >
+      <Button as="span" variant="toolbar" size="status" class="text-fg" data-testid="app-metrics">
         <CodiconIcon name="pulse" :size="13" />
-        <!-- "100%" -->
-        <span class="inline-block text-right min-w-[4ch] font-data" data-testid="app-metrics-cpu">{{
+        <!-- "100%", "12.3%" -->
+        <span class="inline-block text-right min-w-[5ch] font-data" data-testid="app-metrics-cpu">{{
           cpuLabel
         }}</span>
         <span class="text-subtle">·</span>

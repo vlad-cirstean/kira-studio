@@ -114,7 +114,6 @@ U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into i
 # C (rest)
 U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
 U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
-U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
 U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant

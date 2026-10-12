@@ -25,11 +25,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [mode: M];
-  'toggle-project': [];
-  'toggle-operations': [];
-  'open-settings': [];
-  'toggle-keep-awake': [];
-  'new-window': [];
+  toggleProject: [];
+  toggleOperations: [];
+  openSettings: [];
+  toggleKeepAwake: [];
+  newWindow: [];
 }>();
 
 async function onSelect(mode: M): Promise<void> {
@@ -54,7 +54,7 @@ async function onSelect(mode: M): Promise<void> {
         size="title"
         :aria-pressed="projectVisible"
         data-testid="toggle-project-panel"
-        @click="emit('toggle-project')"
+        @click="emit('toggleProject')"
       />
       <TooltipIconButton
         :icon="operationsVisible ? 'layout-panel' : 'layout-panel-off'"
@@ -64,7 +64,7 @@ async function onSelect(mode: M): Promise<void> {
         size="title"
         :aria-pressed="operationsVisible"
         data-testid="toggle-operations-panel"
-        @click="emit('toggle-operations')"
+        @click="emit('toggleOperations')"
       />
       <TooltipIconButton
         :icon="ICON.settings"
@@ -73,12 +73,12 @@ async function onSelect(mode: M): Promise<void> {
         variant="title"
         size="title"
         data-testid="open-settings"
-        @click="emit('open-settings')"
+        @click="emit('openSettings')"
       />
       <TitleBarWindowActions
         :keep-awake="keepAwake"
-        @toggle-keep-awake="emit('toggle-keep-awake')"
-        @new-window="emit('new-window')"
+        @toggle-keep-awake="emit('toggleKeepAwake')"
+        @new-window="emit('newWindow')"
       />
     </div>
 

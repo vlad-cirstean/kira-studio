@@ -87,7 +87,7 @@ const fieldId = useId();
       </optgroup>
     </NativeSelect>
     <span
-      class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-fg"
+      class="truncate text-kira-sm text-fg"
       data-testid="font-preview"
       :style="{ fontFamily: appearance.fontFamily }"
       >{{

@@ -1,6 +1,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
+import { TIMING } from '../behaviour/timing';
 import { fireAndForget } from '../bridge/fireAndForget';
 
 // P128 §2.3: hoisted from Kira Studio's own state/mode.ts — mode is this app's one-dimensional
@@ -13,7 +14,6 @@ import { fireAndForget } from '../bridge/fireAndForget';
 // pushed on every change instead, through the same debounced-writer shape state/layout.ts's own
 // patchLayout uses: never a synchronous IPC per mode click (F20's own invariant — the one thing
 // that must not happen), only an eventual one after the window has sat on a mode for a beat.
-const MODE_WRITE_DEBOUNCE_MS = 150;
 
 export interface ModeControl<M extends string> {
   windowsSetMode(mode: M): Promise<void>;
@@ -52,9 +52,9 @@ export function createModeStore<
     }
 
     // P99 §9.3: useDebounceFn replaces a hand-rolled clearTimeout/setTimeout pair.
-    const scheduleModeWrite = useDebounceFn(writeMode, MODE_WRITE_DEBOUNCE_MS);
+    const scheduleModeWrite = useDebounceFn(writeMode, TIMING.persist);
 
-    // P108 Part 12 F13: a mode change within MODE_WRITE_DEBOUNCE_MS of the window closing must not
+    // P108 Part 12 F13: a mode change within TIMING.persist of the window closing must not
     // be lost — control.onFlushBeforeClose/onWindowFlushBeforeClose are the native "about to
     // close/quit" signals Go already blocks the close on (internal/shell/closeflush.go), reliable
     // across both the quit-handshake and per-window-close paths — unlike a browser `beforeunload`,

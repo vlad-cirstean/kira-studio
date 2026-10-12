@@ -109,7 +109,7 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       try {
         await control.cancel(id);
       } catch (err) {
-        logError('op-log', 'cancel failed', err);
+        logError('opLog', 'cancel failed', err);
       }
     }
 

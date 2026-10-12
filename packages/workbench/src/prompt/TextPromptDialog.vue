@@ -18,8 +18,9 @@ import { useFocusOnMount, useFocusReturn } from '../behaviour/focus';
 // layer and closes the menu before the prompt is seen. A plain, non-portaled `<div v-if>` (this
 // file) is the one shape that works unchanged at both a popover-nested and a directly-raised
 // (GitPanel.vue) call site.
-defineProps<{ title: string; modelValue: string }>();
-const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; cancel: [] }>();
+defineProps<{ title: string }>();
+const value = defineModel<string>({ required: true });
+const emit = defineEmits<{ submit: []; cancel: [] }>();
 const titleId = useId();
 
 // ui/input's root IS the <input> element itself — no querySelector needed. onMounted fires each
@@ -39,7 +40,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 </script>
 
 <template>
-  <!-- P28 D17(c)'s own dialog rung, not a bare z-30 — strictly higher, so unifying every call site
+  <!-- P28 D17(c)'s own dialog rung, not a bare low z-index — strictly higher, so unifying every call site
        on it (including GitPanel.vue, raised directly from the panel with no popover backdrop of its
        own to clear) is a safe superset, never a visible change at any of the three.
        P110 B37/B39: z-index: var(--kira-z-dialog) -> z-(--kira-z-dialog), section 1.2's own
@@ -54,7 +55,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"
-        class="w-100 max-w-[90vw] flex flex-col overflow-hidden rounded-kira-pill bg-elevated text-fg text-kira-md ring-1 ring-fg/10"
+        class="mx-4 w-100 max-w-full flex flex-col overflow-hidden rounded-kira-pill bg-elevated text-fg text-kira-md ring-1 ring-fg/10"
       >
         <div :class="dialogHeaderClass">
           <div :id="titleId" class="text-kira-lg">{{ title }}</div>
@@ -62,11 +63,10 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
         <div :class="dialogBodyClass">
           <Input
             ref="inputRef"
-            :model-value="modelValue"
+            v-model="value"
             size="kira-lg"
             :aria-labelledby="titleId"
             data-testid="text-prompt-input"
-            @update:model-value="emit('update:modelValue', String($event))"
             @keydown="wrapSelectionOnType"
             @keydown.enter="(e: KeyboardEvent) => !e.isComposing && emit('submit')"
             @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('cancel')"

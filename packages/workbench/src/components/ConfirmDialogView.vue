@@ -67,20 +67,19 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
       <DialogFooter>
         <Button
           variant="dialog"
-          size="kira-lg"
+          :size="touch ? 'touch' : 'kira-lg'"
           data-dialog-dismiss
-          :class="touch ? 'h-11 flex-1' : undefined"
-          :disabled="busy"
+          :class="touch ? 'flex-1' : undefined"
           :data-testid="id('cancel')"
-          @click="emit('cancel')"
+          @click="!busy && emit('cancel')"
         >
           {{ t('common.action.cancel.label') }}
         </Button>
         <Button
           data-dialog-initial
           :variant="tone === 'danger' ? 'dialog-danger' : 'dialog-primary'"
-          size="kira-lg"
-          :class="touch ? 'h-11 flex-1' : undefined"
+          :size="touch ? 'touch' : 'kira-lg'"
+          :class="touch ? 'flex-1' : undefined"
           :pending="busy"
           :data-testid="id('confirm')"
           @click="emit('confirm')"

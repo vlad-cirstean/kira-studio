@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowActions } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -193,6 +194,7 @@ if (moveTab) {
     draggable: '[data-testid="tab"]',
     filter: '[data-testid="tab-close"]',
     direction: 'horizontal',
+    keyboard: true,
   });
 }
 </script>
@@ -261,7 +263,7 @@ if (moveTab) {
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
-        class="group/tab"
+        class="group"
         :class="tabChipVariants({ active: tab.active })"
         data-testid="tab"
         :data-tab-id="tab.id"
@@ -275,7 +277,7 @@ if (moveTab) {
         <button
           type="button"
           :aria-current="tab.active || undefined"
-          class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
+          class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0"
           @click="onClick(tab)"
           @dblclick="host.tabs.promoteTab?.(tab.id)"
           @auxclick.middle="onMiddleClick(tab)"
@@ -319,7 +321,7 @@ if (moveTab) {
           variant="toolbar"
           size="title"
           class="tab-close size-4 p-0"
-          :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100'"
+          :class="tab.active ? 'opacity-100' : rowActions"
           :aria-label="t('docker.exec.close.tooltip', { title: titleFor(tab) })"
           data-testid="tab-close"
           @click="onClose($event, tab)"
@@ -337,7 +339,7 @@ if (moveTab) {
          from workbench.css — the data-testid is what's shared now. -->
     <slot name="new-tab" />
     <!-- P110 I2-20: `.tab-chip`'s hover/attention/close-reveal rules moved into `:class` ternaries
-         above -- `group/tab` on each chip replaces `.tab-chip:hover .tab-close`/`.tab-chip.is-active
+         above -- `group` on each chip replaces `.tab-chip:hover .tab-close`/`.tab-chip.is-active
          .tab-close` (`group-hover/tab:opacity-100`, plus the active branch's own `opacity-100`).
          `.tab-chip` was marker-only (no CSS-class test locator); `.is-active`/`.tab-file-icon`/`.tab-title`/
          `.tab-close` stay real classes (slick-grid.spec.ts, budgets.spec.ts,

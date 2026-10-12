@@ -12,7 +12,7 @@ import type { KeepAwakeStatus } from '../bridge/createCoreControl';
 // (the actual keepAwakeStore/control.windowsOpenNew calls) stays app-side: this component only
 // renders and emits, since each app's own store/control instance differs.
 const props = defineProps<{ keepAwake: KeepAwakeStatus }>();
-const emit = defineEmits<{ 'toggle-keep-awake': []; 'new-window': [] }>();
+const emit = defineEmits<{ toggleKeepAwake: []; newWindow: [] }>();
 
 // §8.3: aria-pressed plus this state-naming tooltip carry what a missing coffee-off glyph would
 // have — @vscode/codicons ships no such glyph, so the button can't also swap its icon the way the
@@ -37,14 +37,9 @@ const keepAwakeTooltip = computed(() => {
     size="title"
     :aria-pressed="keepAwake.manual"
     data-testid="toggle-keep-awake"
-    @click="emit('toggle-keep-awake')"
+    @click="emit('toggleKeepAwake')"
   />
-  <Button
-    variant="title"
-    size="title-labelled"
-    data-testid="new-window"
-    @click="emit('new-window')"
-  >
+  <Button variant="title" size="title-labelled" data-testid="new-window" @click="emit('newWindow')">
     <CodiconIcon name="empty-window" :size="16" />
     <span>{{ t('workbench.titleBar.newWindow.label') }}</span>
   </Button>

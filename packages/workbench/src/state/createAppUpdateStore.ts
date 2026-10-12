@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { defineStore } from 'pinia';
 import { computed, type InjectionKey, ref, watch } from 'vue';
 import { usePersistedState } from '../behaviour/persisted';
+import { TIMING } from '../behaviour/timing';
 import { errorText } from '../bridge/codedError';
 import type { AppUpdateStatus } from '../bridge/createCoreControl';
 import { fireAndForget } from '../bridge/fireAndForget';
@@ -23,7 +24,6 @@ export interface AppUpdateControl {
 // appMetrics.ts's own shape, pull instead of push: Go decides cadence (an hourly poll here is a
 // ceiling, not the real interval — UpdateService.Status's own cache floor decides whether any
 // given call actually reaches the network).
-const POLL_MS = 60 * 60 * 1000; // hourly
 
 export function createAppUpdateStore(control: AppUpdateControl, appName: string) {
   return defineStore('appUpdate', () => {
@@ -35,7 +35,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       {
         queryKey: ['appUpdate'],
         queryFn: control.updateStatus,
-        refetchInterval: POLL_MS,
+        refetchInterval: TIMING.pollHourly,
         // Today's setInterval poll ran regardless of window focus — kept, not tightened.
         refetchIntervalInBackground: true,
         staleTime: 0,

@@ -26,8 +26,8 @@ const tooltip = computed(() =>
     <TooltipTrigger as-child>
       <Button
         variant="toolbar"
-        size="kira"
-        class="h-control-sm gap-1 px-1.5 text-kira-sm font-normal text-info"
+        size="status"
+        class="text-info"
         data-testid="update-available"
         @click="emit('open')"
       >

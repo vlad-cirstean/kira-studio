@@ -2,6 +2,7 @@ import { defaultLayout, type Layout, type LayoutPatch } from '@shared/domain/lay
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
+import { TIMING } from '../behaviour/timing';
 import { fireAndForget } from '../bridge/fireAndForget';
 import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
@@ -14,8 +15,6 @@ import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 // Kira Space gets its own Operations dock in Part 2, so both apps' stores expose them now. Studio's
 // `extend` keeps only setCellEditorHeight; Space's `() => ({})` is unchanged and now exposes both
 // through the core.
-
-const WRITE_DEBOUNCE_MS = 150;
 
 export interface LayoutControl {
   layoutSet(patch: LayoutPatch): Promise<Layout>;
@@ -46,7 +45,7 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       const toSend = pendingPatch;
       pendingPatch = {};
       fireAndForget(control.layoutSet(toSend), 'layout');
-    }, WRITE_DEBOUNCE_MS);
+    }, TIMING.persist);
 
     // applyRemote assigns a layout straight into local state with no re-emit back to
     // control.layoutSet — the same shape state/settings.ts's own applySettings/onSettingsChanged
@@ -58,7 +57,7 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       Object.assign(state.panel.operations, layout.panel.operations);
       Object.assign(state.panel.cellEditor, layout.panel.cellEditor);
       // F10: Go's `LayoutService.Set` broadcasts `layoutChanged` to every window, sender included.
-      // A pause of WRITE_DEBOUNCE_MS or more mid-resize lets that echo land here while a newer
+      // A pause of TIMING.persist or more mid-resize lets that echo land here while a newer
       // local edit still sits unflushed in `pendingPatch` -- without reapplying it, the remote
       // value briefly wins and the panel visibly snaps back until the next flush. Local always
       // wins over a same-window echo of an older value.
