@@ -16,6 +16,7 @@ import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -204,6 +205,7 @@ const rowHeights = computed<number[]>(() => {
   });
 });
 
+const { single: rowHeight } = useRowHeight();
 const scrollEl = ref<HTMLElement | null>(null);
 
 const OVERSCAN_PX = 320;
@@ -217,7 +219,7 @@ const overscanRows = computed(() => {
 
 const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => rows.value.length,
-  rowHeight: () => 26,
+  rowHeight: () => rowHeight.value,
   rowHeights: () => rowHeights.value,
   scrollElement: scrollEl,
   overscan: () => overscanRows.value,
@@ -301,11 +303,7 @@ function rowMenuFor(row: number) {
 function onRowContextMenu(e: MouseEvent, row: number): void {
   e.preventDefault();
   const items = rowMenuFor(row);
-  if (items) {
-    contextMenuStore.openContextMenu(e, items, {
-      onRestoreFocus: () => void nav.focusKey(String(row)),
-    });
-  }
+  if (items) nav.contextMenu(row, e, items);
 }
 
 async function onDeleteRow(id: string): Promise<void> {
@@ -451,7 +449,7 @@ onUnmounted(() => {
       <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
         <EmptyState
           v-if="!rt || rt.rowCount === 0"
-          class="h-full"
+          fill
           :icon="rt ? 'json' : undefined"
           :title="rt ? t('studio.documents.empty') : t('common.state.loading.loading')"
         >
