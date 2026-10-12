@@ -64,7 +64,7 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   await expect(view.locator('[data-testid="stream-poll-warning"]')).toContainText(
     'consumes messages',
   );
-  await expect(view.locator('.no-rows')).toContainText('Click Poll to fetch messages');
+  await expect(view.locator('.no-rows')).toContainText('Poll to fetch messages');
   await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(0);
 
   // --- P2 R1 regression: refresh must never itself consume from the queue — a batch tab's
@@ -88,7 +88,7 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
     timeout: 15_000,
   });
   await expect(view.locator('[data-testid="stream-visibility-timeout"]')).toContainText(
-    /visibility \d+s/,
+    /Visibility \d+s/,
   );
   const firstRow = view.locator('[data-testid="stream-row"]').first();
   await expect(firstRow.locator('[data-testid="stream-key"]')).not.toHaveText('None');

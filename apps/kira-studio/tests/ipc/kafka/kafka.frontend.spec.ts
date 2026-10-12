@@ -89,7 +89,7 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
   await expect(tombstoneRow.locator('[data-testid="stream-key"]')).toHaveText('key-6');
   await expect(tombstoneRow.locator('[data-testid="stream-body"]')).toHaveAttribute(
     'aria-label',
-    'null (tombstone)',
+    'Null (tombstone)',
   );
 
   // --- the stream view's cell editor dock is a read-only viewer, no write affordances ---------
