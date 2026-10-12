@@ -39,7 +39,7 @@ function summarize(entry: StreamFilterHistoryEntry): string {
   if (entry.offset !== null)
     parts.push(t('studio.stream.history.offset.label', { value: entry.offset }));
   if (entry.partitions.length === 1)
-    parts.push(t('studio.stream.partition.label', { id: entry.partitions[0] }));
+    parts.push(t('studio.stream.partition.label', { id: String(entry.partitions[0]) }));
   else if (entry.partitions.length > 1)
     parts.push(t('studio.stream.history.partitions.label', { list: entry.partitions.join(', ') }));
   if (entry.timestamp !== null)

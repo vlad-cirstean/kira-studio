@@ -140,7 +140,8 @@ function onTogglePartition(p: number): void {
 const partitionButtonLabel = computed(() => {
   const n = selectedPartitions.value.length;
   if (n === 0) return t('studio.stream.allPartitions.label');
-  if (n === 1) return t('studio.stream.partition.label', { id: selectedPartitions.value[0] });
+  if (n === 1)
+    return t('studio.stream.partition.label', { id: String(selectedPartitions.value[0]) });
   return t('studio.stream.partitions.label', { count: n });
 });
 </script>
@@ -224,7 +225,7 @@ const partitionButtonLabel = computed(() => {
                   >
                     <CodiconIcon name="check" :size="12" />
                   </Checkbox>
-                  <span>{{ t('studio.stream.partition.label', { id: p }) }}</span>
+                  <span>{{ t('studio.stream.partition.label', { id: String(p) }) }}</span>
                 </Label>
               </template>
             </QueryState>
