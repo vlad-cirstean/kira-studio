@@ -590,6 +590,7 @@ const parentSelectId = useId();
           >
             <CodiconIcon
               :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'"
+              :size="13"
             />
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
@@ -687,6 +688,7 @@ const parentSelectId = useId();
           >
             <CodiconIcon
               :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'"
+              :size="13"
             />
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">

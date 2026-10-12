@@ -54,7 +54,7 @@ export function connTextClass(color: string | null | undefined): string | undefi
   return color ? CONN_TEXT[color] : undefined;
 }
 
-export type ColorMark = 'rail' | 'bar' | 'dot' | 'band';
+export type ColorMark = 'rail' | 'bar' | 'dot' | 'band' | 'swatch';
 
 // Tailwind emits only scanned literals, so each shape is spelled in full.
 const MARK_SHAPE: Record<ColorMark, string> = {
@@ -62,13 +62,16 @@ const MARK_SHAPE: Record<ColorMark, string> = {
   bar: 'w-0.5 h-3.5 rounded-xs shrink-0',
   dot: 'size-1.25 rounded-full shrink-0',
   band: 'h-0.5 shrink-0',
+  swatch: 'size-2.5 rounded-full shrink-0',
 };
 
-/** Every palette colour mark in both apps. No colour: an empty slot, or an empty ring for a dot. */
+/** Every palette colour mark in both apps. No colour: an empty slot, or an empty ring for a dot or swatch. */
 export function colorMarkClass(mark: ColorMark, color: string | null | undefined): string {
   const paint = connBgClass(color);
   if (paint) return `${MARK_SHAPE[mark]} ${paint}`;
-  return mark === 'dot' ? `${MARK_SHAPE.dot} bg-none border border-disabled` : MARK_SHAPE[mark];
+  return mark === 'dot' || mark === 'swatch'
+    ? `${MARK_SHAPE[mark]} bg-none border border-disabled`
+    : MARK_SHAPE[mark];
 }
 
 /** The picker's name for a palette colour ('Blue'); `none` reads as "No colour". */

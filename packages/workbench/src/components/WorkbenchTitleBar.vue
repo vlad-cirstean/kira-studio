@@ -49,7 +49,7 @@ async function onSelect(mode: M): Promise<void> {
       <TooltipIconButton
         :icon="projectVisible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
         :label="panelLabel"
-        :icon-size="15"
+        :icon-size="16"
         variant="title"
         size="title"
         :aria-pressed="projectVisible"
@@ -59,7 +59,7 @@ async function onSelect(mode: M): Promise<void> {
       <TooltipIconButton
         :icon="operationsVisible ? 'layout-panel' : 'layout-panel-off'"
         :label="t('common.module.operations.label')"
-        :icon-size="15"
+        :icon-size="16"
         variant="title"
         size="title"
         :aria-pressed="operationsVisible"
@@ -69,7 +69,7 @@ async function onSelect(mode: M): Promise<void> {
       <TooltipIconButton
         :icon="ICON.settings"
         :label="t('common.module.settings.label')"
-        :icon-size="15"
+        :icon-size="16"
         variant="title"
         size="title"
         data-testid="open-settings"

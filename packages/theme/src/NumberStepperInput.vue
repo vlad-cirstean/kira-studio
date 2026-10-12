@@ -64,7 +64,7 @@ function stepBy(dir: 1 | -1): void {
               :disabled="!!attrs.disabled"
               @mousedown.prevent="stepBy(1)"
             >
-              <CodiconIcon name="chevron-up" :size="9" />
+              <CodiconIcon name="chevron-up" :size="12" />
             </InputGroupButton>
           </TooltipTrigger>
           <TooltipContent>{{ t('theme.numberStepper.increase.tooltip') }}</TooltipContent>
@@ -79,7 +79,7 @@ function stepBy(dir: 1 | -1): void {
               :disabled="!!attrs.disabled"
               @mousedown.prevent="stepBy(-1)"
             >
-              <CodiconIcon name="chevron-down" :size="9" />
+              <CodiconIcon name="chevron-down" :size="12" />
             </InputGroupButton>
           </TooltipTrigger>
           <TooltipContent>{{ t('theme.numberStepper.decrease.tooltip') }}</TooltipContent>

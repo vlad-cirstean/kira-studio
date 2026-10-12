@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CodiconSize } from '@theme/CodiconIcon.vue';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import type { ButtonVariants } from '@theme/components/ui/button';
 import { Button } from '@theme/components/ui/button';
@@ -22,16 +23,19 @@ import { computed, useTemplateRef } from 'vue';
 // this component has no single root element to inherit onto.
 defineOptions({ inheritAttrs: false });
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     icon: string;
     label: string;
     ariaLabel?: string;
-    iconSize?: number;
+    iconSize?: CodiconSize;
     disabledTrigger?: boolean;
     variant?: ButtonVariants['variant'];
     size?: ButtonVariants['size'];
+    /** `aria-pressed`; the toolbar variant draws the pressed look from it. */
     pressed?: boolean;
+    /** Colours the icon for a state: `ok` (done, on) or `error`. */
+    tone?: 'ok' | 'error';
     /** Shortcut text (callers format it), shown as a `Kbd` after the label. */
     kbd?: string;
   }>(),
@@ -42,11 +46,10 @@ const props = withDefaults(
     variant: 'toolbar',
     size: 'kira-icon',
     pressed: undefined,
+    tone: undefined,
     kbd: undefined,
   },
 );
-
-const pressedClass = computed(() => (props.pressed ? 'bg-field text-fg' : undefined));
 
 // fix: a handful of call sites (TimestampPane.vue's calendar trigger, FilterToolbar.vue's history
 // trigger, StreamView.vue's ×3, DocumentView.vue's ×2) put `ref="x"` on this component expecting
@@ -72,7 +75,7 @@ defineExpose({ $el: computed(() => buttonRef.value?.$el) });
           :size="size"
           :aria-label="ariaLabel ?? label"
           :aria-pressed="pressed"
-          :class="pressedClass"
+          :data-tone="tone"
           v-bind="$attrs"
         >
           <CodiconIcon :name="icon" :size="iconSize" />
@@ -85,7 +88,7 @@ defineExpose({ $el: computed(() => buttonRef.value?.$el) });
         :size="size"
         :aria-label="ariaLabel ?? label"
         :aria-pressed="pressed"
-        :class="pressedClass"
+        :data-tone="tone"
         v-bind="$attrs"
       >
         <CodiconIcon :name="icon" :size="iconSize" />

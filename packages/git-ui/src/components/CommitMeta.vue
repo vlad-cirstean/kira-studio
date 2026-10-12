@@ -329,7 +329,7 @@ const prIcon = computed(() => {
             data-testid="commit-meta-pr-icon"
             @click="openPullRequest(prIcon!.number)"
           >
-            <CodiconIcon name="github" />
+            <CodiconIcon name="github" :size="13" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{

@@ -15,7 +15,7 @@ export const buttonVariants = cva(
         // Geometry stays on the `kira`/`kira-lg`/`kira-icon` sizes below (design-system tokens,
         // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2).
         toolbar:
-          'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg aria-pressed:bg-field aria-pressed:text-fg',
+          'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg aria-pressed:bg-field aria-pressed:text-fg data-[tone=error]:text-error data-[tone=error]:hover:text-error data-[tone=ok]:text-ok data-[tone=ok]:hover:text-ok',
         'toolbar-primary': 'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80',
         dialog:
           'justify-center rounded-kira-sm border border-border-strong bg-field text-fg hover:bg-hover',

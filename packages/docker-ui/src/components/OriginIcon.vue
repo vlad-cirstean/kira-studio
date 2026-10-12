@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CodiconSize } from '@theme/CodiconIcon.vue';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -9,7 +10,7 @@ import type { ContainerOrigin } from '../wire';
 defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(
-  defineProps<{ origin: ContainerOrigin; name?: string; size?: number }>(),
+  defineProps<{ origin: ContainerOrigin; name?: string; size?: CodiconSize }>(),
   {
     name: '',
     size: 13,

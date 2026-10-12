@@ -38,7 +38,7 @@ function focus(): void {
 }
 
 function onEscape(e: KeyboardEvent): void {
-  if (e.isComposing || props.modelValue === '') return;
+  if (e.isComposing || e.defaultPrevented || props.modelValue === '') return;
   e.stopPropagation();
   emit('update:modelValue', '');
 }

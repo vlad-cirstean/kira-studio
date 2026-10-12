@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // P110 I2-24 (§3.10): the 10-utility swatch label/input/span recipe, carried once instead of 4
 // times (ScriptDialog.vue x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix from
-// I2-8 is already reflected here: peer-focus-visible:outline-* stays always-on utility, the
+// I2-8 is already reflected here: peer-focus-visible:focus-ring stays always-on utility, the
 // selected-state outline is the only conditional class.
+import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import { connBgClass } from './connColor';
 
@@ -17,11 +18,11 @@ const emit = defineEmits<{ change: [value: string] }>();
 </script>
 
 <template>
-  <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
+  <Label class="swatch-label relative flex size-4 shrink-0 cursor-default gap-0">
     <input
       type="radio"
       :name="name"
-      class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      class="peer absolute inset-0 size-full cursor-default opacity-0"
       :value="value"
       :checked="checked"
       :aria-label="color === 'none' ? t('common.field.noColour.label') : color"
@@ -32,7 +33,7 @@ const emit = defineEmits<{ change: [value: string] }>();
          sibling element — &nbsp; keeps this decorative span non-empty. -->
     <span
       aria-hidden="true"
-      class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+      class="swatch pointer-events-none size-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:focus-ring"
       :class="[
         {
           'outline-2 outline-offset-2 outline-fg': checked,
@@ -42,5 +43,5 @@ const emit = defineEmits<{ change: [value: string] }>();
       ]"
       >&nbsp;</span
     >
-  </label>
+  </Label>
 </template>

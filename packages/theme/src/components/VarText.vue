@@ -17,7 +17,7 @@ defineProps<{ parts: readonly TextPart[] }>();
         :data-var="p.name"
         :aria-label="t('theme.varText.aria', { name: p.name, value: p.value })"
       >
-        <CodiconIcon name="symbol-variable" :size="11" /><span>{{ p.value }}</span>
+        <CodiconIcon name="symbol-variable" :size="12" /><span>{{ p.value }}</span>
       </span>
     </template></span
   >

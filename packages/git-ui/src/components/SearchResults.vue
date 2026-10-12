@@ -101,7 +101,7 @@ function optionClass(option: SearchOption): string {
             @keydown.enter="emit('select', option)"
           >
             <template v-if="option.kind === 'ref'">
-              <CodiconIcon :name="REF_ICON[option.hit.ref.kind]" />
+              <CodiconIcon :name="REF_ICON[option.hit.ref.kind]" :size="13" />
               <span class="flex-1 min-w-0 truncate">{{ option.hit.ref.shortName }}</span>
               <Badge v-if="fieldLabel(option.hit.fields)">{{
                 fieldLabel(option.hit.fields)

@@ -605,7 +605,7 @@ onUnmounted(() => {
       <Tooltip v-if="!effectiveSslVerify">
         <TooltipTrigger as-child>
           <Badge variant="warn" data-testid="http-ssl-verify-off-chip">
-            <CodiconIcon name="unverified" />
+            <CodiconIcon name="unverified" :size="13" />
           </Badge>
         </TooltipTrigger>
         <TooltipContent>{{ t('studio.http.sslOff.tooltip') }}</TooltipContent>
