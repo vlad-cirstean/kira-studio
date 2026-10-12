@@ -181,3 +181,16 @@ re-validates URLs), added `v-html` sinks (both escaped), Go panics back to `E_IN
 - High: 0
 - Medium: 3 (P268-1, P268-2, P268-4)
 - Low: 5 (P268-3, P268-5, P268-6, P268-7, P268-8)
+
+## Round 1 fix result
+
+All eight findings real; fixed, one commit per group.
+
+- P268-1: `7ffe473d9`. `provideShellServices` in git-ui `mount()` and mobile `main.ts`; mobile mounts store-host `ConfirmDialog`. Specs: git Create branch dialog, mobile reply sheet.
+- P268-2: `62833d315`. `createTabsStore.dropTabs(ids)` unguarded close, used by `onConnectionsChanged`.
+- P268-3: `e6aa879ee`. `shortcutKeydown` bound to each dialog's `DialogContent` `@keydown`.
+- P268-4: `a915c7e42`. `splitStatements` computed in `useConsoleRun`.
+- P268-5: `0e4ced4eb`. ANSI-stripped text cached per `Line` on first find scan.
+- P268-6: `9b84758b4`. `onActive` reveals option; scroll closer ignores scrolls inside the list.
+- P268-7: `254ca61e7`. Identifier params pass `String(n)`; rule noted beside `t()`. No checker change needed.
+- P268-8: `295fdde7d`. `NewPendingFile` with `WithStaticPermissions`.
