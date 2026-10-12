@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   applyPending,
+  codeParityHits,
   eventHits,
   fileNameHit,
   folderHits,
@@ -27,13 +28,36 @@ describe('N1 file names', () => {
 
 describe('N2/N3', () => {
   test('flags .test.ts and helper folders', () => {
-    expect(testSuffixHit('a/b.spec.ts')?.rule).toBe('N2');
+    expect(testSuffixHit('a/b.test.ts')?.rule).toBe('N2');
     expect(testSuffixHit('a/b.spec.ts')).toBeUndefined();
-    expect(folderHits('p/workbench/src/lib/x.ts').map((h) => h.path)).toEqual([
+    expect(folderHits('p/workbench/src/util/x.ts').map((h) => h.path)).toEqual([
       'p/workbench/src/util',
     ]);
     expect(folderHits('p/workbench/src/lib/x.ts')).toEqual([]);
     expect(folderHits('p/util/lib/x.ts')).toEqual([]);
+  });
+});
+
+describe('N6 error-code parity', () => {
+  const go = (codes: string[], legacy: string[]) =>
+    `${codes.map((c) => `CodeX Code = "${c}"`).join('\n')}\nvar Legacy = map[Code]Code{\n${legacy
+      .map((c) => `"${c}": CodeX,`)
+      .join('\n')}\n}`;
+  const ts = (codes: string[], legacy: string[]) =>
+    `export const ERROR_CODES = [${codes.map((c) => `'${c}'`).join(', ')}] as const;\n` +
+    `export const CLIENT_ERROR_CODES = ['E_NETWORK'] as const;\n` +
+    `export const LEGACY_ERROR_CODES = [${legacy.map((c) => `'${c}'`).join(', ')}] as const;`;
+  test('same sets pass, client-only codes are ignored', () => {
+    expect(codeParityHits(go(['E_A', 'E_B'], ['E_OLD']), ts(['E_B', 'E_A'], ['E_OLD']))).toEqual(
+      [],
+    );
+  });
+  test('a code on one side only fails and names the side', () => {
+    const hits = codeParityHits(go(['E_A', 'E_B'], []), ts(['E_A', 'E_C'], ['E_OLD']));
+    expect(hits).toHaveLength(2);
+    expect(hits[0]?.message).toContain('only in Go: E_B');
+    expect(hits[0]?.message).toContain('only in TS: E_C');
+    expect(hits[1]?.message).toContain('only in TS: E_OLD');
   });
 });
 

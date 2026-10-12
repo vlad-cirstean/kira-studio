@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
- * P266 F3: code convention guard N1-N5, N7 (docs/v2.2/plans/P266-consistency-audit.md section 2.10
- * and 4.2). N6 (error-code registry parity) lands with the registry in F4.
+ * P266 code convention guard N1-N7 (docs/v2.2/plans/P266-consistency-audit.md section 2.10 and
+ * 4.2).
  *
  * N1 file names (.ts camelCase, .vue PascalCase), N2 no `.test.ts`, N3 no util/utils/helpers
  * folder, N4 Pinia id = export name without `use`/`create` and `Store`, N5 event names
  * `kira:<scope>:<name>` in camelCase, N7 new migrations follow `NNNN_<phase>_<slug>.sql` and add no
- * TEXT `*_at` column.
+ * TEXT `*_at` column, N6 the Go (`internal/ipcerr/codes.go`) and TS
+ * (`packages/shared/domain/errorCodes.ts`) error-code registries list the same codes.
  *
  * A hit listed as `N<n> path` in scripts/consistency-allowlist/*.txt is pending migration; a line
  * that matches no hit is stale and fails, so the lists only shrink.
@@ -14,7 +15,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type Rule = 'N1' | 'N2' | 'N3' | 'N4' | 'N5' | 'N7';
+export type Rule = 'N1' | 'N2' | 'N3' | 'N4' | 'N5' | 'N6' | 'N7';
 export interface Hit {
   rule: Rule;
   path: string;
@@ -40,6 +41,8 @@ const EVENT_FILES = [
   { path: 'packages/shared/protocol/events.ts', literal: /'(kira:[^']*)'/g },
   { path: 'internal/appevent/appevent.go', literal: /"(kira:[^"]*)"/g },
 ];
+const GO_CODES_PATH = 'internal/ipcerr/codes.go';
+const TS_CODES_PATH = 'packages/shared/domain/errorCodes.ts';
 const EVENT_NAME = /^kira:[a-z][a-zA-Z]*:[a-z][a-zA-Z]*$/;
 const MIGRATION_SETS: ReadonlyArray<{ dir: string; baseline: number }> = [
   { dir: 'apps/kira-space/internal/gitreview/migrations', baseline: 3 },
@@ -111,6 +114,38 @@ export function eventHits(path: string, source: string, literal: RegExp): Hit[] 
           message: `event names not kira:<scope>:<name> camelCase: ${bad.join(', ')}`,
         },
       ];
+}
+
+function codesOf(text: string): Set<string> {
+  return new Set([...text.matchAll(/"?'?(E_[A-Z_]+)"?'?/g)].map((m) => m[1] ?? ''));
+}
+
+/** Go constants == TS `ERROR_CODES`; Go `Legacy` keys == TS `LEGACY_ERROR_CODES`. */
+export function codeParityHits(goSource: string, tsSource: string): Hit[] {
+  const goActive = new Set(
+    [...goSource.matchAll(/\bCode\s*=\s*"(E_[A-Z_]+)"/g)].map((m) => m[1] ?? ''),
+  );
+  const legacyBlock = goSource.match(/var Legacy = map\[Code\]Code\{([\s\S]*?)\n\}/)?.[1] ?? '';
+  const goLegacy = new Set([...legacyBlock.matchAll(/"(E_[A-Z_]+)":/g)].map((m) => m[1] ?? ''));
+  const tsArray = (name: string): Set<string> =>
+    codesOf(
+      tsSource.match(new RegExp(`export const ${name} = \\[([\\s\\S]*?)\\] as const`))?.[1] ?? '',
+    );
+  const diff = (label: string, go: Set<string>, ts: Set<string>): Hit[] => {
+    const onlyGo = [...go].filter((c) => !ts.has(c)).sort();
+    const onlyTs = [...ts].filter((c) => !go.has(c)).sort();
+    const parts = [
+      onlyGo.length > 0 ? `only in Go: ${onlyGo.join(', ')}` : '',
+      onlyTs.length > 0 ? `only in TS: ${onlyTs.join(', ')}` : '',
+    ].filter(Boolean);
+    return parts.length === 0
+      ? []
+      : [{ rule: 'N6', path: TS_CODES_PATH, message: `${label} differ (${parts.join('; ')})` }];
+  };
+  return [
+    ...diff('error codes', goActive, tsArray('ERROR_CODES')),
+    ...diff('legacy error codes', goLegacy, tsArray('LEGACY_ERROR_CODES')),
+  ];
 }
 
 export function migrationHits(
@@ -193,6 +228,12 @@ function collectHits(): Hit[] {
   for (const { path, literal } of EVENT_FILES) {
     hits.push(...eventHits(path, readFileSync(join(REPO_ROOT, path), 'utf8'), literal));
   }
+  hits.push(
+    ...codeParityHits(
+      readFileSync(join(REPO_ROOT, GO_CODES_PATH), 'utf8'),
+      readFileSync(join(REPO_ROOT, TS_CODES_PATH), 'utf8'),
+    ),
+  );
   for (const { dir, baseline } of MIGRATION_SETS) {
     const files = new Map<string, string>();
     for (const name of readdirSync(join(REPO_ROOT, dir)).filter((n) => n.endsWith('.sql'))) {
@@ -220,7 +261,7 @@ function main(): number {
     );
     return 1;
   }
-  console.log('check-conventions: every convention holds (N1-N5, N7).');
+  console.log('check-conventions: every convention holds (N1-N7).');
   return 0;
 }
 
