@@ -126,10 +126,20 @@ async function openDocker(page: Page): Promise<void> {
 const SCRIPT = {
   id: 'script-1',
   kind: 'script',
-  params: [],
+  params: [
+    {
+      name: 'topic',
+      label: 'Topic',
+      type: 'text',
+      options: [],
+      default: [],
+      required: false,
+      secret: false,
+    },
+  ],
   smart: null,
   name: 'Dev server',
-  command: 'npm run dev',
+  command: 'npm run dev {topic}',
   workingDir: '/tmp/demo',
   dirMode: 'fixed',
   useAdeDir: false,
@@ -182,10 +192,14 @@ test('docker origin icons are codicons, not lucide svgs', async ({ relaunch }) =
   const page = await setupDocker(relaunch);
   await openDocker(page);
 
-  const icon = page.locator('[data-testid="docker-origin-icon"]').first();
+  const icon = page.locator('[data-testid="docker-group-icon"]').first();
   await expect(icon).toBeVisible();
   await expect(icon.locator('.codicon')).toBeVisible();
-  await expect(page.locator('[data-testid="docker-panel"] svg.lucide')).toHaveCount(0);
+  // shadcn's checkbox draws its own check mark with lucide; every other glyph is a codicon.
+  const stray = await page
+    .locator('[data-testid="docker-panel"] svg.lucide')
+    .evaluateAll((els) => els.filter((el) => !el.closest('[data-slot^="checkbox"]')).length);
+  expect(stray).toBe(0);
 });
 
 test('a failed container start shows the catalog text from the backend', async ({ relaunch }) => {

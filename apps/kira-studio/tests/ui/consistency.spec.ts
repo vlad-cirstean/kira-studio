@@ -64,16 +64,18 @@ test('QueryState: E_NOT_FOUND offers no Retry, E_INTERNAL does', async ({ relaun
   const notFound = await openDockerWith(relaunch, {
     Containers: dockerError('E_NOT_FOUND', 'gone'),
   });
-  await expect(notFound.locator('[data-testid="query-error"]')).toBeVisible();
-  await expect(notFound.locator('[data-testid="query-retry"]')).toHaveCount(0);
+  const panel = notFound.locator('[data-testid="docker-panel"]');
+  await expect(panel.locator('[data-testid="query-error"]')).toBeVisible();
+  await expect(panel.locator('[data-testid="query-retry"]')).toHaveCount(0);
 });
 
 test('QueryState: E_INTERNAL offers Retry', async ({ relaunch }) => {
   const page = await openDockerWith(relaunch, {
     Containers: dockerError('E_INTERNAL', 'database is locked'),
   });
-  await expect(page.locator('[data-testid="query-error"]')).toContainText('database is locked');
-  await expect(page.locator('[data-testid="query-retry"]')).toHaveText('Retry');
+  const panel = page.locator('[data-testid="docker-panel"]');
+  await expect(panel.locator('[data-testid="query-error"]')).toContainText('database is locked');
+  await expect(panel.locator('[data-testid="query-retry"]')).toHaveText('Retry');
 });
 
 test('QueryState: E_CONTRACT renders the fixed Kira sentence around the detail', async ({
@@ -82,9 +84,9 @@ test('QueryState: E_CONTRACT renders the fixed Kira sentence around the detail',
   const page = await openDockerWith(relaunch, {
     Containers: dockerError('E_CONTRACT', 'id is required'),
   });
-  await expect(page.locator('[data-testid="query-error"]')).toContainText(
-    'Something went wrong inside Kira (id is required).',
-  );
+  await expect(
+    page.locator('[data-testid="docker-panel"] [data-testid="query-error"]'),
+  ).toContainText('Something went wrong inside Kira (id is required).');
 });
 
 test('QueryState: the loading spinner stays hidden at 100 ms and shows within 1 s', async ({
@@ -99,8 +101,9 @@ test('QueryState: the loading spinner stays hidden at 100 ms and shows within 1 
   await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
 
   await page.waitForTimeout(100);
-  await expect(page.locator('[data-testid="query-loading"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="query-loading"]')).toBeVisible({ timeout: 1000 });
+  const loading = page.locator('[data-testid="docker-panel"] [data-testid="query-loading"]');
+  await expect(loading).toHaveCount(0);
+  await expect(loading).toBeVisible({ timeout: 1000 });
 });
 
 test('reduced motion: dialogs skip animation, the loading Spinner keeps animate-spin', async ({
@@ -122,9 +125,11 @@ test('reduced motion: dialogs skip animation, the loading Spinner keeps animate-
     handlers: { Status: () => DOCKER_OK, Containers: () => new Promise<never>(() => undefined) },
   });
   await modeTab(page, 'docker').click();
-  await expect(page.locator('[data-testid="query-loading"] .codicon.animate-spin')).toBeVisible({
-    timeout: 1000,
-  });
+  await expect(
+    page.locator(
+      '[data-testid="docker-panel"] [data-testid="query-loading"] .codicon.animate-spin',
+    ),
+  ).toBeVisible({ timeout: 1000 });
 });
 
 test('LinkService.OpenExternal rejection is announced in the live region', async ({ relaunch }) => {
@@ -242,20 +247,26 @@ test('Duplicate tab shows the files icon', async ({ relaunch }) => {
   await icon(page.locator('[data-testid="menu-item-duplicate-tab"]'), 'files');
 });
 
-test('relative SQLite path shows the catalog text in the connection dialog', async ({
+test('a refused SQLite test shows the backend catalog text in the connection dialog', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.connectionsList, response: [] }],
+    control: [
+      { channel: IPC.connectionsList, response: [] },
+      {
+        channel: IPC.connectionsTest,
+        response: { ok: false, error: 'The database file must be an absolute path.' },
+      },
+    ],
   });
   await emitWailsEvent(page, IPC.newConnection, null);
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
   await page.click('[data-testid="connection-kind-sqlite"]');
   await page.fill('[data-testid="connection-name"]', 'relative');
   await page.fill('[data-testid="connection-database"]', 'data/app.db');
-  await page.click('[data-testid="connection-save"]');
+  await page.click('[data-testid="connection-test"]');
 
-  await expect(page.locator('[data-testid="connection-dialog"]')).toContainText(
+  await expect(page.locator('[data-testid="connection-test-result"]')).toHaveText(
     'The database file must be an absolute path.',
   );
 });
