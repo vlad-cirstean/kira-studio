@@ -159,7 +159,7 @@ PRE='(?(DEFINE)(?<t>(?:"[^"]*"|'"'"'[^'"'"']*'"'"'|[^>"'"'"'])*))'
 TOK='(?<![\w-])'
 
 # id@@files(v=.vue, vt=.vue+.ts, vc=.vue+.ts also in git-core/git-ipc/api-core, vm=.vue+.ts under mobile only, s=.vue+.ts in SIDE_PANELS only, vS=.vue under /settings/ only)@@built-in exempt paths (|; a name
-# matches a file name, a /dir/ matches anywhere in the path)@@message@@regex
+# matches a file name or a repo-relative path, a /dir/ matches anywhere in the path)@@message@@regex
 cat >"$TMP/guards" <<GUARDS
 U1@@v@@@@<DialogContent without size=@@<DialogContent\b(?!(?&t)\bsize=)
 U2@@v@@@@<DialogContent class sets width, height, padding or gap (size= owns them)@@<DialogContent\b(?&t)\bclass="[^"]*${TOK}(?:w|h|max-w|max-h|min-w|min-h|p|gap)-
@@ -282,7 +282,7 @@ while IFS= read -r line; do
       for e in $exempt; do
         case "$e" in
           /*) case "$f" in *"$e"*) skip=1 ;; esac ;;
-          *) case "$f" in */"$e") skip=1 ;; esac ;;
+          *) case "$f" in "$e" | */"$e") skip=1 ;; esac ;;
         esac
       done
       IFS=$old_ifs

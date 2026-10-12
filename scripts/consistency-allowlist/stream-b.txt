@@ -1,4 +1,2 @@
 # PERMANENT U82 mobile/state/useAdeWrites.ts: slices a UUID into its 8-4-4-4-12 groups, not a commit sha.
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts
-# PERMANENT U79 bridge/index.ts: the one LinkService.OpenExternal call, wrapped by createOpenExternal; the guard exempt path in check-ui-primitives.sh never matches it.
-U79 apps/kira-space/frontend/src/bridge/index.ts

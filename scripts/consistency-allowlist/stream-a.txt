@@ -1,1 +1,0 @@
-U79 apps/kira-studio/frontend/src/docker/context.ts # the one LinkService.OpenExternal call, wrapped by createOpenExternal; rule path exempt lacks a leading slash so it never matches
