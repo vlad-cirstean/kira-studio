@@ -1959,6 +1959,9 @@
     "details": {
       "title": "Details"
     },
+    "discard": {
+      "title": "Discard unsaved edits"
+    },
     "done": {
       "status": "Done"
     },
@@ -3123,6 +3126,9 @@
       "months": "{count}mo",
       "now": "<1m",
       "years": "{count}y"
+    },
+    "currency": {
+      "seed": "{amount} total in {currency}"
     },
     "duration": {
       "hoursMinutes": "{hours}h {minutes}m",
@@ -11866,6 +11872,11 @@
       "description": "Search for a command to run.",
       "title": "Command palette"
     },
+    "disclosure": {
+      "toggle": {
+        "label": "Toggle section"
+      }
+    },
     "fontFamily": {
       "current": {
         "label": "Current font"
@@ -11889,6 +11900,11 @@
         "fallback": {
           "error": "Font not installed. Text falls back to the browser’s {fallback} default."
         }
+      }
+    },
+    "identifier": {
+      "copy": {
+        "label": "Copy identifier"
       }
     },
     "numberStepper": {
@@ -11991,6 +12007,11 @@
     "collectionMenu": {
       "move": {
         "label": "Move to collection"
+      }
+    },
+    "findBar": {
+      "seed": {
+        "label": "Find in view"
       }
     },
     "opLog": {

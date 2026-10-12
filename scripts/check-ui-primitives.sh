@@ -88,13 +88,15 @@ PANELS
 
 # "U<n> path # reason": one guard exempt for one file.
 cat >"$TMP/perm" <<'PERMANENT'
-U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
-U9 apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue # inline edit input blends into the row until focused
-U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc
-U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
-U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
+# foundation
 U27 packages/workbench/src/components/ContextMenu.vue # 10px colour swatch marks a Color submenu choice, it is not a status dot
 U31 packages/workbench/src/components/WorkbenchShell.vue # ns-resize cursor held shell-wide while the dock drag runs, the pointer leaves the 2px handle
+U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
+U41 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup reads modifiers for its own accept keys
+U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+# A (apps/kira-studio)
 U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
 U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
 U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
@@ -104,14 +106,6 @@ U37 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # DOM-built grid 
 U36 apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue # SQL statement is a code block (pre), not a content card
 U36 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue # command code block and a bordered connection list item, not content cards
 U37 apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue # density preview renders the unsaved draft; useRowHeight reads the applied CSS var
-U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-zone DOM built outside Vue cannot render Alert, banner tint matches Alert error
-U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
-U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-relative markdown heading scale tracks the Appearance font size, counted anchor in check-theme-classes
-U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
-U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
-U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
-U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
-U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 U46 apps/kira-studio/frontend/src/bridge/port.ts # bridge transport timeout
 U41 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host reads modifier keys
 U62 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host owns editor focus
@@ -127,6 +121,14 @@ U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder 
 U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host exposes focus(); not a DOM element focus
 U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
 U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret
+# B (apps/kira-space, W/memory)
+U9 apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue # inline edit input blends into the row until focused
+U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
+U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
+U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-zone DOM built outside Vue cannot render Alert, banner tint matches Alert error
+U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
+U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-relative markdown heading scale tracks the Appearance font size, counted anchor in check-theme-classes
+U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
 U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge
 U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
 U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
@@ -134,19 +136,21 @@ U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards betwee
 U40 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue # plain Delete must reach text fields; useShortcut preventDefaults every match
 U41 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # Cmd/Ctrl-click link open reads a mouse event modifier, not a key chord
 U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
+U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha
+# C (rest)
+U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
+U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc
+U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
+U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
+U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
 U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording is domain text, not a display format
-U41 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup reads modifiers for its own accept keys
-U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
-U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
-U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
 U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
 U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
 U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
 U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
 U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
-U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not
@@ -288,7 +292,7 @@ while IFS= read -r line; do
 done <"$TMP/guards"
 sort -u "$TMP/hits" -o "$TMP/hits"
 
-sed 's/[[:space:]]*#.*$//' "$TMP/perm" | sort -u >"$TMP/perm_ids"
+sed -e '/^#/d' -e 's/[[:space:]]*#.*$//' "$TMP/perm" | sort -u >"$TMP/perm_ids"
 mv "$TMP/perm_ids" "$TMP/perm"
 
 sort -u "$TMP/perm" -o "$TMP/perm"
