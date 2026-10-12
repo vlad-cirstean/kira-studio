@@ -1004,6 +1004,9 @@ Could not run or not proven:
   `wails3 generate bindings -clean=true -b -names -ts -i` (`go install ...wails3@v3.0.0-beta.28` to a temp
   `GOBIN`; no `task` binary here). Gitignored, so nothing committed. Typecheck and `test:unit` pass on the
   regenerated set.
-- Observation, not fixed: in `ade-v2-review` "sync button lists..." the sync popover content sat at
-  y=-274 (unpositioned) in WebKit while clicking inside it, so the spec clicks with `dispatchEvent`.
-  Other popovers position fine; not reproduced against the base (base worktree build did not run the spec).
+- Sync popover unpositioned (ade-v2-review "sync button lists..."): not a P267 regression. At base
+  `795948768` (built with `build:test:space`) the same spec shows the popover box at x=0, y=-274, and a
+  normal click on the Disclosure trigger times out there too. The popper wrapper keeps its initial style
+  (`transform: translate(0px, -200%)`), so Reka's popper never computes a position in this review window
+  under WebKit. Tip and base are identical, so the spec clicks with `dispatchEvent`. Other popovers
+  position fine; root cause of the unpositioned wrapper is open.
