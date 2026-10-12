@@ -402,7 +402,7 @@ func (b *TaskBoard) RebasePreview(ctx context.Context, args adewire.OntoArgs) (a
 		out.Blockers = []adewire.RebaseBlocker{}
 	}
 	if p.resolved {
-		out.Prompt = composeRebasePrompt(b.prompts(), p.spec)
+		out.Prompt = rebasePromptText(b.prompts(), p.spec)
 		for _, st := range p.spec.Stack {
 			out.Stack = append(out.Stack, adewire.RebaseStackItem{BranchID: st.BranchID, Name: st.Name, Worktree: st.Worktree, OntoRef: st.ParentRef})
 		}
@@ -440,7 +440,7 @@ func (b *TaskBoard) Rebase(ctx context.Context, args adewire.RebaseArgs) (adewir
 	}
 	message := args.Message
 	if message == "" {
-		message = composeRebasePrompt(b.prompts(), p.spec)
+		message = rebasePromptText(b.prompts(), p.spec)
 	} else {
 		for _, st := range p.spec.Stack { // the preview predicted a path for a worktree that did not exist yet
 			if pred := p.predicted[st.BranchID]; pred != "" && pred != st.Worktree {

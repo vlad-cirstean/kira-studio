@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { previewText, runPreviewSnapshots } from './adePromptPreview';
 import { expect, test } from './fixtures';
 import {
   type AdeBoardFx,
@@ -21,7 +22,7 @@ const cellAction = (id: string, kind: string) =>
   `${task(id)} ${t('ade-task-cells')} ${t(`ade-task-action-${kind}`)}`;
 
 function boardWith(edit: (b: AdeBoardFx) => void): ControlSnapshot[] {
-  return [{ channel: IPC.adeTaskBoard, response: adeBoard(edit) }];
+  return [{ channel: IPC.adeTaskBoard, response: adeBoard(edit) }, ...runPreviewSnapshots()];
 }
 
 async function open(page: Page, id: string): Promise<void> {
@@ -73,8 +74,11 @@ test('the Run dialog shows the default message and the read-only suffix', async 
   await expect(msg).toHaveValue(
     /^Task: .*\n- Jira: PAY-130 \S+\n- Repo: \{repo\} · Branch: \{branch\} · Worktree: \{worktree\}\nStep 1\/5: Plan from spec\n/,
   );
+  await expect(dialog.locator(t('ade-run-suffix'))).toHaveText(previewText('finish'));
   await expect(dialog.locator(t('ade-run-suffix'))).toContainText('call the finish_step tool');
   await expect(msg).not.toHaveValue(/finish_step/);
+  // The message is the backend render without the finish instruction the dialog shows apart.
+  await expect(msg).toHaveValue(previewText('step').replace(`\n\n${previewText('finish')}\n`, ''));
 
   await dialog.locator(t('ade-run-branch')).nth(1).fill('feat/alerts-web');
   await dialog.locator(t('ade-run-send')).click();
@@ -95,6 +99,7 @@ test('the Run dialog asks no branch names when the workflow has Kira Space tools
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: adeBoard(alertsInImpl) },
     { channel: IPC.adeTaskWorkflows, response: wfs },
+    ...runPreviewSnapshots(),
   ]);
   await page.locator(cellAction('T_alerts', 'run')).click();
   const dialog = page.locator(t('ade-run-dialog'));
@@ -114,6 +119,7 @@ test('an edited message is sent and Reset restores the default', async ({ relaun
   await page.locator(cellAction('T_alerts', 'run')).click();
   const dialog = page.locator(t('ade-run-dialog'));
   const msg = dialog.locator(t('ade-run-message'));
+  await expect(msg).not.toHaveValue('');
   const original = await msg.inputValue();
   await msg.fill('Do it differently');
   await dialog.locator(t('ade-run-reset')).click();

@@ -4,6 +4,7 @@ import {
   expectCatalogText,
   setPseudoLocale,
 } from '../../../../packages/workbench/src/testing/ui/copyCoverage';
+import { runPreviewSnapshots } from './adePromptPreview';
 import { expect, reviewTest, test } from './fixtures';
 import { adeFixture, adeV2Control, bandOf, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
@@ -126,6 +127,7 @@ test('run dialog', async ({ relaunch }) => {
   alerts.runs = [];
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: board },
+    ...runPreviewSnapshots(),
   ]);
   await setPseudoLocale(page);
   const allow = fixtureData();

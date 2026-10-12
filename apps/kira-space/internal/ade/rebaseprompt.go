@@ -8,9 +8,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-// composeRebasePrompt is the one rebase prompt: the preview shows it, the run sends it. The fixed
+// rebasePromptText is the one rebase prompt: the preview shows it, the run sends it. The fixed
 // report suffix is appended separately so an edited message keeps it.
-func composeRebasePrompt(src llmprompts.Source, spec model.AdeRebaseSpec) string {
+func rebasePromptText(src llmprompts.Source, spec model.AdeRebaseSpec) string {
 	if len(spec.Stack) == 0 {
 		return ""
 	}

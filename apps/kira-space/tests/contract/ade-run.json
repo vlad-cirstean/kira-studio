@@ -53,9 +53,161 @@
     "summary": "summary-done",
     "taskId": "<id:3>"
   },
+  "LlmPromptsService.Preview#finish": {
+    "errors": [],
+    "parts": [
+      {
+        "text": "When this step is done, call the finish_step tool with status \"done\" and a one-line summary. If it failed, call it with status \"failed\" and say what failed and give the reason. If you need a decision from me, call it with status \"needs_input\" and your question.",
+        "value": "",
+        "var": ""
+      }
+    ]
+  },
+  "LlmPromptsService.Preview#step": {
+    "errors": [],
+    "parts": [
+      {
+        "text": "Task: ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "Usage alerts by email",
+        "var": "Title"
+      },
+      {
+        "text": "\n- Jira: ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "PAY-130",
+        "var": "JiraKey"
+      },
+      {
+        "text": " ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "https://acme.atlassian.net/browse/PAY-130",
+        "var": "JiraURL"
+      },
+      {
+        "text": "\n- Repo: ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "{repo}",
+        "var": "Repo"
+      },
+      {
+        "text": " · Branch: ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "{branch}",
+        "var": "Branch"
+      },
+      {
+        "text": " · Worktree: ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "{worktree}",
+        "var": "Worktree"
+      },
+      {
+        "text": "\nStep 1/5: ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "Plan from spec",
+        "var": "StepName"
+      },
+      {
+        "text": "\n",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "Read the task spec and the Jira ticket PAY-130. Write an implementation plan per repo. Do not change code yet.",
+        "var": "StepPrompt"
+      },
+      {
+        "text": "\n\nWhen this step is done, call the finish_step tool with status \"done\" and a one-line summary. If it failed, call it with status \"failed\" and say what failed and give the reason. If you need a decision from me, call it with status \"needs_input\" and your question.\n",
+        "value": "",
+        "var": ""
+      }
+    ]
+  },
   "args:AdeTaskService.Approve": {
     "stageId": "build",
     "stepId": "two",
     "taskId": "<id:3>"
+  },
+  "args:LlmPromptsService.Preview#finish": {
+    "id": "headless.finishStep.suffix",
+    "vars": {
+      "implicit": true,
+      "results": [
+        {
+          "description": "",
+          "id": "done",
+          "ok": true
+        },
+        {
+          "description": "",
+          "id": "failed",
+          "ok": false
+        }
+      ]
+    }
+  },
+  "args:LlmPromptsService.Preview#step": {
+    "id": "ade.step.prompt",
+    "vars": {
+      "branch": "{branch}",
+      "context": [],
+      "extra": "",
+      "finish": {
+        "implicit": true,
+        "results": [
+          {
+            "description": "",
+            "id": "done",
+            "ok": true
+          },
+          {
+            "description": "",
+            "id": "failed",
+            "ok": false
+          }
+        ]
+      },
+      "jiraKey": "PAY-130",
+      "jiraURL": "https://acme.atlassian.net/browse/PAY-130",
+      "message": "",
+      "repo": "{repo}",
+      "space": false,
+      "stepCount": 5,
+      "stepName": "Plan from spec",
+      "stepNumber": 1,
+      "stepPrompt": "Read the task spec and the Jira ticket PAY-130. Write an implementation plan per repo. Do not change code yet.",
+      "title": "Usage alerts by email",
+      "worktree": "{worktree}"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { previewText } from './adePromptPreview';
 import { expect, test } from './fixtures';
 import { adeFixture, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
@@ -471,4 +472,17 @@ test('a save refused for a changed file offers Reload and Overwrite', async ({ r
   await page.locator(t('ade-wf-reload')).click();
   await expect(page.locator(t('ade-wf-save-error'))).toHaveCount(0);
   await expect(page.locator(t('ade-wf-save'))).toBeDisabled();
+});
+
+test('contract: the step inspector shows the finish instruction rendered by the backend', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openWorkflows(relaunch, [
+    {
+      channel: IPC.llmPromptsPreview,
+      response: contract('ade-run', 'LlmPromptsService.Preview#finish'),
+    },
+  ]);
+  await node(page, 'plan').click();
+  await expect(page.locator(t('ade-wf-finish-note'))).toContainText(previewText('finish'));
 });

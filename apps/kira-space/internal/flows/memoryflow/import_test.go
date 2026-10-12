@@ -36,6 +36,12 @@ const (
 // document blocks for good.
 func importApp(t *testing.T, extract ...fakeagent.PromptRule) *flowharness.App {
 	t.Helper()
+	return importAppGate(t, gateSystem, extract...)
+}
+
+// importAppGate is importApp with the gate answers keyed by system, for a test that edits the gate prompt.
+func importAppGate(t *testing.T, gateSystem string, extract ...fakeagent.PromptRule) *flowharness.App {
+	t.Helper()
 	app := flowharness.New(t)
 	finalize := testdata(t, "finalize.json")
 	prompts := append(slices.Clone(extract),

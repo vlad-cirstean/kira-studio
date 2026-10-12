@@ -16,11 +16,12 @@ function isImplicit(results: readonly ResultLike[]): boolean {
   );
 }
 
-/** Vars of `headless.finishStep.suffix` for a step's results; the text itself renders in Go. */
+/** Vars of `headless.finishStep.suffix` for a step's results; the text itself renders in Go. Keys
+ *  stay in alphabetical order, the order the Go flow tests write the UI fixtures in. */
 export function finishVars(results: readonly ResultLike[]): Record<string, unknown> {
   return {
     implicit: isImplicit(results),
-    results: results.map((r) => ({ id: r.id, description: r.description, ok: r.ok })),
+    results: results.map((r) => ({ description: r.description, id: r.id, ok: r.ok })),
   };
 }
 
@@ -59,7 +60,7 @@ export interface RunMessageInput {
   stage: { steps: readonly { name: string; prompt: string; results: readonly ResultLike[] }[] };
 }
 
-/** Vars of `ade.step.prompt` for the Run dialog. Per-run placeholders (`{repo}` `{branch}`
+/** Vars of `ade.step.prompt` for the Run dialog, keys in alphabetical order. Per-run placeholders (`{repo}` `{branch}`
  *  `{worktree}`) stay literal for the server to fill per run. */
 export function runMessageVars(i: RunMessageInput): Record<string, unknown> {
   const first = i.stage.steps[0];
@@ -69,21 +70,21 @@ export function runMessageVars(i: RunMessageInput): Record<string, unknown> {
     .replaceAll('{jira}', jira)
     .replace(/\n+$/, '');
   return {
-    title: i.title,
+    branch: '{branch}',
+    context: [],
+    extra: '',
+    finish: finishVars(first?.results ?? []),
     jiraKey: jira,
     jiraURL: i.jira?.url ?? '',
+    message: '',
     repo: '{repo}',
-    branch: '{branch}',
-    worktree: '{worktree}',
-    stepNumber: 1,
+    space: false,
     stepCount: i.stage.steps.length,
     stepName: first?.name ?? '',
+    stepNumber: 1,
     stepPrompt: prompt,
-    message: '',
-    extra: '',
-    context: [],
-    space: false,
-    finish: finishVars(first?.results ?? []),
+    title: i.title,
+    worktree: '{worktree}',
   };
 }
 
