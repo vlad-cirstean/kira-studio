@@ -201,7 +201,16 @@ func writeFile(path string, data []byte, perm os.FileMode) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("mcpauth: mkdir %s: %w", dir, err)
 	}
-	if err := renameio.WriteFile(path, data, perm); err != nil {
+	// WriteFile keeps an existing target's mode; static permissions re-tighten a file left looser.
+	f, err := renameio.NewPendingFile(path, renameio.WithStaticPermissions(perm))
+	if err != nil {
+		return fmt.Errorf("mcpauth: write %s: %w", path, err)
+	}
+	defer func() { _ = f.Cleanup() }()
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("mcpauth: write %s: %w", path, err)
+	}
+	if err := f.CloseAtomicallyReplace(); err != nil {
 		return fmt.Errorf("mcpauth: write %s: %w", path, err)
 	}
 	return nil
