@@ -1,10 +1,11 @@
-// Package appwire is Kira Studio's composition root: it builds the 30 bound services, the adapter
+// Package appwire is Kira Studio's composition root: it builds the 31 bound services, the adapter
 // router, the embedded modules and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
 package appwire
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
@@ -21,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -100,6 +102,7 @@ type Wired struct {
 	Update          *bridge.UpdateService
 	Lifecycle       *bridge.LifecycleService
 	PromptsSvc      *bridge.PromptsService
+	LlmPromptsSvc   *bridge.LlmPromptsService
 
 	reopen          func()
 	beforeFlushOnce func()
@@ -126,6 +129,7 @@ func Build(opts Options) (*Wired, error) {
 
 	// P5 D8: the SAME authorizer instance connections.New below is given: that is what makes the
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
+	promptStore := llmprompts.NewStore(filepath.Join(config.KiraHome(), "llm-prompts.json"))
 	deps := appcore.Deps{
 		DB:        db.DB,
 		Home:      config.KiraHome(),
@@ -133,6 +137,7 @@ func Build(opts Options) (*Wired, error) {
 		Repos:     repositories,
 		ApiVars:   apivars.New(repositories.Variables, opts.Authorizer),
 		MaskRules: maskRulesSvc,
+		Prompts:   promptStore,
 	}
 
 	// Read from the just-migrated (possibly still-default) settings row, same as production would
@@ -171,6 +176,12 @@ func Build(opts Options) (*Wired, error) {
 	*w = Wired{
 		Prompts:    promptRouter,
 		PromptsSvc: &bridge.PromptsService{Bound: &prompts.Bound{R: promptRouter}},
+		LlmPromptsSvc: &bridge.LlmPromptsService{Bound: &llmprompts.Bound{
+			Store: promptStore, App: llmprompts.Studio,
+			Changed: func(rev uint64) {
+				opts.Emitter.Emit(bridge.ChannelLlmPromptsChanged, map[string]uint64{"revision": rev})
+			},
+		}},
 
 		StartedAt: startedAt, Repos: repositories, Deps: deps, Router: router, Events: embedded.events,
 		Windows: lifecycle.windows, CloseFlush: lifecycle.closeFlush, Quitter: lifecycle.quitter,
@@ -226,7 +237,7 @@ func (w *Wired) reopenWindow() {
 	}
 }
 
-// Bound returns the 30 bound services in registration order.
+// Bound returns the 31 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -238,7 +249,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
 		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker), application.NewService(w.Link),
-		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc),
+		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
 	}
 }
 

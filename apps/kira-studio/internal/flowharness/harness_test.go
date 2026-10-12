@@ -19,8 +19,8 @@ func TestHarnessBootsAndSends(t *testing.T) {
 	app := flowharness.New(t)
 	t.Logf("harness boot: %s", time.Since(start))
 
-	if got := len(app.W.Bound()); got != 30 {
-		t.Fatalf("bound services = %d, want 30", got)
+	if got := len(app.W.Bound()); got != 31 {
+		t.Fatalf("bound services = %d, want 31", got)
 	}
 	srv := flowharness.HTTP(t)
 	res, err := app.W.Http.Send(context.Background(), bridge.HttpSendArgs{

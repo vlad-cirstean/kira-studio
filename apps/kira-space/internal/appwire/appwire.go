@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 23 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 24 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It sits
 // above internal/bridge in the layering, like internal/appshell.
@@ -35,6 +35,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/prompts"
@@ -135,6 +136,7 @@ type Wired struct {
 	MemoryImport   *bridge.MemoryImportService
 	WindowsSvc     *bridge.WindowsService
 	PromptsSvc     *bridge.PromptsService
+	LlmPromptsSvc  *bridge.LlmPromptsService
 	Update         *bridge.UpdateService
 	CodeWorkspace  *bridge.CodeWorkspaceService
 	AgentNotifySvc *bridge.AgentNotifyService
@@ -163,7 +165,8 @@ func Build(opts Options) *Wired {
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
 	mobileHub := mobileweb.NewHub()
 	emitter := appevent.NewTap(opts.Emitter, mobileHub.Publish)
-	deps := appcore.Deps{Repos: repositories, Home: config.KiraSpaceHome(), Events: emitter, GitRegistry: git.registry}
+	promptStore := llmprompts.NewStore(filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"))
+	deps := appcore.Deps{Repos: repositories, Home: config.KiraSpaceHome(), Events: emitter, GitRegistry: git.registry, Prompts: promptStore}
 	events := bridge.NewEvents(emitter)
 	w.Emitter, w.Deps, w.Events = emitter, deps, events
 	w.Prompts = prompts.New(prompts.Deps{
@@ -178,6 +181,10 @@ func Build(opts Options) *Wired {
 	w.Windows.OnChange = w.Prompts.Reroute
 	credentialRelay.Prompts = w.Prompts
 	w.PromptsSvc = &bridge.PromptsService{Bound: &prompts.Bound{R: w.Prompts}}
+	w.LlmPromptsSvc = &bridge.LlmPromptsService{Bound: &llmprompts.Bound{
+		Store: promptStore, App: llmprompts.Space,
+		Changed: func(rev uint64) { emitter.Emit(bridge.ChannelLlmPromptsChanged, map[string]uint64{"revision": rev}) },
+	}}
 	w.detachOpLog = events.AttachOpLog(git.opLog)
 
 	// P119: the update-availability checker and its detached installer.
@@ -347,7 +354,7 @@ func (w *Wired) reopenWindow() {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 23 bound services in registration order.
+// Bound returns the 24 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
@@ -358,7 +365,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.WindowsSvc), application.NewService(w.Update),
 		application.NewService(w.AgentNotifySvc), application.NewService(w.ClaudeUsageSvc),
-		application.NewService(w.PromptsSvc),
+		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
 	}
 }
 

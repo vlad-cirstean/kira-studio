@@ -783,11 +783,23 @@
       "badEncoding": {
         "body": "The prompt contains invalid text encoding."
       },
+      "badVars": {
+        "body": "The preview variables are invalid ({cause})."
+      },
       "breaks": {
         "body": "This change breaks {name}: {cause}."
       },
+      "conflict": {
+        "body": "The prompt changed elsewhere. Refresh and apply your edit again."
+      },
+      "duplicate": {
+        "body": "The prompt appears twice in one save."
+      },
       "empty": {
         "body": "The prompt can’t be empty."
+      },
+      "invalid": {
+        "body": "Some prompts are invalid. Nothing was saved."
       },
       "missingFragment": {
         "body": "The prompt must include the shared paragraph {name}."
@@ -804,8 +816,17 @@
       "renderEmpty": {
         "body": "The template renders to nothing."
       },
+      "saveFailed": {
+        "body": "Couldn’t save the prompt overrides ({cause})."
+      },
       "tooLong": {
         "body": "The prompt is longer than {max} bytes."
+      },
+      "unknown": {
+        "body": "There is no prompt called {name}."
+      },
+      "unreadable": {
+        "body": "The saved prompt overrides can’t be read ({cause}). Default prompts are in use."
       }
     },
     "menu": {

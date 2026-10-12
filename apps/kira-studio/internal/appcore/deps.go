@@ -12,6 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // Emitter is the Go→renderer push seam (P56 D1/D4) — repo-root internal/appevent.Emitter
@@ -33,7 +34,9 @@ type Emitter = appevent.Emitter
 // by internal/logging since P55 M0). internal/oplog and the metrics ticker have no bridge service
 // yet (P55 §6.1, §7) so they are wired directly in main.go, not carried here.
 type Deps struct {
-	DB *sql.DB
+	// Prompts resolves the editable LLM prompt texts.
+	Prompts llmprompts.Source
+	DB      *sql.DB
 	// Home is the app data folder (KIRA_HOME).
 	Home      string
 	StartedAt int64 // unix millis, for appInfo-style diagnostics later

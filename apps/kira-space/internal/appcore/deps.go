@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // Emitter is the Go->renderer push seam — repo-root internal/appevent.Emitter (P103 Part 3:
@@ -19,7 +20,9 @@ type Emitter = appevent.Emitter
 
 // Deps is embedded by value into every bound service struct.
 type Deps struct {
-	Repos *repos.Repos
+	// Prompts resolves the editable LLM prompt texts.
+	Prompts llmprompts.Source
+	Repos   *repos.Repos
 	// Home is the app data folder (KIRA_SPACE_HOME).
 	Home   string
 	Events Emitter
