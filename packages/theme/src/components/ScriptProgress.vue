@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Card } from '@theme/components/ui/card';
+import { FieldError } from '@theme/components/ui/field';
+import { formatCompactDuration } from '@theme/format';
 import { t } from '@theme/i18n';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
@@ -31,19 +34,9 @@ watch(
   (s) => (s === 'running' ? resume() : pause()),
 );
 
-function format(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  if (total < 60) return t('format.duration.secondsCompact', { seconds: total });
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return s === 0
-    ? t('format.relative.unitMinute', { count: m })
-    : t('format.duration.minutesSeconds', { minutes: m, seconds: s });
-}
-
 const elapsed = computed(() => {
-  if (props.state === 'running') return format(now.value - props.startedAt);
-  return props.finishedAt == null ? '' : format(props.finishedAt - props.startedAt);
+  if (props.state === 'running') return formatCompactDuration(now.value - props.startedAt);
+  return props.finishedAt == null ? '' : formatCompactDuration(props.finishedAt - props.startedAt);
 });
 </script>
 
@@ -60,12 +53,8 @@ const elapsed = computed(() => {
         class="text-info"
         :label="t('common.state.running.status')"
       />
-      <i
-        v-else-if="state === 'ready'"
-        class="codicon codicon-check shrink-0 text-ok"
-        aria-hidden="true"
-      />
-      <i v-else class="codicon codicon-error shrink-0 text-error" aria-hidden="true" />
+      <CodiconIcon v-else-if="state === 'ready'" name="check" :size="13" class="shrink-0 text-ok" />
+      <CodiconIcon v-else name="error" :size="13" class="shrink-0 text-error" />
       <span class="min-w-0 truncate font-medium" data-testid="script-progress-title">{{
         title
       }}</span>
@@ -81,13 +70,13 @@ const elapsed = computed(() => {
       <span class="flex-1" />
       <slot name="actions" />
     </div>
-    <p
+    <FieldError
       v-if="state === 'failed' && note"
-      class="m-0 break-words text-kira-sm text-error"
+      class="break-words"
       data-testid="script-progress-reason"
     >
       {{ note }}
-    </p>
+    </FieldError>
     <slot />
   </Card>
 </template>

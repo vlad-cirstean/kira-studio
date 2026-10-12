@@ -18,7 +18,6 @@ const SEEDS: ReadonlySet<string> = new Set([
   'theme.disclosure.toggle.label',
   'theme.identifier.copy.label',
   'workbench.findBar.seed.label',
-  'format.currency.seed',
 ]);
 const KEY_LITERAL = /["'`]([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+){2,5})["'`]/g;
 const KEY_PREFIX = /`([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+)*\.)\$\{/g;

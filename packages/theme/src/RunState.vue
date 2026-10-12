@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
+import { displayValue, formatDuration } from '@theme/format';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 
-// P110 I2-4: the toolbar run-state ring + elapsed-time label, pasted into 11 Studio views (§2.2
-// audit §1g). LAW 12: a ring + elapsed time in the toolbar that started the work, never a bar
-// across the view. Lives in the theme package, not Studio's own views/shared/, because two
-// consumers (api/EnvironmentsView.vue, api/VariableSetView.vue) sit behind a lint boundary that
-// forbids api/ importing views/ at all (biome.json's api/ noRestrictedImports) -- the state shape
-// is declared locally so this file takes no dependency back on app code.
+// The toolbar run-state mark and elapsed-time label: a mark and a time in the toolbar that started
+// the work, never a bar across the view. Lives in the theme package because api/ views sit behind a
+// lint boundary that forbids importing views/; the state shape is declared locally.
 interface RunState {
   status: 'idle' | 'running' | 'error';
   elapsedMs: number | null;
@@ -21,27 +21,20 @@ const TONE: Record<RunState['status'], string> = {
   error: 'text-error',
 };
 
-const RING: Record<RunState['status'], string> = {
-  idle: 'border-border-strong',
-  running: 'border-primary border-r-transparent animate-spin',
-  error: 'border-error',
-};
-
 const label = computed(() => {
   if (props.state.status === 'error') return t('common.state.failed.status');
-  if (props.state.elapsedMs === null) return '—';
-  return props.state.elapsedMs < 1000
-    ? t('format.duration.ms', { value: Math.round(props.state.elapsedMs) })
-    : t('format.duration.seconds', { value: (props.state.elapsedMs / 1000).toFixed(1) });
+  const ms = props.state.elapsedMs;
+  return displayValue(ms === null ? null : formatDuration(ms));
 });
 </script>
 
 <template>
   <span
     data-testid="run-state"
-    :class="['inline-flex items-center gap-1 font-data text-kira-sm', TONE[state.status]]"
+    :class="['inline-flex items-center gap-1 font-data text-kira-sm tabular-nums', TONE[state.status]]"
   >
-    <span data-testid="run-state-label" class="min-w-[7ch] text-right">{{ label }}</span>
-    <span :class="['h-3 w-3 shrink-0 rounded-full border-2', RING[state.status]]" />
+    <span data-testid="run-state-label">{{ label }}</span>
+    <Spinner v-if="state.status === 'running'" :size="12" label="" />
+    <StatusDot v-else-if="state.status === 'error'" tone="error" />
   </span>
 </template>

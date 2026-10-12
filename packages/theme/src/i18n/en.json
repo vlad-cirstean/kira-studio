@@ -3127,14 +3127,10 @@
       "now": "<1m",
       "years": "{count}y"
     },
-    "currency": {
-      "seed": "{amount} total in {currency}"
-    },
     "duration": {
       "hoursMinutes": "{hours}h {minutes}m",
       "minutesSeconds": "{minutes}m {seconds}s",
-      "ms": "{value} ms",
-      "seconds": "{value} s",
+      "ms": "{value}ms",
       "secondsCompact": "{seconds}s"
     },
     "relative": {

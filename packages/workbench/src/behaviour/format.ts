@@ -32,7 +32,7 @@ export { formatCount } from '@theme/i18n/number';
 export function formatDuration(ms: number): string {
   if (ms < 1000) return t('format.duration.ms', { value: Math.round(ms) });
   const tenths = Math.round(ms / 100) / 10;
-  if (tenths < 60) return t('format.duration.seconds', { value: tenths.toFixed(1) });
+  if (tenths < 60) return t('format.duration.secondsCompact', { seconds: tenths.toFixed(1) });
   const totalSeconds = Math.round(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   if (minutes < 60) {

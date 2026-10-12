@@ -16,14 +16,15 @@ export const i18n = createI18n({
   messages: { en },
 });
 
-// `count` formats with locale digit grouping and also selects the plural branch.
+// Every numeric param formats with locale digit grouping; `count` also selects the plural branch.
 export function t(key: MessageKey, params?: MessageParams): string {
   const g = i18n.global;
-  if (params && typeof params.count === 'number') {
-    const { count, ...rest } = params;
-    return g.t(key, { ...rest, count: formatCount(count) }, count);
+  if (!params) return g.t(key);
+  const formatted: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(params)) {
+    formatted[name] = typeof value === 'number' ? formatCount(value) : value;
   }
-  return params ? g.t(key, params) : g.t(key);
+  return typeof params.count === 'number' ? g.t(key, formatted, params.count) : g.t(key, formatted);
 }
 
 export function installCopyTestHook(): void {
