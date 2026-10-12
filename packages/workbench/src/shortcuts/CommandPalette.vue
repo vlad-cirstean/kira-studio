@@ -1,0 +1,49 @@
+<script setup lang="ts">
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@theme/components/ui/command';
+import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { usePaletteStore } from './palette';
+
+// The shared command palette. CommandDialog (reka-ui underneath) supplies the dialog role, focus
+// trap, restore, Escape and outside-click close. Commands come from the app via
+// `providePaletteCommands`; the app passes its own placeholder and empty copy.
+defineProps<{ placeholder: string; emptyLabel: string }>();
+
+const paletteStore = usePaletteStore();
+
+function runCommand(id: string): void {
+  const command = paletteStore.commands.find((c) => c.id === id);
+  if (!command) return;
+  paletteStore.closePalette();
+  command.run();
+}
+
+function onOpenChange(open: boolean): void {
+  if (!open) paletteStore.closePalette();
+}
+</script>
+
+<template>
+  <CommandDialog :open="paletteStore.open" class="w-105" @update:open="onOpenChange">
+    <CommandInput data-testid="command-palette-input" :placeholder="placeholder" @keydown="wrapSelectionOnType" />
+    <CommandList class="max-h-72">
+      <CommandEmpty class="text-subtle" data-testid="command-palette-empty">{{ emptyLabel }}</CommandEmpty>
+      <CommandItem
+        v-for="command in paletteStore.commands"
+        :key="command.id"
+        :value="command.id"
+        class="whitespace-nowrap"
+        data-testid="command-palette-item"
+        :data-command-id="command.id"
+        @select="runCommand(command.id)"
+      >
+        {{ command.label }}
+      </CommandItem>
+    </CommandList>
+  </CommandDialog>
+</template>
