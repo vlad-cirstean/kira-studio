@@ -1,0 +1,1 @@
+Extract the durable facts from the recent conversation, each with the reason it is true, and store them with the store_memory tool (author "user" for what the user stated, "agent" for what you concluded). If store_memory returns questions, ask the user those questions, then call it again with the revised items and the answers as clarifications. Report what was stored.

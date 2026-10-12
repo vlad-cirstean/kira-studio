@@ -1,0 +1,5 @@
+Rebase feat/login (repo kira-space) onto origin/main:
+1. In /wt/kira-space/feat-login: git rebase --autostash origin/main
+Do not modify review/feat-login.
+Resolve any conflicts by editing the files, then git add and git rebase --continue.
+Do not push.

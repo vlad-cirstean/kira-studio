@@ -1,0 +1,6 @@
+Rebase feat/a (repo kira-space) onto origin/main, then restack the branches built on it:
+1. In /wt/kira-space/feat-a: git rebase --autostash origin/main
+2. In /wt/kira-space/feat-b: git rebase --autostash --onto feat/a 1a2b3c4
+3. In /wt/kira-space/feat-c: git rebase --autostash --onto feat/b 5d6e7f8
+Resolve any conflicts by editing the files, then git add and git rebase --continue.
+Do not push.
