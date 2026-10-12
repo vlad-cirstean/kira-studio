@@ -65,6 +65,7 @@ describe('C3/C4 duplicates', () => {
   test('normalisation erases case, trailing punctuation, quotes and placeholder names', () => {
     expect(nearForm('Delete “{name}”?')).toBe(nearForm('delete "{branch}"?'));
     expect(nearForm('Loading...')).toBe(nearForm('Loading…'));
+    expect(nearForm('Loading…')).not.toBe(nearForm('Loading'));
     expect(nearForm('Copy path')).not.toBe(nearForm('Copy name'));
   });
   test('exemption covers a group only when it matches every key', () => {

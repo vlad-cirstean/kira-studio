@@ -32,6 +32,14 @@ export const PROPER_NOUNS: readonly string[] = [
   'Docker',
   'Jira',
   'MCP',
+  'AI',
+  'SSO',
+  'PII',
+  'CDATA',
+  'DOCTYPE',
+  'PATH',
+  'MB',
+  'Max',
   'SQL',
   'JSON',
   'YAML',
@@ -292,7 +300,7 @@ function normaliseWhitespace(v: string): string {
   return v.replace(/\s+/g, ' ').trim();
 }
 
-/** C4 normal form: case, trailing punctuation, quotes, placeholders and spacing erased. */
+/** C4 normal form: case, trailing punctuation (a trailing `…` is kept), quotes, placeholders and spacing erased. */
 export function nearForm(value: string): string {
   return value
     .toLowerCase()
@@ -300,7 +308,7 @@ export function nearForm(value: string): string {
     .replace(/[‘’]/g, "'")
     .replace(/\{[^{}]*\}/g, '{}')
     .replace(/\.{3}/g, '…')
-    .replace(/[.…:\s]+$/g, '')
+    .replace(/[.:\s]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

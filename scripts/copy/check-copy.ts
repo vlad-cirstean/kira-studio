@@ -6,7 +6,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { applyExemptions } from './allowlist';
+import { applyExemptions, loadPending } from './allowlist';
 import { flattenCatalog, isPlural, placeholdersOf } from './catalogRules';
 import { EXEMPTIONS } from './exemptions';
 import { type Hit, type MessageShape, scanSource } from './sourceRules';
@@ -22,6 +22,9 @@ const SCAN_DIRS = [
   'packages/kira-ui/src',
   'packages/theme/src',
   'packages/shared',
+  'packages/git-core/src',
+  'packages/git-ipc/src',
+  'packages/api-core/src',
 ];
 const SKIP_PATH =
   /(?:^|\/)(?:node_modules|dist|testing|tests?|__tests__)\/|^packages\/theme\/src\/i18n\/|^packages\/shared\/protocol\/wire(?:\/|\.ts$)|\.(?:spec|test)\.ts$|\.d\.ts$/;
@@ -57,7 +60,10 @@ function main(): number {
   for (const file of listSources()) {
     hits.push(...scanSource(file, readFileSync(join(REPO_ROOT, file), 'utf8'), { messages }));
   }
-  const { remaining, errors } = applyExemptions(hits, EXEMPTIONS);
+  const { remaining, errors } = applyExemptions(hits, [
+    ...EXEMPTIONS,
+    ...loadPending(join(REPO_ROOT, 'scripts/consistency-allowlist')),
+  ]);
   const limit = process.argv.includes('--all') ? remaining.length : MAX_PRINTED;
   for (const h of remaining.slice(0, limit)) {
     console.error(`check-copy: ${h.file}:${h.line}: ${h.rule} ${h.message}`);
