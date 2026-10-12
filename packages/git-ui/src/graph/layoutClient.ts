@@ -4,7 +4,7 @@
  * worker itself is deliberately thin and stateless per message (see its own doc comment).
  * `GraphViewState` relays out the whole visible list on every plan change (P93 §5.3), so every
  * request starts a fresh pass: no frontier is threaded between calls. `layoutAppend`'s own
- * incremental contract (a frontier in, a frontier out) stays covered by `lanes.test.ts`.
+ * incremental contract (a frontier in, a frontier out) stays covered by `lanes.spec.ts`.
  *
  * **The direction of copying is the decision here.** `LayoutInput` carries `parentOffsets` and
  * `parentRows` — views over the *whole* `CommitStore`'s parent columns, absolute-indexed,

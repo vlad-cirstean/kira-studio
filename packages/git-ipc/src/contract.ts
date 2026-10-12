@@ -7,12 +7,12 @@
  * `core` and `ipc` both depend on nothing (§3.1), so the wire shapes below are *structural
  * copies* of the corresponding `@kira/git-core` types, not imports of them — `ipc` may
  * not import `@kira/git-core` (B3). Drift between the two sides is caught by
- * `tests/unit/ipc/wireConformance.test.ts`, which asserts assignability in both directions,
+ * `tests/unit/ipc/wireConformance.spec.ts`, which asserts assignability in both directions,
  * not by an import the lint rule would reject anyway.
  */
 
 // ---------------------------------------------------------------------------------------
-// Structural copies of core's wire-relevant types — kept honest by wireConformance.test.ts.
+// Structural copies of core's wire-relevant types — kept honest by wireConformance.spec.ts.
 // ---------------------------------------------------------------------------------------
 
 export type HeadState =
@@ -105,7 +105,7 @@ export interface CommitIdentity {
 
 /** P5's diff model, wired: structural copies of `core/src/model/diff.ts` and the `FileChange`/
  *  `SignatureStatus` halves of `core/src/model/commit.ts`, kept honest by
- *  `wireConformance.test.ts`. */
+ *  `wireConformance.spec.ts`. */
 export interface CommitTrailer {
   readonly token: string;
   readonly value: string;
@@ -181,7 +181,7 @@ export type GoToFileOutcome =
  * W3's wire shape for a slice of `CommitStore` rows — the packed, transferable representation
  * `CommitStore.packSlice`/`appendPacked` (`packages/core/src/store/commitStore.ts`) produce and
  * consume. Declared here (structurally, not imported) because it is the payload of
- * `GraphChunk.commits` below; `wireConformance.test.ts` is what keeps the two in step.
+ * `GraphChunk.commits` below; `wireConformance.spec.ts` is what keeps the two in step.
  */
 export interface PackedCommitChunk {
   readonly from: number;
@@ -211,7 +211,7 @@ export interface PackedCommitChunk {
 // ---------------------------------------------------------------------------------------
 // P6 — refs, status, pre-flight and operations. Structural copies of `packages/core`'s own
 // (`model/ref.ts`, `model/operation.ts`, `model/status.ts`, `preflight/types.ts`, `undo/slot.ts`),
-// kept honest by `tests/unit/ipc/wireConformance.test.ts` rather than an import (B3).
+// kept honest by `tests/unit/ipc/wireConformance.spec.ts` rather than an import (B3).
 // ---------------------------------------------------------------------------------------
 
 export type RefKind = 'branch' | 'remoteBranch' | 'tag';
@@ -446,7 +446,7 @@ export interface StashBranchPreflight {
 
 // ---------------------------------------------------------------------------------------
 // P10 — reset and cherry-pick pre-flight (§7.7/§7.13). Structural copies of
-// `@kira/git-core`'s own; `tests/unit/ipc/wireConformance.test.ts` keeps the two in step.
+// `@kira/git-core`'s own; `tests/unit/ipc/wireConformance.spec.ts` keeps the two in step.
 // ---------------------------------------------------------------------------------------
 
 export type ResetMode = 'soft' | 'mixed' | 'hard';
@@ -603,7 +603,7 @@ export interface WorktreeRemovePreflight {
 // These nine types ARE structural copies of `internal/gitpreflight/stack.go`'s wire types
 // (`StackBranch`/`StackSummary`/`RestackPreflight`) and `internal/gitsession/stack.go`'s
 // (`RestackResult`/`RestackProgress`) — kept honest by hand (this repo carries no
-// `wireConformance.test.ts`; see G24's own commit message for why) rather than by a
+// `wireConformance.spec.ts`; see G24's own commit message for why) rather than by a
 // conformance test.
 // ---------------------------------------------------------------------------------------
 
@@ -733,7 +733,7 @@ export interface RestackProgress {
 // ---------------------------------------------------------------------------------------
 // P8 — remote-op vocabulary, and pull/push pre-flight (§7.3/§7.4). Structural copies of
 // `@kira/git-core`'s own (B3 — core and ipc both depend on nothing, so neither imports the
-// other); `tests/unit/ipc/wireConformance.test.ts` keeps the two in step.
+// other); `tests/unit/ipc/wireConformance.spec.ts` keeps the two in step.
 // ---------------------------------------------------------------------------------------
 
 export type PullStrategy = 'ff-only' | 'merge' | 'rebase';
@@ -1136,7 +1136,7 @@ export interface ServerAppInitResult {
 
 // ---------------------------------------------------------------------------------------
 // G24: GitHub PR links (D1/D5/D14) — a structural copy of internal/ghclient.Status/PR, kept honest
-// by hand (this repo carries no wireConformance.test.ts — see G24's own commit message for why).
+// by hand (this repo carries no wireConformance.spec.ts — see G24's own commit message for why).
 // ---------------------------------------------------------------------------------------
 
 /** D5's own four-kind actionability union: "ok" ⇒ `gh` is installed, authenticated and answered;
@@ -1184,7 +1184,7 @@ export type RepoOpenResult =
 
 // ---------------------------------------------------------------------------------------
 // P7 — Branch review (§6.8). Structural copies of `core`'s `model/review.ts`, kept honest by
-// `tests/unit/ipc/wireConformance.test.ts` rather than an import (B3).
+// `tests/unit/ipc/wireConformance.spec.ts` rather than an import (B3).
 // ---------------------------------------------------------------------------------------
 
 /** A `<base>..<branch>` two-dot range (§6.8/D30). Both are short ref names as the UI shows them
@@ -1314,7 +1314,7 @@ export interface ReviewComment {
 // ---------------------------------------------------------------------------------------
 // P11 — search. Structural copy of `packages/core`'s `search/query.ts` (minus `scope`: the
 // tail scan is commits-only, and Refs/Both are resolved entirely client-side against
-// `RefsState`, no RPC), kept honest by `tests/unit/ipc/wireConformance.test.ts`.
+// `RefsState`, no RPC), kept honest by `tests/unit/ipc/wireConformance.spec.ts`.
 // ---------------------------------------------------------------------------------------
 
 export interface SearchQueryParams {

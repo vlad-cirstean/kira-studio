@@ -84,13 +84,13 @@
     },
     "packages/git-ipc": {
       // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
-      "entry": ["src/**/*.test.ts"],
+      "entry": ["src/**/*.spec.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/git-core": {
       "entry": [
         // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
-        "src/**/*.test.ts",
+        "src/**/*.spec.ts",
         // Invoked via `bun run` against its own absolute path, from a Go test
         // (apps/kira-space/internal/gitsearch/differential_test.go) — never a static import.
         "src/search/differentialRunner.ts"
@@ -100,7 +100,7 @@
     "packages/git-ui": {
       // src/index.ts and src/icons/setiFileIcon.ts both dropped (P94 pass 3 §3.2) — knip already
       // reaches both through package.json's own `main`/`exports` field.
-      "entry": ["src/**/*.test.ts"],
+      "entry": ["src/**/*.spec.ts"],
       "project": ["src/**/*.{ts,vue,css}"]
     },
     "packages/docker-ui": {
@@ -109,7 +109,7 @@
     },
     "packages/kira-ui": {
       // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
-      // entry: src/**/*.test.ts dropped (P131 Part 3 §6.2): tooltip.test.ts, its sole match, is
+      // entry: src/**/*.spec.ts dropped (P131 Part 3 §6.2): tooltip.test.ts, its sole match, is
       // gone along with KuiTooltip.vue.
       "project": ["src/**/*.ts"]
     }

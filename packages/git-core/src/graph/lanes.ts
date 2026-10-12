@@ -27,7 +27,7 @@
  * edge index that last set each lane's `openLanes` entry to a real row — tracked alongside
  * `openLanes`/`laneColors` for exactly this purpose. This is still decided only at the shared
  * target row's own processing (never speculatively at edge-creation time), so the paged-equals-
- * one-pass invariant this module exists to protect is unaffected: see `lanes.test.ts`.
+ * one-pass invariant this module exists to protect is unaffected: see `lanes.spec.ts`.
  *
  * P225: the patch rewrites `toLane` only. `EDGE_RUN_LANE` (set at append, the lane the edge was
  * routed into) stays, so an edge that branched out into lane N and later converges into lane C

@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
-// cherryPickBase mirrors cherryPick.test.ts's own base() helper.
+// cherryPickBase mirrors cherryPick.spec.ts's own base() helper.
 func cherryPickBase() gitpreflight.ClassifyCherryPickInput {
 	return gitpreflight.ClassifyCherryPickInput{
 		Sha: "c1", Subject: "the change to pick",

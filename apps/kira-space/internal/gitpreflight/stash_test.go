@@ -8,7 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
-// stashTestEntry mirrors stashPop.test.ts's own STASH fixture field for field.
+// stashTestEntry mirrors stashPop.spec.ts's own STASH fixture field for field.
 func stashTestEntry() porcelain.StashEntry {
 	branch := "main"
 	return porcelain.StashEntry{
@@ -32,7 +32,7 @@ var (
 	stashUnknown   = gitpreflight.RevertPrediction{Kind: "unknown", Reason: "merge-tree exited 128"}
 )
 
-// stashPopBase mirrors stashPop.test.ts's own base() helper — every field defaulted, overridden
+// stashPopBase mirrors stashPop.spec.ts's own base() helper — every field defaulted, overridden
 // per test.
 func stashPopBase() gitpreflight.ClassifyStashPopInput {
 	return gitpreflight.ClassifyStashPopInput{

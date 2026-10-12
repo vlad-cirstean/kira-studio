@@ -2,7 +2,7 @@
  * G28 D5/D13: `StashList.vue`'s pure half, mirroring `refListModel.ts`'s own "no component
  * touches this logic un-tested" convention. Everything here is a plain function over a
  * `StashEntry` (and, for `originLabel`/`applyMenuLabel`, the currently checked-out branch) — no
- * Vue, no bridge, no reactivity, so `stashListModel.test.ts` exercises it directly with plain
+ * Vue, no bridge, no reactivity, so `stashListModel.spec.ts` exercises it directly with plain
  * fixtures.
  */
 import type { StashEntry } from '@kira/git-ipc';

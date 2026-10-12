@@ -13,7 +13,7 @@
  * W8's graph-column stash node shape reads the exact same decoration, so the two never disagree.
  *
  * Split deliberately in two: `badgeSpecFor`/`planBadges` are pure functions over data (no DOM),
- * unit-tested directly below in `tests/unit/ui/refBadges.test.ts`; `buildRefBadges` and its
+ * unit-tested directly below in `tests/unit/ui/refBadges.spec.ts`; `buildRefBadges` and its
  * private `build*Element` helpers touch `document` and so, per this repo's own W6 precedent (no
  * jsdom/happy-dom is wired into `bun:test` — confirmed, not assumed), are exercised only by
  * W13's Playwright pass rather than here.
@@ -135,7 +135,7 @@ export interface StackBadgeInfo {
 }
 
 /** The pure "what to render" computation: which badges show, and what the overflow badge (if
- *  any) says — with no DOM touched, so this is what `tests/unit/ui/refBadges.test.ts` exercises
+ *  any) says — with no DOM touched, so this is what `tests/unit/ui/refBadges.spec.ts` exercises
  *  directly. `buildRefBadges` below is a thin DOM-construction layer over this. */
 function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
   const specs = decorations.map(badgeSpecFor);

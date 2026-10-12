@@ -125,7 +125,7 @@ func packedChunkToFixture(t *testing.T, blob []byte) fixturePackedChunk {
 	}
 }
 
-// The golden corpus packages/git-ipc/src/streamChannel.test.ts (D16) decodes: the Go encoder and the
+// The golden corpus packages/git-ipc/src/streamChannel.spec.ts (D16) decodes: the Go encoder and the
 // TypeScript decoder must agree byte for byte. The test compares the encoder's frame with the
 // committed corpus; KIRA_CONTRACT=write regenerates it.
 func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {

@@ -46,9 +46,9 @@ describe('setiIconFor — test/spec files render orange, matching VS Code exactl
   const ORANGE = '#e37933';
 
   for (const name of [
-    'foo.test.ts',
     'foo.spec.ts',
-    'foo.test.tsx',
+    'foo.spec.ts',
+    'foo.spec.tsx',
     'foo.spec.tsx',
     'foo.test.cjs',
     'foo.spec.cjs',
@@ -72,11 +72,11 @@ describe('setiIconFor — test/spec files render orange, matching VS Code exactl
   test('the glyph itself is unchanged by the color override — same icon as the plain file', () => {
     // The whole point of VS Code's own _typescript_1 icon def: identical fontCharacter to
     // _typescript, only fontColor differs. This repo's CSS-mask equivalent is maskUrl.
-    expect(setiIconFor('foo.test.ts').maskUrl).toBe(setiIconFor('foo.ts').maskUrl);
+    expect(setiIconFor('foo.spec.ts').maskUrl).toBe(setiIconFor('foo.ts').maskUrl);
   });
 
   test('a nested path still resolves the override correctly (basename-only matching)', () => {
-    expect(setiIconFor('src/components/Widget.test.tsx').color).toBe(ORANGE);
+    expect(setiIconFor('src/components/Widget.spec.tsx').color).toBe(ORANGE);
   });
 });
 

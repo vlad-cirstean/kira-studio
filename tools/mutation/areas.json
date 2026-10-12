@@ -1,6 +1,5 @@
 {
   "globalExcludes": [
-    "**/*.test.ts",
     "**/*.spec.ts",
     "**/*.d.ts",
     "**/generated/**",

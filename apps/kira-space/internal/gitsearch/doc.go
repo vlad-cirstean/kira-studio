@@ -43,5 +43,5 @@
 // A change to matchCommitFields' semantics, to compileQuery's dialect surface, or to whole-word's
 // definition lands in THREE places together: this package, packages/git-core/src/search/
 // {query,matcher}.ts, and packages/git-core/testdata/searchConformance.json (both suites read the
-// same corpus — conformance_test.go here, conformance.test.ts there).
+// same corpus — conformance_test.go here, conformance.spec.ts there).
 package gitsearch

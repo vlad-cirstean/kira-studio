@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// conformanceRow mirrors conformance.test.ts's own ConformanceRow shape exactly — one JSON file,
+// conformanceRow mirrors conformance.spec.ts's own ConformanceRow shape exactly — one JSON file,
 // two readers (docs/v1.3/plans/G23-search.md D9).
 type conformanceRow struct {
 	Name           string          `json:"name"`
@@ -90,7 +90,7 @@ func TestConformanceCorpus_NonEmpty(t *testing.T) {
 
 // TestConformanceCorpus_AgreesWithCompileAndMatchFields is G23's own exit-criterion item 2: every
 // row in the shared corpus, run through Compile + MatchFields, agrees with the expectation
-// conformance.test.ts asserts against the exact same file on the TypeScript side.
+// conformance.spec.ts asserts against the exact same file on the TypeScript side.
 func TestConformanceCorpus_AgreesWithCompileAndMatchFields(t *testing.T) {
 	t.Parallel()
 	corpus := loadCorpus(t)

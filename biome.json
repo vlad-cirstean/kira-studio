@@ -107,7 +107,6 @@
         "packages/workbench/src/testing/**",
         "**/tests/**",
         "**/test/**",
-        "**/*.test.ts",
         "**/*.spec.ts",
         "scripts/**",
         "apps/kira-studio/frontend/proto/**"
@@ -115,7 +114,7 @@
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     },
     {
-      "includes": ["**/tests/**", "**/test/**", "**/*.test.ts", "**/*.spec.ts"],
+      "includes": ["**/tests/**", "**/test/**", "**/*.spec.ts"],
       "linter": {
         "rules": {
           "complexity": { "noExcessiveCognitiveComplexity": "off" },

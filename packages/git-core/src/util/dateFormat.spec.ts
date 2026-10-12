@@ -27,8 +27,8 @@ describe('formatAbsoluteDate — G21 D6b widest-output invariant', () => {
 });
 
 // P5/P62: a fixed nowMs and a table of deltas -> expected strings, boundary values at each unit
-// transition — mirrors memoizedSetter.test.ts's own shape for a tiny pure helper. Moved here from
-// the extension's own blameAge.test.ts (P62 D2) alongside the function itself.
+// transition — mirrors memoizedSetter.spec.ts's own shape for a tiny pure helper. Moved here from
+// the extension's own blameAge.spec.ts (P62 D2) alongside the function itself.
 describe('formatRelativeDate', () => {
   const now = Date.UTC(2024, 5, 15, 12, 0, 0);
   const nowSeconds = now / 1000;

@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
-// resetBase mirrors reset.test.ts's own base() helper — a full, valid, "everything clean" input
+// resetBase mirrors reset.spec.ts's own base() helper — a full, valid, "everything clean" input
 // every subtest overrides from.
 func resetBase() gitpreflight.ClassifyResetInput {
 	branch := "main"

@@ -87,7 +87,7 @@ const GO_EXTENSION_LOOKUP_NAME = 'main.go';
  *  already-correct entry only risks drifting from the package's own value later); it also has no
  *  entry at all for `.cjs`/`.mjs` test/spec files, which VS Code does map. Matched against the
  *  lower-cased basename's suffix, the same longest-match-first shape `seti-icons`' own extension
- *  walk uses, so `foo.test.ts` matches `.test.ts` before any shorter `.ts` handling ever runs. */
+ *  walk uses, so `foo.spec.ts` matches `.test.ts` before any shorter `.ts` handling ever runs. */
 const TEST_FILE_ORANGE = '#e37933';
 const TEST_FILE_COLOR_OVERRIDES: readonly string[] = [
   '.test.ts',

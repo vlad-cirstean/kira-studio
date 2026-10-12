@@ -273,7 +273,7 @@ function expectedDecorationRef(r: {
       if (r.name === undefined) throw new Error('stash decoration fixture is missing an index');
       return { kind: 'stash', index: Number(r.name) };
     default:
-      throw new Error(`streamChannel.test.ts: unrecognised decoration kind ${r.kind}`);
+      throw new Error(`streamChannel.spec.ts: unrecognised decoration kind ${r.kind}`);
   }
 }
 

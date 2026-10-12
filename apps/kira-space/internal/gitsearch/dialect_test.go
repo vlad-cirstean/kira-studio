@@ -231,7 +231,7 @@ func TestTranslate_LookaroundInsideClassIsLiteral(t *testing.T) {
 
 func TestWrapWholeWord_Probe10OverRegexMode(t *testing.T) {
 	t.Parallel()
-	// Row 7/matcher.test.ts's own regex+wholeWord case: "widget" as a regex, matched against
+	// Row 7/matcher.spec.ts's own regex+wholeWord case: "widget" as a regex, matched against
 	// "Fix the widget cache" (match) and "subwidgetary refactor noted" (no match).
 	source, err := translate("widget")
 	if err != nil {

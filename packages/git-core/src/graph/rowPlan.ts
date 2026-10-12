@@ -13,7 +13,7 @@ import type { LayoutInput } from './types.ts';
  * (`buildRowPlan` below). Under `--topo-order` every commit that can reach a row is already
  * loaded when that row arrives, so no later page can lower a row's priority — a plan rebuilt
  * after page 5 agrees with one rebuilt after page 1 about every row page 1 already held
- * (`rowPlan.test.ts`'s "final on arrival" case).
+ * (`rowPlan.spec.ts`'s "final on arrival" case).
  *
  * `buildRowPlan` reprocesses the whole `[0, store.rowCount)` range on every call rather than
  * keeping `claimed`/`pendingBySha` state across calls — a deliberate simplification against this

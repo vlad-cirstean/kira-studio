@@ -276,7 +276,7 @@ describe('rows 16-17: scope is which function the caller invokes, not a matcher 
     );
   });
 
-  test("row 17: 'both' scope's refs-first ordering is the grouping fold's contract, not the matcher's — see searchResultsModel.test.ts", () => {
+  test("row 17: 'both' scope's refs-first ordering is the grouping fold's contract, not the matcher's — see searchResultsModel.spec.ts", () => {
     // `matchCommitFields`/`matchRef` return unordered hit lists per row; grouping ("refs group
     // first, then commits") is `searchResultsModel.ts`'s own pure fold, asserted there. This test
     // only pins down the half that *is* the matcher's job: both a ref and a commit can match the

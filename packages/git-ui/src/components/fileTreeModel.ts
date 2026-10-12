@@ -2,7 +2,7 @@
  * `docs/plans/P5.md` W8: the pure half of `FileTree.vue` — folding a flat `readonly FileChange[]`
  * into a directory tree, aggregating counts, collapsing single-child directory chains, producing
  * the flat list, and applying the filter. No DOM, no Vue — everything here is exercised directly
- * by `tests/unit/ui/fileTreeModel.test.ts`, matching this repo's own precedent for splitting a
+ * by `tests/unit/ui/fileTreeModel.spec.ts`, matching this repo's own precedent for splitting a
  * pure model from its DOM-touching renderer (`refBadges.ts`).
  */
 import type { FileChange, FileChangeKind } from '@kira/git-ipc';

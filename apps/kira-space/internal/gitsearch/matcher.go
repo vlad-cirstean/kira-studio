@@ -35,7 +35,7 @@ type CommitFields struct {
 // AND-across-categories semantics `git log --grep --author` would give being exactly what
 // upstream probe 1 rules out. Returns every field that matched, not a boolean.
 //
-// The ORDER of the returned slice is a contract: matcher.test.ts's own TOGGLE_ROWS (and this
+// The ORDER of the returned slice is a contract: matcher.spec.ts's own TOGGLE_ROWS (and this
 // package's conformance_test.go, reading the same corpus) assert exact arrays — subject, body,
 // authorName, authorEmail, committerName, committerEmail, sha, matcher.ts's own order.
 //

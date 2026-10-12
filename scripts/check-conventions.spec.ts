@@ -27,7 +27,7 @@ describe('N1 file names', () => {
 
 describe('N2/N3', () => {
   test('flags .test.ts and helper folders', () => {
-    expect(testSuffixHit('a/b.test.ts')?.rule).toBe('N2');
+    expect(testSuffixHit('a/b.spec.ts')?.rule).toBe('N2');
     expect(testSuffixHit('a/b.spec.ts')).toBeUndefined();
     expect(folderHits('p/workbench/src/util/x.ts').map((h) => h.path)).toEqual([
       'p/workbench/src/util',
@@ -76,13 +76,13 @@ describe('N7 migrations', () => {
 
 describe('pending list', () => {
   test('exempts a listed hit, reports an unused line as stale, ignores other ids', () => {
-    const pending = parsePending(['N1 a.ts # why', 'N2 gone.test.ts', 'U72 x.vue', 'G1 y.go', '']);
+    const pending = parsePending(['N1 a.ts # why', 'N2 gone.spec.ts', 'U72 x.vue', 'G1 y.go', '']);
     const hits = [
       { rule: 'N1' as const, path: 'a.ts', message: '' },
       { rule: 'N1' as const, path: 'b.ts', message: '' },
     ];
     const { remaining, stale } = applyPending(hits, pending);
     expect(remaining.map((h) => h.path)).toEqual(['b.ts']);
-    expect(stale).toEqual(['N2 gone.test.ts']);
+    expect(stale).toEqual(['N2 gone.spec.ts']);
   });
 });

@@ -13,7 +13,7 @@ if (!area) throw new Error(`unknown mutation area: ${name}`);
 const excluded = new Set(area.excludeTests.map((t) => t.path));
 const tests = area.tests
   .flatMap((dir) =>
-    ['*.spec.ts', '*.test.ts'].flatMap((glob) =>
+    ['*.spec.ts'].flatMap((glob) =>
       globSync(`${dir}/**/${glob}`, { exclude: (p) => p === 'node_modules' }),
     ),
   )

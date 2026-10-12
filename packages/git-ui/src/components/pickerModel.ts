@@ -2,7 +2,7 @@
  * P77 §9: `BranchPicker.vue`'s tab fold — one filter box (§5), a per-tab ordering/pin/cap pass
  * (§6), and the row-id list §7.3's roving keyboard focus walks. Kept beside `refListModel.ts`/
  * `stashListModel.ts`/`stackListModel.ts` as the same "pure fold out of the template" convention
- * those three already follow — no Vue, no bridge, so `pickerModel.test.ts` exercises it directly
+ * those three already follow — no Vue, no bridge, so `pickerModel.spec.ts` exercises it directly
  * with plain fixtures.
  *
  * `refListModel.ts` is NOT modified: `buildRefListSections` has two other consumers
@@ -327,7 +327,7 @@ export function orderAndCapTab(
   };
 }
 
-/** Composes the two halves above — the one entry point `pickerModel.test.ts` exercises with plain
+/** Composes the two halves above — the one entry point `pickerModel.spec.ts` exercises with plain
  *  fixtures. `BranchPicker.vue` calls `filterPickerInput`/`orderAndCapTab` directly instead, as two
  *  separate computeds, so a tab switch or "show more" click recomputes only the cheap half. */
 export function buildPickerModel(

@@ -600,7 +600,7 @@ type RepoSettingsChangedPayload struct {
 // ---------------------------------------------------------------------------------------
 // G24 — commit.resolvePr / branch.resolvePr (D9/D14). GhStatus/PrRecord/PrLookupResult are direct
 // structural copies of @kira/git-ipc's own types of the same name, kept honest by hand (this repo
-// carries no wireConformance.test.ts — see this phase's own commit message) the same way
+// carries no wireConformance.spec.ts — see this phase's own commit message) the same way
 // gitclient.GitStatus's JSON tags already mirror GitStatus's TS twin.
 // ---------------------------------------------------------------------------------------
 

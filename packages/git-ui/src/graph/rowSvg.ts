@@ -8,7 +8,7 @@
  * row's data to an element.
  *
  * Split, like W7's `refBadges.ts`, into a pure planning half (`planEdgePaths`/`planNode`, unit-
- * tested directly in `tests/unit/ui/rowSvg.test.ts`) and a DOM-construction half
+ * tested directly in `tests/unit/ui/rowSvg.spec.ts`) and a DOM-construction half
  * (`buildRowSvg`/its private helpers) exercised by W13's Playwright pass — this repo has no
  * jsdom/happy-dom wired into `bun:test` (confirmed by W6/W7, not assumed here).
  *

@@ -82,7 +82,7 @@ function toRefHit(ref: RefRow, fields: readonly SearchField[]): RefHit {
  * "this row happens to be paged into the store" (P11 W20's own bug: a body-only match on an
  * already-loaded row is loaded but was never a loaded *hit*, since the client-side scan never
  * reads `body` at all — counting it as overlap silently zeroed it out of `matchCount.n` even
- * though it still, correctly, got a `CommitHit` entry below). Exported for `buildCommitHits.test.ts`
+ * though it still, correctly, got a `CommitHit` entry below). Exported for `buildCommitHits.spec.ts`
  * — the merge is subtle enough (and was untested enough) to deserve direct, pure-function
  * coverage rather than only the exercise a mounted `SearchState` gives it.
  */

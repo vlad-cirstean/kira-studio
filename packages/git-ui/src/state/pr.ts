@@ -408,7 +408,7 @@ export class PrState {
    *  exclusion for that one branch — `rowOfBranchTip`'s own doc comment on why an RPC-based
    *  fallback (a `mergeBase` request per PR) was declined in favor of this local-only answer.
    *
-   *  `budget` defaults to `PR_ANCESTRY_WALK_BUDGET` — overridable only so `pr.test.ts` can prove
+   *  `budget` defaults to `PR_ANCESTRY_WALK_BUDGET` — overridable only so `pr.spec.ts` can prove
    *  the cutoff itself without building a 50,000-row fixture; no production caller passes it. */
   rebuildAncestry(store: CommitStore, budget = PR_ANCESTRY_WALK_BUDGET): void {
     const next = new Map<string, PrRecord>();
