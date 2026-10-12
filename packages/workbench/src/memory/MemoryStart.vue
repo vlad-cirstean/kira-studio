@@ -11,7 +11,7 @@ import ModuleStart from '../components/ModuleStart.vue';
 import QueryState from '../components/QueryState.vue';
 import ImportView from './import/ImportView.vue';
 import { useImportUiStore } from './import/importStore';
-import { AUTHOR_LABEL, eventText } from './labels';
+import { eventText, originText } from './labels';
 import { useMemoryHistory } from './queries';
 import { useMemoryUiStore } from './store';
 
@@ -51,8 +51,8 @@ function eventsFor(id: string) {
       <div v-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center gap-1">
-            <Badge :variant="selected.author === 'user' ? 'info' : 'default'">{{
-              t(AUTHOR_LABEL[selected.author])
+            <Badge :variant="selected.origin === 'user' ? 'info' : 'default'">{{
+              originText(selected.origin, selected.sourceTag)
             }}</Badge>
             <Badge v-if="selected.historical" variant="warn">{{
               t('memory.common.historical.status')

@@ -194,11 +194,25 @@ type MemoryIDArgs struct {
 	ID string `json:"id"`
 }
 
-// MemoryStoreArgs is Store's argument shape. Author and source are fixed server-side: the UI
-// always speaks as the user.
+// MemoryStoreItem is one fact the UI stores; origin is fixed server-side to user.
+type MemoryStoreItem struct {
+	Fact   string `json:"fact"`
+	Reason string `json:"reason"`
+}
+
+// MemoryStoreArgs is Store's argument shape. Origin and source are fixed server-side: the UI
+// always speaks as the user. Scope and Project apply to every item; Project is for scope project.
 type MemoryStoreArgs struct {
-	Items          []memory.Item          `json:"items"`
+	Items          []MemoryStoreItem      `json:"items"`
 	Clarifications []memory.Clarification `json:"clarifications"`
+	Scope          string                 `json:"scope"`
+	Project        string                 `json:"project"`
+}
+
+// MemoryContextArgs names one fact and caps the facts per group; Limit 0 means the default.
+type MemoryContextArgs struct {
+	ID    string `json:"id"`
+	Limit int    `json:"limit"`
 }
 
 // Search is the module's recall-first search; an empty query lists recent memories.
@@ -228,11 +242,22 @@ func (s *MemoryService) History(ctx context.Context, args MemoryIDArgs) (memory.
 func (s *MemoryService) Store(ctx context.Context, args MemoryStoreArgs) (memory.StoreResult, error) {
 	items := make([]memory.Item, len(args.Items))
 	for i, it := range args.Items {
-		it.Origin, it.Scope = memory.OriginUser, memory.ScopePersonal
-		items[i] = it
+		items[i] = memory.Item{Fact: it.Fact, Reason: it.Reason, Origin: memory.OriginUser, Scope: args.Scope, Project: args.Project}
 	}
 	res, err := s.service().Store(ctx, memory.StoreRequest{Items: items, Clarifications: args.Clarifications, Source: memory.SourceUI})
 	return res, memoryErr(err)
+}
+
+// Context returns a fact with the other facts stored in its groups.
+func (s *MemoryService) Context(ctx context.Context, args MemoryContextArgs) (memory.Context, error) {
+	c, err := s.service().Context(ctx, args.ID, args.Limit)
+	return c, memoryErr(err)
+}
+
+// Projects lists the project keys of current facts, for the Add dialog's suggestions.
+func (s *MemoryService) Projects(ctx context.Context) ([]string, error) {
+	ps, err := s.service().Projects(ctx)
+	return ps, memoryErr(err)
 }
 
 // SemanticStatus reports semantic search: the service's state, overlaid with download progress

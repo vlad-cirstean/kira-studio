@@ -37,7 +37,7 @@ func TestStoreUsesEditedGatePrompt(t *testing.T) {
 	app := flowharness.New(t)
 	gate(t, app, "gate-accept.json")
 	overrideGate(t, app)
-	if _, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems}); err != nil {
+	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err != nil {
 		t.Fatal(err)
 	}
 	args := recordedArgs(t, app)

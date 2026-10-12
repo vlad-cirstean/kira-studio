@@ -56,6 +56,8 @@ async function submit(): Promise<void> {
     const res = await store.mutateAsync({
       items: [{ fact: text.value.trim(), reason: MANUAL_REASON }],
       clarifications,
+      scope: 'personal',
+      project: '',
       signal: controller.signal,
     });
     asked.value = clarifications;

@@ -36,7 +36,7 @@ export function kindLabel(kind: StageKind, background = false): string {
   return t(
     background
       ? 'space.ade.workflows.kind.agentBackground.option'
-      : 'memory.common.author.agent.label',
+      : 'memory.common.origin.agent.label',
   );
 }
 

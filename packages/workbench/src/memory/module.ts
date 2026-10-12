@@ -1,10 +1,12 @@
 import type {
   Memory,
   MemoryClarification,
+  MemoryContext,
   MemoryHistory,
   MemoryInstallResult,
   MemoryItem,
   MemoryMcpStatus,
+  MemoryScope,
   MemorySemanticStatus,
   MemoryStoreResult,
 } from '@shared/domain/memory';
@@ -23,10 +25,19 @@ export interface MemoryControl {
   memorySearch(query: string, includeHistory: boolean): Promise<Memory[]>;
   memoryRecent(): Promise<Memory[]>;
   memoryHistory(id: string): Promise<MemoryHistory>;
-  /** Aborting `signal` cancels the in-flight store. */
+  /** A fact with the facts stored alongside it, per group. `id` is a fact id or a version id. */
+  memoryContext(id: string): Promise<MemoryContext>;
+  /** Project keys of the current facts, for the Add dialog's suggestions. */
+  memoryProjects(): Promise<string[]>;
+  /**
+   * Stores as the user. `project` is the key for scope 'project', empty otherwise. Aborting `signal`
+   * cancels the in-flight store.
+   */
   memoryStore(
     items: MemoryItem[],
     clarifications: MemoryClarification[],
+    scope: MemoryScope,
+    project: string,
     signal?: AbortSignal,
   ): Promise<MemoryStoreResult>;
   memoryMcpStatus(): Promise<MemoryMcpStatus>;

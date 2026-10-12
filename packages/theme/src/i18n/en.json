@@ -5557,19 +5557,55 @@
       }
     },
     "common": {
-      "author": {
+      "grade": {
         "agent": {
-          "label": "Agent"
+          "description": "Reference only."
+        },
+        "external": {
+          "description": "Correct, probably incomplete."
+        },
+        "user": {
+          "description": "Challenged by a human and correct."
+        }
+      },
+      "groupKind": {
+        "document": {
+          "label": "Document"
+        },
+        "thread": {
+          "label": "Thread"
         }
       },
       "historical": {
         "status": "Historical"
+      },
+      "origin": {
+        "agent": {
+          "label": "Agent"
+        },
+        "external": {
+          "label": "External"
+        },
+        "externalTagged": {
+          "label": "External · {tag}"
+        }
       },
       "pause": {
         "label": "Pause"
       },
       "resume": {
         "label": "Resume"
+      },
+      "scope": {
+        "company": {
+          "label": "Company"
+        },
+        "personal": {
+          "label": "Personal"
+        },
+        "project": {
+          "label": "Project"
+        }
       },
       "version": {
         "label": "Version {version}"
@@ -5761,7 +5797,7 @@
           }
         },
         "plain": {
-          "label": "{action} · {author} · {source}"
+          "label": "{action} · {origin} · {source}"
         },
         "source": {
           "ui": {
@@ -5769,13 +5805,13 @@
           }
         },
         "withBoth": {
-          "label": "{action} · {author} · {source} ({label}) — {rationale}"
+          "label": "{action} · {origin} · {source} ({label}) — {rationale}"
         },
         "withLabel": {
-          "label": "{action} · {author} · {source} ({label})"
+          "label": "{action} · {origin} · {source} ({label})"
         },
         "withRationale": {
-          "label": "{action} · {author} · {source} — {rationale}"
+          "label": "{action} · {origin} · {source} — {rationale}"
         }
       },
       "reason": {

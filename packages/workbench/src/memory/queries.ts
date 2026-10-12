@@ -1,4 +1,4 @@
-import type { MemoryClarification, MemoryItem } from '@shared/domain/memory';
+import type { MemoryClarification, MemoryItem, MemoryScope } from '@shared/domain/memory';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { tryOnScopeDispose } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
@@ -38,9 +38,39 @@ export function useMemoryHistory(id: MaybeRefOrGetter<string | null>) {
   }, queryClient);
 }
 
+/** Sibling facts of one fact, per group. */
+export function useMemoryContext(id: MaybeRefOrGetter<string | null>) {
+  const { control } = useMemoryModule();
+  return useQuery(() => {
+    const memoryId = toValue(id);
+    return {
+      queryKey: [...MEMORY_KEY, 'context', memoryId] as const,
+      queryFn: () => control.memoryContext(memoryId ?? ''),
+      enabled: memoryId !== null,
+      staleTime: 0,
+    };
+  }, queryClient);
+}
+
+/** Project keys of the current facts. */
+export function useMemoryProjects() {
+  const { control } = useMemoryModule();
+  return useQuery(
+    {
+      queryKey: [...MEMORY_KEY, 'projects'] as const,
+      queryFn: () => control.memoryProjects(),
+      staleTime: 0,
+    },
+    queryClient,
+  );
+}
+
 export interface StoreMemoryVars {
   items: MemoryItem[];
   clarifications: MemoryClarification[];
+  scope: MemoryScope;
+  /** Project key for scope 'project', empty otherwise. */
+  project: string;
   signal?: AbortSignal;
 }
 
@@ -50,7 +80,7 @@ export function useStoreMemory() {
     {
       mutationKey: [...MEMORY_KEY, 'store'],
       mutationFn: (vars: StoreMemoryVars) =>
-        control.memoryStore(vars.items, vars.clarifications, vars.signal),
+        control.memoryStore(vars.items, vars.clarifications, vars.scope, vars.project, vars.signal),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: MEMORY_KEY }),
     },
     queryClient,

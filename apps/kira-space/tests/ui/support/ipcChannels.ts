@@ -229,6 +229,9 @@ export const IPC = {
   memoryRecent: 'kira:memory:recent',
   memoryHistory: 'kira:memory:history',
   memoryStore: 'kira:memory:store',
+  // P272: a fact with the facts stored alongside it; the project keys of current facts.
+  memoryContext: 'kira:memory:context',
+  memoryProjects: 'kira:memory:projects',
   memoryMcpStatus: 'kira:memory:mcpStatus',
   memoryMcpInstall: 'kira:memory:mcpInstall',
   memoryChanged: 'kira:memory:changed',

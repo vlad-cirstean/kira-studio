@@ -116,11 +116,11 @@ func TestRestartKeepsUserData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items := []memory.Item{
+	items := []bridge.MemoryStoreItem{
 		{Fact: "billing runs postgres", Reason: "migration notes"},
 		{Fact: "staging deploys at 09:00", Reason: "release calendar"},
 	}
-	if res, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: items}); err != nil || res.Status != "stored" {
+	if res, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: items, Scope: memory.ScopePersonal}); err != nil || res.Status != "stored" {
 		t.Fatalf("Store = %+v, %v", res, err)
 	}
 

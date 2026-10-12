@@ -25,7 +25,7 @@ import ImportMenu from './import/ImportMenu.vue';
 import ImportStatus from './import/ImportStatus.vue';
 import { useImportChangeSync } from './import/importQueries';
 import { useImportUiStore } from './import/importStore';
-import { AUTHOR_LABEL } from './labels';
+import { originText } from './labels';
 import MemorySetupHint from './MemorySetupHint.vue';
 import { useMemoryChangeSync, useMemorySearch, useMemorySemanticStatus } from './queries';
 import { useMemoryUiStore } from './store';
@@ -163,8 +163,8 @@ const historyToggleId = useId();
             >
               <span class="line-clamp-2 text-kira-md">{{ memory.fact }}</span>
               <span class="flex items-center gap-1">
-                <Badge :variant="memory.author === 'user' ? 'info' : 'default'">{{
-                  t(AUTHOR_LABEL[memory.author])
+                <Badge :variant="memory.origin === 'user' ? 'info' : 'default'">{{
+                  originText(memory.origin, memory.sourceTag)
                 }}</Badge>
                 <Badge v-if="memory.historical" variant="warn">{{
                   t('memory.common.historical.status')

@@ -35,23 +35,27 @@ func gate(t *testing.T, app *flowharness.App, file string, actions ...fakeagent.
 	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{"*": actions}})
 }
 
-var twoItems = []memory.Item{
+var twoItems = []bridge.MemoryStoreItem{
 	{Fact: "billing runs postgres", Reason: "migration notes"},
 	{Fact: "staging deploys at 09:00", Reason: "release calendar"},
+}
+
+func twoItemsArgs() bridge.MemoryStoreArgs {
+	return bridge.MemoryStoreArgs{Items: twoItems, Scope: memory.ScopePersonal}
 }
 
 func TestStoreThroughGate(t *testing.T) {
 	app := flowharness.New(t)
 	gate(t, app, "gate-accept.json")
 	mark := app.Events.Mark()
-	res, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems})
+	res, err := app.W.Memory.Store(ctx, twoItemsArgs())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.Status != "stored" || len(res.Outcomes) != 2 || res.Outcomes[0].Action != "add" || res.Outcomes[1].Action != "add" {
 		t.Fatalf("Store = %+v, want two adds", res)
 	}
-	app.Contract(t, "memory", "args:MemoryService.Store#free-text", bridge.MemoryStoreArgs{Items: twoItems})
+	app.Contract(t, "memory", "args:MemoryService.Store#free-text", twoItemsArgs())
 	app.Contract(t, "memory", "MemoryService.Store#stored", res)
 	app.Events.WaitAfter(t, mark, bridge.ChannelMemoryChanged, nil, waitFor)
 
@@ -89,7 +93,7 @@ func TestGateRejectsOrFails(t *testing.T) {
 	}
 
 	gate(t, app, "gate-reject.json")
-	res, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems})
+	res, err := app.W.Memory.Store(ctx, twoItemsArgs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,20 +104,20 @@ func TestGateRejectsOrFails(t *testing.T) {
 	empty("a challenge")
 
 	gate(t, app, "gate-malformed.json")
-	if _, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems}); err == nil ||
+	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err == nil ||
 		!strings.Contains(err.Error(), memory.ErrClaudeOutput.Error()) {
 		t.Fatalf("malformed gate output error = %v, want %q", err, memory.ErrClaudeOutput)
 	}
 	empty("malformed gate output")
 
 	gate(t, app, "", fakeagent.Action{Name: "fail"})
-	if _, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems}); err == nil || !strings.Contains(err.Error(), "Claude Code failed") {
+	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err == nil || !strings.Contains(err.Error(), "Claude Code failed") {
 		t.Fatalf("failing claude error = %v, want a Claude Code failure", err)
 	}
 	empty("a failing claude")
 
 	gate(t, app, "gate-accept.json")
-	if res, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems}); err != nil || res.Status != "stored" {
+	if res, err := app.W.Memory.Store(ctx, twoItemsArgs()); err != nil || res.Status != "stored" {
 		t.Fatalf("Store after the failures = %+v, %v, want stored", res, err)
 	}
 }
@@ -122,7 +126,7 @@ func TestSemanticNotInstalled(t *testing.T) {
 	t.Setenv("KIRA_ORT_LIB", "")
 	app := flowharness.New(t)
 	gate(t, app, "gate-accept.json")
-	if _, err := app.W.Memory.Store(ctx, bridge.MemoryStoreArgs{Items: twoItems}); err != nil {
+	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err != nil {
 		t.Fatal(err)
 	}
 	st, err := app.W.Memory.SemanticStatus(ctx)

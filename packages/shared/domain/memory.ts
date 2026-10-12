@@ -1,18 +1,41 @@
 import { z } from 'zod';
 
-// P201: internal/memory's wire shapes (Memory, Event, History, StoreResult) and
+// P201, P272: internal/memory's wire shapes (Memory, Event, History, Context, StoreResult) and
 // bridge/memory.go's MemoryMcpStatus/MemoryInstallResult.
-export const memoryAuthorSchema = /*#__PURE__*/ z.enum(['user', 'agent']);
-export type MemoryAuthor = z.infer<typeof memoryAuthorSchema>;
+// Who decided a fact. Grade: user (challenged by a human, correct) above external (correct, probably
+// incomplete) above agent (reference only).
+export const memoryOriginSchema = /*#__PURE__*/ z.enum(['user', 'agent', 'external']);
+export type MemoryOrigin = z.infer<typeof memoryOriginSchema>;
+
+export const memoryScopeSchema = /*#__PURE__*/ z.enum(['company', 'project', 'personal']);
+export type MemoryScope = z.infer<typeof memoryScopeSchema>;
+
+export const memoryGroupKindSchema = /*#__PURE__*/ z.enum([
+  'session',
+  'request',
+  'task',
+  'document',
+  'thread',
+]);
+export type MemoryGroupKind = z.infer<typeof memoryGroupKindSchema>;
 
 export const memorySchema = /*#__PURE__*/ z.object({
+  // Version id "<fact id>.<version>".
   id: z.string(),
+  // Fact id "km_...", shared by every version of the fact.
   lineageId: z.string(),
   version: z.number().int(),
   fact: z.string(),
   reason: z.string(),
   keywords: z.array(z.string()),
-  author: memoryAuthorSchema,
+  origin: memoryOriginSchema,
+  // Source name for origin 'external', such as slack; null otherwise.
+  sourceTag: z.string().nullable(),
+  scope: memoryScopeSchema,
+  // Project key for scope 'project', such as github.com/acme/billing; null otherwise.
+  project: z.string().nullable(),
+  // Claude Code session that wrote this version; null for UI, import and pre-existing rows.
+  sessionId: z.string().nullable(),
   status: /*#__PURE__*/ z.enum(['current', 'superseded']),
   // True for a superseded version: an old value kept as history.
   historical: z.boolean(),
@@ -38,7 +61,9 @@ export const memoryEventSchema = /*#__PURE__*/ z.object({
   lineageId: z.string(),
   memoryId: z.string(),
   previousId: z.string().nullable(),
-  author: memoryAuthorSchema,
+  origin: memoryOriginSchema,
+  sourceTag: z.string().nullable(),
+  sessionId: z.string().nullable(),
   rationale: z.string(),
   createdAt: z.string(),
 });
@@ -52,6 +77,24 @@ export type MemoryHistory = z.infer<typeof memoryHistorySchema>;
 
 export const memoryItemSchema = /*#__PURE__*/ z.object({ fact: z.string(), reason: z.string() });
 export type MemoryItem = z.infer<typeof memoryItemSchema>;
+
+export const memoryGroupContextSchema = /*#__PURE__*/ z.object({
+  id: z.string(),
+  kind: memoryGroupKindSchema,
+  key: z.string(),
+  title: z.string(),
+  // Other facts in the group; `facts` holds at most the requested limit of them.
+  total: z.number().int(),
+  facts: z.array(memorySchema),
+});
+export type MemoryGroupContext = z.infer<typeof memoryGroupContextSchema>;
+
+// A fact with the facts stored alongside it, per group (session, request, task, document, thread).
+export const memoryContextSchema = /*#__PURE__*/ z.object({
+  memory: memorySchema,
+  groups: z.array(memoryGroupContextSchema),
+});
+export type MemoryContext = z.infer<typeof memoryContextSchema>;
 
 export const memoryClarificationSchema = /*#__PURE__*/ z.object({
   question: z.string(),

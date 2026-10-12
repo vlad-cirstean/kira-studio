@@ -1,10 +1,45 @@
-import type { MemoryAuthor, MemoryEvent } from '@shared/domain/memory';
+import type {
+  MemoryEvent,
+  MemoryGroupKind,
+  MemoryOrigin,
+  MemoryScope,
+} from '@shared/domain/memory';
 import { type MessageKey, t } from '@theme/i18n';
 
-export const AUTHOR_LABEL = {
+export const ORIGIN_LABEL = {
   user: 'common.user.label',
-  agent: 'memory.common.author.agent.label',
-} as const satisfies Record<MemoryAuthor, MessageKey>;
+  agent: 'memory.common.origin.agent.label',
+  external: 'memory.common.origin.external.label',
+} as const satisfies Record<MemoryOrigin, MessageKey>;
+
+export const SCOPE_LABEL = {
+  company: 'memory.common.scope.company.label',
+  project: 'memory.common.scope.project.label',
+  personal: 'memory.common.scope.personal.label',
+} as const satisfies Record<MemoryScope, MessageKey>;
+
+export const GROUP_KIND_LABEL = {
+  session: 'space.settings.claudeUsage.session.label',
+  request: 'studio.http.raw.requestPending.label',
+  task: 'common.task.label',
+  document: 'memory.common.groupKind.document.label',
+  thread: 'memory.common.groupKind.thread.label',
+} as const satisfies Record<MemoryGroupKind, MessageKey>;
+
+/** How far to trust a fact, by origin: user above external above agent. */
+export const GRADE_TEXT = {
+  user: 'memory.common.grade.user.description',
+  external: 'memory.common.grade.external.description',
+  agent: 'memory.common.grade.agent.description',
+} as const satisfies Record<MemoryOrigin, MessageKey>;
+
+/** Origin label; an external origin names its source, such as "External · slack". */
+export function originText(origin: MemoryOrigin, sourceTag: string | null): string {
+  if (origin === 'external' && sourceTag) {
+    return t('memory.common.origin.externalTagged.label', { tag: sourceTag });
+  }
+  return t(ORIGIN_LABEL[origin]);
+}
 
 const ACTION_LABEL = {
   noop: 'memory.start.event.action.reconfirmed.status',
@@ -22,7 +57,7 @@ const SOURCE_LABEL = {
 export function eventText(event: MemoryEvent): string {
   const params = {
     action: t(ACTION_LABEL[event.action]),
-    author: t(AUTHOR_LABEL[event.author]),
+    origin: originText(event.origin, event.sourceTag),
     source: t(SOURCE_LABEL[event.source]),
     label: event.sourceLabel ?? event.sourceRef ?? '',
     rationale: event.rationale,
