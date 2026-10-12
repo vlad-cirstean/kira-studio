@@ -19,7 +19,6 @@ const SCAN_DIRS = [
   'packages/workbench/src',
   'packages/git-ui/src',
   'packages/docker-ui/src',
-  'packages/kira-ui/src',
   'packages/theme/src',
   'packages/shared',
   'packages/git-core/src',

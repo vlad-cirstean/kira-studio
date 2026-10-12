@@ -10,7 +10,7 @@
     "**/testing/**",
     "**/main.ts"
   ],
-  "noUnitSuite": ["packages/theme", "packages/kira-ui"],
+  "noUnitSuite": ["packages/theme"],
   "areas": {
     "kira-studio": {
       "mutate": ["apps/kira-studio/frontend/src/**/*.ts"],

@@ -14,8 +14,7 @@
     "packages/git-ipc",
     "packages/git-core",
     "packages/git-ui",
-    "packages/docker-ui",
-    "packages/kira-ui"
+    "packages/docker-ui"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
@@ -53,7 +52,7 @@
     "typecheck:space-unit": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/apps-kira-space-tests-unit.tsbuildinfo -p apps/kira-space/tests/unit/tsconfig.json",
     "typecheck:api-core:studio": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-api-core.tsbuildinfo -p packages/api-core/tsconfig.json",
     "typecheck:docker": "vue-tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-docker-ui.tsbuildinfo -p packages/docker-ui/tsconfig.json",
-    "typecheck:git": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-git-ipc.tsbuildinfo -p packages/git-ipc/tsconfig.json && tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-git-core.tsbuildinfo -p packages/git-core/tsconfig.json && vue-tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-git-ui.tsbuildinfo -p packages/git-ui/tsconfig.json && vue-tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-kira-ui.tsbuildinfo -p packages/kira-ui/tsconfig.json",
+    "typecheck:git": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-git-ipc.tsbuildinfo -p packages/git-ipc/tsconfig.json && tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-git-core.tsbuildinfo -p packages/git-core/tsconfig.json && vue-tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/packages-git-ui.tsbuildinfo -p packages/git-ui/tsconfig.json",
     "perf:http:studio": "bun run build:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=perf http-response",
     "perf:documents:studio": "bun run build:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=perf documents-scroll",
     "perf:parse:studio": "bun run build:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=perf parse-callers",

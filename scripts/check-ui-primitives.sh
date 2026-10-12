@@ -32,7 +32,7 @@ if [ -z "$GNU_GREP" ]; then
   exit 1
 fi
 
-DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
+DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src"
 CORE_DIRS="packages/git-core/src packages/git-ipc/src packages/api-core/src"
 
 TMP=$(mktemp -d)
@@ -90,7 +90,6 @@ PANELS
 cat >"$TMP/perm" <<'PERMANENT'
 # foundation
 U11 packages/workbench/src/components/LogLines.vue # ANSI bold is log data
-U31 packages/workbench/src/components/WorkbenchShell.vue # ns-resize cursor held shell-wide while the dock drag runs, the pointer leaves the 2px handle
 U62 packages/workbench/src/components/AutocompleteField.vue # accepting a suggestion restores focus and the caret on the real input
 # A (apps/kira-studio)
 U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
@@ -217,7 +216,7 @@ U54@@v@@/behaviour/|/testing/@@v-if on isLoading/isError (use QueryState)@@v-(?:
 U55@@vt@@/behaviour/|/testing/@@onMutate (use optimisticUpdate)@@onMutate:
 U56@@vt@@/behaviour/|/testing/@@localeCompare, Collator or lowercase includes (use matchesQuery, compareNatural)@@localeCompare\(|new Intl\.Collator|\.toLowerCase\(\)\.includes\(
 U57@@vt@@/behaviour/|/testing/@@manual scroll-to-end or scrollIntoView (use useFollowTail, revealElement)@@scrollTop\s*=\s*\w+(?:\.value)?\.scrollHeight|scrollIntoView\(
-U58@@vt@@/behaviour/|/testing/|floatingPosition.ts|/kira-ui/@@computeFloatPosition or pointReference (use PointPopover)@@computeFloatPosition|pointReference
+U58@@vt@@/behaviour/|/testing/@@computeFloatPosition or pointReference (use PointPopover)@@computeFloatPosition|pointReference
 U59@@vt@@/behaviour/|/testing/@@placeholder dash literal (use displayValue)@@(?:\?\?|\|\|)\s*'(?:—|-)'|return\s+'(?:—|-)'
 U60@@vt@@/behaviour/|/testing/@@vue-draggable-plus (use useSortableReorder)@@from 'vue-draggable-plus'
 U61@@vt@@/behaviour/|/testing/@@empty catch (give a reason comment or surface the error)@@catch\s*(?:\(\w*\))?\s*\{\s*\}|\.catch\(\(\)\s*=>\s*(?:\{\s*\}|undefined)\)

@@ -5,7 +5,7 @@
 # legitimate and is skipped by construction (the pattern below only matches a var() whose closing
 # paren directly follows the property name).
 #
-# P131 Part 3 §6.5: the --kui-* layer (both copies of kira-ui's own token-bridge file, and every
+# P131 Part 3 §6.5: the --kui-* layer (both copies of the retired kira-ui package's token-bridge file, and every
 # Kui* consumer that referenced them) is gone — check_layer's own "resolves to a real definition" shape
 # no longer applies (there is nothing left to define), so the kui- pass below is a zero-use guard
 # instead: any --kui- reference anywhere is a regression, full stop.
@@ -60,7 +60,7 @@ check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_
   "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css $GIT_UI_SRC/theme/git.css" kira
 
 kui_hits=$(grep -rnE --include='*.vue' --include='*.css' --include='*.ts' \
-  -- '--kui-' packages/git-ui/src packages/kira-ui/src packages/theme/src packages/workbench/src || true)
+  -- '--kui-' packages/git-ui/src packages/theme/src packages/workbench/src || true)
 if [ -n "$kui_hits" ]; then
   echo "check-tokens: --kui-* is retired (P131 Part 3 §6.5) but still referenced:" >&2
   echo "$kui_hits" >&2

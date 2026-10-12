@@ -59,7 +59,6 @@ WORKBENCH_SRC=packages/workbench/src
 GIT_UI_SRC=packages/git-ui/src
 SPACE_REPO_SRC=apps/kira-space/frontend/src/repo
 SPACE_REPO_VIEWS_SRC=apps/kira-space/frontend/src/views/repo
-KIRA_UI_SRC=packages/kira-ui/src
 DOCKER_UI_SRC=packages/docker-ui/src
 
 SCAN_DIRS="$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_UI_SRC"
@@ -93,10 +92,10 @@ if [ -z "$TC_COLLECT" ]; then
         -- "(?<![-\\w])(?:[a-z0-9-]+:)*(?:${alt})(?![-\\w])" $SCAN_DIRS 2>/dev/null |
         grep -v "^${THEME_SRC}/components/ui/" || true
     fi
-    grep -rnP --include='*.vue' -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    grep -rnP --include='*.vue' -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" 2>/dev/null |
       grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
       grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
-    grep -rnP --include='*.ts' "" "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    grep -rnP --include='*.ts' "" "$GIT_UI_SRC" 2>/dev/null |
         grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
       grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
   }
@@ -163,7 +162,7 @@ check_no_kui_class() {
     return 0
   fi
   hits=$(grep -rnP --include='*.vue' --include='*.ts' \
-    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P '(?<![-\w])kui-[a-z-]+(?![-\w])' || true)
   if [ -n "$hits" ]; then
@@ -184,10 +183,10 @@ check_no_kui_class() {
 _gu_ku_hits() {
   name="$1"
   vue_hits=$(grep -rnP --include='*.vue' \
-    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
-  ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+  ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
   printf '%s\n%s\n' "$vue_hits" "$ts_hits" | grep -v '^$' || true
@@ -522,7 +521,7 @@ check_no_kui_class
 # Attribute-scoped for the codicon check: codicon.css's own header comment names the class as
 # prose (see that file's own top-of-file doc comment).
 check_class_all 'animate-kira-spin' 'animate-spin'
-check_class_in_attrs_all 'codicon-modifier-spin' 'inline-block animate-spin' "$GIT_UI_SRC $KIRA_UI_SRC"
+check_class_in_attrs_all 'codicon-modifier-spin' 'inline-block animate-spin' "$GIT_UI_SRC"
 
 # P110 I2-10/11: the "nothing here yet" panel, folded into the shared Empty/EmptyMedia/EmptyTitle/
 # EmptyDescription components (packages/theme/src/components/ui/empty/, a shadcn-vue registry

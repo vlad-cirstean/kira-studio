@@ -7,8 +7,7 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    // packages/kira-ui uses ".ts" import specifiers — see frontend/tsconfig.json's identical
-    // comment.
+    // Specs import support modules with explicit .ts specifiers.
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],

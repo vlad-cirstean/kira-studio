@@ -775,7 +775,7 @@ suites). Tooling lives in `scripts/mutation/` and `tools/mutation/` (own `packag
      does not link: `inPlace: true` on the disposable snapshot, and `run.sh` symlinks every
      `node_modules`.
 - **TS limits**: no type checker (bun strips types, so some survivors are type-invalid code), `.vue`
-  files are not mutated, static mutants are ignored, `packages/theme` and `packages/kira-ui` have no
+  files are not mutated, static mutants are ignored, `packages/theme` has no
   unit suite.
 - **CI**: none, by user decision (2026-10-07) — not worth the investment yet. Run manually only,
   via `scripts/mutation/run.sh` below.

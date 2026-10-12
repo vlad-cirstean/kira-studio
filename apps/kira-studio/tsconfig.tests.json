@@ -9,7 +9,7 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": ["node"],
-    // allowImportingTsExtensions is for packages/kira-ui's .ts specifiers.
+    // Specs and vite configs import siblings with explicit .ts specifiers.
     "allowImportingTsExtensions": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {

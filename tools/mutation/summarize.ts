@@ -355,7 +355,7 @@ md.push(
   `- container-gated Go packages (not covered share > 50%): ${gated.length}, ${gated.reduce((a, u) => a + u.counts.noCoverage, 0)} not-covered mutants`,
 );
 md.push(`- Go packages with darwin-only files not mutated: ${darwin.length}`);
-md.push('- TS without a unit suite, not run: packages/theme, packages/kira-ui');
+md.push('- TS without a unit suite, not run: packages/theme');
 md.push('', '## Run', '', `- commit ${meta.commit}, ${meta.nproc} cores`);
 for (const s of meta.segments)
   md.push(`- segment ${s.mode} ${s.start}: ${dur(s.seconds)}, ${s.workers} workers`);

@@ -193,7 +193,7 @@ The scripts specific to this app:
 | `bun run typecheck:space-web` | `apps/kira-space/frontend/src`, including `.vue` files (`vue-tsc`) |
 | `bun run typecheck:space-tests` | `apps/kira-space/tests/` tiers and `playwright.config.ts` (`tsgo`) |
 | `bun run typecheck:space-unit` | `apps/kira-space/tests/unit` (`tsgo`) |
-| `bun run typecheck:git` | `packages/git-ipc`, `packages/git-core` (`tsgo`), plus `packages/git-ui` and `packages/kira-ui` (`vue-tsc`) |
+| `bun run typecheck:git` | `packages/git-ipc`, `packages/git-core` (`tsgo`), plus `packages/git-ui` (`vue-tsc`) |
 | `bun run test:ui:space` | Builds, then runs Playwright (WebKit) against this app's own built bundle |
 | `bun run test:ui:space-mobile` | Builds the phone bundle, then runs its Playwright tests on iOS (WebKit) and Android (Chromium) profiles |
 | `bun run test:e2e-real:space` | Playwright against a real `-tags server` build of this app |
@@ -248,7 +248,6 @@ packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/Tab
 packages/git-ipc     the git contract, RPC/codec/validation, the stream channel, the FlatBuffers schema
 packages/git-core    client-side git logic: commit store, lane layout, the client half of search, settings schema
 packages/git-ui      the git graph/review UI, hosted by this app's native Git module
-packages/kira-ui     a Floating-UI positioning primitive workbench wraps
 packages/theme       shared design tokens/CSS both apps' frontends import, plus the shadcn-vue `components/ui/*` sets
 ```
 
