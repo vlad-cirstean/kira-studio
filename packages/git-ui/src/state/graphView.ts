@@ -4,6 +4,7 @@ import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import { logError } from '@workbench/bridge/log';
 import { markRaw, type Ref, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import {
@@ -372,7 +373,7 @@ export class GraphViewState {
             const status = await this.#bridge.request('graph.status', { repoId });
             this.#packed.applyStatus(status.remaining, status.exhausted);
           } catch (statusError) {
-            console.error('graphView: graph.status failed after load', statusError);
+            logError('graphView', 'graph.status failed after load', statusError);
           }
         } finally {
           if (generation === this.#loadGeneration) this.loading.value = 'idle';
@@ -436,7 +437,7 @@ export class GraphViewState {
       this.#bridge
         .request('graph.reportFailure', { repoId, reason: 'corrupted' })
         .catch((error: unknown) => {
-          console.error('graphView: reporting a corrupted stream failed', error);
+          logError('graphView', 'reporting a corrupted stream failed', error);
         });
     }
   }
@@ -470,7 +471,7 @@ export class GraphViewState {
       // a rejection to — logging here, not in `refresh()` itself, is what stands between a
       // disconnect/git error on an auto-refresh and a silent unhandled rejection, while any future
       // direct caller of `refresh()` still sees it thrown.
-      console.error('graphView: #runAutoRefresh failed', error);
+      logError('graphView', '#runAutoRefresh failed', error);
     } finally {
       this.autoRefreshing.value = false;
       this.#lastAutoRefreshAt = Date.now();
@@ -586,7 +587,7 @@ export class GraphViewState {
         if (!repoId) return;
         this.openStream(repoId, 0).catch((error: unknown) => {
           if (error instanceof TransportError && error.code === 'cancelled') return;
-          console.error('graphView: re-open after a corrupted chunk failed', error);
+          logError('graphView', 're-open after a corrupted chunk failed', error);
           this.#failCorrupted();
         });
       },
@@ -639,7 +640,7 @@ export class GraphViewState {
       // down mid-`submit`, a non-`LayoutClientStaleError` rejection) has no caller left to hand
       // this to. Logged, matching this file's own `graph.status failed after load` precedent —
       // never rethrown, since nothing here would catch it.
-      console.error('graphView: #drainLayoutRebuilds failed', error);
+      logError('graphView', '#drainLayoutRebuilds failed', error);
     } finally {
       this.#layoutDraining = false;
     }

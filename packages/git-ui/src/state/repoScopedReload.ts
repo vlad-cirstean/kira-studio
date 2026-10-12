@@ -1,4 +1,5 @@
 import type { EventPayload } from '@kira/git-ipc';
+import { logError } from '@workbench/bridge/log';
 import type { BridgeClient } from '../bridge/client.ts';
 
 /**
@@ -62,7 +63,7 @@ export class RepoScopedReload {
   }
 
   #logBackgroundError(context: string, error: unknown): void {
-    console.error(`${this.#logName}: ${context} failed`, error);
+    logError(this.#logName, `${context} failed`, error);
   }
 
   dispose(): void {

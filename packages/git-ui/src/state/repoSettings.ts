@@ -1,5 +1,6 @@
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
+import { logError } from '@workbench/bridge/log';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 
@@ -72,7 +73,7 @@ export class RepoSettingsState {
    *  error and a silent unhandled rejection with the dialog left showing stale settings forever.
    *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
   #logBackgroundError(context: string, error: unknown): void {
-    console.error(`RepoSettingsState: ${context} failed`, error);
+    logError('RepoSettingsState', `${context} failed`, error);
   }
 
   async reload(): Promise<void> {

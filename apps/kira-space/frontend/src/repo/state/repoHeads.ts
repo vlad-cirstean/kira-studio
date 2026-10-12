@@ -2,6 +2,7 @@ import { shortSha } from '@kira/git-core';
 import type { HeadState, Transport } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
 import { useTimeoutFn } from '@vueuse/core';
+import { logWarn } from '@workbench/bridge/log';
 import { defineStore } from 'pinia';
 import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -53,7 +54,7 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
       for (const row of rows) byRepoId.set(row.id, row.head);
     } catch (err) {
       // Fired without awaiting from watchers and events; keep the labels already shown.
-      if (!warned) console.warn('repoHeads: refresh failed', err);
+      if (!warned) logWarn('repoHeads', 'refresh failed', err);
       warned = true;
     }
   }

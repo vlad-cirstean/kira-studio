@@ -1,5 +1,6 @@
 import { CommitStore } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
+import { logError } from '@workbench/bridge/log';
 import { markRaw, type ShallowRef, shallowRef } from 'vue';
 
 export type ChunkSource = StreamChunkOf<'graph.stream'>['source'];
@@ -98,11 +99,11 @@ export class PackedStreamState {
       // instead of leaving an unhandled rejection and a half-populated list on screen.
       this.#corruptions++;
       if (this.#corruptions > MAX_CONSECUTIVE_CORRUPTIONS) {
-        console.error('packedStream: appendPacked failed again, giving up', error);
+        logError('packedStream', 'appendPacked failed again, giving up', error);
         hooks.onUnrecoverable(error);
         return undefined;
       }
-      console.error('packedStream: appendPacked failed, re-opening from row 0', error);
+      logError('packedStream', 'appendPacked failed, re-opening from row 0', error);
       await hooks.onCorrupted(error);
       return undefined;
     }

@@ -1,5 +1,6 @@
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import { logError } from '@workbench/bridge/log';
 import type { BridgeClient } from '../bridge/client.ts';
 
 export interface ClipboardOutcome {
@@ -23,7 +24,7 @@ export async function copyToClipboard(
     await bridge.request('clipboard.write', { text, label: message });
     return { ok: true, message };
   } catch (error) {
-    console.error(`clipboard.write failed (${message}):`, error);
+    logError('clipboard.write', `failed (${message})`, error);
     return { ok: false, message: t('common.copy.failed.error', { error: errorText(error) }) };
   }
 }

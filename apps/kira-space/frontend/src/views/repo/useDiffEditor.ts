@@ -10,9 +10,11 @@
 // decorations wiring (attachReviewDecorations) — both are single-active-view concerns RepoDiffView
 // still owns; registering either once per expanded multi-diff section would mean the last section
 // mounted wins, silently shadowing the others'.
+
 import type { DiffSide } from '@shared/domain/repo';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import { logWarn } from '@workbench/bridge/log';
 import { type Ref, ref, shallowRef } from 'vue';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
@@ -129,11 +131,11 @@ function wireGoToFile(
         // branch with no other signal; this raw editor view has no toast/live-region channel to
         // surface it through, so it goes to the console rather than dropping silently.
         if (outcome.kind === 'unavailable') {
-          console.warn(`repo.goToFileFromDiff: ${path} unavailable — ${outcome.reason}`);
+          logWarn('repo.goToFileFromDiff', `${path} unavailable — ${outcome.reason}`);
         }
       })
       .catch((err: unknown) => {
-        console.warn('repo.goToFileFromDiff failed:', err);
+        logWarn('repo.goToFileFromDiff', 'failed', err);
       })
       .finally(() => transport.dispose());
   };

@@ -32,6 +32,7 @@ import type {
 } from '@kira/git-ipc';
 import { buttonVariants } from '@theme/components/ui/button';
 import { i18n, t } from '@theme/i18n';
+import { logError } from '@workbench/bridge/log';
 import { type App, createApp, nextTick } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
@@ -97,7 +98,7 @@ function resolveBase(transport: Transport, repoId: string, branch: string): Prom
       .then((r) => r.base)
       .catch((err) => {
         baseMemo.delete(key);
-        console.error('reviewDecorations: review.resolveBase failed', err);
+        logError('reviewDecorations', 'review.resolveBase failed', err);
         throw err;
       });
     baseMemo.set(key, cached);
@@ -359,7 +360,7 @@ export function attachReviewDecorations(
       // C13-9: a genuine rejection (a transient index.lock conflict, most likely) — resolveBase
       // no longer caches this (see baseMemo's own comment), so the banner's own Retry button (or
       // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
-      console.error('reviewDecorations: review.resolveBase failed', err);
+      logError('reviewDecorations', 'review.resolveBase failed', err);
       showLoadError();
       return false;
     }
@@ -398,7 +399,7 @@ export function attachReviewDecorations(
       // C13-9: previously uncaught — a rejection here left a silently blank review layer and an
       // unhandled promise rejection in the console, entirely bypassing C12-7's retry-banner
       // mechanism (unlike the review.comment.list call below, which already had a `.catch`).
-      console.error('reviewDecorations: review.fileDiff failed', err);
+      logError('reviewDecorations', 'review.fileDiff failed', err);
       showLoadError();
       return false;
     }
@@ -425,7 +426,7 @@ export function attachReviewDecorations(
     } catch (err) {
       if (disposed || seq !== commentsSeq) return;
       // Keep the comments already painted: a transient failure must not look like "all deleted".
-      console.error('reviewDecorations: review.comment.list failed', err);
+      logError('reviewDecorations', 'review.comment.list failed', err);
       commentsLoadFailed = true;
       showLoadError();
       return;
@@ -464,7 +465,7 @@ export function attachReviewDecorations(
         ranges: clamped,
       });
     } catch (err) {
-      console.error('reviewDecorations: review.mark failed', err);
+      logError('reviewDecorations', 'review.mark failed', err);
       return;
     }
     // F9 (reviewMarking.ts:520-521): never predict the stored state locally — reload from the
@@ -529,7 +530,7 @@ export function attachReviewDecorations(
         body,
       });
     } catch (err) {
-      console.error('reviewDecorations: review.comment.add failed', err);
+      logError('reviewDecorations', 'review.comment.add failed', err);
       return;
     }
     closeZone();
@@ -545,7 +546,7 @@ export function attachReviewDecorations(
         id: comment.id,
       });
     } catch (err) {
-      console.error('reviewDecorations: review.comment.remove failed', err);
+      logError('reviewDecorations', 'review.comment.remove failed', err);
       return;
     }
     closeZone();

@@ -1,4 +1,5 @@
 import type { Transport } from '@kira/git-ipc';
+import { logError } from '@workbench/bridge/log';
 
 /**
  * The per-connection `repo.open` hold `blameAnnotation.ts`'s `blame.line` calls need — moved out
@@ -23,7 +24,7 @@ export function ensureRepoOpen(transport: Transport, gitRepoId: string): Promise
       .then(() => undefined)
       .catch((err: unknown) => {
         repoOpenMemo.delete(gitRepoId);
-        console.error('repoOpenHold: repo.open failed', err);
+        logError('repoOpenHold', 'repo.open failed', err);
         throw err;
       });
     repoOpenMemo.set(gitRepoId, cached);

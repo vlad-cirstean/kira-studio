@@ -5,6 +5,7 @@ import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { displayValue } from '@workbench/behaviour/format';
+import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -112,7 +113,7 @@ async function onRerun(record: OpRecord): Promise<void> {
     if (!connected) return;
     await consoleViewStore.run(tabId, statements);
   } catch (err) {
-    console.error('Re-run: failed to reconnect/run', err);
+    logError('OperationsPanel', 'Re-run: failed to reconnect/run', err);
   }
 }
 
