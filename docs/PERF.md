@@ -1646,7 +1646,7 @@ rather than at the time.
 own exit criterion #4 already exercises) at the commit immediately before G34's first code change
 (`521fcba`, a docs-only plan commit — its parent has no G34 code at all) versus at G34's last commit
 (`bf0a1d8`). Nothing between `bf0a1d8` and the measurement date touches a `.vue` `<style>` block or
-a `packages/kira-ui`/`packages/git-ui` `.css` file (checked via `git log bf0a1d8..HEAD` over both
+a `packages/kira-ui` (deleted in P267)/`packages/git-ui` `.css` file (checked via `git log bf0a1d8..HEAD` over both
 extensions), so `bf0a1d8`'s own CSS is byte-identical to what a build at current `HEAD` produces —
 the container this ran in.
 
@@ -1657,7 +1657,7 @@ the container this ran in.
 | Δ | **−3,943 B (−3.85 KiB)** | −167 B (−0.16 KiB) |
 
 **This is a decrease, not an increase** — G34 replaced bespoke, duplicated `.kv-*` button/menu/row
-styling with shared `packages/kira-ui` component classes and a single token scale (D1/D13's own "one
+styling with shared `packages/kira-ui` (deleted in P267) component classes and a single token scale (D1/D13's own "one
 token scale, not two"), and removing the duplication outweighed whatever the newly-consumed
 `kira-ui` classes added. The raw delta's own magnitude (3.85 KiB) is about 1.3x the plan's ±3 KB
 tolerance band, which technically trips exit criterion #9's own "materially larger… worth

@@ -1010,3 +1010,46 @@ Could not run or not proven:
   (`transform: translate(0px, -200%)`), so Reka's popper never computes a position in this review window
   under WebKit. Tip and base are identical, so the spec clicks with `dispatchEvent`. Other popovers
   position fine; root cause of the unpositioned wrapper is open.
+
+## Close-out result
+
+Base `ae1bb8648`, tip `570dc172a` plus this commit. §9 greps run on the tip.
+
+Numbers:
+
+- PERMANENT lines in `check-ui-primitives.sh`: 59 to 38. Above the ~24 target: the user-listed
+  exemptions (U88 x3, U101 x2, U100, U91) plus U91 `UncommittedChangesStrip` and U47 `SearchResults`
+  stay; each has a `#` reason naming a requirement a primitive cannot meet. The plan's own "≈ 24 + new
+  named entries" allows this.
+- Built-in exempt column: 13 dead entries removed; column now stale-checked (`!` opts a blanket out).
+- Copy exemptions (`scripts/copy/exemptions.ts`): 8 to 6.
+- G4 named exemptions (`internal/conventiontest`): 9 to 1 (`gitsession/incremental.go`); path rule skips
+  `flowharness`, `flowtest`, `ipcfixture`.
+- Suppressions: `biome-ignore` 174 to 164 (net 10 removed, mostly a11y list-row ignores; 4 new ones for
+  `<search>`, role-switched rows and untyped fixtures).
+- Importers (files, `.vue` under §9 `$D`): `TruncatedText` 29, `Identifier` 32, `KeyValueList` 11,
+  `Disclosure` 5, `Button pending` (`:pending=`) 68, `FindBar` 4, `HighlightedText` 5.
+- `.vue` files over 600 lines: `SlickGridHost` 2751, `ConsoleSlickGrid` 881, `CommitGrid` 1369,
+  `MonacoHost` 786, git `App.vue` 1995. Exactly the §9 list.
+- U83-U103 lines in `check-ui-primitives.sh`: 30 (≥ 21).
+
+§9 checks:
+
+- Pass: `packages/kira-ui` gone, no `kira-ui`/`computeFloatPosition` in `$D`, `package.json`, `knip.json`;
+  `format.ts`; all importer floors; `MenuSections.vue`, `docker-ui/lib/ansi.ts` gone; no `<details`
+  element, no `ghost` variant outside `components/ui/`, no `z-50`/`shadow-md` in `components/ui`;
+  `connectionsReorder` gone; no `.ts` under git-ui `components/`; no menu file naming hits;
+  `useFocusableInteractive` unused; G4 path rule present; N8-N12 present; `KIRA_NO_STARTUP_ALERT`
+  documented; "UI leftover conventions (P267)" present; all listed specs present.
+- Literal-grep hits, judged not failures: `Disclosure.vue` comment text `<details>`; three-class
+  ellipsis spelling and `cursor-pointer` in `.css` only (`slickTheme.css`, `git.css` virtual row,
+  `tailwind-core.css` comment). The §9 grep spans `.css`; the §2 rules target `.vue` class lists, and
+  the SlickGrid theme is engine internals (out of scope, §8).
+- Spec path drift: the `automations-*` specs live in `apps/*/tests/ui/`, not `packages/workbench/src/testing/ui/scenarios/`.
+
+Parked items: none. Open items recorded in `docs/ARCHITECTURE.md` Known open items: quit discards
+staged edits, sync popover unpositioned under WebKit (root cause open), `ui-timing` budgets on slow
+hosts.
+
+Docs: `ARCHITECTURE.md` conventions section final; remaining `kira-ui` mentions there and in `PERF.md`
+are history lines, marked so.
