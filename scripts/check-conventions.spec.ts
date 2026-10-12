@@ -1,11 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import {
   codeParityHits,
+  componentsTsHit,
   eventHits,
   fileNameHit,
   folderHits,
+  menuShortcutHits,
   migrationHits,
+  oversizeVueHit,
   piniaHits,
+  specHelperHits,
+  stateAndMenuNameHits,
   testSuffixHit,
 } from './check-conventions';
 
@@ -94,5 +99,91 @@ describe('N7 migrations', () => {
   test('only files above the baseline are checked', () => {
     const hits = migrationHits('d', 3, files);
     expect(hits.map((h) => h.path)).toEqual(['d/0005_p266_text.sql', 'd/0006_badname.sql']);
+  });
+});
+
+describe('N8 spec helpers', () => {
+  const body = (name: string, tail = 'a') =>
+    `async function ${name}(page: Page): Promise<void> {\n  await page.click('${tail}');\n  await page.click('b');\n}\n`;
+  test('a verbatim copy in two specs is flagged in both', () => {
+    const specs = new Map([
+      ['a.spec.ts', body('openIt')],
+      ['b.spec.ts', body('openIt')],
+    ]);
+    expect(specHelperHits(specs, new Map()).map((h) => h.path)).toEqual(['a.spec.ts', 'b.spec.ts']);
+  });
+  test('a same-named helper with a different body is a specialisation', () => {
+    const specs = new Map([
+      ['a.spec.ts', body('openIt', 'x')],
+      ['b.spec.ts', body('openIt', 'y')],
+    ]);
+    expect(specHelperHits(specs, new Map())).toEqual([]);
+  });
+  test('a copy of a support export is flagged, a different body is not', () => {
+    const support = new Map([['s/tree.ts', `export ${body('openIt')}`]]);
+    expect(specHelperHits(new Map([['a.spec.ts', body('openIt')]]), support)).toHaveLength(1);
+    expect(specHelperHits(new Map([['a.spec.ts', body('openIt', 'z')]]), support)).toEqual([]);
+  });
+  test('a multi-line signature does not end the body early', () => {
+    const fn = (extra: string) =>
+      `function f(\n  a: string,\n  b: string,\n): string {\n  return a + b + '${extra}';\n}\n`;
+    const specs = new Map([
+      ['a.spec.ts', fn('1')],
+      ['b.spec.ts', fn('2')],
+    ]);
+    expect(specHelperHits(specs, new Map())).toEqual([]);
+  });
+});
+
+describe('N9 components dir', () => {
+  test('.ts under components/ is flagged except ui/ and specs', () => {
+    expect(componentsTsHit('packages/theme/src/components/frames.ts')?.rule).toBe('N9');
+    expect(componentsTsHit('packages/theme/src/components/ui/button/index.ts')).toBeUndefined();
+    expect(componentsTsHit('packages/theme/src/components/Foo.spec.ts')).toBeUndefined();
+    expect(componentsTsHit('packages/theme/src/lib/frames.ts')).toBeUndefined();
+    expect(componentsTsHit('apps/x/frontend/src/components/a.ts')).toBeUndefined();
+  });
+});
+
+describe('N10 oversize .vue', () => {
+  const big = `${'x\n'.repeat(700)}`;
+  test('over 600 lines fails unless a named host', () => {
+    expect(oversizeVueHit('p/Foo.vue', big)?.rule).toBe('N10');
+    expect(oversizeVueHit('p/Foo.vue', 'x\n'.repeat(100))).toBeUndefined();
+    expect(oversizeVueHit('p/SlickGridHost.vue', big)).toBeUndefined();
+    expect(oversizeVueHit('p/foo.ts', big)).toBeUndefined();
+  });
+});
+
+describe('N11 menu shortcuts', () => {
+  const menu = "{ shortcut: 'a.run' }, { shortcut: 'b.go' }, { shortcut: 'tree.open' }";
+  const scopes = new Map([['b.go', 'global']]);
+  test('unbound non-global shortcuts fail', () => {
+    const hits = menuShortcutHits('d/menu.ts', menu, ["useShortcut('a.run', f)"], scopes);
+    expect(hits.map((h) => h.message)).toEqual([expect.stringContaining("'tree.open'")]);
+  });
+  test('useTreeShortcuts binds tree.* ids', () => {
+    const hits = menuShortcutHits(
+      'd/menu.ts',
+      menu,
+      ["shortcutFor(e, ['a.run'])", 'useTreeShortcuts(x)'],
+      scopes,
+    );
+    expect(hits).toEqual([]);
+  });
+});
+
+describe('N12 state and menu names', () => {
+  test('one-file state dir and misnamed menu builders fail', () => {
+    const hits = stateAndMenuNameHits([
+      'a/state/only.ts',
+      'b/state/one.ts',
+      'b/state/two.ts',
+      'c/menus.ts',
+      'c/rowMenu.ts',
+      'c/useRowMenu.ts',
+      'c/menu.ts',
+    ]);
+    expect(hits.map((h) => h.path)).toEqual(['c/menus.ts', 'c/rowMenu.ts', 'a/state']);
   });
 });

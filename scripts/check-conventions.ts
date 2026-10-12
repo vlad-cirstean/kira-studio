@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * P266 code convention guard N1-N7 (docs/v2.2/plans/P266-consistency-audit.md section 2.10 and
- * 4.2).
+ * 4.2) and N8-N12 (docs/v2.2/plans/P267-ui-leftovers.md section 3).
  *
  * N1 file names (.ts camelCase, .vue PascalCase), N2 no `.test.ts`, N3 no util/utils/helpers
  * folder, N4 Pinia id = export name without `use`/`create` and `Store`, N5 event names
@@ -9,13 +9,31 @@
  * TEXT `*_at` column, N6 the Go (`internal/ipcerr/codes.go`) and TS
  * (`packages/shared/domain/errorCodes.ts`) error-code registries list the same codes.
  *
+ * N8 a spec helper (3+ lines) copied verbatim into 2+ spec files, or copied from a
+ * `tests/<suite>/support` or `workbench/testing/ui` export, N9 no non-spec `.ts` under a package `components/` dir (outside
+ * `components/ui`), N10 a `.vue` over 600 lines needs a named engine-host
+ * exemption, N11 a non-global `shortcut: '<id>'` in a `menu.ts` is bound in its feature dir, N12 a
+ * `state/` dir holds 2+ files and menu builders live in `menu.ts`.
+ *
  * No pending list: every hit fails. N6 also fails on any retired-code registry (`Legacy` in Go,
  * `LEGACY_ERROR_CODES` in TS).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type Rule = 'N1' | 'N2' | 'N3' | 'N4' | 'N5' | 'N6' | 'N7';
+export type Rule =
+  | 'N1'
+  | 'N2'
+  | 'N3'
+  | 'N4'
+  | 'N5'
+  | 'N6'
+  | 'N7'
+  | 'N8'
+  | 'N9'
+  | 'N10'
+  | 'N11'
+  | 'N12';
 export interface Hit {
   rule: Rule;
   path: string;
@@ -51,6 +69,32 @@ const MIGRATION_SETS: ReadonlyArray<{ dir: string; baseline: number }> = [
 ];
 const MIGRATION_NAME = /^(\d{4})_[a-z]\d+[a-z]?_[a-z0-9]+(?:_[a-z0-9]+)*\.sql$/;
 const BAD_FOLDERS = new Set(['util', 'utils', 'helpers']);
+const SPEC_ROOTS = [
+  'apps/kira-studio/tests/ui',
+  'apps/kira-studio/tests/visual',
+  'apps/kira-space/tests/ui',
+  'apps/kira-space/tests/visual',
+  'apps/kira-space/tests/mobile',
+];
+const SUPPORT_ROOTS = [
+  'apps/kira-studio/tests/ui/support',
+  'apps/kira-space/tests/ui/support',
+  'packages/workbench/src/testing/ui',
+];
+const MAX_VUE_LINES = 600;
+// Engine hosts and shells: one file owns a whole third-party engine or app frame.
+const OVERSIZE_VUE_OK = new Set([
+  'SlickGridHost.vue',
+  'ConsoleSlickGrid.vue',
+  'CommitGrid.vue',
+  'MonacoHost.vue',
+  'CheetahProto.vue', // P165 prototype
+  'packages/git-ui/src/App.vue',
+]);
+// Printed in a menu, bound by the grid engine itself rather than a shortcut call.
+const ENGINE_BOUND_SHORTCUTS = new Set(['grid.edit']);
+const SHORTCUTS_PATH = 'packages/shared/domain/shortcuts.ts';
+const MENU_ROOTS = ['apps/kira-studio/frontend/src', 'apps/kira-space/frontend/src'];
 
 export function fileNameHit(path: string): Hit | undefined {
   const name = path.slice(path.lastIndexOf('/') + 1);
@@ -179,34 +223,241 @@ export function migrationHits(
   return hits;
 }
 
-function walk(root: string): string[] {
+// Top-level function declarations and arrow-function consts; data constants are not helpers.
+const TOP_LEVEL_DECL =
+  /^(?:export\s+)?(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*(?::[^=\n]+)?=\s*(?:async\s*)?(?:\([^)\n]*\)|\w+)\s*(?::[^=\n]+)?=>)/gm;
+
+// One- and two-line locator/alias helpers are cheaper to keep local than to import.
+const MIN_HELPER_LINES = 3;
+
+/** Whitespace-normalised text of each top-level helper, keyed by name (copy-paste detection). */
+function declaredBodies(source: string): Map<string, string> {
+  const lines = source.split('\n');
+  const out = new Map<string, string>();
+  for (const m of source.matchAll(TOP_LEVEL_DECL)) {
+    const name = m[1] ?? m[2] ?? '';
+    if (name === '') continue;
+    const start = source.slice(0, m.index).split('\n').length - 1;
+    let end = start;
+    if (!/[;}]\s*$/.test(lines[start] ?? '')) {
+      while (
+        end < lines.length - 1 &&
+        !(/^[})\]]/.test(lines[end + 1] ?? '') && !/\{\s*$/.test(lines[end + 1] ?? ''))
+      )
+        end++;
+      end = Math.min(end + 1, lines.length - 1);
+    }
+    if (end - start < MIN_HELPER_LINES - 1) continue;
+    out.set(
+      name,
+      lines
+        .slice(start, end + 1)
+        .join('\n')
+        .replace(/^export\s+/, '')
+        .replace(/\s+/g, ' '),
+    );
+  }
+  return out;
+}
+
+/**
+ * N8: a helper copy-pasted into 2+ specs, or copy-pasted from a `support/` export, belongs in
+ * `support/`. A same-named helper with a different body is a deliberate specialisation, not a hit.
+ */
+export function specHelperHits(
+  specs: ReadonlyMap<string, string>,
+  supports: ReadonlyMap<string, string>,
+): Hit[] {
+  const hits: Hit[] = [];
+  const supportBody = new Map<string, { owner: string; body: string }>();
+  for (const [path, source] of supports) {
+    for (const [n, body] of declaredBodies(source)) supportBody.set(n, { owner: path, body });
+  }
+  const copies = new Map<string, string[]>();
+  for (const [path, source] of specs) {
+    for (const [n, body] of declaredBodies(source)) {
+      const shared = supportBody.get(n);
+      if (shared && shared.body === body) {
+        hits.push({ rule: 'N8', path, message: `'${n}' copies the export of ${shared.owner}` });
+      } else {
+        const key = `${n}\u0000${body}`;
+        copies.set(key, [...(copies.get(key) ?? []), path]);
+      }
+    }
+  }
+  for (const [key, paths] of copies) {
+    if (paths.length < 2) continue;
+    const name = key.slice(0, key.indexOf('\u0000'));
+    for (const path of paths) {
+      hits.push({
+        rule: 'N8',
+        path,
+        message: `'${name}' is copied in ${paths.length} spec files; move it to support/`,
+      });
+    }
+  }
+  return hits;
+}
+
+/** N9: `components/` holds `.vue` only; models and helpers live in `lib/`. */
+export function componentsTsHit(path: string): Hit | undefined {
+  const dirs = path.split('/').slice(0, -1);
+  if (!path.endsWith('.ts') || /\.(?:spec|test|d)\.ts$/.test(path)) return undefined;
+  if (!/^packages\/[^/]+\/src\//.test(path) || !dirs.includes('components')) return undefined;
+  const afterComponents = dirs.slice(dirs.lastIndexOf('components') + 1);
+  return afterComponents[0] === 'ui'
+    ? undefined
+    : { rule: 'N9', path, message: 'components/ holds .vue files only; move to lib/' };
+}
+
+/** N10: a `.vue` over 600 lines is split, or is a named engine host / app shell. */
+export function oversizeVueHit(path: string, source: string): Hit | undefined {
+  if (!path.endsWith('.vue')) return undefined;
+  const lines = source.split('\n').length;
+  if (lines <= MAX_VUE_LINES) return undefined;
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  if (OVERSIZE_VUE_OK.has(name) || OVERSIZE_VUE_OK.has(path)) return undefined;
+  return { rule: 'N10', path, message: `${lines} lines; split it (limit ${MAX_VUE_LINES})` };
+}
+
+/**
+ * N11: a menu item's printed shortcut is bound on that surface. `featureSources` is every non-spec
+ * `.ts`/`.vue` source under the menu's directory; `scopes` maps shortcut id to scope.
+ */
+export function menuShortcutHits(
+  menuPath: string,
+  menuSource: string,
+  featureSources: readonly string[],
+  scopes: ReadonlyMap<string, string>,
+): Hit[] {
+  const ids = new Set([...menuSource.matchAll(/\bshortcut:\s*'([^']+)'/g)].map((m) => m[1] ?? ''));
+  const binders = featureSources.filter((src) => /\b(?:useShortcut|shortcutFor)\(/.test(src));
+  const treeBound = featureSources.some((src) => /\buseTreeShortcuts\(/.test(src));
+  const hits: Hit[] = [];
+  for (const id of ids) {
+    if (scopes.get(id) === 'global' || ENGINE_BOUND_SHORTCUTS.has(id)) continue;
+    if (id.startsWith('tree.') && treeBound) continue;
+    if (binders.some((src) => src.includes(`'${id}'`))) continue;
+    hits.push({
+      rule: 'N11',
+      path: menuPath,
+      message: `shortcut '${id}' is printed but no useShortcut/shortcutFor/useTreeShortcuts binds it in this feature dir`,
+    });
+  }
+  return hits;
+}
+
+/** N12: a state dir needs 2+ files (one file is `state.ts`); menu builders are `menu.ts`. */
+export function stateAndMenuNameHits(paths: readonly string[]): Hit[] {
+  const hits: Hit[] = [];
+  const stateFiles = new Map<string, number>();
+  for (const path of paths) {
+    const parts = path.split('/');
+    const name = parts.at(-1) ?? '';
+    if (!/\.(?:ts|vue)$/.test(name) || /\.(?:spec|test|d)\.ts$/.test(name)) continue;
+    if (parts.at(-2) === 'state') {
+      const dir = parts.slice(0, -1).join('/');
+      stateFiles.set(dir, (stateFiles.get(dir) ?? 0) + 1);
+    }
+    if (/^(?:menus|menuItems)\.ts$|[a-z]Menu\.ts$/.test(name) && !name.startsWith('use')) {
+      hits.push({ rule: 'N12', path, message: 'menu builder file must be named menu.ts' });
+    }
+  }
+  for (const [dir, count] of stateFiles) {
+    if (count < 2)
+      hits.push({ rule: 'N12', path: dir, message: 'a one-file state dir is state.ts' });
+  }
+  return hits;
+}
+
+function walk(root: string, skip: ReadonlySet<string> = SKIP_DIR): string[] {
   const out: string[] = [];
   const base = join(REPO_ROOT, root);
   if (!existsSync(base)) return out;
   for (const rel of readdirSync(base, { recursive: true, encoding: 'utf8' })) {
-    if (rel.split('/').some((seg) => SKIP_DIR.has(seg))) continue;
+    if (rel.split('/').some((seg) => skip.has(seg))) continue;
     out.push(`${root}/${rel}`);
   }
   return out.sort();
 }
 
+function readAll(paths: readonly string[]): Map<string, string> {
+  return new Map(paths.map((p) => [p, readFileSync(join(REPO_ROOT, p), 'utf8')]));
+}
+
+function specHits(): Hit[] {
+  const specPaths = SPEC_ROOTS.flatMap((root) =>
+    walk(root, new Set(['node_modules'])).filter((p) => p.endsWith('.spec.ts')),
+  );
+  const supportPaths = SUPPORT_ROOTS.flatMap((root) =>
+    walk(root, new Set(['node_modules'])).filter(
+      (p) => p.endsWith('.ts') && !p.endsWith('.spec.ts'),
+    ),
+  );
+  return specHelperHits(readAll(specPaths), readAll(supportPaths));
+}
+
+function menuHits(allPaths: readonly string[]): Hit[] {
+  const scopes = new Map(
+    [
+      ...readFileSync(join(REPO_ROOT, SHORTCUTS_PATH), 'utf8').matchAll(
+        /'([\w.]+)':\s*\{\s*scope:\s*'(\w+)'/g,
+      ),
+    ].map((m) => [m[1] ?? '', m[2] ?? ''] as const),
+  );
+  const hits: Hit[] = [];
+  for (const menuPath of allPaths.filter((p) => p.endsWith('/menu.ts'))) {
+    if (!MENU_ROOTS.some((r) => menuPath.startsWith(`${r}/`))) continue;
+    const dir = menuPath.slice(0, menuPath.lastIndexOf('/') + 1);
+    const sources = allPaths
+      .filter((p) => p.startsWith(dir) && !/\.(?:spec|test)\.ts$/.test(p))
+      .map((p) => readFileSync(join(REPO_ROOT, p), 'utf8'));
+    hits.push(
+      ...menuShortcutHits(
+        menuPath,
+        readFileSync(join(REPO_ROOT, menuPath), 'utf8'),
+        sources,
+        scopes,
+      ),
+    );
+  }
+  return hits;
+}
+
+function fileHits(path: string, dirs: Set<string>): Hit[] {
+  const hits: Hit[] = [];
+  const read = (): string => readFileSync(join(REPO_ROOT, path), 'utf8');
+  const componentsHit = componentsTsHit(path);
+  if (componentsHit) hits.push(componentsHit);
+  const big = path.endsWith('.vue') ? oversizeVueHit(path, read()) : undefined;
+  if (big) hits.push(big);
+  const nameHit = fileNameHit(path);
+  if (nameHit) hits.push(nameHit);
+  const suffixHit = testSuffixHit(path);
+  if (suffixHit) hits.push(suffixHit);
+  for (const h of folderHits(path)) dirs.add(JSON.stringify(h));
+  if (path.endsWith('.ts') && !/\.(?:spec|test)\.ts$/.test(path))
+    hits.push(...piniaHits(path, read()));
+  return hits;
+}
+
 function collectHits(): Hit[] {
   const hits: Hit[] = [];
   const dirs = new Set<string>();
+  const allPaths: string[] = [];
   for (const root of SOURCE_ROOTS) {
     for (const path of walk(root)) {
       if (!/\.(?:vue|ts)$/.test(path)) continue;
-      const nameHit = fileNameHit(path);
-      if (nameHit) hits.push(nameHit);
-      const suffixHit = testSuffixHit(path);
-      if (suffixHit) hits.push(suffixHit);
-      for (const h of folderHits(path)) dirs.add(JSON.stringify(h));
-      if (path.endsWith('.ts') && !/\.(?:spec|test)\.ts$/.test(path)) {
-        hits.push(...piniaHits(path, readFileSync(join(REPO_ROOT, path), 'utf8')));
-      }
+      allPaths.push(path);
+      hits.push(...fileHits(path, dirs));
     }
   }
   for (const d of dirs) hits.push(JSON.parse(d) as Hit);
+  hits.push(
+    ...stateAndMenuNameHits(allPaths.filter((p) => MENU_ROOTS.some((r) => p.startsWith(`${r}/`)))),
+  );
+  hits.push(...specHits());
+  hits.push(...menuHits(allPaths));
   for (const { path, literal } of EVENT_FILES) {
     hits.push(...eventHits(path, readFileSync(join(REPO_ROOT, path), 'utf8'), literal));
   }
@@ -231,11 +482,11 @@ function main(): number {
   for (const h of hits) console.error(`check-conventions: ${h.path}: ${h.rule} ${h.message}`);
   if (hits.length > 0) {
     console.error(
-      `check-conventions: ${hits.length} hit(s); see docs/v2.2/plans/P266-consistency-audit.md section 2.10`,
+      `check-conventions: ${hits.length} hit(s); see docs/v2.2/plans/P266-consistency-audit.md section 2.10 and P267-ui-leftovers.md section 3`,
     );
     return 1;
   }
-  console.log('check-conventions: every convention holds (N1-N7).');
+  console.log('check-conventions: every convention holds (N1-N12).');
   return 0;
 }
 
