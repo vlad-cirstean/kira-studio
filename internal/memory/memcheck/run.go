@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/renameio/v2"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
@@ -116,11 +117,7 @@ func installHook(ctx context.Context, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "memory-check:", err)
 		return 2
 	}
-	if err := os.WriteFile(path, []byte(hookScript(exe)), 0o755); err != nil { //nolint:gosec // a hook must be executable
-		fmt.Fprintln(stderr, "memory-check:", err)
-		return 2
-	}
-	if err := os.Chmod(path, 0o755); err != nil { //nolint:gosec // a hook must be executable
+	if err := renameio.WriteFile(path, []byte(hookScript(exe)), 0o755); err != nil { //nolint:gosec // a hook must be executable
 		fmt.Fprintln(stderr, "memory-check:", err)
 		return 2
 	}
