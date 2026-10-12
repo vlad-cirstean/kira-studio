@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"strings"
 	"testing"
@@ -18,7 +19,7 @@ type fakeRunner struct {
 
 func (f *fakeRunner) Run(_ context.Context, c Call) (json.RawMessage, error) {
 	kind := "reconcile"
-	if c.System == gatePrompt {
+	if c.System == llmprompts.MemoryGateSystem.Text(llmprompts.Defaults(), llmprompts.GateVars{MaxKeywords: MaxKeywords}) {
 		kind = "gate"
 	}
 	f.calls = append(f.calls, kind)

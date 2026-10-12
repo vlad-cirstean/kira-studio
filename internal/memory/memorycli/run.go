@@ -13,13 +13,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/mcpserver"
 )
 
-// Run returns the process exit code. Diagnostics go to stderr: stdout is the protocol.
-func Run(args []string) int {
+// Run returns the process exit code. promptsPath is the app's llm-prompts.json: the gate, reconcile
+// and server texts it overrides apply here too. Diagnostics go to stderr: stdout is the protocol.
+func Run(args []string, promptsPath string) int {
 	fs := flag.NewFlagSet("memory-mcp", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	importRef := fs.String("import-ref", "", "attribute every stored memory to this bulk-import file id")
@@ -39,9 +41,13 @@ func Run(args []string) int {
 	store := memory.OpenDefault()
 	defer store.Close()
 	embedder := embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home()})
-	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{Embedder: embedder})
+	var prompts llmprompts.Source = llmprompts.Defaults()
+	if promptsPath != "" {
+		prompts = llmprompts.NewStore(promptsPath)
+	}
+	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
 	defer svc.Close()
-	if err := mcpserver.RunStdio(ctx, svc, mcpserver.Options{ImportRef: *importRef}); err != nil && ctx.Err() == nil {
+	if err := mcpserver.RunStdio(ctx, svc, mcpserver.Options{ImportRef: *importRef, Prompts: prompts}); err != nil && ctx.Err() == nil {
 		fmt.Fprintln(os.Stderr, "kira-memory:", err)
 		return 1
 	}

@@ -12,29 +12,22 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
 const serverVersion = "1"
 
-const instructions = `Long-term memory for the user and their agents.
-
-Store a memory when the user states a durable fact, or when you learn one worth keeping across sessions, with the reason it is true. Call store_memory with one item per fact; set author to "user" when the user said it and "agent" when you concluded it. Never store secrets.
-
-store_memory challenges an item that is ambiguous, has no real reason or does not make sense. A challenge stores nothing: ask the user the returned questions, or fix the item yourself, then call store_memory again with the revised items and the answers in "clarifications".
-
-search_memories is recall-oriented: it matches words and meaning, and returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.`
-
 type storeInput struct {
-	Items          []memory.Item          `json:"items" jsonschema:"facts to store, 1 to 20; each with its reason"`
-	Author         string                 `json:"author" jsonschema:"user when the user stated the facts, agent when the agent concluded them"`
-	Clarifications []memory.Clarification `json:"clarifications,omitempty" jsonschema:"question and answer pairs resolving an earlier challenge"`
+	Items          []memory.Item          `json:"items"`
+	Author         string                 `json:"author"`
+	Clarifications []memory.Clarification `json:"clarifications,omitempty"`
 }
 
 type searchInput struct {
-	Query          string `json:"query" jsonschema:"free text; matched by words (prefixes, word forms) and by meaning"`
-	IncludeHistory bool   `json:"includeHistory,omitempty" jsonschema:"also return superseded versions, flagged historical"`
-	Limit          int    `json:"limit,omitempty" jsonschema:"maximum results, default 25, maximum 100"`
+	Query          string `json:"query"`
+	IncludeHistory bool   `json:"includeHistory,omitempty"`
+	Limit          int    `json:"limit,omitempty"`
 }
 
 type searchOutput struct {
@@ -44,7 +37,7 @@ type searchOutput struct {
 }
 
 type historyInput struct {
-	ID string `json:"id" jsonschema:"id of any version of the memory"`
+	ID string `json:"id"`
 }
 
 // Options tune a server instance.
@@ -52,24 +45,37 @@ type Options struct {
 	// ImportRef puts the server in import mode: every stored memory is attributed to the agent with
 	// source "import" and this import file id, whatever author the caller sends.
 	ImportRef string
+	// Prompts resolves the texts the server shows; nil means the registry defaults. Instructions,
+	// tool and argument descriptions are read once here, so an edit reaches the next session.
+	Prompts llmprompts.Source
 }
 
 // Build registers the tools and the prompt. Pure registration: no I/O.
 func Build(svc *memory.Service, opts Options) *mcp.Server {
+	if opts.Prompts == nil {
+		opts.Prompts = llmprompts.Defaults()
+	}
+	src := opts.Prompts
 	srv := mcp.NewServer(&mcp.Implementation{Name: "kira-memory", Title: "Kira memory", Version: serverVersion},
-		&mcp.ServerOptions{Instructions: instructions})
+		&mcp.ServerOptions{Instructions: llmprompts.MemoryMcpInstructions.Text(src, llmprompts.NoVars{})})
 
 	f := false
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "store_memory",
-		Description: "Store one or more facts, each with its reason. Every item is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored updates it; the old version stays as history.",
+		Description: llmprompts.MemoryToolStoreMemory.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[storeInput](src, llmprompts.MemoryToolStoreMemory.ID(), map[string]any{
+			"items": llmprompts.MaxVars{Max: memory.MaxItems},
+		}),
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: false},
 	}, recovering("store_memory", func(ctx context.Context, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
 		return storeMemory(ctx, svc, opts, req, in)
 	}))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "search_memories",
-		Description: "Search stored memories by keyword and by meaning. Recall-oriented: returns loosely related results, best first. Superseded versions are included only with includeHistory and are flagged historical.",
+		Description: llmprompts.MemoryToolSearchMemories.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[searchInput](src, llmprompts.MemoryToolSearchMemories.ID(), map[string]any{
+			"limit": llmprompts.LimitVars{Default: memory.DefaultSearchLimit, Max: memory.MaxSearchLimit},
+		}),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("search_memories", func(ctx context.Context, _ *mcp.CallToolRequest, in searchInput) (*mcp.CallToolResult, searchOutput, error) {
 		ms, err := svc.Search(ctx, memory.SearchArgs{Query: in.Query, IncludeHistory: in.IncludeHistory, Limit: in.Limit})
@@ -80,12 +86,13 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 		if err != nil {
 			st = memory.SemanticStatus{State: memory.SemanticUnavailable, Message: err.Error()}
 		}
-		text := renderMemories(ms) + semanticNote(st)
+		text := renderMemories(ms) + semanticNote(src, st)
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, searchOutput{Memories: ms, Semantic: st.State}, nil
 	}))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "memory_history",
-		Description: "Return every version of one memory, oldest first, each flagged historical when replaced, with the events that explain each change.",
+		Description: llmprompts.MemoryToolMemoryHistory.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[historyInput](src, llmprompts.MemoryToolMemoryHistory.ID(), nil),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("memory_history", func(ctx context.Context, _ *mcp.CallToolRequest, in historyInput) (*mcp.CallToolResult, memory.History, error) {
 		h, err := svc.History(ctx, in.ID)
@@ -98,28 +105,23 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 	srv.AddPrompt(&mcp.Prompt{
 		Name:        "remember",
 		Title:       "Remember",
-		Description: "Store the durable facts from some text or from this conversation in long-term memory.",
-		Arguments:   []*mcp.PromptArgument{{Name: "text", Description: "What to remember; defaults to the recent conversation"}},
+		Description: llmprompts.MemoryRememberDescription.Text(src, llmprompts.NoVars{}),
+		Arguments: []*mcp.PromptArgument{{Name: "text", Description: llmprompts.Render(src,
+			llmprompts.ID(string(llmprompts.MemoryRememberDescription.ID())+".arg.text"), llmprompts.NoVars{})}},
 	}, func(_ context.Context, r *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		return &mcp.GetPromptResult{Messages: []*mcp.PromptMessage{{
 			Role:    "user",
-			Content: &mcp.TextContent{Text: rememberText(r.Params.Arguments["text"])},
+			Content: &mcp.TextContent{Text: rememberText(src, r.Params.Arguments["text"])},
 		}}}, nil
 	})
 	return srv
 }
 
-func rememberText(text string) string {
-	source := "the recent conversation"
-	if strings.TrimSpace(text) != "" {
-		source = "the text below"
+func rememberText(src llmprompts.Source, text string) string {
+	if strings.TrimSpace(text) == "" {
+		text = ""
 	}
-	out := "Extract the durable facts from " + source + ", each with the reason it is true, and store them with the store_memory tool (author \"user\" for what the user stated, \"agent\" for what you concluded). " +
-		"If store_memory returns questions, ask the user those questions, then call it again with the revised items and the answers as clarifications. Report what was stored."
-	if strings.TrimSpace(text) != "" {
-		out += "\n\n" + text
-	}
-	return out
+	return llmprompts.MemoryRememberMessage.Text(src, llmprompts.RememberVars{Text: text})
 }
 
 func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
@@ -140,13 +142,13 @@ func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mc
 	if err != nil {
 		return nil, memory.StoreResult{}, err
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderStore(res)}}}, res, nil
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderStore(opts.Prompts, res)}}}, res, nil
 }
 
-func renderStore(res memory.StoreResult) string {
+func renderStore(src llmprompts.Source, res memory.StoreResult) string {
 	var b strings.Builder
 	if res.Status == "challenged" {
-		b.WriteString("Nothing was stored. Ask the user these, or fix the items, then call store_memory again with clarifications:\n")
+		b.WriteString(llmprompts.MemoryStoreChallenged.Text(src, llmprompts.NoVars{}) + "\n")
 		n := 0
 		for _, c := range res.Challenges {
 			for _, q := range c.Questions {
@@ -191,12 +193,12 @@ func renderMemories(ms []memory.Memory) string {
 
 // semanticNote tells the agent when results are keyword-only, so it can say so instead of
 // trusting an empty list. Off, indexing and ready add nothing.
-func semanticNote(st memory.SemanticStatus) string {
+func semanticNote(src llmprompts.Source, st memory.SemanticStatus) string {
 	switch st.State {
 	case memory.SemanticNotInstalled:
-		return "\nNote: semantic search is not installed. Results are keyword matches only. Enable it in Kira Space, Memory, Download model.\n"
+		return "\n" + llmprompts.MemorySemanticNotInstalled.Text(src, llmprompts.NoVars{}) + "\n"
 	case memory.SemanticUnavailable:
-		return fmt.Sprintf("\nNote: semantic search is unavailable: %s. Results are keyword matches only.\n", st.Message)
+		return "\n" + llmprompts.MemorySemanticUnavailable.Text(src, llmprompts.CauseVars{Cause: st.Message}) + "\n"
 	}
 	return ""
 }

@@ -6,19 +6,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
-
-const reconcilePrompt = `You reconcile new facts against a long-term memory store. Output only the schema.
-
-` + dataHygiene + `
-
-Input: "facts", each with its "candidates": existing memories found by a loose, recall-first search. Most candidates are unrelated.
-
-For each fact choose exactly one action:
-- "noop" with "target": a candidate already states the same fact and its reason already covers the new one.
-- "update" with "target": a candidate is about the same subject and the new fact replaces, corrects or refines it, or adds to its reason. Return the full new "fact" and a merged "reason". The old memory stays as history.
-- "add": no candidate is about the same subject. Two facts on related topics that are both true are two memories, not an update.
-"why" is one sentence explaining the choice. "target" is "" for add. For noop copy the new fact and reason into "fact" and "reason". Answer every fact index exactly once.`
 
 const reconcileSchema = `{
   "type": "object", "additionalProperties": false, "required": ["decisions"],
@@ -170,7 +160,7 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 	if err != nil {
 		return fmt.Errorf("memory: encode reconcile input: %w", err)
 	}
-	raw, err := s.runner.Run(ctx, Call{System: reconcilePrompt, Input: string(body), Schema: []byte(reconcileSchema)})
+	raw, err := s.runner.Run(ctx, Call{System: llmprompts.MemoryReconcileSystem.Text(s.opts.Prompts, llmprompts.NoVars{}), Input: string(body), Schema: []byte(reconcileSchema)})
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
@@ -47,6 +48,7 @@ type MemoryMcpInstaller interface {
 type MemoryService struct {
 	events    appcore.Emitter
 	installer MemoryMcpInstaller
+	prompts   llmprompts.Source
 
 	mu        sync.Mutex
 	svc       *memory.Service
@@ -67,8 +69,8 @@ type MemoryService struct {
 	engine         *importer.Engine
 }
 
-func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller) *MemoryService {
-	s := &MemoryService{events: events, installer: installer}
+func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source) *MemoryService {
+	s := &MemoryService{events: events, installer: installer, prompts: prompts}
 	s.semanticEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemorySemantic, struct{}{}) })
 	s.importEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemoryImport, struct{}{}) })
 	return s
@@ -83,7 +85,7 @@ func (s *MemoryService) service() *memory.Service {
 	s.store = memory.OpenDefault()
 	s.embedder = embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home(), OnState: s.emitSemantic})
 	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{
-		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic,
+		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic, Prompts: s.prompts,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	s.stopWatch = cancel
@@ -112,7 +114,7 @@ func (s *MemoryService) importer() (*importer.Engine, error) {
 		return nil, err
 	}
 	s.engine, err = importer.Open(s.store, importer.Options{
-		Agent:    importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home()},
+		Agent:    importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(), Prompts: s.prompts},
 		OnChange: s.emitImport,
 	})
 	return s.engine, err

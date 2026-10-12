@@ -11,10 +11,14 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 const (
-	maxItems          = 20
+	maxItems = 20
+	// MaxItems is the most facts one store call takes; the MCP tool description states it.
+	MaxItems          = maxItems
 	maxClarifications = 10
 	maxClarifyLen     = 1000
 	maxPipelines      = 2
@@ -89,10 +93,15 @@ type ServiceOptions struct {
 	OnChange func()
 	// OnSemantic runs when embedding progress changes (a backfill batch landed).
 	OnSemantic func()
+	// Prompts resolves the gate and reconcile prompts; nil means the registry defaults.
+	Prompts llmprompts.Source
 }
 
 func NewService(store *Store, runner Runner, opts ServiceOptions) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
+	if opts.Prompts == nil {
+		opts.Prompts = llmprompts.Defaults()
+	}
 	return &Service{store: store, runner: runner, sem: semaphore.NewWeighted(maxPipelines), opts: opts, ctx: ctx, cancel: cancel}
 }
 

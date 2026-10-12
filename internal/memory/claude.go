@@ -45,9 +45,6 @@ type Call struct {
 	Budget       string        // --max-budget-usd; empty means claudeCallBudget
 }
 
-// DataHygiene is the untrusted-input paragraph every prompt that reads user documents carries.
-const DataHygiene = dataHygiene
-
 // Runner runs one Call and returns the structured_output object.
 type Runner interface {
 	Run(ctx context.Context, c Call) (json.RawMessage, error)

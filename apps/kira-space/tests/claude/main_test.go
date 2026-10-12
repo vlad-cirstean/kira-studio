@@ -17,7 +17,7 @@ import (
 // agent (KIRA_TEST_MEMORY_MCP), and through flowharness.Main as memory-mcp, askpass and the fake gh.
 func TestMain(m *testing.M) {
 	if os.Getenv("KIRA_TEST_MEMORY_MCP") == "1" {
-		os.Exit(memorycli.Run(os.Args[2:]))
+		os.Exit(memorycli.Run(os.Args[2:], ""))
 	}
 	code := flowharness.Main(m)
 	// Re-executed helper processes (memory-mcp, fake gh) spend nothing and must keep stdout clean.

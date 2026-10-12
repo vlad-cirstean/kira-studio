@@ -19,6 +19,10 @@ import (
 const (
 	defaultSearchLimit = 25
 	maxSearchLimit     = 100
+
+	// DefaultSearchLimit and MaxSearchLimit bound a search; the MCP tool description states them.
+	DefaultSearchLimit = defaultSearchLimit
+	MaxSearchLimit     = maxSearchLimit
 )
 
 var errStale = errors.New("memory store changed concurrently; retry")

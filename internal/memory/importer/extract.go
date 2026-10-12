@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
@@ -16,22 +17,6 @@ const (
 	extractTimeout   = 180 * time.Second
 	extractBudget    = "0.50"
 )
-
-const extractPrompt = `You extract durable facts from one chunk of a document for a developer's long-term memory. Output only the schema.
-
-` + memory.DataHygiene + `
-
-Input: "document" (path, title), "chunk" (index, count, headingPath), "context" and "text".
-"text" is the only source of facts. "context" is the end of the previous chunk: read it to understand references, never extract a fact from it.
-
-Extract atomic facts:
-- One claim per fact, written as one complete sentence of at most 300 characters.
-- Keep durable knowledge only: decisions and the reasons for them, conventions, configuration and names, ownership, relationships between components, constraints, how things work.
-- Skip navigation, tables of contents, boilerplate, licence text, examples copied verbatim, step-by-step commands and time-bound chatter.
-- Make a fact standalone only where the text itself makes its subject certain: name the service instead of "it" when the text names it. When the text leaves the subject or a reference open, keep the original wording and say what is missing in "unresolved" (for example: which service "it" means). Leave "unresolved" empty otherwise.
-- Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
-- "evidence" quotes the supporting words from "text", at most 200 characters. "section" is the heading path of the chunk.
-- At most 40 facts. Return none when the chunk holds nothing durable.`
 
 const extractSchema = `{
   "type": "object", "additionalProperties": false, "required": ["facts"],
@@ -70,6 +55,15 @@ type ClaudeAgent struct {
 	Home       string
 	// Env is extra environment for that server (tests only).
 	Env map[string]string
+	// Prompts resolves the extract and finalize prompts; nil means the registry defaults.
+	Prompts llmprompts.Source
+}
+
+func (a ClaudeAgent) prompts() llmprompts.Source {
+	if a.Prompts == nil {
+		return llmprompts.Defaults()
+	}
+	return a.Prompts
 }
 
 func (a ClaudeAgent) Available() error { return a.Runner.Available() }
@@ -84,7 +78,7 @@ func (a ClaudeAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutpu
 		return ExtractOutput{}, err
 	}
 	res, err := a.Runner.RunResult(ctx, memory.Call{
-		System: extractPrompt, Input: string(input), Schema: json.RawMessage(extractSchema),
+		System: llmprompts.MemoryImportExtractSystem.Text(a.prompts(), llmprompts.ExtractVars{MaxFacts: maxFactsPerChunk, MaxEvidence: maxEvidenceLen}), Input: string(input), Schema: json.RawMessage(extractSchema),
 		Timeout: extractTimeout, Budget: extractBudget,
 	})
 	out := ExtractOutput{CostUSD: res.CostUSD}

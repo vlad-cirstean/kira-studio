@@ -52,7 +52,7 @@ func RunArgvShim(args []string) (code int, ok bool) {
 	case "askpass":
 		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
 	case "memory-mcp":
-		return memorycli.Run(args[2:]), true
+		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json")), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
 	}
