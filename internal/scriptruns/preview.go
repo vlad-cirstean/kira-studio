@@ -174,10 +174,10 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 		return nil, err
 	}
 	pv.Prompt = scripts.Compose(body, rendered)
-	pv.Suffix = claudeheadless.ScriptReportSuffix
+	pv.Suffix = claudeheadless.ScriptReport(s.llmPrompts())
 	extra := []string{claudeheadless.FinishStepTool}
 	if args.TaskID != "" {
-		pv.Suffix = claudeheadless.SpaceSuffix + "\n\n" + pv.Suffix
+		pv.Suffix = claudeheadless.SpaceNote(s.llmPrompts()) + "\n\n" + pv.Suffix
 		extra = append(append(extra, claudeheadless.RunOutcomeTool), claudeheadless.SpaceToolNames...)
 	}
 	p.sent = scripts.PlainText(pv.Prompt) + "\n\n" + pv.Suffix

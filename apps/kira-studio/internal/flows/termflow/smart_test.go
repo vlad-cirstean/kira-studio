@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -167,7 +168,7 @@ func TestSmartScript(t *testing.T) {
 		if vars["topic"] != "the build" || vars["level"] != "low" || len(vars) != 2 {
 			t.Fatalf("vars = %v, want topic and level only (branch has no value without a task)", vars)
 		}
-		if len(pv.Env) != 2 || pv.Env[0].Name != "KIRA_PARAM_TOPIC" || pv.Env[0].Value != "the build" || pv.Suffix != claudeheadless.ScriptReportSuffix {
+		if len(pv.Env) != 2 || pv.Env[0].Name != "KIRA_PARAM_TOPIC" || pv.Env[0].Value != "the build" || pv.Suffix != claudeheadless.ScriptReport(llmprompts.Defaults()) {
 			t.Fatalf("env = %+v, suffix = %q", pv.Env, pv.Suffix)
 		}
 		if _, err := app.W.ScriptRuns.Preview(scriptruns.RunArgs{ScriptID: rec.ID, Params: map[string][]string{"topic": {"x"}, "level": {"extreme"}}}); err == nil ||
@@ -235,7 +236,7 @@ func TestSmartScript(t *testing.T) {
 		if strings.Contains(argv, "json-schema") {
 			t.Errorf("argv carries --json-schema:\n%s", argv)
 		}
-		if got, want := callFile(t, app, 1, ".prompt"), scripts.PlainText(pv.Prompt)+"\n\n"+claudeheadless.ScriptReportSuffix; got != want || done.Prompt != want {
+		if got, want := callFile(t, app, 1, ".prompt"), scripts.PlainText(pv.Prompt)+"\n\n"+claudeheadless.ScriptReport(llmprompts.Defaults()); got != want || done.Prompt != want {
 			t.Errorf("prompt sent = %q, stored %q, want %q", got, done.Prompt, want)
 		}
 		if got := callFile(t, app, 1, ".env"); got != strconv.Quote("KIRA_PARAM_TOPIC=cats") {
@@ -398,7 +399,7 @@ func TestSmartScript(t *testing.T) {
 		args.Prompt = &oneOff
 		id, pv := startSmart(t, app, args)
 		waitSmart(t, app, id, "done")
-		if got, want := callFile(t, app, 1, ".prompt"), "one-off for x\n\n"+claudeheadless.ScriptReportSuffix; got != want {
+		if got, want := callFile(t, app, 1, ".prompt"), "one-off for x\n\n"+claudeheadless.ScriptReport(llmprompts.Defaults()); got != want {
 			t.Errorf("prompt = %q, want %q", got, want)
 		}
 		if pv.Body != "changed {topic}" {
@@ -440,7 +441,7 @@ func TestSmartScript(t *testing.T) {
 			} else if got := normalised(n); got != plain {
 				t.Errorf("argv for %q differs from a plain run:\n%s\nvs\n%s", v, got, plain)
 			}
-			if got, want := callFile(t, app, n, ".prompt"), scripts.PlainText(pv.Prompt)+"\n\n"+claudeheadless.ScriptReportSuffix; got != want {
+			if got, want := callFile(t, app, n, ".prompt"), scripts.PlainText(pv.Prompt)+"\n\n"+claudeheadless.ScriptReport(llmprompts.Defaults()); got != want {
 				t.Errorf("stdin for %q = %q, want the preview %q", v, got, want)
 			}
 			if got := callFile(t, app, n, ".env"); got != strconv.Quote("KIRA_PARAM_TOPIC="+v) {

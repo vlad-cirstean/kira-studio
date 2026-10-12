@@ -173,7 +173,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 		Emit:         func(r scriptruns.Run) { deps.Events.Emit(bridge.ChannelScriptRunsChanged, r) },
 		EmitLog:      func(p scriptruns.LogPush) { deps.Events.Emit(bridge.ChannelScriptRunLog, p) },
 		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout,
-		Prompts: promptRouter,
+		Prompts: promptRouter, LlmPrompts: deps.Prompts,
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now

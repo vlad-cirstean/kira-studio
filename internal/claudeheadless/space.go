@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // SpaceToolNames are the allowed-tools names of the Kira Space tools; the headless run and a TUI
@@ -19,9 +21,6 @@ var SpaceToolNames = []string{
 }
 
 const (
-	spaceInstructions = "Kira Space tools for this task. Call task_info first. Declare the repos the work touches with " +
-		"declare_repos before branching. Create branches only with request_branch, never with git branch or git worktree. " +
-		"A new worktree may still be preparing: call branch_status (it can wait) before editing in it."
 	maxDeclareRepos = 20
 	maxWaitSeconds  = 600
 )
@@ -84,17 +83,17 @@ type SpaceTools interface {
 }
 
 type declareArgs struct {
-	Repos []string `json:"repos" jsonschema:"Repos to add to the task: nickname, name or code repo id from task_info registered. 1 to 20."`
+	Repos []string `json:"repos"`
 }
 
 type requestBranchArgs struct {
-	Repo string `json:"repo" jsonschema:"A repo on the task: nickname, name or code repo id."`
-	Name string `json:"name" jsonschema:"The branch name to create, for example feat/login-form."`
+	Repo string `json:"repo"`
+	Name string `json:"name"`
 }
 
 type branchStatusArgs struct {
-	Repo        string `json:"repo" jsonschema:"A repo on the task: nickname, name or code repo id."`
-	WaitSeconds int    `json:"waitSeconds,omitempty" jsonschema:"Seconds to wait for the worktree setup to finish, 0 to 600. Default 0."`
+	Repo        string `json:"repo"`
+	WaitSeconds int    `json:"waitSeconds,omitempty"`
 }
 
 type noArgs struct{}
@@ -125,7 +124,7 @@ func fail(tool string, err error) *mcp.CallToolResult {
 func (s *Server) addSpaceTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "task_info",
-		Description: "The Kira Space task you work on: title, Jira key, workflow, stage, the repos and branches it has, and the repos registered in Kira Space.",
+		Description: llmprompts.HeadlessToolTaskInfo.Text(s.prompts, llmprompts.NoVars{}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noArgs) (*mcp.CallToolResult, TaskInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {
@@ -138,9 +137,11 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 		return nil, info, nil
 	})
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "declare_repos",
-		Description: "Add repos to the task. Only repos registered in Kira Space can be added; an unknown repo is refused, " +
-			"ask the user to import it from the Git module. Never removes a repo.",
+		Name:        "declare_repos",
+		Description: llmprompts.HeadlessToolDeclareRepos.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[declareArgs](s.prompts, llmprompts.HeadlessToolDeclareRepos.ID(), map[string]any{
+			"repos": llmprompts.MaxVars{Max: maxDeclareRepos},
+		}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args declareArgs) (*mcp.CallToolResult, TaskInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {
@@ -156,9 +157,9 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 		return nil, info, nil
 	})
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "request_branch",
-		Description: "Create a branch and its worktree for a repo of the task. Returns at once: the worktree's prepare script may " +
-			"still be running, so call branch_status before working there.",
+		Name:        "request_branch",
+		Description: llmprompts.HeadlessToolRequestBranch.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[requestBranchArgs](s.prompts, llmprompts.HeadlessToolRequestBranch.ID(), nil),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args requestBranchArgs) (*mcp.CallToolResult, BranchInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {
@@ -172,7 +173,10 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 	})
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "branch_status",
-		Description: "The worktree and setup state of a branch of the task. With waitSeconds, waits until the setup is no longer running.",
+		Description: llmprompts.HeadlessToolBranchStatus.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[branchStatusArgs](s.prompts, llmprompts.HeadlessToolBranchStatus.ID(), map[string]any{
+			"waitSeconds": llmprompts.MaxVars{Max: maxWaitSeconds},
+		}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args branchStatusArgs) (*mcp.CallToolResult, BranchInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {

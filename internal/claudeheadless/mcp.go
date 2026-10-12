@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/google/renameio/v2"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/tokenauth"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -102,6 +103,7 @@ type Server struct {
 	onFinish FinishFunc
 	space    SpaceTools
 	outcomes Outcomes
+	prompts  llmprompts.Source
 
 	mu     sync.Mutex
 	seq    uint64
@@ -109,6 +111,9 @@ type Server struct {
 	ln     net.Listener
 	srv    *http.Server
 	closed bool
+	// shared holds the per-flags servers of the revision sharedRev; a prompt edit rebuilds them.
+	shared    map[[4]bool]*mcp.Server
+	sharedRev uint64
 }
 
 // Options configure a Server. Space may be nil: a Space grant is then refused. Outcomes may be nil:
@@ -118,20 +123,25 @@ type Options struct {
 	OnFinish FinishFunc
 	Space    SpaceTools
 	Outcomes Outcomes
+	// Prompts resolves tool and instruction texts; nil means the registry defaults.
+	Prompts llmprompts.Source
 }
 
 // NewServer returns a stopped Server; config files go in o.Dir (created 0700).
 func NewServer(o Options) *Server {
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes}
+	if o.Prompts == nil {
+		o.Prompts = llmprompts.Defaults()
+	}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, prompts: o.Prompts}
 }
 
 type finishArgs struct {
-	Status          string   `json:"status" jsonschema:"done when the step is complete, failed when it could not be completed, needs_input when a decision from the user is needed."`
-	Summary         string   `json:"summary" jsonschema:"One line: what was done, what failed, or the question for the user."`
-	Reason          string   `json:"reason,omitempty" jsonschema:"Why it failed, or what you need. Give it when status is failed or needs_input."`
-	ConflictedFiles []string `json:"conflictedFiles,omitempty" jsonschema:"Files that still conflict, relative to the repo."`
-	LastGitError    string   `json:"lastGitError,omitempty" jsonschema:"The last git error output you saw."`
-	Tried           string   `json:"tried,omitempty" jsonschema:"What you tried before giving up."`
+	Status          string   `json:"status"`
+	Summary         string   `json:"summary"`
+	Reason          string   `json:"reason,omitempty"`
+	ConflictedFiles []string `json:"conflictedFiles,omitempty"`
+	LastGitError    string   `json:"lastGitError,omitempty"`
+	Tried           string   `json:"tried,omitempty"`
 }
 
 // checkFinish bounds the call's text fields; the error names the field.
@@ -167,30 +177,14 @@ func statusIDs(results []ResultSpec) []string {
 }
 
 // finishSchema is finish_step's input schema with status restricted to the run's results.
-func finishSchema(results []ResultSpec) (*jsonschema.Schema, error) {
-	sch, err := jsonschema.For[finishArgs](nil)
-	if err != nil {
-		return nil, err
-	}
+func (s *Server) finishSchema(results []ResultSpec) (*jsonschema.Schema, error) {
+	sch := llmprompts.InputSchema[finishArgs](s.prompts, llmprompts.HeadlessToolFinishStep.ID(), map[string]any{
+		"status": llmprompts.StatusVars{Results: FinishVars(resultsOrImplicit(results)).Results},
+	})
 	status := sch.Properties["status"]
 	if status == nil {
 		return nil, errors.New("claudeheadless: finish_step schema has no status")
 	}
-	var desc strings.Builder
-	desc.WriteString("How the step ended. ")
-	for _, r := range resultsOrImplicit(results) {
-		kind := "not ok"
-		if r.OK {
-			kind = "ok"
-		}
-		fmt.Fprintf(&desc, "%s (%s)", r.ID, kind)
-		if r.Description != "" {
-			desc.WriteString(": " + r.Description)
-		}
-		desc.WriteString(". ")
-	}
-	desc.WriteString("needs_input when a decision from the user is needed.")
-	status.Description = desc.String()
 	status.Enum = nil
 	for _, id := range statusIDs(results) {
 		status.Enum = append(status.Enum, id)
@@ -202,17 +196,17 @@ func finishSchema(results []ResultSpec) (*jsonschema.Schema, error) {
 func (s *Server) buildMCPServer(finish, space, outcomes, git bool, results []ResultSpec) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
-		opts.Instructions = spaceInstructions
+		opts.Instructions = llmprompts.HeadlessSpaceInstructions.Text(s.prompts, llmprompts.NoVars{})
 	}
 	srv := mcp.NewServer(&mcp.Implementation{Name: ServerName, Title: "Kira ADE", Version: "1"}, opts)
 	if finish {
-		schema, err := finishSchema(results)
+		schema, err := s.finishSchema(results)
 		if err != nil {
 			panic(err) // the schema derives from a fixed type: a failure is a programming error
 		}
 		mcp.AddTool(srv, &mcp.Tool{
 			Name:        "finish_step",
-			Description: "Report how this pipeline step ended. Call it exactly once, as the last action.",
+			Description: llmprompts.HeadlessToolFinishStep.Text(s.prompts, llmprompts.NoVars{}),
 			InputSchema: schema,
 		}, s.finishStep)
 	}
@@ -275,7 +269,7 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 		Status: args.Status, Summary: args.Summary, Reason: args.Reason, ConflictedFiles: args.ConflictedFiles,
 		LastGitError: args.LastGitError, Tried: args.Tried,
 	})
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Recorded. Stop now."}}}, nil, nil
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: llmprompts.HeadlessFinishStepAck.Text(s.prompts, llmprompts.NoVars{})}}}, nil, nil
 }
 
 // verify maps a presented bearer token to the registration it was minted for.
@@ -302,18 +296,6 @@ func (s *Server) startLocked() error {
 	if err != nil {
 		return fmt.Errorf("claudeheadless: bind: %w", err)
 	}
-	servers := map[[4]bool]*mcp.Server{}
-	for _, finish := range []bool{false, true} {
-		for _, space := range []bool{false, true} {
-			for _, outcomes := range []bool{false, true} {
-				for _, git := range []bool{false, true} {
-					if finish || space || outcomes || git {
-						servers[[4]bool{finish, space, outcomes, git}] = s.buildMCPServer(finish, space, outcomes, git, nil)
-					}
-				}
-			}
-		}
-	}
 	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		reg, ok := s.registered(auth.TokenInfoFromContext(r.Context()))
 		if !ok {
@@ -323,7 +305,7 @@ func (s *Server) startLocked() error {
 			return reg.server
 		}
 		g := reg.grant
-		return servers[[4]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil}]
+		return s.sharedServer([4]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil})
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
 	mux := http.NewServeMux()
@@ -332,6 +314,22 @@ func (s *Server) startLocked() error {
 	s.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 	go func(srv *http.Server) { _ = srv.Serve(ln) }(s.srv)
 	return nil
+}
+
+// sharedServer returns the tool set for a grant's flags, rebuilt when a prompt edit moved the revision.
+func (s *Server) sharedServer(key [4]bool) *mcp.Server {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if rev := s.prompts.Revision(); s.shared == nil || rev != s.sharedRev {
+		s.shared = map[[4]bool]*mcp.Server{}
+		s.sharedRev = rev
+	}
+	srv := s.shared[key]
+	if srv == nil && (key[0] || key[1] || key[2] || key[3]) {
+		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], nil)
+		s.shared[key] = srv
+	}
+	return srv
 }
 
 // Register mints a token for the grant, writes its MCP config file and returns its path. release

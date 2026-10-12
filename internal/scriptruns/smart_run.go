@@ -46,7 +46,7 @@ func (r *bgRun) endedBy() int {
 // mcpServer returns the loopback report server, started on first use.
 func (s *Service) mcpServer() *claudeheadless.Server {
 	if s.server == nil {
-		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish}
+		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts()}
 		if s.ADE != nil {
 			opts.Space, opts.Outcomes = s.ADE.Tools()
 		}

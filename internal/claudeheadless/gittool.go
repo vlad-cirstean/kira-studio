@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // GitTool is the allowed-tools name of the git MCP tool.
@@ -32,8 +34,8 @@ type GitGrant struct {
 }
 
 type gitArgs struct {
-	Worktree string   `json:"worktree" jsonschema:"One of the worktree paths named in the prompt."`
-	Args     []string `json:"args" jsonschema:"The words after git, one per entry, for example [\"rebase\",\"--continue\"]. Paths go after a \"--\" entry."`
+	Worktree string   `json:"worktree"`
+	Args     []string `json:"args"`
 }
 
 var (
@@ -314,10 +316,9 @@ func runGit(ctx context.Context, worktree string, args []string) (string, error)
 
 func (s *Server) addGitTool(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "git",
-		Description: "Run git in one of the worktrees named in the prompt. Allowed: status, diff, log, show, rev-parse, merge-base, ls-files, " +
-			"fetch <remote>, rebase (not interactive), add, rm, checkout --ours|--theirs -- <path>, and push --force-with-lease when the prompt asks for it. " +
-			"Options outside those shapes are refused. Put paths after a \"--\" entry.",
+		Name:        "git",
+		Description: llmprompts.HeadlessToolGit.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[gitArgs](s.prompts, llmprompts.HeadlessToolGit.ID(), nil),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, a gitArgs) (*mcp.CallToolResult, any, error) {
 		var g Grant
 		var ok bool

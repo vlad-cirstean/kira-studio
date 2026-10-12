@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -39,6 +40,8 @@ type Service struct {
 	SmartTimeout time.Duration
 	// Prompts routes a waiting run's confirm popup to a window and an OS notification; nil routes none.
 	Prompts prompts.Sink
+	// LlmPrompts resolves the report suffixes and server texts; nil means the registry defaults.
+	LlmPrompts llmprompts.Source
 	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
 	ScheduleTimeout time.Duration
 
@@ -54,6 +57,13 @@ type Service struct {
 }
 
 var _ terminal.ScriptLauncher = (*Service)(nil)
+
+func (s *Service) llmPrompts() llmprompts.Source {
+	if s.LlmPrompts == nil {
+		return llmprompts.Defaults()
+	}
+	return s.LlmPrompts
+}
 
 func (s *Service) now() int64 {
 	if s.Now != nil {

@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 const maxOutcomeRuns = 10
@@ -37,10 +39,10 @@ type Outcomes interface {
 }
 
 type runOutcomeArgs struct {
-	RunID  string `json:"runId,omitempty" jsonschema:"One run id, from a prompt or an earlier call."`
-	Branch string `json:"branch,omitempty" jsonschema:"Only runs on this branch name."`
-	Kind   string `json:"kind,omitempty" jsonschema:"rebase, step or automation (script runs started for this task). Default rebase and step."`
-	Limit  int    `json:"limit,omitempty" jsonschema:"How many runs, 1 to 10. Default 3."`
+	RunID  string `json:"runId,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	Kind   string `json:"kind,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
 }
 
 type runOutcomeResult struct {
@@ -49,9 +51,11 @@ type runOutcomeResult struct {
 
 func (s *Server) addOutcomeTool(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "run_outcome",
-		Description: "How the latest runs of this task ended: state, reason, conflicted files, last git error and, for a rebase, " +
-			"what git showed. Use it to learn why a rebase or step failed. Only this task's runs.",
+		Name:        "run_outcome",
+		Description: llmprompts.HeadlessToolRunOutcome.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[runOutcomeArgs](s.prompts, llmprompts.HeadlessToolRunOutcome.ID(), map[string]any{
+			"limit": llmprompts.MaxVars{Max: maxOutcomeRuns},
+		}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args runOutcomeArgs) (*mcp.CallToolResult, runOutcomeResult, error) {
 		var g Grant
 		var ok bool
