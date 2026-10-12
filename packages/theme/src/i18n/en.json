@@ -998,6 +998,9 @@
         "jiraKeyInvalid": {
           "body": "That Jira key isn’t valid."
         },
+        "messageTooLong": {
+          "body": "The message is too long."
+        },
         "nameTooLong": {
           "body": "That name is too long."
         },
@@ -1015,6 +1018,9 @@
         },
         "runNotFound": {
           "body": "That run no longer exists."
+        },
+        "scriptTooLarge": {
+          "body": "The script is too large."
         },
         "sessionNotFound": {
           "body": "That session no longer exists."
@@ -1054,6 +1060,9 @@
         },
         "workflowUnreadable": {
           "body": "Can’t read the file ({detail})."
+        },
+        "yamlTooLarge": {
+          "body": "The workflow file is too large."
         }
       },
       "codeWorkspace": {

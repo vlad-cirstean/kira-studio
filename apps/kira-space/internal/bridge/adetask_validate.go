@@ -67,6 +67,18 @@ func validateAdeName(value, field string) error {
 	return nil
 }
 
+func adeMessageTooLong() error {
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.messageTooLong.body", nil)
+}
+
+func adeScriptTooLarge() error {
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.scriptTooLarge.body", nil)
+}
+
+func adeYamlTooLarge() error {
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.yamlTooLarge.body", nil)
+}
+
 func validateAdeNotes(notes string) error {
 	if len(notes) > adeMaxNotesBytes {
 		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.notesTooLong.body", nil)

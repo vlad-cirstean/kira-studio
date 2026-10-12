@@ -389,7 +389,7 @@ func (s *AdeTaskService) Rebase(ctx context.Context, args adewire.RebaseArgs) (a
 		return adewire.RebaseStart{}, err
 	}
 	if len(args.Message) > adeMaxMessageBytes {
-		return adewire.RebaseStart{}, adeTaskInvalid("message is too long")
+		return adewire.RebaseStart{}, adeMessageTooLong()
 	}
 	r, err := s.Engine.Rebase(ctx, args)
 	return r, adeTaskError(err)
@@ -514,7 +514,7 @@ func (s *AdeTaskService) PromoteBacklogItem(ctx context.Context, args adewire.Ba
 
 func validateAdeYaml(src string) error {
 	if len(src) > adeMaxYamlBytes {
-		return adeTaskInvalid("yaml is too large")
+		return adeYamlTooLarge()
 	}
 	return nil
 }
@@ -550,7 +550,7 @@ func validateUpdateRepo(a adewire.UpdateRepoArgs) error {
 		}
 	}
 	if p.PrepareScript != nil && len(*p.PrepareScript) > adeMaxScriptBytes {
-		return adeTaskInvalid("prepareScript is too large")
+		return adeScriptTooLarge()
 	}
 	if p.Environments != nil {
 		if len(*p.Environments) > adeMaxEnvironments {
@@ -561,7 +561,7 @@ func validateUpdateRepo(a adewire.UpdateRepoArgs) error {
 				return err
 			}
 			if len(env.DeployedShaScript) > adeMaxScriptBytes {
-				return adeTaskInvalid("deployedShaScript is too large")
+				return adeScriptTooLarge()
 			}
 		}
 	}
@@ -688,7 +688,7 @@ func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs
 		}
 	}
 	if len(args.Message) > adeMaxMessageBytes {
-		return adewire.StartRunResult{}, adeTaskInvalid("message is too long")
+		return adewire.StartRunResult{}, adeMessageTooLong()
 	}
 	if err := validateAdeFromStage(args.FromStageID); err != nil {
 		return adewire.StartRunResult{}, err
@@ -796,7 +796,7 @@ func (s *AdeTaskService) LaunchStage(ctx context.Context, args adewire.LaunchSta
 		return adewire.Launch{}, err
 	}
 	if len(args.Message) > adeMaxMessageBytes {
-		return adewire.Launch{}, adeTaskInvalid("message is too long")
+		return adewire.Launch{}, adeMessageTooLong()
 	}
 	if err := validateAdeFromStage(args.FromStageID); err != nil {
 		return adewire.Launch{}, err
@@ -810,7 +810,7 @@ func (s *AdeTaskService) StartBranch(ctx context.Context, args adewire.StartBran
 		return adewire.Launch{}, err
 	}
 	if len(args.Message) > adeMaxMessageBytes {
-		return adewire.Launch{}, adeTaskInvalid("message is too long")
+		return adewire.Launch{}, adeMessageTooLong()
 	}
 	l, err := s.Engine.StartBranch(ctx, args)
 	return l, adeTaskError(err)
@@ -824,7 +824,7 @@ func (s *AdeTaskService) Send(ctx context.Context, args adewire.SendArgs) error 
 		return adeTaskInvalid("message is required")
 	}
 	if len(args.Message) > adeMaxMessageBytes {
-		return adeTaskInvalid("message is too long")
+		return adeMessageTooLong()
 	}
 	return adeTaskError(s.Engine.Send(ctx, args))
 }
