@@ -78,7 +78,7 @@ test.describe('with write access', () => {
     await card.locator(t('plan-stage-next')).click();
     await expect(page.locator(t('confirm-dialog'))).toBeVisible();
     expect(posts(server, '/api/ade/tasks/stage')).toHaveLength(0);
-    await page.locator(t('confirm-dialog')).getByRole('button', { name: 'Move forward' }).click();
+    await page.locator(t('confirm-yes')).click();
     await expect.poll(() => posts(server, '/api/ade/tasks/stage').length).toBe(1);
     const sent = posts(server, '/api/ade/tasks/stage')[0] as { body: string; key: string };
     const body = JSON.parse(sent.body) as { taskId: string; fromStageId: string; stageId: string };
@@ -98,7 +98,7 @@ test.describe('with write access', () => {
       .filter({ hasText: 'Cart total test fails intermittently' });
     await card.locator('button').first().click();
     await card.locator(t('plan-stage-next')).click();
-    await page.locator(t('confirm-dialog')).getByRole('button', { name: 'Move forward' }).click();
+    await page.locator(t('confirm-yes')).click();
     await expect(page.locator(t('confirm-dialog'))).toContainText('moved on the computer');
   });
 });
