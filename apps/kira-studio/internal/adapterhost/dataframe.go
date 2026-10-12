@@ -71,7 +71,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			r.deps.Log("error", fmt.Sprintf("data frame panic: %v\n%s", rec, debug.Stack()))
-			r.respondError(session, probe.ID, adapters.Contract(fmt.Sprintf("internal error: %v", rec), nil))
+			r.respondError(session, probe.ID, adapters.Internal(fmt.Sprintf("internal error: %v", rec), nil))
 		}
 	}()
 

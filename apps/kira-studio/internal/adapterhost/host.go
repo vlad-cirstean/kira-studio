@@ -328,7 +328,7 @@ func (h *Host) safeRun(ctx context.Context, op *adapters.OpCtx, fn func(context.
 				err = adapterErr
 				return
 			}
-			err = adapters.Contract(fmt.Sprintf("internal error: %v", r), nil)
+			err = adapters.Internal(fmt.Sprintf("internal error: %v", r), nil)
 		}
 	}()
 	return fn(ctx, op)

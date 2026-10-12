@@ -208,9 +208,7 @@ func DecodePageToken(token, expectedFingerprint string) ([]string, error) {
 		return nil, Contract("malformed page token", err)
 	}
 	if payload.F != expectedFingerprint {
-		return nil, New(CodeQuery,
-			"keyset pagination is unavailable for this request: the token does not match the "+
-				"current filter/sort/projection/page size", nil)
+		return nil, T(CodeQuery, "backend.studio.adapter.pageTokenMismatch.body", nil, nil)
 	}
 	return payload.K, nil
 }

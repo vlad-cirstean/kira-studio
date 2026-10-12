@@ -1334,6 +1334,9 @@
         "objectKeyExpected": {
           "body": "Expected an object key at position {position}."
         },
+        "pageTokenMismatch": {
+          "body": "The page token doesn’t match the current filter, sort, projection or page size."
+        },
         "portInvalid": {
           "body": "Invalid port."
         },

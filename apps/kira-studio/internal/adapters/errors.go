@@ -54,6 +54,12 @@ func T(code ErrorCode, key string, params map[string]string, cause error) *Error
 	return New(code, i18n.T(key, params), cause)
 }
 
+// Internal reports an unexpected fault (a recovered panic). The text is English developer detail;
+// the UI shows it behind the generic internal-error wording. cause may be nil.
+func Internal(message string, cause error) *Error {
+	return New(CodeInternal, message, cause)
+}
+
 // Contract reports a Kira bug (an invariant the UI or the adapter itself must uphold). The text is
 // English developer text; the UI wraps it in common.error.contract.body. cause may be nil.
 func Contract(message string, cause error) *Error {
