@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { colorMarkClass } from '@theme/connColor';
+import { colorMarkClass, colourLabel } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
@@ -44,6 +44,8 @@ import { useReposDialogStore } from './state/reposDialog';
 import { useRepoVisibilityStore } from './state/repoVisibility';
 import { useRepoPanelTabStore, useRepoSearchStore } from './state/search';
 import { useWorktreesStore, worktreeLabel } from './state/worktrees';
+
+type ColourName = Parameters<typeof colourLabel>[0];
 
 const contextMenuStore = useContextMenuStore();
 
@@ -226,7 +228,7 @@ function repoMenuItems(repo: RepoSummary): MenuItem[] {
       items: PALETTE_COLOR_CHOICES.map((color) => ({
         type: 'item' as const,
         id: `color-${color}`,
-        label: color === 'none' ? t('common.field.noColour.label') : color,
+        label: colourLabel(color as ColourName),
         swatch: color,
         checked: repo.color === color,
         run: () => codeReposStore.setCodeRepoColor(repo.id, color),

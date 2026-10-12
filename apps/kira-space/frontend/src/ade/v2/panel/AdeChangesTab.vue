@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { t } from '@theme/i18n';
-import { computed } from 'vue';
+import { cn } from '@theme/lib/utils';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { computed, useTemplateRef } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { TONE_TAG_CLASS } from '../tones';
 import type { Branch, Commit, DirtyEntry } from '../wire';
@@ -27,6 +29,19 @@ const worktree = computed(() => {
     : where;
 });
 const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).join(', '));
+
+// A branch can touch thousands of files: the list scrolls in its own box and renders only the window.
+const FILE_ROW_HEIGHT = 24;
+const filesEl = useTemplateRef<HTMLElement>('filesEl');
+const {
+  virtualItems: fileItems,
+  totalSize: filesSize,
+  onScroll: onFilesScroll,
+} = useVirtualRows({
+  count: () => props.branch.files.length,
+  rowHeight: () => FILE_ROW_HEIGHT,
+  scrollElement: filesEl,
+});
 
 const dirtyClass = (d: DirtyEntry): string => (d.code === 'M' ? 'text-tone-amber' : 'text-tone-green');
 const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
@@ -92,14 +107,24 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
 
     <div class="flex flex-col gap-0.5">
       <div class="text-muted-foreground">{{ t('common.module.files.label') }}</div>
-      <div
-        v-for="f in branch.files"
-        :key="f.path"
-        class="truncate rounded-kira-xs px-1.5 py-0.5 font-data text-kira-sm"
-        :class="branch.conflictsIfRebased.includes(f.path) ? TONE_TAG_CLASS.red : 'text-fg'"
-        data-testid="ade-changes-file-row"
-      >
-        {{ f.path }}
+      <div ref="filesEl" class="max-h-64 overflow-auto" data-testid="ade-changes-files" @scroll.passive="onFilesScroll">
+        <div class="relative w-full" :style="{ height: `${filesSize}px` }">
+          <div
+            v-for="item in fileItems"
+            :key="branch.files[item.index]?.path ?? item.key"
+            :class="
+              cn(
+                VIRTUAL_ROW_CLASS,
+                'truncate rounded-kira-xs px-1.5 py-0.5 font-data text-kira-sm',
+                branch.conflictsIfRebased.includes(branch.files[item.index]?.path ?? '') ? TONE_TAG_CLASS.red : 'text-fg',
+              )
+            "
+            :style="{ height: `${FILE_ROW_HEIGHT}px`, transform: `translateY(${item.start}px)` }"
+            data-testid="ade-changes-file-row"
+          >
+            {{ branch.files[item.index]?.path }}
+          </div>
+        </div>
       </div>
     </div>
   </div>

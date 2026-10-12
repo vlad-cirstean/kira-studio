@@ -1,8 +1,6 @@
-U73 apps/kira-space/frontend/src/ade/v2/workflows/AdeStageInspector.vue
 U74 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue
 U74 apps/kira-space/frontend/mobile/screens/NeedsScreen.vue
 U74 apps/kira-space/frontend/mobile/screens/PlanScreen.vue
-U74 apps/kira-space/frontend/src/ade/AdeView.vue
 U74 apps/kira-space/frontend/src/repo/GitPanel.vue
 U74 apps/kira-space/frontend/src/repo/GitStart.vue
 U74 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue
@@ -12,7 +10,6 @@ U74 apps/kira-space/frontend/src/views/repo/RepoMultiDiffView.vue
 U74 packages/workbench/src/memory/MemoryPanel.vue
 U74 packages/workbench/src/memory/MemoryStart.vue
 U74 packages/workbench/src/memory/import/ImportView.vue
-U76 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue
 U77 apps/kira-space/frontend/src/repo/state/search.ts
 U77 apps/kira-space/frontend/src/state/agentNotify.ts
 U77 apps/kira-space/frontend/src/state/workspace.ts
@@ -24,9 +21,6 @@ U82 apps/kira-space/frontend/mobile/screens/PlanTaskCard.vue
 U82 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts
 U82 apps/kira-space/frontend/mobile/terminal/KeyBar.vue
-U82 apps/kira-space/frontend/src/ade/v2/board/workflowForm.ts
-U82 apps/kira-space/frontend/src/ade/v2/panel/AdeRunOutcome.vue
-U82 apps/kira-space/frontend/src/ade/v2/review/AdeReviewSync.vue
 U82 apps/kira-space/frontend/src/repo/git/hostHandlers.ts
 U82 apps/kira-space/frontend/src/repo/state/repoHeads.ts
 U82 apps/kira-space/frontend/src/state/tabKinds.ts

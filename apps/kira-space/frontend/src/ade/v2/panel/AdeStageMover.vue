@@ -10,6 +10,7 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { stageMoves } from '../board/stageMoves';
@@ -46,7 +47,7 @@ async function move(stageId: string): Promise<void> {
     <div class="flex items-center gap-1">
       <span class="text-kira-sm text-muted-foreground">{{ t('space.common.stage.label') }}</span>
       <TooltipIconButton
-        icon="arrow-left"
+        :icon="ICON.back"
         :label="reason || t('space.ade.stageMover.back.tooltip')"
         :aria-label="t('space.ade.stageMover.back.tooltip')"
         :disabled="live || !prev"

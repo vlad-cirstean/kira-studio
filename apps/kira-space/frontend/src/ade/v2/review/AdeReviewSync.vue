@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
@@ -110,10 +111,6 @@ function onOpenChange(next: boolean): void {
     void plan.refetch();
   }
 }
-
-function short(sha: string): string {
-  return sha.slice(0, 7);
-}
 </script>
 
 <template>
@@ -136,7 +133,7 @@ function short(sha: string): string {
           {{ t('space.ade.review.sync.account.label', { account: data.account }) }}
         </p>
         <p v-if="headDiffers && data" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-head">
-          {{ t('space.ade.review.sync.headDiffers.label', { head: short(data.headSha), local: short(data.localTip) }) }}
+          {{ t('space.ade.review.sync.headDiffers.label', { head: shortSha(data.headSha), local: shortSha(data.localTip) }) }}
         </p>
 
         <template v-if="result">

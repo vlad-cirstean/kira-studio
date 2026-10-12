@@ -105,7 +105,7 @@ test('estimate: unset takes number and unit, set only extends, a backend refusal
   ]);
   await openTask(page, 'T_notif');
   await page.locator('[data-testid="ade-estimate-num"]').fill('3');
-  await page.getByRole('button', { name: 'days' }).click();
+  await page.locator('[data-testid="ade-estimate-unit-d"]').click();
   await expect.poll(() => updates(control)).toHaveLength(1);
   expect(updates(control)[0]?.args).toMatchObject({ patch: { est: '3d' } });
 

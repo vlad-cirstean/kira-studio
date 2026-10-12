@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
@@ -59,6 +60,11 @@ function extend(): void {
   extendBy.value = '';
 }
 
+const unitItems = computed(() => [
+  { value: 'h', label: t('space.ade.estimate.hours.option'), testid: 'ade-estimate-unit-h' },
+  { value: 'd', label: t('space.ade.estimate.days.option'), testid: 'ade-estimate-unit-d' },
+]);
+
 const hint = computed(() =>
   props.days > 1 ? t('space.ade.estimate.spans.label', { count: props.days }) : '',
 );
@@ -104,30 +110,16 @@ const hint = computed(() =>
         data-testid="ade-estimate-num"
         @change="commit"
       />
-      <fieldset
+      <!-- mousedown.prevent: a click would otherwise blur the number input first and commit with the stale unit. -->
+      <SecondaryTabs
+        variant="segmented"
+        size="kira-lg"
+        :model-value="unit"
+        :items="unitItems"
         :aria-label="t('space.ade.estimate.unit.aria')"
-        class="m-0 flex gap-0.5 border-0 p-0"
-      >
-        <!-- mousedown.prevent: a click would otherwise blur the number input first and commit with the stale unit. -->
-        <Button
-          :variant="unit === 'h' ? 'dialog' : 'ghost'"
-          size="kira-lg"
-          :aria-pressed="unit === 'h'"
-          @mousedown.prevent
-          @click="pickUnit('h')"
-        >
-          {{ t('space.ade.estimate.hours.option') }}
-        </Button>
-        <Button
-          :variant="unit === 'd' ? 'dialog' : 'ghost'"
-          size="kira-lg"
-          :aria-pressed="unit === 'd'"
-          @mousedown.prevent
-          @click="pickUnit('d')"
-        >
-          {{ t('space.ade.estimate.days.option') }}
-        </Button>
-      </fieldset>
+        @mousedown.prevent
+        @update:model-value="(v) => pickUnit(v === 'd' ? 'd' : 'h')"
+      />
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
     <FieldError v-if="error" data-testid="ade-estimate-error">{{ error }}</FieldError>

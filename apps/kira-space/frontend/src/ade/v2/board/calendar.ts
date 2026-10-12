@@ -1,4 +1,5 @@
 import { t } from '@theme/i18n';
+import { monthNames, weekdayNames } from '@workbench/behaviour/format';
 import type { Settings } from '../../../state/settingsDomain';
 
 // Calendar arithmetic shared by the ADE queue engines: integer day offsets from `today`, via
@@ -6,22 +7,6 @@ import type { Settings } from '../../../state/settingsDomain';
 
 /** Mockup line 934: the sentinel "no day assigned yet" offset. */
 export const LATER = 9999;
-
-const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-export const MO = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
 
 const DAY_MS = 86_400_000;
 
@@ -159,11 +144,16 @@ export function firstWork(cal: Calendar, k: number): number {
   return isOff(cal, k) ? nextWork(cal, k) : k;
 }
 
+/** Short month name (locale) for a 0-based month. */
+export function monthLabel(month: number): string {
+  return monthNames('short')[month] ?? '';
+}
+
 export function dayLabel(cal: Calendar, k: number): string {
   if (k === LATER) return t('common.later.label');
   if (k === 0) return t('space.common.day.today.label');
   const p = dateParts(cal, k);
-  return `${WD[p.dow]} ${p.date}`;
+  return `${weekdayNames()[p.dow]} ${p.date}`;
 }
 
 export function spanDays(cal: Calendar, start: number, n: number): number[] {

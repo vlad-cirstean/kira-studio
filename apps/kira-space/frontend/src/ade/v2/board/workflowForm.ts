@@ -40,12 +40,14 @@ export function kindLabel(kind: StageKind, background = false): string {
   );
 }
 
+const ID_SUFFIX_LENGTH = 8;
+
 /** `prefix-<8 hex>`, never in `taken`. Runs are keyed by these ids, so a removed id must not come
  *  back: the lowest free `prefix-N` would hand a new stage or step the old one's runs. */
 function nextId(prefix: 'stage' | 'step', taken: readonly string[]): string {
   const used = new Set(taken);
   let id: string;
-  do id = `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  do id = `${prefix}-${crypto.randomUUID().slice(0, ID_SUFFIX_LENGTH)}`;
   while (used.has(id));
   return id;
 }

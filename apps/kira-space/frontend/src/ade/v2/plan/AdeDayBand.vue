@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 // `sort: false` and no group pull/put mean it never moves Vue-managed DOM; the parent resolves the
 // drop target from the pointer instead.
 const dropEl = ref<HTMLElement | null>(null);
+const ghostClass = SORTABLE_GHOST_CLASS;
 useDraggable(dropEl, {
   draggable: '[data-ade-task]',
   sort: false,
@@ -44,7 +46,7 @@ useDraggable(dropEl, {
   forceFallback: true,
   fallbackOnBody: true,
   fallbackTolerance: 4,
-  ghostClass: 'opacity-40',
+  ghostClass,
   chosenClass: 'ring-2',
   onStart: (evt) => emit('dragStart', evt.item.dataset.taskId ?? ''),
   onEnd: () => emit('dragEnd'),

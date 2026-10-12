@@ -5,6 +5,7 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { useFocus, useTimeoutFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
@@ -47,7 +48,7 @@ const { start: armHint, stop: stopHint } = useTimeoutFn(
   () => {
     if (status.value === 'sent') status.value = 'noSubmit';
   },
-  10_000,
+  TIMING.agentPasteWait,
   { immediate: false },
 );
 

@@ -2,6 +2,7 @@ import { type MessageKey, t } from '@theme/i18n';
 import { formatDuration } from '@workbench/behaviour/format';
 import type { Board, Branch, Run, Session } from '../wire';
 import type { TaskProgress } from './progress';
+import { runsOnLabel } from './workflowForm';
 
 // Needs-you list (SPEC2 §11), mockup v2 lines 2490-2520. No CI item: D9 has no CI badge.
 
@@ -181,7 +182,7 @@ function stepItems(c: Ctx): NeedsItem[] {
           }),
         );
       }
-      const base = { taskId: task.id, stepId: step.id, scope: step.runsOn };
+      const base = { taskId: task.id, stepId: step.id, scope: runsOnLabel(step.runsOn) };
       if (step.state === 'failed') {
         const failed = step.runs.filter((x) => x.state === 'failed' || x.state === 'stuck');
         out.push(

@@ -113,7 +113,6 @@ U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-z
 U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
 U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-relative markdown heading scale tracks the Appearance font size, counted anchor in check-theme-classes
 U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
-U25 apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue # failed log line colours run output (stderr), not an error sentence
 U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
 U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
 U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
@@ -141,7 +140,6 @@ U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.foc
 U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
 U40 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue # plain Delete must reach text fields; useShortcut preventDefaults every match
 U41 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # Cmd/Ctrl-click link open reads a mouse event modifier, not a key chord
-U46 apps/kira-space/frontend/src/ade/v2/review/AdeReviewCompose.vue # 10 s wait for Claude Code to take a pasted message; a protocol timeout, not UI timing
 U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus

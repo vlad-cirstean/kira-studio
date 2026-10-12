@@ -5,6 +5,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { colourLabel } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
@@ -16,6 +17,8 @@ import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import RepoEnvRow from './RepoEnvRow.vue';
 import { useUpdateRepo } from './state/reposQueries';
+
+type ColourName = Parameters<typeof colourLabel>[0];
 
 // Settings of one repo. Each field commits alone: the patch carries only its leaf.
 const props = defineProps<{ repo: Repo }>();
@@ -225,7 +228,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
                 @change="chooseColor(swatch)"
               />
             </TooltipTrigger>
-            <TooltipContent>{{ swatch === 'none' ? t('common.field.noColour.label') : swatch }}</TooltipContent>
+            <TooltipContent>{{ colourLabel(swatch as ColourName) }}</TooltipContent>
           </Tooltip>
         </fieldset>
         <FieldError v-if="colorError" data-testid="repo-color-error">{{ colorError }}</FieldError>

@@ -12,7 +12,7 @@ import {
   isoToOffset,
   isWeekend,
   LATER,
-  MO,
+  monthLabel,
   nextWork,
   parseEst,
   spanDays,
@@ -364,7 +364,7 @@ function bandLabels(cal: Calendar, dayKeys: readonly number[]): string[] {
       prevMonth = dateParts(cal, 0).month;
     } else if (dk !== LATER) {
       const p = dateParts(cal, dk);
-      if (prevMonth !== null && p.month !== prevMonth) label += ` ${MO[p.month]}`;
+      if (prevMonth !== null && p.month !== prevMonth) label += ` ${monthLabel(p.month)}`;
       prevMonth = p.month;
     }
     return label;

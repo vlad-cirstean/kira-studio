@@ -14,6 +14,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import { ICON } from '@theme/icons';
 import { statusLabel } from '../board/actions';
 import { FAILURE_OPTIONS, failureLabel, kindLabel, PLACEHOLDER_TOKENS, runsOnLabel, STATUS_OPTIONS, withKind } from '../board/workflowForm';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
@@ -41,7 +42,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button variant="toolbar" size="kira-icon" :aria-label="t('space.ade.workflows.stageInspector.actions.aria')" data-testid="ade-wf-stage-menu">
-            <CodiconIcon name="kebab-vertical" :size="13" />
+            <CodiconIcon :name="ICON.moreActions" :size="13" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

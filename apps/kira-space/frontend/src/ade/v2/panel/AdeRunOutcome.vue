@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
@@ -93,7 +94,6 @@ const endedBy = computed(() => {
   ].join(' · ');
 });
 
-const short = (sha: string): string => sha.slice(0, 7);
 
 function text(): string {
   const o = outcome.value;
@@ -122,8 +122,8 @@ function text(): string {
     lines.push(
       t(b.onBase ? 'space.ade.outcome.copy.branch.label' : 'space.ade.outcome.copy.branchOffBase.label', {
         name: b.name,
-        before: short(b.before),
-        after: short(b.after),
+        before: shortSha(b.before),
+        after: shortSha(b.after),
       }),
     );
   }
@@ -167,7 +167,7 @@ function copy(): void {
     </p>
     <div v-for="b in rebase?.branches ?? []" :key="b.branchId" class="flex items-center gap-1.5 font-data text-kira-sm" data-testid="ade-outcome-branch">
       <span class="min-w-0 truncate">{{ b.name }}</span>
-      <span class="text-subtle">{{ short(b.before) }} → {{ short(b.after) }}</span>
+      <span class="text-subtle">{{ shortSha(b.before) }} → {{ shortSha(b.after) }}</span>
       <span v-if="!b.onBase" class="text-tone-amber">{{ t('space.ade.outcome.notOnBase.status') }}</span>
     </div>
     <FieldError v-if="copyError">{{ copyError }}</FieldError>
