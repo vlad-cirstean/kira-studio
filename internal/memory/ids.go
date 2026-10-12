@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
+
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const (
@@ -17,9 +19,9 @@ const (
 )
 
 // FactIDPattern matches a fact id inside text (word-boundary grep).
-var FactIDPattern = regexp.MustCompile(`\bkm_[0-9a-hjkmnp-tv-z]{12}\b`)
+var FactIDPattern = regexp.MustCompile(`\b` + memfmt.FactID + `\b`)
 
-var factIDExact = regexp.MustCompile(`^km_[0-9a-hjkmnp-tv-z]{12}$`)
+var factIDExact = regexp.MustCompile(`^` + memfmt.FactID + `$`)
 
 func newID(prefix string) (string, error) {
 	n, err := gonanoid.Generate(idAlphabet, idLen)
