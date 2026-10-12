@@ -78,7 +78,6 @@ func readGit(stored map[string]json.RawMessage) model.GitSettings {
 // readAde reads every ade.* leaf from stored on top of model.DefaultAdeSettings() (P129 Part 2 §7).
 func readAde(stored map[string]json.RawMessage) model.AdeSettings {
 	result := model.DefaultAdeSettings()
-	appsettings.LeafValid(stored, "ade.panelWidth", &result.PanelWidth, model.ValidAdePanelWidth)
 	appsettings.LeafValid(stored, "ade.horizonDays", &result.HorizonDays, model.ValidAdeHorizonDays)
 	appsettings.LeafValid(stored, "ade.historyDays", &result.HistoryDays, model.ValidAdeHistoryDays)
 	appsettings.LeafValid(stored, "ade.extraDays", &result.ExtraDays, model.ValidAdeDateList)
@@ -116,9 +115,6 @@ func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
 func upsertAde(tx *sql.Tx, a *model.AdePatch) error {
 	if a == nil {
 		return nil
-	}
-	if err := appsettings.UpsertOptional(tx, "ade.panelWidth", a.PanelWidth); err != nil {
-		return err
 	}
 	if err := appsettings.UpsertOptional(tx, "ade.horizonDays", a.HorizonDays); err != nil {
 		return err

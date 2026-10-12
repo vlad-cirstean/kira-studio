@@ -52,7 +52,7 @@ const portError = computed(() => {
   const port = parseIntField(portDraft.value);
   if (!Number.isInteger(port)) return t('common.enterWholeNumber.error');
   if (port < MOBILE_PORT_RANGE.min || port > MOBILE_PORT_RANGE.max) {
-    return t('space.workbench.mobileAccess.port.range.error', { min: MOBILE_PORT_RANGE.min, max: MOBILE_PORT_RANGE.max });
+    return t('space.settings.mobileAccess.port.range.error', { min: MOBILE_PORT_RANGE.min, max: MOBILE_PORT_RANGE.max });
   }
   return null;
 });
@@ -90,9 +90,9 @@ async function onTrust(): Promise<void> {
   const now = current.value;
   if (!now) return;
   const ok = await confirmDialogStore.confirm({
-    title: t('space.workbench.mobileAccess.trustConfirm.title'),
-    message: t('space.workbench.mobileAccess.trustConfirm.body', { subnet: now.subnet, mac: now.routerMac }),
-    confirmLabel: t('space.workbench.mobileAccess.network.trustVerb.label'),
+    title: t('space.settings.mobileAccess.trustConfirm.title'),
+    message: t('space.settings.mobileAccess.trustConfirm.body', { subnet: now.subnet, mac: now.routerMac }),
+    confirmLabel: t('space.settings.mobileAccess.network.trustVerb.label'),
     tone: 'danger',
   });
   if (ok) await runTrust();
@@ -100,9 +100,9 @@ async function onTrust(): Promise<void> {
 
 async function onForget(): Promise<void> {
   const ok = await confirmDialogStore.confirm({
-    title: t('space.workbench.mobileAccess.forgetConfirm.title'),
-    message: t('space.workbench.mobileAccess.forgetConfirm.body'),
-    confirmLabel: t('space.workbench.mobileAccess.network.forget.label'),
+    title: t('space.settings.mobileAccess.forgetConfirm.title'),
+    message: t('space.settings.mobileAccess.forgetConfirm.body'),
+    confirmLabel: t('space.settings.mobileAccess.network.forget.label'),
     tone: 'danger',
   });
   if (ok) await runForget();
@@ -110,9 +110,9 @@ async function onForget(): Promise<void> {
 
 async function onRevoke(id: string, label: string): Promise<void> {
   const ok = await confirmDialogStore.confirm({
-    title: t('space.workbench.mobileAccess.revokeConfirm.title'),
-    message: t('space.workbench.mobileAccess.revokeConfirm.body', { name: label || id }),
-    confirmLabel: t('space.workbench.mobileAccess.devices.revoke.label'),
+    title: t('space.settings.mobileAccess.revokeConfirm.title'),
+    message: t('space.settings.mobileAccess.revokeConfirm.body', { name: label || id }),
+    confirmLabel: t('space.settings.mobileAccess.devices.revoke.label'),
     tone: 'danger',
   });
   if (ok) await store.revoke(id);
@@ -124,15 +124,15 @@ const trustedText = computed(() => {
   const at = store.status.trustedAt;
   const params = { subnet: net.subnet, router: net.routerIp, mac: net.routerMac, interface: net.interface };
   return at
-    ? t('space.workbench.mobileAccess.network.trustedAt.status', { ...params, date: formatDateTime(at) })
-    : t('space.workbench.mobileAccess.network.trusted.status', params);
+    ? t('space.settings.mobileAccess.network.trustedAt.status', { ...params, date: formatDateTime(at) })
+    : t('space.settings.mobileAccess.network.trusted.status', params);
 });
 
 function lastSeenText(device: { lastSeenAt: number; lastIp?: string }): string {
   const when = formatRelative(device.lastSeenAt);
   return device.lastIp
-    ? t('space.workbench.mobileAccess.devices.lastSeenFrom.status', { when, address: device.lastIp })
-    : t('space.workbench.mobileAccess.devices.lastSeen.status', { when });
+    ? t('space.settings.mobileAccess.devices.lastSeenFrom.status', { when, address: device.lastIp })
+    : t('space.settings.mobileAccess.devices.lastSeen.status', { when });
 }
 
 const activeDevices = computed(() =>
@@ -144,7 +144,7 @@ const activeDevices = computed(() =>
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">{{ t('space.workbench.mobileAccess.enabled.label') }}</Label>
+        <Label :for="switchId">{{ t('space.settings.mobileAccess.enabled.label') }}</Label>
       </div>
       <Switch
         :id="switchId"
@@ -154,7 +154,7 @@ const activeDevices = computed(() =>
         @update:model-value="(v) => onToggle(v === true)"
       />
       <FieldDescription>
-        {{ t('space.workbench.mobileAccess.enabled.description') }}
+        {{ t('space.settings.mobileAccess.enabled.description') }}
       </FieldDescription>
       <FieldError v-if="store.status.error" data-testid="mobile-access-error">
         {{ store.status.error }}
@@ -162,20 +162,20 @@ const activeDevices = computed(() =>
     </Field>
 
     <Alert variant="warn" data-testid="mobile-access-plaintext-warning">
-      {{ t('space.workbench.mobileAccess.plaintext.body') }}
+      {{ t('space.settings.mobileAccess.plaintext.body') }}
     </Alert>
 
     <section class="flex flex-col gap-1" data-testid="mobile-access-network">
-      <h3 class="m-0 text-kira-md font-medium">{{ t('space.workbench.mobileAccess.network.title') }}</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{ t('space.settings.mobileAccess.network.title') }}</h3>
       <p v-if="trusted" class="m-0 text-kira-sm" data-testid="mobile-access-trusted">
         {{ trustedText }}
       </p>
       <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-trusted">
-        {{ t('space.workbench.mobileAccess.network.none.empty') }}
+        {{ t('space.settings.mobileAccess.network.none.empty') }}
       </p>
       <p v-if="current" class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
         {{
-          t('space.workbench.mobileAccess.network.current.status', {
+          t('space.settings.mobileAccess.network.current.status', {
             address: current.address,
             subnet: current.subnet,
             router: current.routerIp,
@@ -184,7 +184,7 @@ const activeDevices = computed(() =>
         }}
       </p>
       <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
-        {{ t('space.workbench.mobileAccess.network.offNetwork.empty') }}
+        {{ t('space.settings.mobileAccess.network.offNetwork.empty') }}
       </p>
       <div class="flex gap-2">
         <Button
@@ -194,7 +194,7 @@ const activeDevices = computed(() =>
           data-testid="mobile-access-trust"
           @click="onTrust"
         >
-          {{ t('space.workbench.mobileAccess.network.trust.label') }}
+          {{ t('space.settings.mobileAccess.network.trust.label') }}
         </Button>
         <Button
           v-if="trusted"
@@ -203,7 +203,7 @@ const activeDevices = computed(() =>
           data-testid="mobile-access-forget"
           @click="onForget"
         >
-          {{ t('space.workbench.mobileAccess.network.forget.label') }}
+          {{ t('space.settings.mobileAccess.network.forget.label') }}
         </Button>
       </div>
       <p
@@ -216,7 +216,7 @@ const activeDevices = computed(() =>
     </section>
 
     <section v-if="store.status.running" class="flex flex-col gap-1" data-testid="mobile-access-step-app">
-      <h3 class="m-0 text-kira-md font-medium">{{ t('space.workbench.mobileAccess.openApp.title') }}</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{ t('space.settings.mobileAccess.openApp.title') }}</h3>
       <figure class="m-0 flex flex-col gap-0.5">
         <MobileQr :url="store.status.appUrl" />
         <figcaption class="font-data text-kira-sm break-all select-all">{{ store.status.appUrl }}</figcaption>
@@ -225,7 +225,7 @@ const activeDevices = computed(() =>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="agentInputId">{{ t('space.workbench.mobileAccess.agentInput.label') }}</Label>
+        <Label :for="agentInputId">{{ t('space.settings.mobileAccess.agentInput.label') }}</Label>
       </div>
       <Switch
         :id="agentInputId"
@@ -235,7 +235,7 @@ const activeDevices = computed(() =>
         @update:model-value="(v) => onToggleAgentInput(v === true)"
       />
       <FieldDescription>
-        {{ t('space.workbench.mobileAccess.agentInput.description') }}
+        {{ t('space.settings.mobileAccess.agentInput.description') }}
       </FieldDescription>
     </Field>
 
@@ -258,14 +258,14 @@ const activeDevices = computed(() =>
         data-testid="mobile-access-apply-port"
         @click="onApplyPort"
       >
-        {{ t('space.workbench.mobileAccess.port.apply.label') }}
+        {{ t('space.settings.mobileAccess.port.apply.label') }}
       </Button>
     </Field>
 
     <section class="flex flex-col gap-1">
-      <h3 class="m-0 text-kira-md font-medium">{{ t('space.workbench.mobileAccess.devices.title') }}</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{ t('space.settings.mobileAccess.devices.title') }}</h3>
       <p v-if="activeDevices.length === 0" class="text-subtle text-kira-sm" data-testid="mobile-devices-empty">
-        {{ t('space.workbench.mobileAccess.devices.none.empty') }}
+        {{ t('space.settings.mobileAccess.devices.none.empty') }}
       </p>
       <ul v-else class="m-0 flex list-none flex-col gap-1 p-0">
         <li
@@ -283,7 +283,7 @@ const activeDevices = computed(() =>
               class="text-subtle text-kira-sm leading-normal"
               :data-testid="`mobile-device-expires-${device.id}`"
             >
-              <CatalogText k="space.workbench.mobileAccess.devices.expires.status">
+              <CatalogText k="space.settings.mobileAccess.devices.expires.status">
                 <template #when><RelativeTime :at="device.expiresAt" /></template>
               </CatalogText>
             </span>
@@ -292,7 +292,7 @@ const activeDevices = computed(() =>
               class="text-kira-sm leading-normal"
               :data-testid="`mobile-device-terminals-${device.id}`"
             >
-              {{ t('space.workbench.mobileAccess.devices.terminals.status', { count: phones.countFor(device.id) }) }}
+              {{ t('space.settings.mobileAccess.devices.terminals.status', { count: phones.countFor(device.id) }) }}
             </span>
           </span>
           <span class="flex shrink-0 items-center gap-2">
@@ -307,7 +307,7 @@ const activeDevices = computed(() =>
               />
             </Label>
             <Label class="flex items-center gap-1 text-kira-sm">
-              {{ t('space.workbench.mobileAccess.devices.agentInput.label') }}
+              {{ t('space.settings.mobileAccess.devices.agentInput.label') }}
               <Switch
                 :model-value="device.canAgentInput"
                 :disabled="!store.status.agentInput"
@@ -317,7 +317,7 @@ const activeDevices = computed(() =>
             </Label>
             <TooltipIconButton
               icon="trash"
-              :label="t('space.workbench.mobileAccess.devices.revoke.label')"
+              :label="t('space.settings.mobileAccess.devices.revoke.label')"
               variant="danger"
               :data-testid="`mobile-device-revoke-${device.id}`"
               @click="onRevoke(device.id, device.label)"

@@ -59,6 +59,7 @@ import type {
 import { CHANNEL } from '@shared/protocol/events';
 import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
+import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
 import type { SpaceMode } from '../state/modeDomain';
@@ -158,10 +159,12 @@ const spaceControl = {
   scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
     unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 
-  // P120: linkOpenExternal moved off createCoreControl.ts's now-deleted shared `link` binding —
+  // P120: openExternal (LinkService) moved off createCoreControl.ts's now-deleted shared `link` binding —
   // Kira Studio never had a real use for it, so this app's own LinkService.OpenExternal call
   // stays here instead.
-  linkOpenExternal: (url: string): Promise<void> => unwrap(LinkService.OpenExternal({ url })),
+  openExternal: createOpenExternal((url) => unwrap(LinkService.OpenExternal({ url }))),
+  onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
+  onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
 
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),

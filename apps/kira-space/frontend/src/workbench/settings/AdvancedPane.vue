@@ -29,16 +29,16 @@ function setSources(ignore: boolean): void {
     <LogLevelField
       :advanced="draft.advanced"
       leaf="gitLogLevel"
-      :label="t('space.workbench.advanced.gitLogLevel.label')"
+      :label="t('space.settings.advanced.gitLogLevel.label')"
       select-test-id="settings-git-log-level"
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
     >
-      <FieldDescription>{{ t('space.workbench.advanced.gitLogLevel.description') }}</FieldDescription>
+      <FieldDescription>{{ t('space.settings.advanced.gitLogLevel.description') }}</FieldDescription>
     </LogLevelField>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">{{ t('space.workbench.advanced.ignoreRepoSettings.label') }}</Label>
+        <Label :for="switchId">{{ t('space.settings.advanced.ignoreRepoSettings.label') }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
@@ -54,7 +54,7 @@ function setSources(ignore: boolean): void {
         data-testid="settings-ade-headless-sources"
         @update:model-value="(v) => setSources(v === true)"
       />
-      <FieldDescription>{{ t('space.workbench.advanced.ignoreRepoSettings.description') }}</FieldDescription>
+      <FieldDescription>{{ t('space.settings.advanced.ignoreRepoSettings.description') }}</FieldDescription>
     </Field>
     <NotifyPromptsField
       :advanced="draft.advanced"

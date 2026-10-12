@@ -4,7 +4,7 @@ import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { t } from '@theme/i18n';
 import { useElementSize, useParentElement } from '@vueuse/core';
 import { computed } from 'vue';
-import { useSettingsStore } from '../../../state/settings';
+import { useAdeLayoutStore } from '../../../state/adeLayout';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeArchivedPanel from './AdeArchivedPanel.vue';
@@ -12,12 +12,12 @@ import AdeBranchPanel from './AdeBranchPanel.vue';
 import AdeTaskPanel from './AdeTaskPanel.vue';
 
 // Right-hand panel of the Plan: the selected task, or one of its branches. Width is
-// `Settings.ade.panelWidth`, 0 = half the row.
+// `panel.ade.width` in the layout store, 0 = half the row.
 const MIN_WIDTH = 340;
 const MIN_PLAN = 320;
 
 const ui = useAdeBoardUiStore();
-const settingsStore = useSettingsStore();
+const layout = useAdeLayoutStore();
 const { model } = usePlanModel();
 
 const parent = useParentElement();
@@ -26,11 +26,11 @@ const { width: rowWidth } = useElementSize(parent);
 const maxWidth = computed(() => Math.max(MIN_WIDTH, rowWidth.value - MIN_PLAN));
 const pane = useLiveSize(
   () => {
-    const stored = settingsStore.ade.panelWidth;
+    const stored = layout.width;
     const base = stored > 0 ? stored : Math.round(rowWidth.value / 2);
     return Math.max(MIN_WIDTH, Math.min(maxWidth.value, base));
   },
-  (w) => void settingsStore.patchSettings({ ade: { panelWidth: Math.round(w) } }),
+  (w) => layout.setWidth(Math.round(w)),
 );
 const width = pane.size;
 

@@ -81,6 +81,8 @@ const (
 	ChannelTabClose           = appevent.ChannelTabClose
 	ChannelKeepAwake          = appevent.ChannelKeepAwake
 	ChannelAppMetrics         = appevent.ChannelAppMetrics
+	ChannelCommandPalette     = "kira:menu:commandPalette"
+	ChannelViewFind           = "kira:menu:viewFind"
 )
 
 // P132 Part 2's op log channels, hoisted to internal/appevent (shared with Kira Studio's own

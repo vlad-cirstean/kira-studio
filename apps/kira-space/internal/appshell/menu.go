@@ -15,7 +15,7 @@ import (
 
 // BuildTemplate is Kira Space's own menu — Kira Studio's own BuildTemplate
 // (apps/kira-studio/internal/appshell/menu.go) trimmed to this app's own commands: no connections/
-// requests/import items, no command palette/find/run (this app has none of those). P116 G1-G4 grew
+// requests/import items, no run/format (this app has none of those). P116 G1-G4 grew
 // this from the P103 Part 1 stub (App/Edit/Window only, no ItemEmit item at all): Settings…, a View
 // section with the project-panel toggle, tab navigation, dev-only Reload/DevTools.
 func BuildTemplate(appName string, isDev bool) []shell.Section {
@@ -32,6 +32,9 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 	viewItems := []shell.Item{
 		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.toggleProjectPanel.label", nil), Accelerator: shell.Shortcuts["view.toggleProjectPanel"].Accelerator(), Channel: bridge.ChannelToggleProjectPanel},
 		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.toggleOperationsPanel.label", nil), Accelerator: shell.Shortcuts["view.toggleOperationsPanel"].Accelerator(), Channel: bridge.ChannelToggleOperationsPanel},
+		{Kind: shell.ItemSeparator},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.commandPalette.label", nil), Accelerator: shell.Shortcuts["view.commandPalette"].Accelerator(), Channel: bridge.ChannelCommandPalette},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.find.label", nil), Accelerator: shell.Shortcuts["view.find"].Accelerator(), Channel: bridge.ChannelViewFind},
 	}
 	if isDev {
 		viewItems = append(viewItems,

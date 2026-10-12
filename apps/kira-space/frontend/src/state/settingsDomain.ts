@@ -74,7 +74,6 @@ const appSpaceAppearanceSettingsSchema = /*#__PURE__*/ appearanceSettingsSchema.
 // overrides), persisted as settings leaves rather than component state so they survive a relaunch.
 // No UI reads these yet — Part 3 wires the queue board to them. Not exported — nothing outside this
 // file references the raw schema object; `Settings['ade']` covers real consumers.
-const ADE_PANEL_WIDTH_RANGE = { min: 340, max: 4000 } as const;
 const ADE_HORIZON_DAYS_RANGE = { min: 1, max: 365 } as const;
 const ADE_HISTORY_DAYS_RANGE = { min: 1, max: 365 } as const;
 const ADE_WORKDAY_HOURS_RANGE = { min: 1, max: 24 } as const;
@@ -89,12 +88,6 @@ const adeIsoDateSchema = /*#__PURE__*/ z
 const adeDateListSchema = /*#__PURE__*/ z.array(adeIsoDateSchema).max(ADE_DATE_LIST_MAX);
 
 const adeSettingsSchema = /*#__PURE__*/ z.object({
-  // 0 = half the window's own width (Part 3's own layout default), 340..4000 an explicit drag.
-  panelWidth: z
-    .number()
-    .int()
-    .refine((v) => v === 0 || (v >= ADE_PANEL_WIDTH_RANGE.min && v <= ADE_PANEL_WIDTH_RANGE.max))
-    .default(0),
   horizonDays: z
     .number()
     .int()
@@ -159,7 +152,6 @@ const settingsSchema = /*#__PURE__*/ z.object({
     graphFontSize: 0,
   }),
   ade: adeSettingsSchema.default({
-    panelWidth: 0,
     horizonDays: 14,
     historyDays: 14,
     extraDays: [],
@@ -217,7 +209,6 @@ export const defaultSettings: Settings = {
     graphFontSize: 0,
   },
   ade: {
-    panelWidth: 0,
     horizonDays: 14,
     historyDays: 14,
     extraDays: [],

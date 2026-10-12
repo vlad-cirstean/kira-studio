@@ -5,6 +5,7 @@ import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, useId } from 'vue';
 import { control } from '../../bridge/control';
 import type { Settings } from '../../state/settingsDomain';
@@ -22,11 +23,11 @@ type NotifyLeaf = Exclude<
 
 // P238: master first; the rest are disabled while it is off.
 const notifyLeaves = computed<{ leaf: NotifyLeaf; testid: string; label: string }[]>(() => [
-  { leaf: 'notifyEnabled', testid: 'settings-claude-code-notify', label: t('space.workbench.claudeCode.notify.label') },
-  { leaf: 'notifyOnFinished', testid: 'settings-claude-code-notify-finished', label: t('space.workbench.claudeCode.notifyFinished.label') },
-  { leaf: 'notifyOnNeedsInput', testid: 'settings-claude-code-notify-needs-input', label: t('space.workbench.claudeCode.notifyNeedsInput.label') },
-  { leaf: 'notifyOnRunEnded', testid: 'settings-claude-code-notify-run-ended', label: t('space.workbench.claudeCode.notifyRunEnded.label') },
-  { leaf: 'notifyIncludeMessage', testid: 'settings-claude-code-notify-include-message', label: t('space.workbench.claudeCode.notifyIncludeMessage.label') },
+  { leaf: 'notifyEnabled', testid: 'settings-claude-code-notify', label: t('space.settings.claudeCode.notify.label') },
+  { leaf: 'notifyOnFinished', testid: 'settings-claude-code-notify-finished', label: t('space.settings.claudeCode.notifyFinished.label') },
+  { leaf: 'notifyOnNeedsInput', testid: 'settings-claude-code-notify-needs-input', label: t('space.settings.claudeCode.notifyNeedsInput.label') },
+  { leaf: 'notifyOnRunEnded', testid: 'settings-claude-code-notify-run-ended', label: t('space.settings.claudeCode.notifyRunEnded.label') },
+  { leaf: 'notifyIncludeMessage', testid: 'settings-claude-code-notify-include-message', label: t('space.settings.claudeCode.notifyIncludeMessage.label') },
 ]);
 
 function setNotify(leaf: NotifyLeaf, on: boolean): void {
@@ -34,9 +35,7 @@ function setNotify(leaf: NotifyLeaf, on: boolean): void {
 }
 
 function sendTest(): void {
-  void control.agentNotifySendTest().catch((err: unknown) => {
-    console.error('agent notify: test failed', err);
-  });
+  fireAndForget(control.agentNotifySendTest(), 'agentNotify');
 }
 
 function setUsage(on: boolean): void {
@@ -52,7 +51,7 @@ function setKeepAwake(on: boolean): void {
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">{{ t('space.workbench.claudeCode.keepAwake.label') }}</Label>
+        <Label :for="switchId">{{ t('space.settings.claudeCode.keepAwake.label') }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
@@ -69,7 +68,7 @@ function setKeepAwake(on: boolean): void {
         @update:model-value="(v) => setKeepAwake(v === true)"
       />
       <FieldDescription>
-        {{ t('space.workbench.claudeCode.keepAwake.description') }}
+        {{ t('space.settings.claudeCode.keepAwake.description') }}
       </FieldDescription>
     </Field>
 
@@ -93,7 +92,7 @@ function setKeepAwake(on: boolean): void {
         @update:model-value="(v) => setNotify(n.leaf, v === true)"
       />
       <FieldDescription v-if="n.leaf === 'notifyEnabled'">
-        {{ t('space.workbench.claudeCode.notify.description') }}
+        {{ t('space.settings.claudeCode.notify.description') }}
       </FieldDescription>
     </Field>
     <Field>
@@ -111,7 +110,7 @@ function setKeepAwake(on: boolean): void {
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="`${switchId}-usage`">{{ t('space.workbench.claudeCode.usage.label') }}</Label>
+        <Label :for="`${switchId}-usage`">{{ t('space.settings.claudeCode.usage.label') }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
@@ -128,7 +127,7 @@ function setKeepAwake(on: boolean): void {
         @update:model-value="(v) => setUsage(v === true)"
       />
       <FieldDescription>
-        {{ t('space.workbench.claudeCode.usage.description') }}
+        {{ t('space.settings.claudeCode.usage.description') }}
       </FieldDescription>
     </Field>
   </div>

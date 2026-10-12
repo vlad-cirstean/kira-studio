@@ -6,6 +6,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { ref } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeChip from '../AdeChip.vue';
@@ -36,7 +37,7 @@ function onSave(): void {
 
 function openLink(e: MouseEvent): void {
   e.preventDefault();
-  void control.linkOpenExternal(props.url);
+  fireAndForget(control.openExternal(props.url), 'ade.link');
 }
 </script>
 

@@ -4,6 +4,7 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLegend } from '
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
+import FontFamilyField from '@workbench/settings/fields/FontFamilyField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
@@ -29,6 +30,8 @@ const inlineBlameId = useId();
 <template>
   <div class="contents" v-show="active">
     <FieldLegend class="pt-0">{{ t('common.typography.label') }}</FieldLegend>
+    <FontFamilyField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
+
     <FontSizeField
       :appearance="draft.appearance"
       :is-at-default="isAtDefault"
@@ -37,11 +40,11 @@ const inlineBlameId = useId();
     />
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>{{ t('space.workbench.appearance.rowDensity.description') }}</FieldDescription>
+      <FieldDescription>{{ t('space.settings.appearance.rowDensity.description') }}</FieldDescription>
     </RowDensityField>
 
     <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>{{ t('space.workbench.appearance.wordWrap.description') }}</FieldDescription>
+      <FieldDescription>{{ t('space.settings.appearance.wordWrap.description') }}</FieldDescription>
     </WordWrapField>
 
     <FieldGroup>
@@ -53,8 +56,8 @@ const inlineBlameId = useId();
           @update:model-value="(v) => onInlineBlameChange(v === true)"
         />
         <FieldContent>
-          <Label :for="inlineBlameId">{{ t('space.workbench.appearance.inlineBlame.label') }}</Label>
-          <FieldDescription>{{ t('space.workbench.appearance.inlineBlame.description') }}</FieldDescription>
+          <Label :for="inlineBlameId">{{ t('space.settings.appearance.inlineBlame.label') }}</Label>
+          <FieldDescription>{{ t('space.settings.appearance.inlineBlame.description') }}</FieldDescription>
         </FieldContent>
       </Field>
       <TooltipIconButton

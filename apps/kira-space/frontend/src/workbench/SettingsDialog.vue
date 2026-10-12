@@ -30,13 +30,13 @@ const settingsStore = useSettingsStore();
 const sectionLabels = computed<Record<Section, string>>(() => ({
   Appearance: t('common.appearance.label'),
   Git: t('common.module.git.label'),
-  'Mobile access': t('space.workbench.settingsNav.mobileAccess.label'),
+  'Mobile access': t('space.settings.nav.mobileAccess.label'),
   'Claude Code': t('common.product.claudeCode.label'),
   Memory: t('common.module.memory.label'),
   Advanced: t('common.advanced.label'),
 }));
 
-// §10.1: a later plain open (TitleBar.vue's gear icon) must not inherit a deep link this instance
+// §10.1: a later plain open (the title bar's gear icon) must not inherit a deep link this instance
 // was opened with.
 useSettingsDeepLinkReset(settingsStore);
 

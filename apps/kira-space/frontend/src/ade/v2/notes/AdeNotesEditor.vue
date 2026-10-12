@@ -7,6 +7,7 @@ import { t } from '@theme/i18n';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { control } from '../../../bridge/control';
 import { notesExtensions } from './notesExtensions';
@@ -61,7 +62,7 @@ const editor = useEditor({
       const link = target?.closest('a');
       if (link && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        void control.linkOpenExternal(link.href);
+        fireAndForget(control.openExternal(link.href), 'ade.notes');
         return true;
       }
       return false;

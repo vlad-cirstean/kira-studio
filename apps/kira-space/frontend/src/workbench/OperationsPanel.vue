@@ -33,7 +33,7 @@ function canCancel(record: SpaceOpRecord): boolean {
     :records="opsStore.visibleOps"
     :running-count="opsStore.runningCount"
     :columns="columns"
-    :clear-hint="t('space.workbench.operations.clearHint.hint')"
+    :clear-hint="t('space.operations.clearHint.hint')"
     :can-cancel="canCancel"
     @clear="opsStore.clearOps"
     @cancel="(record) => opsStore.cancelOp(record.id)"

@@ -26,7 +26,7 @@ async function onApprove(): Promise<void> {
 
 <template>
   <PairingRequestDialog
-    :title="t('space.workbench.mobilePairing.dialog.title')"
+    :title="t('space.mobilePairing.dialog.title')"
     :request-id="current?.requestId"
     :expires-at-ms="current?.expiresAtMs"
     :more="more"
@@ -37,16 +37,16 @@ async function onApprove(): Promise<void> {
   >
     <template v-if="current">
       <p class="m-0 whitespace-pre-wrap">
-        {{ t('space.workbench.mobilePairing.intro.body') }}
+        {{ t('space.mobilePairing.intro.body') }}
       </p>
       <p class="m-0 font-data text-kira-xl tracking-widest" data-testid="mobile-pairing-code">
         {{ current.code }}
       </p>
       <p class="m-0 text-subtle break-all" data-testid="mobile-pairing-label">
-        {{ t('space.workbench.mobilePairing.says.label', { name: current.label || t('space.workbench.mobilePairing.unnamed.label') }) }}
+        {{ t('space.mobilePairing.says.label', { name: current.label || t('space.mobilePairing.unnamed.label') }) }}
       </p>
       <p class="m-0 text-subtle break-all" data-testid="mobile-pairing-origin">
-        {{ t('space.workbench.mobilePairing.from.label', { address: current.remoteIp }) }}
+        {{ t('space.mobilePairing.from.label', { address: current.remoteIp }) }}
         <span v-if="current.userAgent">({{ current.userAgent }})</span>
       </p>
     </template>

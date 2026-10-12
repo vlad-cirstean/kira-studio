@@ -9,10 +9,21 @@ type PanelProject struct {
 	Width   float64 `json:"width"`
 }
 
+// PanelAde is the ADE side panel's own width in px; 0 means "half the window", not a zero-width panel.
+type PanelAde struct {
+	Width float64 `json:"width"`
+}
+
 type Layout struct {
 	Panel struct {
 		Project PanelProject `json:"project"`
+		Ade     PanelAde     `json:"ade"`
 	} `json:"panel"`
+}
+
+// ValidAdePanelWidth accepts 0 (="half the window") or an explicit 340..4000 drag width.
+func ValidAdePanelWidth(v float64) bool {
+	return v == 0 || (v >= 340 && v <= 4000)
 }
 
 // DefaultLayout mirrors Kira Studio's own DefaultLayout, minus the two dropped panels.
@@ -28,8 +39,13 @@ type PanelProjectPatch struct {
 	Width   *float64 `json:"width,omitempty"`
 }
 
+type PanelAdePatch struct {
+	Width *float64 `json:"width,omitempty"`
+}
+
 type PanelsPatch struct {
 	Project *PanelProjectPatch `json:"project,omitempty"`
+	Ade     *PanelAdePatch     `json:"ade,omitempty"`
 }
 
 type LayoutPatch struct {

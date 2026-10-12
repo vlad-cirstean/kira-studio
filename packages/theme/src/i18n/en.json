@@ -7156,6 +7156,33 @@
         "label": "Workflows"
       }
     },
+    "gitCredential": {
+      "dialog": {
+        "title": "Git credentials"
+      }
+    },
+    "mobilePairing": {
+      "dialog": {
+        "title": "Phone wants to view the agents board"
+      },
+      "from": {
+        "label": "From {address}"
+      },
+      "intro": {
+        "body": "A phone on your network wants read-only access to the agents board. Approve only if the code below matches the one on the phone."
+      },
+      "says": {
+        "label": "Says it is: {name}"
+      },
+      "unnamed": {
+        "label": "Unnamed phone"
+      }
+    },
+    "operations": {
+      "clearHint": {
+        "hint": "Clears this window’s list only. The log resets when Kira Space quits."
+      }
+    },
     "repo": {
       "blame": {
         "line": {
@@ -7440,11 +7467,6 @@
       }
     },
     "settings": {
-      "seed": {
-        "label": "Settings seed placeholder"
-      }
-    },
-    "workbench": {
       "advanced": {
         "gitLogLevel": {
           "description": "Kira Space’s own diagnostic log verbosity.",
@@ -7532,12 +7554,7 @@
           "label": "Weekly"
         }
       },
-      "gitCredential": {
-        "dialog": {
-          "title": "Git credentials"
-        }
-      },
-      "gitSettings": {
+      "git": {
         "fetchInterval": {
           "description": "Zero disables background fetching. It never prompts for a credential. After a credential or remote error it stops until the next explicit fetch, and network errors retry with backoff.",
           "label": "Auto-fetch interval (minutes)"
@@ -7656,32 +7673,30 @@
           "title": "Trust network?"
         }
       },
-      "mobilePairing": {
-        "dialog": {
-          "title": "Phone wants to view the agents board"
-        },
-        "from": {
-          "label": "From {address}"
-        },
-        "intro": {
-          "body": "A phone on your network wants read-only access to the agents board. Approve only if the code below matches the one on the phone."
-        },
-        "says": {
-          "label": "Says it is: {name}"
-        },
-        "unnamed": {
-          "label": "Unnamed phone"
-        }
-      },
-      "operations": {
-        "clearHint": {
-          "hint": "Clears this window’s list only. The log resets when Kira Space quits."
-        }
-      },
-      "settings": {},
-      "settingsNav": {
+      "nav": {
         "mobileAccess": {
           "label": "Mobile access"
+        }
+      }
+    },
+    "shortcuts": {
+      "palette": {
+        "closeTab": {
+          "label": "Close current tab"
+        },
+        "empty": "No commands match",
+        "nextTab": {
+          "label": "Go to next tab"
+        },
+        "placeholder": "Search commands",
+        "previousTab": {
+          "label": "Go to previous tab"
+        },
+        "toggleOperationsPanel": {
+          "label": "Show or hide operations"
+        },
+        "toggleProjectPanel": {
+          "label": "Show or hide repositories"
         }
       }
     }

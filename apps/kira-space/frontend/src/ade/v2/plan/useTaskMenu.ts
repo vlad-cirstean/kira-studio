@@ -95,7 +95,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
           });
           return;
         case 'link':
-          return await control.linkOpenExternal(cmd.url);
+          return await control.openExternal(cmd.url);
         case 'copy':
           await copy(cmd.text);
           return;

@@ -33,7 +33,7 @@ const fieldId = useId();
 <template>
   <Field>
     <div class="flex items-center justify-between gap-1">
-      <Label :for="fieldId">{{ t('space.workbench.appearance.commitDate.label') }}</Label>
+      <Label :for="fieldId">{{ t('space.settings.appearance.commitDate.label') }}</Label>
       <TooltipIconButton
         icon="discard"
         :label="t('common.action.resetToDefault.label')"
@@ -51,9 +51,9 @@ const fieldId = useId();
       :model-value="appearance.dateFormat"
       @update:model-value="onDateFormatChange"
     >
-      <option value="relative">{{ t('space.workbench.appearance.commitDate.relative.option') }}</option>
-      <option value="absolute">{{ t('space.workbench.appearance.commitDate.absolute.option') }}</option>
+      <option value="relative">{{ t('space.settings.appearance.commitDate.relative.option') }}</option>
+      <option value="absolute">{{ t('space.settings.appearance.commitDate.absolute.option') }}</option>
     </NativeSelect>
-    <FieldDescription>{{ t('space.workbench.appearance.commitDate.description') }}</FieldDescription>
+    <FieldDescription>{{ t('space.settings.appearance.commitDate.description') }}</FieldDescription>
   </Field>
 </template>

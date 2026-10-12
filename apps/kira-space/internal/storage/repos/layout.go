@@ -26,6 +26,7 @@ func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	result := model.DefaultLayout()
 	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
 	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
+	appsettings.LeafValid(stored, "panel.ade.width", &result.Panel.Ade.Width, model.ValidAdePanelWidth)
 	return result
 }
 
@@ -37,7 +38,7 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	return decodeLayout(stored), nil
 }
 
-// Set writes both leaves every time, mirroring Kira Studio's own LayoutRepo.Set (the read-modify-
+// Set writes every leaf every time, mirroring Kira Studio's own LayoutRepo.Set (the read-modify-
 // write runs inside one transaction — storage/db.go's SetMaxOpenConns(1) makes that transaction's
 // Begin() hold the database's one connection exclusively until Commit/Rollback, so no concurrent
 // Set can race it — same C7/F7 fix Kira Studio's own copy documents).
@@ -45,18 +46,22 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 	var merged model.Layout
 	err := appstorage.UpdateLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL, func(tx *sql.Tx, stored map[string]json.RawMessage) error {
 		merged = decodeLayout(stored)
-		if p := patch.Panel; p != nil && p.Project != nil {
-			if p.Project.Visible != nil {
+		if p := patch.Panel; p != nil {
+			if p.Project != nil && p.Project.Visible != nil {
 				merged.Panel.Project.Visible = *p.Project.Visible
 			}
-			if p.Project.Width != nil {
+			if p.Project != nil && p.Project.Width != nil {
 				merged.Panel.Project.Width = *p.Project.Width
+			}
+			if p.Ade != nil && p.Ade.Width != nil {
+				merged.Panel.Ade.Width = *p.Ade.Width
 			}
 		}
 
 		return appstorage.UpsertLeafList(tx, "ui_layout", []appstorage.Leaf{
 			{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
 			{Key: "panel.project.width", Value: merged.Panel.Project.Width},
+			{Key: "panel.ade.width", Value: merged.Panel.Ade.Width},
 		})
 	})
 	if err != nil {

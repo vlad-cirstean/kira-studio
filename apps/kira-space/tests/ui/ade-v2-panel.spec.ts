@@ -294,9 +294,7 @@ test('dragging the handle persists the dragged width; a click persists nothing',
   const widthWrites = () =>
     control
       .log()
-      .filter(
-        (e) => e.channel === IPC.settingsSet && JSON.stringify(e.args).includes('panelWidth'),
-      );
+      .filter((e) => e.channel === IPC.layoutSet && JSON.stringify(e.args).includes('"ade"'));
   await page.mouse.click(x, y);
   expect(widthWrites()).toHaveLength(0);
   await page.mouse.move(x, y);
@@ -304,7 +302,9 @@ test('dragging the handle persists the dragged width; a click persists nothing',
   await page.mouse.move(x - 120, y, { steps: 6 });
   await page.mouse.up();
   await expect.poll(() => widthWrites()).toHaveLength(1);
-  expect(widthWrites()[0]?.args).toEqual({ patch: { ade: { panelWidth: startWidth + 120 } } });
+  expect(widthWrites()[0]?.args).toEqual({
+    patch: { panel: { ade: { width: startWidth + 120 } } },
+  });
 });
 
 test('arrow keys on the handle resize and persist the panel width', async ({ relaunch }) => {
@@ -317,12 +317,10 @@ test('arrow keys on the handle resize and persist the panel width', async ({ rel
   const writes = () =>
     control
       .log()
-      .filter(
-        (e) => e.channel === IPC.settingsSet && JSON.stringify(e.args).includes('panelWidth'),
-      );
+      .filter((e) => e.channel === IPC.layoutSet && JSON.stringify(e.args).includes('"ade"'));
   await expect.poll(() => writes().length).toBe(1);
-  const patch = writes()[0]?.args as { patch: { ade: { panelWidth: number } } };
-  expect(patch.patch.ade.panelWidth).toBeGreaterThan(startWidth);
+  const patch = writes()[0]?.args as { patch: { panel: { ade: { width: number } } } };
+  expect(patch.patch.panel.ade.width).toBeGreaterThan(startWidth);
 });
 
 test('the Advanced switch saves ade.headlessSettingSources with the dialog', async ({

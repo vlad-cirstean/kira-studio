@@ -4,8 +4,6 @@ import ScheduleConfirmHost from '@workbench/automations/schedule/ScheduleConfirm
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
-import { runCommand } from '@workbench/shortcuts/commands';
-import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed } from 'vue';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
@@ -20,13 +18,9 @@ import StatusBar from './StatusBar.vue';
 // alongside `terminal` and `ade` — the per-module "+" branch this file used to hold moved into the
 // module itself (repo/GitNewTab.vue), the same shape Kira Studio's own automations module took at
 // P128 §2.4. This file keeps only this app's own per-app content: the mode-scoped left-panel
-// lookup and the "view.find" keydown binding.
+// lookup.
 const layoutStore = useLayoutStore();
 const modeStore = useModeStore();
-
-// 'view.find' is the one id with no Go menu item, so it binds through a local keydown here.
-// Menu-backed shortcuts (Cmd+J included) reach the renderer only as menu channels (App.vue).
-useShortcut(window, ['view.find'], (id) => runCommand(id));
 
 // P129 Part 3 §0.12/§0.13/§2.1: a `layout: 'full'` module (`ade`) has no panel/start/newTab at all
 // — `def`'s own `layout` discriminant is what every computed below narrows on, so a `FullModeDef`

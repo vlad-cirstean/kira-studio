@@ -21,14 +21,14 @@ const windows = computed(() => {
   const d = data.value;
   if (d?.state !== 'ok') return [];
   return [
-    { label: t('space.workbench.claudeUsage.session.label'), long: t('space.workbench.claudeUsage.fiveHourLong.label'), window: d.fiveHour },
-    { label: t('space.workbench.claudeUsage.weeklyLong.label'), long: t('space.workbench.claudeUsage.weeklyLong.label'), window: d.sevenDay },
+    { label: t('space.settings.claudeUsage.session.label'), long: t('space.settings.claudeUsage.fiveHourLong.label'), window: d.fiveHour },
+    { label: t('space.settings.claudeUsage.weeklyLong.label'), long: t('space.settings.claudeUsage.weeklyLong.label'), window: d.sevenDay },
   ].filter((w): w is { label: string; long: string; window: ClaudeUsageWindow } => w.window !== null);
 });
 
 const text = computed(() => {
-  if (isError.value && windows.value.length === 0) return t('space.workbench.claudeUsage.unavailable.status');
-  if (windows.value.length === 0) return t('space.workbench.claudeUsage.unknown.status');
+  if (isError.value && windows.value.length === 0) return t('space.settings.claudeUsage.unavailable.status');
+  if (windows.value.length === 0) return t('space.settings.claudeUsage.unknown.status');
   return windows.value
     .map((w) => t('common.progressPercent.label', { label: w.label, percent: Math.round(w.window.usedPercent) }))
     .join(' · ');
@@ -45,7 +45,7 @@ const lines = computed(() =>
   windows.value.map((w) => {
     const when = formatDateTime(w.window.resetsAt);
     const left = formatDuration(Math.max(0, Math.round((w.window.resetsAt - now.value.getTime()) / 60_000)) * 60_000);
-    return t('space.workbench.claudeUsage.line.status', { window: w.long, percent: Math.round(w.window.usedPercent), when, left });
+    return t('space.settings.claudeUsage.line.status', { window: w.long, percent: Math.round(w.window.usedPercent), when, left });
   }),
 );
 
@@ -53,11 +53,11 @@ const sourceLine = computed(() => {
   const d = data.value;
   if (d?.state !== 'ok') return '';
   const when = formatRelative(d.updatedAt, now.value.getTime());
-  return t(d.source === 'run' ? 'space.workbench.claudeUsage.sourceRun.status' : 'space.workbench.claudeUsage.sourceSession.status', { when });
+  return t(d.source === 'run' ? 'space.settings.claudeUsage.sourceRun.status' : 'space.settings.claudeUsage.sourceSession.status', { when });
 });
 
 const detail = computed(() => {
-  if (isError.value && windows.value.length === 0) return t('space.workbench.claudeUsage.readFailed.error');
+  if (isError.value && windows.value.length === 0) return t('space.settings.claudeUsage.readFailed.error');
   return data.value?.state === 'ok' ? '' : (data.value?.detail ?? '');
 });
 </script>

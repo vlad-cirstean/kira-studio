@@ -1,6 +1,7 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import { i18n, installCopyTestHook } from '@theme/i18n';
 import { bootstrapShell } from '@workbench/bootstrapShell';
+import { logError } from '@workbench/bridge/log';
 import { windowKey } from '@workbench/lib/window';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
@@ -12,6 +13,7 @@ import { adeReaderKey } from './ade/v2/reader';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { controlAdeReader } from './bridge/adeReader';
 import { control } from './bridge/control';
+import { useAdeLayoutStore } from './state/adeLayout';
 import { installAgentNotifyFocus } from './state/agentNotify';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
@@ -54,6 +56,7 @@ async function mountShell(): Promise<void> {
   const appMetricsStore = useAppMetricsStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const layoutStore = useLayoutStore(pinia);
+  const adeLayoutStore = useAdeLayoutStore(pinia);
   const modeStore = useModeStore(pinia);
   const settingsStore = useSettingsStore(pinia);
   const codeReposStore = useCodeReposStore(pinia);
@@ -86,6 +89,7 @@ async function mountShell(): Promise<void> {
 
   await Promise.all([
     layoutStore.hydrateLayout(),
+    adeLayoutStore.hydrate(),
     settingsStore.hydrateSettings(),
     codeReposStore.initCodeRepos(),
     tabsStore.hydrateTabs(),
@@ -114,7 +118,7 @@ async function mountShell(): Promise<void> {
   ]);
   for (const result of optional) {
     if (result.status === 'rejected') {
-      console.error('bootstrap: optional store hydrate failed', result.reason);
+      logError('bootstrap', 'optional store hydrate failed', result.reason);
     }
   }
 

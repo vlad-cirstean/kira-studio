@@ -34,7 +34,6 @@ import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 const NOW = 1790067000000 + 220_000;
 const TODAY = '2026-09-22';
 const SETTINGS = {
-  panelWidth: 0,
   horizonDays: 14,
   historyDays: 14,
   extraDays: [] as string[],

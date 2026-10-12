@@ -388,7 +388,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     // Answered entirely here (no repoId, no socket round trip) rather than forwarded — Go's
     // gitrpc has no case for it at all.
     'link.openExternal': async ({ url }) => {
-      await control.linkOpenExternal(url);
+      await control.openExternal(url);
       return {};
     },
 

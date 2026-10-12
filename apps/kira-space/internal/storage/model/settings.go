@@ -57,9 +57,6 @@ type GitSettings struct {
 // AdeSettings is P129 Part 2 §7's own UiPrefs-as-settings-leaves: Part 3's queue-board layout and
 // planning-horizon preferences, persisted so they survive a relaunch. No UI reads them yet.
 type AdeSettings struct {
-	// PanelWidth is the queue side panel's own width in px; 0 means "half the window" (Part 3's own
-	// layout default) rather than a literal zero-width panel.
-	PanelWidth      int      `json:"panelWidth"`
 	HorizonDays     int      `json:"horizonDays"`
 	HistoryDays     int      `json:"historyDays"`
 	ExtraDays       []string `json:"extraDays"`
@@ -137,7 +134,6 @@ func DefaultGitSettings() GitSettings {
 // DefaultAdeSettings mirrors settingsDomain.ts's own adeSettingsSchema defaults (P129 Part 2 §7).
 func DefaultAdeSettings() AdeSettings {
 	return AdeSettings{
-		PanelWidth:      0,
 		HorizonDays:     14,
 		HistoryDays:     14,
 		ExtraDays:       []string{},
@@ -197,7 +193,6 @@ type GitPatch struct {
 
 // AdePatch mirrors AdeSettings' own `.partial()` shape (§7).
 type AdePatch struct {
-	PanelWidth      *int      `json:"panelWidth,omitempty"`
 	HorizonDays     *int      `json:"horizonDays,omitempty"`
 	HistoryDays     *int      `json:"historyDays,omitempty"`
 	ExtraDays       *[]string `json:"extraDays,omitempty"`
@@ -285,12 +280,6 @@ func validateGitSection(g *GitPatch) error {
 	return nil
 }
 
-// ValidAdePanelWidth mirrors settingsDomain.ts's adeSettingsSchema.panelWidth refinement: 0 (="half
-// the window") or an explicit 340..4000 drag width.
-func ValidAdePanelWidth(v int) bool {
-	return v == 0 || (v >= 340 && v <= 4000)
-}
-
 // ValidAdeHeadlessSettingSources mirrors adeSettingsSchema.headlessSettingSources' enum.
 func ValidAdeHeadlessSettingSources(v string) bool {
 	return v == "user" || v == "all"
@@ -327,9 +316,6 @@ func ValidAdeDateList(vs []string) bool {
 func validateAdeSection(a *AdePatch) error {
 	if a == nil {
 		return nil
-	}
-	if a.PanelWidth != nil && !ValidAdePanelWidth(*a.PanelWidth) {
-		return fmt.Errorf("model: ade.panelWidth: invalid value %d", *a.PanelWidth)
 	}
 	if a.HorizonDays != nil && !ValidAdeHorizonDays(*a.HorizonDays) {
 		return fmt.Errorf("model: ade.horizonDays: out of range value %d", *a.HorizonDays)

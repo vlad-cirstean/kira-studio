@@ -7,6 +7,7 @@ import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -154,7 +155,7 @@ function copyLink(key: string, text: string): void {
 }
 function open(url: string, e: MouseEvent): void {
   e.preventDefault();
-  void control.linkOpenExternal(url);
+  fireAndForget(control.openExternal(url), 'ade.branch');
 }
 
 const repoInfo = computed(() =>
