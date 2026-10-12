@@ -8,6 +8,7 @@ import * as FiltersService from '@bindings/filtersservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
+import * as LlmPromptsService from '@bindings/llmpromptsservice.js';
 import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
@@ -459,6 +460,7 @@ export const control = {
     keepAwake: KeepAwakeService,
     update: UpdateService,
     prompts: PromptsService,
+    llmPrompts: LlmPromptsService,
   }),
   ...apiControl,
   ...studioControl,

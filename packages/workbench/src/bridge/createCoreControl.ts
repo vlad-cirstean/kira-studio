@@ -1,4 +1,13 @@
 import type { LayoutPatch } from '@shared/domain/layout';
+import {
+  type LlmPromptChange,
+  type LlmPromptList,
+  type LlmPromptPreview,
+  type LlmPromptPreviewArgs,
+  type LlmPromptsChangedEvent,
+  llmPromptListSchema,
+  llmPromptPreviewSchema,
+} from '@shared/domain/llmPrompts';
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
@@ -91,6 +100,11 @@ export interface CoreBindings {
     Status(): Promise<unknown>;
     InstallUpdate(): Promise<void>;
     CancelInstall(): Promise<void>;
+  };
+  llmPrompts: {
+    List(): Promise<unknown>;
+    Save(a: { changes: LlmPromptChange[] }): Promise<unknown>;
+    Preview(a: { id: string; text?: string; vars?: unknown }): Promise<unknown>;
   };
   prompts: {
     List(): Promise<unknown>;
@@ -208,6 +222,11 @@ export interface CoreControl<S, L, T, P, M> {
   promptsSendTest: () => Promise<void>;
   onPromptsChanged: (cb: (prompts: RoutedPrompt[]) => void) => () => void;
   onPromptsReveal: (cb: (event: { id: string }) => void) => () => void;
+  // The editable LLM prompt registry (internal/llmprompts) — see llmPrompts/queries.ts.
+  llmPromptsList: () => Promise<LlmPromptList>;
+  llmPromptsSave: (changes: LlmPromptChange[]) => Promise<LlmPromptList>;
+  llmPromptsPreview: (args: LlmPromptPreviewArgs) => Promise<LlmPromptPreview>;
+  onLlmPromptsChanged: (cb: (event: LlmPromptsChangedEvent) => void) => () => void;
 }
 
 export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S, L, T, P, M> {
@@ -314,5 +333,14 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
       on(CHANNEL.promptsChanged, (p) => cb(trust<RoutedPrompt[]>(p ?? []))),
     onPromptsReveal: (cb: (event: { id: string }) => void): (() => void) =>
       on(CHANNEL.promptsReveal, (e) => cb(trust<{ id: string }>(e))),
+
+    llmPromptsList: (): Promise<LlmPromptList> =>
+      unwrap(b.llmPrompts.List()).then((r) => llmPromptListSchema.parse(r)),
+    llmPromptsSave: (changes: LlmPromptChange[]): Promise<LlmPromptList> =>
+      unwrap(b.llmPrompts.Save({ changes })).then((r) => llmPromptListSchema.parse(r)),
+    llmPromptsPreview: ({ id, text, vars }: LlmPromptPreviewArgs): Promise<LlmPromptPreview> =>
+      unwrap(b.llmPrompts.Preview({ id, text, vars })).then((r) => llmPromptPreviewSchema.parse(r)),
+    onLlmPromptsChanged: (cb: (event: LlmPromptsChangedEvent) => void): (() => void) =>
+      on(CHANNEL.llmPromptsChanged, (e) => cb(trust<LlmPromptsChangedEvent>(e))),
   };
 }

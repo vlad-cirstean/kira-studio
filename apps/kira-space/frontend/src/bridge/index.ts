@@ -10,6 +10,7 @@ import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
+import * as LlmPromptsService from '@bindings/llmpromptsservice.js';
 import * as MobileAccessService from '@bindings/mobileaccessservice.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as PromptsService from '@bindings/promptsservice.js';
@@ -480,6 +481,7 @@ export const control = {
     keepAwake: KeepAwakeService,
     update: UpdateService,
     prompts: PromptsService,
+    llmPrompts: LlmPromptsService,
   }),
   ...memoryControl,
   ...spaceControl,

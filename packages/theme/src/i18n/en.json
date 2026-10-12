@@ -5312,6 +5312,160 @@
           "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
         }
       }
+    },
+    "kind": {
+      "argument": {
+        "description": "The description an agent reads for this tool argument."
+      },
+      "fragment": {
+        "description": "A shared paragraph that other prompts include."
+      },
+      "instructions": {
+        "description": "Server instructions an MCP client reads once, when it connects."
+      },
+      "message": {
+        "description": "A message sent to an agent. Variables are filled in when it is sent."
+      },
+      "suffix": {
+        "description": "A closing instruction added to the end of an agent prompt."
+      },
+      "system": {
+        "description": "A system prompt sent with a Claude call. The reply follows a fixed schema."
+      },
+      "tool": {
+        "description": "The description an agent reads for this MCP tool."
+      },
+      "toolResult": {
+        "description": "Text a tool returns to the agent to steer its next step."
+      }
+    },
+    "var": {
+      "autostash": {
+        "description": "True when git rebase runs with --autostash."
+      },
+      "base": {
+        "description": "The branch the work is based on."
+      },
+      "branch": {
+        "description": "The branch name."
+      },
+      "cause": {
+        "description": "The reason the notice appears."
+      },
+      "context": {
+        "description": "Extra lines added after the prompt, one per entry."
+      },
+      "default": {
+        "description": "The value used when the argument is left out."
+      },
+      "extra": {
+        "description": "A line added after the prompt, such as a failure notice."
+      },
+      "finish": {
+        "description": "The variables of the finish instruction."
+      },
+      "from": {
+        "description": "The name of the step that failed."
+      },
+      "implicit": {
+        "description": "True when the step declares no results beyond done and failed."
+      },
+      "jiraKey": {
+        "description": "The Jira key. Empty when the task has none."
+      },
+      "jiraURL": {
+        "description": "The Jira link. Empty when the task has none."
+      },
+      "max": {
+        "description": "The upper bound of the argument."
+      },
+      "maxEvidence": {
+        "description": "The longest evidence quote, in characters."
+      },
+      "maxFacts": {
+        "description": "The most facts one chunk may yield."
+      },
+      "maxItems": {
+        "description": "The most items one store_memory call may carry."
+      },
+      "maxKeywords": {
+        "description": "The most keywords the gate may give a fact."
+      },
+      "maxReason": {
+        "description": "The longest reason, in characters."
+      },
+      "message": {
+        "description": "A message that replaces the composed prompt. Empty by default."
+      },
+      "notes": {
+        "description": "The task notes, cut to 2000 characters."
+      },
+      "onto": {
+        "description": "The branch or ref the rebase goes onto."
+      },
+      "outcome": {
+        "description": "How the last rebase ended, as a short phrase."
+      },
+      "push": {
+        "description": "True when the rebase pushes the rebased branches."
+      },
+      "readOnlyRoot": {
+        "description": "The folder of a read-only repository. Empty for a writable one."
+      },
+      "reason": {
+        "description": "Why it failed."
+      },
+      "remote": {
+        "description": "The remote to fetch first. Empty when the rebase does not fetch."
+      },
+      "repo": {
+        "description": "The repository name."
+      },
+      "repos": {
+        "description": "The repositories of the task, each with its branch and worktree."
+      },
+      "results": {
+        "description": "The results the step may end with, each with an ID, a description and an ok flag."
+      },
+      "review": {
+        "description": "A review branch the rebase must leave alone. Empty when there is none."
+      },
+      "runID": {
+        "description": "The run ID to pass to run_outcome."
+      },
+      "space": {
+        "description": "True when the Kira Space tools are on."
+      },
+      "stack": {
+        "description": "The branches to rebase, root first, each with its worktree and parent."
+      },
+      "stageName": {
+        "description": "The stage name."
+      },
+      "stagePrompt": {
+        "description": "The stage’s own prompt with placeholders filled in."
+      },
+      "stepCount": {
+        "description": "The number of steps in the stage."
+      },
+      "stepName": {
+        "description": "The step name."
+      },
+      "stepNumber": {
+        "description": "The position of the step in its stage, starting at 1."
+      },
+      "stepPrompt": {
+        "description": "The step’s own prompt with placeholders filled in."
+      },
+      "text": {
+        "description": "The text to remember. Empty when none was given."
+      },
+      "title": {
+        "description": "The task title."
+      },
+      "worktree": {
+        "description": "The worktree path."
+      }
     }
   },
   "memory": {
