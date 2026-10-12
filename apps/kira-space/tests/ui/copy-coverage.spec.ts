@@ -200,7 +200,13 @@ test('repositories dialog', async ({ relaunch }) => {
 test('settings dialog, every pane', async ({ relaunch }) => {
   const status = contract<{ command: string }>('memory-settings', 'MemoryService.McpStatus');
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.memoryMcpStatus, response: status }],
+    control: [
+      { channel: IPC.memoryMcpStatus, response: status },
+      {
+        channel: IPC.memoryCommentCheck,
+        response: contract('memory-settings', 'MemoryService.CommentCheck'),
+      },
+    ],
   });
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-dialog')).waitFor();

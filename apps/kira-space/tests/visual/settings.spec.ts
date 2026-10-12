@@ -19,6 +19,15 @@ for (const section of sections) {
             probed: [],
           },
         },
+        {
+          channel: IPC.memoryCommentCheck,
+          response: {
+            executable: '/Applications/Kira Space',
+            installCommand: "'/Applications/Kira Space' memory-check --install-hook",
+            hookLine:
+              "if [ -x '/Applications/Kira Space' ]; then '/Applications/Kira Space' memory-check --staged; fi",
+          },
+        },
       ],
     });
     await window.click('[data-testid="open-settings"]');

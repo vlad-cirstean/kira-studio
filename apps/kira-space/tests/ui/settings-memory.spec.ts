@@ -43,6 +43,38 @@ test('contract: Connect Claude Code shows the registration command', async ({ re
   );
 });
 
+// Contract memory-settings. Backend half: memoryflow TestCommentCheckHook.
+test('contract: comment check shows the install commands and copies each', async ({ relaunch }) => {
+  const check = contract<{ installCommand: string; hookLine: string }>(
+    'memory-settings',
+    'MemoryService.CommentCheck',
+  );
+  expect(check.installCommand).toContain('memory-check --install-hook');
+  expect(check.hookLine).toContain('memory-check --staged');
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.memoryCommentCheck, response: check }],
+  });
+  await openMemorySettings(page);
+  await expect(page.locator('[data-testid="memory-check-section"]')).toBeVisible();
+  await expect(page.locator('[data-testid="memory-check-install"]')).toHaveText(
+    check.installCommand,
+  );
+  await expect(page.locator('[data-testid="memory-check-hook"]')).toHaveText(check.hookLine);
+  await page.evaluate(() => {
+    const w = window as unknown as { __clipboard: string[] };
+    w.__clipboard = [];
+    navigator.clipboard.writeText = async (text: string) => {
+      w.__clipboard.push(text);
+    };
+  });
+  const copied = () =>
+    page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard);
+  await page.locator('[data-testid="memory-check-copy-install"]').click();
+  await expect.poll(copied).toEqual([check.installCommand]);
+  await page.locator('[data-testid="memory-check-copy-hook"]').click();
+  await expect.poll(copied).toEqual([check.installCommand, check.hookLine]);
+});
+
 for (const key of ['not-installed', 'cancelled'] as const) {
   test(`contract: semantic ${key}: download logs the install`, async ({ relaunch }) => {
     const status = contract<{ state: string }>(

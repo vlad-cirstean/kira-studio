@@ -1,4 +1,9 @@
 {
+  "MemoryService.CommentCheck": {
+    "executable": "<bin>/kira-space",
+    "hookLine": "if [ -x '<bin>/kira-space' ]; then '<bin>/kira-space' memory-check --staged; fi",
+    "installCommand": "'<bin>/kira-space' memory-check --install-hook"
+  },
   "MemoryService.InstallClaudeCode": {
     "detail": "",
     "outcome": "installed",
