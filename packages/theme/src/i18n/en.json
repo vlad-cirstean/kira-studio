@@ -12007,8 +12007,13 @@
       }
     },
     "findBar": {
-      "seed": {
-        "label": "Find in view"
+      "region": {
+        "aria": "Find in view"
+      }
+    },
+    "identifier": {
+      "copy": {
+        "label": "Copy to clipboard"
       }
     },
     "opLog": {

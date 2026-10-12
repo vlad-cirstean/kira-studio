@@ -15,7 +15,6 @@ const SKIP_FILE = /(?:\.spec\.ts|\.test\.ts|_test\.go|\.d\.ts|\.check\.ts)$/;
 /** P267 F0 seeds: keys with no caller yet, one per object so writers merge cleanly. A writer deletes its seed when it adds a real key (F1/F2/streams); empty by P267 close. */
 const SEEDS: ReadonlySet<string> = new Set([
   'theme.identifier.copy.label',
-  'workbench.findBar.seed.label',
 ]);
 const KEY_LITERAL = /["'`]([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+){2,5})["'`]/g;
 const KEY_PREFIX = /`([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+)*\.)\$\{/g;

@@ -278,7 +278,7 @@ defineExpose({ focusInput });
               v-model:whole-word="search.wholeWord.value"
               v-model:regex="search.regex.value"
               testid-prefix="search-toggle-"
-              match-case-test-id="search-toggle-case"
+              match-case-testid="search-toggle-case"
             />
           </section>
           <NativeSelect

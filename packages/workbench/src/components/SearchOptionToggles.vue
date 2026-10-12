@@ -2,57 +2,40 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
 
-// P113 F3: the match-case/whole-word/regex toggle trio — identical icons, labels, active-state
-// class and toggle shape — repeated across SearchToolbar.vue (the data views' find widget),
-// ResponseFindBar.vue (the HTTP response find widget) and kira-space's RepoSearchView.vue. A plain
-// fragment, not its own wrapping div: each caller's own wrapper already differs slightly (gap,
-// items-center, min-w-0), and reproducing one here would be a visual change nobody asked for —
-// this only replaces the three buttons themselves.
+// The match-case/whole-word/regex toggle trio shared by every find and search widget. A plain
+// fragment, not a wrapping element: each caller's wrapper differs (gap, items-center, min-w-0).
 defineProps<{
-  matchCase: boolean;
-  wholeWord: boolean;
-  regex: boolean;
-  /** Prepended to `match-case`/`whole-word`/`regex` for two of the three testids. Every site's own
-   *  testid already follows `${prefix}whole-word` / `${prefix}regex` (SearchToolbar.vue:
-   *  `${testidPrefix}search-`, ResponseFindBar.vue: `'http-find-'`, RepoSearchView.vue:
-   *  `'repo-search-'`) — only match-case needs its own override below (RepoSearchView.vue's own
-   *  testid there is `repo-search-case`, not `repo-search-match-case`). */
+  /** Prepended to `match-case`/`whole-word`/`regex` for the testids. */
   testidPrefix?: string;
-  /** Overrides `${testidPrefix}match-case` for the one site whose match-case testid doesn't follow
-   *  that pattern. */
-  matchCaseTestId?: string;
+  /** Overrides `${testidPrefix}match-case` for the one site whose testid does not follow that. */
+  matchCaseTestid?: string;
 }>();
 
-defineEmits<{
-  'update:matchCase': [value: boolean];
-  'update:wholeWord': [value: boolean];
-  'update:regex': [value: boolean];
-}>();
+const matchCase = defineModel<boolean>('matchCase', { required: true });
+const wholeWord = defineModel<boolean>('wholeWord', { required: true });
+const regex = defineModel<boolean>('regex', { required: true });
 </script>
 
 <template>
   <TooltipIconButton
     icon="case-sensitive"
     :label="t('workbench.search.matchCase.label')"
-    :class="{ 'bg-field text-fg': matchCase }"
-    :aria-pressed="matchCase"
-    :data-testid="matchCaseTestId ?? `${testidPrefix ?? ''}match-case`"
-    @click="$emit('update:matchCase', !matchCase)"
+    :pressed="matchCase"
+    :data-testid="matchCaseTestid ?? `${testidPrefix ?? ''}match-case`"
+    @click="matchCase = !matchCase"
   />
   <TooltipIconButton
     icon="whole-word"
     :label="t('workbench.search.wholeWord.label')"
-    :class="{ 'bg-field text-fg': wholeWord }"
-    :aria-pressed="wholeWord"
+    :pressed="wholeWord"
     :data-testid="`${testidPrefix ?? ''}whole-word`"
-    @click="$emit('update:wholeWord', !wholeWord)"
+    @click="wholeWord = !wholeWord"
   />
   <TooltipIconButton
     icon="regex"
     :label="t('workbench.search.regex.label')"
-    :class="{ 'bg-field text-fg': regex }"
-    :aria-pressed="regex"
+    :pressed="regex"
     :data-testid="`${testidPrefix ?? ''}regex`"
-    @click="$emit('update:regex', !regex)"
+    @click="regex = !regex"
   />
 </template>
