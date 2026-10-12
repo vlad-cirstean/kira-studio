@@ -100,9 +100,8 @@ test('QueryState: the loading spinner stays hidden at 100 ms and shows within 1 
   await modeTab(page, 'docker').click();
   await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
 
-  await page.waitForTimeout(100);
   const loading = page.locator('[data-testid="docker-panel"] [data-testid="query-loading"]');
-  await expect(loading).toHaveCount(0);
+  expect(await loading.count()).toBe(0);
   await expect(loading).toBeVisible({ timeout: 1000 });
 });
 

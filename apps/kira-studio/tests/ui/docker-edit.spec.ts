@@ -358,7 +358,7 @@ test('contract: failures keep the draft and explain the state', async ({ relaunc
   await tid(page, 'docker-edit-name').fill('kira-flow-other');
   await tid(page, 'docker-edit-apply-now').click();
   await expect(tid(page, 'docker-edit-stale')).toBeVisible();
-  await expect(tid(page, 'docker-edit-error')).toContainText('reload');
+  await expect(tid(page, 'docker-edit-error')).toContainText('Refresh the editor');
   await tid(page, 'docker-edit-reload').click();
   await expect(tid(page, 'docker-edit-stale')).toHaveCount(0);
   await expect(tid(page, 'docker-edit-name')).toHaveValue('kira-flow-edit');
