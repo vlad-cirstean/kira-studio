@@ -167,7 +167,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
 <template>
   <Dialog v-model:open="dialog.open">
     <DialogContent size="xl" fixed-height data-testid="repos-dialog">
-      <DialogHeader icon="repo" close-testid="repos-dialog-close">
+      <DialogHeader close-testid="repos-dialog-close">
         <DialogTitle>{{ t('common.module.repositories.label') }}</DialogTitle>
         <DialogDescription class="sr-only">{{
           t('space.repo.dialog.description.description')

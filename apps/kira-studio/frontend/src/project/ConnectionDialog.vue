@@ -693,7 +693,7 @@ const preconnectText = computed({
   <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
     <DialogContent size="xl" fixed-height data-testid="connection-dialog">
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
-      <DialogHeader v-if="step === 'engine'" icon="database" close-testid="connection-dialog-close">
+      <DialogHeader v-if="step === 'engine'" close-testid="connection-dialog-close">
         <DialogTitle>{{
           isEdit ? t('studio.project.connectionDialog.changeEngine.title') : t('studio.project.connectionDialog.newConnection.title')
         }}</DialogTitle>

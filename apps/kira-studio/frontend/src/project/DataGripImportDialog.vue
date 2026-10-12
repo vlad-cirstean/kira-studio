@@ -177,7 +177,7 @@ async function onConfirm(): Promise<void> {
     @update:open="(v) => !v && datagripImportStore.closeDataGripImportDialog()"
   >
     <DialogContent size="xl" fixed-height data-testid="datagrip-import-dialog">
-      <DialogHeader icon="database" close-testid="datagrip-import-dialog-close">
+      <DialogHeader close-testid="datagrip-import-dialog-close">
         <DialogTitle>{{
           report ? t('studio.project.dataGripImport.report.title') : t('studio.project.dataGripImport.dialog.title')
         }}</DialogTitle>

@@ -1960,6 +1960,7 @@
       "title": "Details"
     },
     "discard": {
+      "body": "Unsaved edits are lost.",
       "title": "Discard unsaved edits"
     },
     "done": {

@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import DialogOverlay from '@theme/components/ui/dialog/DialogOverlay.vue';
+import { CONFIRM_DISCARD_KEY, DIALOG_REQUEST_CLOSE_KEY } from '@theme/components/ui/dialog/discard';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { reactiveOmit } from '@vueuse/core';
 import type { DialogContentEmits, DialogContentProps } from 'reka-ui';
-import { DialogContent, DialogPortal, useForwardPropsEmits } from 'reka-ui';
+import {
+  DialogContent,
+  DialogPortal,
+  injectDialogRootContext,
+  useForwardPropsEmits,
+} from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
-import { computed } from 'vue';
+import { computed, inject, provide } from 'vue';
 import type { DialogContentSizeVariants } from '.';
 import { dialogContentSizeVariants } from '.';
 
@@ -22,16 +29,19 @@ const props = withDefaults(
       size: NonNullable<DialogContentSizeVariants['size']>;
       fixedHeight?: boolean;
       destructive?: boolean;
+      /** Unsaved edits: an outside click is ignored; Esc and the header X ask to discard first. */
+      dirty?: boolean;
     }
   >(),
   {
     fixedHeight: false,
     destructive: false,
+    dirty: false,
   },
 );
 const emits = defineEmits<DialogContentEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class', 'size', 'fixedHeight', 'destructive');
+const delegatedProps = reactiveOmit(props, 'class', 'size', 'fixedHeight', 'destructive', 'dirty');
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
@@ -45,6 +55,40 @@ function onOpenAutoFocus(event: Event): void {
   if (!target) return;
   event.preventDefault();
   target.focus();
+}
+
+const rootContext = injectDialogRootContext();
+const confirmDiscard = inject(CONFIRM_DISCARD_KEY, null);
+let asking = false;
+
+// Footer Cancel never asks: it is a plain DialogClose. Only the X and Esc route through here.
+async function requestClose(): Promise<void> {
+  if (asking) return;
+  if (props.dirty && confirmDiscard) {
+    asking = true;
+    try {
+      const discard = await confirmDiscard({
+        title: t('common.discard.title'),
+        body: t('common.discard.body'),
+        confirmLabel: t('common.action.discard.label'),
+      });
+      if (!discard) return;
+    } finally {
+      asking = false;
+    }
+  }
+  rootContext.onOpenChange(false);
+}
+provide(DIALOG_REQUEST_CLOSE_KEY, requestClose);
+
+function onEscapeKeyDown(event: KeyboardEvent): void {
+  if (!props.dirty) return;
+  event.preventDefault();
+  void requestClose();
+}
+
+function onPointerDownOutside(event: Event): void {
+  if (props.dirty) event.preventDefault();
 }
 
 const contentClass = computed(() =>
@@ -63,7 +107,10 @@ const contentClass = computed(() =>
       data-slot="dialog-content"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="contentClass"
+      :data-dirty="dirty || undefined"
       @open-auto-focus="onOpenAutoFocus"
+      @escape-key-down="onEscapeKeyDown"
+      @pointer-down-outside="onPointerDownOutside"
     >
       <slot />
     </DialogContent>

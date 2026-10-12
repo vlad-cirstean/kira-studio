@@ -11,6 +11,8 @@ export { default as DialogHeader } from '@theme/components/ui/dialog/DialogHeade
 export { default as DialogOverlay } from '@theme/components/ui/dialog/DialogOverlay.vue';
 export { default as DialogTitle } from '@theme/components/ui/dialog/DialogTitle.vue';
 export { default as DialogTrigger } from '@theme/components/ui/dialog/DialogTrigger.vue';
+export type { ConfirmDiscard, DiscardPrompt } from '@theme/components/ui/dialog/discard';
+export { CONFIRM_DISCARD_KEY } from '@theme/components/ui/dialog/discard';
 
 // P262 §2.2: shared class strings, also consumed by TextPromptDialog (non-portaled, own scrim).
 export const dialogHeaderClass =

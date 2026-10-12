@@ -187,7 +187,7 @@ const connectionName = computed(
     @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()"
   >
     <DialogContent size="lg" data-testid="filters-dialog">
-      <DialogHeader icon="filter" close-testid="filters-dialog-close">
+      <DialogHeader close-testid="filters-dialog-close">
         <DialogTitle>{{
           connectionName
             ? t('studio.project.filtersDialog.dialog.named.title', { connectionName })

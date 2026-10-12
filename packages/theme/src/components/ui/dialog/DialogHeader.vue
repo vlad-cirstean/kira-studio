@@ -2,15 +2,16 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import DialogClose from '@theme/components/ui/dialog/DialogClose.vue';
+import { DIALOG_REQUEST_CLOSE_KEY } from '@theme/components/ui/dialog/discard';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import type { HTMLAttributes } from 'vue';
+import { inject } from 'vue';
 import { dialogHeaderClass } from '.';
 
 const props = withDefaults(
   defineProps<{
     class?: HTMLAttributes['class'];
-    icon?: string;
     closable?: boolean;
     closeTestid?: string;
   }>(),
@@ -18,27 +19,37 @@ const props = withDefaults(
     closable: true,
   },
 );
+
+// Inside a `DialogContent` the X closes through its dirty guard; elsewhere it is a plain close.
+const requestClose = inject(DIALOG_REQUEST_CLOSE_KEY, null);
 </script>
 
 <template>
   <div data-slot="dialog-header" :class="cn(dialogHeaderClass, props.class)">
-    <span
-      v-if="icon"
-      class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"
-    >
-      <CodiconIcon :name="icon" :size="13" />
-    </span>
     <slot />
-    <DialogClose v-if="closable" as-child>
+    <template v-if="closable">
       <Button
+        v-if="requestClose"
         variant="ghost"
         size="icon-sm"
         class="ml-auto pointer-coarse:size-touch"
         :aria-label="t('common.action.close.label')"
         :data-testid="closeTestid"
+        @click="requestClose"
       >
         <CodiconIcon name="close" :size="13" />
       </Button>
-    </DialogClose>
+      <DialogClose v-else as-child>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="ml-auto pointer-coarse:size-touch"
+          :aria-label="t('common.action.close.label')"
+          :data-testid="closeTestid"
+        >
+          <CodiconIcon name="close" :size="13" />
+        </Button>
+      </DialogClose>
+    </template>
   </div>
 </template>
