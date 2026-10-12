@@ -884,3 +884,53 @@ symlink `node_modules`. `/home/user/kira-v22-base` is not P267's; leave it. Keep
 - Specs present: `apps/kira-studio/tests/ui/ui-leftovers.spec.ts`, `ui-leftovers-docker-automations.spec.ts`,
   `apps/kira-space/tests/ui/ui-leftovers.spec.ts`, `ui-leftovers-git.spec.ts`, `apps/kira-space/tests/mobile/ui-leftovers.spec.ts`,
   `packages/workbench/src/testing/ui/scenarios/automations-*.ts` (4); every §6.3 suite green; baselines listed.
+
+## Step R result
+
+Commits on `v2.0` after tip `b8970518b`:
+
+- `873b9138f` chore(lint): P267 guards U83-U103 (+ `check-theme-classes.sh` shadow rule, `split="path"` fix)
+- `1b1754a6e` chore(lint): built-in exempt stale check (13 dead entries removed)
+- `cff3991bb` refactor(p267): R handoffs, unresolved-component check
+- `83b120121` refactor(p267): shared spec helpers to support, non-component .ts to lib
+- `79ad0ed32` chore(lint): conventions N8-N12 (+ spec cases)
+- `c5222eb28` docs: `KIRA_*` table, `dateFormat` path, stream findings deleted
+
+Handoffs closed: `isPrimaryModifier` takes MouseEvent; `ade.reviewCode` in `shell.Shortcuts` and
+`CHANNEL.reviewCode`, used by Space; `close` emit for `LogLevelField`/`TextPromptDialog`; `TabStrip`
+chip focus after a keyboard move; `LogLines` follow control and `scrollToIndex`, Docker Follow and
+jump-to-end restored.
+
+Unresolved-component check: `vueCompilerOptions.checkUnknownComponents` in the five vue-tsc tsconfigs
+(proto extends Studio). Found and fixed missing imports in `GitPanel` (`RepoList`), `StashDetailPane`
+(`Spinner`), `WorktreeList` (`FieldError`), `ResourceDetail` (`KeyValueList`), `ConstraintsSection`
+(`SectionHeading`). `FindBar` keeps `<search>` as `<div role="search">` plus a biome-ignore, since
+`nativeTags` is not honoured by vue-tsc 3.3.11.
+
+PERMANENT lines in `check-ui-primitives.sh`: 59 at plan time, 29 at tip `b8970518b`, 38 now. Above the
+~24 target: the user-listed exemptions (U88 x3, U101 x2, U100, U91) plus U91 `UncommittedChangesStrip`
+(tooltip differs from label) and `U47 SearchResults` (listbox keys live in the combobox). `U47 SearchBox`
+deleted.
+
+Narrowings of the plan's wording:
+
+- N8 flags a helper only when 3+ lines and a verbatim copy (whitespace-normalised) in 2+ specs or of a
+  `support/` export. Name-only matching gave 249 hits, mostly one-line locator aliases (`t`, `row`).
+  Fixed 31 real copies by moving them into `support/` (`apiRows`, `connectionArgs`, `consolePages`,
+  `dockerFixture`, `repoRows`, `panelResize`, and existing `tree`, `tabs`, `apiMode`, `redisFixture`).
+- N10 names `CheetahProto.vue` (P165 prototype). N11 names `grid.edit` (bound by the grid engine).
+  N12 scans `apps/*/frontend/src` only.
+- N9: `rowVariants.ts`, `frames.ts` moved to `packages/theme/src/lib/`; `opLog.ts`,
+  `settingsPaneProps.ts` to `packages/workbench/src/lib/`.
+
+Undone, not verifiable here:
+
+- Specs the streams wrote and the spec helper moves touched were typechecked (tsgo) but not run; no UI,
+  e2e or visual suites per instruction.
+- `AdeAutomationsBlock.vue` keeps one bare `<button>`.
+- `apps/kira-studio/frontend/bindings/` is gitignored and was stale: it still bound the removed
+  `ConnectionsService.Reorder`, failing `mock-runtime-bindings.spec.ts` locally. Hand-trimmed; regenerate
+  with the Wails bindings task on a real box.
+
+Checks green at close: `bun run lint`, `typecheck`, `lint:go`, `lint:dead`, `test:unit` (1902 pass),
+`go test` for `internal/shell` and `apps/kira-space/internal/appshell`.
