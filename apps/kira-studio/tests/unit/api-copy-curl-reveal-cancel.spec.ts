@@ -65,5 +65,4 @@ test('close during a pending reveal stops the loop and leaves no plaintext behin
   expect(calls).toEqual(['vA']);
   expect(store.revealedSecretValues).toEqual({});
   expect(useVariableSetStore().revealedValues).toEqual({});
-  expect(store.revealing).toBe(false);
 });

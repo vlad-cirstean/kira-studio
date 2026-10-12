@@ -29,7 +29,16 @@ A8d 74feb65fe, A8e aceb1e1c3, A9 7085261eb. A10 sweep in the commit carrying thi
 - `EnvironmentSelect`, `MethodSelect` are `PickerTrigger` (size kira).
 - `isPrimaryModifier` type widened.
 - `CopyAsCurlDialog`: read-only fields only; no `dirty` on `DialogContent` (U100 hit kept).
-- Store busy flags (`ref` pending in Pinia stores) not converted to `useAsyncAction`.
+- Busy flags converted (B6): `datagripImport` store `busy` removed; `DataGripImportDialog` and
+  `StudioStart` use `useAsyncAction().pending`. `copyAsCurl` store `revealing` removed;
+  `CopyAsCurlDialog` uses `useAsyncAction().pending`. Files: `state/datagripImport.ts`,
+  `project/DataGripImportDialog.vue`, `workbench/panels/StudioStart.vue`, `api/state/curl.ts`,
+  `api/CopyAsCurlDialog.vue`, `tests/unit/api-copy-curl-reveal-cancel.spec.ts`.
+- Not converted: `collections` store `busy` (`api/state/collections.ts`) is a re-entry guard for
+  import/export that drives no button. HTTP/gRPC/Console `running` is run status from the runtime
+  record (Stop button), not a busy flag.
+- Named exemption candidate for R: U100 `api/CopyAsCurlDialog.vue`. Read-only `Textarea`, nothing
+  to discard, so `DialogContent` takes no `dirty`.
 - s3 `formatBytes` has no conformance text; Go test updated only where text exists.
 - `editDirty` now published by `DocumentView` and `KeyValuePane` through `usePublishEditDirty`.
 - Keyvalue edit-popover error is an `Alert` (testid `keyvalue-edit-error`); add popover gets

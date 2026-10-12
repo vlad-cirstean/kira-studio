@@ -158,7 +158,6 @@ interface CopyAsCurlDialogState {
   /** D10 step 3/§0.3: a second transient map with `revealedValues`' identical discipline — dropped
    *  on close, keyed by *name* here (not variable id) since that is what a `{{name}}` span carries. */
   revealedSecretValues: Record<string, string>;
-  revealing: boolean;
   /** A reveal failure's message — this dialog's own sink, never `variablesDialogState.error`
    *  (§1.4's "one-line generalization"). */
   error: string | null;
@@ -174,7 +173,6 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     environmentId: '',
     deferredNames: [],
     revealedSecretValues: {},
-    revealing: false,
     error: null,
   });
 
@@ -207,7 +205,6 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     state.collectionId = collectionId;
     state.environmentId = environmentId;
     state.deferredNames = [...deferredNames];
-    state.revealing = false;
     state.error = null;
     for (const key of Object.keys(state.revealedSecretValues)) {
       delete state.revealedSecretValues[key];
@@ -218,7 +215,6 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
   function closeCopyAsCurlDialog(): void {
     openSeq++;
     state.open = false;
-    state.revealing = false;
     state.resolved = null;
     // D10: nothing generated is ever persisted — dropped on close, the same discipline
     // `revealedValues` follows.
@@ -277,30 +273,25 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
   async function revealSecretValues(): Promise<void> {
     const { deferredNames, collectionId, environmentId } = state;
     const mySeq = openSeq;
-    state.revealing = true;
     state.error = null;
-    try {
-      for (const name of deferredNames) {
-        if (state.revealedSecretValues[name] !== undefined) continue;
-        const id = await findSecretVariableId(name, collectionId, environmentId);
-        if (mySeq !== openSeq) return;
-        if (!id) continue;
-        // Branch on this call's own return value, not on the shared revealedValues map: a stale
-        // success there for the same id must not mask a cancelled/unavailable/errored outcome.
-        const value = await useVariableSetStore().revealVariable(id, (message) => {
-          if (mySeq === openSeq) state.error = message;
-        });
-        if (mySeq !== openSeq) {
-          useVariableSetStore().clearRevealed();
-          return;
-        }
-        if (value !== undefined) {
-          state.revealedSecretValues[name] = value;
-          revealedSecretValuesExpiry.schedule(name);
-        }
+    for (const name of deferredNames) {
+      if (state.revealedSecretValues[name] !== undefined) continue;
+      const id = await findSecretVariableId(name, collectionId, environmentId);
+      if (mySeq !== openSeq) return;
+      if (!id) continue;
+      // Branch on this call's own return value, not on the shared revealedValues map: a stale
+      // success there for the same id must not mask a cancelled/unavailable/errored outcome.
+      const value = await useVariableSetStore().revealVariable(id, (message) => {
+        if (mySeq === openSeq) state.error = message;
+      });
+      if (mySeq !== openSeq) {
+        useVariableSetStore().clearRevealed();
+        return;
       }
-    } finally {
-      if (mySeq === openSeq) state.revealing = false;
+      if (value !== undefined) {
+        state.revealedSecretValues[name] = value;
+        revealedSecretValuesExpiry.schedule(name);
+      }
     }
   }
 

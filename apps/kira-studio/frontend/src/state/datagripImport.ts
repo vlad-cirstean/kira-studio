@@ -21,7 +21,6 @@ export function looksAlreadyImported(row: DataGripPreviewRow): boolean {
 export const useDatagripImportStore = defineStore('datagripImport', () => {
   const state = reactive({
     open: false,
-    busy: false,
     projectPath: '',
     preview: null as DataGripPreview | null,
     selected: new Set<string>(),
@@ -58,11 +57,9 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
 
   /** Opens the native folder picker and scans the chosen project (D13/D9). Returns false when the
    *  picker was cancelled or failed or the scan failed. A failure opens the dialog on its error
-   *  alert (a closed dialog would make it look like a cancelled picker). Ignored while a pick or
-   *  scan is in flight, so a double click cannot open two pickers. */
+   *  alert (a closed dialog would make it look like a cancelled picker). Callers own the pending
+   *  state (`useAsyncAction`), which also stops a double click opening two pickers. */
   async function pickAndScanDataGripProject(): Promise<boolean> {
-    if (state.busy) return false;
-    state.busy = true;
     state.error = null;
     let path: string;
     try {
@@ -71,14 +68,11 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
       path = chosen.path;
     } catch (err) {
       return failToDialog(err);
-    } finally {
-      state.busy = false;
     }
     return scanDataGripProject(path);
   }
 
   async function scanDataGripProject(path: string): Promise<boolean> {
-    state.busy = true;
     state.error = null;
     try {
       const preview = await control.datagripScan(path);
@@ -90,8 +84,6 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
       return true;
     } catch (err) {
       return failToDialog(err);
-    } finally {
-      state.busy = false;
     }
   }
 
@@ -111,7 +103,6 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
   async function confirmDataGripImport(): Promise<DataGripReport | null> {
     if (!state.preview || state.selected.size === 0) return null;
     const uuids = [...state.selected];
-    state.busy = true;
     state.error = null;
     try {
       const report = await control.datagripImport(state.projectPath, uuids);
@@ -120,8 +111,6 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
     } catch (err) {
       state.error = errorText(err);
       return null;
-    } finally {
-      state.busy = false;
     }
   }
 

@@ -19,6 +19,7 @@ import {
 import { FieldDescription } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
@@ -165,11 +166,12 @@ function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'w
   return { label: t('common.created.label'), tone: 'ok' };
 }
 
+// No auto-close after confirm: the store's `report` flips the template into the results view and
+// the user closes explicitly.
+const pick = useAsyncAction(() => datagripImportStore.pickAndScanDataGripProject());
+const confirm = useAsyncAction(() => datagripImportStore.confirmDataGripImport());
 async function onConfirm(): Promise<void> {
-  // Deliberately no auto-close here (review finding): confirmDataGripImport already stores its
-  // result on the store's own `report`, which flips the template below into the results view —
-  // the user closes explicitly once they have seen it.
-  await datagripImportStore.confirmDataGripImport();
+  await confirm.run();
 }
 </script>
 
@@ -340,8 +342,8 @@ async function onConfirm(): Promise<void> {
             variant="dialog"
             size="kira-lg"
             data-testid="datagrip-import-choose-another"
-            :pending="datagripImportStore.busy"
-            @click="datagripImportStore.pickAndScanDataGripProject"
+            :pending="pick.pending.value"
+            @click="pick.run"
           >
             {{ t('studio.project.dataGripImport.chooseAnother.label') }}
           </Button>
@@ -358,7 +360,7 @@ async function onConfirm(): Promise<void> {
             size="kira-lg"
             data-testid="datagrip-import-confirm"
             :disabled="checkedCount === 0"
-            :pending="datagripImportStore.busy"
+            :pending="confirm.pending.value"
             @click="onConfirm"
           >
             {{ t('studio.project.dataGripImport.import.label', { count: checkedCount }) }}

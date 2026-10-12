@@ -12,6 +12,7 @@ import {
 import { FieldDescription } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed } from 'vue';
 import { useCopyAsCurlStore } from './state/curl';
 
@@ -54,9 +55,7 @@ const hasDynamicValue = computed(() =>
   ),
 );
 
-function onReveal(): void {
-  void copyAsCurlStore.revealSecretValues();
-}
+const reveal = useAsyncAction(() => copyAsCurlStore.revealSecretValues());
 
 function onCopy(): void {
   copyAsCurlStore.copyCurlCommand();
@@ -92,9 +91,9 @@ function close(): void {
             <Button
               variant="dialog"
               size="kira"
-              :pending="copyAsCurlStore.revealing"
+              :pending="reveal.pending.value"
               data-testid="copy-as-curl-reveal"
-              @click="onReveal"
+              @click="reveal.run"
             >
               {{ t('studio.api.copyAsCurl.reveal.label') }}
             </Button>
