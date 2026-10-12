@@ -33,17 +33,18 @@ import (
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
+	"github.com/kirathecat/kira-studio/internal/memory/memcheck"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
-// RunArgvShim runs the askpass, memory-mcp and memory-embed subcommands, before anything
+// RunArgvShim runs the askpass, memory-mcp, memory-embed and memory-check subcommands, before anything
 // Wails-related, so they never start a window. memory-mcp is Claude Code's stdio MCP server; it runs
 // before startupfail and the single-instance lock, so it works while the window is open.
 // memory-embed is the ONNX embedding worker those processes and the app spawn; same ordering for
-// the same reason.
+// the same reason. memory-check is the kira-memory comment and doc validator, run as a git hook.
 func RunArgvShim(args []string) (code int, ok bool) {
 	if len(args) < 2 {
 		return 0, false
@@ -55,6 +56,8 @@ func RunArgvShim(args []string) (code int, ok bool) {
 		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json")), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
+	case "memory-check":
+		return memcheck.Run(args[2:], os.Stdout, os.Stderr), true
 	}
 	return 0, false
 }
