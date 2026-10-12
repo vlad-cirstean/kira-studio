@@ -19,5 +19,5 @@ watch(phase, (p, prev) => {
 
 <template>
   <RouterView />
-  <ConfirmDialog />
+  <ConfirmDialog touch />
 </template>

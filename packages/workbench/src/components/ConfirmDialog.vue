@@ -4,6 +4,8 @@ import { useFocusReturn } from '../behaviour/focus';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import ConfirmDialogView from './ConfirmDialogView.vue';
 
+defineProps<{ touch?: boolean }>();
+
 const confirmDialogStore = useConfirmDialogStore();
 
 // Focus goes back to whatever held it when the dialog opened (a row, a toolbar button).
@@ -35,6 +37,7 @@ watch(
     :tone="confirmDialogStore.tone"
     :pending="confirmDialogStore.busy"
     :error="confirmDialogStore.error"
+    :touch="touch"
     @confirm="confirmDialogStore.acceptConfirm()"
     @cancel="confirmDialogStore.cancelConfirm()"
   />
