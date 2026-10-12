@@ -30,10 +30,8 @@ const GIT_DATA = [
   /Paragraph \d|This paragraph exists|Co-authored-by|Signed-off-by/,
   /\bago\b|\d{4}|\bnow\b|\b\d+\s?(second|minute|hour|day|month|year)s?\b/,
   /^\s*[+-]?\d+\s*$/,
-  // git-core's compact ages (`2y`) and its preflight messages mirror Go and stay English (P266);
-  // `connection-state` is a text hook the e2e specs wait on.
+  // Compact ages (`2y`); `connection-state` is a text hook the e2e specs wait on.
   /^\d+[smhdwy]$/,
-  /^Name cannot be empty\.$/,
   /^(connecting|connected|error)$/,
   /^tmp\/$/,
   /^src$/,
