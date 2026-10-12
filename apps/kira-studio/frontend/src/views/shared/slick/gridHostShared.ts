@@ -23,7 +23,7 @@ export function gutterColumn(
   field: string,
   // biome-ignore lint/suspicious/noExplicitAny: see doc comment above.
   formatter: Column<any>['formatter'],
-  cellTestId: string,
+  cellTestid: string,
   headerCellAttrs?: Record<string, string>,
   // biome-ignore lint/suspicious/noExplicitAny: see doc comment above.
 ): Column<any> {
@@ -40,7 +40,7 @@ export function gutterColumn(
     selectable: true,
     cssClass: 'kira-gutter',
     formatter,
-    cellAttrs: { 'data-testid': cellTestId },
+    cellAttrs: { 'data-testid': cellTestid },
     ...(headerCellAttrs ? { headerCellAttrs } : {}),
   };
 }
