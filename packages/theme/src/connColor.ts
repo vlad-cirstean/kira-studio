@@ -1,4 +1,4 @@
-import { t } from '@theme/i18n';
+import { t } from './i18n/index.ts';
 
 // 'none' is a real, storable ConnectionColor (D18's default) — not merely a falsy value — so
 // every call site that decides whether to paint a mark must exclude it explicitly rather
