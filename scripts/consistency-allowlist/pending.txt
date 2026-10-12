@@ -140,7 +140,6 @@ U74 packages/workbench/src/automations/AutomationsPanel.vue
 U74 packages/workbench/src/automations/AutomationsStart.vue
 U74 packages/workbench/src/components/BootFailure.vue
 U74 packages/workbench/src/components/OpLogPanel.vue
-U74 packages/workbench/src/components/QueryState.vue
 U74 packages/workbench/src/memory/MemoryPanel.vue
 U74 packages/workbench/src/memory/MemoryStart.vue
 U74 packages/workbench/src/memory/import/ImportView.vue

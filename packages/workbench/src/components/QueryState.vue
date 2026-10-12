@@ -1,13 +1,16 @@
 <script setup lang="ts" generic="T">
+import { isRetryable } from '@shared/domain/errorCodes';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
+import { useTimeout } from '@vueuse/core';
 import type { Ref } from 'vue';
-import { computed } from 'vue';
-import { errorText } from '../bridge/codedError';
+import { computed, watch } from 'vue';
+import { TIMING } from '../behaviour/timing';
+import { errorText, toCodedError } from '../bridge/codedError';
 
 // The one loading / error / empty shell for bridge data. `pane` fills a panel or view body with an
 // Empty block (spinner, error with Retry); `inline` is a one-line state inside a list or popover.
@@ -47,6 +50,17 @@ const state = computed<'loading' | 'error' | 'empty' | 'data'>(() => {
   return empty ? 'empty' : 'data';
 });
 
+const canRetry = computed(() => state.value === 'error' && isRetryable(toCodedError(props.query.error.value).code));
+
+// A fast load never flashes the default spinner; a caller's own loading slot shows at once.
+const { ready: spinnerReady, start: startSpinnerDelay } = useTimeout(TIMING.spinnerDelay, { controls: true });
+watch(
+  () => state.value === 'loading',
+  (loading) => {
+    if (loading) startSpinnerDelay();
+  },
+);
+
 function retry(): void {
   void props.query.refetch();
 }
@@ -55,25 +69,26 @@ function retry(): void {
 <template>
   <template v-if="state === 'loading'">
     <slot name="loading">
-      <Empty v-if="variant === 'pane'" class="h-full" data-testid="query-loading">
-        <EmptyHeader>
-          <EmptyMedia><Spinner :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ loadingLabel }}</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
-      <InlineState v-else kind="loading" data-testid="query-loading">{{ loadingLabel }}</InlineState>
+      <template v-if="spinnerReady">
+        <EmptyState v-if="variant === 'pane'" class="h-full" data-testid="query-loading" :title="loadingLabel">
+          <template #media><Spinner :size="24" /></template>
+        </EmptyState>
+        <InlineState v-else kind="loading" data-testid="query-loading">{{ loadingLabel }}</InlineState>
+      </template>
     </slot>
   </template>
   <template v-else-if="state === 'error'">
     <slot name="error" :message="message" :retry="retry">
-      <Empty v-if="variant === 'pane'" class="h-full" data-testid="query-error">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="error" :size="24" class="text-error" /></EmptyMedia>
-          <EmptyTitle>{{ t('common.state.loadFailed.title') }}</EmptyTitle>
-          <EmptyDescription>{{ message }}</EmptyDescription>
-        </EmptyHeader>
-        <Button size="kira" variant="toolbar" data-testid="query-retry" @click="retry">{{ t('common.action.retry.label') }}</Button>
-      </Empty>
+      <EmptyState
+        v-if="variant === 'pane'"
+        class="h-full"
+        data-testid="query-error"
+        :title="t('common.state.loadFailed.title')"
+        :description="message"
+      >
+        <template #media><CodiconIcon name="error" :size="24" class="text-error" /></template>
+        <Button v-if="canRetry" size="kira" variant="toolbar" data-testid="query-retry" @click="retry">{{ t('common.action.retry.label') }}</Button>
+      </EmptyState>
       <InlineState v-else kind="error" data-testid="query-error">{{ message }}</InlineState>
     </slot>
   </template>
