@@ -481,3 +481,31 @@ ADE UI specs that open `AdeRunDialog`/`AdeStepInspector` mock `Preview` with con
   Space/Studio UI split fails because the pane is shared workbench code.
 - Defaults byte-identical, golden-tested: wording changes belong to P272-P276.
 - Guard = Go AST rules plus default-phrase scan over Go and TS: catches new prompts and copies.
+
+## Test and fix result
+
+Suites, all green after fixes: `bun run lint`, `lint:go` (0 issues), `typecheck`, `test:unit` (1902 pass),
+`go test ./...` (126 ok packages; flows both apps included), `test:ui:space` (561 pass), `test:ui:studio`
+`ui` project (537 pass), mobile ios/android (81 pass, 1 skip), visual both apps. `ui-timing` not run.
+
+Fixes:
+- `fix`: `catalog_test` rejected `i18n.T` calls with variable keys in `llmprompts/check.go` and
+  `validate.go`; both added to `wrappers`.
+- `refactor`: memory gate/reconcile/extract/finalize schemas now read via `Prompt.Schema()` from the
+  registry; local constants and drift tests deleted (plan §3.1: schemas move to registry).
+- `test`: visual baselines updated: Prompts nav row (settings, both apps); ADE workflow graph finish
+  note now backend-rendered (placeholder when Preview unmocked).
+
+Decisions: refused-Save problems stay footer-only (§4 invalid-save row says footer); no per-id UI.
+
+Flakes, pass alone, unrelated to P271: `repo-graph-refresh` scroll test (space ui), `ui-leftovers`
+"Close others over a dirty tab" (studio ui, 60 s timeout under load), `TestDescribeCancel` (grpcflow).
+`TestScheduleADE` race (api-2.env read after waitCall) not hit; owned by P277.
+
+§5 greps: pass. Hits for `FinishStepSuffix` etc. outside llmprompts are handle names in
+`claudeheadless/suffix.go` and en.json keys, not constants.
+
+Real `claude` rows (haiku, temp HOME, under $0.05 cap each): space `TestMemoryGate`,
+`TestMemoryMcpThroughClaude|TestMemoryInstallRegisters`, `TestMemoryImport`, `TestAdeHeadlessRun|
+TestAdeStepResults|TestAdeStageSession|TestAdeRebaseRun`, `TestSmartScriptRun`; studio full module
+(`TestDbMcpThroughClaude`, `TestDbMcpInstallRegisters`, `TestSmartScriptRun`). All PASS. Spend not measured.
