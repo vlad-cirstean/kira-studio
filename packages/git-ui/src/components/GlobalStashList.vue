@@ -31,8 +31,6 @@ const props = defineProps<{
   ops: OpsState;
   inProgress: InProgressOperation | null;
   currentBranch?: string | null;
-  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
-  showMore: () => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
   focusedRowId?: string;
 }>();
@@ -91,7 +89,6 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
     <StashRows
       :section="section"
       :stash="stash"
-      :show-more="showMore"
       :focused-row-id="focusedRowId"
       :empty-message="t('git.stash.globalEmpty.empty')"
       :row-model="globalStashRowModel"

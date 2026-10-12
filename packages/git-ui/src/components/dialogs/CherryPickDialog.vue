@@ -9,6 +9,7 @@
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
+import { shortSha } from '@kira/git-core';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -150,7 +151,7 @@ function confirm(): void {
               <FieldLabel :for="`${mainlineId}-${entry.parentNumber}`">
                 <span>
                   <CatalogText k="git.common.mergeParent.option" :params="{ number: entry.parentNumber, subject: entry.subject }">
-                    <template #sha><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></template>
+                    <template #sha><code class="font-data">{{ shortSha(entry.sha) }}</code></template>
                   </CatalogText>
                 </span>
               </FieldLabel>

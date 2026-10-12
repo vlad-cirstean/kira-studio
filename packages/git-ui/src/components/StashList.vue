@@ -20,6 +20,7 @@
  * (`stashRowModel`) and its own menu action set (Pop/Drop/`stashSaveGlobal` exist only on a real
  * stack entry, never on a global bucket one).
  */
+import { shortSha } from '@kira/git-core';
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
@@ -40,8 +41,6 @@ const props = defineProps<{
   /** G28 D5: the currently checked-out branch — `undefined`/`null` for a detached HEAD. Drives
    *  the origin-branch chip and `buildStashMenu`'s own cross-branch Apply label/Pop suppression. */
   currentBranch?: string | null;
-  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
-  showMore: () => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
   focusedRowId?: string;
 }>();
@@ -63,7 +62,7 @@ function stashRowModel(entry: StashEntry): StashRowModel {
   const origin = originLabel(entry, props.currentBranch);
   return {
     id: `stash:${entry.sha}`,
-    rowTooltip: t('git.stash.base.tooltip', { sha: entry.baseSha.slice(0, 7), subject: entry.baseSubject }),
+    rowTooltip: t('git.stash.base.tooltip', { sha: shortSha(entry.baseSha), subject: entry.baseSubject }),
     badge: `stash@{${entry.index}}`,
     origin,
     originTooltip: origin === undefined ? undefined : t('git.stash.stashedFrom.tooltip', { origin }),
@@ -110,7 +109,6 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
     <StashRows
       :section="section"
       :stash="stash"
-      :show-more="showMore"
       :focused-row-id="focusedRowId"
       :empty-message="t('git.stash.list.empty')"
       :row-model="stashRowModel"

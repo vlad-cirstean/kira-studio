@@ -11,7 +11,7 @@
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
-import { validateRefName } from '@kira/git-core';
+import { shortSha, validateRefName } from '@kira/git-core';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -83,7 +83,7 @@ async function submit(): Promise<void> {
       <DialogBody>
         <FieldDescription>
           <CatalogText k="git.dialog.branch.startPoint.description">
-            <template #sha><code class="font-data">{{ startPoint.slice(0, 7) }}</code></template>
+            <template #sha><code class="font-data">{{ shortSha(startPoint) }}</code></template>
           </CatalogText>
         </FieldDescription>
 

@@ -22,8 +22,8 @@
  * `<FileTree>` here is `flex-auto` and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
+import EmptyState from '@theme/components/EmptyState.vue';
 import Spinner from '@theme/components/Spinner.vue';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
@@ -100,9 +100,8 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <Empty v-else-if="!detailState.error.value" class="h-full p-6">
-      <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
-      <EmptyTitle>{{ t('common.state.loading.loading') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else-if="!detailState.error.value" class="h-full p-6" :title="t('common.state.loading.loading')">
+      <template #media><Spinner :size="24" label="" /></template>
+    </EmptyState>
   </div>
 </template>

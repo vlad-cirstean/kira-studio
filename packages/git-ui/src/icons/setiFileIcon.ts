@@ -1,6 +1,6 @@
 /**
  * G-UX D3 (item 3): real per-language file icons for `FileTree.vue`, replacing the codicon set's
- * one shared `codicon-file-code` glyph for every source language (F4's own survey — `.ts`, `.go`,
+ * one shared file-code codicon glyph for every source language (F4's own survey — `.ts`, `.go`,
  * `.vue`, `.rs`, `.py`, `.css`, `.html` all land on that one icon today, since codicons has no
  * finer distinction). `seti-icons` (MIT) repackages jesseweed/seti-ui verbatim as plain JSON data
  * — the only surveyed option that ships both an icon body table AND a machine-readable

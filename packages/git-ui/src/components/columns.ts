@@ -166,7 +166,7 @@ function messageFormatter(
       cell.className = CELL_MESSAGE_COLLAPSED_CLASS;
       cell.dataset.testid = 'graph-collapsed-row';
       cell.dataset.groupKey = collapsedCtx.plan().groupKeyAt(row);
-      // `codicon-chevron-right`, not `FileTree.vue`/`ReviewCommitRow.vue`'s own expanded/collapsed
+      // A right chevron, not `FileTree.vue`/`ReviewCommitRow.vue`'s own expanded/collapsed
       // pair — a placeholder row only ever means "collapsed" (expanding it replaces the row
       // outright, §4.2), so there is no expanded state for this glyph to reflect.
       const chevron = document.createElement('span');

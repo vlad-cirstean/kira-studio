@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 /**
@@ -92,7 +93,7 @@ async function submit(): Promise<void> {
       <DialogBody>
         <FieldDescription>
           <CatalogText k="git.dialog.tag.target.description">
-            <template #sha><code class="font-data">{{ target.slice(0, 7) }}</code></template>
+            <template #sha><code class="font-data">{{ shortSha(target) }}</code></template>
           </CatalogText>
         </FieldDescription>
 

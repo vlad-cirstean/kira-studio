@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
 } from '@theme/components/ui/dropdown-menu';
-import { codiconName } from '../icons/index.ts';
 import type { MenuSection } from '../lib/menuModel.ts';
 
 defineProps<{
@@ -39,7 +38,7 @@ const emit = defineEmits<(e: 'select', id: string) => void>();
       <span class="flex items-center justify-center shrink-0 size-4">
         <CodiconIcon
           v-if="item.icon"
-          :name="codiconName(item.icon)"
+          :name="item.icon"
           :size="13"
           class="text-muted-foreground"
         />

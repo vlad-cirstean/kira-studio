@@ -34,6 +34,7 @@ import {
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
@@ -181,7 +182,7 @@ const pushMenuSections = computed<readonly MenuSection[]>(() => [
     items: [
       {
         id: 'force-push-trigger',
-        label: t('common.forcePush.label'),
+        label: t('git.menu.forcePush.label'),
         disabled: false,
         disabledReason: undefined,
         danger: true,
@@ -440,7 +441,7 @@ const stashDisabled = computed(
     />
 
     <TooltipIconButton
-      icon="gear"
+      :icon="ICON.settings"
       :label="t('git.toolbar.repoSettings.tooltip')"
       data-testid="repo-settings-button"
       @click="emit('open-repo-settings')"

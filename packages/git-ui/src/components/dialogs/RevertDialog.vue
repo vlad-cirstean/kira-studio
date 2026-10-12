@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 /**
@@ -94,7 +95,7 @@ function confirm(): void {
               v-for="entry in preflight?.mainlineRequired"
               :key="entry.sha"
             >
-              <p class="m-0 mb-0.5"><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></p>
+              <p class="m-0 mb-0.5"><code class="font-data">{{ shortSha(entry.sha) }}</code></p>
               <Field
                 v-for="parent in entry.parents"
                 :key="parent.parentNumber"
@@ -108,7 +109,7 @@ function confirm(): void {
                 <FieldLabel :for="`${mainlineId}-${entry.sha}-${parent.parentNumber}`">
                   <span>
                     <CatalogText k="git.common.mergeParent.option" :params="{ number: parent.parentNumber, subject: parent.subject }">
-                      <template #sha><code class="font-data">{{ parent.sha.slice(0, 7) }}</code></template>
+                      <template #sha><code class="font-data">{{ shortSha(parent.sha) }}</code></template>
                     </CatalogText>
                   </span>
                 </FieldLabel>

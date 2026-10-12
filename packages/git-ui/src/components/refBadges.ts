@@ -184,7 +184,7 @@ function buildBadgeElement(
   }
 
   const icon = document.createElement('span');
-  icon.className = `codicon shrink-0 ${spec.icon}`;
+  icon.className = `codicon shrink-0 codicon-${spec.icon}`;
   icon.dataset.testid = 'badge-icon';
   // Decorative: the visible label text (or, for the overflow badge, its title) already carries
   // the information — see this file's module doc on "no colour/glyph-only meaning" (§7.9/W14).

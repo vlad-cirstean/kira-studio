@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CommitStore } from '@kira/git-core';
 /**
  * `docs/plans/P9.md` W14 (OQ4): "selecting a stash node or list row loads `stash.show` into the
  * existing `FileTree.vue`". Mirrors `DetailPane.vue`'s own composition but keyed off `StashState`
@@ -14,10 +15,10 @@
  * `fallbackSha` param (D12) carries that through to the host handler now, which retries the whole
  * composition against it when `path` is not among the primary sha's changed files.
  */
-import type { CommitStore } from '@kira/git-core';
+import { shortSha } from '@kira/git-core';
+import EmptyState from '@theme/components/EmptyState.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Badge } from '@theme/components/ui/badge';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -76,7 +77,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           </TooltipTrigger>
           <TooltipContent>{{ entry.message }}</TooltipContent>
         </Tooltip>
-        <Badge>{{ entry.baseSha.slice(0, 7) }}</Badge>
+        <Badge>{{ shortSha(entry.baseSha) }}</Badge>
         <Badge v-if="entry.includedUntracked">{{ t('git.stash.untracked.example') }}</Badge>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -102,9 +103,8 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <Empty v-else-if="!stash.error.value" class="p-6">
-      <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
-      <EmptyTitle>{{ t('common.state.loading.loading') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else-if="!stash.error.value" class="p-6" :title="t('common.state.loading.loading')">
+      <template #media><Spinner :size="24" label="" /></template>
+    </EmptyState>
   </div>
 </template>

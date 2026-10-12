@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CommitStore } from '@kira/git-core';
+import { shortSha } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
 /**
  * `docs/plans/P7.md` W13 — one commit in the review list. Collapsed: a disclosure triangle,
@@ -60,7 +61,7 @@ const emit = defineEmits<{
 
 const row = computed(() => props.store.rowOfSha(props.sha));
 const commit = computed(() => (row.value === -1 ? undefined : props.store.commitAt(row.value)));
-const shortSha = computed(() => props.sha.slice(0, 7));
+const sha7 = computed(() => shortSha(props.sha));
 const dateText = computed(() =>
   commit.value ? formatAgeCompact(commit.value.committer.timestamp) : '',
 );
@@ -208,7 +209,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
                sha renders as plain text; the existing copySha context-menu item (buildReadOnlyRowMenu)
                already covers this, and F7 found these two affordances genuinely redundant with it. -->
-          <span class="font-data text-inherit shrink-0 bg-transparent border-0 cursor-pointer p-0">{{ shortSha }}</span>
+          <span class="font-data text-inherit shrink-0 bg-transparent border-0 cursor-pointer p-0">{{ sha7 }}</span>
         </span>
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within

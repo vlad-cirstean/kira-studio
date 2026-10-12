@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -51,7 +52,7 @@ async function undo(): Promise<void> {
           class="font-data text-kira-sm text-muted-foreground cursor-copy"
           @click="copy(ops.undoSlot.value.recoverySha, t('git.copy.recoverySha.announce'))"
         >
-          {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
+          {{ shortSha(ops.undoSlot.value.recoverySha) }}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{{ t('git.undo.copyRecovery.tooltip', { sha: ops.undoSlot.value.recoverySha }) }}</TooltipContent>

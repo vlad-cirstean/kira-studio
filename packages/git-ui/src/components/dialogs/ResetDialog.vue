@@ -15,6 +15,7 @@
  * `@update:model-value`, not a plain `v-model`, per OQ11 above), the stash-first checkbox is
  * `Checkbox`+`Label`, and the confirm-token field is `Input`.
  */
+import { shortSha } from '@kira/git-core';
 import type { ResetMode } from '@kira/git-ipc';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
@@ -66,7 +67,7 @@ function selectMode(next: ResetMode): void {
 
 /** `HEAD` is a Git ref name, not prose. */
 const refName = computed(() => preflight.value?.branch ?? 'HEAD');
-const shortTarget = computed(() => preflight.value?.target.slice(0, 7) ?? '');
+const shortTarget = computed(() => shortSha(preflight.value?.target ?? ''));
 const destroys = computed(() => preflight.value?.destroys ?? []);
 const requiresToken = computed(() => preflight.value?.requiresTypedConfirmation ?? false);
 const canStashFirst = computed(() => (preflight.value?.routes ?? []).includes('stashFirst'));
@@ -121,7 +122,7 @@ function confirm(): void {
           </DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="c in preflight.leavingCommits" :key="c.sha">
-              <code class="font-data">{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
+              <code class="font-data">{{ shortSha(c.sha) }}</code> {{ c.subject }}
             </li>
           </ul>
           <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">{{ t('git.dialog.reset.more.status') }}</p>

@@ -19,6 +19,7 @@
  * icon button is gone too — SHA/message copy already exist via the row context menu, and the new
  * facts row's SHA button covers the one copy path this pane itself offers.
  */
+import { shortSha } from '@kira/git-core';
 import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
@@ -30,6 +31,7 @@ import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
+import { createOpenExternal } from '@workbench/bridge/openExternal';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
@@ -242,7 +244,7 @@ const trailerRows = computed<TrailerRow[]>(() =>
   }),
 );
 
-const shortSha = computed(() => props.detail?.sha.slice(0, 7) ?? '');
+const sha7 = computed(() => (props.detail ? shortSha(props.detail.sha) : ''));
 
 /** G-UX (item 6): the facts row's own copy path — the only sha-copy affordance this pane offers
  *  now (the old header copy button copied the full *message*, not the sha, and is gone). */
@@ -272,15 +274,8 @@ async function openPullRequest(number: number): Promise<void> {
   }
 }
 
-/** P79 finding 4: the message body's own linkified URLs (`renderBody`, above) — the same
- *  try/announce shape `openPullRequest` already uses. */
-async function openLink(url: string): Promise<void> {
-  try {
-    await props.actions.openExternalLink(url);
-  } catch (err) {
-    props.actions.announce(t('git.link.open.error', { error: errorText(err) }));
-  }
-}
+/** The message body's own linkified URLs (`renderBody`, above). */
+const openLink = createOpenExternal((url) => props.actions.openExternalLink(url));
 
 /** P74 §4.3: the facts row's own icon — the first PR `prForCommit` names (ancestry's own
  *  first-writer-wins already resolved which branch wins when more than one claims a commit;
@@ -431,7 +426,7 @@ const prIcon = computed(() => {
               data-testid="commit-meta-sha"
               @click="copySha"
             >
-              {{ shortSha }}
+              {{ sha7 }}
             </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ t('git.commit.copySha.tooltip') }}</TooltipContent>

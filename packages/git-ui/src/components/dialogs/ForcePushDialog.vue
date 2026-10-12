@@ -20,6 +20,7 @@
  * `<details>` body (in the default slot) rather than moving to `DialogFooter`, since it belongs
  * beside its own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
  */
+import { shortSha } from '@kira/git-core';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -73,10 +74,6 @@ const branchNameMatches = computed(
 const canConfirmLease = computed(() => branchNameMatches.value);
 const canConfirmPlain = computed(() => branchNameMatches.value && understandPlain.value);
 
-function shortSha(sha: string | null): string {
-  return (sha ?? '').slice(0, 7);
-}
-
 function cancel(): void {
   props.ops.resolveForcePushDialog(null);
 }
@@ -107,7 +104,7 @@ function confirmPlain(): void {
             :k="pending.preflight.remoteTip === null ? 'git.dialog.forcePushConfirm.bodyNew.body' : 'git.dialog.forcePushConfirm.body'"
           >
             <template #ref><code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code></template>
-            <template #sha><code class="font-data">{{ shortSha(pending.preflight.remoteTip) }}</code></template>
+            <template #sha><code class="font-data">{{ shortSha(pending.preflight.remoteTip ?? '') }}</code></template>
           </CatalogText>
           <template v-if="pending.preflight.behind > 0">
             {{ t('git.dialog.forcePushConfirm.ahead.hint', { count: pending.preflight.behind }) }}

@@ -32,20 +32,10 @@
 import { worktreeLabel } from '@kira/git-core';
 import type { RefRow, StackBranch, StackSummary, StashEntry, WorktreeEntry } from '@kira/git-ipc';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
-import { capItems, filterRefs, REF_LIST_SECTION_CAP, sortTags } from './refListModel.ts';
+import { filterRefs, sortTags } from './refListModel.ts';
 import { stashLabel } from './stashListModel.ts';
 
 export type PickerTab = 'branches' | 'tags' | 'stashes' | 'worktrees' | 'stacks';
-
-/** Every capped list in the panel — the key `capSteps` and `PickerModel` are both addressed by. */
-export type PickerListKey =
-  | 'branchesLocal'
-  | 'branchesRemote'
-  | 'tags'
-  | 'stashStack'
-  | 'stashGlobal'
-  | 'worktrees'
-  | 'stacks';
 
 export interface PickerList<T> {
   readonly visible: readonly T[];
@@ -67,27 +57,6 @@ export interface PickerInput {
   readonly worktrees: readonly WorktreeEntry[];
   readonly stacks: readonly StackSummary[];
   readonly orphans: readonly StackBranch[];
-}
-
-export interface PickerModel {
-  /** Every tab's badge (§5.3 widens this to a live match count once the filter is tab-scoped). */
-  readonly counts: Readonly<Record<PickerTab, number>>;
-  readonly branchesLocal: PickerList<RefRow>;
-  readonly branchesRemote: PickerList<RefRow>;
-  readonly tags: PickerList<RefRow>;
-  readonly stashStack: PickerList<StashEntry>;
-  readonly stashGlobal: PickerList<StashEntry>;
-  readonly worktrees: PickerList<WorktreeEntry>;
-  readonly stacks: PickerList<PickerStackGroup>;
-  readonly orphans: PickerList<StackBranch>;
-  /** The active tab's rows in DOM order, for §7.3's roving focus — shape chosen to feed
-   *  `enabledNeighbour` directly. Every other tab's own lists above are returned empty (the body
-   *  renders one tab; folding the other four would be work nothing reads). */
-  readonly rowIds: readonly { id: string; disabled: boolean }[];
-}
-
-function emptyList<T>(): PickerList<T> {
-  return { visible: [], hiddenCount: 0 };
 }
 
 /** `WorktreeList.vue`'s own row identity text — `@kira/git-core`'s `worktreeLabel` (T1-24; also
@@ -150,9 +119,8 @@ function byRecencyThenName(a: RefRow, b: RefRow): number {
 }
 
 /** §6.1/§6.2: HEAD first, then a branch checked out in another worktree, then everything else by
- *  recency — closing N3/N4. `pinned` is handed to `capWithPins` so the cap floor never drops a
- *  pinned row. */
-function orderLocalBranches(rows: readonly RefRow[]): { rows: RefRow[]; pinned: number } {
+ *  recency — closing N3/N4. Pinned rows lead, so a cap over the ordered list never drops one. */
+function orderLocalBranches(rows: readonly RefRow[]): RefRow[] {
   const isPinned = (r: RefRow) => r.isHead || r.checkedOutIn !== undefined;
   const pinned = rows
     .filter(isPinned)
@@ -160,7 +128,7 @@ function orderLocalBranches(rows: readonly RefRow[]): { rows: RefRow[]; pinned: 
       (a, b) => Number(b.isHead) - Number(a.isHead) || compareNatural(a.shortName, b.shortName),
     );
   const rest = rows.filter((r) => !isPinned(r)).sort(byRecencyThenName);
-  return { rows: [...pinned, ...rest], pinned: pinned.length };
+  return [...pinned, ...rest];
 }
 
 function orderRemoteBranches(rows: readonly RefRow[]): RefRow[] {
@@ -187,14 +155,6 @@ function orderWorktrees(entries: readonly WorktreeEntry[]): WorktreeEntry[] {
   const main = entries.filter((e) => !e.isCurrent && e.isMain).sort(byPath);
   const rest = entries.filter((e) => !e.isCurrent && !e.isMain).sort(byPath);
   return [...current, ...main, ...rest];
-}
-
-/** `capItems` with a floor: a pinned row is never capped out, and never duplicated — the rows are
- *  already ordered pinned-first, so one slice does both (§6.2). */
-function capWithPins<T>(rows: readonly T[], pinned: number, cap: number): PickerList<T> {
-  const limit = Math.max(cap, pinned);
-  if (rows.length <= limit) return { visible: rows, hiddenCount: 0 };
-  return { visible: rows.slice(0, limit), hiddenCount: rows.length - limit };
 }
 
 /** The expensive half of the fold (§5.1's filter, plus §5.3's cross-tab counts) — depends only on
@@ -242,99 +202,80 @@ export function filterPickerInput(input: PickerInput, filter: string): FilteredP
   return { counts, local, remote, tags, stashStack, stashGlobal, worktrees, stackGroups, orphans };
 }
 
-/** The cheap half: only orders/caps the active tab's already-filtered rows — depends on
- *  `(filtered, tab, capSteps)`, so a tab switch or a "show more" click never touches the other
- *  four tabs' lists. */
-export function orderAndCapTab(
-  filtered: FilteredPicker,
-  tab: PickerTab,
-  capSteps: Readonly<Partial<Record<PickerListKey, number>>>,
-): PickerModel {
-  const capFor = (key: PickerListKey): number => capSteps[key] ?? REF_LIST_SECTION_CAP;
-
-  const base: Omit<PickerModel, 'rowIds'> = {
-    counts: filtered.counts,
-    branchesLocal: emptyList(),
-    branchesRemote: emptyList(),
-    tags: emptyList(),
-    stashStack: emptyList(),
-    stashGlobal: emptyList(),
-    worktrees: emptyList(),
-    stacks: emptyList(),
-    orphans: emptyList(),
-  };
-
-  if (tab === 'branches') {
-    const { rows: orderedLocal, pinned } = orderLocalBranches(filtered.local);
-    const branchesLocal = capWithPins(orderedLocal, pinned, capFor('branchesLocal'));
-    const branchesRemote = capItems(orderRemoteBranches(filtered.remote), capFor('branchesRemote'));
-    return {
-      ...base,
-      branchesLocal,
-      branchesRemote,
-      rowIds: [
-        ...branchesLocal.visible.map((r) => ({ id: `branch:${r.refname}`, disabled: false })),
-        ...branchesRemote.visible.map((r) => ({ id: `remote:${r.refname}`, disabled: false })),
-      ],
-    };
-  }
-
-  if (tab === 'tags') {
-    const tags = capItems(sortTags(filtered.tags), capFor('tags'));
-    return {
-      ...base,
-      tags,
-      rowIds: tags.visible.map((r) => ({ id: `tag:${r.refname}`, disabled: false })),
-    };
-  }
-
-  if (tab === 'stashes') {
-    const stashStack = capItems(orderStashStack(filtered.stashStack), capFor('stashStack'));
-    const stashGlobal = capItems(orderGlobalStash(filtered.stashGlobal), capFor('stashGlobal'));
-    return {
-      ...base,
-      stashStack,
-      stashGlobal,
-      rowIds: [
-        ...stashStack.visible.map((e) => ({ id: `stash:${e.sha}`, disabled: false })),
-        ...stashGlobal.visible.map((e) => ({ id: `global:${e.sha}`, disabled: false })),
-      ],
-    };
-  }
-
-  if (tab === 'worktrees') {
-    const worktrees = capItems(orderWorktrees(filtered.worktrees), capFor('worktrees'));
-    return {
-      ...base,
-      worktrees,
-      rowIds: worktrees.visible.map((w) => ({ id: `worktree:${w.path}`, disabled: false })),
-    };
-  }
-
-  // tab === 'stacks'
-  const stacks = capItems(filtered.stackGroups, capFor('stacks'));
-  const orphans = capItems(filtered.orphans, capFor('stacks'));
-  return {
-    ...base,
-    stacks,
-    orphans,
-    rowIds: [
-      ...stacks.visible.flatMap((g) =>
-        g.branches.map((b) => ({ id: `stack:${b.name}`, disabled: false })),
-      ),
-      ...orphans.visible.map((o) => ({ id: `orphan:${o.name}`, disabled: false })),
-    ],
-  };
+/** One tab's ordered, uncapped lists (every other tab's lists are empty — the body renders one
+ *  tab). `BranchPicker.vue` caps each list with `useCappedList`. */
+export interface OrderedPicker {
+  readonly branchesLocal: readonly RefRow[];
+  readonly branchesRemote: readonly RefRow[];
+  readonly tags: readonly RefRow[];
+  readonly stashStack: readonly StashEntry[];
+  readonly stashGlobal: readonly StashEntry[];
+  readonly worktrees: readonly WorktreeEntry[];
+  readonly stacks: readonly PickerStackGroup[];
+  readonly orphans: readonly StackBranch[];
 }
 
-/** Composes the two halves above — the one entry point `pickerModel.spec.ts` exercises with plain
- *  fixtures. `BranchPicker.vue` calls `filterPickerInput`/`orderAndCapTab` directly instead, as two
- *  separate computeds, so a tab switch or "show more" click recomputes only the cheap half. */
-export function buildPickerModel(
-  input: PickerInput,
-  filter: string,
+/** The cheap half: only orders the active tab's already-filtered rows — depends on
+ *  `(filtered, tab)`, so a tab switch never touches the other four tabs' lists. */
+export function orderTab(filtered: FilteredPicker, tab: PickerTab): OrderedPicker {
+  const base: OrderedPicker = {
+    branchesLocal: [],
+    branchesRemote: [],
+    tags: [],
+    stashStack: [],
+    stashGlobal: [],
+    worktrees: [],
+    stacks: [],
+    orphans: [],
+  };
+  switch (tab) {
+    case 'branches':
+      return {
+        ...base,
+        branchesLocal: orderLocalBranches(filtered.local),
+        branchesRemote: orderRemoteBranches(filtered.remote),
+      };
+    case 'tags':
+      return { ...base, tags: sortTags(filtered.tags) };
+    case 'stashes':
+      return {
+        ...base,
+        stashStack: orderStashStack(filtered.stashStack),
+        stashGlobal: orderGlobalStash(filtered.stashGlobal),
+      };
+    case 'worktrees':
+      return { ...base, worktrees: orderWorktrees(filtered.worktrees) };
+    case 'stacks':
+      return { ...base, stacks: filtered.stackGroups, orphans: filtered.orphans };
+  }
+}
+
+/** The visible rows in DOM order, for §7.3's roving focus — shape chosen to feed
+ *  `enabledNeighbour` directly. Takes the capped lists, since only rendered rows can take focus. */
+export function pickerRowIds(
   tab: PickerTab,
-  capSteps: Readonly<Partial<Record<PickerListKey, number>>>,
-): PickerModel {
-  return orderAndCapTab(filterPickerInput(input, filter), tab, capSteps);
+  visible: OrderedPicker,
+): { id: string; disabled: boolean }[] {
+  const row = (id: string) => ({ id, disabled: false });
+  switch (tab) {
+    case 'branches':
+      return [
+        ...visible.branchesLocal.map((r) => row(`branch:${r.refname}`)),
+        ...visible.branchesRemote.map((r) => row(`remote:${r.refname}`)),
+      ];
+    case 'tags':
+      return visible.tags.map((r) => row(`tag:${r.refname}`));
+    case 'stashes':
+      return [
+        ...visible.stashStack.map((e) => row(`stash:${e.sha}`)),
+        ...visible.stashGlobal.map((e) => row(`global:${e.sha}`)),
+      ];
+    case 'worktrees':
+      return visible.worktrees.map((w) => row(`worktree:${w.path}`));
+    case 'stacks':
+      return [
+        ...visible.stacks.flatMap((g) => g.branches.map((b) => row(`stack:${b.name}`))),
+        ...visible.orphans.map((o) => row(`orphan:${o.name}`)),
+      ];
+  }
 }

@@ -10,6 +10,7 @@
  * or failure — is composed here too, per that phase's own rule that a destructive action which
  * silently does nothing is the same failure mode §6.4 already named for the clipboard.
  */
+import { shortSha } from '@kira/git-core';
 import type {
   CheckoutPreflight,
   OpErrorKind,
@@ -79,7 +80,7 @@ export function composeRevealSearchHitAnnouncement(outcome: 'loading' | 'notFoun
 /** A short name for `target`, the way every P6 confirmation reads it: a raw sha is shortened,
  *  anything else (a branch, tag, or remote-branch name) is shown exactly as given. */
 function shortTarget(target: string): string {
-  return /^[0-9a-f]{20,40}$/i.test(target) ? target.slice(0, 7) : target;
+  return /^[0-9a-f]{20,40}$/i.test(target) ? shortSha(target) : target;
 }
 
 /** §7.5's own two silent-success verdicts, given a voice: `cleanCarry` is "proceed with no

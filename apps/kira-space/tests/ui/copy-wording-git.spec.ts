@@ -34,7 +34,7 @@ test('commit row menu offers New branch', async ({ relaunch }) => {
   await expect(row).toBeVisible();
 
   await row.click({ button: 'right' });
-  await expect(tid(page, 'menu-item-createBranchHere')).toHaveText('New branch');
+  await expect(tid(page, 'menu-item-createBranchHere')).toHaveText('New branch…');
 });
 
 // The app has no delete branch dialog; an unmerged branch raises the force delete prompt.

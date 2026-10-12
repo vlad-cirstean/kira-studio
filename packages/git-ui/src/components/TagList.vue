@@ -7,16 +7,15 @@
  * menu shape `BranchPicker.vue`'s branch/remote rows use, built here because tag rows live in
  * this file's own template, not that one's.
  */
+import { shortSha } from '@kira/git-core';
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
 import { rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
-import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { OpsState } from '../state/ops.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import type { RefListSection } from './refListModel.ts';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildRefMenu } from './rowMenuModel.ts';
 import { useSectionMenu } from './useSectionMenu.ts';
 
@@ -25,9 +24,6 @@ const props = defineProps<{
   ops: OpsState;
   knownRemotes: readonly string[];
   inProgress: InProgressOperation | null;
-  /** P77 §6.3: raises this tab's own cap by `REF_LIST_SECTION_CAP` for the current panel-open —
-   *  `BranchPicker.vue` owns the `capSteps` state every tab's own button reaches through this. */
-  showMore: () => void;
   /** P77 §7.3: the roving-tabindex list's own "current" row id (`BranchPicker.vue`'s own
    *  `activeRowId`) — every row binds `tabindex`/`data-row-id` off it; the actual key handling
    *  lives in `BranchPicker.vue`, which owns the body every tab's rows render into. */
@@ -46,7 +42,7 @@ async function checkout(row: RefRow): Promise<void> {
  *  lightweight one. Mirrors `core`'s `tagTargetCommit`, adapted to the wire's `RefRow` rather than
  *  a full `RefRecord` (this file has no need for `objectType`). */
 function targetCommit(row: RefRow): string {
-  return (row.peeledObjectId ?? row.objectId).slice(0, 7);
+  return shortSha(row.peeledObjectId ?? row.objectId);
 }
 
 const rowMenu = useSectionMenu();
@@ -116,7 +112,6 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
         @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
       />
     </div>
-    <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('git.tag.list.empty') }}</div>
 
   </section>

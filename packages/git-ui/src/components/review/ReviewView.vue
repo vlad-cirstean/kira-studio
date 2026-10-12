@@ -3,6 +3,7 @@ import { SETTINGS } from '@kira/git-core';
 import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
@@ -34,7 +35,6 @@ import { Button } from '@theme/components/ui/button';
  *    life of this component, not just at mount.
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
@@ -49,7 +49,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
-import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
+import { ACTION_ICONS } from '../../icons/index.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
@@ -601,7 +601,7 @@ const panelItems = computed(() =>
   panelOptions.value.map((o) => ({
     value: o.id,
     label: t(o.label),
-    icon: codiconName(o.icon),
+    icon: o.icon,
     count: o.badge,
     tooltip: t(o.label),
     testid: `review-pane-${o.id}`,
@@ -611,7 +611,7 @@ const listModeItems = computed(() =>
   listModeOptions.map((o) => ({
     value: o.id,
     label: t(o.label),
-    icon: codiconName(o.icon),
+    icon: o.icon,
     tooltip: t(o.label),
   })),
 );
@@ -793,10 +793,9 @@ watch(
     </template>
 
     <template v-else-if="!review">
-      <Empty class="h-full">
-        <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
-        <EmptyTitle>{{ t('git.review.loading.loading') }}</EmptyTitle>
-      </Empty>
+      <EmptyState class="h-full" :title="t('git.review.loading.loading')">
+      <template #media><Spinner :size="24" label="" /></template>
+    </EmptyState>
     </template>
 
     <template v-else-if="noActiveRepo">

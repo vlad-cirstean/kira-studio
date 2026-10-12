@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 /**
@@ -350,7 +351,7 @@ function buildGraphTips(): TipRef[] {
       tips.push({ sha: branch.objectId, key: `branch:${branch.refname}`, label: branch.shortName });
     }
   } else if (head?.kind === 'detached') {
-    tips.push({ sha: head.sha, key: `detached:${head.sha}`, label: head.sha.slice(0, 7) });
+    tips.push({ sha: head.sha, key: `detached:${head.sha}`, label: shortSha(head.sha) });
   }
   // `head.kind === 'unborn'` contributes no group 0 tip — no commit exists yet to be one.
 
@@ -1816,10 +1817,7 @@ onBeforeUnmount(() => {
               @live="setDetailWidth"
               @commit="setDetailWidth"
             />
-            <Empty v-if="!hasSelection" class="h-full p-6">
-              <EmptyMedia><CodiconIcon name="git-commit" :size="24" /></EmptyMedia>
-              <EmptyTitle>{{ t('git.detail.noSelection.emptyHint') }}</EmptyTitle>
-            </Empty>
+            <EmptyState v-if="!hasSelection" class="h-full p-6" icon="git-commit" :title="t('git.detail.noSelection.emptyHint')" />
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1853,10 +1851,7 @@ onBeforeUnmount(() => {
             data-testid="detail-region"
             :aria-label="t('git.detail.region.aria')"
           >
-            <Empty v-if="!hasSelection" class="h-full p-6">
-              <EmptyMedia><CodiconIcon name="git-commit" :size="24" /></EmptyMedia>
-              <EmptyTitle>{{ t('git.detail.noSelection.emptyHint') }}</EmptyTitle>
-            </Empty>
+            <EmptyState v-if="!hasSelection" class="h-full p-6" icon="git-commit" :title="t('git.detail.noSelection.emptyHint')" />
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"

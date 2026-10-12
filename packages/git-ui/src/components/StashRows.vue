@@ -15,12 +15,10 @@ import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
-import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { useSectionMenu } from './useSectionMenu.ts';
 
 const UNTRACKED_FLAG = '-u';
@@ -45,7 +43,6 @@ export interface StashRowModel {
 const props = defineProps<{
   section: PickerList<StashEntry>;
   stash: StashState;
-  showMore: () => void;
   focusedRowId?: string;
   emptyMessage: string;
   rowModel: (entry: StashEntry) => StashRowModel;
@@ -105,7 +102,6 @@ function onMenuSelect(entry: StashEntry, id: string): void {
       @contextmenu="rowMenu.openAt($event, menuFor(entry), (id) => onMenuSelect(entry, id))"
     />
   </div>
-  <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
   <InlineState v-if="section.visible.length === 0" kind="empty">{{ emptyMessage }}</InlineState>
 
 </template>

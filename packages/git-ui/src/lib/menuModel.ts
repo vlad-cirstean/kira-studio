@@ -11,7 +11,7 @@ export interface MenuItem {
   /** An accessible description for a disabled item — wired to `aria-describedby`, not only a
    *  hover-only `title` (kept from `RowContextMenu.vue`'s own precedent). */
   readonly disabledReason: string | undefined;
-  /** A codicon class name (e.g. `'codicon-git-branch'`), rendered inside the row's own icon slot
+  /** A codicon name (e.g. `git-branch`), rendered inside the row's own icon slot
    *  (`MenuSections.vue`). Optional so every pre-existing `MenuItem` producer keeps typechecking
    *  unchanged. */
   readonly icon?: string;
@@ -69,7 +69,7 @@ export function sectionsToMenuItems(
         type: 'item',
         id: item.id,
         label: item.label,
-        icon: item.icon?.replace(/^codicon-/, ''),
+        icon: item.icon,
         danger: item.danger,
         disabled: item.disabled,
         hint: item.disabled ? item.disabledReason : undefined,

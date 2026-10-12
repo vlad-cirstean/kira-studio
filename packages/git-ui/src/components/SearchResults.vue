@@ -18,6 +18,8 @@
  * classes, `w-105`/`max-h-90`/`overflow-y-auto`/`py-0.5`, moved onto `PopoverContent` there too),
  * rendering only the inner listbox content.
  */
+import { shortSha } from '@kira/git-core';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -25,9 +27,16 @@ import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
 import { computed } from 'vue';
+import { BADGE_ICONS } from '../icons/index.ts';
 import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
 import type { SearchOption, SearchResultsModel } from './searchResultsModel.ts';
 import { fieldLabel } from './searchResultsModel.ts';
+
+const REF_ICON = {
+  branch: BADGE_ICONS.localBranch,
+  remoteBranch: BADGE_ICONS.remoteBranch,
+  tag: BADGE_ICONS.tag,
+} as const;
 
 const props = defineProps<{
   model: SearchResultsModel;
@@ -90,20 +99,12 @@ function optionClass(option: SearchOption): string {
             @keydown.enter="emit('select', option)"
           >
             <template v-if="option.kind === 'ref'">
-              <span
-                class="codicon"
-                :class="{
-                  'codicon-git-branch': option.hit.ref.kind === 'branch',
-                  'codicon-cloud': option.hit.ref.kind === 'remoteBranch',
-                  'codicon-tag': option.hit.ref.kind === 'tag',
-                }"
-                aria-hidden="true"
-              ></span>
+              <CodiconIcon :name="REF_ICON[option.hit.ref.kind]" />
               <span class="flex-1 min-w-0 truncate">{{ option.hit.ref.shortName }}</span>
               <Badge v-if="fieldLabel(option.hit.fields)">{{ fieldLabel(option.hit.fields) }}</Badge>
             </template>
             <template v-else>
-              <span class="font-data text-muted-foreground">{{ option.hit.sha.slice(0, 7) }}</span>
+              <span class="font-data text-muted-foreground">{{ shortSha(option.hit.sha) }}</span>
               <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
               <span class="text-muted-foreground text-kira-sm">{{ option.hit.authorName }}</span>
               <span class="text-muted-foreground text-kira-sm">{{ formatAgeCompact(option.hit.authorTime) }}</span>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 import type { LineRange, ReviewComment } from '@kira/git-ipc';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 /**
@@ -60,12 +61,12 @@ function lineLabel(range: LineRange): string {
 
 /** D12's own two suffix forms, restated for the sidebar rather than the export's plain text. */
 function anchorTitle(c: ReviewComment): string | undefined {
-  const sha8 = c.anchorSha.slice(0, 8);
+  const sha7 = shortSha(c.anchorSha);
   switch (c.anchor) {
     case 'removed':
-      return t('git.review.comments.anchorRemoved.hint', { sha: sha8 });
+      return t('git.review.comments.anchorRemoved.hint', { sha: sha7 });
     case 'stale':
-      return t('git.review.comments.anchorStale.hint', { sha: sha8 });
+      return t('git.review.comments.anchorStale.hint', { sha: sha7 });
     case 'exact':
     case 'projected':
       return undefined;

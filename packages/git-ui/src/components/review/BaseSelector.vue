@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/po
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
-import { codiconName, STATE_ICONS } from '../../icons/index.ts';
+import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
 import { buildRefListSections } from '../refListModel.ts';
 import { useFieldFocus } from '../useFieldFocus.ts';
@@ -120,7 +120,7 @@ function onOpenAutoFocus(e: Event): void {
         <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
           <span class="truncate">{{ triggerLabel }}</span>
           <span v-if="triggerReason" class="text-muted-foreground text-kira-sm">{{ triggerReason }}</span>
-          <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
+          <CodiconIcon :name="STATE_ICONS.chevronDown" :size="13" />
         </Button>
       </PopoverTrigger>
 

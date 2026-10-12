@@ -3147,7 +3147,8 @@
       }
     },
     "emptyRepository": {
-      "description": "This repository has no commits yet. Create the first one on {branch} to see it here."
+      "description": "Create the first commit on {branch} to see it here.",
+      "title": "No commits yet"
     },
     "failure": {
       "authFailed": {
@@ -3273,11 +3274,6 @@
         "label": "Resize graph column"
       }
     },
-    "link": {
-      "open": {
-        "error": "Couldn’t open the link: {error}"
-      }
-    },
     "loadMore": {
       "busy": {
         "label": "Loading… ({remaining} remaining)"
@@ -3314,11 +3310,17 @@
       "deleteOnRemote": {
         "label": "Delete on {remote}"
       },
+      "forcePush": {
+        "label": "Force push…"
+      },
       "globalStashBranch": {
         "label": "New branch from this…"
       },
       "globalStashRemove": {
         "label": "Remove from global stash"
+      },
+      "newBranch": {
+        "label": "New branch…"
       },
       "newTag": {
         "label": "New tag…"

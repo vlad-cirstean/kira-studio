@@ -14,6 +14,7 @@
  * context menu W14 builds, which is where the destructive actions live") — a kebab button (mouse
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
+import { shortSha } from '@kira/git-core';
 import type { RefRow, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
@@ -30,12 +31,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener, useFocus } from '@vueuse/core';
+import { useCappedList } from '@workbench/behaviour/cappedList';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
-import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
+import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
@@ -46,11 +48,11 @@ import { prBadgeClass } from './badgeClass.ts';
 import GlobalStashList from './GlobalStashList.vue';
 import {
   filterPickerInput,
-  orderAndCapTab,
+  orderTab,
   type PickerInput,
-  type PickerListKey,
-  type PickerModel,
+  type PickerList,
   type PickerTab,
+  pickerRowIds,
 } from './pickerModel.ts';
 import { prStateLabel } from './prStateLabel.ts';
 import RowActionsButton from './RowActionsButton.vue';
@@ -148,16 +150,13 @@ const activeTab = ref<PickerTab>('branches');
 // arrow key, at which point `activeRowId` below still resolves it (falls back to the first
 // enabled row), so a fresh tab/query always has exactly one tabbable row.
 const focusedRowId = ref<string | null>(null);
-// P77 §6.3: one list's own step count for the current panel-open — reset on close and on a filter
-// change (a new query is a new list, §6.3's own words), never persisted.
-const capSteps = ref<Partial<Record<PickerListKey, number>>>({});
 
 const triggerLabel = computed(() => {
   const head = props.refs.head.value;
   if (!head) return '…';
   if (head.kind === 'branch') return head.name;
   if (head.kind === 'unborn') return t('git.picker.unborn.label', { name: head.name });
-  return head.sha.slice(0, 7);
+  return shortSha(head.sha);
 });
 
 const pickerInput = computed<PickerInput>(() => ({
@@ -171,27 +170,70 @@ const pickerInput = computed<PickerInput>(() => ({
   orphans: props.stack.orphans.value,
 }));
 
-// P79: split into two computeds so a tab switch or "show more" click (only ever changing
-// `activeTab`/`capSteps`) never re-runs the expensive filter fold over every list —
-// `filteredPicker` depends only on `(pickerInput, filter)`, `model` only adds the cheap per-tab
-// ordering/cap pass on top. See `pickerModel.ts`'s own doc comment on `filterPickerInput`.
+// P79: split into two computeds so a tab switch (only ever changing `activeTab`) never re-runs the
+// expensive filter fold over every list — `filteredPicker` depends only on `(pickerInput, filter)`,
+// `ordered` only adds the cheap per-tab ordering pass on top. See `pickerModel.ts`'s own doc
+// comment on `filterPickerInput`.
 const filteredPicker = computed(() => filterPickerInput(pickerInput.value, filter.value));
-const model = computed(() => orderAndCapTab(filteredPicker.value, activeTab.value, capSteps.value));
+const ordered = computed(() => orderTab(filteredPicker.value, activeTab.value));
 
-/** P77 §6.3: "Show 50 more (150 remaining)" — raises one list's own cap by
- *  `REF_LIST_SECTION_CAP` for the current panel-open. Every tab-body button below calls this with
- *  its own `PickerListKey`; `StackList.vue`'s single button raises `'stacks'`, which
- *  `pickerModel.ts` already shares between its `stacks`/`orphans` lists. */
-function showMore(key: PickerListKey): void {
-  capSteps.value = {
-    ...capSteps.value,
-    [key]: (capSteps.value[key] ?? REF_LIST_SECTION_CAP) + REF_LIST_SECTION_CAP,
-  };
+// P77 §6.3: one list's own "Show 50 more" cap for the current panel-open — reset on close and on a
+// filter change (a new query is a new list, §6.3's own words), never persisted.
+const caps = {
+  branchesLocal: useCappedList(() => ordered.value.branchesLocal, REF_LIST_SECTION_CAP),
+  branchesRemote: useCappedList(() => ordered.value.branchesRemote, REF_LIST_SECTION_CAP),
+  tags: useCappedList(() => ordered.value.tags, REF_LIST_SECTION_CAP),
+  stashStack: useCappedList(() => ordered.value.stashStack, REF_LIST_SECTION_CAP),
+  stashGlobal: useCappedList(() => ordered.value.stashGlobal, REF_LIST_SECTION_CAP),
+  worktrees: useCappedList(() => ordered.value.worktrees, REF_LIST_SECTION_CAP),
+  stacks: useCappedList(() => ordered.value.stacks, REF_LIST_SECTION_CAP),
+  orphans: useCappedList(() => ordered.value.orphans, REF_LIST_SECTION_CAP),
+};
+
+function resetCaps(): void {
+  for (const cap of Object.values(caps)) cap.reset();
 }
 
-watch(filter, () => {
-  capSteps.value = {};
+function sectionOf<T>(cap: {
+  visible: { value: readonly T[] };
+  hiddenCount: { value: number };
+}): PickerList<T> {
+  return { visible: cap.visible.value, hiddenCount: cap.hiddenCount.value };
+}
+
+const model = computed(() => {
+  const lists = {
+    branchesLocal: sectionOf(caps.branchesLocal),
+    branchesRemote: sectionOf(caps.branchesRemote),
+    tags: sectionOf(caps.tags),
+    stashStack: sectionOf(caps.stashStack),
+    stashGlobal: sectionOf(caps.stashGlobal),
+    worktrees: sectionOf(caps.worktrees),
+    stacks: sectionOf(caps.stacks),
+    orphans: sectionOf(caps.orphans),
+  };
+  return {
+    ...lists,
+    counts: filteredPicker.value.counts,
+    rowIds: pickerRowIds(activeTab.value, {
+      branchesLocal: lists.branchesLocal.visible,
+      branchesRemote: lists.branchesRemote.visible,
+      tags: lists.tags.visible,
+      stashStack: lists.stashStack.visible,
+      stashGlobal: lists.stashGlobal.visible,
+      worktrees: lists.worktrees.visible,
+      stacks: lists.stacks.visible,
+      orphans: lists.orphans.visible,
+    }),
+  };
 });
+
+function showMoreStacks(): void {
+  caps.stacks.showMore();
+  caps.orphans.showMore();
+}
+
+watch(filter, resetCaps);
 
 // ---------------------------------------------------------------------------------------
 // §7.3: roving focus over the active tab's own rows through `useListNavigation`. The rows live in
@@ -199,7 +241,7 @@ watch(filter, () => {
 // `branch-row`/`branch-row-main` stay as bare query hooks for `closest()`/`querySelector()`.
 // ---------------------------------------------------------------------------------------
 const rowsScrollEl = ref<HTMLElement | null>(null);
-type PickerRow = PickerModel['rowIds'][number];
+type PickerRow = (typeof model.value.rowIds)[number];
 
 const activeRowId = computed<string | undefined>(() => {
   const rows = model.value.rowIds;
@@ -279,7 +321,7 @@ const tabItems = computed(() =>
   tabOptions.value.map((tab) => ({
     value: tab.id,
     label: tab.label,
-    icon: codiconName(tab.icon),
+    icon: tab.icon,
     count: tab.badge,
     tooltip: tab.label,
   })),
@@ -291,7 +333,7 @@ const knownRemotes = computed(() =>
 
 // P131 Part 2 §5.2: reka's own PopoverContent Escape/outside-click dismissal replaces the
 // rootEl keydown listener and onClickOutside call this file used to own -- close()'s resets
-// (row menu, renaming, forceDeleteCandidate, filter, capSteps) now run from the Popover's own
+// (row menu, renaming, forceDeleteCandidate, filter, caps) now run from the Popover's own
 // @update:open(false), reached either way (trigger click, Escape, outside click, or this file's
 // own explicit close() calls below).
 function close(): void {
@@ -300,7 +342,7 @@ function close(): void {
   renaming.value = undefined;
   forceDeleteCandidate.value = undefined;
   filter.value = '';
-  capSteps.value = {};
+  resetCaps();
 }
 
 // G10 D17/P77 §13: forwarded so App.vue's palette dispatcher can open this panel exactly the way
@@ -527,7 +569,7 @@ watch(visibleBranchNames, (names) => {
               <Button data-testid="branch-trigger" ref="triggerEl" variant="toolbar" size="kira" class="max-w-50">
                 <CodiconIcon name="git-branch" :size="13" />
                 <span class="truncate">{{ triggerLabel }}</span>
-                <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
+                <CodiconIcon :name="STATE_ICONS.chevronDown" :size="13" />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -631,7 +673,7 @@ watch(visibleBranchNames, (names) => {
               <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">{{ t('common.action.cancel.label') }}</Button>
             </div>
           </Alert>
-          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
+          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesLocal.hiddenCount" @click="caps.branchesLocal.showMore()" />
           <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">{{ t('git.picker.branches.empty') }}</InlineState>
         </section>
 
@@ -658,23 +700,24 @@ watch(visibleBranchNames, (names) => {
               @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
             />
           </div>
-          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
+          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesRemote.hiddenCount" @click="caps.branchesRemote.showMore()" />
           <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
             {{ t('git.picker.remoteBranches.empty') }}
           </InlineState>
         </section>
         </template>
 
+        <template v-else-if="activeTab === 'tags'">
         <TagList
-          v-else-if="activeTab === 'tags'"
           :section="model.tags"
           :ops="ops"
           :known-remotes="knownRemotes"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
-          :show-more="() => showMore('tags')"
           :focused-row-id="activeRowId"
           @checked-out="close"
         />
+        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.tags.hiddenCount" @click="caps.tags.showMore()" />
+        </template>
 
         <template v-else-if="activeTab === 'stashes'">
         <StashList
@@ -683,12 +726,12 @@ watch(visibleBranchNames, (names) => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
-          :show-more="() => showMore('stashStack')"
           :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
           @selected="closeForCheckout"
         />
+        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.stashStack.hiddenCount" @click="caps.stashStack.showMore()" />
 
         <GlobalStashList
           :section="model.stashGlobal"
@@ -696,37 +739,39 @@ watch(visibleBranchNames, (names) => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
-          :show-more="() => showMore('stashGlobal')"
           :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-global-stash="emit('saveGlobalStash')"
           @selected="closeForCheckout"
         />
+        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.stashGlobal.hiddenCount" @click="caps.stashGlobal.showMore()" />
         </template>
 
+        <template v-else-if="activeTab === 'worktrees'">
         <WorktreeList
-          v-else-if="activeTab === 'worktrees'"
           :section="model.worktrees"
           :worktrees="worktrees"
           :ops="ops"
-          :show-more="() => showMore('worktrees')"
           :focused-row-id="activeRowId"
           @switch-worktree="(path) => emit('switchWorktree', path)"
           @create-worktree="emit('createWorktree')"
         />
+        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.worktrees.hiddenCount" @click="caps.worktrees.showMore()" />
+        </template>
 
+        <template v-else-if="activeTab === 'stacks'">
         <StackList
-          v-else-if="activeTab === 'stacks'"
           :stacks="model.stacks"
           :orphans="model.orphans"
           :ops="ops"
           :pr="pr"
           :open-pull-request="openPullRequest"
-          :show-more="() => showMore('stacks')"
           :focused-row-id="activeRowId"
           @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
           @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />
+        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.stacks.hiddenCount + model.orphans.hiddenCount" @click="showMoreStacks" />
+        </template>
           </div>
         </div>
       </PopoverContent>

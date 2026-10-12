@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Empty, EmptyDescription, EmptyMedia } from '@theme/components/ui/empty';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { EmptyDescription } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 /**
  * §6.2's "repository with no commits" state — an unborn HEAD (P1 detects it; P2's store renders
@@ -10,20 +11,22 @@ import CatalogText from '@theme/i18n/CatalogText.vue';
  * Takes `head: HeadState` narrowed to the unborn variant rather than the whole `RepoSummary` —
  * this panel only ever needs the branch name unborn HEAD points at.
  */
-import { codiconName, STATE_ICONS } from '../icons/index.ts';
+import { STATE_ICONS } from '../icons/index.ts';
 
 defineProps<{ branchName: string }>();
 </script>
 
 <template>
-  <Empty class="h-full p-6" data-testid="empty-repository-panel">
-    <EmptyMedia>
-      <CodiconIcon :name="codiconName(STATE_ICONS.commit)" :size="24" />
-    </EmptyMedia>
+  <EmptyState
+    class="h-full p-6"
+    data-testid="empty-repository-panel"
+    :icon="STATE_ICONS.commit"
+    :title="t('git.emptyRepository.title')"
+  >
     <EmptyDescription class="max-w-105">
       <CatalogText k="git.emptyRepository.description">
         <template #branch><strong>{{ branchName }}</strong></template>
       </CatalogText>
     </EmptyDescription>
-  </Empty>
+  </EmptyState>
 </template>

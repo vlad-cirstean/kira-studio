@@ -10,13 +10,13 @@ import type { RepoCandidate } from '@kira/git-ipc';
  * the one-repo-per-workspace model).
  */
 import { TransportError } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { EmptyDescription } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { onMounted, ref } from 'vue';
-import { codiconName, STATE_ICONS } from '../icons/index.ts';
+import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
 
 const props = defineProps<{ repoState: RepoState }>();
@@ -56,11 +56,12 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
 </script>
 
 <template>
-  <Empty class="h-full p-6" data-testid="no-repository-panel">
-    <EmptyMedia>
-      <CodiconIcon :name="codiconName(STATE_ICONS.repo)" :size="24" />
-    </EmptyMedia>
-    <EmptyTitle>{{ t('git.noRepository.open.title') }}</EmptyTitle>
+  <EmptyState
+    class="h-full p-6"
+    data-testid="no-repository-panel"
+    :icon="STATE_ICONS.repo"
+    :title="t('git.noRepository.open.title')"
+  >
     <ul
       v-if="repoState.candidates.value.length > 0"
       class="flex flex-col gap-0.5 m-0 p-0 list-none max-w-105 w-full"
@@ -105,5 +106,5 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     <EmptyDescription v-if="pickError" class="max-w-105" data-testid="no-repository-pick-error">
       {{ t('git.noRepository.openError.error', { error: pickError }) }}
     </EmptyDescription>
-  </Empty>
+  </EmptyState>
 </template>

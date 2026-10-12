@@ -6,9 +6,9 @@
  */
 import type { GitStatus } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { computed } from 'vue';
-import { codiconName, STATE_ICONS } from '../icons/index.ts';
+import { STATE_ICONS } from '../icons/index.ts';
 import { type BlockedGitStatus, detectPlatform, gitBlockedCopy } from './gitBlockedCopy.ts';
 
 const props = defineProps<{ status: GitStatus }>();
@@ -20,11 +20,14 @@ const copy = computed(() => {
 </script>
 
 <template>
-  <Empty v-if="copy" class="h-full p-6" role="alert" data-testid="git-blocked-panel">
-    <EmptyMedia>
-      <CodiconIcon :name="codiconName(STATE_ICONS.warning)" :size="24" class="text-error" />
-    </EmptyMedia>
-    <EmptyTitle>{{ copy.title }}</EmptyTitle>
-    <EmptyDescription class="max-w-120">{{ copy.detail }}</EmptyDescription>
-  </Empty>
+  <EmptyState
+    v-if="copy"
+    class="h-full p-6"
+    role="alert"
+    data-testid="git-blocked-panel"
+    :title="copy.title"
+    :description="copy.detail"
+  >
+    <template #media><CodiconIcon :name="STATE_ICONS.warning" :size="24" class="text-error" /></template>
+  </EmptyState>
 </template>

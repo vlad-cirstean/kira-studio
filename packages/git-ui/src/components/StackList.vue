@@ -20,12 +20,10 @@ import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
-import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import { prBadgeClass, refBadgeClass } from './badgeClass.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
 const props = defineProps<{
@@ -38,10 +36,6 @@ const props = defineProps<{
   /** P74 §3.3 — see `BranchPicker.vue`'s own doc comment, threaded straight through from
    *  `AppToolbar.vue`. */
   openPullRequest: (number: number) => void;
-  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop.
-   *  `stacks`/`orphans` share one `capSteps` key (`pickerModel.ts`'s own `capFor('stacks')`), so
-   *  one button raises both. */
-  showMore: () => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
   focusedRowId?: string;
 }>();
@@ -170,7 +164,6 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="stacks.hiddenCount + orphans.hiddenCount" @click="showMore" />
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"

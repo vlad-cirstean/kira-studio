@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CommitStore } from '@kira/git-core';
 /**
  * `docs/plans/P5.md` W8: §6.4 item 2 — the file tree, its tree/flat toggle, its filter box, and
  * (in this component's own header, per the plan's own placement decision) the merge parent
@@ -16,9 +17,8 @@
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
  * `ReviewCommitRow.vue` alike.
  */
-import type { CommitStore } from '@kira/git-core';
+import { shortSha } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
-import { CheckIcon, MinusIcon } from '@lucide/vue';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
@@ -37,7 +37,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useId, watch } from 'vue';
-import { ACTION_ICONS, codiconName } from '../icons/index.ts';
+import { ACTION_ICONS } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
 import { sectionsToMenuItems } from '../lib/menuModel.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -124,7 +124,7 @@ const listModeItems = computed(() =>
   listModeOptions.value.map((option) => ({
     value: option.id,
     label: option.label,
-    icon: codiconName(option.icon),
+    icon: option.icon,
     tooltip: option.label,
   })),
 );
@@ -342,10 +342,10 @@ const parentOptions = computed<ParentOption[]>(() =>
   props.parents.map((sha, index) => {
     const row = props.store.rowOfSha(sha);
     const subject = row !== -1 ? props.store.subjectAt(row) : undefined;
-    const shortSha = sha.slice(0, 7);
+    const sha7 = shortSha(sha);
     const label = subject
-      ? t('git.fileTree.parent.label', { number: index + 1, sha: shortSha, subject })
-      : t('git.fileTree.parentNoSubject.label', { number: index + 1, sha: shortSha });
+      ? t('git.fileTree.parent.label', { number: index + 1, sha: sha7, subject })
+      : t('git.fileTree.parentNoSubject.label', { number: index + 1, sha: sha7 });
     return { sha, label };
   }),
 );
@@ -585,8 +585,7 @@ const parentSelectId = useId();
             @click.stop
             @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
           >
-            <MinusIcon v-if="reviewCheckboxState(row.node.change.path) === 'indeterminate'" />
-            <CheckIcon v-else />
+            <CodiconIcon :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'" />
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
             <span
@@ -678,8 +677,7 @@ const parentSelectId = useId();
             @click.stop
             @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
           >
-            <MinusIcon v-if="reviewCheckboxState(row.node.change.path) === 'indeterminate'" />
-            <CheckIcon v-else />
+            <CodiconIcon :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'" />
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
             <span

@@ -26,7 +26,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
-import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
+import { ACTION_ICONS } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
@@ -71,7 +71,7 @@ const diffModeItems = computed(() =>
   diffModeOptions.map((o) => ({
     value: o.id,
     label: t(o.label),
-    icon: codiconName(o.icon),
+    icon: o.icon,
     tooltip: t(o.label),
   })),
 );
