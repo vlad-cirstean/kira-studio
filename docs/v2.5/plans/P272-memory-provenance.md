@@ -414,3 +414,14 @@ Existing specs `memory-module.spec.ts` and `list-keyboard.spec.ts` and flows `st
 
 Real `claude -p --strict-mcp-config` started a stdio server that printed its env. `CLAUDE_CODE_SESSION_ID`
 arrived and equaled the run's `--session-id`. Session capture from env works; no known open item.
+
+### 9.2 Test run
+
+- Green: `lint`, `lint:go`, `lint:claude`, `typecheck`, `go test ./... -count=1` (126 pkgs ok; `test:flows:*` inside), `test:unit` 1902 pass, `test:ui:space` 562 pass, `test:ui:studio` (ui) 538 pass, `test:ui:space-mobile` 81 pass 1 skip, `test:visual:space` 13, `test:visual:studio` 13.
+- Fixes: `restart.json` contract regenerated (journeyflow `TestRestartKeepsUserData`, stale `author`/uuid ids). `memory-row-project`/`memory-detail-project` testids dropped by `TruncatedText` (Tooltip root eats attrs): moved to wrapper span. `memory-provenance.spec.ts` gave contract facts empty `createdAt` (Go masks it), detail pane threw `RangeError` on format: spec sets a fixed time.
+- `memory-row-` prefix: all specs select rows with `button[...]` or `[tabindex="0"]`; no collision.
+- Visual: no baseline covers the memory panel or detail; nothing to regenerate. `settings-memory` baseline unchanged.
+- Migration 0004: `TestMigration4Provenance` green. Scratch run on 1500 lineages x 3 versions with events and embeddings: 4500 rows, 1500 distinct `km_` lineages, 0 old ids, `foreign_key_check` empty, 4500 embeddings joined, legacy `<uuid>-v2` resolves through `Lineage`, FTS finds a fact. Scratch test not kept.
+- Real `claude` 2.1.296: `TestMemoryGate` 15 s, `TestMemoryImport` 55 s (0.140 USD; 20 added, 1 unresolved), `TestMemoryMcpThroughClaude` 24 s, `TestMemoryInstallRegisters` 2 s all pass. `claude -p` spend 0.0087 USD (import cost is its own line).
+- Flake, not P272: `adapters/clickhouse` failed once under load (`QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING`), passes alone x2 at `-count=1`. `-count>1` fails by design (shared container state).
+- §7 greps: 1-3, 5-7 clean (`uuid.NewString` only `requestID` and import ids; `gonanoid` in `ids.go` via `newFactID` in `commitFact`; scope dialog uses `SecondaryTabs`, built on `ToggleGroup`).
