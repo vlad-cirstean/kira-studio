@@ -69,6 +69,7 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 				MaskRules:        s.Deps.MaskRules,
 				ExplainThreshold: s.explainThreshold,
 				Logger:           slog.Default(),
+				Prompts:          s.Deps.Prompts,
 			})
 			if err != nil {
 				return nil, err

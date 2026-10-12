@@ -77,7 +77,7 @@ func (s *Server) bindHTTP() error {
 		return fmt.Errorf("dbmcp: bind 127.0.0.1:%d: %w (another process is using this port — free it and try again)", DefaultPort, err)
 	}
 
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcp }, &mcp.StreamableHTTPOptions{
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.server() }, &mcp.StreamableHTTPOptions{
 		Stateless: true,
 		// Only takes effect for protocol >= 2026-07-28; older clients rely on requestContextKey.
 		PropagateRequestCancellation: true,

@@ -27,6 +27,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -106,6 +107,8 @@ type Config struct {
 	// backends and adds no new service dependency. Required — a silently-defaulted threshold would
 	// make every heavy-query verdict wrong in a way nothing surfaces.
 	ExplainThreshold func() int
+	// Prompts resolves the editable instruction and tool texts; nil means the registry defaults.
+	Prompts llmprompts.Source
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
 	Logger *slog.Logger
 }
@@ -127,7 +130,10 @@ type Server struct {
 	tokenMu sync.RWMutex
 	token   mcpauth.Record
 
-	mcp *mcp.Server
+	// mcp is the tool set for revision mcpRev of the prompts; a prompt edit rebuilds it (server()).
+	mcpMu  sync.Mutex
+	mcp    *mcp.Server
+	mcpRev uint64
 
 	httpState // http.go's own fields (listener, *http.Server)
 
@@ -137,9 +143,6 @@ type Server struct {
 // serverVersion mirrors the app's own declared version — no ldflags plumbing invented for this
 // phase alone.
 const serverVersion = "0.0.0"
-
-// instructions is §4's own one paragraph: the steer that decides whether any of this pays off.
-const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Plan an expensive-looking query with `explain_query` before running it, and expect `run_query` to plan it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it."
 
 // New resolves cfg, mints or loads this instance's own token, builds the five-tool mcp.Server, and
 // binds the HTTP listener (§3.2, DefaultPort only — see bindHTTP/F11) — but does not yet accept
@@ -181,12 +184,31 @@ func New(cfg Config) (*Server, error) {
 		log:   log,
 		token: tokenRec,
 	}
-	s.mcp = s.buildMCPServer()
+	s.mcp, s.mcpRev = s.buildMCPServer(), s.prompts().Revision()
 
 	if err := s.bindHTTP(); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// prompts is the source of the server's instruction and tool texts.
+func (s *Server) prompts() llmprompts.Source {
+	if s.cfg.Prompts == nil {
+		return llmprompts.Defaults()
+	}
+	return s.cfg.Prompts
+}
+
+// server returns the tool set, rebuilt when a prompt edit moved the revision: the HTTP transport is
+// stateless, so the next request already sees the new texts.
+func (s *Server) server() *mcp.Server {
+	s.mcpMu.Lock()
+	defer s.mcpMu.Unlock()
+	if rev := s.prompts().Revision(); rev != s.mcpRev {
+		s.mcp, s.mcpRev = s.buildMCPServer(), rev
+	}
+	return s.mcp
 }
 
 // buildMCPServer constructs the five-tool mcp.Server (§4) — pure registration, no I/O of its own;
@@ -196,31 +218,37 @@ func (s *Server) buildMCPServer() *mcp.Server {
 		Name:    "kira-db",
 		Title:   "Kira Studio databases",
 		Version: serverVersion,
-	}, &mcp.ServerOptions{Instructions: instructions})
+	}, &mcp.ServerOptions{Instructions: llmprompts.DbmcpInstructions.Text(s.prompts(), llmprompts.NoVars{})})
 
+	src := s.prompts()
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_connections",
-		Description: "List every database connection this app has exposed to MCP, with its kind, read-only flag, live status and (once connected) capabilities.",
+		Description: llmprompts.DbmcpToolListConnections.Text(src, llmprompts.NoVars{}),
 	}, withPanicRecovery(s, "list_connections", s.listConnections))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_children",
-		Description: "List one container's own children — databases, schemas, tables, keys, topics, buckets, whatever this connection's own engine has at that level. Omit path for the connection's top level.",
+		Description: llmprompts.DbmcpToolListChildren.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[listChildrenArgs](src, llmprompts.DbmcpToolListChildren.ID(), nil),
 	}, withPanicRecovery(s, "list_children", s.listChildren))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_table",
-		Description: "Describe one table, view or collection's own columns, primary key, foreign keys, indexes and row estimate.",
+		Description: llmprompts.DbmcpToolDescribeTable.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[describeTableArgs](src, llmprompts.DbmcpToolDescribeTable.ID(), nil),
 	}, withPanicRecovery(s, "describe_table", s.describeTable))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_schema",
-		Description: "Describe every table and view's columns in one database or schema in a single call — cheaper than one describe_table call per table.",
+		Description: llmprompts.DbmcpToolDescribeSchema.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[describeSchemaArgs](src, llmprompts.DbmcpToolDescribeSchema.ID(), nil),
 	}, withPanicRecovery(s, "describe_schema", s.describeSchema))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_query",
-		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Reading stops at maxRows: rowCount is the number of rows fetched, a lower bound on the result size when truncated is true, and the database may still run the statement to completion. Each connection's read/write/DDL permission is checked first: a denied class is refused, and a class set to prompt waits for the user to approve it, which can take up to two minutes. On a connection whose owner turned auto-explain on, an explainable SELECT/WITH is planned first — a plan estimated over the connection owner's expensive-query threshold pauses the query for approval the same way a prompt-mode permission does.",
+		Description: llmprompts.DbmcpToolRunQuery.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[runQueryArgs](src, llmprompts.DbmcpToolRunQuery.ID(), map[string]any{"maxRows": llmprompts.LimitVars{Default: runQueryDefaultMaxRows, Max: runQueryMaxMaxRows}}),
 	}, withPanicRecovery(s, "run_query", s.runQuery))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "explain_query",
-		Description: "Plan one SELECT or WITH statement without running it, and return the normalized plan: the node tree, each node's estimated rows and native cost, and the structural issues this app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
+		Description: llmprompts.DbmcpToolExplainQuery.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[explainQueryArgs](src, llmprompts.DbmcpToolExplainQuery.ID(), nil),
 	}, withPanicRecovery(s, "explain_query", s.explainQuery))
 
 	return srv

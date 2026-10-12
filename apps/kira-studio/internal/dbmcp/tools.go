@@ -89,9 +89,9 @@ func (s *Server) resolveReadGated(connectionID string) (summary model.Connection
 // information than a pair of fixed names could carry. ---
 
 type listChildrenArgs struct {
-	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
-	Path         string `json:"path,omitempty" jsonschema:"Encoded path of the container to list, exactly as a previous list_children returned it. Omit for the connection's top level."`
-	Refresh      bool   `json:"refresh,omitempty" jsonschema:"Bypass the cached listing and re-read from the server. Default false."`
+	ConnectionID string `json:"connectionId"`
+	Path         string `json:"path,omitempty"`
+	Refresh      bool   `json:"refresh,omitempty"`
 }
 
 func (s *Server) listChildren(_ context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
@@ -108,9 +108,9 @@ func (s *Server) listChildren(_ context.Context, _ *mcp.CallToolRequest, args li
 // --- describe_table (§4.3) ---
 
 type describeTableArgs struct {
-	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
-	Path         string `json:"path" jsonschema:"Encoded path of the table, view or collection, from list_children."`
-	Refresh      bool   `json:"refresh,omitempty" jsonschema:"Bypass the cached listing and re-read from the server. Default false."`
+	ConnectionID string `json:"connectionId"`
+	Path         string `json:"path"`
+	Refresh      bool   `json:"refresh,omitempty"`
 }
 
 // describeTable is gated on Caps().Describe only in the sense that an adapter which cannot serve
@@ -130,9 +130,9 @@ func (s *Server) describeTable(_ context.Context, _ *mcp.CallToolRequest, args d
 // --- describe_schema (§4.4) ---
 
 type describeSchemaArgs struct {
-	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
-	Path         string `json:"path" jsonschema:"Encoded path of a database or schema, from list_children."`
-	Refresh      bool   `json:"refresh,omitempty" jsonschema:"Bypass the cached listing and re-read from the server. Default false."`
+	ConnectionID string `json:"connectionId"`
+	Path         string `json:"path"`
+	Refresh      bool   `json:"refresh,omitempty"`
 }
 
 func (s *Server) describeSchema(_ context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
@@ -154,10 +154,10 @@ const (
 )
 
 type runQueryArgs struct {
-	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
-	SQL          string `json:"sql" jsonschema:"One statement to run. Not a script — send one statement per call."`
-	Path         string `json:"path,omitempty" jsonschema:"Encoded path selecting the database to run against, from list_children. Required for engines with more than one database; ignored by engines with one."`
-	MaxRows      int    `json:"maxRows,omitempty" jsonschema:"Rows to return, 1-2000. Default 200. Reading stops once this many rows are fetched; rowCount is then a lower bound."`
+	ConnectionID string `json:"connectionId"`
+	SQL          string `json:"sql"`
+	Path         string `json:"path,omitempty"`
+	MaxRows      int    `json:"maxRows,omitempty"`
 }
 
 // runQuery builds an adapterhost.ExecuteRequestWire and calls Query.Execute — literally the method
@@ -397,10 +397,10 @@ const queueFullMessage = "too many queries are already waiting for approval; ret
 // --- explain_query (§4) ---
 
 type explainQueryArgs struct {
-	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
-	SQL          string `json:"sql" jsonschema:"One SELECT or WITH statement to plan. It is not executed — EXPLAIN is always issued without ANALYZE."`
-	Path         string `json:"path,omitempty" jsonschema:"Encoded path selecting the database to plan against, from list_children. Required for engines with more than one database; ignored by engines with one."`
-	IncludeRaw   bool   `json:"includeRaw,omitempty" jsonschema:"Also return the server's own raw EXPLAIN text. Default false — it can be tens of kilobytes, and the parsed plan above is the point."`
+	ConnectionID string `json:"connectionId"`
+	SQL          string `json:"sql"`
+	Path         string `json:"path,omitempty"`
+	IncludeRaw   bool   `json:"includeRaw,omitempty"`
 }
 
 // explainQueryResult embeds queryplan.Plan so its own fields inline directly into the result
