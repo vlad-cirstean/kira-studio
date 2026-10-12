@@ -16,6 +16,7 @@
 // Usage (Web Inspector console, one hard two-finger flick between the two calls):
 //   __kiraScrollTrace.start()
 //   copy(JSON.stringify(__kiraScrollTrace.stop()))
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { logWarn } from '@workbench/bridge/log';
 
 interface ScrollTraceEvent {
@@ -347,19 +348,9 @@ export function stop(): ScrollTraceResult | null {
   rafId = 0;
 
   const result: ScrollTraceResult = { frames, summary: summarize(frames) };
-  // Best-effort: readable from the console's own return value regardless, but a build where the
-  // inspector isn't attachable still needs a way to get the JSON out.
-  // P99 §9.3: not copyText/useClipboard — the optional-chained navigator.clipboard? guard plus the
-  // outer synchronous try/catch handle a context where the Clipboard API itself may be entirely
-  // absent (a dev-tool console hook, not a normal app surface); copyText()/useClipboard() assume
-  // the API exists and would throw where this deliberately swallows. Declined, named per
-  // CLAUDE.md's library rule.
-  try {
-    navigator.clipboard
-      ?.writeText(JSON.stringify(result))
-      ?.catch((err: unknown) => logWarn('scrollTrace', 'clipboard write failed', err));
-  } catch {
-    // ignore — clipboard access can throw synchronously outside a secure/focused context.
-  }
+  // Best-effort: the console return value is the primary output.
+  void copyOrReportError(JSON.stringify(result), (message) =>
+    logWarn('scrollTrace', 'clipboard write failed', message),
+  );
   return result;
 }

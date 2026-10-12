@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
 import {
   Table,
   TableBody,
@@ -52,12 +53,10 @@ function onNavigate(c: ConstraintRow): void {
 
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-constraints">
-    <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
-        t('studio.definition.constraints.heading.label')
-      }}</span>
-      <Badge>{{ constraints.length }}</Badge>
-    </header>
+    <SectionHeading
+      :label="t('studio.definition.constraints.heading.label')"
+      :count="constraints.length"
+    />
     <Table columns>
       <TableHeader>
         <TableRow class="hover:bg-transparent">
@@ -83,22 +82,15 @@ function onNavigate(c: ConstraintRow): void {
             }}</span>
             <Badge v-else>{{ t(TYPE_LABEL_KEY[c.type]) }}</Badge>
           </TableCell>
-          <TableCell
-            class="overflow-hidden text-ellipsis whitespace-nowrap font-data text-muted-foreground"
-            >{{
-              c.detail
-            }}</TableCell
-          >
+          <TableCell class="max-w-80 truncate font-data text-muted-foreground">{{
+            c.detail
+          }}</TableCell>
           <TableCell class="def-con-table">
             <Tooltip v-if="c.referencedPath">
               <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="border-0 bg-none p-0 cursor-pointer underline text-info hover:text-primary"
-                  @click="onNavigate(c)"
-                >
+                <Button variant="link" size="inline" @click="onNavigate(c)">
                   {{ referencedTableName(c) }}
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent>{{
                 t('studio.definition.constraint.openReferenced.tooltip', { table: referencedTableName(c) ?? '' })

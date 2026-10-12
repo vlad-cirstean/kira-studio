@@ -348,7 +348,7 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
 
   // --- default (P46-2): running again appends a new result set instead of replacing ---------
   const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
-  await expect(newResultToggle).not.toHaveClass(/is-active/);
+  await expect(newResultToggle).toHaveAttribute('aria-pressed', 'false');
 
   await typeInto(consoleView, page, 'SELECT 1 AS n;');
   await page.click('[data-testid="console-run-statement"]');
@@ -374,7 +374,7 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
 
   // --- toggle on: running replaces the current result set instead of appending (D6) ----------
   await newResultToggle.click();
-  await expect(newResultToggle).toHaveClass(/is-active/);
+  await expect(newResultToggle).toHaveAttribute('aria-pressed', 'true');
 
   await typeInto(consoleView, page, '\nSELECT 3 AS n;');
   await page.click('[data-testid="console-run-statement"]');

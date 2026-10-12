@@ -6,10 +6,11 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
+import { buttonVariants } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
-import { copyText } from '@workbench/behaviour/clipboard';
+import { copyText, readClipboardText } from '@workbench/behaviour/clipboard';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { useRowHeight } from '@workbench/lib/rowHeight';
@@ -1102,8 +1103,7 @@ function placeNavButtonsForRenderedCells(): void {
 }
 
 // `cell-nav-btn`/`header-key` stay as marker names (click delegation, test selectors).
-const NAV_BTN_CLASS =
-  'cell-nav-btn absolute left-1 top-1/2 z-[1] flex size-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-kira-sm border border-(color:--kira-border) bg-elevated p-0 text-(color:--kira-fg-muted) hover:bg-hover hover:text-fg';
+const NAV_BTN_CLASS = `cell-nav-btn absolute left-1 top-1/2 z-1 size-4 -translate-y-1/2 bg-elevated ${buttonVariants({ variant: 'toolbar', size: 'inline' })}`;
 const HEADER_KEY_CLASS = 'header-key ml-1 shrink-0 font-data text-warn';
 const HEADER_KEY_FK_CLASS = 'header-key is-fk ml-1 shrink-0 font-data text-info';
 
@@ -1250,7 +1250,7 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   // setup()'s effect scope is captured), not a stable Vue-tracked ref; its own destruction is what
   // tears the listener down (onBeforeHeaderCellDestroy's own comment). Declined, named exception.
   const zone = document.createElement('span');
-  zone.className = 'header-select-zone absolute inset-0 z-0 cursor-pointer';
+  zone.className = 'header-select-zone absolute inset-0 z-0';
   zone.dataset.testid = 'grid-header-select';
   zone.dataset.column = name;
   zone.dataset.colIndex = args.node.dataset.colIndex ?? '';
@@ -1866,13 +1866,9 @@ async function onPaste(): Promise<void> {
   if (!sel || !p) return;
   if (sel.kind !== 'cell' && sel.kind !== 'range' && sel.kind !== 'row') return;
 
-  // P99 §9.3: not useClipboard — its read() is a reactive-UI composable (a `text` ref synced on
-  // 'copy'/'cut' events for display), not documented to preserve the exact promise-rejects-on-
-  // permission-denial contract this catch depends on. Declined, named exception (correctness-
-  // critical path, no existing useClipboard-read precedent in this app to confirm against).
   let clipboardText: string;
   try {
-    clipboardText = await navigator.clipboard.readText();
+    clipboardText = await readClipboardText();
   } catch {
     return;
   }
@@ -1914,21 +1910,22 @@ function onKeydown(e: SlickEventData): void {
   const runtimeEntry = rt();
   if (!runtimeEntry) return;
 
-  const key = (e.key ?? '').toLowerCase();
+  const _key = (e.key ?? '').toLowerCase();
   // The cell editor and insert-row inputs sit under SlickGrid's keydown handler; copy and paste
   // there stay native.
-  const target = e.getNativeEvent<KeyboardEvent>().target;
+  const native = e.getNativeEvent<KeyboardEvent>();
+  const target = native.target;
   const inTextControl =
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     (target instanceof HTMLElement && target.isContentEditable);
-  if ((e.ctrlKey || e.metaKey) && key === 'c' && !inTextControl) {
+  if (shortcutFor(native, ['grid.copy']) !== null && !inTextControl) {
     e.preventDefault();
     e.stopImmediatePropagation();
     onCopy();
     return;
   }
-  if ((e.ctrlKey || e.metaKey) && key === 'v' && !inTextControl) {
+  if (shortcutFor(native, ['grid.paste']) !== null && !inTextControl) {
     e.preventDefault();
     e.stopImmediatePropagation();
     void onPaste();

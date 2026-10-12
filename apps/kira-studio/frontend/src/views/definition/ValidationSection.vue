@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { DocumentSchemaMeta } from '@shared/domain/definition';
+import CodeBlock from '@theme/components/CodeBlock.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { t } from '@theme/i18n';
@@ -23,21 +26,20 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-validation">
-    <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
-        t('studio.definition.validation.heading.label')
-      }}</span>
-      <Badge v-if="documentSchema?.validationLevel" variant="chip" data>
-        {{ documentSchema.validationLevel }}
-      </Badge>
-      <Badge v-if="documentSchema?.validationAction" variant="chip" data>
-        {{ documentSchema.validationAction }}
-      </Badge>
-    </header>
+    <SectionHeading :label="t('studio.definition.validation.heading.label')">
+      <span class="flex items-center gap-1.5">
+        <Badge v-if="documentSchema?.validationLevel" variant="chip" data>
+          {{ documentSchema.validationLevel }}
+        </Badge>
+        <Badge v-if="documentSchema?.validationAction" variant="chip" data>
+          {{ documentSchema.validationAction }}
+        </Badge>
+      </span>
+    </SectionHeading>
 
-    <p v-if="!documentSchema?.validator" class="text-muted-foreground m-0">
+    <InlineState v-if="!documentSchema?.validator" kind="empty">
       {{ t('studio.definition.validation.noValidator.empty') }}
-    </p>
+    </InlineState>
 
     <Table v-else-if="fields">
       <TableBody>
@@ -52,9 +54,6 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
       </TableBody>
     </Table>
 
-    <pre
-      v-else-if="showRaw"
-      class="m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2 font-data"
-    >{{ documentSchema?.validator }}</pre>
+    <CodeBlock v-else-if="showRaw">{{ documentSchema?.validator }}</CodeBlock>
   </section>
 </template>

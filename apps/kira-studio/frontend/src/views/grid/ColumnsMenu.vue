@@ -92,7 +92,12 @@ useSortableReorder(
   (from, to) => {
     order.value = moveId(order.value, from, to);
   },
-  { draggable: '[data-testid="columns-menu-row"]', direction: 'vertical', fallbackOnBody: false },
+  {
+    draggable: '[data-testid="columns-menu-row"]',
+    direction: 'vertical',
+    fallbackOnBody: false,
+    keyboard: true,
+  },
 );
 
 // P104 §3: PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,

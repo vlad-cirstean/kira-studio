@@ -14,8 +14,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
-import { useEventListener } from '@vueuse/core';
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
@@ -38,16 +37,16 @@ const props = defineProps<{
   filtered?: boolean;
 }>();
 
+const name = defineModel<string>('name', { required: true });
+const value = defineModel<string>('value', { required: true });
+const description = defineModel<string>('description', { required: true });
+const isSecret = defineModel<boolean>('isSecret', { required: true });
+
 const emit = defineEmits<{
-  'update:name': [value: string];
-  'update:value': [value: string];
-  'update:isSecret': [value: boolean];
-  'update:description': [value: string];
   blur: [];
   remove: [];
   /** Not yet revealed (row.value === '' && row.isSecret) — the eye IS the reveal action. */
   reveal: [];
-  move: [direction: 'up' | 'down'];
   /** R10: the parent knows the tab/scope/owner this row's history popover needs to open against
    *  (state/variables.ts's openHistoryMenu now takes them explicitly) — this row only says
    *  "the history button for this id was clicked". */
@@ -61,14 +60,11 @@ const emit = defineEmits<{
 // way) — the transition from '' to non-empty, while still isSecret, is exactly "just revealed",
 // which is when the value should first render unmasked rather than start hidden again.
 const visible = ref(false);
-watch(
-  () => props.row.value,
-  (value, previous) => {
-    if (props.row.isSecret && previous === '' && value !== '') visible.value = true;
-  },
-);
+watch(value, (next, previous) => {
+  if (isSecret.value && previous === '' && next !== '') visible.value = true;
+});
 
-const notYetRevealed = () => props.row.isSecret && props.row.value === '';
+const notYetRevealed = () => isSecret.value && value.value === '';
 const valueToggleLabel = computed(() => {
   if (notYetRevealed()) return t('common.action.reveal.label');
   return visible.value ? t('common.hideValue.label') : t('studio.api.variables.showValue.label');
@@ -80,19 +76,6 @@ function onEyeClick(): void {
   } else {
     visible.value = !visible.value;
   }
-}
-
-function onNameInput(v: string): void {
-  emit('update:name', v);
-}
-function onValueInput(v: string): void {
-  emit('update:value', v);
-}
-function onSecretChange(checked: boolean): void {
-  emit('update:isSecret', checked);
-}
-function onDescriptionInput(v: string): void {
-  emit('update:description', v);
 }
 
 const showHistory = ref(false);
@@ -108,24 +91,6 @@ function onHistoryOpenChange(open: boolean): void {
   showHistory.value = false;
   variableSetStore.closeHistoryMenu();
 }
-
-// D14: Alt+↑/↓ moves the focused row — a drag-only affordance is unusable from the keyboard, and
-// every other control in this dialog is reachable by Tab.
-function onKeydown(e: KeyboardEvent): void {
-  if (props.trailing || props.filtered || !e.altKey) return;
-  if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    emit('move', 'up');
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    emit('move', 'down');
-  }
-}
-
-// P105 §5.1: the row root has no interactive role of its own -- the keydown listener binds here via
-// VueUse instead of as a raw template attribute.
-const rootEl = useTemplateRef<HTMLElement>('rootEl');
-useEventListener(rootEl, 'keydown', onKeydown);
 </script>
 
 <template>
@@ -137,7 +102,6 @@ useEventListener(rootEl, 'keydown', onKeydown);
        allowlist gap as VariableSetView.vue's own header-row and VariablesOverviewPanel.vue's
        overview-row -- a pre-existing value relocated, not a new one. -->
   <div
-    ref="rootEl"
     class="grid items-center gap-1 px-1.5 py-1 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] variable-row"
     data-testid="variable-row"
     :data-id="row.id"
@@ -166,10 +130,10 @@ useEventListener(rootEl, 'keydown', onKeydown);
     <div class="flex min-w-0 items-center gap-1 name-cell">
       <Input
         size="kira"
-        :model-value="row.name"
+        :model-value="name"
         :placeholder="t('common.field.name.label')"
         data-testid="variable-name"
-        @update:model-value="onNameInput(String($event))"
+        @update:model-value="name = String($event)"
         @blur="emit('blur')"
       />
       <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">{{
@@ -189,19 +153,19 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <Input
         v-else
         size="kira"
-        :type="row.isSecret && !visible ? 'password' : 'text'"
-        :model-value="row.value"
+        :type="isSecret && !visible ? 'password' : 'text'"
+        :model-value="value"
         :placeholder="t('common.field.value.label')"
         data-testid="variable-value"
-        @update:model-value="onValueInput(String($event))"
+        @update:model-value="value = String($event)"
         @blur="emit('blur')"
       />
       <TooltipIconButton
-        v-if="row.isSecret"
+        v-if="isSecret"
         icon="eye"
         :label="valueToggleLabel"
         :aria-label="t('common.action.reveal.label')"
-        :class="{ 'bg-field text-fg': visible }"
+        :pressed="visible"
         data-testid="variable-reveal"
         @click="onEyeClick"
       />
@@ -209,10 +173,10 @@ useEventListener(rootEl, 'keydown', onKeydown);
     <div class="flex min-w-0 items-center gap-1 description-cell">
       <Input
         size="kira"
-        :model-value="row.description"
+        :model-value="description"
         :placeholder="t('common.field.description.label')"
         data-testid="variable-description"
-        @update:model-value="onDescriptionInput(String($event))"
+        @update:model-value="description = String($event)"
         @blur="emit('blur')"
       />
     </div>
@@ -220,10 +184,10 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger class="flex items-center">
           <Checkbox
-            :model-value="row.isSecret"
-            :disabled="secretsUnavailable && !row.isSecret"
+            :model-value="isSecret"
+            :disabled="secretsUnavailable && !isSecret"
             data-testid="variable-secret"
-            @update:model-value="(v) => onSecretChange(v === true)"
+            @update:model-value="(v) => (isSecret = v === true)"
           >
             <CodiconIcon name="check" :size="12" />
           </Checkbox>

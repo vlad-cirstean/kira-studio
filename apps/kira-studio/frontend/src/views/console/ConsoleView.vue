@@ -11,6 +11,7 @@ import {
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowActions, rowMeta } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
@@ -84,6 +85,7 @@ const running = computed(() => rt.value?.status === 'running');
 // window: set before the reconnect await, cleared right after it resolves and before run()/
 // explain() is called -- by the time either actually runs, `running` has already taken over.
 const starting = ref(false);
+const runBlocked = computed(() => running.value || starting.value);
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
@@ -741,7 +743,7 @@ const statusLine = computed(() => {
               variant="toolbar-primary"
               size="kira"
               data-testid="console-run-statement"
-              :disabled="running || starting"
+              :pending="running || starting"
               @click="runStatement"
             >
               <CodiconIcon name="play" :size="13" />
@@ -758,7 +760,7 @@ const statusLine = computed(() => {
               variant="toolbar"
               size="kira"
               data-testid="console-run-all"
-              :disabled="running || starting"
+              :disabled="runBlocked"
               @click="runAll"
             >
               <CodiconIcon name="run-all" :size="13" />
@@ -796,7 +798,7 @@ const statusLine = computed(() => {
               variant="toolbar"
               size="kira"
               data-testid="console-explain"
-              :disabled="!canExplain || starting"
+              :disabled="!canExplain || runBlocked"
               @click="onExplain"
             >
               <CodiconIcon name="list-tree" :size="13" />
@@ -817,7 +819,7 @@ const statusLine = computed(() => {
               ? t('studio.console.newResultSet.add.tooltip')
               : t('studio.console.newResultSet.replace.tooltip')"
         :aria-label="t('studio.console.newResultSet.toggle.aria')"
-        :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
+        :pressed="!tab.state.newResultSet"
         data-testid="console-new-result-toggle"
         @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
       />
@@ -853,7 +855,7 @@ const statusLine = computed(() => {
         v-if="!activeResultIsPlan"
         icon="search"
         :label="t('studio.console.findInResult.label')"
-        :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
+        :pressed="!!rt?.searchOpen"
         data-testid="console-search"
         @click="onToggleSearch"
       />
@@ -897,14 +899,14 @@ const statusLine = computed(() => {
     <Alert strip v-if="rt?.autoExplain" variant="warn" data-testid="console-auto-explain">
       <AlertDescription>{{ autoExplainMessage }}</AlertDescription>
       <AlertAction v-if="canShowAutoExplainPlan">
-        <button
-          type="button"
-          class="border-0 bg-none p-0 text-inherit underline cursor-pointer"
+        <Button
+          variant="link"
+          size="inline"
           data-testid="console-auto-explain-show-plan"
           @click="onShowAutoExplainPlan"
         >
           {{ t('studio.console.autoExplain.showPlan.label') }}
-        </button>
+        </Button>
       </AlertAction>
     </Alert>
 
@@ -954,7 +956,7 @@ const statusLine = computed(() => {
               <div
                 v-for="(result, i) in rt.results"
                 :key="result.key"
-                class="group/tab"
+                class="group"
                 :class="cn(tabChipVariants({ active: result.key === rt.activeKey }), 'max-w-36')"
                 data-testid="console-result-tab"
                 :data-active="result.key === rt.activeKey"
@@ -964,13 +966,13 @@ const statusLine = computed(() => {
                    sibling now, not its child. -->
                 <button
                   type="button"
-                  class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
+                  class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0"
                   @click="consoleViewStore.setActiveResult(tab.id, result.key)"
                   @auxclick.middle="onResultMiddleClick(result.key)"
                   @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
                 >
                   <CodiconIcon :name="iconForResult(result.key)" :size="13" class="shrink-0" />
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">{{
+                  <span class="min-w-0 truncate">{{
                     t('studio.console.result.tab.label', { n: i + 1 })
                   }}</span>
                 </button>
@@ -978,7 +980,7 @@ const statusLine = computed(() => {
                   variant="toolbar"
                   size="kira-icon"
                   class="size-4"
-                  :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
+                  :class="result.key === rt.activeKey ? 'opacity-100' : rowActions"
                   :aria-label="t('studio.console.result.close.aria')"
                   data-testid="console-result-close"
                   @click="consoleViewStore.closeResult(tab.id, result.key)"
@@ -987,7 +989,7 @@ const statusLine = computed(() => {
                 </Button>
               </div>
             </div>
-            <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="console-status">{{
+            <span class="ml-auto" :class="rowMeta" data-testid="console-status">{{
               statusLine
             }}</span>
             <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
@@ -1049,9 +1051,4 @@ const statusLine = computed(() => {
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
     </div>
   </div>
-  <!-- P110 I2-16: `.result-tab`/`.result-close`'s own hover/active rules moved onto the template --
-       `group/tab` on the tab, its own ternary for the inactive-hover background (`is-active` stays
-       a real marker class, console.spec.ts's own `toHaveClass(/is-active/)` assertion); the close
-       button's opacity is `isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'`, its
-       own hover background now the toolbar Button variant's. -->
 </template>

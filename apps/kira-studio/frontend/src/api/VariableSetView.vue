@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
+import type { PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { colorMarkClass, colourLabel } from '@theme/connColor';
+import { tableHeadClass, tableHeadRowClass } from '@theme/components/ui/table';
+import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
+import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
-import SwatchRadio from '@theme/SwatchRadio.vue';
 import { revealElement } from '@workbench/behaviour/focus';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
@@ -24,6 +21,7 @@ import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { VariableSetTabRecord } from '../state/tabDomain';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
+import EnvironmentFields from './EnvironmentFields.vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
 import { mergeDrafts, reconcileOrder, reseedCommitted } from './state/draftMerge';
@@ -85,45 +83,6 @@ const runState = useRunState(() => props.tab.id);
 const rowsQuery = useVariableRows(scope.value, ownerId);
 const rows = computed<ApiVariable[]>(() => rowsQuery.data.value ?? []);
 const error = computed(() => variableSetStore.variableSetError(props.tab.id));
-
-// ---- environment scope only: name + description + Duplicate (D16/D17) ----
-
-const envNameDraft = ref('');
-const envDescriptionDraft = ref('');
-watch(
-  owningEnvironment,
-  (env) => {
-    envNameDraft.value = env?.name ?? '';
-    envDescriptionDraft.value = env?.description ?? '';
-  },
-  { immediate: true },
-);
-async function onEnvFieldBlur(): Promise<void> {
-  const env = owningEnvironment.value;
-  if (!env) return;
-  const name = envNameDraft.value.trim();
-  if (name === '') {
-    envNameDraft.value = env.name;
-    return;
-  }
-  if (name === env.name && envDescriptionDraft.value === env.description) return;
-  // updateEnvironment writes name/description/color as one row update (D19) — color has its own
-  // immediate handler below, so a name/description blur passes the environment's own current
-  // colour through unchanged rather than defaulting it back to 'none'.
-  await variablesStore.updateEnvironment(env.id, name, envDescriptionDraft.value, env.color);
-}
-// P18 D17/D19: a swatch click applies immediately, unlike name/description's blur-commit — a
-// colour choice is a discrete action with its own visible feedback (the swatch's own selection
-// ring), not text a user is still composing.
-async function onEnvColorChange(color: PaletteColor): Promise<void> {
-  const env = owningEnvironment.value;
-  if (!env) return;
-  await variablesStore.updateEnvironment(env.id, env.name, env.description, color);
-}
-async function onDuplicateEnvironment(): Promise<void> {
-  if (owningEnvironment.value)
-    await variablesStore.duplicateEnvironment(owningEnvironment.value.id);
-}
 
 // ---- the row table (VariablesDialog.vue's own mechanics, verbatim but tab-scoped) ----
 
@@ -232,6 +191,7 @@ watch(variableSetStore.revealedValues, (values) => {
   }
 });
 
+const headCell = cn(tableHeadClass, 'px-0');
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 
@@ -274,7 +234,7 @@ const displayRows = computed<ApiVariable[]>(() => {
   return [...real, trailingRow.value];
 });
 
-// D14: drag by the grip, or Alt+Arrow (onMove). Declared ahead of the first syncDrafts run (the
+// D14: drag by the grip, or Alt+Arrow (`keyboard`). Declared ahead of the first syncDrafts run (the
 // immediate watch below) so `dragging` exists when it reads it. The trailing blank row is never a
 // drag source.
 const listRef = useTemplateRef<HTMLElement>('listRef');
@@ -290,6 +250,7 @@ const { dragging } = useSortableReorder(
     handle: '[data-testid="variable-grip"]',
     direction: 'vertical',
     disabled: () => isFiltered.value,
+    keyboard: true,
   },
 );
 watch(rows, syncDrafts, { immediate: true });
@@ -434,17 +395,6 @@ function onReveal(id: string): void {
   void variableSetStore.revealVariable(id, onRevealError);
 }
 
-async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
-  if (isFiltered.value) return;
-  const from = order.value.indexOf(id);
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (from === -1 || to < 0 || to >= order.value.length) return;
-  const next = [...order.value];
-  [next[from], next[to]] = [next[to], next[from]];
-  order.value = next;
-  await persistOrder();
-}
-
 async function onRemove(id: string): Promise<void> {
   if (id === '') return;
   await variableSetStore.deleteVariable(props.tab.id, scope.value, ownerId.value, id);
@@ -528,7 +478,7 @@ function onBulkClose(): void {
           v-if="ownerExists"
           icon="code"
           :label="t('studio.api.variableSet.bulkToggle.label')"
-          :class="{ 'bg-field text-fg': bulkMode }"
+          :pressed="bulkMode"
           data-testid="variables-bulk-toggle"
           @click="bulkMode = !bulkMode"
         />
@@ -569,73 +519,10 @@ function onBulkClose(): void {
       <!-- P28 D16(b): flex-end, not center -- each labelled field is now a two-row column, and
            centering would misalign the inputs against the colour picker and Duplicate button
            beside them. -->
-      <div
+      <EnvironmentFields
         v-if="scope === 'environment' && owningEnvironment"
-        class="flex items-end gap-1 border-b border-border px-1.5 py-1"
-      >
-        <!-- P28 D16(b): real labels. Both fields carried a placeholder and nothing else, so a
-             populated environment showed two unlabelled text boxes — the placeholder is gone the
-             moment either has a value, which is most of the time. Same .cell label convention
-             the variable table's own header row below uses. -->
-        <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-sm text-subtle">{{ t('common.field.name.label') }}</span>
-          <Input
-            v-model="envNameDraft"
-            :placeholder="t('common.field.name.label')"
-            size="kira"
-            data-testid="environment-name"
-            @blur="onEnvFieldBlur"
-          />
-        </Label>
-        <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-sm text-subtle">{{
-            t('common.field.description.label')
-          }}</span>
-          <Input
-            v-model="envDescriptionDraft"
-            :placeholder="t('common.field.description.label')"
-            size="kira"
-            data-testid="environment-description"
-            @blur="onEnvFieldBlur"
-          />
-        </Label>
-        <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
-             call site rather than kept as a shared primitive component. -->
-        <!-- P105 §7: `role="radio"` on a Button wants a real radio input (`useSemanticElements`)
-             — a visually-hidden native radio input per swatch keeps the circle's own
-             styling exactly (an actual `ToggleGroupItem` would swap in `toggleVariants`' own
-             rectangular look), with native Tab/Arrow-key/checked behaviour for free. `opacity-0`
-             over the swatch's full area rather than `sr-only`'s 1px-clip technique — Playwright's
-             `.click()` (this file's own e2e suite, `connections.spec.ts` and others) refuses a
-             target with a near-zero bounding box; a real-size, invisible overlay stays clickable
-             both for a person and for a test, same as a custom file-input skin. -->
-        <fieldset
-          class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
-          :aria-label="t('studio.api.variableSet.colour.aria')"
-          data-testid="environment-color-picker"
-        >
-          <Tooltip v-for="color in PALETTE_COLOR_CHOICES" :key="color">
-            <TooltipTrigger as-child>
-              <SwatchRadio
-                name="environment-color"
-                :value="color"
-                :color="color"
-                :checked="owningEnvironment.color === color"
-                @change="onEnvColorChange(color)"
-              />
-            </TooltipTrigger>
-            <TooltipContent>{{ colourLabel(color) }}</TooltipContent>
-          </Tooltip>
-        </fieldset>
-        <Button
-          variant="toolbar"
-          size="kira"
-          data-testid="environment-duplicate"
-          @click="onDuplicateEnvironment"
-        >
-          {{ t('common.action.duplicate.label') }}
-        </Button>
-      </div>
+        :environment="owningEnvironment"
+      />
 
       <!-- P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
            description, secret, history, remove) so the labels sit above their columns; the four
@@ -644,20 +531,24 @@ function onBulkClose(): void {
            gap as .overview-row (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue) --
            a pre-existing value relocated, not a new one. -->
       <div
-        class="grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]"
+        :class="cn(tableHeadRowClass, 'grid gap-1 px-1.5 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]')"
       >
-        <span class="cell"></span>
-        <span class="cell">{{ t('common.field.name.label') }}</span>
-        <span class="cell">{{ t('common.field.value.label') }}</span>
-        <span class="cell">{{ t('common.field.description.label') }}</span>
-        <span class="cell"></span>
-        <span class="cell"></span>
-        <span class="cell"></span>
+        <span></span>
+        <span :class="headCell">{{ t('common.field.name.label') }}</span>
+        <span :class="headCell">{{ t('common.field.value.label') }}</span>
+        <span :class="headCell">{{ t('common.field.description.label') }}</span>
+        <span></span>
+        <span></span>
+        <span></span>
       </div>
       <VariableRow
         v-for="row in displayRows"
         :key="row.id || 'trailing'"
         :row="row"
+        :name="row.name"
+        :value="row.value"
+        :description="row.description"
+        :is-secret="row.isSecret"
         :duplicate="duplicateFor(row)"
         :trailing="row.id === ''"
         :filtered="isFiltered"
@@ -670,7 +561,6 @@ function onBulkClose(): void {
         @remove="onRemove(row.id)"
         @reveal="onReveal(row.id)"
         @history="onHistoryClickFor(row)"
-        @move="onMove(row.id, $event)"
       />
     </div>
   </div>

@@ -96,23 +96,15 @@ U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are 
 U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
 U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
 U36 apps/kira-studio/frontend/src/project/FiltersDialog.vue # bordered scroll list box (input-like), rows own the look
-U36 apps/kira-studio/frontend/src/views/console/ExplainResultView.vue # bordered plan-tree list container, rows own the look
-U37 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # DOM-built grid cell navigation button hover, no Vue Button
 U36 apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue # SQL statement is a code block (pre), not a content card
 U36 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue # command code block and a bordered connection list item, not content cards
 U37 apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue # density preview renders the unsaved draft; useRowHeight reads the applied CSS var
 U46 apps/kira-studio/frontend/src/bridge/port.ts # bridge transport timeout
 U41 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host reads modifier keys
 U62 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host owns editor focus
-U41 apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue # SlickGrid engine host reads modifier keys
-U41 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # SlickGrid engine host reads modifier keys
-U42 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # paste read inside the grid engine
+U41 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # column-header click reads the Ctrl/Cmd mouse modifier, not a key chord
 U62 apps/kira-studio/frontend/src/views/grid/slick/editor.ts # SlickGrid cell editor owns its input focus
-U41 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue # editor host reads modifier keys
 U52 apps/kira-studio/frontend/src/views/shared/celleditor/timestamp.ts # spelling-preserving timestamp re-encoding
-U42 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
-U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Down row reorder chord, not list navigation
-U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
 U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host exposes focus(); not a DOM element focus
 U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
 U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret

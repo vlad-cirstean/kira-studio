@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { ShortcutId } from '@shared/domain/shortcuts';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
@@ -21,9 +21,11 @@ import { useDebounceFn } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
+import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useRowHeight } from '@workbench/lib/rowHeight';
+import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
@@ -240,10 +242,7 @@ function onRowKeydown(e: KeyboardEvent, node: TreeNode): void {
 // instead of by tree row.
 function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
   if (!props.tab.connectionId) return;
-  browseViewStore.selectRow(props.tab.id, node.path);
-  contextMenuStore.openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node), {
-    onRestoreFocus: () => void nav.focusKey(node.path),
-  });
+  nav.contextMenu(node, e, menuForNode(props.tab.id, props.tab.connectionId, node));
 }
 
 // P33 D3: the same caps.fileTransfer + canInsert + not-read-only gate uploadMenuItem applies,
@@ -259,14 +258,14 @@ function onUploadClick(): void {
   objectStoreStore.openUploadDialog(props.tab.connectionId, currentLevelPath.value);
 }
 
-const rowHeight = 28;
+const { single: rowHeight } = useRowHeight();
 
 // P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
 // useVirtualRows composable.
 const scrollEl = ref<HTMLElement | null>(null);
 const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => filteredNodes.value.length,
-  rowHeight: () => rowHeight,
+  rowHeight: () => rowHeight.value,
   scrollElement: scrollEl,
 });
 
@@ -295,6 +294,18 @@ const nav = useListNavigation<TreeNode>({
   },
   scrollToIndex: (index) => scrollToIndex(index),
   rendered: () => virtualItems.value,
+});
+
+function viaMenu(id: ShortcutId): (path: string) => void {
+  return (path) => {
+    const connectionId = props.tab.connectionId;
+    const node = rt.value?.nodes.find((n) => n.path === path);
+    if (connectionId && node) runMenuShortcut(menuForNode(props.tab.id, connectionId, node), id);
+  };
+}
+useTreeShortcuts(nav, {
+  'tree.copyName': viaMenu('tree.copyName'),
+  'tree.delete': viaMenu('tree.delete'),
 });
 
 // VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
@@ -349,7 +360,7 @@ onMounted(() => {
       <TooltipIconButton
         :icon="ICON.search"
         :label="t('common.action.filter.label')"
-        :class="{ 'bg-field text-fg': filterOpen }"
+        :pressed="filterOpen"
         data-testid="browse-filter-toggle"
         @click="toggleFilter"
       />
@@ -438,47 +449,39 @@ onMounted(() => {
           <span class="flex items-center min-w-0 overflow-hidden gap-0.5">
             <template v-for="(crumb, i) in crumbs" :key="crumb.path">
               <span v-if="i > 0" class="text-subtle">/</span>
-              <button
-                type="button"
-                class="overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-kira-md px-0.5"
-                :class="
-                    i === crumbs.length - 1
-                      ? 'text-fg cursor-default'
-                      : 'text-muted-foreground cursor-pointer hover:text-fg hover:underline'
-                  "
+              <Button
+                variant="toolbar"
+                size="inline"
+                class="min-w-0 truncate px-0.5 text-kira-md"
+                :class="i === crumbs.length - 1 && 'text-fg'"
                 data-testid="browse-crumb"
                 @click="onCrumbClick(crumb.path)"
               >
                 {{ crumb.name }}
-              </button>
+              </Button>
             </template>
           </span>
-          <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{
-            countText
-          }}</span>
+          <span class="ml-auto" :class="rowMeta" data-testid="browse-count">{{ countText }}</span>
         </ViewToolbar>
         <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
           <EmptyState
             v-if="!rt || (loading && rt.nodes.length === 0)"
-            class="h-full"
+            fill
+            loading
             :title="t('common.state.loading.loading')"
-          >
-            <template #media><Spinner :size="24" /></template>
-          </EmptyState>
-          <div
+          />
+          <EmptyState
             v-else-if="rt.nodes.length === 0"
-            class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
+            fill
             data-testid="browse-empty"
-          >
-            {{ t('studio.browse.items.empty') }}
-          </div>
-          <div
+            :title="t('studio.browse.items.empty')"
+          />
+          <EmptyState
             v-else-if="filteredNodes.length === 0"
-            class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
+            fill
             data-testid="browse-empty"
-          >
-            {{ t('common.state.noMatches.empty') }}
-          </div>
+            :title="t('common.state.noMatches.empty')"
+          />
           <div
             v-else
             ref="scrollEl"
@@ -527,9 +530,7 @@ onMounted(() => {
                     :size="13"
                   /></span
                 >
-                <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{
-                  filteredNodes[vi.index]?.name
-                }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ filteredNodes[vi.index]?.name }}</span>
                 <Badge
                   data
                   v-if="
@@ -541,13 +542,9 @@ onMounted(() => {
                     redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
                   }}</Badge
                 >
-                <span
-                  v-if="filteredNodes[vi.index]?.detail"
-                  class="shrink-0 text-kira-sm text-muted-foreground"
-                  >{{
-                    filteredNodes[vi.index]?.detail
-                  }}</span
-                >
+                <span v-if="filteredNodes[vi.index]?.detail" class="shrink-0" :class="rowMeta">{{
+                  filteredNodes[vi.index]?.detail
+                }}</span>
               </div>
             </div>
           </div>
@@ -566,7 +563,7 @@ onMounted(() => {
         <KeyValuePane v-if="previewable" :view-key="previewKey" />
         <EmptyState
           v-else
-          class="min-h-0 flex-1"
+          fill
           data-testid="browse-preview-empty"
           :icon="emptyPreviewIcon"
           :title="emptyPreviewLabel"

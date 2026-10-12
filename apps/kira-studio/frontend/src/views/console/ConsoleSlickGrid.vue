@@ -2,6 +2,7 @@
 import type { TabularPage } from '@shared/protocol/page';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { useRowHeight } from '@workbench/lib/rowHeight';
+import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import type {
   Column,
@@ -652,8 +653,7 @@ function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }
 // triggers `onKeyDown` first and honours `stopImmediatePropagation`, checked right after this
 // fires — the same contract SlickGridHost.vue's own onKeydown relies on.
 function onKeydown(e: SlickEventData): void {
-  const key = (e.key ?? '').toLowerCase();
-  if ((e.ctrlKey || e.metaKey) && key === 'c') {
+  if (shortcutFor(e.getNativeEvent<KeyboardEvent>(), ['grid.copy']) !== null) {
     e.preventDefault();
     e.stopImmediatePropagation();
     onCopy();

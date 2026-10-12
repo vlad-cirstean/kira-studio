@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { IndexMeta } from '@shared/domain/tree';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import {
   Table,
@@ -18,12 +19,7 @@ defineProps<{
 
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-indexes">
-    <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
-        t('studio.definition.indexes.heading.label')
-      }}</span>
-      <Badge>{{ indexes.length }}</Badge>
-    </header>
+    <SectionHeading :label="t('studio.definition.indexes.heading.label')" :count="indexes.length" />
     <Table columns>
       <TableHeader>
         <TableRow class="hover:bg-transparent">

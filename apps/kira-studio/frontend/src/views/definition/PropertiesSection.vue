@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DefinitionSection } from '@shared/domain/definition';
-import { Badge } from '@theme/components/ui/badge';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { t } from '@theme/i18n';
 
@@ -19,16 +21,11 @@ defineProps<{
     data-testid="definition-properties"
     :data-title="section.title"
   >
-    <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
-        section.title
-      }}</span>
-      <Badge>{{ section.rows.length }}</Badge>
-    </header>
+    <SectionHeading :label="section.title" :count="section.rows.length" />
 
-    <p v-if="section.rows.length === 0" class="text-muted-foreground m-0">{{
+    <InlineState v-if="section.rows.length === 0" kind="empty">{{
       t('studio.definition.properties.empty')
-    }}</p>
+    }}</InlineState>
 
     <Table v-else>
       <TableBody>
@@ -37,7 +34,7 @@ defineProps<{
             row.name
           }}</TableCell>
           <TableCell class="def-prop-value font-data">{{ row.value }}</TableCell>
-          <TableCell class="text-subtle text-kira-sm">{{ row.detail ?? '' }}</TableCell>
+          <TableCell :class="rowMeta">{{ row.detail ?? '' }}</TableCell>
         </TableRow>
       </TableBody>
     </Table>

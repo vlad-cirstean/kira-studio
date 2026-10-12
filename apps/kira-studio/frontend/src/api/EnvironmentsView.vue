@@ -13,7 +13,6 @@ import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
-import { useEventListener } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -110,7 +109,7 @@ const displayEnvironments = computed<ApiEnvironment[]>(() => {
   return orderedEnvironments.value.filter((env) => matchesQuery(env.name, filterQuery.value));
 });
 
-// D14: drag by the grip, or Alt+Arrow below. Declared ahead of the first syncDrafts run (the
+// D14: drag by the grip, or Alt+Arrow (`keyboard`). Declared ahead of the first syncDrafts run (the
 // immediate watch below) so `dragging` exists when it reads it. The grip is the drag handle: rows
 // hold text inputs and a radio, which a whole-row drag would start from.
 const listEl = useTemplateRef<HTMLElement>('listEl');
@@ -126,6 +125,7 @@ const { dragging } = useSortableReorder(
     handle: '[data-testid="environment-grip"]',
     direction: 'vertical',
     disabled: () => isFiltered.value,
+    keyboard: true,
   },
 );
 watch(() => variablesStore.environments, syncDrafts, { immediate: true });
@@ -196,43 +196,6 @@ async function onDelete(id: string, name: string): Promise<void> {
 async function onDuplicate(id: string): Promise<void> {
   await variablesStore.duplicateEnvironment(id);
 }
-
-// D14: the same refusal while filtered as elsewhere (both splice `order` by the rendered index,
-// which a filter can move, but the deeper reason is semantic: "move up" past a filter-hidden
-// neighbour has no defined result).
-async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
-  if (isFiltered.value) return;
-  const from = order.value.indexOf(id);
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (from === -1 || to < 0 || to >= order.value.length) return;
-  const next = [...order.value];
-  [next[from], next[to]] = [next[to], next[from]];
-  order.value = next;
-  await persistOrder();
-}
-function onKeydown(e: KeyboardEvent, id: string): void {
-  if (isFiltered.value || !e.altKey) return;
-  if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    void onMove(id, 'up');
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    void onMove(id, 'down');
-  }
-}
-
-// P105 §5.1: the row divs carry no interactive role of their own, so the keydown listener binds
-// once on the list container and resolves back to a row via its own data-id.
-function rowIdFromEvent(e: Event): string | null {
-  return (
-    (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="environment-row"]')
-      ?.dataset.id ?? null
-  );
-}
-useEventListener(listEl, 'keydown', (e) => {
-  const id = rowIdFromEvent(e);
-  if (id !== null) onKeydown(e as KeyboardEvent, id);
-});
 </script>
 
 <template>

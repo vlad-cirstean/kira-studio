@@ -388,8 +388,9 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   ).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(findBar).toHaveCount(0);
-  await expect(page.locator('[data-testid="cell-editor-search-toggle"]')).not.toHaveClass(
-    /is-active/,
+  await expect(page.locator('[data-testid="cell-editor-search-toggle"]')).toHaveAttribute(
+    'aria-pressed',
+    'false',
   );
 
   // --- scenario 2: every format, read out of the fixture's own `kind` column -------------

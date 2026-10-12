@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Card } from '@theme/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatCount } from '@workbench/behaviour/format';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useSettingsStore } from '../../state/settings';
@@ -118,19 +121,13 @@ const rawLanguage = computed(() =>
         </div>
         <Tooltip v-if="nativeCostLabel">
           <TooltipTrigger as-child>
-            <span
-              class="text-muted-foreground text-kira-sm cursor-default"
-              data-testid="explain-native-cost"
-              >{{
-                nativeCostLabel
-              }}</span
-            >
+            <span :class="rowMeta" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
           </TooltipTrigger>
           <TooltipContent>{{ t('studio.console.plan.nativeCost.tooltip') }}</TooltipContent>
         </Tooltip>
       </div>
       <p
-        class="text-muted-foreground text-kira-sm whitespace-pre-wrap break-words font-data"
+        :class="[rowMeta, 'whitespace-pre-wrap break-words font-data']"
         data-testid="explain-statement"
         >{{
           result.statement
@@ -153,11 +150,11 @@ const rawLanguage = computed(() =>
           <span>{{ issue.message }}</span>
         </li>
       </ul>
-      <p v-else class="text-subtle m-0" data-testid="explain-no-issues">{{
+      <InlineState v-else kind="empty" data-testid="explain-no-issues">{{
         t('studio.console.plan.noIssues.empty')
-      }}</p>
+      }}</InlineState>
 
-      <div class="border border-border rounded-kira-sm py-1" data-testid="explain-tree">
+      <Card variant="list" data-testid="explain-tree">
         <div
           v-for="row in flatRows"
           :key="row.id"
@@ -165,53 +162,37 @@ const rawLanguage = computed(() =>
           data-testid="explain-plan-node"
           :style="{ paddingLeft: `${row.depth * 18 + 4}px` }"
         >
-          <button
-            v-if="row.hasChildren"
-            type="button"
-            class="inline-flex items-center w-3 shrink-0 cursor-pointer border-0 bg-transparent p-0"
-            :aria-label="collapsedIds.has(row.id) ? t('common.action.expand.label') : t('common.action.collapse.label')"
-            @click="toggleNode(row.id)"
-          >
-            <CodiconIcon
-              :name="collapsedIds.has(row.id) ? 'chevron-right' : 'chevron-down'"
-              :size="12"
-            />
-          </button>
-          <span v-else class="inline-flex items-center w-3 shrink-0 cursor-pointer"></span>
+          <TreeTwisty
+            :expanded="!collapsedIds.has(row.id)"
+            :has-children="row.hasChildren"
+            @toggle="toggleNode(row.id)"
+          />
           <span class="font-data">{{ row.node.label }}</span>
-          <span
-            v-if="row.node.estimatedRows !== undefined"
-            class="plan-meta text-muted-foreground text-kira-sm"
-            >{{
-              t('studio.console.plan.nodeRows.label', { count: row.node.estimatedRows })
-            }}</span
-          >
-          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">{{
+          <span v-if="row.node.estimatedRows !== undefined" class="plan-meta" :class="rowMeta">{{
+            t('studio.console.plan.nodeRows.label', { count: row.node.estimatedRows })
+          }}</span>
+          <span v-if="row.node.cost" class="plan-meta" :class="rowMeta">{{
             t('common.cost.label', { value: formatCount(row.node.cost.total) })
           }}</span>
           <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{
             row.node.detail
           }}</span>
-          <span
-            v-if="row.node.metrics.length"
-            class="plan-metrics text-muted-foreground text-kira-sm"
-            >{{
-              metricsLine(row.node)
-            }}</span
-          >
+          <span v-if="row.node.metrics.length" class="plan-metrics" :class="rowMeta">{{
+            metricsLine(row.node)
+          }}</span>
         </div>
-      </div>
+      </Card>
 
       <div class="flex items-center gap-1">
         <TooltipIconButton
           icon="code"
           :label="t('studio.console.plan.raw.tooltip')"
           :aria-label="t('studio.console.plan.raw.aria')"
-          :class="{ 'bg-field text-fg': showRaw }"
+          :pressed="showRaw"
           data-testid="explain-raw-toggle"
           @click="showRaw = !showRaw"
         />
-        <span class="text-muted-foreground text-kira-sm">{{ t('common.raw.label') }}</span>
+        <span :class="rowMeta">{{ t('common.raw.label') }}</span>
       </div>
       <div
         v-if="showRaw"
@@ -226,9 +207,7 @@ const rawLanguage = computed(() =>
         />
       </div>
     </template>
-    <p v-else class="text-muted-foreground text-kira-sm m-0">{{
-      t('studio.console.plan.empty.empty')
-    }}</p>
+    <InlineState v-else kind="empty">{{ t('studio.console.plan.empty.empty') }}</InlineState>
   </div>
   <!-- P110 I2-16: `.verdict.warn`/`.issue-list li[.warn/.info]`/`.plan-row:hover` all moved onto
        the template as ternaries/utilities -- `issue.severity` is exhaustively 'warn'/'info'

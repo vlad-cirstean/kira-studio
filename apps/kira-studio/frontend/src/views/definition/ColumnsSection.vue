@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Badge } from '@theme/components/ui/badge';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import {
   Table,
   TableBody,
@@ -13,6 +13,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { ref } from 'vue';
 import { columnTypeIcon, columnTypeTextClass } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';
@@ -35,8 +36,10 @@ function keyLabel(col: ColumnMeta): 'PK' | 'FK' | null {
 
 // D9: the tree's former column-row context menu (Copy name / Add to projection / Sort by),
 // relocated here — the table path is `tablePath` directly, not derived from a tree row's path.
+const selectedName = ref<string | null>(null);
 function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   ev.preventDefault();
+  selectedName.value = col.name;
   contextMenuStore.openContextMenu(
     ev,
     columnsSectionMenu(props.connectionId, props.tablePath, col.name, (m) => emit('copyError', m)),
@@ -46,12 +49,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-columns">
-    <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
-        t('studio.common.columns.label')
-      }}</span>
-      <Badge>{{ columns.length }}</Badge>
-    </header>
+    <SectionHeading :label="t('studio.common.columns.label')" :count="columns.length" />
     <Table columns>
       <TableHeader>
         <TableRow class="hover:bg-transparent">
@@ -61,9 +59,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           <TableHead>{{ t('common.field.type.label') }}</TableHead>
           <TableHead class="w-20">{{ t('studio.definition.nullable.label') }}</TableHead>
           <TableHead>{{ t('common.state.default.option') }}</TableHead>
-          <TableHead class="max-w-60 overflow-hidden text-ellipsis">{{
-            t('common.comment.label')
-          }}</TableHead>
+          <TableHead class="max-w-60 truncate">{{ t('common.comment.label') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -71,6 +67,9 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           v-for="col in columns"
           :key="col.name"
           data-testid="definition-row"
+          :data-state="selectedName === col.name ? 'selected' : undefined"
+          :aria-selected="selectedName === col.name"
+          @click="selectedName = col.name"
           @contextmenu="onContextMenu($event, col)"
         >
           <TableCell class="w-4 text-muted-foreground">
@@ -94,7 +93,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <Tooltip v-if="typeDescription(col.dataType)">
               <TooltipTrigger as-child>
                 <span
-                  class="align-middle cursor-help text-subtle ml-0.5"
+                  class="align-middle text-subtle ml-0.5"
                   :aria-label="typeDescription(col.dataType) ?? ''"
                 >
                   <CodiconIcon name="info" :size="13" />
@@ -109,12 +108,9 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           <TableCell class="whitespace-nowrap font-data text-muted-foreground">{{
             col.defaultExpr ?? ''
           }}</TableCell>
-          <TableCell
-            class="max-w-60 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground"
-            >{{
-              col.comment ?? ''
-            }}</TableCell
-          >
+          <TableCell class="max-w-60 truncate text-muted-foreground">{{
+            col.comment ?? ''
+          }}</TableCell>
         </TableRow>
       </TableBody>
     </Table>

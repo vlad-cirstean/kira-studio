@@ -2,11 +2,11 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import {
   Tooltip,
@@ -19,6 +19,7 @@ import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatBytes } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
@@ -350,10 +351,7 @@ onBeforeUnmount(() => {
 // propagation, so this handler still receives it — the same mechanism Ctrl/Cmd+Enter above
 // already relies on.
 function onEditorKeydown(e: KeyboardEvent): void {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    e.preventDefault();
-    saveEdit();
-  } else if (e.key === 'Escape') {
+  if (e.key === 'Escape') {
     e.preventDefault();
     buffer.reset();
   }
@@ -363,6 +361,7 @@ function onEditorKeydown(e: KeyboardEvent): void {
 // template attributes. `e.currentTarget` inside onEditorBlur is still this same element.
 const editorBodyEl = useTemplateRef<HTMLElement>('editorBodyEl');
 useEventListener(editorBodyEl, 'keydown', onEditorKeydown);
+useShortcut(editorBodyEl, ['form.save', 'form.submit'], saveEdit);
 useEventListener(editorBodyEl, 'focusout', onEditorBlur);
 
 function closePanel(): void {
@@ -557,22 +556,15 @@ const statusLine = computed(() => {
       }}</Badge>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Badge class="max-w-56 overflow-hidden text-ellipsis" data-testid="cell-editor-status">{{
-            statusLine
-          }}</Badge>
+          <Badge class="max-w-56 truncate" data-testid="cell-editor-status">{{ statusLine }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ statusLine }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="formatProblem">
         <TooltipTrigger as-child>
-          <Badge
-            variant="error"
-            class="max-w-56 overflow-hidden text-ellipsis whitespace-nowrap"
-            data-testid="cell-editor-invalid"
-            >{{
-              formatProblem.message
-            }}</Badge
-          >
+          <Badge variant="error" class="max-w-56 truncate" data-testid="cell-editor-invalid">{{
+            formatProblem.message
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ formatProblem.message }}</TooltipContent>
       </Tooltip>
@@ -583,26 +575,14 @@ const statusLine = computed(() => {
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
-              <!-- P42 D27: an app-drawn menu trigger, not a native select — border/background/
-                   padding/cursor still come from nativeSelectVariants({variant: 'bordered'})
-                   (P110 B24, applied directly as a class function since this is a <button>, not a
-                   NativeSelect component); its appearance:base-select/::picker(select)/option
-                   selectors are select-only and simply don't match a <button>, which is why the
-                   chevron below is drawn explicitly instead of relying on one. Its own
-                   disabled:text-disabled/cursor-default already covers this button too, no local
-                   duplicate needed. -->
-              <button
-                type="button"
-                :class="[nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'max-w-40 font-ui']"
+              <PickerTrigger
+                size="kira"
+                class="max-w-40 font-ui"
                 data-testid="cell-editor-format"
                 :disabled="isNullValue"
+                :label="override ? formatLabel(override) : formatAutoLabel(detectedFormat)"
                 @click="openFormatMenu"
-              >
-                <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
-                  override ? formatLabel(override) : formatAutoLabel(detectedFormat)
-                }}</span>
-                <CodiconIcon name="chevron-down" :size="12" />
-              </button>
+              />
             </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ formatHint }}</TooltipContent>
@@ -668,7 +648,7 @@ const statusLine = computed(() => {
         <TooltipIconButton
           icon="search"
           :label="t('studio.cellEditor.find.tooltip')"
-          :class="{ 'bg-field text-fg': findOpen }"
+          :pressed="findOpen"
           data-testid="cell-editor-search-toggle"
           @click="toggleFind"
         />
