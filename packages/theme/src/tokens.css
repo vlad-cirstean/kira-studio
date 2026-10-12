@@ -166,6 +166,10 @@
   --kira-board-row-h: 40px; /* ADE plan board row (action cell, branch row); tall = two-line cell */
   --kira-board-row-h-tall: 68px;
   --kira-t-touch: 16px; /* fixed: iOS zooms a focused input under 16px */
+  --kira-touch-target: 44px; /* minimum coarse-pointer hit area (h-touch, size-touch, min-h-touch) */
+  /* P266: the one transition duration and easing; Tailwind's defaults read these (tailwind-core.css). */
+  --kira-motion: 150ms;
+  --kira-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --kira-control-inline-h: 14px; /* drawn inside a control or a bar: checkbox box, toolbar separator, tab rail */
 
   /* §8.12 connection color palette — softened to oklch(0.72 0.09 h): one lightness

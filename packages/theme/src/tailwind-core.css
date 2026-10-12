@@ -99,6 +99,9 @@
   /* P110 B30: AutocompleteField's own completion popup width cap -- rung 3, matches
      --kira-z-autocomplete's existing precedent for this same, single popup. */
   --spacing-completion-max-w: var(--kira-completion-max-w);
+  --spacing-touch: var(--kira-touch-target);
+  --default-transition-duration: var(--kira-motion);
+  --default-transition-timing-function: var(--kira-ease);
 
   /* P123: removes Tailwind's stock text-xs...text-9xl from the host root -- chrome speaks only the
      four sizes below. The retired xs step, right below, stays: the data anchors (§3.8) still use

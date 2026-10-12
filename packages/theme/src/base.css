@@ -79,3 +79,23 @@ textarea,
     background: transparent;
   }
 }
+
+/* P266: reduced motion. Spinner keeps rotating (the loading signal); StatusDot pulse stops. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+
+  .animate-spin {
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+  }
+
+  [data-slot="status-dot"] {
+    animation: none;
+  }
+}

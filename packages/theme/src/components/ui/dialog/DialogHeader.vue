@@ -33,7 +33,7 @@ const props = withDefaults(defineProps<{
       <Button
         variant="ghost"
         size="icon-sm"
-        class="ml-auto"
+        class="ml-auto pointer-coarse:size-touch"
         :aria-label="t('common.action.close.label')"
         :data-testid="closeTestid"
       >
