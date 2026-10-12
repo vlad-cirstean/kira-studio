@@ -16,20 +16,20 @@ export const IPC = {
   layoutSet: 'kira:layout:set',
   layoutChanged: 'kira:layout:changed',
 
-  appFlushBeforeClose: 'kira:app:flush-before-close',
+  appFlushBeforeClose: 'kira:app:flushBeforeClose',
   appFlushed: 'kira:app:flushed',
-  windowFlushBeforeClose: 'kira:window:flush-before-close',
+  windowFlushBeforeClose: 'kira:window:flushBeforeClose',
   windowFlushed: 'kira:window:flushed',
 
   filesChooseFolder: 'kira:files:chooseFolder',
 
   // P116 G1-G7: the menu-pushed commands, keep-awake and new-window bound calls, and the app-metrics
   // push — same values as Kira Studio's own ipcChannels.ts.
-  openSettings: 'kira:open-settings',
-  toggleProjectPanel: 'kira:menu:toggle-project-panel',
-  tabNext: 'kira:menu:tab-next',
-  tabPrev: 'kira:menu:tab-prev',
-  tabClose: 'kira:menu:tab-close',
+  openSettings: 'kira:menu:openSettings',
+  toggleProjectPanel: 'kira:menu:toggleProjectPanel',
+  tabNext: 'kira:menu:tabNext',
+  tabPrev: 'kira:menu:tabPrev',
+  tabClose: 'kira:menu:tabClose',
   windowsOpenNew: 'kira:windows:openNew',
   // P128 §2.2/§2.6: this app now persists a per-window module mode too, same channels as Kira
   // Studio's own ipcChannels.ts.
@@ -73,7 +73,7 @@ export const IPC = {
   keepAwake: 'kira:keepAwake:changed',
   appMetrics: 'kira:app:metrics',
   // P132 Part 2: the operations dock's own toggle, bound calls and push.
-  toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
+  toggleOperationsPanel: 'kira:menu:toggleOperationsPanel',
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
   opUpdate: 'kira:op:update',
@@ -142,9 +142,9 @@ export const IPC = {
   // P238: desktop notifications. The two calls report focus and send a test; the pushes are a click's reveal.
   agentNotifyReportFocus: 'kira:agentnotify:reportFocus',
   agentNotifySendTest: 'kira:agentnotify:sendTest',
-  agentRevealTerminal: 'kira:agent:reveal-terminal',
-  agentRevealTask: 'kira:agent:reveal-task',
-  agentRevealScriptRun: 'kira:agent:reveal-script-run',
+  agentRevealTerminal: 'kira:agent:revealTerminal',
+  agentRevealTask: 'kira:agent:revealTask',
+  agentRevealScriptRun: 'kira:agent:revealScriptRun',
   claudeUsageGet: 'kira:claudeusage:get',
   claudeUsage: 'kira:claude:usage',
   // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is
@@ -215,7 +215,7 @@ export const IPC = {
   adeTaskRunsChanged: 'kira:adetask:runs',
   adeTaskLogChanged: 'kira:adetask:log',
   adeTaskSessionsChanged: 'kira:adetask:sessions',
-  adeTaskOpenSession: 'kira:adetask:open-session',
+  adeTaskOpenSession: 'kira:adetask:openSession',
 
   // P201 Part 2: the Memory module's bound surface; memoryChanged is a push channel, no FQN entry.
   memorySearch: 'kira:memory:search',

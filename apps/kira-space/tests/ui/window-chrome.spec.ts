@@ -138,7 +138,7 @@ test('a pushed kira:app:metrics sample renders CPU and memory in the status bar'
   await expect(window.locator('[data-testid="app-metrics-cpu"]')).toHaveText('3.4%');
 });
 
-test('kira:open-settings opens the Settings dialog', async ({ relaunch }) => {
+test('kira:menu:openSettings opens the Settings dialog', async ({ relaunch }) => {
   const { window } = await relaunch();
   await expect(window.locator('[data-testid="settings-dialog"]')).toHaveCount(0);
 
@@ -158,7 +158,7 @@ test('the date-format select shows its real value on open (P117 S2)', async ({ r
   await expect(window.locator('[data-testid="settings-date-format"]')).toHaveValue('relative');
 });
 
-test('kira:menu:toggle-project-panel toggles the project panel', async ({ relaunch }) => {
+test('kira:menu:toggleProjectPanel toggles the project panel', async ({ relaunch }) => {
   const { window } = await relaunch();
   const panel = window.locator('[data-testid="project-panel"]');
   await expect(panel).toBeVisible();
@@ -170,7 +170,7 @@ test('kira:menu:toggle-project-panel toggles the project panel', async ({ relaun
   await expect(panel).toBeVisible();
 });
 
-test('kira:menu:toggle-operations-panel toggles the operations dock', async ({ relaunch }) => {
+test('kira:menu:toggleOperationsPanel toggles the operations dock', async ({ relaunch }) => {
   const { window } = await relaunch();
   const dock = window.locator('[data-testid="operations-panel"]');
   await expect(dock).toHaveCount(0);
@@ -182,7 +182,7 @@ test('kira:menu:toggle-operations-panel toggles the operations dock', async ({ r
   await expect(dock).toHaveCount(0);
 });
 
-test('kira:menu:tab-next activates the next tab in the active workspace', async ({ relaunch }) => {
+test('kira:menu:tabNext activates the next tab in the active workspace', async ({ relaunch }) => {
   const { window } = await relaunch({ control: TWO_TABS });
   const activeTab = () => window.locator('[data-testid="tab"][data-active="true"]');
   await expect(activeTab()).toHaveAttribute('data-tab-id', 'tab-a');
@@ -192,7 +192,7 @@ test('kira:menu:tab-next activates the next tab in the active workspace', async 
   await expect(activeTab()).toHaveAttribute('data-tab-id', 'tab-b');
 });
 
-test('kira:menu:tab-close closes the active tab', async ({ relaunch }) => {
+test('kira:menu:tabClose closes the active tab', async ({ relaunch }) => {
   const { window } = await relaunch({ control: TWO_TABS });
   await expect(window.locator('[data-testid="tab"]')).toHaveCount(2);
 

@@ -15,21 +15,21 @@ import (
 // under their own names here so no call site anywhere in this package has to change.
 const (
 	ChannelOpenSettings           = appevent.ChannelOpenSettings
-	ChannelNewConnection          = "kira:menu:new-connection"
-	ChannelNewRequest             = "kira:menu:new-request"
-	ChannelImportPostman          = "kira:menu:import-postman"
-	ChannelImportDataGrip         = "kira:menu:import-datagrip"
+	ChannelNewConnection          = "kira:menu:newConnection"
+	ChannelNewRequest             = "kira:menu:newRequest"
+	ChannelImportPostman          = "kira:menu:importPostman"
+	ChannelImportDataGrip         = "kira:menu:importDataGrip"
 	ChannelToggleProjectPanel     = appevent.ChannelToggleProjectPanel
 	ChannelToggleOperationsPanel  = appevent.ChannelToggleOperationsPanel
-	ChannelCommandPalette         = "kira:menu:command-palette"
+	ChannelCommandPalette         = "kira:menu:commandPalette"
 	ChannelTabNext                = appevent.ChannelTabNext
 	ChannelTabPrev                = appevent.ChannelTabPrev
 	ChannelTabClose               = appevent.ChannelTabClose
-	ChannelViewFind               = "kira:menu:view-find"
-	ChannelViewRefresh            = "kira:menu:view-refresh"
-	ChannelViewRun                = "kira:menu:view-run"
-	ChannelViewRunAll             = "kira:menu:view-run-all"
-	ChannelViewFormat             = "kira:menu:view-format"
+	ChannelViewFind               = "kira:menu:viewFind"
+	ChannelViewRefresh            = "kira:menu:viewRefresh"
+	ChannelViewRun                = "kira:menu:viewRun"
+	ChannelViewRunAll             = "kira:menu:viewRunAll"
+	ChannelViewFormat             = "kira:menu:viewFormat"
 	ChannelFlushBeforeClose       = appevent.ChannelFlushBeforeClose
 	ChannelWindowFlushBeforeClose = appevent.ChannelWindowFlushBeforeClose
 	ChannelConnectionState        = "kira:connection:state"

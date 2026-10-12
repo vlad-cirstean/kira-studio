@@ -65,10 +65,10 @@ const (
 // (EmitTo, one window): show that terminal tab, or that ADE task. Space only, not on the phone
 // allowlist.
 const (
-	ChannelAgentRevealTerminal = "kira:agent:reveal-terminal"
-	ChannelAgentRevealTask     = "kira:agent:reveal-task"
+	ChannelAgentRevealTerminal = "kira:agent:revealTerminal"
+	ChannelAgentRevealTask     = "kira:agent:revealTask"
 	// ChannelAgentRevealScriptRun opens a script run's tab; payload {runId, label}.
-	ChannelAgentRevealScriptRun = "kira:agent:reveal-script-run"
+	ChannelAgentRevealScriptRun = "kira:agent:revealScriptRun"
 )
 
 // The five below are P116's own window-chrome-parity channels (G1-G5/G7) — Kira Studio's own

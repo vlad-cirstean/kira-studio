@@ -52,19 +52,19 @@ func (ev *Events) Broadcast(channel string) {
 // window-chrome machinery's own wire vocabulary, never app-specific. Each app's bridge/events.go
 // re-exports these under its own ChannelX names so no call site outside this hoist has to change.
 const (
-	ChannelFlushBeforeClose       = "kira:app:flush-before-close"
-	ChannelWindowFlushBeforeClose = "kira:window:flush-before-close"
+	ChannelFlushBeforeClose       = "kira:app:flushBeforeClose"
+	ChannelWindowFlushBeforeClose = "kira:window:flushBeforeClose"
 	ChannelSettingsChanged        = "kira:settings:changed"
 	ChannelLayoutChanged          = "kira:layout:changed"
 	ChannelTerminal               = "kira:terminal:data"
 	ChannelCodeSearch             = "kira:code:search"
 	// The seven below are P116's own hoist — Kira Studio's native-menu/window-chrome channels that
 	// Kira Space now wires too (window-chrome-parity G1-G5/G7), byte-identical strings on both sides.
-	ChannelOpenSettings       = "kira:open-settings"
-	ChannelToggleProjectPanel = "kira:menu:toggle-project-panel"
-	ChannelTabNext            = "kira:menu:tab-next"
-	ChannelTabPrev            = "kira:menu:tab-prev"
-	ChannelTabClose           = "kira:menu:tab-close"
+	ChannelOpenSettings       = "kira:menu:openSettings"
+	ChannelToggleProjectPanel = "kira:menu:toggleProjectPanel"
+	ChannelTabNext            = "kira:menu:tabNext"
+	ChannelTabPrev            = "kira:menu:tabPrev"
+	ChannelTabClose           = "kira:menu:tabClose"
 	ChannelKeepAwake          = "kira:keepAwake:changed"
 	ChannelAppMetrics         = "kira:app:metrics"
 	// ChannelAgentSessions/ChannelAgentEvent are P127's own hoist — Claude Code agent-activity
@@ -77,7 +77,7 @@ const (
 	ChannelAgentSessions = "kira:agent:sessions"
 	ChannelAgentEvent    = "kira:agent:event"
 	// P132 Part 2's hoist: Space's op log dock shares Studio's toggle channel and update push.
-	ChannelToggleOperationsPanel = "kira:menu:toggle-operations-panel"
+	ChannelToggleOperationsPanel = "kira:menu:toggleOperationsPanel"
 	ChannelOpUpdate              = "kira:op:update"
 	// P246: the routed popup list (broadcast) and a reveal for one window.
 	ChannelPromptsChanged = "kira:prompts:changed"

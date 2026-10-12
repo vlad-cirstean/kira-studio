@@ -65,7 +65,7 @@ test('a window reports its focus at boot', async ({ relaunch }) => {
 });
 
 test('contract: reveal-task switches to the Agents module', async ({ relaunch }) => {
-  const reveal = contract<{ taskId: string }>('notify-reveal', 'event:kira:agent:reveal-task');
+  const reveal = contract<{ taskId: string }>('notify-reveal', 'event:kira:agent:revealTask');
   const { window: page } = await relaunch();
   await emitWailsEvent(page, IPC.agentRevealTask, reveal);
   await expect(page.locator('[data-testid="mode-tab"][data-mode="ade"]')).toHaveClass(/is-active/);
@@ -76,7 +76,7 @@ test('contract: reveal-terminal switches to the Terminal module and shows that t
 }) => {
   const reveal = contract<{ terminalId: string }>(
     'notify-reveal',
-    'event:kira:agent:reveal-terminal',
+    'event:kira:agent:revealTerminal',
   );
   const { window: page, control } = await relaunch({
     control: [{ channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } }],

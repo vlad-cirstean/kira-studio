@@ -1,13 +1,13 @@
 {
-  "event:kira:adetask:open-session": {
+  "event:kira:adetask:openSession": {
     "branchId": "",
     "sessionId": "<id:1>",
     "taskId": "<id:2>"
   },
-  "event:kira:agent:reveal-task": {
+  "event:kira:agent:revealTask": {
     "taskId": "<id:1>"
   },
-  "event:kira:agent:reveal-terminal": {
+  "event:kira:agent:revealTerminal": {
     "terminalId": "tab-1"
   }
 }

@@ -423,11 +423,11 @@ const spaceControl = {
     unwrap(AgentNotifyService.ReportFocus({ windowKey, ...args })),
   agentNotifySendTest: (): Promise<void> => unwrap(AgentNotifyService.SendTest()),
   onAgentRevealTerminal: (cb: (event: { terminalId: string }) => void): (() => void) =>
-    on('kira:agent:reveal-terminal', cb),
+    on('kira:agent:revealTerminal', cb),
   onAgentRevealTask: (cb: (event: { taskId: string }) => void): (() => void) =>
-    on('kira:agent:reveal-task', cb),
+    on('kira:agent:revealTask', cb),
   onAgentRevealScriptRun: (cb: (event: { runId: string; label: string }) => void): (() => void) =>
-    on('kira:agent:reveal-script-run', cb),
+    on('kira:agent:revealScriptRun', cb),
   // P239: Claude Code usage limits for the ADE status bar.
   claudeUsageGet: (): Promise<ClaudeUsageSnapshot> => unwrap(ClaudeUsageService.Get()),
   onClaudeUsage: (cb: (snapshot: ClaudeUsageSnapshot) => void): (() => void) =>

@@ -72,8 +72,6 @@ N4 apps/kira-studio/frontend/src/state/dbmcp.ts
 N4 packages/workbench/src/memory/import/importStore.ts
 N4 packages/workbench/src/memory/settings/modelDownloads.ts
 N4 packages/workbench/src/state/createOpLogStore.ts
-N5 internal/appevent/appevent.go
-N5 packages/shared/protocol/events.ts
 U67 packages/api-core/src/http/body.ts
 U67 packages/api-core/src/http/curl/parse.ts
 U67 packages/api-core/src/http/curl/tokenize.ts

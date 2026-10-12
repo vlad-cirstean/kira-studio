@@ -139,7 +139,7 @@ test('contract: an open-session event selects that session in its Sessions tab',
 }) => {
   const open = contract<{ taskId: string; branchId: string; sessionId: string }>(
     'notify-reveal',
-    'event:kira:adetask:open-session',
+    'event:kira:adetask:openSession',
   );
   expect(Object.keys(open).sort()).toEqual(['branchId', 'sessionId', 'taskId']);
   const { window: page } = await openPlan(relaunch);

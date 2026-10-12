@@ -9,5 +9,5 @@ const (
 	ChannelRuns        = "kira:adetask:runs" // RunsChangedEvent
 	ChannelLog         = "kira:adetask:log"  // LogEvent
 	ChannelSessions    = "kira:adetask:sessions"
-	ChannelOpenSession = "kira:adetask:open-session" // OpenSessionEvent, EmitTo
+	ChannelOpenSession = "kira:adetask:openSession" // OpenSessionEvent, EmitTo
 )
