@@ -43,7 +43,6 @@ const projectSize = computed(() =>
   clamp(liveProject.value ?? props.projectWidth, PROJECT_MIN_PX, PROJECT_MAX_PX),
 );
 const dockHeight = computed(() => clamp(liveOps.value ?? props.opsHeight, OPS_MIN_PX, OPS_MAX_PX));
-const dockDragging = ref(false);
 
 function commitProject(size: number): void {
   liveProject.value = null;
@@ -61,10 +60,7 @@ function commitOps(size: number): void {
        reproduce byte-identical geometry to the pre-P104 CSS grid. The dock's own 6px gaps above and
        below (main-to-dock, dock-to-status) come from this same gap-0.5 plus the handle's own h-0.5
        and the status bar's own mt-1 below — no separate spacing rule for the dock. -->
-  <div
-    class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome"
-    :class="{ 'cursor-ns-resize select-none': dockDragging }"
-  >
+  <div class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome">
     <div class="flex flex-1 min-h-0 gap-0.5">
       <div
         v-if="projectVisible"
@@ -118,7 +114,6 @@ function commitOps(size: number): void {
         @live="liveOps = $event"
         @commit="commitOps"
         @cancel="liveOps = null"
-        @dragging="dockDragging = $event"
       />
       <div
         class="shrink-0 overflow-hidden min-w-0 min-h-0 rounded-kira border border-border bg-bg"

@@ -88,8 +88,8 @@ function onPointerMove(e: PointerEvent): void {
 }
 
 // P131 Part 2 §3.2: a focusable row/checkbox behind a data-kira-tip attribute (git-ui's list
-// rows, FileTree's checkboxes) opens its tip on keyboard focus too, matching kira-ui's own
-// delegated controller and reka's real TooltipTrigger (which opens on focus with no hover delay).
+// rows, FileTree's checkboxes) opens its tip on keyboard focus too, matching reka's real
+// TooltipTrigger (which opens on focus with no hover delay).
 function onFocusIn(e: FocusEvent): void {
   const el = (e.target as HTMLElement | null)?.closest<HTMLElement>(`[${TIP_ATTR}]`) ?? null;
   if (!el) return;

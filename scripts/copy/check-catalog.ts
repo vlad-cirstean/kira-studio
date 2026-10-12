@@ -12,10 +12,6 @@ const CATALOG = join(REPO_ROOT, 'packages/theme/src/i18n/en.json');
 const UNUSED_SCAN = ['apps', 'packages', 'internal'];
 const SKIP_DIR = /(?:^|\/)(?:node_modules|dist|dist-test|dist-proto|\.git|tests?|testing)(?:\/|$)/;
 const SKIP_FILE = /(?:\.spec\.ts|\.test\.ts|_test\.go|\.d\.ts|\.check\.ts)$/;
-/** P267 F0 seeds: keys with no caller yet, one per object so writers merge cleanly. A writer deletes its seed when it adds a real key (F1/F2/streams); empty by P267 close. */
-const SEEDS: ReadonlySet<string> = new Set([
-  'theme.identifier.copy.label',
-]);
 const KEY_LITERAL = /["'`]([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+){2,5})["'`]/g;
 const KEY_PREFIX = /`([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+)*\.)\$\{/g;
 
@@ -37,9 +33,7 @@ function collectUsed(): UsedKeys {
 function main(): number {
   const unused = process.argv.includes('--unused');
   const root: unknown = JSON.parse(readFileSync(CATALOG, 'utf8'));
-  const violations = checkCatalog(root, unused ? { used: collectUsed() } : {}).filter(
-    (v) => !(v.rule === 'C10' && SEEDS.has(v.key)),
-  );
+  const violations = checkCatalog(root, unused ? { used: collectUsed() } : {});
   violations.sort((a, b) => a.key.localeCompare(b.key) || a.rule.localeCompare(b.rule));
   for (const v of violations) console.error(`check-catalog: ${v.key}: ${v.rule} ${v.message}`);
   if (violations.length > 0) {

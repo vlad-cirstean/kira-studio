@@ -3,6 +3,8 @@ import {
   formatAbsoluteUtc,
   formatAgeCompact,
   formatBytes,
+  formatCompactDuration,
+  formatCurrency,
   formatDuration,
   formatElapsed,
 } from './format';
@@ -26,14 +28,52 @@ describe('formatBytes rounding edges', () => {
 });
 
 describe('formatDuration unit boundaries', () => {
+  test('sub-ms keeps two decimals; ms rounds whole', () => {
+    expect(formatDuration(0.424)).toBe('0.42ms');
+    expect(formatDuration(0)).toBe('0.00ms');
+    expect(formatDuration(0.999)).toBe('1.00ms');
+    expect(formatDuration(1)).toBe('1ms');
+    expect(formatDuration(240.4)).toBe('240ms');
+  });
+
   test('ms, seconds, minutes, hours', () => {
-    expect(formatDuration(999)).toBe('999 ms');
-    expect(formatDuration(1000)).toBe('1.0 s');
-    expect(formatDuration(59_949)).toBe('59.9 s');
+    expect(formatDuration(999)).toBe('999ms');
+    expect(formatDuration(1000)).toBe('1.0s');
+    expect(formatDuration(59_949)).toBe('59.9s');
     expect(formatDuration(59_950)).toBe('1m 0s');
     expect(formatDuration(125_000)).toBe('2m 5s');
     expect(formatDuration(3_600_000)).toBe('1h 0m');
     expect(formatDuration(3_725_000)).toBe('1h 2m');
+  });
+});
+
+describe('formatCompactDuration', () => {
+  test('seconds, whole minutes, minutes with seconds, hours', () => {
+    expect(formatCompactDuration(0)).toBe('0s');
+    expect(formatCompactDuration(5_000)).toBe('5s');
+    expect(formatCompactDuration(59_999)).toBe('59s');
+    expect(formatCompactDuration(60_000)).toBe('1m');
+    expect(formatCompactDuration(125_000)).toBe('2m 5s');
+    expect(formatCompactDuration(3_600_000)).toBe('1h');
+    expect(formatCompactDuration(3_725_000)).toBe('1h 2m');
+  });
+
+  test('ceil rounds a partial second up so a countdown never shows 0s early', () => {
+    expect(formatCompactDuration(100)).toBe('0s');
+    expect(formatCompactDuration(100, { ceil: true })).toBe('1s');
+    expect(formatCompactDuration(59_001, { ceil: true })).toBe('1m');
+  });
+
+  test('negative clamps to zero', () => {
+    expect(formatCompactDuration(-5_000)).toBe('0s');
+  });
+});
+
+describe('formatCurrency', () => {
+  test('US dollars with cents, zero and large amounts', () => {
+    expect(formatCurrency(0.42)).toMatch(/\$0\.42/);
+    expect(formatCurrency(0)).toMatch(/\$0\.00/);
+    expect(formatCurrency(1234.5)).toMatch(/\$1,234\.50/);
   });
 });
 

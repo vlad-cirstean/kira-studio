@@ -15,7 +15,7 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
-import { connBgClass } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { plainText, type TextPart } from '@theme/varText';
 import { useId } from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
@@ -25,10 +25,8 @@ defineProps<{ items: readonly MenuItem[] }>();
 
 // A disabled item takes no pointer events, so its hint needs them back to show on hover.
 const HINT_WHEN_DISABLED = 'data-disabled:pointer-events-auto';
-// Colour-choice swatch mark; becomes colorMarkClass('swatch') once the theme exports it.
 // A two-line (detail) item outgrows the fixed item height.
 const DETAIL_ROW = 'h-auto py-1';
-const SWATCH_MARK = 'size-2.5 rounded-full shrink-0';
 const uid = useId();
 
 function hintParts(hint: string | readonly TextPart[] | undefined): readonly TextPart[] {
@@ -39,8 +37,8 @@ function keyOf(item: MenuItem, idx: number): string {
   return item.type === 'separator' || item.type === 'label' ? `${item.type}-${idx}` : item.id;
 }
 
-function swatchClass(swatch: string): string | undefined {
-  return swatch === 'none' ? 'border border-disabled' : connBgClass(swatch);
+function swatchClass(swatch: string): string {
+  return colorMarkClass('swatch', swatch === 'none' ? null : swatch);
 }
 
 async function onItemClick(item: MenuItem): Promise<void> {
@@ -85,7 +83,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
           @select="onItemClick(item)"
         >
           <span class="flex items-center justify-center shrink-0 size-4">
-            <span v-if="item.swatch" :class="[SWATCH_MARK, swatchClass(item.swatch)]" />
+            <span v-if="item.swatch" :class="swatchClass(item.swatch)" />
             <CodiconIcon
               v-else-if="item.icon"
               :name="item.icon"

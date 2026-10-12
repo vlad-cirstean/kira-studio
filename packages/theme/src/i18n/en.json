@@ -11899,11 +11899,6 @@
         }
       }
     },
-    "identifier": {
-      "copy": {
-        "label": "Copy identifier"
-      }
-    },
     "numberStepper": {
       "decrease": {
         "tooltip": "Decrease"

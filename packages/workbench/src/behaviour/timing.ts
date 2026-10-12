@@ -1,3 +1,5 @@
+import { SPINNER_DELAY } from '@theme/timing';
+
 /** Every debounce, poll, tick and feedback duration in app code, in ms. One table so the same kind
  *  of wait is the same number everywhere. */
 export const TIMING = {
@@ -27,8 +29,8 @@ export const TIMING = {
   runTick: 200,
   /** Wait before a dropped connection retries. */
   reconnect: 3000,
-  /** QueryState shows its loading state only after this wait, so fast loads do not flash. */
-  spinnerDelay: 300,
+  /** Loading placeholders show only after this wait, so fast loads do not flash. */
+  spinnerDelay: SPINNER_DELAY,
   /** Scroll-position persistence. */
   scrollPersist: 300,
   /** How long an agent paste waits for the terminal to settle. */

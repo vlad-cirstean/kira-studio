@@ -1,6 +1,6 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import { i18n, installCopyTestHook } from '@theme/i18n';
-import { bootstrapShell } from '@workbench/bootstrapShell';
+import { bootstrapShell, provideShellServices } from '@workbench/bootstrapShell';
 import { logError } from '@workbench/bridge/log';
 import { windowKey } from '@workbench/lib/window';
 import { queryClient } from '@workbench/state/queryClient';
@@ -157,6 +157,7 @@ async function mountShell(): Promise<void> {
   app.use(i18n);
   app.provide(adeReaderKey, controlAdeReader);
   app.use(pinia);
+  provideShellServices(app);
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');
   // Review windows show no agent sessions, so only a normal window reports focus.

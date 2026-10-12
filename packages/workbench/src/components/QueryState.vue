@@ -3,18 +3,15 @@ import { isRetryable } from '@shared/domain/errorCodes';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
-import { useTimeout } from '@vueuse/core';
 import type { Ref } from 'vue';
-import { computed, watch } from 'vue';
-import { TIMING } from '../behaviour/timing';
+import { computed } from 'vue';
 import { errorText, toCodedError } from '../bridge/codedError';
 
 // The one loading / error / empty shell for bridge data. `pane` fills a panel or view body with an
 // Empty block (spinner, error with Retry); `inline` is a one-line state inside a list or popover.
-// A caller passes its TanStack query result and fills the `default` slot with the loaded data.
+// Loading placeholders wait `SPINNER_DELAY` themselves. A caller passes its TanStack query result and fills the `default` slot with the loaded data.
 interface QueryLike {
   data: Ref<T | undefined>;
   isPending: Ref<boolean>;
@@ -56,19 +53,6 @@ const canRetry = computed(
   () => state.value === 'error' && isRetryable(toCodedError(props.query.error.value).code),
 );
 
-// A fast load never flashes the default spinner; a caller's own loading slot shows at once.
-const { ready: spinnerReady, start: startSpinnerDelay } = useTimeout(TIMING.spinnerDelay, {
-  controls: true,
-  immediate: false,
-});
-watch(
-  () => state.value === 'loading',
-  (loading) => {
-    if (loading) startSpinnerDelay();
-  },
-  { immediate: true },
-);
-
 function retry(): void {
   void props.query.refetch();
 }
@@ -77,26 +61,23 @@ function retry(): void {
 <template>
   <template v-if="state === 'loading'">
     <slot name="loading">
-      <template v-if="spinnerReady">
-        <EmptyState
-          v-if="variant === 'pane'"
-          class="h-full"
-          data-testid="query-loading"
-          :title="loadingLabel"
-        >
-          <template #media><Spinner :size="24" /></template>
-        </EmptyState>
-        <InlineState v-else kind="loading" data-testid="query-loading">{{
-          loadingLabel
-        }}</InlineState>
-      </template>
+      <EmptyState
+        v-if="variant === 'pane'"
+        fill
+        loading
+        data-testid="query-loading"
+        :title="loadingLabel"
+      />
+      <InlineState v-else kind="loading" data-testid="query-loading">{{
+        loadingLabel
+      }}</InlineState>
     </slot>
   </template>
   <template v-else-if="state === 'error'">
     <slot name="error" :message="message" :retry="retry">
       <EmptyState
         v-if="variant === 'pane'"
-        class="h-full"
+        fill
         data-testid="query-error"
         :title="t('common.state.loadFailed.title')"
         :description="message"

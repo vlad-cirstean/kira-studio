@@ -8,7 +8,7 @@ import type {
 import { usePaneResize } from '@theme/components/ui/resizable/usePaneResize';
 import { cn } from '@theme/lib/utils';
 import type { HTMLAttributes } from 'vue';
-import { useTemplateRef, watch } from 'vue';
+import { useTemplateRef } from 'vue';
 
 // The one pane and column resize handle: ARIA separator, pointer drag and keyboard. The caller owns
 // the layout (the resized pane takes `flex: 0 0 <size>`) and the persistence (`commit`).
@@ -40,12 +40,10 @@ const emit = defineEmits<{
   commit: [size: number];
   /** Drag aborted: drop the live preview. */
   cancel: [];
-  /** A drag starts or ends (the shell shows the resize cursor everywhere meanwhile). */
-  dragging: [value: boolean];
 }>();
 
 const handle = useTemplateRef<HTMLElement>('handle');
-const { handleProps, dragging } = usePaneResize({
+const { handleProps } = usePaneResize({
   target: handle,
   size: () => props.size,
   min: () => props.min,
@@ -59,7 +57,6 @@ const { handleProps, dragging } = usePaneResize({
   onCommit: (size) => emit('commit', size),
   onCancel: () => emit('cancel'),
 });
-watch(dragging, (value) => emit('dragging', value));
 </script>
 
 <template>

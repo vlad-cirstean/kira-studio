@@ -1,8 +1,10 @@
+import { CONFIRM_DISCARD_KEY, type ConfirmDiscard } from '@theme/components/ui/dialog';
 import { i18n } from '@theme/i18n';
-import { createApp } from 'vue';
+import { type App, createApp } from 'vue';
 import { errorText } from './bridge/codedError';
 import { logError } from './bridge/log';
 import BootFailure from './components/BootFailure.vue';
+import { useConfirmDialogStore } from './state/confirmDialog';
 
 // P113 F6: kira-space's and kira-studio's own main.ts each wrote this identical catch-and-retry
 // wrapper around their own app-specific mountShell() (P100 Part 2 F2 / P108 Part 12 F13) —
@@ -10,6 +12,15 @@ import BootFailure from './components/BootFailure.vue';
 // uncaught, that rejection skips app.mount entirely: a permanently blank window, logged only as an
 // unhandled rejection in the webview console. This mounts BootFailure instead, with a Retry that
 // re-runs the whole sequence.
+// Theme dialogs cannot import the confirm store, so the shell hands them a discard confirm built on
+// it. Call on the app before `mount`, after `app.use(pinia)`.
+const confirmDiscard: ConfirmDiscard = ({ title, body, confirmLabel }) =>
+  useConfirmDialogStore().confirm({ title, message: body, confirmLabel, tone: 'danger' });
+
+export function provideShellServices(app: App): void {
+  app.provide(CONFIRM_DISCARD_KEY, confirmDiscard);
+}
+
 export async function bootstrapShell(
   mountShell: () => Promise<void>,
   appName: string,

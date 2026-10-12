@@ -7,8 +7,7 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    // packages/kira-ui uses ".ts" import specifiers, reached from this app directly and via
-    // packages/kira-ui/src/floatingPosition.ts.
+    // packages/theme and packages/workbench import siblings with explicit ".ts" specifiers.
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
