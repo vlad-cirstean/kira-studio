@@ -1,9 +1,3 @@
-N4 apps/kira-space/frontend/mobile/state/auth.ts
-N4 apps/kira-space/frontend/src/state/coderepos.ts
-N4 apps/kira-studio/frontend/src/state/dbmcp.ts
-N4 packages/workbench/src/memory/import/importStore.ts
-N4 packages/workbench/src/memory/settings/modelDownloads.ts
-N4 packages/workbench/src/state/createOpLogStore.ts
 U67 packages/api-core/src/http/body.ts
 U67 packages/api-core/src/http/curl/parse.ts
 U67 packages/api-core/src/http/curl/tokenize.ts

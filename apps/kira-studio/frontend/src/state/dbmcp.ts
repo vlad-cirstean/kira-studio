@@ -15,7 +15,7 @@ const DEFAULT_STATUS: DbMcpStatus = {
   error: '',
 };
 
-export const useDbMcpStore = defineStore('dbmcp', () => {
+export const useDbMcpStore = defineStore('dbMcp', () => {
   const state = reactive({
     status: DEFAULT_STATUS as DbMcpStatus,
     installResult: null as DbMcpInstallResult | null,

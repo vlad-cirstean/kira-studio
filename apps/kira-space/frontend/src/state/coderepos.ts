@@ -37,7 +37,7 @@ export function repoText(color: PaletteColor): { style: Record<string, string>; 
 // import, rename, reorder, remove. No connect/disconnect lifecycle (a repository is a path, not a live
 // session, D11) and no secret-storage concept (D1's own "nothing secret, nothing credential-
 // shaped").
-export const useCodeReposStore = defineStore('coderepos', () => {
+export const useCodeReposStore = defineStore('codeRepos', () => {
   const state = reactive({
     records: [] as RepoSummary[],
   });

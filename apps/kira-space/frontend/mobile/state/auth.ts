@@ -28,7 +28,7 @@ function fourDigitCode(): string {
   return String((buf[0] as number) % 10000).padStart(4, '0');
 }
 
-export const useAuthStore = defineStore('mobileAuth', () => {
+export const useAuthStore = defineStore('auth', () => {
   const state = reactive({
     phase: 'checking' as AuthPhase,
     /** Shown on the phone and in the desktop prompt so the user can match the request. */
