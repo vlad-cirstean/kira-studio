@@ -50,19 +50,14 @@ const message = computed(() => {
         }}</Card
       >
     </QueryState>
-    <p v-if="command" class="m-0 text-kira-sm text-muted-foreground">
+    <FieldDescription v-if="command">
       <CatalogText k="memory.mcp.command.hint">
         <template #command><code class="font-data">memory-mcp</code></template>
       </CatalogText>
-    </p>
-    <p
-      v-if="message"
-      class="m-0 text-kira-sm text-muted-foreground"
-      data-testid="memory-mcp-install-outcome"
-      >{{
-        message
-      }}</p
-    >
+    </FieldDescription>
+    <FieldDescription v-if="message" data-testid="memory-mcp-install-outcome">{{
+      message
+    }}</FieldDescription>
     <div class="flex items-center gap-1">
       <Button
         variant="dialog"
@@ -76,7 +71,8 @@ const message = computed(() => {
       <Button
         variant="dialog-primary"
         size="kira-lg"
-        :disabled="install.isPending.value || !status.data.value?.claudeAvailable"
+        :pending="install.isPending.value"
+        :disabled="!status.data.value?.claudeAvailable"
         data-testid="memory-mcp-install"
         @click="install.mutate()"
       >

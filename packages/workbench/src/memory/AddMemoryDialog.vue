@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
@@ -93,7 +94,7 @@ function select(id: string): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="lg" data-testid="add-memory-dialog">
+    <DialogContent size="lg" :dirty="!stored && text.trim() !== ''" data-testid="add-memory-dialog">
       <DialogHeader>
         <DialogTitle>{{ t('memory.add.label') }}</DialogTitle>
       </DialogHeader>
@@ -164,14 +165,9 @@ function select(id: string): void {
               </Alert>
             </template>
           </div>
-          <p
-            v-if="busy"
-            class="m-0 text-kira-sm text-muted-foreground"
-            data-testid="add-memory-busy"
-            >{{
-              t('memory.add.checking.loading')
-            }}</p
-          >
+          <FieldDescription v-if="busy" data-testid="add-memory-busy">{{
+            t('memory.add.checking.loading')
+          }}</FieldDescription>
         </template>
       </DialogBody>
       <DialogFooter>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
@@ -73,14 +74,12 @@ function eventsFor(id: string) {
           </div>
         </div>
         <div v-if="trail.length > 1" class="flex flex-col gap-1.5" data-testid="memory-trail">
-          <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{
-            t('memory.start.versions.label')
-          }}</span>
+          <SectionHeading :label="t('memory.start.versions.label')" />
           <Card
             v-for="version in trail"
             :key="version.id"
             class="gap-0.5"
-            :class="{ 'opacity-70': version.historical }"
+            :class="{ 'opacity-50': version.historical }"
             :data-testid="`memory-version-${version.version}`"
           >
             <div class="flex items-center gap-1">

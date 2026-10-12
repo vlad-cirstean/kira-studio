@@ -11,6 +11,7 @@ import { storeToRefs } from 'pinia';
 import { computed, useTemplateRef } from 'vue';
 import { useVirtualRows } from '../../behaviour/virtualRows';
 import { errorText } from '../../bridge/codedError';
+import { useRowHeight } from '../../lib/rowHeight';
 import ImportFileRow from './ImportFileRow.vue';
 import { JOB_STATE_LABEL, jobTitle } from './importFormat';
 import { useImportAction, useImportJob, useRetryImportFile } from './importQueries';
@@ -25,7 +26,6 @@ const act = useImportAction();
 const retryFile = useRetryImportFile();
 const { confirm } = useConfirmDialogStore();
 
-const ROW_HEIGHT = 32;
 const job = computed(() => detail.data.value?.job);
 const files = computed(() => detail.data.value?.files ?? []);
 const selectedFile = computed(() => files.value.find((f) => f.id === selectedFileId.value));
@@ -35,9 +35,10 @@ const percent = computed(() => {
 });
 
 const scrollRef = useTemplateRef<HTMLDivElement>('scroll');
+const { single: rowHeight } = useRowHeight();
 const { virtualItems, totalSize } = useVirtualRows({
   count: () => files.value.length,
-  rowHeight: () => ROW_HEIGHT,
+  rowHeight: () => rowHeight.value,
   scrollElement: scrollRef,
 });
 const actError = computed(() => (act.isError.value ? errorText(act.error.value) : ''));
@@ -74,13 +75,9 @@ async function discard(): Promise<void> {
           </TooltipTrigger>
           <TooltipContent>{{ job.roots.join(', ') }}</TooltipContent>
         </Tooltip>
-        <span
-          class="text-kira-sm uppercase tracking-wider text-muted-foreground"
-          data-testid="import-job-state"
-          >{{
-            t(JOB_STATE_LABEL[job.state])
-          }}</span
-        >
+        <span class="text-kira-sm text-muted-foreground" data-testid="import-job-state">{{
+          t(JOB_STATE_LABEL[job.state])
+        }}</span>
         <Button
           v-if="job.state === 'awaiting'"
           variant="toolbar"

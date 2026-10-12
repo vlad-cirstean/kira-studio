@@ -117,7 +117,8 @@ async function dismiss(): Promise<void> {
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          :disabled="!ready || act.isPending.value"
+          :pending="act.isPending.value"
+          :disabled="!ready"
           data-testid="import-confirm-start"
           @click="start"
         >

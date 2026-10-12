@@ -131,7 +131,7 @@ const historyToggleId = useId();
         </template>
         <template #empty>
           <EmptyState
-            class="h-full"
+            fill
             data-testid="memory-empty"
             :title="query.trim() === '' ? t('memory.panel.list.empty') : t('common.state.noMatches.empty')"
             :description="query.trim() !== '' ? t('memory.panel.list.emptyHint') : undefined"
@@ -154,7 +154,7 @@ const historyToggleId = useId();
             cn(
               rowVariants({ layout: 'double', selected: selectedId === memory.id }),
               'w-full flex-col gap-1 whitespace-normal border-b border-border py-1.5 text-left',
-              memory.historical && 'opacity-70',
+              memory.historical && 'opacity-50',
             )
           "
               :style="rowIndent(0)"

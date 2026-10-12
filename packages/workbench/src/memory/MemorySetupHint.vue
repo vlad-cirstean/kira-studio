@@ -11,13 +11,7 @@ const { openSettings } = useMemoryModule();
 <template>
   <div class="flex items-center gap-1 text-kira-sm text-muted-foreground">
     <span class="min-w-0">{{ message }}</span>
-    <Button
-      variant="link"
-      size="kira"
-      class="h-auto p-0"
-      data-testid="memory-open-settings"
-      @click="openSettings()"
-    >
+    <Button variant="link" size="inline" data-testid="memory-open-settings" @click="openSettings()">
       {{ t('common.action.openSettings.label') }}
     </Button>
   </div>

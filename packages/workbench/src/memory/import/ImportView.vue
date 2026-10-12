@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
+import PanelBar from '../../components/PanelBar.vue';
 import ImportJobDetail from './ImportJobDetail.vue';
 import { jobTitle } from './importFormat';
 import { useImportJobs } from './importQueries';
@@ -30,7 +31,7 @@ const jobItems = computed(() =>
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="import-view">
-    <div class="flex shrink-0 items-center gap-1.5 border-b border-border p-1.5">
+    <PanelBar class="flex-row items-center gap-1.5">
       <Button variant="toolbar" size="kira" data-testid="import-back" @click="ui.view = 'memory'">{{
         t('memory.import.back.label')
       }}</Button>
@@ -40,10 +41,10 @@ const jobItems = computed(() =>
         :items="jobItems"
         @update:model-value="(v) => (selectedJobId = v)"
       />
-    </div>
+    </PanelBar>
     <EmptyState
       v-if="!current"
-      class="h-full"
+      fill
       data-testid="import-empty"
       :title="t('memory.import.list.empty')"
       :description="t('memory.import.list.emptyHint')"
