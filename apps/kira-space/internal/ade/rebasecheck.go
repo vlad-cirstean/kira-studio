@@ -221,13 +221,6 @@ func firstLine(s string) string {
 	return s
 }
 
-func short7(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
-}
-
 func logRebase(j rebaseJob, outcome string, conflicts int, reason string, cached bool, start time.Time) {
 	result := "clean"
 	switch {
@@ -236,8 +229,8 @@ func logRebase(j rebaseJob, outcome string, conflicts int, reason string, cached
 	case conflicts > 0:
 		result = fmt.Sprintf("conflicts(%d)", conflicts)
 	}
-	attrs := []any{"repo", j.repoID, "branch", j.branch, "base", j.base, "baseTip", short7(j.key.BaseTip),
-		"tip", short7(j.key.Tip), "result", result, "cached", cached, "ms", time.Since(start).Milliseconds()}
+	attrs := []any{"repo", j.repoID, "branch", j.branch, "base", j.base, "baseTip", gitclient.ShortSHA(j.key.BaseTip),
+		"tip", gitclient.ShortSHA(j.key.Tip), "result", result, "cached", cached, "ms", time.Since(start).Milliseconds()}
 	if outcome == "failed" {
 		slog.Warn("ade rebase check", append(attrs, "reason", reason)...)
 		return

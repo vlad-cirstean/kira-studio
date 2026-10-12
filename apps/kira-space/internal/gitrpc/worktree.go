@@ -36,7 +36,7 @@ func (r *Router) handlePreflightWorktreeAdd(ctx context.Context, c *gitsession.C
 	return handleRepoCall(ctx, c, "preflight.worktreeAdd", params,
 		func(p PreflightWorktreeAddParams) (string, error) {
 			if p.RepoID == "" || p.Path == "" || (p.Mode != "existingBranch" && p.Mode != "newBranch" && p.Mode != "detach") {
-				return "", ipcerr.BadRequest("gitrpc: preflight.worktreeAdd: repoId, path and a valid mode are required")
+				return "", ipcerr.Contract("gitrpc: preflight.worktreeAdd: repoId, path and a valid mode are required")
 			}
 			return p.RepoID, nil
 		},

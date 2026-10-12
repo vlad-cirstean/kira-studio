@@ -42,7 +42,7 @@ func (r *Router) handleReviewFiles(ctx context.Context, c *gitsession.Conn, para
 				return nil, ipcerr.Internal(merr.Error())
 			}
 			if len(raw) > MaxResultBytes {
-				return nil, ipcerr.New("E_TOO_LARGE", "gitrpc: review.files: result too large")
+				return nil, ipcerr.T(ipcerr.CodeTooLarge, "backend.space.gitrpc.resultTooLarge.body", nil)
 			}
 			return json.RawMessage(raw), nil
 		},
@@ -66,7 +66,7 @@ func (r *Router) handleReviewFileDiff(ctx context.Context, c *gitsession.Conn, p
 				return "", err
 			}
 			if p.Mode != "range" && p.Mode != "sinceReview" {
-				return "", ipcerr.BadRequest("gitrpc: review.fileDiff: mode must be \"range\" or \"sinceReview\"")
+				return "", ipcerr.Contract("gitrpc: review.fileDiff: mode must be \"range\" or \"sinceReview\"")
 			}
 			return p.RepoID, nil
 		},
@@ -109,7 +109,7 @@ func (r *Router) handleReviewMark(ctx context.Context, c *gitsession.Conn, param
 			// validation right above enforces the identical rule.
 			for _, rng := range p.Ranges {
 				if rng.Start < 1 || rng.End < rng.Start {
-					return "", ipcerr.BadRequest("gitrpc: review.mark: range must satisfy 1 <= start <= end")
+					return "", ipcerr.Contract("gitrpc: review.mark: range must satisfy 1 <= start <= end")
 				}
 			}
 			return p.RepoID, nil

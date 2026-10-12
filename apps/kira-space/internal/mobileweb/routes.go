@@ -8,6 +8,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 type access int
@@ -224,7 +225,7 @@ func (s *Server) handleLog(w http.ResponseWriter, r *http.Request, _ repos.Mobil
 	if raw := q.Get("afterSeq"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "E_BAD_REQUEST", "afterSeq must be a number")
+			writeErrorT(w, http.StatusBadRequest, string(ipcerr.CodeBadRequest), "backend.space.mobileweb.afterSeq.body")
 			return
 		}
 		args.AfterSeq = n

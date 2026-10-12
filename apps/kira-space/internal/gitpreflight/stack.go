@@ -10,7 +10,11 @@
 // pre-computed behind/ahead counts as input; they never guess at them.
 package gitpreflight
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+)
 
 // MaxStackedBranches (D3) bounds both the number of `rev-list --left-right` spawns a stack.list
 // costs and the number of iterations a cycle walk will ever take — a pre-existing cycle in a
@@ -538,18 +542,11 @@ type RestackBaseInfo struct {
 	Source string // "recorded" | "mergeBase"
 }
 
-func shortSha(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
-}
-
 func restoresHeadOf(h HeadRef) string {
 	if h.Branch != "" {
 		return h.Branch
 	}
-	return shortSha(h.Sha)
+	return gitclient.ShortSHA(h.Sha)
 }
 
 func findBranchStack(stacks []StackSummary, target string) (StackSummary, StackBranch, bool) {

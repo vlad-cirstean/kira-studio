@@ -21,7 +21,7 @@ func (r *Router) handleStackList(ctx context.Context, c *gitsession.Conn, params
 	return handleRepoCall(ctx, c, "stack.list", params,
 		func(p StackListParams) (string, error) {
 			if p.RepoID == "" {
-				return "", ipcerr.BadRequest("gitrpc: stack.list: repoId is required")
+				return "", ipcerr.Contract("gitrpc: stack.list: repoId is required")
 			}
 			return p.RepoID, nil
 		},
@@ -39,7 +39,7 @@ func (r *Router) handlePreflightRestack(ctx context.Context, c *gitsession.Conn,
 	return handleRepoCall(ctx, c, "preflight.restack", params,
 		func(p PreflightRestackParams) (string, error) {
 			if p.RepoID == "" || p.Branch == "" {
-				return "", ipcerr.BadRequest("gitrpc: preflight.restack: repoId and branch are required")
+				return "", ipcerr.Contract("gitrpc: preflight.restack: repoId and branch are required")
 			}
 			return p.RepoID, nil
 		},
@@ -62,7 +62,7 @@ func (r *Router) handleStackRestack(ctx context.Context, c *gitsession.Conn, par
 	return handleRepoCall(ctx, c, "stack.restack", params,
 		func(p StackRestackParams) (string, error) {
 			if p.RepoID == "" || p.Branch == "" {
-				return "", ipcerr.BadRequest("gitrpc: stack.restack: repoId and branch are required")
+				return "", ipcerr.Contract("gitrpc: stack.restack: repoId and branch are required")
 			}
 			return p.RepoID, nil
 		},
@@ -79,10 +79,10 @@ func (r *Router) handleStackRestack(ctx context.Context, c *gitsession.Conn, par
 func (r *Router) handleStackCancelRestack(_ context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p StackCancelRestackParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: stack.cancelRestack: invalid params")
+		return nil, ipcerr.Contract("gitrpc: stack.cancelRestack: invalid params")
 	}
 	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: stack.cancelRestack: repoId is required")
+		return nil, ipcerr.Contract("gitrpc: stack.cancelRestack: repoId is required")
 	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {

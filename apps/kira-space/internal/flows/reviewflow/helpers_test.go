@@ -39,7 +39,7 @@ func external(t *testing.T, gs *flowharness.GitStream, fn func()) {
 	testx.WaitUntil(t, wait, func() bool { return refsChanged(gs) > before })
 }
 
-// badRequest asserts err is E_BAD_REQUEST naming field.
+// badRequest asserts err is E_BAD_REQUEST (user input) or E_CONTRACT (caller bug) naming field.
 func badRequest(t *testing.T, gs *flowharness.GitStream, method string, params any, field string) {
 	t.Helper()
 	err := gs.Request(method, params, nil)
@@ -47,8 +47,8 @@ func badRequest(t *testing.T, gs *flowharness.GitStream, method string, params a
 	if !ok {
 		t.Fatalf("%s: err = %v, want a wire error", method, err)
 	}
-	if we.Code != "E_BAD_REQUEST" || !strings.Contains(we.Message, field) {
-		t.Fatalf("%s: error = %+v, want E_BAD_REQUEST naming %q", method, we, field)
+	if (we.Code != "E_BAD_REQUEST" && we.Code != "E_CONTRACT") || !strings.Contains(we.Message, field) {
+		t.Fatalf("%s: error = %+v, want E_BAD_REQUEST or E_CONTRACT naming %q", method, we, field)
 	}
 }
 

@@ -49,7 +49,7 @@ func (r *Router) handlePrBrowserUrl(ctx context.Context, c *gitsession.Conn, par
 	return handleRepoCall(ctx, c, "pr.browserUrl", params,
 		func(p PrBrowserUrlParams) (string, error) {
 			if p.RepoID == "" || p.Number <= 0 {
-				return "", ipcerr.BadRequest("gitrpc: pr.browserUrl: repoId and a positive number are required")
+				return "", ipcerr.Contract("gitrpc: pr.browserUrl: repoId and a positive number are required")
 			}
 			return p.RepoID, nil
 		},

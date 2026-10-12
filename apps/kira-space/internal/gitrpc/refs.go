@@ -17,7 +17,7 @@ func (r *Router) handleRefsList(ctx context.Context, c *gitsession.Conn, params 
 	return handleRepoCall(ctx, c, "refs.list", params,
 		func(p RefsListParams) (string, error) {
 			if p.RepoID == "" {
-				return "", ipcerr.BadRequest("gitrpc: refs.list: repoId is required")
+				return "", ipcerr.Contract("gitrpc: refs.list: repoId is required")
 			}
 			return p.RepoID, nil
 		},
@@ -35,7 +35,7 @@ func (r *Router) handleStatusGet(ctx context.Context, c *gitsession.Conn, params
 	return handleRepoCall(ctx, c, "status.get", params,
 		func(p StatusGetParams) (string, error) {
 			if p.RepoID == "" {
-				return "", ipcerr.BadRequest("gitrpc: status.get: repoId is required")
+				return "", ipcerr.Contract("gitrpc: status.get: repoId is required")
 			}
 			return p.RepoID, nil
 		},
@@ -53,7 +53,7 @@ func (r *Router) handlePreflightCheckout(ctx context.Context, c *gitsession.Conn
 	return handleRepoCall(ctx, c, "preflight.checkout", params,
 		func(p PreflightCheckoutParams) (string, error) {
 			if p.RepoID == "" || p.Target == "" || (p.Mode != "switch" && p.Mode != "detach") {
-				return "", ipcerr.BadRequest("gitrpc: preflight.checkout: repoId, target and a valid mode are required")
+				return "", ipcerr.Contract("gitrpc: preflight.checkout: repoId, target and a valid mode are required")
 			}
 			// F1 (P108 Part 16 review), defense in depth: gitsession's own validOpArg is the real
 			// guard (target reaches RewrittenPathsArgs as a bare argv token) — reject here too so a
@@ -77,7 +77,7 @@ func (r *Router) handlePreflightRevert(ctx context.Context, c *gitsession.Conn, 
 	return handleRepoCall(ctx, c, "preflight.revert", params,
 		func(p PreflightRevertParams) (string, error) {
 			if p.RepoID == "" || len(p.Shas) == 0 {
-				return "", ipcerr.BadRequest("gitrpc: preflight.revert: repoId and a non-empty shas are required")
+				return "", ipcerr.Contract("gitrpc: preflight.revert: repoId and a non-empty shas are required")
 			}
 			// F1 (P108 Part 16 review), defense in depth: each sha reaches ShowMetadataArgs as a
 			// bare argv token (gitsession.revertMergeParents already guards it — this is the second

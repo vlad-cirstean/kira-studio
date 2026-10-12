@@ -773,7 +773,7 @@ func prepareGlobalStashRemove(ctx context.Context, e *RepoEntry, conn ConnID, co
 	// Best-effort label lookup for the undo record's own human-readable text — never fatal to the
 	// removal itself; a race that drops the entry between the existence check above and this read
 	// simply falls back to a short-sha label instead.
-	label := shortSha7(op.Sha)
+	label := gitclient.ShortSHA(op.Sha)
 	if entries, lerr := e.GlobalStashList(ctx); lerr == nil {
 		for _, entry := range entries {
 			if entry.Sha == op.Sha {
@@ -844,10 +844,7 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 		dirty := gitpreflight.DirtySplit(statusResult)
 		stagedNew := gitpreflight.StagedNewPaths(statusResult)
 		anyDestroyed := len(dirty.Staged) > 0 || len(dirty.Unstaged) > 0 || len(stagedNew) > 0
-		shortSha := resolved.Sha
-		if len(shortSha) > 7 {
-			shortSha = shortSha[:7]
-		}
+		shortSha := gitclient.ShortSHA(resolved.Sha)
 		if anyDestroyed && (op.ConfirmToken == nil || *op.ConfirmToken != shortSha) {
 			return prepared{earlyError: &OpError{
 				Kind:    "ConfirmationRequired",
@@ -865,7 +862,7 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 	if statusResult.Branch.OID != "" {
 		labelTarget := resolved.Subject
 		if labelTarget == "" {
-			labelTarget = shortSha7(resolved.Sha)
+			labelTarget = gitclient.ShortSHA(resolved.Sha)
 		}
 		undo = &gitpreflight.UndoRecord{
 			ID:          newUndoID(),
@@ -880,15 +877,6 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 	// F14: op.Target passed to the write verbatim, never resolved.Sha — classifyReset's own
 	// contract is that target is echoed unchanged, and the client always passes a full sha anyway.
 	return prepared{argvList: [][]string{gitops.ResetArgs(op.Mode, op.Target)}, undo: undo, expectRefs: []string{"HEAD"}}, nil
-}
-
-// shortSha7 truncates sha to its first 7 characters — the same convention captureTagDeleteUndo's
-// neighbours and UndoRun already use, extracted here only because prepareReset needs it twice.
-func shortSha7(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
 }
 
 // prepareCherryPick is cherryPick's own Prepare (D8/D9). Same rationale as prepareReset's own
@@ -919,7 +907,7 @@ func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel
 	if !op.NoCommit && statusResult.Branch.OID != "" {
 		undo = &gitpreflight.UndoRecord{
 			ID:          newUndoID(),
-			Label:       i18n.T("backend.git.undo.cherryPick.label", map[string]string{"sha": shortSha7(op.Sha)}),
+			Label:       i18n.T("backend.git.undo.cherryPick.label", map[string]string{"sha": gitclient.ShortSHA(op.Sha)}),
 			RecoverySha: statusResult.Branch.OID,
 			CreatedAt:   time.Now().UnixMilli(),
 			Replay:      [][]string{gitops.ResetKeepArgs(statusResult.Branch.OID)}, // --keep, never --hard (D9).
@@ -1290,10 +1278,7 @@ func (e *RepoEntry) autoStashFailureNote(ctx context.Context) string {
 	if sha == "" {
 		return ""
 	}
-	short := sha
-	if len(short) > 7 {
-		short = short[:7]
-	}
+	short := gitclient.ShortSHA(sha)
 	return fmt.Sprintf(" Your local changes were stashed as %s (stash@{0}) before the switch failed — see stash.list.", short)
 }
 
@@ -1397,10 +1382,7 @@ func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result O
 	}
 	if _, err := session.Check(ctx, record.RecoverySha+"^{commit}"); err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
-			short := record.RecoverySha
-			if len(short) > 7 {
-				short = short[:7]
-			}
+			short := gitclient.ShortSHA(record.RecoverySha)
 			return e.undoRunFailure(ctx, "NotFound", fmt.Sprintf("The recovered commit %s no longer exists.", short))
 		}
 		return OpResult{}, err

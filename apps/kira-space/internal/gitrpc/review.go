@@ -18,10 +18,10 @@ import (
 // client-side job (`@{` shorthand and the rest stay git's own problem when the argv runs).
 func validRefArg(field, value string) error {
 	if value == "" {
-		return ipcerr.BadRequest("gitrpc: " + field + " must not be empty")
+		return ipcerr.Contract("gitrpc: %s must not be empty", field)
 	}
 	if strings.HasPrefix(value, "-") {
-		return ipcerr.BadRequest("gitrpc: " + field + " must not begin with '-'")
+		return ipcerr.Contract("gitrpc: %s must not begin with '-'", field)
 	}
 	return nil
 }

@@ -29,7 +29,7 @@ func handleRepoCall[P, R any](
 ) (any, error) {
 	var p P
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: " + op + ": invalid params")
+		return nil, ipcerr.Contract("gitrpc: %s: invalid params", op)
 	}
 	repoID, err := resolve(p)
 	if err != nil {
@@ -54,7 +54,7 @@ func handleCall[P, R any](
 ) (any, error) {
 	var p P
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: " + op + ": invalid params")
+		return nil, ipcerr.Contract("gitrpc: %s: invalid params", op)
 	}
 	if validate != nil {
 		if err := validate(p); err != nil {
@@ -65,7 +65,7 @@ func handleCall[P, R any](
 }
 
 // requireNonEmpty replaces 43 handlers' own hand-rolled "if a == \"\" || b == \"\" { return
-// ipcerr.BadRequest(op + \": a and b are required\") }" check (P107 I2-13). namesAndValues
+// ipcerr.Contract(...) }" check (P107 I2-13). namesAndValues
 // alternates a field's wire name and its value ("repoId", p.RepoID, "sha", p.SHA, ...) — every
 // call site here is a fixed literal, so there is no real risk of mispairing. The doc's own stated
 // `fields map[string]string` does not fit: every existing message lists its fields in a fixed,
@@ -84,7 +84,7 @@ func requireNonEmpty(op string, namesAndValues ...string) error {
 	if len(missing) > 1 {
 		verb = "are"
 	}
-	return ipcerr.BadRequest("gitrpc: " + op + ": " + joinRequired(missing) + " " + verb + " required")
+	return ipcerr.Contract("gitrpc: %s: %s %s required", op, joinRequired(missing), verb)
 }
 
 // joinRequired renders ["repoId", "sha", "branch"] as "repoId, sha and branch" — the exact join

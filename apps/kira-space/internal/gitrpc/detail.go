@@ -18,21 +18,21 @@ import (
 func mapDetailError(err error) error {
 	switch {
 	case errors.Is(err, gitsession.ErrParentIndexOutOfRange):
-		return ipcerr.BadRequest("gitrpc: parentIndex is out of range")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.parentOutOfRange.body", nil)
 	case errors.Is(err, gitsession.ErrFileNotInCommit):
-		return ipcerr.BadRequest("gitrpc: path is not one of this commit's changed files")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.fileNotInCommit.body", nil)
 	case errors.Is(err, gitsession.ErrPathEscapesRoot):
-		return ipcerr.BadRequest("gitrpc: path escapes the repository root")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.pathEscapesRoot.body", nil)
 	case errors.Is(err, gitsession.ErrBranchNotFound):
-		return ipcerr.BadRequest("gitrpc: branch not found")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.branchNotFound.body", nil)
 	case errors.Is(err, gitsession.ErrUnrelatedHistories):
-		return ipcerr.BadRequest("gitrpc: base and branch share no history")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.noSharedHistory.body", nil)
 	case errors.Is(err, gitsession.ErrRangedMarkOnNonText):
-		return ipcerr.BadRequest("gitrpc: a ranged mark requires a text file")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.rangedMarkNeedsText.body", nil)
 	case errors.Is(err, gitsession.ErrCommentNotText):
-		return ipcerr.BadRequest("gitrpc: a comment requires a text file")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentNeedsText.body", nil)
 	case errors.Is(err, gitsession.ErrCommentRangeOutOfFile):
-		return ipcerr.BadRequest("gitrpc: comment range is past the end of the file")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentRangePastEnd.body", nil)
 	default:
 		return mapGitError(err)
 	}
@@ -70,7 +70,7 @@ func (r *Router) handleCommitDetail(ctx context.Context, c *gitsession.Conn, par
 	return handleRepoCall(ctx, c, "commit.detail", params,
 		func(p CommitDetailParams) (string, error) {
 			if p.RepoID == "" || p.SHA == "" {
-				return "", ipcerr.BadRequest("gitrpc: commit.detail: repoId and sha are required")
+				return "", ipcerr.Contract("gitrpc: commit.detail: repoId and sha are required")
 			}
 			if err := validRefArg("sha", p.SHA); err != nil {
 				return "", err
@@ -95,10 +95,10 @@ func (r *Router) handleCommitDetail(ctx context.Context, c *gitsession.Conn, par
 func (r *Router) handleCommitFileDiff(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p CommitFileDiffParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: commit.fileDiff: invalid params")
+		return nil, ipcerr.Contract("gitrpc: commit.fileDiff: invalid params")
 	}
 	if p.RepoID == "" || p.SHA == "" || p.Path == "" {
-		return nil, ipcerr.BadRequest("gitrpc: commit.fileDiff: repoId, sha and path are required")
+		return nil, ipcerr.Contract("gitrpc: commit.fileDiff: repoId, sha and path are required")
 	}
 	if err := validRefArg("sha", p.SHA); err != nil {
 		return nil, err
@@ -131,10 +131,10 @@ func (r *Router) handleCommitFileDiff(ctx context.Context, c *gitsession.Conn, p
 func (r *Router) handleFileRead(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p FileReadParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: file.read: invalid params")
+		return nil, ipcerr.Contract("gitrpc: file.read: invalid params")
 	}
 	if p.RepoID == "" || p.Rev == "" || p.Path == "" {
-		return nil, ipcerr.BadRequest("gitrpc: file.read: repoId, rev and path are required")
+		return nil, ipcerr.Contract("gitrpc: file.read: repoId, rev and path are required")
 	}
 	// D8 (see validRefArg, review.go): Rev reaches `git show <rev>:<path>` as a bare argv token
 	// (gitclient/catfile) — unguarded, a rev beginning with "-" would be read as an option.
@@ -167,10 +167,10 @@ func (r *Router) handleFileRead(ctx context.Context, c *gitsession.Conn, params 
 func (r *Router) handleFileGoToTarget(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p FileGoToTargetParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: file.goToTarget: invalid params")
+		return nil, ipcerr.Contract("gitrpc: file.goToTarget: invalid params")
 	}
 	if p.RepoID == "" || p.Rev == "" || p.Path == "" {
-		return nil, ipcerr.BadRequest("gitrpc: file.goToTarget: repoId, rev and path are required")
+		return nil, ipcerr.Contract("gitrpc: file.goToTarget: repoId, rev and path are required")
 	}
 	// D8 (see validRefArg, review.go): Rev reaches `git diff <rev> -- <path>` as a bare argv token
 	// in an option-consuming position (gitclient/porcelain.WorktreeDiffArgs) — unguarded, a rev of
@@ -195,7 +195,7 @@ func (r *Router) handleBlameLine(ctx context.Context, c *gitsession.Conn, params
 	return handleRepoCall(ctx, c, "blame.line", params,
 		func(p BlameLineParams) (string, error) {
 			if p.RepoID == "" || p.Path == "" || p.Line < 1 {
-				return "", ipcerr.BadRequest("gitrpc: blame.line: repoId, path and a 1-based line are required")
+				return "", ipcerr.Contract("gitrpc: blame.line: repoId, path and a 1-based line are required")
 			}
 			return p.RepoID, nil
 		},
@@ -218,7 +218,7 @@ func (r *Router) handleWorkingDetail(ctx context.Context, c *gitsession.Conn, pa
 	return handleRepoCall(ctx, c, "working.detail", params,
 		func(p WorkingDetailParams) (string, error) {
 			if p.RepoID == "" {
-				return "", ipcerr.BadRequest("gitrpc: working.detail: repoId is required")
+				return "", ipcerr.Contract("gitrpc: working.detail: repoId is required")
 			}
 			return p.RepoID, nil
 		},

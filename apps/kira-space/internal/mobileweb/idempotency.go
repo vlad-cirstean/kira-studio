@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // idemKeyHeader carries a per-intent UUID on every phone write. A retry after a lost response
@@ -120,7 +121,7 @@ func (s *Server) idempotent(rt route, next deviceHandler) deviceHandler {
 	return func(w http.ResponseWriter, r *http.Request, dev repos.MobileDeviceRow) {
 		key := r.Header.Get(idemKeyHeader)
 		if _, err := uuid.Parse(key); err != nil || len(key) != 36 {
-			writeError(w, http.StatusBadRequest, "E_IDEMPOTENCY_KEY", "Idempotency-Key must be a UUID")
+			writeErrorT(w, http.StatusBadRequest, string(ipcerr.CodeIdempotencyKey), "backend.space.mobileweb.idempotencyKey.body")
 			return
 		}
 		e, outcome := s.idem.begin(dev.ID, key, routeID)
@@ -132,10 +133,10 @@ func (s *Server) idempotent(rt route, next deviceHandler) deviceHandler {
 			_, _ = w.Write(e.body)
 			return
 		case idemMismatch:
-			writeError(w, http.StatusUnprocessableEntity, "E_IDEMPOTENCY_MISMATCH", "that key was used for another request")
+			writeErrorT(w, http.StatusUnprocessableEntity, string(ipcerr.CodeIdempotencyMismatch), "backend.space.mobileweb.idempotencyMismatch.body")
 			return
 		case idemInFlight:
-			writeError(w, http.StatusConflict, "E_IN_FLIGHT", "that request is still running")
+			writeErrorT(w, http.StatusConflict, string(ipcerr.CodeConflict), "backend.space.mobileweb.requestInFlight.body")
 			return
 		}
 		rec := newRecorder(w, true)

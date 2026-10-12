@@ -964,6 +964,141 @@
       }
     },
     "space": {
+      "gitrpc": {
+        "branchNotFound": {
+          "body": "That branch no longer exists."
+        },
+        "commentEmpty": {
+          "body": "A comment can’t be empty."
+        },
+        "commentNeedsText": {
+          "body": "Only text files can have comments."
+        },
+        "commentRangePastEnd": {
+          "body": "The comment range is past the end of the file."
+        },
+        "commentTooLong": {
+          "body": "A comment can’t be longer than 8,192 bytes."
+        },
+        "fileNotInCommit": {
+          "body": "This commit doesn’t change that file."
+        },
+        "gitUnavailable": {
+          "body": "Git is unavailable."
+        },
+        "noSharedHistory": {
+          "body": "The base and the branch share no history."
+        },
+        "parentOutOfRange": {
+          "body": "This commit has no such parent."
+        },
+        "pathEscapesRoot": {
+          "body": "That path is outside the repository."
+        },
+        "prepareScriptSpaceOnly": {
+          "body": "Only Kira Space can set the worktree prepare script."
+        },
+        "rangedMarkNeedsText": {
+          "body": "Only text files can be marked by line range."
+        },
+        "repoNotOpen": {
+          "body": "This repository is no longer open."
+        },
+        "resultTooLarge": {
+          "body": "The result is too large to send."
+        },
+        "reviewStoreClosed": {
+          "body": "The review store is closed because Kira Space is shutting down."
+        },
+        "stashNotFound": {
+          "body": "No stash entry matches this commit."
+        },
+        "unknownMethod": {
+          "body": "Git doesn’t support {method}."
+        }
+      },
+      "mobileterm": {
+        "accessOff": {
+          "body": "Terminal access was turned off for this phone."
+        },
+        "controlledElsewhere": {
+          "body": "Another phone controls this terminal."
+        },
+        "noLiveTerminal": {
+          "body": "No live terminal for this session."
+        }
+      },
+      "mobileweb": {
+        "accessDenied": {
+          "body": "Access was denied."
+        },
+        "afterSeq": {
+          "body": "The event position must be a number."
+        },
+        "agentInputOffDevice": {
+          "body": "Agent input is off for this phone. Turn it on for this phone in the mobile access settings on the computer."
+        },
+        "agentInputOffGlobal": {
+          "body": "Agent input is off. Turn it on in the mobile access settings on the computer."
+        },
+        "changesUnavailable": {
+          "body": "Changes are unavailable."
+        },
+        "crossOrigin": {
+          "body": "Cross-origin requests are refused."
+        },
+        "deviceExpired": {
+          "body": "Access for this phone expired."
+        },
+        "deviceRevoked": {
+          "body": "Access for this phone was revoked."
+        },
+        "deviceStoreUnavailable": {
+          "body": "The device store is unavailable."
+        },
+        "idempotencyKey": {
+          "body": "The idempotency key must be a UUID."
+        },
+        "idempotencyMismatch": {
+          "body": "That key was used for another request."
+        },
+        "invalidBody": {
+          "body": "The request body is invalid."
+        },
+        "invalidCredentials": {
+          "body": "The credentials are invalid."
+        },
+        "notPaired": {
+          "body": "This phone isn’t paired."
+        },
+        "pairingFields": {
+          "body": "A label and a 4-digit code are required."
+        },
+        "pairingSave": {
+          "body": "Couldn’t save the pairing."
+        },
+        "pairingUnavailable": {
+          "body": "Pairing is unavailable."
+        },
+        "requestInFlight": {
+          "body": "That request is still running."
+        },
+        "requestTimedOut": {
+          "body": "The request timed out."
+        },
+        "terminalsUnavailable": {
+          "body": "Terminals are unavailable."
+        },
+        "tooManyRequests": {
+          "body": "Too many requests."
+        },
+        "tooManyStreams": {
+          "body": "Too many streams are open."
+        },
+        "writeOff": {
+          "body": "Changes are off for this phone. Turn them on for it in the mobile access settings on the computer."
+        }
+      },
       "seed": {
         "body": "Space seed placeholder."
       }

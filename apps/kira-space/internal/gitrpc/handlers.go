@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
@@ -133,7 +132,7 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 		Request: func(ctx context.Context, method string, params json.RawMessage) (any, error) {
 			h, ok := requestHandlers[method]
 			if !ok {
-				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
+				return nil, ipcerr.T(ipcerr.CodeUnknownMethod, "backend.space.gitrpc.unknownMethod.body", map[string]string{"method": method})
 			}
 			return h(r, ctx, c, params)
 		},
@@ -142,7 +141,7 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 			case "graph.stream":
 				return r.handleGraphStream(ctx, c, params, emit)
 			default:
-				return ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
+				return ipcerr.T(ipcerr.CodeUnknownMethod, "backend.space.gitrpc.unknownMethod.body", map[string]string{"method": method})
 			}
 		},
 	}
@@ -348,10 +347,10 @@ func gitPathFrom(reg *gitsession.Registry) string {
 func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p RepoOpenParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: repo.open: invalid params")
+		return nil, ipcerr.Contract("gitrpc: repo.open: invalid params")
 	}
 	if p.Path == "" {
-		return nil, ipcerr.BadRequest("gitrpc: repo.open: path is required")
+		return nil, ipcerr.Contract("gitrpc: repo.open: path is required")
 	}
 	p.Path = gitpath.CleanNFC(p.Path) // G27 D5d: a client-supplied directory param (D2 tier 1).
 
@@ -382,10 +381,10 @@ func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params 
 func handleRepoClose(c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p RepoCloseParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: repo.close: invalid params")
+		return nil, ipcerr.Contract("gitrpc: repo.close: invalid params")
 	}
 	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: repo.close: repoId is required")
+		return nil, ipcerr.Contract("gitrpc: repo.close: repoId is required")
 	}
 	// G31 round-2 architecture/security review, finding #4: CloseRepo's own map is keyed by
 	// entry.Summary.RepoID (NFC, since Identify normalizes) — a decomposed repoId for a non-ASCII
@@ -406,35 +405,31 @@ func mapGitError(err error) error {
 	case errors.Is(err, gitsession.ErrRepoNotHeld), errors.Is(err, gitsession.ErrRepoTornDown):
 		// Ordinary under concurrency: a request racing repo.close, teardown or a walk replaced by
 		// another graph.loadMore. The client must tell this from a server fault.
-		return ipcerr.BadRequest("gitrpc: repository is not open on this connection")
+		return ipcerr.T(ipcerr.CodeConflict, "backend.space.gitrpc.repoNotOpen.body", nil)
 	case errors.Is(err, catfile.ErrInvalidRev):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, gitreview.ErrStoreClosed):
-		return ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: review store is closed (shutting down)")
+		return ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.reviewStoreClosed.body", nil)
 	}
 	kind, ok := gitclient.KindOf(err)
 	if !ok {
 		return err
 	}
-	return ipcerr.New("E_GIT_"+camelToSnake(string(kind)), err.Error())
+	return ipcerr.New(string(gitErrorCode(kind)), err.Error())
 }
 
-// camelToSnake converts gitclient's camelCase ErrorKind values ("notARepository") into
-// SCREAMING_SNAKE_CASE ("NOT_A_REPOSITORY") for the E_GIT_<KIND> wire code.
-func camelToSnake(s string) string {
-	var b strings.Builder
-	for i, r := range s {
-		switch {
-		case r >= 'A' && r <= 'Z':
-			if i > 0 {
-				b.WriteByte('_')
-			}
-			b.WriteRune(r)
-		case r >= 'a' && r <= 'z':
-			b.WriteRune(r - ('a' - 'A'))
-		default:
-			b.WriteRune(r)
-		}
+// gitErrorCode maps gitclient's closed ErrorKind vocabulary to its E_GIT_* wire code.
+func gitErrorCode(kind gitclient.ErrorKind) ipcerr.Code {
+	switch kind {
+	case gitclient.KindNotARepository:
+		return ipcerr.CodeGitNotARepository
+	case gitclient.KindPermissionDenied:
+		return ipcerr.CodeGitPermissionDenied
+	case gitclient.KindCancelled:
+		return ipcerr.CodeGitCancelled
+	case gitclient.KindTimeout:
+		return ipcerr.CodeGitTimeout
+	default:
+		return ipcerr.CodeGitUnknown
 	}
-	return b.String()
 }

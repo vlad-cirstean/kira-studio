@@ -46,7 +46,7 @@ func (r *Router) handleStashList(ctx context.Context, c *gitsession.Conn, params
 // anything else falls through to mapGitError.
 func mapStashError(err error) error {
 	if errors.Is(err, gitsession.ErrStashNotFound) {
-		return ipcerr.BadRequest("gitrpc: no stash entry matches this sha")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.stashNotFound.body", nil)
 	}
 	return mapGitError(err)
 }
@@ -58,7 +58,7 @@ func (r *Router) handleStashShow(ctx context.Context, c *gitsession.Conn, params
 				return "", err
 			}
 			if !validStashScope(p.Scope) {
-				return "", ipcerr.BadRequest("gitrpc: stash.show: invalid scope " + p.Scope)
+				return "", ipcerr.Contract("gitrpc: stash.show: invalid scope %s", p.Scope)
 			}
 			return p.RepoID, nil
 		},
@@ -79,7 +79,7 @@ func (r *Router) handlePreflightStashPop(ctx context.Context, c *gitsession.Conn
 				return "", err
 			}
 			if !validStashScope(p.Scope) {
-				return "", ipcerr.BadRequest("gitrpc: preflight.stashPop: invalid scope " + p.Scope)
+				return "", ipcerr.Contract("gitrpc: preflight.stashPop: invalid scope %s", p.Scope)
 			}
 			// F1 (P108 Part 16 review), defense in depth: targetSha reaches MergeTreeArgs as a
 			// bare argv token (gitsession.PreflightStashPop already guards it — this is the second
@@ -108,7 +108,7 @@ func (r *Router) handlePreflightStashBranch(ctx context.Context, c *gitsession.C
 				return "", err
 			}
 			if !validStashScope(p.Scope) {
-				return "", ipcerr.BadRequest("gitrpc: preflight.stashBranch: invalid scope " + p.Scope)
+				return "", ipcerr.Contract("gitrpc: preflight.stashBranch: invalid scope %s", p.Scope)
 			}
 			return p.RepoID, nil
 		},

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -175,11 +176,11 @@ func (b *TaskBoard) deploymentRow(ctx context.Context, sc *boardCtx, sb model.Ad
 		return d, err
 	}
 	if !ok {
-		d.Status, d.Error = "unknown", fmt.Sprintf("deployed SHA %s is not in this clone", shortSha(st.Sha))
+		d.Status, d.Error = "unknown", fmt.Sprintf("deployed SHA %s is not in this clone", gitclient.ShortSHA(st.Sha))
 		return d, nil
 	}
 	d.DeployedSha = full
-	short := shortSha(full)
+	short := gitclient.ShortSHA(full)
 	mark, hasMark := sc.markFor(sb.ID, "env", env)
 
 	if hasMark && mark.MergedTip != tip {
@@ -251,13 +252,6 @@ func (b *TaskBoard) movedBack(ctx context.Context, sc *boardCtx, baseTip, tip, c
 		return false, err
 	}
 	return sc.entry.IsAncestor(ctx, current, prev)
-}
-
-func shortSha(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
 }
 
 // missingNote is the stale-deploy note; the verb agrees with the count (mockup: "is missing" for one).

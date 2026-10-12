@@ -187,7 +187,7 @@ func (h *Hub) CloseAll() {
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
 	sub, err := s.cfg.Hub.Subscribe(d.ID)
 	if err != nil {
-		writeError(w, http.StatusTooManyRequests, codeRateLimited, "too many open streams")
+		writeErrorT(w, http.StatusTooManyRequests, codeRateLimited, "backend.space.mobileweb.tooManyStreams.body")
 		return
 	}
 	defer sub.Close()

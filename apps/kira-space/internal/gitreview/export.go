@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 )
 
 // CommentAnchor is how a stored comment's line range relates to the revision it was asked about
@@ -52,15 +54,6 @@ func SortAnchored(cs []AnchoredComment) {
 	})
 }
 
-// sha8 is the anchor line's own cosmetic shorthand — the full sha is on review.comment.list for
-// anything that needs it (D12).
-func sha8(sha string) string {
-	if len(sha) <= 8 {
-		return sha
-	}
-	return sha[:8]
-}
-
 // FormatComments renders D12's exact AI-paste text: a header line naming branch and the comment
 // count, then one entry per comment (an anchor line, the body, a blank line), ending in exactly
 // one trailing newline. "" for an empty session (rule 9: cs must already be SortAnchored'd — this
@@ -86,9 +79,9 @@ func FormatComments(branch string, cs []AnchoredComment) string {
 		}
 		switch c.Anchor {
 		case AnchorRemoved:
-			fmt.Fprintf(&b, "  [these lines no longer exist on %s; shown as of %s]", branch, sha8(c.AnchorSHA))
+			fmt.Fprintf(&b, "  [these lines no longer exist on %s; shown as of %s]", branch, gitclient.ShortSHA(c.AnchorSHA))
 		case AnchorStale:
-			fmt.Fprintf(&b, "  [lines as of %s; %s's history was rewritten since]", sha8(c.AnchorSHA), branch)
+			fmt.Fprintf(&b, "  [lines as of %s; %s's history was rewritten since]", gitclient.ShortSHA(c.AnchorSHA), branch)
 		}
 		b.WriteByte('\n')
 

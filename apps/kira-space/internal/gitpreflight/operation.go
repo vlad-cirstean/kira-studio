@@ -8,6 +8,8 @@
 // matrices, the in-progress precedence table) testable with no repository at all.
 package gitpreflight
 
+import "github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+
 // InProgressKind mirrors @kira/git-ipc's own InProgressKind union verbatim.
 type InProgressKind string
 
@@ -205,11 +207,7 @@ func DescribeInProgress(op *InProgressOperation) string {
 	}
 	shortSha := ""
 	if op.OtherSha != nil && len(*op.OtherSha) > 0 {
-		sha := *op.OtherSha
-		if len(sha) > 7 {
-			sha = sha[:7]
-		}
-		shortSha = " `" + sha + "`"
+		shortSha = " `" + gitclient.ShortSHA(*op.OtherSha) + "`"
 	}
 	return kindLabel[op.Kind] + shortSha
 }

@@ -220,16 +220,16 @@ func (b *Broker) AllowResize(id string, cols, rows int) bool {
 func (b *Broker) Attach(sessionID string, dev repos.MobileDeviceRow, cols, rows int) (*phoneConn, error) {
 	tid, ok := b.deps.Sessions(sessionID)
 	if !ok {
-		return nil, ipcerr.New("E_NOT_FOUND", "no live terminal for this session")
+		return nil, ipcerr.T(ipcerr.CodeNotFound, "backend.space.mobileterm.noLiveTerminal.body", nil)
 	}
 	e := b.get(tid)
 	if e == nil {
-		return nil, ipcerr.New("E_NOT_FOUND", "no live terminal for this session")
+		return nil, ipcerr.T(ipcerr.CodeNotFound, "backend.space.mobileterm.noLiveTerminal.body", nil)
 	}
 	e.mu.Lock()
 	if e.state != stateDesktop && e.deviceID != dev.ID {
 		e.mu.Unlock()
-		return nil, ipcerr.New("E_TERMINAL_BUSY", "another phone controls this terminal")
+		return nil, ipcerr.T(ipcerr.CodeConflict, "backend.space.mobileterm.controlledElsewhere.body", nil)
 	}
 	c := &phoneConn{e: e, device: dev.ID, notify: make(chan struct{}, 1), done: make(chan struct{})}
 	if old := e.conn; old != nil {

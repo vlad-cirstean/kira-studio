@@ -121,7 +121,7 @@ func TestCommentClearKeepsMarks(t *testing.T) {
 	}
 }
 
-// Guards the add refusals: each E_BAD_REQUEST names the field, nothing is stored.
+// Guards the add refusals: each refusal names the field, nothing is stored.
 func TestCommentAddRefusals(t *testing.T) {
 	app := flowharness.New(t)
 	gs := app.OpenGitStream()
@@ -136,8 +136,8 @@ func TestCommentAddRefusals(t *testing.T) {
 		name, field string
 		mutate      func(*gitrpc.ReviewCommentAddParams)
 	}{
-		{"whitespace body", "body", func(p *gitrpc.ReviewCommentAddParams) { p.Body = "   " }},
-		{"oversized body", "body", func(p *gitrpc.ReviewCommentAddParams) { p.Body = strings.Repeat("a", (8<<10)+1) }},
+		{"whitespace body", "can’t be empty", func(p *gitrpc.ReviewCommentAddParams) { p.Body = "   " }},
+		{"oversized body", "8,192 bytes", func(p *gitrpc.ReviewCommentAddParams) { p.Body = strings.Repeat("a", (8<<10)+1) }},
 		{"bad at", "hex object id", func(p *gitrpc.ReviewCommentAddParams) { p.At = "not-a-sha" }},
 		{"inverted range", "range", func(p *gitrpc.ReviewCommentAddParams) { p.Range = lr(5, 2) }},
 		{"past end of file", "past the end", func(p *gitrpc.ReviewCommentAddParams) { p.Range = lr(100, 100) }},

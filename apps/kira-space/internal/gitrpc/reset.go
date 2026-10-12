@@ -18,7 +18,7 @@ func (r *Router) handlePreflightReset(ctx context.Context, c *gitsession.Conn, p
 	return handleRepoCall(ctx, c, "preflight.reset", params,
 		func(p PreflightResetParams) (string, error) {
 			if p.RepoID == "" || p.Target == "" || (p.Mode != "soft" && p.Mode != "mixed" && p.Mode != "hard") {
-				return "", ipcerr.BadRequest("gitrpc: preflight.reset: repoId, target and a valid mode are required")
+				return "", ipcerr.Contract("gitrpc: preflight.reset: repoId, target and a valid mode are required")
 			}
 			return p.RepoID, nil
 		},

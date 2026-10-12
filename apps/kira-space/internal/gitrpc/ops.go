@@ -19,7 +19,7 @@ func (r *Router) handleOpRun(ctx context.Context, c *gitsession.Conn, params jso
 	return handleRepoCall(ctx, c, "op.run", params,
 		func(p OpRunParams) (string, error) {
 			if p.RepoID == "" || p.Op.Kind == "" {
-				return "", ipcerr.BadRequest("gitrpc: op.run: repoId and op.kind are required")
+				return "", ipcerr.Contract("gitrpc: op.run: repoId and op.kind are required")
 			}
 			return p.RepoID, nil
 		},
@@ -31,7 +31,7 @@ func (r *Router) handleOpRun(ctx context.Context, c *gitsession.Conn, params jso
 					// D5: an unserved kind names itself in the error, never a stub and never a
 					// silent success — the same E_UNKNOWN_METHOD code the router already answers
 					// with for a method it does not serve at all.
-					return gitsession.OpResult{}, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: op.run: "+unserved.Kind+" is not served yet")
+					return gitsession.OpResult{}, ipcerr.T(ipcerr.CodeUnknownMethod, "backend.space.gitrpc.unknownMethod.body", map[string]string{"method": "op.run " + unserved.Kind})
 				}
 				if errors.Is(err, gitsession.ErrInvalidResetMode) {
 					return gitsession.OpResult{}, ipcerr.BadRequest("gitrpc: op.run: " + err.Error())

@@ -42,14 +42,14 @@ func (b *Broker) Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileD
 	cols, errC := strconv.Atoi(q.Get("cols"))
 	rows, errR := strconv.Atoi(q.Get("rows"))
 	if errC != nil || errR != nil || !terminal.ValidDim(cols) || !terminal.ValidDim(rows) {
-		writeErr(w, http.StatusBadRequest, ipcerr.New("E_BAD_REQUEST", "cols and rows are required"))
+		writeErr(w, http.StatusBadRequest, ipcerr.Contract("cols and rows are required"))
 		return
 	}
 	from := int64(-1)
 	if s := q.Get("from"); s != "" {
 		v, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || v < 0 {
-			writeErr(w, http.StatusBadRequest, ipcerr.New("E_BAD_REQUEST", "from must be a byte offset"))
+			writeErr(w, http.StatusBadRequest, ipcerr.Contract("from must be a byte offset"))
 			return
 		}
 		from = v
@@ -61,7 +61,7 @@ func (b *Broker) Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileD
 	}
 	if authorized != nil && !authorized() {
 		b.Release(c)
-		writeErr(w, http.StatusForbidden, ipcerr.New("E_FORBIDDEN", "terminal access was turned off for this phone"))
+		writeErr(w, http.StatusForbidden, ipcerr.T(ipcerr.CodeForbidden, "backend.space.mobileterm.accessOff.body", nil))
 		return
 	}
 	ws, err := websocket.Accept(w, r, nil)
@@ -207,7 +207,7 @@ func sendCtrl(ctx context.Context, ws *websocket.Conn, f ctrlFrame) bool {
 
 func statusOf(err error) int {
 	var ie *ipcerr.Error
-	if errors.As(err, &ie) && ie.Code == "E_NOT_FOUND" {
+	if errors.As(err, &ie) && ie.Code == string(ipcerr.CodeNotFound) {
 		return http.StatusNotFound
 	}
 	return http.StatusConflict
@@ -217,7 +217,7 @@ func writeErr(w http.ResponseWriter, status int, err error) {
 	var ie *ipcerr.Error
 	if !errors.As(err, &ie) {
 		slog.Warn("mobileterm: attach", "scope", "mobileweb", "err", err)
-		ie = ipcerr.New("E_INTERNAL", "internal error")
+		ie = ipcerr.T(ipcerr.CodeInternal, "backend.error.internal.body", nil)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

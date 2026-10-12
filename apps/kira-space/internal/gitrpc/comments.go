@@ -3,7 +3,6 @@ package gitrpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -25,7 +24,7 @@ var objectIDPattern = regexp.MustCompile(`^[0-9a-f]{40}$|^[0-9a-f]{64}$`)
 
 func validObjectID(field, value string) error {
 	if !objectIDPattern.MatchString(value) {
-		return ipcerr.BadRequest("gitrpc: " + field + " must be a 40- or 64-character lowercase hex object id")
+		return ipcerr.Contract("gitrpc: %s must be a 40- or 64-character lowercase hex object id", field)
 	}
 	return nil
 }
@@ -68,14 +67,14 @@ func (r *Router) handleReviewCommentAdd(ctx context.Context, c *gitsession.Conn,
 				return "", err
 			}
 			if p.Range.Start < 1 || p.Range.End < p.Range.Start {
-				return "", ipcerr.BadRequest("gitrpc: review.comment.add: range must satisfy 1 <= start <= end")
+				return "", ipcerr.Contract("gitrpc: review.comment.add: range must satisfy 1 <= start <= end")
 			}
 			body = normalizeCommentBody(p.Body)
 			if body == "" {
-				return "", ipcerr.BadRequest("gitrpc: review.comment.add: body must not be empty")
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentEmpty.body", nil)
 			}
 			if len(body) > MaxCommentBytes {
-				return "", ipcerr.BadRequest("gitrpc: review.comment.add: body exceeds 8 KiB")
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentTooLong.body", nil)
 			}
 			return p.RepoID, nil
 		},
@@ -114,7 +113,7 @@ func (r *Router) handleReviewCommentList(ctx context.Context, c *gitsession.Conn
 				return nil, ipcerr.Internal(merr.Error())
 			}
 			if len(raw) > MaxResultBytes {
-				return nil, ipcerr.New("E_TOO_LARGE", fmt.Sprintf("gitrpc: review.comment.list: result too large (%d comments)", len(result.Comments)))
+				return nil, ipcerr.T(ipcerr.CodeTooLarge, "backend.space.gitrpc.resultTooLarge.body", nil)
 			}
 			return json.RawMessage(raw), nil
 		},
@@ -131,7 +130,7 @@ func (r *Router) handleReviewCommentRemove(ctx context.Context, c *gitsession.Co
 				return "", err
 			}
 			if p.ID <= 0 {
-				return "", ipcerr.BadRequest("gitrpc: review.comment.remove: id must be positive")
+				return "", ipcerr.Contract("gitrpc: review.comment.remove: id must be positive")
 			}
 			return p.RepoID, nil
 		},
@@ -189,7 +188,7 @@ func (r *Router) handleReviewCommentExport(ctx context.Context, c *gitsession.Co
 				return nil, ipcerr.Internal(merr.Error())
 			}
 			if len(raw) > MaxResultBytes {
-				return nil, ipcerr.New("E_TOO_LARGE", "gitrpc: review.comment.export: result too large")
+				return nil, ipcerr.T(ipcerr.CodeTooLarge, "backend.space.gitrpc.resultTooLarge.body", nil)
 			}
 			return json.RawMessage(raw), nil
 		},

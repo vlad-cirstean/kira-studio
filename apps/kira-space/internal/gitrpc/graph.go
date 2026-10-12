@@ -80,7 +80,7 @@ func rangedWalkSpecFrom(rng *CommitRangeParams) (porcelain.WalkSpec, error) {
 func (r *Router) handleGraphStatus(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p GraphStatusParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: graph.status: invalid params")
+		return nil, ipcerr.Contract("gitrpc: graph.status: invalid params")
 	}
 	if err := requireNonEmpty("graph.status", "repoId", p.RepoID); err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (r *Router) handleGraphStatus(ctx context.Context, c *gitsession.Conn, para
 func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p GraphLoadMoreParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: graph.loadMore: invalid params")
+		return nil, ipcerr.Contract("gitrpc: graph.loadMore: invalid params")
 	}
 	if err := requireNonEmpty("graph.loadMore", "repoId", p.RepoID); err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 
 	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
-		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
+		return nil, ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 
 	// D10: `range` present -> pages the review walk, never the graph's.
@@ -161,7 +161,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p GraphRefreshParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: graph.refresh: invalid params")
+		return nil, ipcerr.Contract("gitrpc: graph.refresh: invalid params")
 	}
 	if err := requireNonEmpty("graph.refresh", "repoId", p.RepoID); err != nil {
 		return nil, err
@@ -206,13 +206,13 @@ func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParam
 func (r *Router) handleGraphReportFailure(_ context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p GraphReportFailureParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: graph.reportFailure: invalid params")
+		return nil, ipcerr.Contract("gitrpc: graph.reportFailure: invalid params")
 	}
 	if err := requireNonEmpty("graph.reportFailure", "repoId", p.RepoID); err != nil {
 		return nil, err
 	}
 	if p.Reason != "corrupted" {
-		return nil, ipcerr.BadRequest("gitrpc: graph.reportFailure: unknown reason")
+		return nil, ipcerr.Contract("gitrpc: graph.reportFailure: unknown reason")
 	}
 	c.RecordFailure(gitpath.CleanNFC(p.RepoID), "graph.load", "graph data stream was corrupted; the graph was reset")
 	return struct{}{}, nil
@@ -238,7 +238,7 @@ func (r *Router) handleGraphReportFailure(_ context.Context, c *gitsession.Conn,
 func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, params json.RawMessage, emit func(payload any, blob []byte) error) error {
 	var p GraphStreamParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return ipcerr.BadRequest("gitrpc: graph.stream: invalid params")
+		return ipcerr.Contract("gitrpc: graph.stream: invalid params")
 	}
 	if err := requireNonEmpty("graph.stream", "repoId", p.RepoID); err != nil {
 		return err
@@ -254,7 +254,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	}
 	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
-		return ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
+		return ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {

@@ -74,7 +74,7 @@ func (r *Router) handleRepoSettingsGet(_ context.Context, _ *gitsession.Conn, pa
 			p.RepoID = gitpath.CleanNFC(p.RepoID)
 			s, err := r.deps.Registry.RepoSettingsGet(p.RepoID)
 			if err != nil {
-				return RepoSettingsSnapshot{}, ipcerr.New("E_INTERNAL", "gitrpc: repoSettings.get: "+err.Error())
+				return RepoSettingsSnapshot{}, ipcerr.Internal("gitrpc: repoSettings.get: " + err.Error())
 			}
 			return repoSettingsSnapshotFrom(s), nil
 		},
@@ -88,8 +88,7 @@ func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, pa
 	return handleCall("repoSettings.set", params,
 		func(p RepoSettingsSetParams) error {
 			if p.Patch.WorktreePrepareScript != nil {
-				return ipcerr.New("E_READ_ONLY",
-					"gitrpc: repoSettings.set: kiraSpace.worktree.prepareScript is set in Kira Space only")
+				return ipcerr.T(ipcerr.CodeReadOnly, "backend.space.gitrpc.prepareScriptSpaceOnly.body", nil)
 			}
 			return requireNonEmpty("repoSettings.set", "repoId", p.RepoID)
 		},

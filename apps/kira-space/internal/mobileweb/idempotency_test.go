@@ -50,7 +50,7 @@ func TestIdempotency_ReplayMismatchInFlightAndExpiry(t *testing.T) {
 
 	// A 4xx is cached: a retry replays the same refusal.
 	writer.mu.Lock()
-	writer.err = ipcerr.New("E_STALE", "moved")
+	writer.err = ipcerr.New(string(ipcerr.CodeConflict), "moved")
 	writer.mu.Unlock()
 	stale := uuid.NewString()
 	for range 2 {

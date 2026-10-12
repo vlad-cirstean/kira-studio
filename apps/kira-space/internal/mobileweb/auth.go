@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/tokenauth"
 )
 
@@ -25,11 +26,11 @@ const (
 
 // Auth failure codes on the wire; the phone branches on them.
 const (
-	codeUnauthorized = "E_UNAUTHORIZED"
-	codeRevoked      = "E_REVOKED"
-	codeExpired      = "E_EXPIRED"
-	codeRateLimited  = "E_RATE_LIMITED"
-	codePairDenied   = "E_PAIRING_DENIED"
+	codeUnauthorized = string(ipcerr.CodeUnauthorized)
+	codeRevoked      = string(ipcerr.CodeRevoked)
+	codeExpired      = string(ipcerr.CodeExpired)
+	codeRateLimited  = string(ipcerr.CodeRateLimited)
+	codePairDenied   = string(ipcerr.CodePairingDenied)
 )
 
 // dummyHash/dummySalt give an unknown device id something to compare against, so a missing row and
@@ -111,25 +112,25 @@ func (s *Server) withDevice(h func(http.ResponseWriter, *http.Request, repos.Mob
 		switch v {
 		case verdictOK:
 		case verdictNoCredential:
-			writeError(w, http.StatusUnauthorized, codeUnauthorized, "not paired")
+			writeErrorT(w, http.StatusUnauthorized, codeUnauthorized, "backend.space.mobileweb.notPaired.body")
 			return
 		case verdictStoreError:
-			writeError(w, http.StatusServiceUnavailable, "E_UNAVAILABLE", "device store unavailable")
+			writeErrorT(w, http.StatusServiceUnavailable, codeUnavailable, "backend.space.mobileweb.deviceStoreUnavailable.body")
 			return
 		case verdictExpired:
 			s.failedAuth.allow(ip)
 			clearCookie(w)
-			writeError(w, http.StatusUnauthorized, codeExpired, "device access expired")
+			writeErrorT(w, http.StatusUnauthorized, codeExpired, "backend.space.mobileweb.deviceExpired.body")
 			return
 		case verdictRevoked:
 			s.failedAuth.allow(ip)
 			clearCookie(w)
-			writeError(w, http.StatusUnauthorized, codeRevoked, "device revoked")
+			writeErrorT(w, http.StatusUnauthorized, codeRevoked, "backend.space.mobileweb.deviceRevoked.body")
 			return
 		default:
 			s.failedAuth.allow(ip)
 			clearCookie(w)
-			writeError(w, http.StatusUnauthorized, codeUnauthorized, "invalid credentials")
+			writeErrorT(w, http.StatusUnauthorized, codeUnauthorized, "backend.space.mobileweb.invalidCredentials.body")
 			return
 		}
 		if !s.deviceRate.allow(dev.ID) {
@@ -201,7 +202,7 @@ func csrfGuard(rt route, next http.Handler) http.Handler {
 	checked := rt.kind == kindUpgrade
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if (checked || !isSafeMethod(r.Method)) && !sameOriginRequest(r) {
-			writeError(w, http.StatusForbidden, "E_FORBIDDEN", "cross-origin request refused")
+			writeErrorT(w, http.StatusForbidden, string(ipcerr.CodeForbidden), "backend.space.mobileweb.crossOrigin.body")
 			return
 		}
 		next.ServeHTTP(w, r)

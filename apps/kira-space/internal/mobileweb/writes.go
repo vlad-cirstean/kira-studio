@@ -12,13 +12,14 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Permission failure codes on the wire; the phone names the desktop pane that fixes each.
 const (
-	codeWriteOff      = "E_WRITE_OFF"
-	codeAgentInputOff = "E_AGENT_INPUT_OFF"
-	codeUnavailable   = "E_UNAVAILABLE"
+	codeWriteOff      = string(ipcerr.CodeWriteOff)
+	codeAgentInputOff = string(ipcerr.CodeAgentInputOff)
+	codeUnavailable   = string(ipcerr.CodeUnavailable)
 	maxWriteBody      = 64 << 10
 	// writeCallLimit bounds one service call. A write detaches from the phone's connection so a
 	// dropped request cannot abort it half way; the idempotency key lets the phone retry.
@@ -57,19 +58,18 @@ func (s *Server) requirePerm(rt route, next deviceHandler) deviceHandler {
 		switch rt.perm {
 		case permWrite:
 			if !dev.CanWrite {
-				writeError(w, http.StatusForbidden, codeWriteOff,
-					"Changes are off for this phone. Turn on Changes for it in Settings > Mobile access on the computer.")
+				writeErrorT(w, http.StatusForbidden, codeWriteOff, "backend.space.mobileweb.writeOff.body")
 				return
 			}
 		case permAgentInput:
 			if !s.agentInputGlobal() {
 				writeJSON(w, http.StatusForbidden, errorBody{Code: codeAgentInputOff, Reason: "global",
-					Message: "Agent input is off. Turn it on in Settings > Mobile access on the computer."})
+					Message: i18n.T("backend.space.mobileweb.agentInputOffGlobal.body", nil)})
 				return
 			}
 			if !dev.CanAgentInput {
 				writeJSON(w, http.StatusForbidden, errorBody{Code: codeAgentInputOff, Reason: "device",
-					Message: "Agent input is off for this phone. Turn it on for this phone in Settings > Mobile access on the computer."})
+					Message: i18n.T("backend.space.mobileweb.agentInputOffDevice.body", nil)})
 				return
 			}
 		}
@@ -111,7 +111,8 @@ func auditAdd(r *http.Request, kv ...any) {
 
 // logWrite is the one audit line of a phone write, attach, release or reclaim.
 func logWrite(device, action string, kv ...any) {
-	slog.Info("mobileweb: write", append([]any{"scope", "mobileweb", "device", device, "action", action}, kv...)...)
+	audit := slog.With("scope", "mobileweb", "device", device, "action", action)
+	audit.Info("mobileweb: write", kv...)
 }
 
 func (s *Server) audited(rt route, next deviceHandler) deviceHandler {
@@ -132,7 +133,7 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, "E_BAD_REQUEST", "invalid request body")
+		writeErrorT(w, http.StatusBadRequest, string(ipcerr.CodeBadRequest), "backend.space.mobileweb.invalidBody.body")
 		return false
 	}
 	return true
@@ -143,7 +144,7 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 func writeRoute[Req, Res any](s *Server, call func(ctx context.Context, wr Writer, r *http.Request, req Req) (Res, error)) deviceHandler {
 	return func(w http.ResponseWriter, r *http.Request, _ repos.MobileDeviceRow) {
 		if s.cfg.Writer == nil {
-			writeError(w, http.StatusServiceUnavailable, codeUnavailable, "changes are unavailable")
+			writeErrorT(w, http.StatusServiceUnavailable, codeUnavailable, "backend.space.mobileweb.changesUnavailable.body")
 			return
 		}
 		var req Req
@@ -265,7 +266,7 @@ func (s *Server) handleSessionTakeOver(w http.ResponseWriter, r *http.Request, d
 
 func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
 	if s.cfg.Terminals == nil {
-		writeError(w, http.StatusServiceUnavailable, codeUnavailable, "terminals are unavailable")
+		writeErrorT(w, http.StatusServiceUnavailable, codeUnavailable, "backend.space.mobileweb.terminalsUnavailable.body")
 		return
 	}
 	id := r.PathValue("id")

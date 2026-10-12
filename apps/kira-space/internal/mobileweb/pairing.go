@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/pairing"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -95,7 +96,7 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&req)
 	_ = rc.SetReadDeadline(time.Time{})
 	if err != nil || !pairCodeRe.MatchString(req.Code) {
-		writeError(w, http.StatusBadRequest, "E_BAD_REQUEST", "label and a 4-digit code are required")
+		writeErrorT(w, http.StatusBadRequest, string(ipcerr.CodeBadRequest), "backend.space.mobileweb.pairingFields.body")
 		return
 	}
 	meta := MobileMeta{
@@ -122,11 +123,11 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 	case pairing.Approved:
 		s.finishPairing(w, requestID, meta)
 	case pairing.Denied:
-		writeJSON(w, http.StatusForbidden, errorBody{Code: codePairDenied, Message: "access denied", Reason: "denied"})
+		writeJSON(w, http.StatusForbidden, errorBody{Code: codePairDenied, Message: i18n.T("backend.space.mobileweb.accessDenied.body", nil), Reason: "denied"})
 	case pairing.TimedOut:
-		writeJSON(w, http.StatusForbidden, errorBody{Code: codePairDenied, Message: "request timed out", Reason: "timeout"})
+		writeJSON(w, http.StatusForbidden, errorBody{Code: codePairDenied, Message: i18n.T("backend.space.mobileweb.requestTimedOut.body", nil), Reason: "timeout"})
 	default:
-		writeError(w, http.StatusServiceUnavailable, "E_UNAVAILABLE", "pairing unavailable")
+		writeErrorT(w, http.StatusServiceUnavailable, codeUnavailable, "backend.space.mobileweb.pairingUnavailable.body")
 	}
 }
 
@@ -135,7 +136,7 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 func (s *Server) finishPairing(w http.ResponseWriter, requestID string, meta MobileMeta) {
 	tok, ok := s.cfg.Broker.TakeApprovedToken(requestID)
 	if !ok {
-		writeJSON(w, http.StatusForbidden, errorBody{Code: codePairDenied, Message: "access denied", Reason: "denied"})
+		writeJSON(w, http.StatusForbidden, errorBody{Code: codePairDenied, Message: i18n.T("backend.space.mobileweb.accessDenied.body", nil), Reason: "denied"})
 		return
 	}
 	now := s.cfg.Now().UnixMilli()
@@ -146,7 +147,7 @@ func (s *Server) finishPairing(w http.ResponseWriter, requestID string, meta Mob
 	}
 	if err := s.cfg.Devices.Insert(row); err != nil {
 		slog.Error("mobileweb: insert paired device", "scope", "mobileweb", "err", err)
-		writeError(w, http.StatusInternalServerError, "E_INTERNAL", "could not save the pairing")
+		writeErrorT(w, http.StatusInternalServerError, string(ipcerr.CodeInternal), "backend.space.mobileweb.pairingSave.body")
 		return
 	}
 	setCookie(w, row.ID, tok.Plain, deviceTTL)

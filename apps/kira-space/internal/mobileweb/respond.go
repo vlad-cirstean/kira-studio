@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 type errorBody struct {
@@ -29,9 +30,14 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, errorBody{Code: code, Message: message})
 }
 
+// writeErrorT answers with the catalog text for key.
+func writeErrorT(w http.ResponseWriter, status int, code, key string) {
+	writeError(w, status, code, i18n.T(key, nil))
+}
+
 func writeRateLimited(w http.ResponseWriter) {
 	w.Header().Set("Retry-After", "10")
-	writeError(w, http.StatusTooManyRequests, codeRateLimited, "too many requests")
+	writeErrorT(w, http.StatusTooManyRequests, codeRateLimited, "backend.space.mobileweb.tooManyRequests.body")
 }
 
 // writeServiceError maps a bridge error to a status. Internal failures are logged and answered
@@ -40,23 +46,20 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	var ie *ipcerr.Error
 	if errors.As(err, &ie) {
 		switch ie.Code {
-		case "E_BAD_REQUEST":
+		case string(ipcerr.CodeBadRequest), string(ipcerr.CodeContract):
 			writeError(w, http.StatusBadRequest, ie.Code, ie.Message)
 			return
-		case "E_NOT_FOUND":
+		case string(ipcerr.CodeNotFound):
 			writeError(w, http.StatusNotFound, ie.Code, ie.Message)
 			return
-		case "E_INVALID":
-			writeError(w, http.StatusUnprocessableEntity, ie.Code, ie.Message)
-			return
-		case "E_STALE", "E_PREPARING", "E_TERMINAL_BUSY", "E_NO_WINDOW":
+		case string(ipcerr.CodeConflict), string(ipcerr.CodePreparing), string(ipcerr.CodeUnavailable):
 			writeError(w, http.StatusConflict, ie.Code, ie.Message)
 			return
-		case "E_LAUNCH_TIMEOUT":
+		case string(ipcerr.CodeTimeout):
 			writeError(w, http.StatusGatewayTimeout, ie.Code, ie.Message)
 			return
 		}
 	}
 	slog.Warn("mobileweb: service error", "scope", "mobileweb", "err", err)
-	writeError(w, http.StatusInternalServerError, "E_INTERNAL", "internal error")
+	writeErrorT(w, http.StatusInternalServerError, string(ipcerr.CodeInternal), "backend.error.internal.body")
 }

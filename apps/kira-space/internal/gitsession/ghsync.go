@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 )
@@ -130,7 +131,7 @@ func (e *RepoEntry) GhSyncPlan(ctx context.Context, branch, base string, pr int,
 		if errors.Is(err, catfile.ErrMissing) {
 			return GhSyncPlanResult{
 				Status: "headNotFetched", Account: account, HeadSha: files.HeadSha,
-				Message: fmt.Sprintf("PR head %s is not fetched. Refresh the repo first.", short7(files.HeadSha)),
+				Message: fmt.Sprintf("PR head %s is not fetched. Refresh the repo first.", gitclient.ShortSHA(files.HeadSha)),
 			}, nil
 		}
 		return GhSyncPlanResult{}, err
@@ -238,11 +239,4 @@ func (e *RepoEntry) SetPrFilesViewed(ctx context.Context, prNodeID string, paths
 		return failed, *e.ghFailure(status)
 	}
 	return failed, GhSyncPlanResult{Status: "ok"}
-}
-
-func short7(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
 }

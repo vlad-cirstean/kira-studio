@@ -33,7 +33,7 @@ const MaxSearchLimit = DefaultSearchLimit * 10
 func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p SearchRunParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: search.run: invalid params")
+		return nil, ipcerr.Contract("gitrpc: search.run: invalid params")
 	}
 	if err := requireNonEmpty("search.run", "repoId", p.RepoID); err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params
 
 	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
-		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
+		return nil, ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, nil)
 	if err != nil {
