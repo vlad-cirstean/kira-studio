@@ -12,8 +12,9 @@ import ParamsForm from '@workbench/automations/run/ParamsForm.vue';
 import { computed, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import { promptParts, smartBodyParts } from '../automation/smartStepBody';
-import { finishStepParts } from '../board/runMessage';
+import { finishVars, previewTextParts } from '../board/runMessage';
 import { formatTools, parseTools, runsOnLabel } from '../board/workflowForm';
+import { useAdePromptPreview } from '../queries';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
 import AdeStepResults from './AdeStepResults.vue';
@@ -57,7 +58,10 @@ const bodyParts = computed(() =>
   script.value ? smartBodyParts(script.value.command, props.step.params) : [],
 );
 const preview = computed(() => promptParts(props.step.prompt));
-const finish = computed(() => finishStepParts(props.step.results));
+const finishPreview = useAdePromptPreview('headless.finishStep.suffix', () =>
+  finishVars(props.step.results),
+);
+const finish = computed(() => previewTextParts(finishPreview.data.value?.parts ?? []));
 
 const toolsText = ref(formatTools(props.step.allowedTools));
 watch(

@@ -1,16 +1,9 @@
 import type { TextPart } from '@theme/varText';
 
-/** Ends every agent step prompt, added by the app and not editable (SPEC2 section 5.1.2); mirrors
- *  Go `claudeheadless.FinishStepSuffix`. */
-export const FINISH_STEP_SUFFIX =
-  'When this step is done, call the finish_step tool with status "done" and a one-line summary. If it failed, call it with status "failed" and say what failed and give the reason. If you need a decision from me, call it with status "needs_input" and your question.';
+type ResultLike = { id: string; ok: boolean; description: string };
 
-export const FINISH_RESULTS_INTRO =
-  'When this step ends, call the finish_step tool once with status set to one of: ';
-export const FINISH_RESULTS_TAIL =
-  '. Add a one-line summary; for a not-ok status give the reason. If you need a decision from me, use status "needs_input" with your question.';
-
-function isImplicit(results: readonly { id: string; ok: boolean; description: string }[]): boolean {
+/** True for no results or the implicit done/failed pair; mirrors Go `claudeheadless.IsImplicit`. */
+function isImplicit(results: readonly ResultLike[]): boolean {
   return (
     results.length === 0 ||
     (results.length === 2 &&
@@ -23,32 +16,26 @@ function isImplicit(results: readonly { id: string; ok: boolean; description: st
   );
 }
 
-/** `finishStepSuffix` as parts: each result id is a chip. Joined, the parts read as that text. */
-export function finishStepParts(
-  results: readonly { id: string; ok: boolean; description: string }[],
-): TextPart[] {
-  if (isImplicit(results)) return [FINISH_STEP_SUFFIX];
-  const parts: TextPart[] = [FINISH_RESULTS_INTRO];
-  results.forEach((r, i) => {
-    parts.push({ name: 'result', value: r.id });
-    parts.push(
-      `${r.ok ? ' (ok' : ' (not ok'}${r.description ? `: ${r.description}` : ''})${i < results.length - 1 ? ', ' : ''}`,
-    );
-  });
-  parts.push(FINISH_RESULTS_TAIL);
-  return parts;
+/** Vars of `headless.finishStep.suffix` for a step's results; the text itself renders in Go. */
+export function finishVars(results: readonly ResultLike[]): Record<string, unknown> {
+  return {
+    implicit: isImplicit(results),
+    results: results.map((r) => ({ id: r.id, description: r.description, ok: r.ok })),
+  };
 }
 
-/** The finish instruction for a step's results; mirrors Go `claudeheadless.FinishStepSuffixFor`. The
- *  implicit pair gives `FINISH_STEP_SUFFIX`. */
-export function finishStepSuffix(
-  results: readonly { id: string; ok: boolean; description: string }[],
+/** A preview as one string: literal text and variable values. */
+export function previewPlain(
+  parts: readonly { text: string; var: string; value: string }[],
 ): string {
-  if (isImplicit(results)) return FINISH_STEP_SUFFIX;
-  const parts = results.map(
-    (r) => `${r.id} (${r.ok ? 'ok' : 'not ok'}${r.description ? `: ${r.description}` : ''})`,
-  );
-  return `${FINISH_RESULTS_INTRO}${parts.join(', ')}${FINISH_RESULTS_TAIL}`;
+  return parts.map((p) => (p.var === '' ? p.text : p.value)).join('');
+}
+
+/** The suffix preview as parts: each variable is a chip, literal text stays plain. */
+export function previewTextParts(
+  parts: readonly { text: string; var: string; value: string }[],
+): TextPart[] {
+  return parts.map((p) => (p.var === '' ? p.text : { name: p.var, value: p.value }));
 }
 
 const MAX_BRANCH_SLUG = 40;
@@ -69,18 +56,40 @@ export interface RunMessageInput {
   title: string;
   jira: { key: string; url: string } | null;
   /** Agent stage being run. */
-  stage: { steps: readonly { name: string; prompt: string }[] };
+  stage: { steps: readonly { name: string; prompt: string; results: readonly ResultLike[] }[] };
 }
 
-/** Default Run dialog text; mirrors Go `composePrompt` without the suffix. Per-run placeholders
- *  (`{repo}` `{branch}` `{worktree}`) stay literal for the server to fill per run. */
-export function defaultRunMessage(i: RunMessageInput): string {
+/** Vars of `ade.step.prompt` for the Run dialog. Per-run placeholders (`{repo}` `{branch}`
+ *  `{worktree}`) stay literal for the server to fill per run. */
+export function runMessageVars(i: RunMessageInput): Record<string, unknown> {
   const first = i.stage.steps[0];
   const jira = i.jira?.key ?? '';
-  const prompt = (first?.prompt ?? '').replaceAll('{task}', i.title).replaceAll('{jira}', jira);
-  const lines = [`Task: ${i.title}`];
-  if (i.jira?.key) lines.push(`- Jira: ${i.jira.key} ${i.jira.url}`);
-  lines.push('- Repo: {repo} · Branch: {branch} · Worktree: {worktree}');
-  lines.push(`Step 1/${i.stage.steps.length}: ${first?.name ?? ''}`);
-  return `${lines.join('\n')}\n${prompt}`.replace(/\n+$/, '');
+  const prompt = (first?.prompt ?? '')
+    .replaceAll('{task}', i.title)
+    .replaceAll('{jira}', jira)
+    .replace(/\n+$/, '');
+  return {
+    title: i.title,
+    jiraKey: jira,
+    jiraURL: i.jira?.url ?? '',
+    repo: '{repo}',
+    branch: '{branch}',
+    worktree: '{worktree}',
+    stepNumber: 1,
+    stepCount: i.stage.steps.length,
+    stepName: first?.name ?? '',
+    stepPrompt: prompt,
+    message: '',
+    extra: '',
+    context: [],
+    space: false,
+    finish: finishVars(first?.results ?? []),
+  };
+}
+
+/** The editable part of a rendered `ade.step.prompt`: it ends with a blank line, the finish
+ *  instruction and a newline, which the dialog shows read-only. */
+export function editablePart(rendered: string, suffix: string): string {
+  const tail = `\n\n${suffix}\n`;
+  return (rendered.endsWith(tail) ? rendered.slice(0, -tail.length) : rendered).replace(/\n+$/, '');
 }

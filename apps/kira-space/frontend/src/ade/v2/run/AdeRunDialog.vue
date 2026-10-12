@@ -22,10 +22,16 @@ import { computed, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { smartBodyParts } from '../automation/smartStepBody';
-import { branchSlug, defaultRunMessage, finishStepSuffix } from '../board/runMessage';
+import {
+  branchSlug,
+  editablePart,
+  finishVars,
+  previewPlain,
+  runMessageVars,
+} from '../board/runMessage';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
-import { useSpaceTools, useStartRun } from '../queries';
+import { useAdePromptPreview, useSpaceTools, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { ACTION_CLASS } from '../tones';
 
@@ -40,10 +46,19 @@ const close = (): void => {
   ui.runTaskId = null;
 };
 const stage = computed(() => card.value?.progress.stage ?? null);
-const initial = computed(() =>
+// Both texts render in Go (ade.step.prompt, headless.finishStep.suffix), so edits in Settings show here.
+const stepPreview = useAdePromptPreview('ade.step.prompt', () =>
   card.value && stage.value
-    ? defaultRunMessage({ title: card.value.title, jira: card.value.task.jira, stage: stage.value })
-    : '',
+    ? runMessageVars({ title: card.value.title, jira: card.value.task.jira, stage: stage.value })
+    : null,
+);
+const suffixPreview = useAdePromptPreview('headless.finishStep.suffix', () =>
+  stage.value ? finishVars(stage.value.steps[0]?.results ?? []) : null,
+);
+// The finish instruction the first step ends with, as its results declare it.
+const suffix = computed(() => previewPlain(suffixPreview.data.value?.parts ?? []));
+const initial = computed(() =>
+  editablePart(previewPlain(stepPreview.data.value?.parts ?? []), suffix.value),
 );
 // A smart first step runs its script's body: shown read-only, and no message is sent.
 const scripts = useCustomScriptsStore();
@@ -61,8 +76,6 @@ const smartBody = computed(() => {
     jira: c.task.jira?.key ?? '',
   });
 });
-// The finish instruction the first step ends with, as its results declare it.
-const suffix = computed(() => finishStepSuffix(stage.value?.steps[0]?.results ?? []));
 const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
 const pending = computed(
   () => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? [],
@@ -96,6 +109,12 @@ watch(open, (o) => {
   message.value = initial.value;
   names.value = {};
   sending.error.value = null;
+});
+// The preview lands after the dialog opens: an untouched message takes it over.
+watch(initial, (next) => {
+  if (!open.value || message.value !== opening.value) return;
+  opening.value = next;
+  message.value = next;
 });
 
 const sending = useAsyncAction(async () => {

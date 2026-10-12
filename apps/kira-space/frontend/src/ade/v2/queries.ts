@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from '@tanstack/vue-query';
+import type { LlmPromptPreview } from '@shared/domain/llmPrompts';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { optimisticUpdate } from '@workbench/behaviour/optimistic';
 import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
@@ -385,5 +386,23 @@ export function useAbortRebase() {
 export function useSetBranchBase() {
   return useMutation({
     mutationFn: (args: SetBranchBaseArgs) => control.adeTaskSetBranchBase(args),
+  });
+}
+
+/** Renders registry prompt `id` in Go for `vars`; idle while `vars` is null. */
+export function useAdePromptPreview(
+  id: string,
+  vars: MaybeRefOrGetter<Record<string, unknown> | null>,
+) {
+  return useQuery(() => {
+    const v = toValue(vars);
+    return {
+      queryKey: ['llmPrompts', 'adePreview', id, v] as const,
+      queryFn: (): Promise<LlmPromptPreview> =>
+        control.llmPromptsPreview({ id, vars: v as Record<string, unknown> }),
+      enabled: v !== null,
+      placeholderData: keepPreviousData,
+      staleTime: 0,
+    };
   });
 }
