@@ -18,6 +18,7 @@ import {
   watch,
 } from 'vue';
 import { isActiveDescendantKey, useActiveDescendant } from '../behaviour/activeDescendant';
+import { revealElement } from '../behaviour/focus';
 import { TIMING } from '../behaviour/timing';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../editor/fieldCompletion';
 import { monacoLanguageIdFor } from '../editor/monacoLanguages';
@@ -174,6 +175,10 @@ const nav = useActiveDescendant<Completion>({
   items: () => filtered.value,
   optionId: (_, i) => `${listId}-${i}`,
   onSelect: accept,
+  onActive: (_, i) => {
+    const el = document.getElementById(`${listId}-${i}`);
+    if (el) revealElement(el);
+  },
   onEscape: () => {
     if (!open.value) return false;
     close();
@@ -330,7 +335,9 @@ function onBlur(e: FocusEvent): void {
 }
 
 // A scroll or resize mid-selection is rare; a closed popup beats one stranded off its anchor.
-function closeOnViewportChange(): void {
+function closeOnViewportChange(e?: Event): void {
+  // The list scrolls itself (wheel, arrow onto an overflowed option); only an outer scroll strands it.
+  if (e?.target instanceof Element && e.target.closest('.autocomplete-suggestions')) return;
   closeHover();
   if (open.value) close();
 }
