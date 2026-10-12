@@ -5,7 +5,6 @@ import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
-import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
@@ -180,7 +179,7 @@ function onKeydown(e: KeyboardEvent): void {
     </span>
 
     <span v-if="row.badges?.length" class="flex gap-0.5 shrink-0">
-      <Badge v-for="badge in row.badges" :key="badge" variant="count">{{ badge }}</Badge>
+      <span v-for="badge in row.badges" :key="badge" :class="rowMeta">{{ badge }}</span>
     </span>
 
     <ErrorPopover v-if="row.error" :message="row.error" />

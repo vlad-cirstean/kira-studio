@@ -2,12 +2,14 @@
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/behaviour/format';
+import Identifier from '@workbench/components/Identifier.vue';
 import ModuleStart from '@workbench/components/ModuleStart.vue';
 import { computed } from 'vue';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
@@ -106,9 +108,7 @@ function openRecent(entry: RecentTableEntry): void {
     data-testid="no-tab-open"
   >
     <template v-if="recentEntries.length > 0" #below>
-      <div class="uppercase tracking-wider text-kira-sm mb-1.5 text-subtle">{{
-        t('studio.start.recent.label')
-      }}</div>
+      <SectionHeading :label="t('studio.start.recent.label')" class="mb-1.5 px-0" />
       <div class="flex flex-col">
         <button
           v-for="entry in recentEntries"
@@ -124,7 +124,7 @@ function openRecent(entry: RecentTableEntry): void {
           >
             <CodiconIcon :name="iconFor(entry)" :size="13" />
           </span>
-          <span class="truncate min-w-0">{{ entry.path }}</span>
+          <Identifier :value="entry.path" />
           <span class="ml-auto text-kira-sm text-subtle"
             >{{ connectionFor(entry)?.name }}
             · {{ formatRelative(entry.openedAt) }}</span

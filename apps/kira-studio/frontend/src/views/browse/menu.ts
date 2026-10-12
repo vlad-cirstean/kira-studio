@@ -5,7 +5,7 @@ import { announceApp } from '@workbench/behaviour/liveRegion';
 import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyNameItems, openItems } from '../../project/menuItems';
+import { copyNameItems, openItems } from '../../project/menu';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { useTabsStore } from '../../state/tabs';

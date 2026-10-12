@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
-import EmptyState from '@theme/components/EmptyState.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
-import { ICON } from '@theme/icons';
 import { formatRelative } from '@workbench/behaviour/format';
 import { useVariableSetStore } from './state/variables';
 
@@ -35,12 +35,14 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
 <template>
   <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="variable-history">
     <div class="flex max-h-80 flex-col overflow-auto p-1">
-      <EmptyState
+      <InlineState
         v-if="variableSetStore.entries.length === 0"
+        kind="empty"
         data-testid="variable-history-empty"
-        :icon="ICON.history"
-        :title="t('studio.api.variableHistory.empty')"
-      />
+        >{{
+          t('studio.api.variableHistory.empty')
+        }}</InlineState
+      >
       <div
         v-for="entry in variableSetStore.entries"
         :key="entry.id"
@@ -53,18 +55,13 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
                span's inherited font-size (text-kira-md, 12px) that is 1.2px. -->
           <span
             v-if="notYetRevealed(entry)"
-            class="overflow-hidden text-ellipsis whitespace-nowrap text-subtle tracking-widest"
+            class="truncate text-subtle tracking-widest"
             data-testid="variable-history-masked"
           >
             ••••••••
           </span>
-          <span
-            v-else
-            class="overflow-hidden text-ellipsis whitespace-nowrap font-data"
-            data-testid="variable-history-value"
-            >{{
-              displayValue(entry)
-            }}</span
+          <span v-else class="min-w-0 font-data" data-testid="variable-history-value"
+            ><TruncatedText :text="displayValue(entry)" /></span
           >
         </div>
         <TooltipIconButton

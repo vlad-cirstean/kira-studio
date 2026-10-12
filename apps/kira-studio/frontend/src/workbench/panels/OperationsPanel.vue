@@ -113,7 +113,7 @@ async function onRerun(record: OpRecord): Promise<void> {
     if (!connected) return;
     await consoleViewStore.run(tabId, statements);
   } catch (err) {
-    logError('OperationsPanel', 'Re-run: failed to reconnect/run', err);
+    logError('operations.rerun', 'Re-run: failed to reconnect/run', err);
   }
 }
 

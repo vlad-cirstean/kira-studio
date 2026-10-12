@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
-import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
@@ -17,34 +17,9 @@ import { useVariablesStore } from './state/variables';
 
 const variablesStore = useVariablesStore();
 
-// P5 D11: the switcher — mounted in both request views' existing `#toolbar-2` slot, right-aligned
-// via `.ml-auto` beside the request-pane SegmentedControl. The left panel's header and the title
-// bar were both weighed and declined (§ D11): environments exist independently of collections, so
-// the switcher must stay visible with none, and the title bar is shared chrome Api must not grow
-// into.
-//
-// Real-interaction fix (reported bug — the dropdown rendered right-aligned): its own popover used
-// to request `anchor="left"` ('bottom-start', its left edge flush with the trigger's own left
-// edge) despite this trigger sitting flush against its toolbar's own right edge (`.ml-auto` above)
-// — a 200px popover extending rightward from there almost always has nowhere to go, so
-// PopoverPanel's own shift() middleware silently clamped it back against the *viewport's* right
-// edge instead, not this trigger's. Confirmed empirically (Playwright, a 1440px window): the
-// popover's right edge landed within 4px of the viewport edge, not this trigger's right edge —
-// coincidentally close at that width, but unrelated to the trigger's own position, and only
-// getting less related the wider the window. `anchor="right"` ('bottom-end') is what every other
-// right-edge-toolbar trigger in this app already uses correctly (ColumnsMenu.vue,
-// ProjectionMenu.vue, PreviewCommandPanel.vue) — this was the one outlier, and gets a popover
-// that is actually, reliably anchored to *this* control at every window width, not to the window.
-//
-// P18 D19: app-drawn now, on P17 D18's exact precedent (MethodSelect.vue) and for the identical
-// reason — a native <option>'s per-row colour is `option`-level styling that lands only under
-// `appearance: base-select` and only where the engine implements it, and this control now needs a
-// colour dot per row (D17). The closed state stays styled by nativeSelectVariants({variant:
-// 'bordered'}) either way, so its height/border/padding do not change at all (P16 D6's rule,
-// api-ui-consistency.spec.ts's own guard).
-//
-// P112: no onMounted fetch left here — useVariablesStore's own app-lifetime query observer fetches
-// the environments list on store creation.
+// Right-aligned in the request views' `#toolbar-2` slot; stays visible with no environments.
+// Popover anchors `end`: the trigger sits flush against the toolbar's right edge.
+// App-drawn, not native: each row carries a colour dot.
 
 // P71 §3.3: an optional tabId — present from both request views, so their own selection can be an
 // incognito tab's own in-memory override instead of the app-wide active environment.
@@ -79,18 +54,16 @@ function manage(): void {
   <DropdownMenu :modal="false">
     <div class="relative flex min-w-0 flex-initial ml-auto">
       <DropdownMenuTrigger as-child>
-        <button
-          type="button"
-          :class="[nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'min-w-0']"
+        <PickerTrigger
+          size="kira"
           data-testid="api-environment-select"
           :data-value="activeEnvironmentId"
         >
-          <span :class="colorMarkClass('dot', activeEnvironment?.color)" data-testid="conn-dot" />
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
-            activeEnvironment?.name ?? t('studio.api.environments.none.option')
-          }}</span>
-          <CodiconIcon name="chevron-down" :size="12" />
-        </button>
+          <template #leading>
+            <span :class="colorMarkClass('dot', activeEnvironment?.color)" data-testid="conn-dot" />
+          </template>
+          {{ activeEnvironment?.name ?? t('studio.api.environments.none.option') }}
+        </PickerTrigger>
       </DropdownMenuTrigger>
     </div>
     <DropdownMenuContent align="end" data-testid="api-environment-menu">
@@ -101,9 +74,7 @@ function manage(): void {
           data-value=""
         >
           <span :class="colorMarkClass('dot', 'none')" data-testid="conn-dot" />
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            t('studio.api.environments.none.option')
-          }}</span>
+          <span class="flex-1 truncate">{{ t('studio.api.environments.none.option') }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem
@@ -114,15 +85,13 @@ function manage(): void {
           :data-value="env.id"
         >
           <span :class="colorMarkClass('dot', env.color)" data-testid="conn-dot" />
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ env.name }}</span>
+          <span class="flex-1 truncate">{{ env.name }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem data-testid="api-environment-manage" @select="manage">
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-          t('studio.api.environments.manage.label')
-        }}</span>
+        <span class="flex-1 truncate">{{ t('studio.api.environments.manage.label') }}</span>
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

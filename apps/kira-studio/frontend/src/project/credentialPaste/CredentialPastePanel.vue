@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -199,13 +200,9 @@ function onCancel(): void {
       {{ t('studio.project.credentialPaste.empty.empty') }}
     </p>
 
-    <p
-      v-if="alsoFound.length > 0"
-      class="m-0 text-kira-sm text-muted-foreground"
-      data-testid="paste-credentials-also-found"
-    >
+    <FieldDescription v-if="alsoFound.length > 0" data-testid="paste-credentials-also-found">
       {{ t('studio.project.credentialPaste.alsoFound.hint', { fields: alsoFound.join(', ') }) }}
-    </p>
+    </FieldDescription>
     <div
       v-if="result && (result.notes.length > 0 || result.unrecognised > 0)"
       class="flex flex-col gap-0.5 text-kira-sm text-muted-foreground"

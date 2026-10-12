@@ -13,7 +13,7 @@ import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef } from 'vue';
 import CollectionRow from './CollectionRow.vue';
-import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
+import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menu';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import EmptyState from '@theme/components/EmptyState.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import SearchField from '@theme/components/SearchField.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -9,7 +10,6 @@ import { tableCellClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
-import { ICON } from '@theme/icons';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { computed, ref } from 'vue';
@@ -108,18 +108,22 @@ function editEnvironmentVariables(): void {
       </Alert>
 
       <div class="flex flex-col gap-0.5 overflow-y-auto p-1">
-        <EmptyState
+        <InlineState
           v-if="isFiltered && filteredRows.length === 0"
+          kind="empty"
           data-testid="variables-overview-empty"
-          :icon="ICON.search"
-          :title="t('common.state.noMatches.empty')"
-        />
-        <EmptyState
+          >{{
+            t('common.state.noMatches.empty')
+          }}</InlineState
+        >
+        <InlineState
           v-else-if="rows.length === 0"
+          kind="empty"
           data-testid="variables-overview-empty"
-          :icon="ICON.variables"
-          :title="t('studio.api.variablesOverview.empty')"
-        />
+          >{{
+            t('studio.api.variablesOverview.empty')
+          }}</InlineState
+        >
         <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
              has no use for (handle, secret toggle, history, remove) -- name, value, scope,
              description, in the DOM order below. `description` is the last column specifically
@@ -142,14 +146,12 @@ function editEnvironmentVariables(): void {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="ghost"
-                size="kira"
-                class="h-auto min-w-0 justify-start overflow-hidden text-ellipsis rounded-none p-0 text-left font-data font-normal hover:bg-transparent"
+                variant="toolbar"
+                size="inline"
+                class="min-w-0 justify-start font-data font-normal text-fg hover:bg-transparent"
                 data-testid="variables-overview-name"
                 @click="onCopy(row.name)"
-                >{{
-                  reference(row.name)
-                }}</Button
+                ><span class="truncate">{{ reference(row.name) }}</span></Button
               >
             </TooltipTrigger>
             <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
@@ -157,13 +159,8 @@ function editEnvironmentVariables(): void {
           <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">{{
             t('common.secret.label')
           }}</Badge>
-          <span
-            v-else
-            class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle"
-            data-testid="variables-overview-value"
-            >{{
-              row.value
-            }}</span
+          <span v-else class="min-w-0 text-subtle" data-testid="variables-overview-value"
+            ><TruncatedText :text="row.value" /></span
           >
           <Tooltip v-if="row.shadowed">
             <TooltipTrigger as-child>
@@ -189,11 +186,9 @@ function editEnvironmentVariables(): void {
           >
           <span
             v-if="row.description"
-            class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-sm"
+            class="min-w-0 text-subtle text-kira-sm"
             data-testid="variables-overview-description"
-            >{{
-              row.description
-            }}</span
+            ><TruncatedText :text="row.description" /></span
           >
         </div>
       </div>
@@ -202,8 +197,8 @@ function editEnvironmentVariables(): void {
         <Button
           v-if="canEdit"
           variant="link"
-          size="kira"
-          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle"
+          size="inline"
+          class="justify-start gap-1 font-normal"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
           @click="editCollectionVariables"
@@ -213,8 +208,8 @@ function editEnvironmentVariables(): void {
         <Button
           v-if="canEdit"
           variant="link"
-          size="kira"
-          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle"
+          size="inline"
+          class="justify-start gap-1 font-normal"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"
           @click="editEnvironmentVariables"
@@ -228,10 +223,5 @@ function editEnvironmentVariables(): void {
         </Button>
       </div>
     </div>
-    <!-- P110 I2-18: `.overview-link`'s `all: unset` + @apply folded directly onto both footer
-         buttons above -- `border-0 bg-transparent cursor-pointer` replaces what `all: unset` reset
-         that Preflight's own button normalization doesn't (Preflight zeroes font/margin/padding and
-         sets `appearance: button`, not border/background/cursor). `disabled:` variants replace the
-         old `:disabled` compound selector. -->
   </PopoverContent>
 </template>

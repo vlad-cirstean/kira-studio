@@ -199,7 +199,7 @@ onUnmounted(() => {
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <ImportReportStrip />
       <EmptyState
-        class="h-full"
+        fill
         data-testid="collections-empty"
         icon="folder-library"
         :title="t('studio.api.collections.empty')"

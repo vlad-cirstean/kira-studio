@@ -26,6 +26,7 @@ import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { useCappedList } from '@workbench/behaviour/cappedList';
 import { revealElement } from '@workbench/behaviour/focus';
+import { compareNatural } from '@workbench/behaviour/match';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, watch } from 'vue';
@@ -51,7 +52,10 @@ const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
 const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
 const sig = (v: TreeVisibility): string =>
-  JSON.stringify([[...v.hiddenKinds].sort(), [...v.hiddenPaths].sort()]);
+  JSON.stringify([
+    [...v.hiddenKinds].sort(compareNatural),
+    [...v.hiddenPaths].sort(compareNatural),
+  ]);
 const baseline = ref(sig(EMPTY_VISIBILITY));
 const dirty = computed(() => sig(draft.value) !== baseline.value);
 // Saving replaces the whole persisted set, so the draft must seed from the loaded set, never from
@@ -361,8 +365,8 @@ const connectionName = computed(
           variant="dialog-primary"
           size="kira-lg"
           data-testid="filters-save"
-          :disabled="loading || !!loadError"
-          :pending="saving"
+          :disabled="!!loadError"
+          :pending="loading || saving"
           @click="onSave"
           >{{
             t('common.action.save.label')

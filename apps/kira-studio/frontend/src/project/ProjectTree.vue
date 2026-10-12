@@ -13,7 +13,7 @@ import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
-import { emptyBackgroundMenu, menuForRow } from './menus';
+import { emptyBackgroundMenu, menuForRow } from './menu';
 import { type TreeRowVm, useTreeStore } from './state/tree';
 import TreeRow from './TreeRow.vue';
 
