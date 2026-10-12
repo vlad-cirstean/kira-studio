@@ -1,28 +1,12 @@
 <script setup lang="ts">
-import { PALETTE_COLOR_CHOICES } from '@shared/domain/color';
-import type { ConnectionKind, McpPermissionMode } from '@shared/domain/connection';
-import {
-  AWS_STYLE_KINDS,
-  CONNECTION_THROTTLE_RANGE,
-  connectionInputSchema,
-  connectionKindSchema,
-  DEFAULT_PORT,
-  EXPLAIN_SUPPORTED_KINDS,
-  FILE_KINDS,
-  MIN_SERVER_VERSION,
-  SECRET_OPTION_KEYS,
-} from '@shared/domain/connection';
-import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
-import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
-import { useQuery } from '@tanstack/vue-query';
+import type { ConnectionKind } from '@shared/domain/connection';
+import { DEFAULT_PORT, FILE_KINDS } from '@shared/domain/connection';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
   DialogBody,
@@ -31,160 +15,38 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { Field, FieldError, FieldLabel } from '@theme/components/ui/field';
-import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
-import { NativeSelect } from '@theme/components/ui/native-select';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
-import { RadioGroup } from '@theme/components/ui/radio-group';
-import { Tabs, TabsContent } from '@theme/components/ui/tabs';
-import { Textarea } from '@theme/components/ui/textarea';
+import { FieldDescription } from '@theme/components/ui/field';
+import { Tabs } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { colourLabel } from '@theme/connColor';
-import { type MessageKey, t } from '@theme/i18n';
-import NumberStepperInput from '@theme/NumberStepperInput.vue';
-import SwatchRadio from '@theme/SwatchRadio.vue';
-import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
-import { matchesQuery } from '@workbench/behaviour/match';
-import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { RadioGroupItem } from 'reka-ui';
-import { computed, ref, watch } from 'vue';
+import { computed, provide, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
-import {
-  loadMaskRules,
-  maskRulesQueryKey,
-  regenerateMaskKey,
-  removeMaskRule,
-  upsertMaskRule,
-} from '../state/maskRules';
-import { schemaDialectFor } from '../state/schemas';
 import EngineIcon from '../theme/EngineIcon.vue';
-import CredentialPastePanel from './credentialPaste/CredentialPastePanel.vue';
-import type { PasteField } from './credentialPaste/parse';
-import { revealConnectionSecret } from './state/connectionReveal';
+import ConnectionAdvancedTab from './connection/ConnectionAdvancedTab.vue';
+import ConnectionEnginePicker from './connection/ConnectionEnginePicker.vue';
+import ConnectionGeneralTab from './connection/ConnectionGeneralTab.vue';
+import ConnectionMcpTab from './connection/ConnectionMcpTab.vue';
+import ConnectionPreconnectTab from './connection/ConnectionPreconnectTab.vue';
+import ConnectionPrivacyTab from './connection/ConnectionPrivacyTab.vue';
+import { CONNECTION_FORM_KEY, type DetailTab, useConnectionForm } from './connection/form';
+import { KIND_ACCENT_CLASS, KIND_LABEL, SUPPORTED_KINDS } from './connection/kinds';
+import { CONNECTION_REVEAL_KEY, useConnectionReveal } from './connection/reveal';
 
-const confirmDialogStore = useConfirmDialogStore();
 const connectionsStore = useConnectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 
-const KIND_LABEL: Record<ConnectionKind, string> = {
-  postgres: 'PostgreSQL',
-  mariadb: 'MariaDB',
-  mysql: 'MySQL',
-  sqlite: 'SQLite',
-  clickhouse: 'ClickHouse',
-  mongodb: 'MongoDB',
-  redis: 'Redis',
-  kafka: 'Kafka',
-  sqs: 'SQS',
-  s3: 'S3',
-};
-// P34 D19: 'teal' is unused elsewhere in the rail and is the furthest free hue from MariaDB's
-// own 'blue' — the two engines a MySQL connection most often sits beside. P35 D29: 'violet' is
-// free too, and sits furthest from the three other SQL engines' blue/cyan/teal hues. P36 D32:
-// 'orange' is ClickHouse's own identity colour and sits apart from every other SQL engine's
-// blue/cyan/teal/violet hues (Kafka's amber is the nearest neighbour, and belongs to a stream
-// engine that never sits beside a SQL connection in the same list).
-const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {
-  postgres: 'text-conn-cyan',
-  mariadb: 'text-conn-blue',
-  mysql: 'text-conn-teal',
-  sqlite: 'text-conn-violet',
-  clickhouse: 'text-conn-orange',
-  mongodb: 'text-conn-green',
-  redis: 'text-conn-red',
-  kafka: 'text-conn-amber',
-  sqs: 'text-conn-magenta',
-  s3: 'text-conn-olive',
-};
-const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
-  'postgres',
-  'mariadb',
-  'mysql',
-  'sqlite',
-  'clickhouse',
-  'mongodb',
-  'redis',
-  'kafka',
-  'sqs',
-  's3',
-]);
-const kinds = connectionKindSchema.options;
-// P104 §3: ColorPicker inlined -- the offered subset (not the full storable enum), same as its
-// own `colors` constant.
-const connectionColors = PALETTE_COLOR_CHOICES;
-
-// M2 §7.2: the MCP tab's three permission rows, one SegmentedControl per class — mcpModeOptions(x)
-// builds each row's own per-button testids (connection-mcp-<class>-<mode>) under the row's own
-// data-testid (connection-mcp-<class>) prefix.
-function mcpModeOptions(
-  cls: 'read' | 'write' | 'ddl',
-): readonly { value: McpPermissionMode; label: string; testid: string; disabled: boolean }[] {
-  const disabled = !draft.value?.mcpEnabled;
-  return [
-    {
-      value: 'deny',
-      label: t('common.action.deny.label'),
-      testid: `connection-mcp-${cls}-deny`,
-      disabled,
-    },
-    {
-      value: 'allow',
-      label: t('studio.project.connectionDialog.mcp.allow.label'),
-      testid: `connection-mcp-${cls}-allow`,
-      disabled,
-    },
-    {
-      value: 'prompt',
-      label: t('studio.project.connectionDialog.mcp.prompt.label'),
-      testid: `connection-mcp-${cls}-prompt`,
-      disabled,
-    },
-  ];
-}
-
-const MODE_ITEMS = computed(
-  () =>
-    [
-      { value: 'fields', label: t('studio.common.fields.label'), testid: 'mode-fields' },
-      {
-        value: 'uri',
-        label: t('studio.project.connectionDialog.mode.uri.label'),
-        testid: 'mode-uri',
-      },
-    ] as const,
-);
-
 const draft = computed(() => connectionDialogStore.draft);
 const isEdit = computed(() => connectionDialogStore.mode === 'edit');
-// M5 §7: the Privacy tab operates against the real, saved connection — a brand-new (unsaved)
-// connection has no id yet, so its own pane shows a "save first" message instead (below).
-const editingConnectionId = computed(() => connectionDialogStore.editingId);
-// M3 §9.1: whether this kind has an EXPLAIN this app can parse at all — the auto-explain checkbox
-// is disabled (never hidden) for the rest, since the setting is visible where it's set rather than
-// discovered missing.
-const mcpExplainSupported = computed(
-  () => !!draft.value && EXPLAIN_SUPPORTED_KINDS.has(draft.value.kind),
-);
-// P25 D8: reported once at startup (state/connections.ts's hydrateConnections()), never changes
-// for the life of the process.
 const secretStatus = computed(() => connectionsStore.secretStorage);
+const isFileStyle = computed(() => !!draft.value && FILE_KINDS.has(draft.value.kind));
 
-// P16 design system: NewConnection.html (step 1, pick the engine) and ConnectionDialog.html
-// (step 2, only that engine's fields) are two mockups for this one dialog — both steps live
-// here. A brand-new connection starts at the engine picker (FirstRun.html's "one door, no
-// vestibule" — nothing is assumed until an engine is chosen); editing an existing one starts
-// on its fields directly, reaching the picker only through "Change engine".
+// A new connection starts at the engine picker; an existing one starts on its fields and
+// reaches the picker through "Change engine".
 const step = ref<'engine' | 'details'>(isEdit.value ? 'details' : 'engine');
-const engineSearch = ref('');
 
-// P28 §4.2: step 2's own tab strip — General/Advanced/Pre-connect. Reset to 'General' whenever
-// step 2 is (re-)entered so "Change engine → back" never lands on a stale tab.
-type DetailTab = 'General' | 'Advanced' | 'Pre-connect' | 'MCP' | 'Privacy';
 const activeTab = ref<DetailTab>('General');
 watch(step, (s) => {
   if (s === 'details') activeTab.value = 'General';
@@ -210,126 +72,49 @@ const DETAIL_TABS = computed<readonly { value: DetailTab; label: string; testid:
   },
 ]);
 
-const showPassword = ref(false);
-// P14 D1: a brand-new connection has no stored secret to reveal at all — whatever's typed is
-// already "revealed" in the only sense that applies, so the eye button is a free toggle from the
-// start. Editing an existing connection starts un-revealed; pressing the eye is what fetches the
-// real secret, gated behind local authentication (onReveal, below).
-const revealed = ref(!isEdit.value);
-// Only the mode-flip messages: nothing derives display from the URI, which stays masked (P181).
-const uriNote = ref('');
-const testState = ref<{ status: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({
-  status: 'idle',
+const form = useConnectionForm((tab) => {
+  activeTab.value = tab;
 });
-const fieldErrors = ref<Record<string, string>>({});
+provide(CONNECTION_FORM_KEY, form);
+provide(CONNECTION_REVEAL_KEY, useConnectionReveal());
 
-function setMode(mode: 'fields' | 'uri'): void {
-  const d = draft.value;
-  if (!d || mode === d.mode) return;
-  uriNote.value = '';
+// Unsaved edits are those made on the details step; the engine pick itself is not an edit.
+const baseline = ref(JSON.stringify(draft.value));
+watch(draft, (d) => {
+  baseline.value = JSON.stringify(d);
+});
+const dirty = computed(
+  () => step.value === 'details' && JSON.stringify(draft.value) !== baseline.value,
+);
 
-  if (mode === 'uri') {
-    // Keep the password out of the URI text; it stays in the draft and Go folds it into the
-    // stored URI on Save.
-    d.uri = formatConnectionUri({ ...d, password: null });
-    d.mode = 'uri';
-    return;
-  }
-
-  // Masked and never shown: the draft holds no URI to convert.
-  if (d.uri === null) {
-    uriNote.value = t('studio.project.connectionDialog.uriNote.hidden.hint');
-    return;
-  }
-  // URI -> fields: only flip if it round-trips (§8.12); otherwise stay in URI mode and say why.
-  const parsed = parseConnectionUri(d.uri);
-  if (!parsed || !canRoundTripToFields(parsed, d.kind)) {
-    uriNote.value = parsed
-      ? t('studio.project.connectionDialog.uriNote.notRepresentable.hint')
-      : t('studio.project.connectionDialog.uriNote.unparsable.hint');
-    return;
-  }
-  const secretKey = Object.keys(parsed.params).find((k) => SECRET_OPTION_KEYS.has(k.toLowerCase()));
-  if (secretKey) {
-    uriNote.value = t('studio.project.connectionDialog.uriNote.secretParam.hint', {
-      param: secretKey,
-    });
-    return;
-  }
-  d.host = parsed.host;
-  d.port = parsed.port;
-  d.database = parsed.database;
-  d.username = parsed.username;
-  if (parsed.password) d.password = parsed.password;
-  d.options = parsed.params;
-  d.mode = 'fields';
-  // Fields mode is authoritative; a stale URI (which can carry a password in memory) must not
-  // linger in the draft.
-  d.uri = null;
-}
-
-// Input's own modelValue type is string|number; the port field's own type is number|null (D27's
-// per-kind default), so this mirrors what v-model.number did on the raw <input type="number">
-// (parse on the way in, fall back rather than write a non-numeric value into a numeric field).
-function setPort(value: string): void {
-  const d = draft.value;
-  if (!d) return;
-  const n = Number.parseFloat(value);
-  d.port = Number.isNaN(n) ? null : n;
-}
-
-// Typing replaces the masked value, so the eye is a plain toggle from here on (same as
-// onPasswordInput). Options are derived from the URI in Go, never copied here.
-function setUri(value: string): void {
-  const d = draft.value;
-  if (!d) return;
-  d.uri = value;
-  revealed.value = true;
-}
-
-function onKindChange(kind: ConnectionKind): void {
+function pickKind(kind: ConnectionKind): void {
   const d = draft.value;
   if (!d || !SUPPORTED_KINDS.has(kind)) return;
   d.kind = kind;
   const defaultPort = DEFAULT_PORT[kind];
   if (defaultPort !== undefined) d.port = defaultPort;
-}
-
-// Engine tiles pick and, since the engine is all step 1 exists for, immediately advance —
-// the same radio-button "click selects" interaction this picker already had, just now
-// followed by a step change instead of nothing. Bound to both click and change on the radio
-// input (below): change alone never fires for re-clicking the already-checked default kind,
-// which would otherwise strand the dialog on step 1.
-function pickKind(kind: ConnectionKind): void {
-  if (!SUPPORTED_KINDS.has(kind)) return;
-  onKindChange(kind);
+  baseline.value = JSON.stringify(d);
   step.value = 'details';
 }
 
 function continueToDetails(): void {
-  const d = draft.value;
-  if (!d || !SUPPORTED_KINDS.has(d.kind)) return;
-  step.value = 'details';
+  if (draft.value && SUPPORTED_KINDS.has(draft.value.kind)) step.value = 'details';
 }
 
-// P16 D8/D9: a plain informational note, sourced from the shared kind-keyed map beside
-// DEFAULT_PORT — absent for kinds with no server version to state (SQS, S3).
-const minVersionNote = computed(() => {
-  const d = draft.value;
-  return d ? MIN_SERVER_VERSION[d.kind] : undefined;
+const testState = ref<{ status: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({
+  status: 'idle',
+});
+const testLabel = computed(() => {
+  const { status, message } = testState.value;
+  if (status === 'testing') return t('studio.project.connectionDialog.test.testing.loading');
+  if (status === 'ok') {
+    return t('studio.project.connectionDialog.test.ok.status', { message: message ?? '' });
+  }
+  return message ?? '';
 });
 
-const filteredKinds = computed(() => {
-  return kinds.filter((kind) => matchesQuery(KIND_LABEL[kind], engineSearch.value));
-});
-
-// P108 Part 12 F17: draft is edited in place (every field's v-model mutates the same reactive
-// object; only a whole-dialog reopen/swap reassigns connectionDialogStore.draft itself, the case
-// requestReveal's own stillCurrent below already guards), so a plain field edit made while a Test
-// is in flight left `d` pointing at the very same, now-different object — the response then
-// landed as the result for whatever the user had typed by the time it arrived, not what was
-// actually tested. `snapshot` catches that edit; the identity/editingId check catches the rarer
-// swap-to-a-different-connection race, same pattern requestReveal already established.
+// Edits made while a Test is in flight, or a swap to another draft, make the response describe
+// something other than what was typed: the snapshot and identity check drop such a result.
 async function onTest(): Promise<void> {
   const d = draft.value;
   if (!d) return;
@@ -341,131 +126,14 @@ async function onTest(): Promise<void> {
     JSON.stringify(connectionDialogStore.draft) === snapshot;
 
   testState.value = { status: 'testing' };
-  // P14 D3: editingId (empty for a brand-new connection) lets the backend fill in the stored
-  // secret when the draft carries none, so testing an existing connection whose password was
-  // never revealed still probes with the real credential rather than none at all.
+  // The backend fills in the stored secret when the draft carries none, so an unrevealed
+  // connection still probes with its real credential.
   const result = await control.connectionsTest(d, targetEditingId ?? '');
   if (!stillCurrent()) return;
   testState.value = result.ok
     ? { status: 'ok', message: result.serverVersion }
     : { status: 'error', message: result.error };
 }
-
-// P108 Part 12 F4: this dialog stays mounted across a draft swap (openCreateDialog/openEditDialog
-// Object.assign a new draft into the same reactive `dialog` in place — no close/reopen — so the
-// menu-bar New Connection, or closing and opening a different Edit, can replace
-// connectionDialogStore.draft while an OS auth prompt or the confirm dialog is still up).
-// `target`/`targetEditingId` pin down which draft this reveal was requested for;
-// revealConnectionSecret re-checks stillCurrent after every await, so a reveal that outlives its
-// own draft never writes (or shows) a secret into a draft the user never asked to reveal.
-async function requestReveal(id: string): Promise<void> {
-  const target = draft.value;
-  const targetEditingId = connectionDialogStore.editingId;
-  const stillCurrent = (): boolean =>
-    connectionDialogStore.draft === target && connectionDialogStore.editingId === targetEditingId;
-
-  const result = await revealConnectionSecret(
-    id,
-    target?.name || t('studio.project.connectionDialog.unnamed.label'),
-    target?.mode === 'uri' ? 'uri' : 'fields',
-    stillCurrent,
-  );
-  if (!result) return;
-  if (result.outcome === 'error') {
-    connectionDialogStore.error = result.error;
-    return;
-  }
-  if (target) {
-    target.password = result.password;
-    if (result.uri !== null) target.uri = result.uri;
-  }
-  revealed.value = true;
-  showPassword.value = true;
-}
-
-// P108 Part 12 F4: revealed/showPassword are plain refs, set once at setup — a draft swap while
-// this component stays mounted (see requestReveal's own comment above) never re-ran that setup,
-// so a revealed secret from the old draft stayed shown (and un-masked) in the new one. Reset on
-// every genuine draft-identity change (a fresh create or a fresh edit), never on an in-place edit
-// of the current draft's own fields.
-watch(
-  () => connectionDialogStore.draft,
-  () => {
-    revealed.value = !isEdit.value;
-    showPassword.value = false;
-  },
-);
-
-function onReveal(): void {
-  const id = connectionDialogStore.editingId;
-  if (!id) return;
-  void requestReveal(id);
-}
-
-// Shared by the password and URI inputs (only one is on screen at a time). Not yet revealed: the
-// eye button is the reveal action itself (gated in Go). Once revealed (or
-// for a brand-new connection, which was never gated to begin with), it's a free client-side mask
-// toggle — no second round trip, no second prompt (F8/D5).
-function onEyeClick(): void {
-  if (revealed.value) {
-    showPassword.value = !showPassword.value;
-  } else {
-    onReveal();
-  }
-}
-
-// A password typed directly (without ever pressing the eye) must not later be clobbered by a
-// deferred reveal fetch — once the user has edited the field themselves, `revealed` means "the
-// eye is a plain toggle from here on", the same as if they had pressed it.
-function onPasswordInput(value: string): void {
-  if (draft.value) draft.value.password = value;
-  revealed.value = true;
-}
-
-// Paste credentials: parsed in the panel, applied into the draft only on its Apply.
-const pasteOpen = ref(false);
-const pasteAllowed = computed<readonly PasteField[]>(() => {
-  const kind = draft.value?.kind;
-  if (kind && AWS_STYLE_KINDS.has(kind)) return ['region', 'profile'];
-  if (kind === 'mongodb') return ['host', 'port', 'database', 'username', 'password', 'authSource'];
-  return ['host', 'port', 'database', 'username', 'password'];
-});
-
-function onPasteApply(values: Partial<Record<PasteField, string>>): void {
-  const d = draft.value;
-  pasteOpen.value = false;
-  if (!d) return;
-  const aws = AWS_STYLE_KINDS.has(d.kind);
-  const database = aws ? values.region : values.database;
-  const username = aws ? values.profile : values.username;
-  if (values.host !== undefined) d.host = values.host;
-  if (values.port !== undefined) d.port = Number(values.port);
-  if (database !== undefined) d.database = database;
-  if (username !== undefined) d.username = username;
-  if (values.password !== undefined) onPasswordInput(values.password);
-  if (values.authSource !== undefined) d.options = { ...d.options, authSource: values.authSource };
-  const touched = new Set<string>();
-  if (values.host !== undefined) touched.add('host');
-  if (values.port !== undefined) touched.add('port');
-  if (database !== undefined) touched.add('database');
-  fieldErrors.value = Object.fromEntries(
-    Object.entries(fieldErrors.value).filter(([key]) => !touched.has(key)),
-  );
-}
-
-// P28 §4.2: with the fields split across tabs, a field error is no longer always on screen — a
-// failed save must switch to the tab holding the first offending field, or the user never sees
-// why Save did nothing.
-const TAB_FOR_FIELD: Record<string, DetailTab> = {
-  name: 'General',
-  host: 'General',
-  port: 'General',
-  database: 'General',
-  uri: 'General',
-  preconnect: 'Pre-connect',
-  throttlePerSec: 'Advanced',
-  mcpDescription: 'MCP',
-};
 
 // Guards a double click: two in-flight creates would insert two connections.
 const {
@@ -475,224 +143,16 @@ const {
 } = useAsyncAction(() => connectionDialogStore.saveDialog());
 
 async function onSave(): Promise<void> {
-  const d = draft.value;
-  if (!d || saving.value) return;
-  const parsed = connectionInputSchema.safeParse(d);
-  if (!parsed.success) {
-    const errors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const key = issue.path[0];
-      if (typeof key === 'string') errors[key] = issue.message;
-    }
-    fieldErrors.value = errors;
-    const firstField = parsed.error.issues[0]?.path[0];
-    if (typeof firstField === 'string' && firstField in TAB_FOR_FIELD) {
-      activeTab.value = TAB_FOR_FIELD[firstField];
-    }
-    return;
-  }
-  fieldErrors.value = {};
-  // P25 D7: cleared before every attempt so a retry doesn't show a stale failure from the last
-  // one while the new one is in flight; saveDialog() throws rather than returning null on
-  // failure (see its own comment), so catching here is the one place a failed save is handled.
+  if (!draft.value || saving.value) return;
+  if (!(await form.submit())) return;
   connectionDialogStore.error = null;
   if (!(await runSave())) connectionDialogStore.error = saveError.value;
 }
-
-// P28 §5.6: mirrors setPort's own parse-on-input, same Input modelValue-type reason.
-function setThrottlePerSec(value: string): void {
-  const d = draft.value;
-  if (!d) return;
-  const n = Number.parseFloat(value);
-  d.throttlePerSec = Number.isNaN(n) ? 0 : n;
-}
-
-// Same split SettingsDialog.vue's own numeric fields use (P17 D6): the draft accepts whatever is
-// typed, validity is derived here and gates Save. 0 is always valid (unlimited); a non-zero value
-// outside CONNECTION_THROTTLE_RANGE is not — mirrors connections/input.go's Validate().
-const throttlePerSecError = computed<string | null>(() => {
-  const v = draft.value?.throttlePerSec ?? 0;
-  if (!Number.isFinite(v)) return t('common.enterNumber.error');
-  if (v !== 0 && (v < CONNECTION_THROTTLE_RANGE.min || v > CONNECTION_THROTTLE_RANGE.max)) {
-    return t('studio.project.connectionDialog.throttle.range.status', {
-      min: CONNECTION_THROTTLE_RANGE.min,
-      max: CONNECTION_THROTTLE_RANGE.max,
-    });
-  }
-  return null;
-});
-
-const isValid = computed(
-  () =>
-    !!draft.value &&
-    connectionInputSchema.safeParse(draft.value).success &&
-    !throttlePerSecError.value,
-);
-
-// SQS/S3 have no host/port at all (connection.ts's AWS_STYLE_KINDS/superRefine exception); fields
-// mode instead repurposes `database` for the AWS region and `username` for a named profile
-// (sqs/client.ts's, s3/client.ts's own D8/D9).
-const isAwsStyle = computed(() => !!draft.value && AWS_STYLE_KINDS.has(draft.value.kind));
-
-// P35 D10/D11/D14: a file kind (SQLite) has no host/port/username/password at all — `database`
-// carries the absolute file path instead, edited through one full-width field with a Browse
-// button rather than the network-shaped host/port/user/password block.
-const isFileStyle = computed(() => !!draft.value && FILE_KINDS.has(draft.value.kind));
-
-// P18 (v1.1) D18: the auto-explain checkbox is a SQL-only surface, same gate the console's own
-// SQL behaviours use — through state/schemas.ts's schemaDialectFor wrapper, SPEC §11's own rule
-// that project/ must not import views/ directly (menus.ts's "Schema (DDL)…" gate uses the same
-// wrapper). Absent, not disabled, on the five non-SQL kinds, matching isFileStyle's own precedent
-// immediately above.
-const isSqlKind = computed(() => !!draft.value && schemaDialectFor(draft.value.kind) !== undefined);
-
-// M5 §7: the Privacy tab's own state. A rule takes effect immediately (§7.2's own "not part of
-// the connection's save/cancel draft") — no local draft copy, this reads state/maskRules.ts
-// directly and every control here writes straight through it.
-// P99 §5.5: a reactive useQuery, `enabled` only once the Privacy tab is actually open — replaces
-// the old watch(activeTab)/ensureMaskRulesLoaded pair with TanStack Query's own lazy-fetch-on-
-// enable, and Query's in-flight dedupe means a caller elsewhere already loading this connection's
-// rules (SlickGridHost.vue's own mount-time load) is shared rather than re-fetched.
-const maskRulesQuery = useQuery(() => ({
-  queryKey: maskRulesQueryKey(editingConnectionId.value ?? ''),
-  queryFn: () => loadMaskRules(editingConnectionId.value ?? ''),
-  enabled: activeTab.value === 'Privacy' && !!editingConnectionId.value,
-}));
-const maskRules = computed(() => maskRulesQuery.data.value ?? []);
-
-// §7.4: table — placeholder `*`, column, kind. Reset after a successful Add.
-const newMaskTable = ref('');
-const newMaskColumn = ref('');
-const newMaskKind = ref<MaskKind>('redact');
-const maskRuleError = ref<string | null>(null);
-
-// §2.3, verbatim: the per-kind one-line explanation shown under the kind select.
-const MASK_KIND_EXPLANATION: Record<MaskKind, MessageKey> = {
-  name: 'studio.project.connectionDialog.maskKind.name.description',
-  email: 'studio.project.connectionDialog.maskKind.email.description',
-  text: 'studio.project.connectionDialog.maskKind.text.description',
-  number: 'studio.project.connectionDialog.maskKind.number.description',
-  date: 'studio.project.connectionDialog.maskKind.date.description',
-  redact: 'studio.project.connectionDialog.maskKind.redact.description',
-};
-
-// keepHint's own label changes per kind (§7.4); hidden for the four kinds where it means nothing.
-const KEEP_HINT_LABEL: Partial<Record<MaskKind, MessageKey>> = {
-  name: 'studio.project.connectionDialog.keep.initials.label',
-  email: 'studio.project.connectionDialog.keep.domain.label',
-  date: 'studio.project.connectionDialog.keep.year.label',
-};
-
-function keepHintLabel(kind: MaskKind): string | undefined {
-  const key = KEEP_HINT_LABEL[kind];
-  return key ? t(key) : undefined;
-}
-
-async function onAddMaskRule(): Promise<void> {
-  const connectionId = editingConnectionId.value;
-  const columnName = newMaskColumn.value.trim();
-  if (!connectionId || !columnName) return;
-  maskRuleError.value = null;
-  const fields: MaskRuleFields = {
-    tableName: newMaskTable.value.trim() || '*',
-    columnName,
-    kind: newMaskKind.value,
-    keepHint: true,
-    correlate: newMaskKind.value !== 'number' && newMaskKind.value !== 'date',
-  };
-  try {
-    await upsertMaskRule(connectionId, fields);
-    newMaskTable.value = '';
-    newMaskColumn.value = '';
-    newMaskKind.value = 'redact';
-  } catch (err) {
-    maskRuleError.value = errorText(err);
-  }
-}
-
-async function onChangeMaskRuleKind(ruleId: string, kind: MaskKind): Promise<void> {
-  const connectionId = editingConnectionId.value;
-  const rule = maskRules.value.find((r) => r.id === ruleId);
-  if (!connectionId || !rule) return;
-  await upsertMaskRule(connectionId, {
-    tableName: rule.tableName,
-    columnName: rule.columnName,
-    kind,
-    keepHint: rule.keepHint,
-    correlate: kind === 'number' ? false : rule.correlate,
-  });
-}
-
-async function onToggleMaskRuleFlag(
-  ruleId: string,
-  field: 'keepHint' | 'correlate',
-): Promise<void> {
-  const connectionId = editingConnectionId.value;
-  const rule = maskRules.value.find((r) => r.id === ruleId);
-  if (!connectionId || !rule) return;
-  await upsertMaskRule(connectionId, {
-    tableName: rule.tableName,
-    columnName: rule.columnName,
-    kind: rule.kind,
-    keepHint: field === 'keepHint' ? !rule.keepHint : rule.keepHint,
-    correlate: field === 'correlate' ? !rule.correlate : rule.correlate,
-  });
-}
-
-async function onRemoveMaskRule(ruleId: string): Promise<void> {
-  const connectionId = editingConnectionId.value;
-  if (!connectionId) return;
-  await removeMaskRule(connectionId, ruleId);
-}
-
-async function onRegenerateMaskKey(): Promise<void> {
-  const connectionId = editingConnectionId.value;
-  if (!connectionId) return;
-  const ok = await confirmDialogStore.confirm({
-    title: t('studio.project.connectionDialog.regenerateConfirm.title'),
-    message: [
-      t('studio.project.connectionDialog.regenerateConfirm.body'),
-      t('common.confirm.irreversible.body'),
-    ].join(' '),
-    confirmLabel: t('studio.common.regenerate.label'),
-    tone: 'danger',
-  });
-  if (!ok) return;
-  await regenerateMaskKey(connectionId);
-}
-
-// P35 D15: the SQLite-specific filter list — chooseOpen's own filters payload is generic, so a
-// second file kind would pass a different list here rather than this being hardcoded lower down.
-async function onBrowseDatabaseFile(): Promise<void> {
-  const d = draft.value;
-  if (!d) return;
-  const res = await control.filesChooseOpen({
-    filters: [
-      {
-        name: t('studio.project.connectionDialog.sqliteFilter.label'),
-        extensions: ['sqlite', 'sqlite3', 'db', 'db3'],
-      },
-      { name: t('studio.common.allFiles.label'), extensions: ['*'] },
-    ],
-    title: t('studio.project.connectionDialog.databasePicker.title'),
-  });
-  if (!res.canceled && res.file) d.database = res.file.path;
-}
-
-// P11: '' <-> null bridging so an emptied field is "no script" rather than a schema violation
-// the user cannot see (min(1) on the underlying schema rejects '').
-const preconnectText = computed({
-  get: () => draft.value?.preconnect ?? '',
-  set: (value: string) => {
-    if (draft.value) draft.value.preconnect = value.trim() === '' ? null : value;
-  },
-});
 </script>
 
 <template>
   <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
-    <DialogContent size="xl" fixed-height data-testid="connection-dialog">
-      <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
+    <DialogContent size="xl" fixed-height :dirty="dirty" data-testid="connection-dialog">
       <DialogHeader v-if="step === 'engine'" close-testid="connection-dialog-close">
         <DialogTitle>{{
           isEdit ? t('studio.project.connectionDialog.changeEngine.title') : t('studio.project.connectionDialog.newConnection.title')
@@ -703,8 +163,7 @@ const preconnectText = computed({
           {{ t('common.action.back.label') }}
         </Button>
       </DialogHeader>
-      <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
-           is identity here, not a control (changed via "Change engine" back to step 1). -->
+      <!-- The engine is identity here, not a control: it changes via "Change engine". -->
       <DialogHeader v-else close-testid="connection-dialog-close">
         <span class="flex shrink-0" :class="KIND_ACCENT_CLASS[draft.kind]">
           <EngineIcon :kind="draft.kind" :size="13" />
@@ -727,689 +186,69 @@ const preconnectText = computed({
       </DialogHeader>
 
       <DialogBody flush data-testid="connection-dialog-body">
-        <template v-if="step === 'engine'">
-          <div class="flex flex-col gap-3 p-3 min-h-0 flex-1">
-            <SearchField
-              v-model="engineSearch"
-              size="kira-lg"
-              :placeholder="t('studio.project.connectionDialog.engineSearch.placeholder')"
-              class="font-ui"
-              data-testid="connection-engine-search"
+        <ConnectionEnginePicker v-if="step === 'engine'" :kind="draft.kind" @pick="pickKind" />
+        <Tabs
+          v-else
+          :model-value="activeTab"
+          class="flex flex-col"
+          @update:model-value="(v) => (activeTab = v as DetailTab)"
+        >
+          <ViewToolbar class="px-3">
+            <SecondaryTabs
+              :model-value="activeTab"
+              :items="DETAIL_TABS"
+              :aria-label="t('studio.project.connectionDialog.tabs.aria')"
+              @update:model-value="(v) => (activeTab = v as DetailTab)"
             />
+          </ViewToolbar>
 
-            <RadioGroup
-              class="grid-cols-3 gap-1.5 content-start"
-              :aria-label="t('studio.project.connectionDialog.kind.aria')"
-              :model-value="draft.kind"
-              data-testid="connection-kind"
-              @update:model-value="(v) => pickKind(String(v) as ConnectionKind)"
+          <ConnectionGeneralTab />
+          <ConnectionAdvancedTab />
+          <ConnectionPreconnectTab />
+          <ConnectionMcpTab />
+          <ConnectionPrivacyTab v-if="activeTab === 'Privacy'" />
+
+          <div class="flex flex-col gap-3 px-3 pb-3 empty:hidden">
+            <Alert
+              v-if="connectionDialogStore.error"
+              variant="error"
+              data-testid="connection-save-error"
             >
-              <Tooltip v-for="kind in filteredKinds" :key="kind">
-                <TooltipTrigger as-child>
-                  <!-- reka's own item: the theme RadioGroupItem is the 14px radio dot, this is a card. -->
-                  <RadioGroupItem
-                    :value="kind"
-                    :disabled="!SUPPORTED_KINDS.has(kind)"
-                    :aria-label="KIND_LABEL[kind]"
-                    :data-testid="`connection-kind-${kind}`"
-                    class="relative flex cursor-pointer flex-col items-start gap-1 rounded-kira border bg-bg px-2 py-3 text-left text-inherit not-data-[disabled]:hover:border-border-strong not-data-[disabled]:hover:bg-hover data-[disabled]:cursor-default data-[disabled]:opacity-50"
-                    :class="draft.kind === kind ? 'border-focus' : 'border-border'"
-                    @click="pickKind(kind)"
-                  >
-                    <span
-                      class="flex mb-1"
-                      :class="SUPPORTED_KINDS.has(kind) ? KIND_ACCENT_CLASS[kind] : 'text-muted-foreground'"
-                    >
-                      <EngineIcon :kind="kind" :size="22" />
-                    </span>
-                    <span class="text-kira-md text-fg">{{ KIND_LABEL[kind] }}</span>
-                  </RadioGroupItem>
-                </TooltipTrigger>
-                <TooltipContent>{{
-                  SUPPORTED_KINDS.has(kind) ? KIND_LABEL[kind] : t('studio.project.connectionDialog.kind.unsupported.tooltip', { kind: KIND_LABEL[kind] })
-                }}</TooltipContent>
-              </Tooltip>
-            </RadioGroup>
+              <AlertDescription>{{ connectionDialogStore.error }}</AlertDescription>
+            </Alert>
+
+            <!-- Three states from connectionsStore.secretStorage; none renders until hydrated. A
+                 file kind has no credentials, so none applies. Dialog-level: it describes the
+                 whole connection and stays visible on every tab. -->
+            <template v-if="!isFileStyle">
+              <FieldDescription
+                v-if="secretStatus?.available && !secretStatus.insecureFallback"
+                class="text-muted-foreground"
+                data-testid="connection-credential-note"
+              >
+                {{ t('studio.project.connectionDialog.credentials.encrypted.hint') }}
+              </FieldDescription>
+              <Alert
+                v-else-if="secretStatus?.insecureFallback"
+                data-testid="connection-credential-note"
+                variant="warn"
+              >
+                <AlertDescription>
+                  {{ t('studio.project.connectionDialog.credentials.fallback.body') }}
+                </AlertDescription>
+              </Alert>
+              <Alert
+                v-else-if="secretStatus"
+                variant="error"
+                data-testid="connection-credential-note"
+              >
+                <AlertDescription>
+                  {{ t('studio.project.connectionDialog.credentials.unavailable.body') }}
+                </AlertDescription>
+              </Alert>
+            </template>
           </div>
-        </template>
-        <template v-else>
-          <Tabs
-            :model-value="activeTab"
-            class="flex flex-col"
-            @update:model-value="(v) => (activeTab = v as DetailTab)"
-          >
-            <ViewToolbar class="px-3">
-              <SecondaryTabs
-                :model-value="activeTab"
-                :items="DETAIL_TABS"
-                :aria-label="t('studio.project.connectionDialog.tabs.aria')"
-                @update:model-value="(v) => (activeTab = v as DetailTab)"
-              />
-            </ViewToolbar>
-
-            <TabsContent value="General" class="flex flex-col gap-3 p-3">
-              <div class="flex gap-2 items-start">
-                <Field class="flex-2">
-                  <FieldLabel>{{ t('common.field.name.label') }}</FieldLabel>
-                  <Input v-model="draft.name" class="font-ui" data-testid="connection-name" />
-                </Field>
-                <Field class="flex-none">
-                  <FieldLabel>{{ t('common.field.colour.label') }}</FieldLabel>
-                  <fieldset
-                    class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
-                    :aria-label="t('studio.project.connectionDialog.colour.aria')"
-                  >
-                    <Tooltip v-for="color in connectionColors" :key="color">
-                      <TooltipTrigger as-child>
-                        <SwatchRadio
-                          name="connection-color"
-                          :value="color"
-                          :color="color"
-                          :checked="draft.color === color"
-                          @change="draft.color = color"
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>{{ colourLabel(color) }}</TooltipContent>
-                    </Tooltip>
-                  </fieldset>
-                </Field>
-              </div>
-              <FieldError v-if="fieldErrors.name">{{ fieldErrors.name }}</FieldError>
-
-              <p
-                v-if="minVersionNote"
-                class="m-0 text-muted-foreground text-kira-sm"
-                data-testid="connection-min-version"
-              >
-                {{ minVersionNote }}
-              </p>
-
-              <div class="flex items-end gap-2">
-                <Field class="flex-1">
-                  <FieldLabel>{{ t('common.mode.label') }}</FieldLabel>
-                  <SecondaryTabs
-                    variant="segmented"
-                    size="kira-lg"
-                    :model-value="draft.mode"
-                    :items="MODE_ITEMS"
-                    @update:model-value="(v) => setMode(v as 'fields' | 'uri')"
-                  />
-                </Field>
-                <Popover v-if="draft.mode === 'fields' && !isFileStyle" v-model:open="pasteOpen">
-                  <PopoverTrigger as-child>
-                    <Button
-                      variant="dialog"
-                      size="kira-lg"
-                      data-testid="connection-paste-credentials"
-                    >
-                      <CodiconIcon name="clippy" :size="13" />
-                      {{ t('studio.project.connectionDialog.pasteCredentials.label') }}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" class="w-96" data-testid="connection-paste-popover">
-                    <CredentialPastePanel
-                      :kind="draft.kind"
-                      :allowed="pasteAllowed"
-                      @apply="onPasteApply"
-                      @cancel="pasteOpen = false"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <template v-if="draft.mode === 'fields' && isFileStyle">
-                <Field class="flex-1">
-                  <FieldLabel>{{
-                    t('studio.project.connectionDialog.databaseFile.label')
-                  }}</FieldLabel>
-                  <div class="flex items-center gap-1">
-                    <div class="flex-1 min-w-0">
-                      <Input
-                        :model-value="draft.database ?? ''"
-                        class="font-data"
-                        data-testid="connection-database"
-                        @update:model-value="draft.database = String($event)"
-                      />
-                    </div>
-                    <Button
-                      variant="dialog"
-                      size="kira-lg"
-                      data-testid="connection-browse"
-                      @click="onBrowseDatabaseFile"
-                    >
-                      {{ t('studio.common.browse.label') }}
-                    </Button>
-                  </div>
-                </Field>
-                <FieldError v-if="fieldErrors.database">{{ fieldErrors.database }}</FieldError>
-              </template>
-              <template v-else-if="draft.mode === 'fields'">
-                <div v-if="!isAwsStyle" class="flex gap-2 items-start">
-                  <Field class="flex-1">
-                    <FieldLabel>{{ t('studio.project.connectionDialog.host.label') }}</FieldLabel>
-                    <Input
-                      :model-value="draft.host ?? ''"
-                      class="font-data"
-                      data-testid="connection-host"
-                      @update:model-value="draft.host = String($event)"
-                    />
-                  </Field>
-                  <Field class="flex-none basis-24">
-                    <FieldLabel>{{ t('common.port.label') }}</FieldLabel>
-                    <NumberStepperInput
-                      :model-value="draft.port != null ? String(draft.port) : ''"
-                      data-testid="connection-port"
-                      @update:model-value="(v: string | number) => setPort(String(v))"
-                    />
-                  </Field>
-                </div>
-                <FieldError v-if="fieldErrors.host">{{ fieldErrors.host }}</FieldError>
-                <div v-if="isAwsStyle" class="flex gap-2 items-start">
-                  <Field class="flex-1">
-                    <FieldLabel>{{ t('studio.project.connectionDialog.region.label') }}</FieldLabel>
-                    <Input
-                      :model-value="draft.database ?? ''"
-                      class="font-data"
-                      data-testid="connection-database"
-                      @update:model-value="draft.database = String($event)"
-                    />
-                  </Field>
-                  <Field class="flex-1">
-                    <FieldLabel>{{
-                      t('studio.project.connectionDialog.awsProfile.label')
-                    }}</FieldLabel>
-                    <Input
-                      :model-value="draft.username ?? ''"
-                      class="font-data"
-                      data-testid="connection-username"
-                      @update:model-value="draft.username = String($event)"
-                    />
-                  </Field>
-                </div>
-                <template v-else>
-                  <Field class="flex-1">
-                    <FieldLabel>{{
-                      t('studio.project.connectionDialog.database.label')
-                    }}</FieldLabel>
-                    <Input
-                      :model-value="draft.database ?? ''"
-                      class="font-data"
-                      data-testid="connection-database"
-                      @update:model-value="draft.database = String($event)"
-                    />
-                  </Field>
-                  <div class="flex gap-2 items-start">
-                    <Field class="flex-1">
-                      <FieldLabel>{{ t('common.user.label') }}</FieldLabel>
-                      <Input
-                        :model-value="draft.username ?? ''"
-                        class="font-data"
-                        data-testid="connection-username"
-                        @update:model-value="draft.username = String($event)"
-                      />
-                    </Field>
-                    <Field class="flex-1">
-                      <FieldLabel>{{
-                        t('studio.project.connectionDialog.password.label')
-                      }}</FieldLabel>
-                      <div class="flex items-center gap-1">
-                        <div class="flex-1 min-w-0">
-                          <Input
-                            :model-value="draft.password ?? ''"
-                            :type="showPassword ? 'text' : 'password'"
-                            class="font-data"
-                            :placeholder="revealed ? undefined : t('studio.project.connectionDialog.unchanged.placeholder')"
-                            data-testid="connection-password"
-                            @update:model-value="(v) => onPasswordInput(String(v))"
-                          />
-                        </div>
-                        <TooltipIconButton
-                          :icon="showPassword ? 'eye-closed' : 'eye'"
-                          :label="showPassword ? t('studio.project.connectionDialog.hidePassword.label') : t('studio.project.connectionDialog.showPassword.label')"
-                          @click="onEyeClick"
-                        />
-                      </div>
-                    </Field>
-                  </div>
-                </template>
-              </template>
-              <template v-else>
-                <Field class="flex-1">
-                  <FieldLabel>{{ t('studio.project.connectionDialog.mode.uri.label') }}</FieldLabel>
-                  <div class="flex items-center gap-1">
-                    <div class="flex-1 min-w-0">
-                      <Input
-                        :model-value="draft.uri ?? ''"
-                        :type="showPassword ? 'text' : 'password'"
-                        class="font-data"
-                        :placeholder="revealed ? undefined : t('studio.project.connectionDialog.unchanged.placeholder')"
-                        data-testid="connection-uri"
-                        @update:model-value="(v) => setUri(String(v))"
-                      />
-                    </div>
-                    <TooltipIconButton
-                      :icon="showPassword ? 'eye-closed' : 'eye'"
-                      :label="showPassword ? t('studio.project.connectionDialog.hideUri.label') : t('studio.project.connectionDialog.showUri.label')"
-                      @click="onEyeClick"
-                    />
-                  </div>
-                </Field>
-                <p class="font-data uri-note text-muted-foreground text-kira-sm">{{ uriNote }}</p>
-              </template>
-            </TabsContent>
-
-            <TabsContent value="Advanced" class="flex flex-col gap-3 p-3">
-              <Label
-                class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none"
-              >
-                <Checkbox
-                  :model-value="draft.readOnly"
-                  class="size-3.5"
-                  data-testid="connection-readonly"
-                  @update:model-value="(v) => { if (draft) draft.readOnly = v === true; }"
-                >
-                  <CodiconIcon name="check" :size="12" />
-                </Checkbox>
-                <span>{{ t('common.state.readOnly.status') }}</span>
-                <span class="text-subtle text-kira-sm leading-normal w-full">{{
-                  t('studio.project.connectionDialog.readOnly.description')
-                }}</span>
-              </Label>
-
-              <Label
-                v-if="isSqlKind"
-                class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none"
-              >
-                <Checkbox
-                  :model-value="draft.autoExplain"
-                  class="size-3.5"
-                  data-testid="connection-auto-explain"
-                  @update:model-value="(v) => { if (draft) draft.autoExplain = v === true; }"
-                >
-                  <CodiconIcon name="check" :size="12" />
-                </Checkbox>
-                <span>{{ t('studio.project.connectionDialog.autoExplain.label') }}</span>
-                <span class="text-subtle text-kira-sm leading-normal w-full">
-                  {{ t('studio.project.connectionDialog.autoExplain.description') }}
-                </span>
-              </Label>
-
-              <Field class="flex-1">
-                <FieldLabel>{{ t('studio.project.connectionDialog.throttle.label') }}</FieldLabel>
-                <div class="w-24">
-                  <NumberStepperInput
-                    :min="0"
-                    :max="CONNECTION_THROTTLE_RANGE.max"
-                    step="0.5"
-                    :aria-invalid="!!throttlePerSecError"
-                    data-testid="connection-throttle"
-                    :model-value="String(draft.throttlePerSec)"
-                    @update:model-value="(v: string | number) => setThrottlePerSec(String(v))"
-                  />
-                </div>
-                <FieldError v-if="throttlePerSecError" data-testid="connection-throttle-error">
-                  {{ throttlePerSecError }}
-                </FieldError>
-                <span v-else class="text-subtle text-kira-sm leading-normal w-full">
-                  {{ t('studio.project.connectionDialog.throttle.description') }}
-                </span>
-              </Field>
-            </TabsContent>
-
-            <TabsContent value="Pre-connect" class="flex flex-col gap-3 p-3">
-              <Field class="flex-1">
-                <FieldLabel>{{ t('studio.project.connectionDialog.preconnect.label') }}</FieldLabel>
-                <Textarea
-                  v-model="preconnectText"
-                  class="font-data"
-                  rows="4"
-                  maxlength="2000"
-                  data-testid="connection-preconnect"
-                  @keydown="wrapSelectionOnType"
-                />
-                <span class="text-subtle text-kira-sm leading-normal w-full">
-                  {{ t('studio.project.connectionDialog.preconnect.description') }}
-                </span>
-                <span
-                  v-if="preconnectText"
-                  class="text-warn text-kira-sm"
-                  data-testid="connection-preconnect-warning"
-                >
-                  {{ t('studio.project.connectionDialog.preconnect.warning.body') }}
-                </span>
-              </Field>
-              <FieldError v-if="fieldErrors.preconnect">{{ fieldErrors.preconnect }}</FieldError>
-
-              <Label
-                v-if="preconnectText"
-                class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none"
-              >
-                <Checkbox
-                  :model-value="draft.preconnectSidecar"
-                  class="size-3.5"
-                  data-testid="connection-preconnect-sidecar"
-                  @update:model-value="(v) => { if (draft) draft.preconnectSidecar = v === true; }"
-                >
-                  <CodiconIcon name="check" :size="12" />
-                </Checkbox>
-                <span>{{ t('studio.project.connectionDialog.sidecar.label') }}</span>
-                <span class="text-subtle text-kira-sm leading-normal w-full">
-                  {{ t('studio.project.connectionDialog.sidecar.description') }}
-                </span>
-              </Label>
-            </TabsContent>
-
-            <TabsContent value="MCP" class="flex flex-col gap-3 p-3">
-              <Label
-                class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none"
-              >
-                <Checkbox
-                  :model-value="draft.mcpEnabled"
-                  class="size-3.5"
-                  data-testid="connection-mcp-enabled"
-                  @update:model-value="(v) => { if (draft) draft.mcpEnabled = v === true; }"
-                >
-                  <CodiconIcon name="check" :size="12" />
-                </Checkbox>
-                <span>{{ t('studio.project.connectionDialog.mcp.expose.label') }}</span>
-                <span class="text-subtle text-kira-sm leading-normal w-full">
-                  {{ t('studio.project.connectionDialog.mcp.expose.description') }}
-                </span>
-              </Label>
-
-              <Field class="flex-1">
-                <FieldLabel
-                  >{{ t('common.field.description.label') }}
-                  <span class="text-subtle"
-                    >— {{ t('studio.project.connectionDialog.mcp.descriptionNote.label') }}</span
-                  ></FieldLabel
-                >
-                <Textarea
-                  v-model="draft.mcpDescription"
-                  class="font-data"
-                  rows="2"
-                  maxlength="1000"
-                  :disabled="!draft.mcpEnabled"
-                  data-testid="connection-mcp-description"
-                  @keydown="wrapSelectionOnType"
-                />
-                <FieldError v-if="fieldErrors.mcpDescription">{{
-                  fieldErrors.mcpDescription
-                }}</FieldError>
-              </Field>
-
-              <Label
-                class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none"
-              >
-                <Checkbox
-                  :model-value="draft.mcpAutoExplain"
-                  :disabled="!draft.mcpEnabled || !mcpExplainSupported"
-                  class="size-3.5"
-                  data-testid="connection-mcp-auto-explain"
-                  @update:model-value="(v) => { if (draft) draft.mcpAutoExplain = v === true; }"
-                >
-                  <CodiconIcon name="check" :size="12" />
-                </Checkbox>
-                <span>{{ t('studio.project.connectionDialog.mcp.plan.label') }}</span>
-                <span
-                  v-if="!mcpExplainSupported"
-                  class="text-subtle text-kira-sm leading-normal w-full"
-                >
-                  {{ t('studio.project.connectionDialog.mcp.plan.description') }}
-                </span>
-              </Label>
-
-              <Field class="flex-1">
-                <FieldLabel
-                  >{{ t('studio.project.connectionDialog.mcp.read.label') }}
-                  <span class="text-subtle"
-                    >— {{ t('studio.project.connectionDialog.mcp.readNote.label') }}</span
-                  ></FieldLabel
-                >
-                <SecondaryTabs
-                  variant="segmented"
-                  size="kira-lg"
-                  :model-value="draft.mcpReadMode"
-                  :items="mcpModeOptions('read')"
-                  data-testid="connection-mcp-read"
-                  @update:model-value="(v) => draft && (draft.mcpReadMode = v as McpPermissionMode)"
-                />
-              </Field>
-              <Field class="flex-1">
-                <FieldLabel
-                  >{{ t('studio.project.connectionDialog.mcp.write.label') }}
-                  <span class="text-subtle"
-                    >— {{ t('studio.project.connectionDialog.mcp.writeNote.label') }}</span
-                  ></FieldLabel
-                >
-                <SecondaryTabs
-                  variant="segmented"
-                  size="kira-lg"
-                  :model-value="draft.mcpWriteMode"
-                  :items="mcpModeOptions('write')"
-                  data-testid="connection-mcp-write"
-                  @update:model-value="(v) => draft && (draft.mcpWriteMode = v as McpPermissionMode)"
-                />
-              </Field>
-              <Field class="flex-1">
-                <FieldLabel
-                  >{{ t('studio.project.connectionDialog.mcp.ddl.label') }}
-                  <span class="text-subtle"
-                    >— {{ t('studio.project.connectionDialog.mcp.ddlNote.label') }}</span
-                  ></FieldLabel
-                >
-                <SecondaryTabs
-                  variant="segmented"
-                  size="kira-lg"
-                  :model-value="draft.mcpDdlMode"
-                  :items="mcpModeOptions('ddl')"
-                  data-testid="connection-mcp-ddl"
-                  @update:model-value="(v) => draft && (draft.mcpDdlMode = v as McpPermissionMode)"
-                />
-              </Field>
-              <p class="text-subtle text-kira-sm leading-normal w-full">
-                {{
-                  t('studio.project.connectionDialog.mcp.strictest.description', { tab: t('common.advanced.label') })
-                }}
-              </p>
-            </TabsContent>
-
-            <TabsContent value="Privacy" class="flex flex-col gap-3 p-3">
-              <p class="text-subtle text-kira-sm leading-normal w-full">
-                {{ t('studio.project.connectionDialog.privacy.intro.description') }}
-              </p>
-
-              <template v-if="!editingConnectionId">
-                <p class="text-subtle text-kira-sm leading-normal w-full">{{
-                  t('studio.project.connectionDialog.privacy.saveFirst.hint')
-                }}</p>
-              </template>
-              <template v-else>
-                <div
-                  v-if="maskRules.length"
-                  class="flex flex-col gap-1 max-h-55 overflow-y-auto"
-                  data-testid="mask-rule-list"
-                >
-                  <div
-                    v-for="rule in maskRules"
-                    :key="rule.id"
-                    class="flex items-center gap-1.5 py-1 border-b border-border"
-                    :data-testid="`mask-rule-${rule.id}`"
-                  >
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <span
-                          class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-fg font-data"
-                          >{{ rule.tableName }}.{{ rule.columnName }}</span
-                        >
-                      </TooltipTrigger>
-                      <TooltipContent>{{ rule.tableName }}.{{ rule.columnName }}</TooltipContent>
-                    </Tooltip>
-                    <NativeSelect
-                      variant="bordered"
-                      :model-value="rule.kind"
-                      data-testid="mask-rule-kind"
-                      @update:model-value="(v) => onChangeMaskRuleKind(rule.id, String(v) as MaskKind)"
-                    >
-                      <option value="name">{{ t('common.field.name.label') }}</option>
-                      <option value="email">{{ t('common.field.email.label') }}</option>
-                      <option value="text">{{ t('common.field.text.label') }}</option>
-                      <option value="number">{{ t('common.field.number.label') }}</option>
-                      <option value="date">{{ t('common.field.date.label') }}</option>
-                      <option value="redact">{{
-                        t('studio.project.connectionDialog.redact.label')
-                      }}</option>
-                    </NativeSelect>
-                    <Label
-                      v-if="keepHintLabel(rule.kind)"
-                      class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-none leading-none"
-                    >
-                      <Checkbox
-                        :model-value="rule.keepHint"
-                        class="size-3.5"
-                        data-testid="mask-rule-keep-hint"
-                        @update:model-value="onToggleMaskRuleFlag(rule.id, 'keepHint')"
-                      >
-                        <CodiconIcon name="check" :size="12" />
-                      </Checkbox>
-                      <span>{{ keepHintLabel(rule.kind) }}</span>
-                    </Label>
-                    <Label
-                      class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-none leading-none"
-                    >
-                      <Checkbox
-                        :model-value="rule.correlate"
-                        :disabled="rule.kind === 'number'"
-                        class="size-3.5"
-                        data-testid="mask-rule-correlate"
-                        @update:model-value="onToggleMaskRuleFlag(rule.id, 'correlate')"
-                      >
-                        <CodiconIcon name="check" :size="12" />
-                      </Checkbox>
-                      <span>{{ t('studio.project.connectionDialog.correlate.label') }}</span>
-                    </Label>
-                    <TooltipIconButton
-                      icon="trash"
-                      :label="t('studio.project.connectionDialog.removeRule.tooltip')"
-                      variant="danger"
-                      data-testid="mask-rule-remove"
-                      @click="onRemoveMaskRule(rule.id)"
-                    />
-                  </div>
-                </div>
-                <p v-else class="text-subtle text-kira-sm leading-normal w-full">{{
-                  t('studio.project.connectionDialog.privacy.noRules.emptyHint')
-                }}</p>
-
-                <div class="flex gap-2 items-center">
-                  <Input
-                    v-model="newMaskTable"
-                    placeholder="*"
-                    class="font-data"
-                    data-testid="mask-rule-add-table"
-                  />
-                  <Input
-                    v-model="newMaskColumn"
-                    :placeholder="t('studio.project.connectionDialog.column.placeholder')"
-                    class="font-data"
-                    data-testid="mask-rule-add-column"
-                  />
-                  <NativeSelect
-                    v-model="newMaskKind"
-                    variant="bordered"
-                    data-testid="mask-rule-add-kind"
-                  >
-                    <option value="name">{{ t('common.field.name.label') }}</option>
-                    <option value="email">{{ t('common.field.email.label') }}</option>
-                    <option value="text">{{ t('common.field.text.label') }}</option>
-                    <option value="number">{{ t('common.field.number.label') }}</option>
-                    <option value="date">{{ t('common.field.date.label') }}</option>
-                    <option value="redact">{{
-                      t('studio.project.connectionDialog.redact.label')
-                    }}</option>
-                  </NativeSelect>
-                  <Button
-                    variant="dialog"
-                    size="kira-lg"
-                    data-testid="mask-rule-add"
-                    @click="onAddMaskRule"
-                    >{{
-                      t('common.action.add.label')
-                    }}</Button
-                  >
-                </div>
-                <p class="text-subtle text-kira-sm leading-normal w-full">{{
-                  t(MASK_KIND_EXPLANATION[newMaskKind])
-                }}</p>
-                <FieldError v-if="maskRuleError" data-testid="mask-rule-error">{{
-                  maskRuleError
-                }}</FieldError>
-
-                <Button
-                  variant="dialog"
-                  size="kira-lg"
-                  class="self-start"
-                  data-testid="mask-regenerate-key"
-                  @click="onRegenerateMaskKey"
-                >
-                  {{ t('studio.project.connectionDialog.regenerate.label') }}
-                </Button>
-
-                <template v-if="!isFileStyle">
-                  <Alert
-                    v-if="secretStatus?.insecureFallback"
-                    data-testid="mask-key-credential-note"
-                    variant="warn"
-                  >
-                    <AlertDescription>
-                      {{ t('studio.project.connectionDialog.privacy.keyFallback.body') }}
-                    </AlertDescription>
-                  </Alert>
-                </template>
-              </template>
-            </TabsContent>
-
-            <div class="flex flex-col gap-3 px-3 pb-3 empty:hidden">
-              <FieldError v-if="connectionDialogStore.error" data-testid="connection-save-error">{{
-                connectionDialogStore.error
-              }}</FieldError>
-
-              <!-- P25 D8: three states driven by connectionsStore.secretStorage, replacing the old
-               unconditional plaintext warning — a null secretStatus (not hydrated yet) renders
-               none of them rather than guessing. P35 D14: a file kind has no credentials at all,
-               so none of the three states apply — the note would be describing something that
-               doesn't exist. Dialog-level, not tab-level: describes the connection as a whole and
-               must stay visible no matter which tab is active. -->
-              <template v-if="!isFileStyle">
-                <p
-                  v-if="secretStatus?.available && !secretStatus.insecureFallback"
-                  class="text-muted-foreground text-kira-sm"
-                  data-testid="connection-credential-note"
-                >
-                  {{ t('studio.project.connectionDialog.credentials.encrypted.hint') }}
-                </p>
-                <Alert
-                  v-else-if="secretStatus?.insecureFallback"
-                  data-testid="connection-credential-note"
-                  variant="warn"
-                >
-                  <AlertDescription>
-                    {{ t('studio.project.connectionDialog.credentials.fallback.body') }}
-                  </AlertDescription>
-                </Alert>
-                <Alert
-                  v-else-if="secretStatus"
-                  variant="error"
-                  data-testid="connection-credential-note"
-                >
-                  <AlertDescription>
-                    {{ t('studio.project.connectionDialog.credentials.unavailable.body') }}
-                  </AlertDescription>
-                </Alert>
-              </template>
-            </div>
-          </Tabs>
-        </template>
+        </Tabs>
       </DialogBody>
 
       <DialogFooter v-if="step === 'engine'">
@@ -1429,30 +268,24 @@ const preconnectText = computed({
       </DialogFooter>
       <DialogFooter v-else>
         <template #start>
-          <Button variant="dialog" size="kira-lg" data-testid="connection-test" @click="onTest">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="connection-test"
+            :pending="testState.status === 'testing'"
+            @click="onTest"
+          >
             <CodiconIcon name="plug" :size="13" />
             {{ t('studio.project.connectionDialog.test.label') }}
           </Button>
-          <Tooltip v-if="testState.status !== 'idle'" :disabled="testState.status !== 'error'">
-            <TooltipTrigger as-child>
-              <Badge
-                class="overflow-hidden text-ellipsis whitespace-nowrap"
-                :variant="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'error' : 'info'"
-                data-testid="connection-test-result"
-              >
-                {{
-                  testState.status === 'testing'
-                    ? t('studio.project.connectionDialog.test.testing.loading')
-                    : testState.status === 'ok'
-                      ? t('studio.project.connectionDialog.test.ok.status', { message: testState.message ?? '' })
-                      : testState.message
-                }}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent v-if="testState.status === 'error'">{{
-              testState.message ?? ''
-            }}</TooltipContent>
-          </Tooltip>
+          <Badge
+            v-if="testState.status !== 'idle'"
+            class="min-w-0"
+            :variant="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'error' : 'info'"
+            data-testid="connection-test-result"
+          >
+            <TruncatedText :text="testLabel" />
+          </Badge>
         </template>
         <Button
           variant="dialog"
@@ -1467,7 +300,7 @@ const preconnectText = computed({
           variant="dialog-primary"
           size="kira-lg"
           data-testid="connection-save"
-          :disabled="!isValid || saving"
+          :pending="saving"
           @click="onSave"
         >
           {{ t('common.action.save.label') }}

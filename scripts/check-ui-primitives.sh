@@ -93,8 +93,8 @@ U11 packages/workbench/src/components/LogLines.vue # ANSI bold is log data
 U62 packages/workbench/src/components/AutocompleteField.vue # accepting a suggestion restores focus and the caret on the real input
 # A (apps/kira-studio)
 U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
-U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
-U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
+U36 apps/kira-studio/frontend/src/project/connection/ConnectionEnginePicker.vue # engine tile is a selectable radio card, not a content box
+U37 apps/kira-studio/frontend/src/project/connection/ConnectionEnginePicker.vue # engine tile hover fill (radio card, not a row)
 U46 apps/kira-studio/frontend/src/bridge/port.ts # bridge transport timeout
 U41 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host reads modifier keys
 U62 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host owns editor focus
