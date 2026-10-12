@@ -1,34 +1,24 @@
 <script setup lang="ts">
-import type { SortSpec } from '@shared/domain/queries';
-import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import HighlightedText from '@theme/components/HighlightedText.vue';
 import Spinner from '@theme/components/Spinner.vue';
-import StatusDot from '@theme/components/StatusDot.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
-import RunState from '@theme/RunState.vue';
-import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatBytes } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
-import { fireAndForget } from '@workbench/bridge/fireAndForget';
-import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { nodeKindLabel } from '../../state/nodeKindLabel';
@@ -37,60 +27,34 @@ import type { DocumentTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
-import { beautifyShellText, toShellText } from '../shared/document/ejson';
 import { type DocumentRowView, useDocumentRowsStore } from '../shared/document/rows';
-import EditBufferActions from '../shared/EditBufferActions.vue';
-import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
-import {
-  mongoFilterCandidates,
-  mongoSortCandidates,
-  useMongoFieldSampleStore,
-} from '../shared/mongoFieldSample';
-import PagerControls from '../shared/page/PagerControls.vue';
 import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
-import { useEditBuffer } from '../shared/useEditBuffer';
 import { writeDisabledReason } from '../shared/writeGate';
+import DocumentEditor from './DocumentEditor.vue';
+import DocumentFilterRow from './DocumentFilterRow.vue';
+import DocumentToolbar from './DocumentToolbar.vue';
 import { confirmDeleteDocument, rowMenu } from './menu';
-import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
-import ProjectionMenu from './ProjectionMenu.vue';
-import { documentRow, fieldNamesOnPage, getPage, pageVersion, setVisibleWindow } from './page';
+import { deleteDocument } from './mutations';
+import { documentRow, pageVersion, setVisibleWindow } from './page';
 import RowActionButton from './RowActionButton.vue';
-import {
-  searchState as docSearchState,
-  type Match,
-  matchedRows,
-  pageSearchApi,
-  previewLineFor,
-} from './search';
-import { parseSortText, sortSpecToText } from './sortDocument';
+import { type Match, matchedRows, pageSearchApi } from './search';
 import { useDocumentViewStore } from './state';
+import { useDocumentEdit } from './useDocumentEdit';
+import { useDocumentSearchMatches } from './useDocumentSearchMatches';
+import { useRowTip } from './useRowTip';
 
 const contextMenuStore = useContextMenuStore();
 const documentRowsStore = useDocumentRowsStore();
-const mongoFieldSampleStore = useMongoFieldSampleStore();
 const connectionsStore = useConnectionsStore();
 const documentViewStore = useDocumentViewStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
-// Mongo syntax samples, not wording.
-const FILTER_EXAMPLE = "{ name: 'a' }";
-const SORT_EXAMPLE = '{ createdAt: -1, name: 1 }';
-
 const props = defineProps<{ tab: DocumentTabRecord }>();
 
-// Item (regression pass, task batch P46-5): registered here, at setup's own top level, rather
-// than inside onMounted below (P42 D9's original placement) — Vue's first render already reads
-// `rows` (and so, transitively, this source) before onMounted ever fires, so registering it there
-// raced every remount: switching back to an already-loaded tab skipped load() (data was already
-// there), so nothing ever forced `rows` to recompute after the late registration landed, leaving
-// its first, empty-sourced result cached for good. A restored tab returning empty on reopen was
-// the reported symptom (never a fresh load — this only shows up once a tab is loaded and remounts
-// without reloading, so the fresh-open path this comment used to describe never hit it).
 documentRowsStore.registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
@@ -99,20 +63,13 @@ const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
 );
 
 const rt = computed(() => documentViewStore.runtime[props.tab.id]);
-const running = computed(() => rt.value?.status === 'loading');
+const _running = computed(() => rt.value?.status === 'loading');
 
-// DataToolbar.vue's own gate, narrowed to the one flag this view's Add-document button reads
-// (§0 note: "A renderer gating a single action ... reads the matching flag instead of `writable`").
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
   return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
 });
 
-// P21 round 2 functional finding 3: Caps is a static per-adapter literal (internal/adapters/*/
-// caps.go) that never narrows for a connection's own read-only flag — grid/keyvalue/browse's own
-// write gates already combine the two (KeyValueView.vue's own canUpdate/canDelete/canInsert);
-// this view read caps alone, so Add/Edit/Delete stayed enabled on a read-only MongoDB connection
-// and only failed server-side with a raw E_UNSUPPORTED.
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
 const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
@@ -155,211 +112,38 @@ function editGateFor(row: number): { editable: boolean; label: string } {
   return { editable: true, label: t('common.action.edit.label') };
 }
 
-// P16 design system LAW: the connection colour reaches a view as a 2px rail (here: the
-// toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
-// No colour assigned leaves the rail slot unpainted rather than unrendered, so nothing shifts
-// when a colour is set later. Mirrors Toolbar.vue's `color`/`railStyle` computed pair.
 const connectionColor = computed(
   () => connectionsStore.connectionRecord(props.tab.connectionId)?.color,
 );
 
 const iconClass = computed(() => connTextClass(connectionColor.value) ?? 'text-muted-foreground');
 
-// P104 §3: ViewChrome/ViewHeader/RunState inlined -- railColor mirrors ViewChrome.vue's own
-// `envColor ?? (connection ? connection.color ?? null : undefined)`; this view has no envColor.
 const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
-const runState = useRunState(() => props.tab.id);
+const _runState = useRunState(() => props.tab.id);
 
 // The view-head's breadcrumb prefix ("connection / database / "): derived from the already
 // loaded connection record and the tab's own path, purely for display — no new state.
 const pathPrefix = computed(() => ancestorPathPrefix(props.tab.connectionId, props.tab.path));
 
-const searchText = ref('');
-
-// FilterToolbar.vue's own watch(() => props.tab.state.filter, ...) reasoning, verbatim:
-// patchDocumentTabState mutates tab.state in place, so a non-deep watch on `tab` itself would
-// never see it — this is what keeps the field in sync with a write that didn't come from typing
-// into it (onClearFilter, applyFromFilterHistory below).
-watch(
-  () => props.tab.state.search,
-  (search) => {
-    searchText.value = search;
-  },
-  { immediate: true },
+const {
+  creatingNew,
+  newBuffer,
+  editingRow,
+  editBuffer,
+  saving,
+  onAddDocument,
+  cancelCreate,
+  commitCreate,
+  startEdit,
+  cancelEdit,
+  commitEdit,
+} = useDocumentEdit(
+  () => props.tab.id,
+  (row) => editGateFor(row).editable,
 );
-
-function onSearchInput(): void {
-  // A blur fires on every focus loss, not just an edit — re-applying an unchanged filter would
-  // reset paging/count for no reason (FilterToolbar.applyWhere's own guard and reason).
-  if (searchText.value.trim() === props.tab.state.search.trim()) return;
-  documentViewStore.setSearch(props.tab.id, searchText.value);
-  recordFilterHistory(searchText.value, props.tab.state.sort);
-}
-
-// AutocompleteField's own @escape only fires once its suggestion dropdown has already closed, so
-// by the time this runs focus is still genuinely on the field — FilterToolbar.onWhereEscape,
-// verbatim.
-function onSearchEscape(): void {
-  searchText.value = props.tab.state.search;
-  (document.activeElement as HTMLElement | null)?.blur();
-}
-
-// P18 D9/D13: candidate lists computed here (not inside mongoFieldSample.ts, which is plain and
-// Vue-unaware) so `void pageVersion.n` — fieldNamesOnPage's own non-reactive-Map dependency,
-// same line projectionCount below already carries — is what drives the recompute. Without
-// it the candidate list would freeze at whatever the first loaded page happened to contain.
-// `_id` is prepended here (not inside fieldNamesOnPage, which deliberately excludes it for the
-// projection picker) — it is always returned regardless of projection, so it is the single
-// most-filtered Mongo field.
-const filterCandidates = computed(() => {
-  void pageVersion.n;
-  return mongoFilterCandidates(['_id', ...fieldNamesOnPage(props.tab.id)]);
-});
-const sortCandidates = computed(() => {
-  void pageVersion.n;
-  return mongoSortCandidates(['_id', ...fieldNamesOnPage(props.tab.id)]);
-});
-
-// P22c D8: pushes this tab's own loaded field names into the shared, connection-scoped sample the
-// Mongo console reads from (views/shared/mongoFieldSample.ts) — a push, not a pull, so the
-// language layer never fetches (D5). `props.tab.path` is the collection's own tree path, the same
-// key a console opened on that collection resolves via mongoCompletionSource's own
-// enclosingCollectionPath.
-watch(
-  () => [pageVersion.n, props.tab.connectionId, props.tab.path] as const,
-  ([, connectionId, path]) => {
-    if (!connectionId) return;
-    mongoFieldSampleStore.registerMongoFieldSample(
-      connectionId,
-      path,
-      fieldNamesOnPage(props.tab.id),
-    );
-  },
-  { immediate: true },
+const { isSearchMatch, isCurrentSearchMatch, previewSegments } = useDocumentSearchMatches(
+  () => props.tab.id,
 );
-
-const sortText = ref('');
-
-watch(
-  () => props.tab.state.sort,
-  (sort) => {
-    sortText.value = sortSpecToText(sort);
-  },
-  { immediate: true },
-);
-
-function onSortInput(): void {
-  const sort = parseSortText(sortText.value);
-  // Comparing the *text* form, not the object — SortSpec is a structure and Object.is would
-  // never match (FilterToolbar.applyWhere's own guard, adapted).
-  if (sortSpecToText(sort) === sortSpecToText(props.tab.state.sort)) return;
-  documentViewStore.setSort(props.tab.id, sort);
-  recordFilterHistory(props.tab.state.search, sort);
-}
-
-function onSortEscape(): void {
-  sortText.value = sortSpecToText(props.tab.state.sort);
-  (document.activeElement as HTMLElement | null)?.blur();
-}
-
-// Mirrors FilterToolbar.vue's own history recording/Clear/apply — same generic {connectionId,
-// path} keyed storage (queriesHistoryRecord/queriesSave), just filed under Document's own
-// filter/sort vocabulary (a Mongo filter document + sort document, not a WHERE/ORDER BY pair).
-function recordFilterHistory(search: string, sort: SortSpec | null): void {
-  const connectionId = props.tab.connectionId;
-  if (!connectionId) return;
-  fireAndForget(
-    control.queriesHistoryRecord(connectionId, props.tab.path, search === '' ? null : search, sort),
-    'record filter history',
-  );
-}
-
-// The two watchers above pick up whatever this writes to tab.state — no need to also assign
-// searchText/sortText by hand, which would be the one place the two could drift.
-function onClearFilter(): void {
-  documentViewStore.setSearch(props.tab.id, '');
-  documentViewStore.setSort(props.tab.id, null);
-  recordFilterHistory('', null);
-}
-
-const filterHistoryOpen = ref(false);
-// P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
-// established `.$el` idiom, e.g. ConsoleView.vue's savedMenuTriggerEl).
-const filterHistoryTriggerEl = ref<{ $el: HTMLElement } | null>(null);
-
-function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null): void {
-  documentViewStore.setSearch(props.tab.id, where ?? '');
-  documentViewStore.setSort(props.tab.id, orderBy);
-}
-
-// P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
-const PAGE_SIZE_OPTIONS = pageSizeOptions('document-');
-const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({
-  value: String(o.value),
-  label: o.label,
-  testid: o.testid,
-}));
-
-function onPageSize(size: PageSize): void {
-  documentViewStore.setPageSize(props.tab.id, size);
-}
-
-function onJump(pageIndex: number): void {
-  void documentViewStore.goToPage(props.tab.id, pageIndex);
-}
-
-const projectionOpen = ref(false);
-// P104 §3: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (its own
-// rendered anchor position is irrelevant once `reference` is given) -- the established `.$el`
-// idiom (ConsoleView.vue's savedMenuTriggerEl) rather than a dedicated forwardRef/exposed handle.
-const projectionTriggerEl = ref<{ $el: HTMLElement } | null>(null);
-
-// P16 design system's count Badge on the Columns button (DataToolbar.vue's own
-// `columnCountLabel` precedent) — narrowed to "fields seen so far" since a document collection
-// has no fixed total.
-const projectionCount = computed(() => {
-  void pageVersion.n;
-  const total = fieldNamesOnPage(props.tab.id).length;
-  if (total === 0) return null;
-  const projection = props.tab.state.projection;
-  return { shown: projection ? projection.length : total, total };
-});
-
-const creatingNew = ref(false);
-const NEW_DOCUMENT_TEMPLATE = '{\n  \n}';
-// P27 D28/D29: the new-document panel adopts the same edit-buffer row the document editor uses —
-// "revert" here means back to the empty template, not to a stored value that doesn't exist yet.
-const newBuffer = useEditBuffer({
-  original: () => NEW_DOCUMENT_TEMPLATE,
-  beautifier: () => beautifyShellText,
-});
-
-function onAddDocument(): void {
-  creatingNew.value = true;
-  newBuffer.reseed();
-}
-
-function cancelCreate(): void {
-  creatingNew.value = false;
-}
-
-// A second Save while the first awaits the server would insert a second document (no `_id` yet).
-const createAction = useAsyncAction(() => saveNewDocument(props.tab.id, newBuffer.doc.value));
-const editAction = useAsyncAction((id: string) =>
-  saveDocumentEdit(props.tab.id, id, editBuffer.doc.value),
-);
-const saving = computed(() => createAction.pending.value || editAction.pending.value);
-
-async function commitCreate(): Promise<void> {
-  if (saving.value) return;
-  if (await createAction.run()) {
-    documentViewStore.setActionError(props.tab.id, null);
-    creatingNew.value = false;
-    newBuffer.reseed();
-  } else {
-    documentViewStore.setActionError(props.tab.id, createAction.error.value);
-  }
-}
 
 function onToggleSearch(): void {
   documentViewStore.toggleSearchOpen(props.tab.id);
@@ -369,32 +153,11 @@ function onCloseSearch(): void {
   documentViewStore.setSearchOpen(props.tab.id, false);
 }
 
-const editingId = ref<string | null>(null);
-// P5 C2: tracked alongside `editingId` by row index, not just by id — rows.ts's own `rowHeight`
-// compares against this directly (below), so the height pass never has to decode a row's id
-// purely to ask "is this the one being edited".
-const editingRow = ref<number | null>(null);
-// The row currently being edited seeds from toShellText(body) — the shell-literal spelling, not
-// the raw canonical-EJSON wire text — so editing reads the same ObjectId(…)/ISODate(…) form the
-// collapsed row and the tree already show (D14/D29).
-const editOriginal = ref('');
-const editBuffer = useEditBuffer({
-  original: () => editOriginal.value,
-  beautifier: () => beautifyShellText,
-});
-
-// P5 C2/F4: the list's v-for now iterates plain page-row indices, not per-row view objects — a
-// document row is resolved (id/body decoded, body parsed into a DocNode tree) through `rowAt`
-// below, only for the row actually being rendered, mirroring KeyValueView.vue's/StreamView.vue's
-// own `rowIndices`/`rowAt` pattern (which never had this problem, §2 F4). Previously `rows` called
-// `documentRow`/`rowView` for *every* row on the page on every load — +15.56 MB of permanently
-// cached parse trees for a 5 000-document page, none of it visible.
 interface DocumentRowEntry {
   view: DocumentRowView;
   body: string;
 }
 
-// P31 D17/D18: the same "hide non-matching rows" toggle grid/keyvalue/stream share (P24 D2).
 const displayRows = computed<number[] | null>(() => matchedRows(props.tab.id));
 
 const rows = computed<number[]>(() => {
@@ -425,76 +188,6 @@ function idsOf(indices: readonly number[]): string[] {
   return out;
 }
 
-// P31 D20: real match highlighting — .search-match/.search-match-current on the row, and the
-// matched substring wrapped in <mark> inside a preview line built with search.ts's own
-// previewLineFor, so the highlighted offsets can never disagree with what the scanner matched
-// against. Keyed by row (search.ts's Match has no column, unlike the grid/keyvalue's).
-// P21 round 2 performance finding 8: this used to rebuild `byRow` from scratch on every access —
-// including a bare Next/Prev, which only moves `index` (SearchToolbar.vue's goNext/goPrev replace
-// the whole entry with `{ ...e, index }`; `entry.matches` is the same array reference both times,
-// spread-copied not cloned). Same manual memo as search.ts's own createMatchIndex, keyed on
-// `entry.matches`' identity, for the same reason: Vue's computed can only invalidate at "did
-// `state[tabId]`'s reference change", not "did this one field of it change", once searchState is
-// shallowReactive (P2 R1's own choice).
-let lastMatches: { row: number; start: number; end: number }[] | null = null;
-let lastByRow: Map<number, Array<{ start: number; end: number }>> | null = null;
-const docMatchIndex = computed(() => {
-  const entry = docSearchState[props.tab.id];
-  if (!entry) return null;
-
-  let byRow: Map<number, Array<{ start: number; end: number }>>;
-  if (entry.matches === lastMatches && lastByRow) {
-    byRow = lastByRow;
-  } else {
-    byRow = new Map<number, Array<{ start: number; end: number }>>();
-    for (const m of entry.matches) {
-      const list = byRow.get(m.row);
-      if (list) list.push(m);
-      else byRow.set(m.row, [m]);
-    }
-    lastMatches = entry.matches;
-    lastByRow = byRow;
-  }
-
-  return { byRow, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
-});
-function isSearchMatch(row: number): boolean {
-  return docMatchIndex.value?.byRow.has(row) ?? false;
-}
-function isCurrentSearchMatch(row: number): boolean {
-  return docMatchIndex.value?.current?.row === row;
-}
-
-interface PreviewSegment {
-  text: string;
-  matched: boolean;
-}
-
-// Splits the same string the scanner matched against into matched/unmatched runs, in order —
-// documents/search.ts's Match.start/end are offsets into exactly this string (previewLineFor(body)), so
-// there is no separate "what did it match" computation to keep in sync.
-function previewSegments(row: number, body: string): PreviewSegment[] {
-  const matches = docMatchIndex.value?.byRow.get(row);
-  const line = previewLineFor(body);
-  if (!matches || matches.length === 0) return [{ text: line, matched: false }];
-  const segments: PreviewSegment[] = [];
-  let cursor = 0;
-  for (const m of matches) {
-    if (m.start > cursor) segments.push({ text: line.slice(cursor, m.start), matched: false });
-    segments.push({ text: line.slice(m.start, m.end), matched: true });
-    cursor = m.end;
-  }
-  if (cursor < line.length) segments.push({ text: line.slice(cursor), matched: false });
-  return segments;
-}
-
-// One height per row, in `rows`' own order — VirtualList's `rowHeights` prop (P27 D18/D20).
-// Depends on `rowsVersion` too: a nested-path toggle inside DocumentTree.vue changes a row's
-// visible line count without changing `rows` itself (id/fieldCount/byteLabel/root are unaffected).
-//
-// P5 C2/F4: `documentRow` here is a decode only (id, to resolve the persisted-by-id expansion
-// flag) — `rowHeight` (rows.ts) itself no longer decodes or parses anything for a collapsed,
-// unedited, non-preview row, which is the common case for every row outside the rendered window.
 const rowHeights = computed<number[]>(() => {
   void pageVersion.n;
   void documentRowsStore.rowsVersion.n;
@@ -511,13 +204,8 @@ const rowHeights = computed<number[]>(() => {
   });
 });
 
-// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
-// useVirtualRows composable -- rowHeights carries the same variable per-row height VirtualList's
-// own `rowHeights` prop did (a document row's collapsed head vs. expanded body).
 const scrollEl = ref<HTMLElement | null>(null);
 
-// Overscan in px, not rows (P161): 8 rows is 1 280 px of off-screen markup for 160 px expanded
-// documents, and a fast flick re-renders all of it each frame. Collapsed lists keep the 8-row cap.
 const OVERSCAN_PX = 320;
 const overscanRows = computed(() => {
   const heights = rowHeights.value;
@@ -567,60 +255,12 @@ const nav = useListNavigation<number>({
   rendered: () => virtualItems.value,
 });
 
-// One tooltip for every row's Edit/Delete (RowActionButton.vue): anchored to a fixed, invisible span
-// moved over the hovered or focused button, driven by delegated listeners on the list.
-interface RowTip {
-  label: string;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-const rowTip = ref<RowTip | null>(null);
-const rowTipStyle = computed(() => ({
-  left: `${rowTip.value?.left ?? 0}px`,
-  top: `${rowTip.value?.top ?? 0}px`,
-  width: `${rowTip.value?.width ?? 0}px`,
-  height: `${rowTip.value?.height ?? 0}px`,
-}));
-function tipSource(e: Event): HTMLElement | null {
-  return e.target instanceof Element ? e.target.closest<HTMLElement>('[data-tip]') : null;
-}
-function showRowTip(e: Event): void {
-  const el = tipSource(e);
-  if (!el) return;
-  const r = el.getBoundingClientRect();
-  rowTip.value = {
-    label: el.dataset.tip ?? '',
-    left: r.left,
-    top: r.top,
-    width: r.width,
-    height: r.height,
-  };
-}
-function hideRowTip(e: PointerEvent | FocusEvent): void {
-  const el = tipSource(e);
-  if (el && !(e.relatedTarget instanceof Node && el.contains(e.relatedTarget))) rowTip.value = null;
-}
+const { rowTip, rowTipStyle, showRowTip, hideRowTip, clearRowTip } = useRowTip();
 function onListScroll(): void {
-  rowTip.value = null;
+  clearRowTip();
   onScroll();
 }
 
-// P42 D39: VirtualList reported positions *within* `rows` (§ above) — while filtering, that array
-// is a non-contiguous subset of page-row indices, so the reported bounds are the page rows
-// themselves now that `rows` holds plain row numbers (no `.view.index` indirection left to
-// resolve). `rows` is itself always ascending (matchedRows' own ascending-de-duplicated
-// contract), so the first and last rendered virtual items' own `.index` are its min/max.
-//
-// P5 C3/F5: the same bounds also prune the decode cache (page.ts's own `setVisibleWindow`, mirrors
-// grid/console) and rows.ts's `parseCache` (`pruneRows`) — both already widened by the
-// virtualizer's own overscan (useVirtualRows' default, same 8-row margin VirtualList.vue used), so
-// a fling never prunes a row about to be re-rendered. Derived from `virtualItems` (no more
-// `@visible-range` emit to receive a `{start, end}` pair from) since useVirtualRows exposes no
-// visible-range equivalent of its own -- every VirtualList caller computed this bound differently
-// (a plain window here, a sticky-band-aware one in ProjectTree), so it stays local
-// rather than folded into the shared composable.
 watch(virtualItems, (items) => {
   if (items.length === 0) return;
   const list = rows.value;
@@ -632,12 +272,6 @@ watch(virtualItems, (items) => {
   documentRowsStore.pruneRows(props.tab.id, from, to + 1);
 });
 
-// A search match names a row index into the currently loaded page (documents/search.ts) — jumping to it
-// expands that document (if it wasn't already) and scrolls it into view via the virtualizer's own
-// offset-aware scrollToIndex (D8) rather than querySelector + scrollIntoView, which silently did
-// nothing for a match outside the rendered window (F10). scrollToIndex takes a position in
-// `rows.value` (the rendered array), not a raw page-row number — the two only coincide when the
-// filter toggle (D17) is off, so this always looks the position up rather than assuming they match.
 function onGoToMatch(match: Match): void {
   const row = match.row;
   const view = documentRowsStore.rowView(props.tab.id, row);
@@ -648,49 +282,6 @@ function onGoToMatch(match: Match): void {
     const index = rows.value.indexOf(row);
     if (index >= 0) scrollToIndex(index);
   });
-}
-
-function startEdit(row: number, id: string, body: string): void {
-  if (!editGateFor(row).editable) return;
-  editingRow.value = row;
-  editingId.value = id;
-  editOriginal.value = toShellText(body);
-  editBuffer.reseed();
-}
-
-function cancelEdit(): void {
-  editingRow.value = null;
-  editingId.value = null;
-}
-
-// A new page (paging, a delete's reload, filter) moves or removes the edited document: re-find it
-// by id so the editor stays under its own document, and drop the edit when it left the page.
-const currentPage = computed(() => {
-  void pageVersion.n;
-  return getPage(props.tab.id);
-});
-watch(currentPage, (page) => {
-  const id = editingId.value;
-  if (id === null || !page) return;
-  for (let i = 0; i < page.rowCount; i++) {
-    if (documentRow(props.tab.id, i)?.id === id) {
-      editingRow.value = i;
-      return;
-    }
-  }
-  cancelEdit();
-});
-
-async function commitEdit(): Promise<void> {
-  const id = editingId.value;
-  if (id === null || saving.value) return;
-  if (await editAction.run(id)) {
-    documentViewStore.setActionError(props.tab.id, null);
-    editingRow.value = null;
-    editingId.value = null;
-  } else {
-    documentViewStore.setActionError(props.tab.id, editAction.error.value);
-  }
 }
 
 function rowMenuFor(row: number) {
@@ -717,8 +308,6 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
   }
 }
 
-// D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
-// (documents/menu.ts) — one delete path, not two.
 async function onDeleteRow(id: string): Promise<void> {
   if (!(await confirmDeleteDocument(id))) return;
   deleteDocument(props.tab.id, id)
@@ -728,7 +317,7 @@ async function onDeleteRow(id: string): Promise<void> {
     });
 }
 
-function onStop(): void {
+function _onStop(): void {
   documentViewStore.stop(props.tab.id);
 }
 
@@ -739,8 +328,6 @@ function onRefresh(): void {
 }
 
 function onExpandAll(): void {
-  // P21 round 2 performance finding 2: setAllExpanded's own `true` branch never reads `ids` — no
-  // reason to pay for a whole-page idsOf(rows.value) decode just to hand it an argument it drops.
   documentViewStore.setAllExpanded(props.tab.id, [], true);
 }
 
@@ -756,14 +343,9 @@ let unregisterCommand: (() => void) | null = null;
 let unregisterFindCommand: (() => void) | null = null;
 
 onMounted(() => {
-  // P42 D9: this tab's own page.ts documentRow is where views/shared/document/rows.ts's
-  // functions resolve `props.tab.id` to actual rows — now registered at setup's own top level
-  // (see the comment up there for why), not here.
   if (!needsReconnect.value && !documentViewStore.runtime[props.tab.id]) {
     void documentViewStore.load(props.tab.id);
   }
-  // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
-  // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
   unregisterCommand = registerCommand('view.refresh', onRefresh);
   unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
@@ -777,12 +359,6 @@ onUnmounted(() => {
 
 <template>
   <div class="h-full flex flex-col min-h-0" data-testid="document-view" :data-path="tab.path">
-    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore
-         (plan's own "nothing hand-rolled survives as a component" for these layout containers).
-         Item (regression pass, task batch P46-5): the old ViewChrome's own `:disabled="canRefresh
-         === false"` made an absent can-refresh mean "always disabled" -- Refresh below has no
-         disabled binding at all now, since this view always passes the literal `true` ViewChrome
-         used to receive. -->
     <ViewToolbar>
       <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
@@ -796,253 +372,26 @@ onUnmounted(() => {
         {{ targetTail?.name ?? tab.path }}</span
       >
       <Badge>{{ nodeKindLabel('collection') }}</Badge>
-      <span class="ml-auto flex items-center gap-1"></span>
     </ViewToolbar>
 
     <div :class="colorMarkClass('band', railColor)" />
-    <ViewToolbar>
-      <div class="flex items-center gap-1.5 min-w-0">
-        <TooltipIconButton
-          :icon="ICON.refresh"
-          :label="t('common.action.refresh.label')"
-          data-testid="document-refresh"
-          @click="onRefresh"
-        />
-        <TooltipIconButton
-          :icon="ICON.stop"
-          :label="t('common.action.stop.label')"
-          disabled-trigger
-          :class="{ 'text-error': running }"
-          data-testid="document-stop"
-          :disabled="!running"
-          @click="onStop"
-        />
-      </div>
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-      <!-- Real-interaction fix (reported bug — the pager sits on the right instead of where it
-           made sense before): mirrors DataToolbar.vue's own P28 D7 revert of d2892f49 ("the
-           pager sits at the toolbar's right edge"), which moved the SQL grid's pager back beside
-           the page-size picker it pages through, at the toolbar's reading edge — by user report,
-           navigation belongs there, not alone at the far #toolbar-end. That revert was
-           deliberately NOT applied here at the time (f9ef22de's own commit message: "DocumentView's
-           pager is deliberately left where it is: that commit never touched it and its placement
-           was not reported") — this collection's pager was left in #toolbar-end (P22 D4's earlier
-           move, made to agree with the SQL grid's *then-current* right-edge placement, before D7
-           reverted it there). Now that the same placement is reported here too, this gets the
-           identical fix, same reading-edge position DataToolbar.vue uses. -->
-      <PagerControls
-        :page-index="tab.state.pageIndex"
-        :page-size="tab.state.pageSize"
-        :count="rt?.count?.value ?? null"
-        :has-more="!!rt?.hasMore"
-        testid-prefix="document-"
-        :last-tooltip="t('studio.documents.pager.countFirst.tooltip')"
-        @first="documentViewStore.goFirst(tab.id)"
-        @prev="documentViewStore.goPrev(tab.id)"
-        @next="documentViewStore.goNext(tab.id)"
-        @last="documentViewStore.goLast(tab.id)"
-        @jump="onJump"
-      />
-      <SecondaryTabs
-        variant="segmented"
-        :model-value="String(tab.state.pageSize)"
-        :items="PAGE_SIZE_ITEMS"
-        data-testid="document-page-size-picker"
-        @update:model-value="(v) => onPageSize(Number(v) as PageSize)"
-      />
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-      <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
-           the exact count, the fields/projection menu, and expand/collapse-all. -->
-      <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="rt?.countError ? 'text-error' : ''"
-              :aria-label="t('studio.documents.count.run.aria')"
-              data-testid="document-count"
-              @click="documentViewStore.runCount(tab.id)"
-            >
-              <CodiconIcon name="symbol-number" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <!-- P108 Part 11 F15: mirrors grid/DataToolbar.vue's own count tooltip — a failed count
-               is no longer silent. -->
-          <TooltipContent data-testid="document-count-tooltip">{{
-            rt?.countError
-              ? t('studio.common.countFailed.tooltip', { error: rt.countError })
-              : t('studio.documents.count.run.tooltip')
-          }}</TooltipContent>
-        </Tooltip>
-        <div class="relative">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                ref="projectionTriggerEl"
-                variant="toolbar"
-                size="kira-icon"
-                class="relative"
-                :class="{ 'bg-field text-fg': projectionOpen }"
-                :aria-label="t('studio.common.fields.label')"
-                data-testid="document-toolbar-projection"
-                @click="projectionOpen = !projectionOpen"
-              >
-                <CodiconIcon name="list-selection" :size="13" />
-                <StatusDot
-                  v-if="tab.state.projection !== null"
-                  tone="state-on"
-                  class="absolute top-0.5 right-0.5"
-                />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{
-              projectionCount
-                ? t('studio.documents.projection.shown.tooltip', projectionCount)
-                : t('studio.common.fields.label')
-            }}</TooltipContent>
-          </Tooltip>
-          <!-- P104 §3: PopoverPanel's own `anchor="right"` -> `align="end"`; PopoverAnchor's
-               `:reference` uses the trigger Button's real DOM node directly, so its own render
-               (hidden) never matters for positioning. -->
-          <Popover :open="projectionOpen" @update:open="(v) => (projectionOpen = v)">
-            <PopoverAnchor
-              :reference="(projectionTriggerEl?.$el as HTMLElement) ?? undefined"
-              class="hidden"
-            />
-            <PopoverContent align="end" class="w-56 p-0" data-testid="document-projection-menu">
-              <ProjectionMenu :tab-id="tab.id" :caps="caps" />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <TooltipIconButton
-          icon="expand-all"
-          :label="t('common.action.expandAll.label')"
-          data-testid="document-expand-all"
-          @click="onExpandAll"
-        />
-        <TooltipIconButton
-          icon="collapse-all"
-          :label="t('common.action.collapseAll.label')"
-          data-testid="document-collapse-all"
-          @click="onCollapseAll"
-        />
-      </div>
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-      <!-- DataToolbar's [add-row, delete-row, search] group — this collection has no delete
-           affordance in the toolbar (deletion lives on the row's own context menu). -->
-      <div class="flex items-center gap-1.5 min-w-0">
-        <TooltipIconButton
-          :icon="ICON.add"
-          :label="insertTitle"
-          :aria-label="t('studio.documents.add.label')"
-          disabled-trigger
-          :disabled="!canInsert"
-          data-testid="document-add"
-          @click="onAddDocument"
-        />
-        <TooltipIconButton
-          :icon="ICON.search"
-          :label="t('studio.common.searchPage.label')"
-          :class="{ 'bg-field text-fg': rt?.searchOpen }"
-          data-testid="document-toolbar-search"
-          @click="onToggleSearch"
-        />
-      </div>
-      <span class="ml-auto" />
-      <Tooltip :disabled="true">
-        <TooltipTrigger as-child>
-          <RunState :state="runState" />
-        </TooltipTrigger>
-      </Tooltip>
-      <div class="flex items-center gap-1.5 min-w-0"></div>
-    </ViewToolbar>
+    <DocumentToolbar
+      :tab="tab"
+      :caps="caps"
+      :can-insert="canInsert"
+      :insert-title="insertTitle"
+      @refresh="onRefresh"
+      @expand-all="onExpandAll"
+      @collapse-all="onCollapseAll"
+      @add="onAddDocument"
+    />
     <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
          SORT box beside it (read.ts's structured-sort-only rule, see ./sortDocument.ts's
          sortSpecToText/parseSortText), FilterToolbar.vue's ORDER BY box narrowed to the one form
          Mongo can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's.
          History button and Clear button match FilterToolbar.vue's own layout exactly — this row
          used to have neither. -->
-    <ViewToolbar border="none">
-      <div class="relative">
-        <TooltipIconButton
-          :icon="ICON.history"
-          :label="t('studio.common.savedAndRecentFilters.label')"
-          ref="filterHistoryTriggerEl"
-          data-testid="document-filter-history-button"
-          @click="filterHistoryOpen = !filterHistoryOpen"
-        />
-        <Popover :open="filterHistoryOpen" @update:open="(v) => (filterHistoryOpen = v)">
-          <PopoverAnchor
-            :reference="(filterHistoryTriggerEl?.$el as HTMLElement) ?? undefined"
-            class="hidden"
-          />
-          <FilterHistoryMenu
-            v-if="filterHistoryOpen"
-            :connection-id="tab.connectionId"
-            :path="tab.path"
-            :current-filter="searchText === '' ? null : searchText"
-            :current-sort="tab.state.sort"
-            @apply="applyFromFilterHistory"
-            @close="filterHistoryOpen = false"
-          />
-        </Popover>
-      </div>
-      <div class="flex-1 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <AutocompleteField
-              v-model="searchText"
-              class="w-full"
-              prefix="FILTER"
-              :prefix-active="tab.state.search.trim() !== ''"
-              :placeholder="FILTER_EXAMPLE"
-              data-testid="document-search"
-              :candidates="filterCandidates"
-              language="mongo"
-              @enter="onSearchInput"
-              @escape="onSearchEscape"
-              @blur="onSearchInput"
-            />
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.documents.filter.tooltip') }}</TooltipContent>
-        </Tooltip>
-      </div>
-      <div class="w-72 shrink-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <AutocompleteField
-              v-model="sortText"
-              class="w-full"
-              prefix="SORT"
-              :prefix-active="!!tab.state.sort"
-              :placeholder="SORT_EXAMPLE"
-              data-testid="document-sort"
-              :candidates="sortCandidates"
-              language="mongo"
-              @enter="onSortInput"
-              @escape="onSortEscape"
-              @blur="onSortInput"
-            />
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.documents.sort.tooltip') }}</TooltipContent>
-        </Tooltip>
-      </div>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira"
-            data-testid="document-filter-clear"
-            @click="onClearFilter"
-            >{{
-              t('common.action.clear.label')
-            }}</Button
-          >
-        </TooltipTrigger>
-        <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
-      </Tooltip>
-    </ViewToolbar>
+    <DocumentFilterRow :tab="tab" />
 
     <Alert
       strip
@@ -1052,13 +401,9 @@ onUnmounted(() => {
     >
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
-    <!-- P43 F6/D7: a failed insert/edit/delete, distinct from a failed load above — the list
-         is still showing a perfectly valid page, only the write was refused. -->
     <Alert strip v-if="rt?.actionError" variant="error" data-testid="document-action-error">
       <AlertDescription>{{ rt.actionError }}</AlertDescription>
     </Alert>
-    <!-- Below the filter/sort row, above the list it searches — views/shared/page/SearchToolbar.vue's own
-         "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->
     <SearchToolbar
       v-if="rt?.searchOpen"
       :tab-id="tab.id"
@@ -1094,34 +439,13 @@ onUnmounted(() => {
         class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated"
         data-testid="document-new"
       >
-        <MonacoHost v-model:doc="newBuffer.doc.value" language="json" />
-        <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
-          <EditBufferActions
-            :buffer="newBuffer"
-            testid-prefix="document-new"
-            :show-compact="false"
-          />
-          <span class="flex-1 min-w-0"></span>
-          <Button
-            variant="toolbar-primary"
-            size="kira"
-            data-testid="document-new-save"
-            :disabled="saving"
-            @click="commitCreate"
-            >{{
-              t('common.action.save.label')
-            }}</Button
-          >
-          <Button
-            variant="toolbar"
-            size="kira"
-            data-testid="document-new-cancel"
-            @click="cancelCreate"
-            >{{
-              t('common.action.cancel.label')
-            }}</Button
-          >
-        </div>
+        <DocumentEditor
+          :buffer="newBuffer"
+          testid-prefix="document-new"
+          :saving="saving"
+          @save="commitCreate"
+          @cancel="cancelCreate"
+        />
       </div>
 
       <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
@@ -1133,8 +457,6 @@ onUnmounted(() => {
         >
           <template v-if="!rt" #media><Spinner :size="24" /></template>
         </EmptyState>
-        <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
-           from "no documents loaded". -->
         <SearchFilterNotice
           v-else-if="displayRows && displayRows.length === 0"
           class="h-full"
@@ -1142,10 +464,6 @@ onUnmounted(() => {
           :filter-key="tab.id"
           show-all-testid="document-show-all-rows"
         />
-        <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
-           the body — until expanded; an expanded document renders through DocumentTree.vue's
-           flat line list, never a per-row CodeMirror instance, which is what makes "every
-           document expanded by default" (D2) affordable at all. -->
         <div
           v-else
           ref="scrollEl"
@@ -1169,21 +487,8 @@ onUnmounted(() => {
             </TooltipTrigger>
             <TooltipContent>{{ rowTip?.label }}</TooltipContent>
           </Tooltip>
-          <!-- P5 C2: `rows[vi.index]` is a plain page-row number — `rowAt` (script above) resolves
-             it (id/body decode, body parse) only for the row the virtualizer is actually
-             rendering. Guarded by `v-if="rowAt(rows[vi.index])"` (never false for a row the
-             virtualizer hands back; page rows in range always resolve) so `rowAt(rows[vi.index])!`
-             below can carry a definite, non-null DocumentRowView into DocumentRow's own required
-             `view` prop. -->
           <div class="relative" :style="{ height: `${totalSize}px` }">
             <template v-for="vi in virtualItems" :key="String(vi.key)">
-              <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
-                 selectRow) — this view mounts no cell editor dock to publish a selection into
-                 (§8.7: a document's own row is already the read/write surface). The expand
-                 toggle and the Edit/Delete buttons below are nested inside this same click
-                 target — clicking any of them also reselects the row, which is harmless (selecting
-                 the row you just acted on is never wrong), so their own handlers stop propagation
-                 rather than double-firing selectRow with the same index. -->
               <DocumentRow
                 v-if="rowAt(rows[vi.index])"
                 data-testid="document-row"
@@ -1226,25 +531,14 @@ onUnmounted(() => {
                   </div>
                 </template>
                 <template #body>
-                  <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
-                     collapsed row otherwise shows only `_id`, per D1) — this wraps the matched
-                     substring in <mark> inside the same string documents/search.ts's scanner matched
-                     against, so it cannot disagree with the offsets. Only while collapsed: an
-                     expanded document's own body is out of scope (§6). -->
                   <div
                     v-if="isSearchMatch(rows[vi.index]) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-                    class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1 in-[.search-match-current]:text-bg"
+                    class="truncate text-muted-foreground text-kira-sm font-data px-2 pb-1 in-[.search-match-current]:text-bg"
                     data-testid="document-search-preview"
                   >
-                    <template
-                      v-for="(seg, si) in previewSegments(rows[vi.index], rowAt(rows[vi.index])!.body)"
-                      :key="si"
-                    >
-                      <mark v-if="seg.matched" class="rounded-kira-sm bg-warn text-bg">{{
-                        seg.text
-                      }}</mark>
-                      <template v-else>{{ seg.text }}</template>
-                    </template>
+                    <HighlightedText
+                      :parts="previewSegments(rows[vi.index], rowAt(rows[vi.index])!.body)"
+                    />
                   </div>
                   <div
                     v-if="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
@@ -1253,46 +547,20 @@ onUnmounted(() => {
                   >
                     <!-- The editor is the same code surface the definition view and the console views
                        use — the only difference is the language. -->
-                    <template v-if="editingRow === rows[vi.index]">
-                      <MonacoHost v-model:doc="editBuffer.doc.value" language="json" />
-                      <div
-                        class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2"
-                      >
-                        <EditBufferActions
-                          :buffer="editBuffer"
-                          testid-prefix="document-edit"
-                          :show-compact="false"
-                        />
-                        <span class="flex-1 min-w-0"></span>
-                        <Button
-                          variant="toolbar-primary"
-                          size="kira"
-                          data-testid="document-edit-save"
-                          :disabled="saving"
-                          @click="commitEdit"
-                          >{{
-                            t('common.action.save.label')
-                          }}</Button
-                        >
-                        <Button
-                          variant="toolbar"
-                          size="kira"
-                          data-testid="document-edit-cancel"
-                          @click="cancelEdit"
-                          >{{
-                            t('common.action.cancel.label')
-                          }}</Button
-                        >
-                      </div>
-                    </template>
+                    <DocumentEditor
+                      v-if="editingRow === rows[vi.index]"
+                      :buffer="editBuffer"
+                      testid-prefix="document-edit"
+                      :saving="saving"
+                      @save="commitEdit"
+                      @cancel="cancelEdit"
+                    />
                     <DocumentTree
                       v-else-if="rowAt(rows[vi.index])!.view.root"
                       :tab-id="tab.id"
                       :row="rows[vi.index]"
                       @toggle-path="(path) => documentRowsStore.togglePath(tab.id, rows[vi.index], path)"
                     />
-                    <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
-                       object) falls back to raw text rather than a tree that has nothing to walk. -->
                     <MonacoHost
                       v-else
                       :doc="rowAt(rows[vi.index])!.body"
@@ -1308,12 +576,4 @@ onUnmounted(() => {
       </div>
     </template>
   </div>
-  <!-- P110 I2-16: `.doc-preview-match` (dropped, no other consumer) -- `:deep(.doc-row.search-
-       match-current) .doc-preview-match { text-bg }` replaced by Tailwind v4's `in-*` variant
-       directly on the element: `in-[.search-match-current]:text-bg` matches whenever an ancestor
-       carries that literal class, same compound-selector effect, compile-verified. `.doc-preview-
-       match mark` moved onto the template `<mark>` itself (`rounded-kira-sm bg-warn text-bg`) --
-       a real template element here (not v-html), so no `[&_mark]:` indirection needed.
-       P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/lib/
-       virtualRows.ts), bound on DocumentRow's own `:class` -- see ProjectTree.vue's identical note. -->
 </template>

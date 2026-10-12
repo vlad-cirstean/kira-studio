@@ -149,7 +149,7 @@ U2@@v@@@@<DialogContent class sets width, height, padding or gap (size= owns the
 U3@@v@@TextPromptDialog.vue@@role="dialog" outside TextPromptDialog.vue@@role="dialog"
 U4@@v@@@@<ToggleGroup/<ToggleGroupItem outside SecondaryTabs (use <SecondaryTabs>)@@<ToggleGroup(?:Item)?\b
 U5@@v@@AdeShell.vue@@<TabsList/<TabsTrigger outside AdeShell.vue (use <SecondaryTabs>)@@<Tabs(?:List|Trigger)\b
-U6@@vt@@TabStrip.vue|ModeSwitcher.vue|AdeShell.vue|ConsoleView.vue|ExecView.vue|AdeSessionStrip.vue@@tabChipVariants( outside primary tab bars@@tabChipVariants\(
+U6@@vt@@TabStrip.vue|ModeSwitcher.vue|AdeShell.vue|ConsoleView.vue|ConsoleResultStrip.vue|ExecView.vue|AdeSessionStrip.vue@@tabChipVariants( outside primary tab bars@@tabChipVariants\(
 U7@@v@@@@<Button without variant, or retired variant default/secondary/outline/destructive@@<Button\b(?:(?!(?&t)\s:?variant=)|(?&t)\svariant="(?:default|secondary|outline|destructive)")
 U8@@v@@@@<Button without size, or retired size default/xs/sm/lg/icon/icon-xs/icon-lg/icon-sm@@<Button\b(?:(?!(?&t)\s:?size=)|(?&t)\ssize="(?:default|xs|sm|lg|icon|icon-xs|icon-lg|icon-sm)")
 U9@@v@@@@Input/NativeSelect/Textarea/InputGroup with size="default" or h-/rounded-/bg-/border-/px-/py- class@@<(?:Input|NativeSelect|Textarea|InputGroup)\b(?:(?&t)\ssize="default"|(?&t)\s:?class="[^"]*${TOK}(?:h|rounded|bg|border|px|py)-)
