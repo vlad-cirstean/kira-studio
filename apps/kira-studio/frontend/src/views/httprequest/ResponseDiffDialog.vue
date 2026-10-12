@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/responseHistory';
+import Disclosure from '@theme/components/Disclosure.vue';
 import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -13,6 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import {
@@ -269,7 +280,7 @@ onUnmounted(() => {
             <div class="flex flex-col gap-0.5">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span class="text-kira-sm text-subtle self-start">{{
+                  <span :class="[rowMeta, 'self-start']">{{
                     formatRelative(snapA.entry.sentAt)
                   }}</span>
                 </TooltipTrigger>
@@ -288,19 +299,15 @@ onUnmounted(() => {
                   </TooltipTrigger>
                   <TooltipContent>{{ statusHint(snapA.entry.status) }}</TooltipContent>
                 </Tooltip>
-                <span class="text-kira-sm text-subtle">{{
-                  formatDuration(snapA.entry.elapsedMs)
-                }}</span>
-                <span class="text-kira-sm text-subtle">{{
-                  formatBytes(snapA.entry.bodyBytes)
-                }}</span>
+                <span :class="rowMeta">{{ formatDuration(snapA.entry.elapsedMs) }}</span>
+                <span :class="rowMeta">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
               </div>
             </div>
             <span class="text-muted-foreground">→</span>
             <div class="flex flex-col gap-0.5">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span class="text-kira-sm text-subtle self-start">{{
+                  <span :class="[rowMeta, 'self-start']">{{
                     formatRelative(snapB.entry.sentAt)
                   }}</span>
                 </TooltipTrigger>
@@ -319,12 +326,8 @@ onUnmounted(() => {
                   </TooltipTrigger>
                   <TooltipContent>{{ statusHint(snapB.entry.status) }}</TooltipContent>
                 </Tooltip>
-                <span class="text-kira-sm text-subtle">{{
-                  formatDuration(snapB.entry.elapsedMs)
-                }}</span>
-                <span class="text-kira-sm text-subtle">{{
-                  formatBytes(snapB.entry.bodyBytes)
-                }}</span>
+                <span :class="rowMeta">{{ formatDuration(snapB.entry.elapsedMs) }}</span>
+                <span :class="rowMeta">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
               </div>
             </div>
           </div>
@@ -333,50 +336,54 @@ onUnmounted(() => {
             class="max-h-40 shrink-0 overflow-auto border-b border-border px-2 py-1"
             data-testid="http-diff-headers"
           >
-            <!-- P110 B37: grid-cols-[72px_160px_1fr_1fr] -- same disclosed section 1.2 allowlist gap as
-             the api/ files' own grid-cols-[...] conversions -- a pre-existing value relocated, not a
-             new one. -->
-            <div
-              class="grid gap-1 py-0.5 text-kira-sm grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider"
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead class="w-18"></TableHead>
+                  <TableHead class="w-40"></TableHead>
+                  <TableHead>{{ t('studio.http.diff.before.label') }}</TableHead>
+                  <TableHead>{{ t('studio.http.diff.after.label') }}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow
+                  v-for="row in changedHeaderRows"
+                  :key="row.name"
+                  data-testid="http-diff-header-row"
+                >
+                  <TableCell class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{
+                    headerStatusText(row.status)
+                  }}</TableCell>
+                  <TableCell class="font-data text-muted-foreground">{{ row.name }}</TableCell>
+                  <TableCell class="font-data wrap-anywhere">{{ displayValue(row.a) }}</TableCell>
+                  <TableCell class="font-data wrap-anywhere">{{ displayValue(row.b) }}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+            <Disclosure
+              v-if="unchangedHeaderRows.length > 0"
+              :label="t('studio.http.diff.unchanged.status', { count: unchangedHeaderRows.length })"
+              trigger-class="text-kira-sm text-subtle"
             >
-              <span></span>
-              <span></span>
-              <span>{{ t('studio.http.diff.before.label') }}</span>
-              <span>{{ t('studio.http.diff.after.label') }}</span>
-            </div>
-            <div
-              v-for="row in changedHeaderRows"
-              :key="row.name"
-              class="grid gap-1 py-0.5 text-kira-md grid-cols-[72px_160px_1fr_1fr]"
-              data-testid="http-diff-header-row"
-            >
-              <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{
-                headerStatusText(row.status)
-              }}</span>
-              <span class="font-data text-muted-foreground">{{ row.name }}</span>
-              <span class="font-data wrap-anywhere">{{ displayValue(row.a) }}</span>
-              <span class="font-data wrap-anywhere">{{ displayValue(row.b) }}</span>
-            </div>
-            <details v-if="unchangedHeaderRows.length > 0" class="group">
-              <summary
-                class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
-              >
-                {{ t('studio.http.diff.unchanged.status', { count: unchangedHeaderRows.length }) }}
-              </summary>
-              <div
-                v-for="row in unchangedHeaderRows"
-                :key="row.name"
-                class="grid gap-1 py-0.5 text-kira-md grid-cols-[72px_160px_1fr_1fr]"
-                data-testid="http-diff-header-row-unchanged"
-              >
-                <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{
-                  headerStatusText(row.status)
-                }}</span>
-                <span class="font-data text-muted-foreground">{{ row.name }}</span>
-                <span class="font-data wrap-anywhere">{{ row.a }}</span>
-                <span class="font-data wrap-anywhere">{{ row.b }}</span>
-              </div>
-            </details>
+              <Table>
+                <TableBody>
+                  <TableRow
+                    v-for="row in unchangedHeaderRows"
+                    :key="row.name"
+                    data-testid="http-diff-header-row-unchanged"
+                  >
+                    <TableCell class="w-18 text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{
+                      headerStatusText(row.status)
+                    }}</TableCell>
+                    <TableCell class="w-40 font-data text-muted-foreground">{{
+                      row.name
+                    }}</TableCell>
+                    <TableCell class="font-data wrap-anywhere">{{ row.a }}</TableCell>
+                    <TableCell class="font-data wrap-anywhere">{{ row.b }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </Disclosure>
           </div>
 
           <Alert v-if="!bothStored" variant="info" data-testid="http-diff-not-comparable">
@@ -385,9 +392,9 @@ onUnmounted(() => {
             </AlertDescription>
           </Alert>
           <template v-else>
-            <div v-if="!commonFormat" class="text-kira-sm text-subtle shrink-0 px-2 py-1">
-              {{ t('studio.http.diff.rawBytes.description') }}
-            </div>
+            <FieldDescription v-if="!commonFormat" class="shrink-0 px-2 py-1">{{
+              t('studio.http.diff.rawBytes.description')
+            }}</FieldDescription>
             <InlineState v-if="mergeLoading" kind="loading">{{
               t('studio.http.diff.loadingMerge.loading')
             }}</InlineState>

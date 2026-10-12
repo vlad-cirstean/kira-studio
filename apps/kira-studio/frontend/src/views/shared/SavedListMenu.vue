@@ -1,6 +1,8 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
@@ -9,26 +11,18 @@ import { t } from '@theme/i18n';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { ref } from 'vue';
 
-// Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
-// a "Saved" list (pin/rename/delete an entry, click to apply it) with an optional "Recent" list
-// underneath (click-to-apply only — history entries can't be pinned, renamed or deleted). Every
-// bit of per-caller business logic (what "apply"/"pin"/"delete" actually do, the rename prompt,
-// the "save current …" action) stays in the caller; this component only owns the shell, the two
-// list sections, and the pin/delete affordances that are identical in both call sites.
-//
-// `Entry` is left otherwise unconstrained (beyond the `id` used for :key) so each caller can pass
-// its own saved/recent shape — SavedFilterQuery + FilterHistoryEntry for the grid, SavedConsoleQuery
-// alone for the console. Because a "recent" entry doesn't necessarily carry a `pinned` field,
-// pin state is derived by duck-typing rather than requiring it on Entry.
+// Popover shell for FilterHistoryMenu and ConsoleSavedMenu: a "Saved" list (pin, rename, delete,
+// click to apply) with an optional click-to-apply "Recent" list. Callers own what each action does.
+// `Entry` only needs an `id`; a "recent" entry may lack `pinned`, so pin state is duck-typed.
 const props = defineProps<{
   /** Label for the saved section, e.g. "Saved" or "Saved queries". */
   title: string;
   saved: readonly Entry[];
   /** Omit entirely (undefined) to hide the "Recent" section — the console has no history list. */
   recent?: readonly Entry[];
-  panelTestId: string;
-  savedEntryTestId: string;
-  recentEntryTestId?: string;
+  panelTestid: string;
+  savedEntryTestid: string;
+  recentEntryTestid?: string;
   emptySavedText: string;
   emptyRecentText?: string;
   /** Row text for first-letter type-ahead. */
@@ -90,23 +84,16 @@ defineSlots<{
 </script>
 
 <template>
-  <PopoverContent align="start" class="w-80 gap-0 p-0" :data-testid="panelTestId">
+  <PopoverContent align="start" class="w-80 gap-0 p-0" :data-testid="panelTestid">
     <div class="max-h-100 overflow-y-auto">
-      <div
-        class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
-        >{{
-          title
-        }}</div
-      >
-      <div v-if="saved.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
-        emptySavedText
-      }}</div>
+      <SectionHeading :label="title" />
+      <InlineState v-if="saved.length === 0" kind="empty">{{ emptySavedText }}</InlineState>
       <div v-else ref="savedEl" role="listbox" :aria-label="title">
         <div
           v-for="entry in saved"
           :key="entry.id"
           :class="rowVariants()"
-          :data-testid="savedEntryTestId"
+          :data-testid="savedEntryTestid"
           role="option"
           v-bind="savedNav.rowProps(entry.id)"
           :tabindex="savedNav.tabindexFor(entry.id)"
@@ -117,7 +104,7 @@ defineSlots<{
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="flex shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                class="flex shrink-0 border-0 bg-transparent p-0"
                 :class="isPinned(entry) ? 'text-warn' : 'text-subtle'"
                 @click.stop="emit('togglePin', entry)"
               >
@@ -140,21 +127,14 @@ defineSlots<{
 
       <template v-if="recent">
         <Separator class="my-1" />
-        <div
-          class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
-          >{{
-            t('studio.savedList.recent.label')
-          }}</div
-        >
-        <div v-if="recent.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
-          emptyRecentText
-        }}</div>
+        <SectionHeading :label="t('studio.savedList.recent.label')" />
+        <InlineState v-if="recent.length === 0" kind="empty">{{ emptyRecentText }}</InlineState>
         <div v-else ref="recentEl" role="listbox" :aria-label="t('studio.savedList.recent.label')">
           <div
             v-for="entry in recent"
             :key="entry.id"
             :class="rowVariants()"
-            :data-testid="recentEntryTestId"
+            :data-testid="recentEntryTestid"
             role="option"
             v-bind="recentNav.rowProps(entry.id)"
             :tabindex="recentNav.tabindexFor(entry.id)"
@@ -167,16 +147,6 @@ defineSlots<{
       </template>
 
       <slot name="footer" />
-      <!-- P110 I2-18: `.pin-button.pinned` moved to a ternary above.
-           flex-1/overflow-hidden/text-ellipsis/whitespace-nowrap used to live here as a single
-           :slotted(.entry-name) rule, but reka-ui's TooltipTrigger `as-child` clones the slotted
-           vnode (every caller wraps its entry-name span in a Tooltip, for the full-text-on-hover
-           P31 D27/F27 behavior) without carrying Vue's slotted-content scope-id marker, so the rule
-           silently never matched — the row's flex children packed left instead of stretching, and
-           its geometric center (what a real click/tap lands on) fell on the trailing action buttons
-           instead of the row's own content (console.spec.ts's saved-query-apply scenario caught
-           it). Each caller applies these Tailwind classes directly on its own entry-name span
-           instead. -->
     </div>
   </PopoverContent>
 </template>

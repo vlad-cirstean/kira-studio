@@ -1,33 +1,11 @@
 <script setup lang="ts">
-import SearchField from '@theme/components/SearchField.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { t } from '@theme/i18n';
-import { useFindBar } from '@workbench/behaviour/findBar';
-import { useFocusOnMount } from '@workbench/behaviour/focus';
+import FindBar from '@workbench/components/FindBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
-import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
-// P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
-// case, whole word, regex — which is what the report means by "the standard search toolbar (the
-// same one with more options)". Their semantics come from editor/searchPattern.ts, the same
-// compiler that scanner uses, rather than a second implementation here. The comment below is the
-// original P16 note; its "no case/word/regex" clause is what this supersedes.
-//
-// P16 D11: a find bar over the response body and the raw exchange's two documents, built on
-// P15b's own `rangeHighlights` seam (editor/findRanges.ts is the "find", this file is the toolbar
-// chrome and the cross-document navigation) — deliberately not @codemirror/search (D11: not a
-// dependency, and its own panel/keymap/styling would need suppressing and re-skinning for a
-// requirement `indexOf` already meets). SearchToolbar.vue's own placement (LAW 03: docks below the
-// toolbar/filter row and above the content it searches, never floating over it and never below
-// the content — real-interaction fix: this comment previously had it backwards, "docks below the
-// pane it searches", which is exactly the "docks at the bottom of the result" placement
-// DataView.vue's own SearchToolbar usage records as rejected for reading "as a bug rather than a
-// search bar"; ResponsePane.vue's own placement of this component is corrected to match) and key
-// handling (Enter/Shift+Enter to step, Escape to close) are the precedent this mirrors, at a
-// fraction of that widget's size — no case/word/regex, no chunked scan, no filter mode: a response
-// body is one in-memory string, not a paged result set.
+// Find bar over the response body and the raw exchange's documents: matches are numbered across
+// all targets in order. The host pane paints them from the exposed query, cursor and options.
 
 export interface FindBarHost {
   scrollRangeIntoView(from: number, to: number): void;
@@ -38,8 +16,7 @@ export interface FindBarTarget {
   host: FindBarHost | null;
 }
 
-// D11: "multiple documents, one bar" — one target for the Body pane, two for the Raw pane
-// (request wire, response wire). Matches are numbered across the targets in order.
+// One target for the Body pane, two for the Raw pane (request wire, response wire).
 const props = defineProps<{ targets: readonly FindBarTarget[] }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -50,15 +27,12 @@ const currentGlobal = ref(0);
 const matchCase = ref(false);
 const wholeWord = ref(false);
 const regex = ref(false);
-// One object the whole file (and, through defineExpose, the host pane) passes around, so a new
-// option can never be threaded into one call site and forgotten at another.
 const options = computed<FindOptions>(() => ({
   matchCase: matchCase.value,
   wholeWord: wholeWord.value,
   regex: regex.value,
 }));
-// Only ever true with regex on — a half-typed pattern is an ordinary intermediate state while
-// typing, so it marks the input rather than throwing or clearing what is already highlighted.
+// A half-typed regex marks the input instead of clearing the highlights.
 const invalid = computed(() => findQueryIsInvalid(query.value, options.value));
 
 const matchCounts = computed(() =>
@@ -68,12 +42,6 @@ const totalMatches = computed(() => matchCounts.value.reduce((a, b) => a + b, 0)
 const displayIndex = computed(() =>
   totalMatches.value === 0 ? 0 : Math.min(currentGlobal.value, totalMatches.value - 1) + 1,
 );
-
-// D11: exposed so ResponsePane.vue (which owns the actual CodeMirrorHost instances this bar has
-// no template access to) can paint the exact matches this bar counts and steps through — each
-// editor's own `rangeHighlights` source reads `query`/`currentGlobal` here, so it recomputes (and
-// so the compartment repaints) exactly when either changes.
-defineExpose({ query, currentGlobal, options });
 
 function scrollToCurrent(): void {
   if (totalMatches.value === 0) return;
@@ -90,9 +58,7 @@ function scrollToCurrent(): void {
   }
 }
 
-// The options belong here alongside the query: changing one changes the match set, so the cursor
-// has to go back to the first match exactly as it does on a new query. The reset is immediate (the
-// highlights follow it); the scroll waits for useFindBar's query debounce.
+// An option change alters the match set, so the cursor resets like a new query does.
 watch([query, options], () => {
   currentGlobal.value = 0;
 });
@@ -113,71 +79,28 @@ function close(): void {
   emit('close');
 }
 
-// P105 §5.1: the toolbar div is not interactive -- useFindBar binds the keys on it.
-const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
-useFindBar({
-  root: rootEl,
-  query,
-  onQuery: scrollToCurrent,
-  next: goNext,
-  prev: goPrev,
-  close,
-});
-
-// Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
-const fieldWrap = useTemplateRef<HTMLElement>('fieldWrap');
-useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
+defineExpose({ query, currentGlobal, options });
 </script>
 
 <template>
-  <!-- LAW 03: docks below the pane it searches, never floating over it. -->
-  <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
-    <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField
-        v-model="query"
-        @keydown.escape.stop="close"
-        :placeholder="t('common.action.find.label')"
-        :aria-invalid="invalid"
-        data-testid="http-find-input"
-      />
-    </div>
-    <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
-         same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
-         options in the data views. -->
-    <div class="flex items-center gap-1.5 min-w-0">
+  <FindBar
+    v-model="query"
+    :position="displayIndex"
+    :total="totalMatches"
+    :invalid="invalid"
+    testid-prefix="http-find-"
+    @query="scrollToCurrent"
+    @next="goNext"
+    @prev="goPrev"
+    @close="close"
+  >
+    <template #options>
       <SearchOptionToggles
         v-model:match-case="matchCase"
         v-model:whole-word="wholeWord"
         v-model:regex="regex"
         testid-prefix="http-find-"
       />
-    </div>
-    <span
-      class="text-kira-sm text-muted-foreground whitespace-nowrap"
-      data-testid="http-find-count"
-    >
-      {{
-        totalMatches === 0 ? t('common.state.noMatches.empty') : t('common.matchPosition.status', { position: displayIndex, total: totalMatches })
-      }}
-    </span>
-    <TooltipIconButton
-      icon="chevron-up"
-      :label="t('common.action.previousMatch.label')"
-      data-testid="http-find-prev"
-      @click="goPrev"
-    />
-    <TooltipIconButton
-      icon="chevron-down"
-      :label="t('common.action.nextMatch.label')"
-      data-testid="http-find-next"
-      @click="goNext"
-    />
-    <TooltipIconButton
-      icon="close"
-      :label="t('common.action.close.label')"
-      class="ml-auto"
-      data-testid="http-find-close"
-      @click="close"
-    />
-  </ViewToolbar>
+    </template>
+  </FindBar>
 </template>

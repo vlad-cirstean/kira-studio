@@ -2,12 +2,14 @@
 import { grpcMethodClass } from '@shared/domain/grpc';
 import { httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import HighlightedText from '@theme/components/HighlightedText.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
+import { splitMatches } from '@workbench/behaviour/match';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
@@ -42,7 +44,7 @@ const emit = defineEmits<{
   open: [row: CollectionRowVm];
   contextmenu: [row: CollectionRowVm, event: MouseEvent];
   rename: [row: CollectionRowVm, name: string];
-  'cancel-rename': [];
+  cancelRename: [];
 }>();
 
 const collectionsStore = useCollectionsStore();
@@ -56,29 +58,10 @@ const icon = computed(() => {
 
 const renaming = computed(() => collectionsStore.renamingKey === props.row.key);
 
-// Splits the label on every case-insensitive occurrence of the live query so only the matched
-// substring is <mark>-ed, not the whole label — project/TreeRow.vue's own highlighting, over this
-// tree's own row model.
-const parts = computed<{ text: string; hit: boolean }[]>(() => {
-  const query = collectionsStore.activeSearchQuery;
-  const name = props.row.name;
-  if (!props.row.matched || !query) return [{ text: name, hit: false }];
-  const lower = name.toLowerCase();
-  const out: { text: string; hit: boolean }[] = [];
-  let i = 0;
-  while (i < name.length) {
-    const idx = lower.indexOf(query, i);
-    if (idx === -1) {
-      out.push({ text: name.slice(i), hit: false });
-      break;
-    }
-    if (idx > i) out.push({ text: name.slice(i, idx), hit: false });
-    out.push({ text: name.slice(idx, idx + query.length), hit: true });
-    i = idx + query.length;
-  }
-  // A URL-only match leaves the name unsplit, which is correct — the URL is searched, not shown.
-  return out.length > 0 ? out : [{ text: name, hit: false }];
-});
+// A URL-only match leaves the name unsplit: the URL is searched, not shown.
+const parts = computed(() =>
+  props.row.matched ? splitMatches(props.row.name, collectionsStore.activeSearchQuery) : [],
+);
 
 function onTwistyClick(): void {
   emit('toggle', props.row);
@@ -128,7 +111,7 @@ function onKeydown(e: KeyboardEvent): void {
          at all. -->
     <Badge
       v-if="row.kind === 'request' && row.protocol === 'grpc'"
-      class="w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-sm"
+      class="w-14 shrink-0 overflow-hidden text-center text-ellipsis text-kira-sm"
       :variant="grpcMethodClass(row.method)"
       data-testid="grpc-collection-chip"
     >
@@ -138,7 +121,7 @@ function onKeydown(e: KeyboardEvent): void {
       v-else-if="row.kind === 'request'"
       variant="chip"
       data
-      class="method w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-sm"
+      class="method w-14 shrink-0 overflow-hidden text-center text-ellipsis text-kira-sm"
       :class="methodTextClass(httpMethodToken(row.method))"
       >{{
         row.method
@@ -154,24 +137,13 @@ function onKeydown(e: KeyboardEvent): void {
       :name="row.name"
       data-testid="collection-rename-input"
       @commit="(name) => emit('rename', row, name)"
-      @cancel="emit('cancel-rename')"
+      @cancel="emit('cancelRename')"
     />
-    <Tooltip v-else>
-      <TooltipTrigger as-child>
-        <span class="min-w-0 overflow-hidden text-ellipsis">
-          <template v-for="(part, i) in parts" :key="i">
-            <!-- The same yellow search-match tint every other search-capable view in the app uses. -->
-            <mark v-if="part.hit" class="rounded-kira-sm text-inherit bg-search-match">{{
-              part.text
-            }}</mark>
-            <template v-else>{{ part.text }}</template>
-          </template>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{{ row.url || row.name }}</TooltipContent>
-    </Tooltip>
-    <!-- P110 I2-14: `.tree-row`'s hover/selected ternary moved onto the root binding (stateClass,
-         above) -- see packages/theme/src/base.css's own pointer comment for the retired
-         `@utility tree-row`. P110 I2-13: the twisty moved to TreeTwisty.vue. -->
+    <span v-else class="min-w-0">
+      <TruncatedText :text="row.url || row.name">
+        <HighlightedText v-if="parts.length > 0" :parts="parts" />
+        <template v-else>{{ row.name }}</template>
+      </TruncatedText>
+    </span>
   </div>
 </template>

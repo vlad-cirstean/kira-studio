@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { useFindBar } from '@workbench/behaviour/findBar';
-import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { formatCount } from '@workbench/behaviour/format';
-import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import FindBar from '@workbench/components/FindBar.vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import { useStreamSearchStore } from './search';
@@ -71,10 +68,6 @@ function close(): void {
   emit('close');
 }
 
-// P105 §5.1: the toolbar div is not interactive -- useFindBar binds the keys on it.
-const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
-useFindBar({ root: rootEl, query, onQuery: searchNow, next, prev, close });
-
 onUnmounted(() => {
   closed = true;
   streamSearchStore.clearSearchState(props.tabId);
@@ -82,77 +75,46 @@ onUnmounted(() => {
   // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).
   pageSearchFilterStore.setSearchFiltering(props.tabId, false);
 });
-
-// Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
-const fieldWrap = useTemplateRef<HTMLElement>('fieldWrap');
-useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
 </script>
 
 <template>
-  <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
-  <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="stream-search-toolbar">
-    <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField
-        v-model="query"
-        @keydown.escape.stop="close"
-        :placeholder="t('common.action.find.label')"
-        data-testid="stream-search-input"
-      />
-    </div>
-    <span
-      class="text-kira-sm text-muted-foreground whitespace-nowrap"
-      data-testid="stream-search-count"
-    >
-      <template v-if="entry && entry.matches.length > 0">
-        <CatalogText k="common.matchPosition.status">
-          <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
-          <template #total><b class="font-data">{{ entry.matches.length }}</b></template>
-        </CatalogText>
-      </template>
-      <template v-else>{{ t('common.state.noMatches.empty') }}</template>
-    </span>
-    <TooltipIconButton
-      icon="chevron-up"
-      :label="t('common.action.previousMatch.label')"
-      data-testid="stream-search-prev"
-      @click="prev"
-    />
-    <TooltipIconButton
-      icon="chevron-down"
-      :label="t('common.action.nextMatch.label')"
-      data-testid="stream-search-next"
-      @click="next"
-    />
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-    <!-- P31 D17: same filter *mode* as views/shared/page/SearchToolbar.vue (P24 D1/D9) — hides every
-         non-matching row. -->
-    <div class="flex items-center gap-1.5 min-w-0">
+  <FindBar
+    v-model="query"
+    :position="entry ? entry.index + 1 : 0"
+    :total="entry ? entry.matches.length : 0"
+    testid-prefix="stream-search-"
+    @query="searchNow"
+    @next="next"
+    @prev="prev"
+    @close="close"
+  >
+    <template #options>
       <TooltipIconButton
         icon="filter"
         :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
         :aria-label="t('studio.search.filterRows.tooltip')"
-        :class="{ 'bg-field text-fg': filtering }"
+        :pressed="filtering"
         data-testid="stream-search-filter-rows"
         @click="toggleFilter"
       />
-    </div>
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-    <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
-      <template v-if="filtering && filteredRowCount !== null">
-        {{
-          t('studio.search.scopeFilteredRows.status', { shown: formatCount(filteredRowCount), count: loadedRowCount })
-        }}
-      </template>
-      <template v-else>{{
-        t('studio.search.scopeRows.status', { count: loadedRowCount })
-      }}</template>
-    </span>
-    <TooltipIconButton
-      icon="close"
-      :label="t('common.action.close.label')"
-      class="ml-auto"
-      data-testid="stream-search-close"
-      @click="close"
-    />
-  </ViewToolbar>
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
+        <template v-if="filtering && filteredRowCount !== null">
+          {{
+            t('studio.search.scopeFilteredRows.status', { shown: formatCount(filteredRowCount), count: loadedRowCount })
+          }}
+        </template>
+        <template v-else>{{
+          t('studio.search.scopeRows.status', { count: loadedRowCount })
+        }}</template>
+      </span>
+    </template>
+    <template #count="{ text }">
+      <CatalogText v-if="entry && entry.matches.length > 0" k="common.matchPosition.status">
+        <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
+        <template #total><b class="font-data">{{ entry.matches.length }}</b></template>
+      </CatalogText>
+      <template v-else>{{ text }}</template>
+    </template>
+  </FindBar>
 </template>

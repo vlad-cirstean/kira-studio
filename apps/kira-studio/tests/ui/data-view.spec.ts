@@ -1336,7 +1336,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // --- search toolbar: match count, case, whole word, regex, prev/next, no new op rows -------
   const opsBeforeSearch = (await stream.ops()).length;
   await page.click('[data-testid="toolbar-search"]');
-  const searchToolbar = page.locator('[data-testid="search-toolbar"]');
+  const searchToolbar = page.locator('[data-testid="search-bar"]');
   await expect(searchToolbar).toBeVisible();
   await page.fill('[data-testid="search-input"]', '1');
   await expect(page.locator('[data-testid="search-count"]')).not.toContainText('No matches');
@@ -1419,7 +1419,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(0);
   await page.click('[data-testid="grid-show-all-rows"]');
   await expect(page.locator('[data-testid="grid-no-matching-rows"]')).toHaveCount(0);
-  await expect(filterToggle).not.toHaveClass(/is-active/);
+  await expect(filterToggle).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10);
 
   // Pending inserts survive the filter (D5), whatever the query matches — an unsaved row is work
@@ -1439,7 +1439,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // empty the grid.
   await page.fill('[data-testid="search-input"]', '');
   await filterToggle.click();
-  await expect(filterToggle).toHaveClass(/is-active/);
+  await expect(filterToggle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10);
 
   // Closing the toolbar unfilters (D7), and reopening starts with the toggle off.
@@ -1450,7 +1450,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10);
   await page.click('[data-testid="toolbar-search"]');
   await expect(searchToolbar).toBeVisible();
-  await expect(filterToggle).not.toHaveClass(/is-active/);
+  await expect(filterToggle).toHaveAttribute('aria-pressed', 'false');
 
   // Zero operations for the whole filter sequence (D13): the single assertion that proves the
   // filter never reached the server — a new PortRequest would mean it had.

@@ -83,7 +83,7 @@ describe('api/state/collections.ts search debounce and indexed childrenOf (findi
         request('req-1', 'col-1', null, 'Health check', 1),
       ],
     );
-    collectionsStore.expanded = new Set(['c:col-1']);
+    collectionsStore.expanded = ['c:col-1'];
     collectionsStore.search = '';
     // Let any debounce timer left over from a previous test in this file settle first.
     await sleep(200);
@@ -109,7 +109,7 @@ describe('api/state/collections.ts search debounce and indexed childrenOf (findi
       [collection('col-2', 'Widgets API')],
       [request('req-2', 'col-2', null, 'List widgets', 0)],
     );
-    collectionsStore.expanded = new Set(['c:col-2']);
+    collectionsStore.expanded = ['c:col-2'];
     collectionsStore.search = '';
     await sleep(200);
 

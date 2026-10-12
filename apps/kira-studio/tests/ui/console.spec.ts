@@ -387,7 +387,7 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
   await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
 
   await page.click('[data-testid="console-search"]');
-  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-bar"]');
   await expect(searchToolbar).toBeVisible();
   await page.fill('[data-testid="console-search-input"]', '55');
   await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText(
@@ -482,7 +482,7 @@ test('Query console — a filter change clears the tabular selection, and a gutt
   // --- filter to n=2/n=4 (page rows 1 and 3): the selection clears outright, not just when the
   // selected row itself drops out of view --------------------------------------------------------
   await page.click('[data-testid="console-search"]');
-  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-bar"]');
   await expect(searchToolbar).toBeVisible();
   await page.click('[data-testid="console-search-regex"]');
   await page.fill('[data-testid="console-search-input"]', '^[24]$');
@@ -562,7 +562,7 @@ test('Query console — the one-cell selection highlight clears (not jumps) when
   // visible and renders at display position 2 — the exact slot a nearest-match fallback would
   // wrongly paint the highlight onto ---------------------------------------------------------------
   await page.click('[data-testid="console-search"]');
-  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-bar"]');
   await expect(searchToolbar).toBeVisible();
   await page.click('[data-testid="console-search-regex"]');
   await page.fill('[data-testid="console-search-input"]', '^[1245]$');
@@ -1133,7 +1133,7 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
 
   // --- narrowed to what the find-filter actually shows ----------------------------------------
   await page.click('[data-testid="console-search"]');
-  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-bar"]');
   await expect(searchToolbar).toBeVisible();
   await page.fill('[data-testid="console-search-input"]', 'beta');
   await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText('of 1');

@@ -1,23 +1,18 @@
 <script setup lang="ts" generic="M extends { row: number }">
-import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { type MessageKey, t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { useFindBar } from '@workbench/behaviour/findBar';
-import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
+import FindBar from '@workbench/components/FindBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
-import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
 import { usePageSearchFilterStore } from './searchFilter';
 
-// P39 D9: replaces grid/SearchToolbar.vue, documents/DocumentSearchToolbar.vue and
-// keyvalue/KeyValueSearchToolbar.vue — same markup, same classes, same testids (testidPrefix is
-// '' for the grid, 'document-' and 'keyvalue-' for the other two). stream/StreamSearchToolbar.vue
-// is a different widget (no case/word/regex toggles, no chunked scan) and stays on its own.
+// Shared by the grid, document and key-value views (testidPrefix '', 'document-', 'keyvalue-'):
+// a chunked scan over the loaded rows on the workbench `FindBar` shell.
 const props = defineProps<{
   tabId: string;
   testidPrefix: string;
@@ -223,10 +218,6 @@ function close(): void {
   emit('close');
 }
 
-// P105 §5.1: the toolbar div is not interactive -- useFindBar binds the keys on it.
-const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
-useFindBar({ root: rootEl, query, onQuery, next: goNext, prev: goPrev, close });
-
 onUnmounted(() => {
   closed = true;
   handle?.cancel();
@@ -236,112 +227,35 @@ onUnmounted(() => {
   // above — the toggle must reset here too.
   pageSearchFilterStore.setSearchFiltering(props.tabId, false);
 });
-
-// Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
-const fieldWrap = useTemplateRef<HTMLElement>('fieldWrap');
-useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
 </script>
 
 <template>
-  <!-- LAW 03 / README: docks at the bottom of the result it searches (never floating over it),
-       so it's obvious what's being searched — and it only ever walks the loaded rows. -->
-  <ViewToolbar ref="rootEl" class="bg-elevated" :data-testid="`${testidPrefix}search-toolbar`">
-    <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField
-        v-model="query"
-        @keydown.escape.stop="close"
-        :placeholder="t('common.action.find.label')"
-        :data-testid="`${testidPrefix}search-input`"
-        :aria-invalid="!!errorMessage"
-      />
-    </div>
-    <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
-         single-value picker, so each is its own icon button rather than a <SegmentedControl> (which
-         only models "exactly one option selected") — the same three codicons VS Code's own
-         find widget uses for this. -->
-    <div class="flex items-center gap-1.5 min-w-0">
+  <FindBar
+    v-model="query"
+    :position="entry ? entry.index + 1 : 0"
+    :total="entry ? (entry.found ?? entry.matches.length) : 0"
+    :invalid="!!errorMessage"
+    :testid-prefix="`${testidPrefix}search-`"
+    @query="onQuery"
+    @next="goNext"
+    @prev="goPrev"
+    @close="close"
+  >
+    <template #options>
       <SearchOptionToggles
         v-model:match-case="matchCase"
         v-model:whole-word="wholeWord"
         v-model:regex="regex"
         :testid-prefix="`${testidPrefix}search-`"
       />
-    </div>
-
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-
-    <!-- P24 D1/D9: a filter *mode* on this same widget — hides every row with no match. Its own
-         group, flanked by .sep on both sides, since case/word/regex say *how to match* and this
-         (with prev/next) says *what to do with the matches*. -->
-    <div class="flex items-center gap-1.5 min-w-0">
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <TooltipIconButton
         icon="filter"
         :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
         :aria-label="t('studio.search.filterRows.tooltip')"
-        :class="{ 'bg-field text-fg is-active': filtering }"
+        :pressed="filtering"
         :data-testid="`${testidPrefix}search-filter-rows`"
         @click="toggleFilter"
-      />
-    </div>
-
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-
-    <span
-      v-if="errorMessage"
-      class="text-kira-sm whitespace-nowrap overflow-hidden text-ellipsis text-error"
-      :data-testid="`${testidPrefix}search-error`"
-      >{{
-        errorMessage
-      }}</span
-    >
-    <template v-else>
-      <!-- P42 D38: `scanning` now wins over a non-empty `entry` — a scan in progress publishes
-           partial matches into searchState too (so highlighting can show them immediately), and
-           without this order swap that partial entry's own non-zero length would make the branch
-           above print a growing, and misleading, "0 of N" instead of "N…". P43 iter2 F24/D33: the
-           order swap alone doesn't cover every path here — a superseded scan's own stale `.then`
-           used to set `scanning` false while a newer scan was still genuinely running, falling
-           through to this same branch with a partial `index: -1` entry underneath it; that path is
-           closed by `startSearch`'s own handle-identity check, not by this template. -->
-      <span
-        class="text-kira-sm text-muted-foreground whitespace-nowrap"
-        :data-testid="`${testidPrefix}search-count`"
-      >
-        <template v-if="scanning">{{
-          t('studio.search.scanning.loading', { count: foundSoFar })
-        }}</template>
-        <template v-else-if="entry && entry.matches.length > 0">
-          <CatalogText k="common.matchPosition.status">
-            <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
-            <template #total
-              ><b class="font-data">{{
-                formatCount(entry.found ?? entry.matches.length)
-              }}</b></template
-            >
-          </CatalogText>
-          <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —
-               a user cannot act on the un-shown remainder, so this says plainly that only the
-               first N are on offer for Prev/Next/highlight. -->
-          <span
-            v-if="entry.found !== undefined && entry.found > entry.matches.length"
-            :data-testid="`${testidPrefix}search-capped`"
-          >
-            {{ t('studio.search.capped.status', { count: entry.matches.length }) }}
-          </span>
-        </template>
-        <template v-else>{{ t('common.state.noMatches.empty') }}</template>
-      </span>
-      <TooltipIconButton
-        icon="chevron-up"
-        :label="t('common.action.previousMatch.label')"
-        :data-testid="`${testidPrefix}search-prev`"
-        @click="goPrev"
-      />
-      <TooltipIconButton
-        icon="chevron-down"
-        :label="t('common.action.nextMatch.label')"
-        :data-testid="`${testidPrefix}search-next`"
-        @click="goNext"
       />
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <span class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-scope`">
@@ -350,9 +264,6 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
         </template>
         <template v-else>{{ t(scopeKey, { count: loadedRowCount }) }}</template>
       </span>
-      <!-- M5 §6.6: search stays over raw stored values even while the grid's own preview shows
-           masked ones — a surprising mismatch otherwise ("why did my search for a real name match
-           a row showing buckets"), named here rather than left implicit. -->
       <span
         v-if="maskPreviewOn"
         class="text-kira-sm text-subtle"
@@ -361,12 +272,30 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
         {{ t('studio.search.maskNote.status') }}
       </span>
     </template>
-    <TooltipIconButton
-      icon="close"
-      :label="t('common.action.close.label')"
-      class="ml-auto"
-      :data-testid="`${testidPrefix}search-close`"
-      @click="close"
-    />
-  </ViewToolbar>
+    <template #count="{ text }">
+      <span v-if="errorMessage" class="text-error" :data-testid="`${testidPrefix}search-error`">{{
+        errorMessage
+      }}</span>
+      <template v-else-if="scanning">{{
+        t('studio.search.scanning.loading', { count: foundSoFar })
+      }}</template>
+      <template v-else-if="entry && entry.matches.length > 0">
+        <CatalogText k="common.matchPosition.status">
+          <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
+          <template #total
+            ><b class="font-data">{{
+              formatCount(entry.found ?? entry.matches.length)
+            }}</b></template
+          >
+        </CatalogText>
+        <span
+          v-if="entry.found !== undefined && entry.found > entry.matches.length"
+          :data-testid="`${testidPrefix}search-capped`"
+        >
+          {{ t('studio.search.capped.status', { count: entry.matches.length }) }}
+        </span>
+      </template>
+      <template v-else>{{ text }}</template>
+    </template>
+  </FindBar>
 </template>

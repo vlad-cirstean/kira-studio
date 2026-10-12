@@ -1,25 +1,25 @@
 <script setup lang="ts">
 import type { SavedConsoleQuery } from '@shared/domain/queries';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Separator } from '@theme/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
-import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { errorText } from '@workbench/bridge/codedError';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
-import { onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { setText } from './state';
 
-// A lean sibling of views/shared/FilterHistoryMenu.vue: saved-only (§8.14 gives the console no run
-// history, only saved_queries), scoped to one tab's own connectionId/path. Both share the same
-// popover shell/list layout via views/shared/SavedListMenu.vue.
+// Saved-only sibling of FilterHistoryMenu (§8.14: the console has no run history), scoped to one
+// tab's connectionId/path, on the shared SavedListMenu shell.
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -27,7 +27,18 @@ function tab() {
   return useTabsStore().findConsoleTab(props.tabId);
 }
 
-const saved = ref<SavedConsoleQuery[]>([]);
+const queryClient = useQueryClient();
+const savedQuery = useQuery(() => {
+  const current = tab();
+  return {
+    queryKey: ['consoleSaved', current?.connectionId ?? null, current?.path ?? null] as const,
+    queryFn: () =>
+      control.queriesListConsole(current?.connectionId as string, current?.path as string),
+    enabled: !!current?.connectionId,
+    staleTime: 0,
+  };
+});
+const saved = computed<SavedConsoleQuery[]>(() => savedQuery.data.value ?? []);
 
 // P107 T2-19: shared in-app substitute for window.prompt() — see
 // packages/workbench/src/prompt/useTextPrompt.ts (same one FilterHistoryMenu.vue uses).
@@ -38,21 +49,40 @@ const {
   cancel: cancelPrompt,
 } = useTextPrompt();
 
-// Every action runs through `attempt`: a storage failure shows in the footer, never as an
-// unhandled rejection with nothing on screen.
-const run = useAsyncAction((action: () => Promise<void>) => action());
-const error = run.error;
-async function attempt(action: () => Promise<void>): Promise<void> {
-  await run.run(action);
+const invalidate = () => queryClient.invalidateQueries({ queryKey: ['consoleSaved'] });
+const updateMutation = useMutation({
+  mutationFn: (args: { id: string; patch: { pinned?: boolean; name?: string } }) =>
+    control.queriesUpdate(args.id, args.patch),
+  onSuccess: invalidate,
+});
+const deleteMutation = useMutation({
+  mutationFn: (id: string) => control.queriesDelete(id),
+  onSuccess: invalidate,
+});
+const saveMutation = useMutation({
+  mutationFn: (args: { name: string; text: string; connectionId: string; path: string }) =>
+    control.queriesSaveConsole({
+      connectionId: args.connectionId,
+      path: args.path,
+      name: args.name,
+      body: { text: args.text },
+      pinned: false,
+    }),
+  onSuccess: invalidate,
+});
+// A storage failure shows in the footer, never as an unhandled rejection with nothing on screen.
+const failure = ref<string | null>(null);
+const error = computed(
+  () => failure.value ?? (savedQuery.error.value ? errorText(savedQuery.error.value) : null),
+);
+async function attempt(action: () => Promise<unknown>): Promise<void> {
+  failure.value = null;
+  try {
+    await action();
+  } catch (err) {
+    failure.value = errorText(err);
+  }
 }
-
-async function load(): Promise<void> {
-  const t = tab();
-  if (!t?.connectionId) return;
-  saved.value = await control.queriesListConsole(t.connectionId, t.path);
-}
-const reload = (): Promise<void> => attempt(load);
-onMounted(reload);
 
 function apply(entry: SavedConsoleQuery): void {
   setText(props.tabId, entry.body.text);
@@ -63,22 +93,15 @@ function apply(entry: SavedConsoleQuery): void {
 }
 
 const togglePin = (entry: SavedConsoleQuery): Promise<void> =>
-  attempt(async () => {
-    await control.queriesUpdate(entry.id, { pinned: !entry.pinned });
-    await load();
-  });
+  attempt(() => updateMutation.mutateAsync({ id: entry.id, patch: { pinned: !entry.pinned } }));
 const rename = (entry: SavedConsoleQuery): Promise<void> =>
   attempt(async () => {
     const name = await promptText(t('studio.console.savedMenu.renameTitle.title'), entry.name);
     if (!name || name.trim() === '') return;
-    await control.queriesUpdate(entry.id, { name: name.trim() });
-    await load();
+    await updateMutation.mutateAsync({ id: entry.id, patch: { name: name.trim() } });
   });
 const remove = (entry: SavedConsoleQuery): Promise<void> =>
-  attempt(async () => {
-    await control.queriesDelete(entry.id);
-    await load();
-  });
+  attempt(() => deleteMutation.mutateAsync(entry.id));
 
 const saveCurrent = (): Promise<void> =>
   attempt(async () => {
@@ -86,14 +109,12 @@ const saveCurrent = (): Promise<void> =>
     if (!current?.connectionId) return;
     const name = await promptText(t('studio.console.savedMenu.nameTitle.title'), '');
     if (!name || name.trim() === '') return;
-    await control.queriesSaveConsole({
+    await saveMutation.mutateAsync({
+      name: name.trim(),
+      text: current.state.text,
       connectionId: current.connectionId,
       path: current.path,
-      name: name.trim(),
-      body: { text: current.state.text },
-      pinned: false,
     });
-    await load();
   });
 </script>
 
@@ -101,8 +122,8 @@ const saveCurrent = (): Promise<void> =>
   <SavedListMenu
     :title="t('studio.console.savedMenu.title')"
     :saved="saved"
-    panel-test-id="console-saved-menu"
-    saved-entry-test-id="console-saved-entry"
+    panel-testid="console-saved-menu"
+    saved-entry-testid="console-saved-entry"
     :empty-saved-text="t('studio.console.savedMenu.empty')"
     :entry-text="(entry) => entry.name"
     @apply="apply"
@@ -110,18 +131,7 @@ const saveCurrent = (): Promise<void> =>
     @delete="remove"
   >
     <template #entry="{ entry }">
-      <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's
-           own note (the 320px popover is structurally too narrow for a saved query's full text). -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <span class="entry-name flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            entry.name
-          }}</span>
-        </TooltipTrigger>
-        <TooltipContent class="whitespace-pre-wrap">{{
-          `${entry.name}\n${entry.body.text}`
-        }}</TooltipContent>
-      </Tooltip>
+      <span class="min-w-0 flex-1"><TruncatedText :text="entry.name" /></span>
     </template>
     <template #entry-actions="{ entry }">
       <TooltipIconButton
@@ -135,10 +145,6 @@ const saveCurrent = (): Promise<void> =>
       <Alert v-if="error" variant="error" data-testid="console-saved-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
-      <!-- text-primary not text-hover: hover reads --kira-hover (grey); --primary maps to
-           --kira-accent, same workaround as api/CollectionRow.vue's rename-input (Part 3). P110
-           I2-37 retired the shadcn accent alias this comment used to warn against; hover is its
-           I2-37 replacement name. -->
       <button
         type="button"
         :class="cn(rowVariants(), 'w-full text-primary')"
@@ -150,12 +156,8 @@ const saveCurrent = (): Promise<void> =>
         >
         {{ t('studio.console.savedMenu.saveCurrent.label') }}
       </button>
-      <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
-           (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own
-           imperative focus call on mount would otherwise move focus outside reka's Popover content
-           boundary, which its own dismiss layer reads as an outside interaction and closes the
-           whole menu before the prompt is ever seen (console.spec.ts's saved-queries scenario
-           caught it; see that file's own header comment for why it isn't shadcn's Dialog). -->
+      <!-- Stays inside PopoverContent: a sibling would move focus outside its dismiss layer and
+           close the menu before the prompt shows. -->
       <TextPromptDialog
         v-if="textPrompt"
         :title="textPrompt.title"

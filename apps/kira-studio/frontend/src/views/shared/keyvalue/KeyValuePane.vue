@@ -79,6 +79,7 @@ import { createMatchIndex } from '../page/search';
 import { pageSizeOptions } from '../page/sizes';
 import { setVisibleRows } from '../page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../useConnectionGate';
+import { writeDisabledReason } from '../writeGate';
 import { keyValueHost } from './host';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
@@ -251,16 +252,6 @@ const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.r
 // materially bigger job than a single SET, so the action stays disabled with an explanatory
 // tooltip for those types rather than attempting a lossy whole-key replace.
 const editableType = computed(() => page.value?.redisType === 'string');
-// "Connection is read-only" only actually explains the disabled state when the connection's own
-// readOnly toggle is the reason — an adapter that structurally can't write at all (S3, this
-// phase) would show the same tooltip on a control that toggle could never turn back on.
-function writeDisabledReason(capFlag: boolean | undefined): string {
-  return t(
-    capFlag === false
-      ? 'studio.common.writeUnsupported.tooltip'
-      : 'studio.common.connectionReadOnly.tooltip',
-  );
-}
 const editTitle = computed(() => {
   if (page.value?.redisType === 'object') return objectEditGate.value.reason;
   if (!canUpdate.value) return writeDisabledReason(caps.value?.canUpdate);

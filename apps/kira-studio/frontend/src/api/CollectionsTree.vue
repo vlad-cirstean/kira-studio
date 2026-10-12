@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import type { ShortcutId } from '@shared/domain/shortcuts';
 import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { announceApp } from '@workbench/behaviour/liveRegion';
+import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/lib/rowHeight';
-import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef } from 'vue';
@@ -132,10 +133,7 @@ async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
 }
 
 function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
-  collectionsStore.selectRow(row.key);
-  contextMenuStore.openContextMenu(event, menuForRow(row, actions), {
-    onRestoreFocus: () => void nav.focusKey(row.key),
-  });
+  nav.contextMenu(row, event, menuForRow(row, actions));
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
@@ -180,27 +178,26 @@ const nav = useListNavigation<CollectionRowVm>({
   rowSelector: () => '[role="treeitem"][tabindex="0"]',
 });
 
-function onTreeKeydown(e: KeyboardEvent): void {
-  if (e.defaultPrevented || e.isComposing) return;
-  const target = e.target as HTMLElement | null;
-  if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  const id = shortcutFor(e, TREE_SHORTCUTS);
-  if (!id) return;
-  const row = collectionsStore.visibleRows.find((r) => r.key === collectionsStore.selected);
-  if (row && runMenuShortcut(menuForRow(row, actions), id)) e.preventDefault();
+// Dispatches through the menu builder, so disabled gating and the printed chord stay in one place.
+function viaMenu(id: ShortcutId): (key: string) => void {
+  return (key) => {
+    const row = collectionsStore.visibleRows.find((r) => r.key === key);
+    if (row) runMenuShortcut(menuForRow(row, actions), id);
+  };
 }
+useTreeShortcuts(nav, {
+  'tree.rename': viaMenu('tree.rename'),
+  'tree.delete': viaMenu('tree.delete'),
+  'tree.duplicate': viaMenu('tree.duplicate'),
+});
 
 const hasVisibleSelection = computed(() =>
   collectionsStore.visibleRows.some((r) => r.key === collectionsStore.selected),
 );
 
-const TREE_SHORTCUTS = ['tree.rename', 'tree.delete', 'tree.duplicate'] as const;
-
-// P105 §5.1: the tree background has no interactive role of its own -- both listeners bind here
-// via VueUse rather than as raw template attributes on a non-interactive div.
+// The tree background has no interactive role of its own: bind its listener via VueUse.
 const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
 useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
-useEventListener(scrollEl, 'keydown', onTreeKeydown);
 </script>
 
 <template>
@@ -252,6 +249,4 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
       </div>
     </div>
   </div>
-  <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
-       (packages/workbench/src/lib/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
 </template>

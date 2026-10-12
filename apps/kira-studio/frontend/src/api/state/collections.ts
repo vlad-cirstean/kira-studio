@@ -12,6 +12,7 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { logWarn } from '@workbench/bridge/log';
@@ -93,7 +94,6 @@ function rowMatches(name: string, url: string, query: string): boolean {
 // now (null data === confirmed orphan, undefined === not loaded yet, apiQueries.ts's own
 // convention), not a second local Record.
 interface CollectionsState {
-  expanded: Set<string>;
   selected: string | null;
   search: string;
   /** The row key whose label is currently an inline rename input, if any. */
@@ -119,7 +119,6 @@ interface CollectionsState {
 
 export const useCollectionsStore = defineStore('collections', () => {
   const state = reactive<CollectionsState>({
-    expanded: new Set<string>(),
     selected: null,
     search: '',
     renamingKey: null,
@@ -128,6 +127,18 @@ export const useCollectionsStore = defineStore('collections', () => {
     exportWarning: null,
     error: null,
   });
+
+  // Expanded keys survive a reload (the whole tree is in memory, so restoring is just a key set).
+  const expandedKeys = usePersistedState<string[]>('kira.api.expanded', []);
+  const expandedSet = {
+    has: (key: string): boolean => expandedKeys.value.includes(key),
+    add(key: string): void {
+      if (!expandedKeys.value.includes(key)) expandedKeys.value = [...expandedKeys.value, key];
+    },
+    delete(key: string): void {
+      expandedKeys.value = expandedKeys.value.filter((k) => k !== key);
+    },
+  };
 
   function dismissError(): void {
     state.error = null;
@@ -220,7 +231,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         const children = childrenOf(collectionId, item.id);
         // While a query is active every ancestor of a match renders expanded **without mutating
         // `expanded`**, so clearing the search restores exactly the shape the user had.
-        const expanded = query ? true : state.expanded.has(itemKey(item.id));
+        const expanded = query ? true : expandedSet.has(itemKey(item.id));
         rows.push({
           key: itemKey(item.id),
           depth,
@@ -244,7 +255,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       const children = childrenOf(collection.id, null);
       const hasMatch = !query || children.some((child) => subtreeMatches(child, query));
       if (query && !hasMatch && !rowMatches(collection.name, '', query)) continue;
-      const expanded = query ? true : state.expanded.has(collectionKey(collection.id));
+      const expanded = query ? true : expandedSet.has(collectionKey(collection.id));
       rows.push({
         key: collectionKey(collection.id),
         depth: 0,
@@ -273,16 +284,16 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   function toggleRow(row: CollectionRowVm): void {
     if (!row.hasChildren) return;
-    if (state.expanded.has(row.key)) state.expanded.delete(row.key);
-    else state.expanded.add(row.key);
+    if (expandedSet.has(row.key)) expandedSet.delete(row.key);
+    else expandedSet.add(row.key);
   }
 
   function expandRow(row: CollectionRowVm): void {
-    if (row.hasChildren) state.expanded.add(row.key);
+    if (row.hasChildren) expandedSet.add(row.key);
   }
 
   function collapseRow(row: CollectionRowVm): void {
-    state.expanded.delete(row.key);
+    expandedSet.delete(row.key);
   }
 
   /** Every ancestor of an item, so a freshly created row is visible without the user expanding to
@@ -292,14 +303,14 @@ export const useCollectionsStore = defineStore('collections', () => {
    *  macrotask behind it (notifyManager's own batching), so this reads the cache directly rather
    *  than `items.value`. */
   function revealItem(collectionId: string, itemId: string | null): void {
-    state.expanded.add(collectionKey(collectionId));
+    expandedSet.add(collectionKey(collectionId));
     const currentItems =
       queryClient.getQueryData<ApiCollectionsTree>(apiCollectionsTreeKey)?.items ?? [];
     let cursor = itemId;
     while (cursor) {
       const item = currentItems.find((row) => row.id === cursor);
       if (!item) return;
-      state.expanded.add(itemKey(item.id));
+      expandedSet.add(itemKey(item.id));
       cursor = item.parentId;
     }
   }
@@ -734,7 +745,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     try {
       const report = await control.collectionsImport(chosen.file.path);
       state.report = { ...report, warnings: report.warnings ?? [] };
-      state.expanded.add(collectionKey(report.collectionId));
+      expandedSet.add(collectionKey(report.collectionId));
       state.selected = collectionKey(report.collectionId);
       return true;
     } catch (err) {
@@ -836,6 +847,7 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   return {
     ...toRefs(state),
+    expanded: expandedKeys,
     collections,
     items,
     loaded,

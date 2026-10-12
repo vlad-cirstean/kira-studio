@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import HighlightedText from '@theme/components/HighlightedText.vue';
+import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
+import { splitMatches } from '@workbench/behaviour/match';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -72,29 +75,10 @@ const connectionKind = computed(() => {
   return connectionsStore.connectionRecord(props.row.connectionId)?.kind;
 });
 
-// Splits row.name on every case-insensitive occurrence of the live search query so only the
-// matched substring(s) get <mark>-ed, not the whole label.
-function highlightParts(): { text: string; hit: boolean }[] {
-  const query = treeStore.activeSearchQuery;
-  if (!props.row.matched || !query) return [{ text: props.row.name, hit: false }];
-  const name = props.row.name;
-  const lower = name.toLowerCase();
-  const parts: { text: string; hit: boolean }[] = [];
-  let i = 0;
-  while (i < name.length) {
-    const idx = lower.indexOf(query, i);
-    if (idx === -1) {
-      parts.push({ text: name.slice(i), hit: false });
-      break;
-    }
-    if (idx > i) parts.push({ text: name.slice(i, idx), hit: false });
-    parts.push({ text: name.slice(idx, idx + query.length), hit: true });
-    i = idx + query.length;
-  }
-  return parts;
-}
-
-const parts = computed(highlightParts);
+// Only the matched substring(s) of the label are marked, not the whole label.
+const parts = computed(() =>
+  props.row.matched ? splitMatches(props.row.name, treeStore.activeSearchQuery) : [],
+);
 
 // A focused row is the roving stop, so Shift+F10 and arrows act on it.
 function onFocus(): void {
@@ -188,56 +172,28 @@ function onKeydown(e: KeyboardEvent): void {
       class="shrink-0 text-muted-foreground"
     />
 
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <span class="label overflow-hidden text-ellipsis min-w-0">
-          <template v-for="(part, i) in parts" :key="i">
-            <mark v-if="part.hit" class="rounded-kira-xs bg-search-match text-inherit">{{
-              part.text
-            }}</mark>
-            <template v-else>{{ part.text }}</template>
-          </template>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{{ row.name }}</TooltipContent>
-    </Tooltip>
+    <span class="label min-w-0">
+      <TruncatedText :text="row.name">
+        <HighlightedText v-if="parts.length > 0" :parts="parts" />
+        <template v-else>{{ row.name }}</template>
+      </TruncatedText>
+    </span>
 
     <span v-if="row.badges?.length" class="flex gap-0.5 shrink-0">
       <Badge v-for="badge in row.badges" :key="badge" variant="count">{{ badge }}</Badge>
     </span>
 
     <ErrorPopover v-if="row.error" :message="row.error" />
-    <!-- P24: a connect failure has no separate `row.error`/ErrorPopover of its own (tree.ts's
-         `error` field is a post-connect children-fetch failure only, never set when connect()
-         itself fails) — previously the reason lived nowhere but the status dot's own tooltip
-         (a 8px hit target), with no visible text at all. Truncated-with-hover-detail, matching
-         OperationsPanel.vue's own `error-text`/`Tooltip` pattern for the same "errors are
-         truncated by default, full text on hover" shape. -->
-    <Tooltip v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail">
-      <TooltipTrigger as-child>
-        <span
-          class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-error"
-          data-testid="connection-error-detail"
-          >{{
-            row.statusDetail
-          }}</span
-        >
-      </TooltipTrigger>
-      <TooltipContent>{{ row.statusDetail }}</TooltipContent>
-    </Tooltip>
+    <!-- A connect failure has no `row.error`/ErrorPopover (tree.ts sets `error` only for a
+         post-connect children-fetch failure), so the reason shows here, truncated. -->
     <span
-      v-else-if="row.detail"
-      class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-muted-foreground text-kira-sm"
-      >{{
-        row.detail
-      }}</span
+      v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail"
+      class="ml-auto min-w-0 shrink text-error"
+      data-testid="connection-error-detail"
+      ><TruncatedText :text="row.statusDetail" /></span
     >
-    <!-- P110 I2-14: `.tree-row`'s hover/selected ternary moved onto the root binding (stateClass,
-         above) -- see packages/theme/src/base.css's own pointer comment for the retired
-         `@utility tree-row`. P110 I2-13: the twisty moved to TreeTwisty.vue; the loading-spinner
-         override above is this file's own slot content. P110 B35: `.status-dot`/`.label` stay
-         bare marker classes (data-status assertions, font-roles.spec.ts's `.label` check);
-         `.spin` became `data-testid="tree-row-spinner"` (tree.spec.ts/support/tree.ts's own
-         `[data-testid="tree-twisty"] [data-testid="tree-row-spinner"]` locator). -->
+    <span v-else-if="row.detail" class="ml-auto min-w-0 shrink" :class="rowMeta"
+      ><TruncatedText :text="row.detail" /></span
+    >
   </div>
 </template>

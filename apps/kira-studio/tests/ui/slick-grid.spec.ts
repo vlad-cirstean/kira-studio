@@ -1112,7 +1112,7 @@ test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 
   // shape), so a whole-cell digit-run regex matches the `id` column exactly once per row and
   // never the `hash` column (32 hex chars, never all-digit in this fixture's md5 seed).
   await page.click('[data-testid="toolbar-search"]');
-  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await expect(page.locator('[data-testid="search-bar"]')).toBeVisible();
   await page.click('[data-testid="search-regex"]');
   await page.fill('[data-testid="search-input"]', '^\\d+$');
   await expect(page.locator('[data-testid="search-count"]')).toContainText('of 10,000', {
@@ -1212,7 +1212,7 @@ test('P22 Pass B follow-up — select-all under an active row filter copies only
   // contiguous filtered gap (a `'range'`-kind selection's own corners-only shape, untouched by
   // this fix). id/hash pairs are the well-known md5-of-decimal-string fixture values.
   await page.click('[data-testid="toolbar-search"]');
-  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await expect(page.locator('[data-testid="search-bar"]')).toBeVisible();
   await page.click('[data-testid="search-regex"]');
   await page.fill('[data-testid="search-input"]', '^[1-3]$');
   await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3');
@@ -1923,7 +1923,7 @@ test('P22 Pass B follow-up — the cell selection highlight tracks its row throu
   // --- filter to ids 2/4 (page rows 1 and 3): id=4 now renders at display position 1, the exact
   // slot a stale, position-keyed highlight would still be pointing at ---------------------------
   await page.click('[data-testid="toolbar-search"]');
-  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await expect(page.locator('[data-testid="search-bar"]')).toBeVisible();
   await page.click('[data-testid="search-regex"]');
   await page.fill('[data-testid="search-input"]', '^[24]$');
   await expect(page.locator('[data-testid="search-count"]')).toContainText('of 2');
@@ -2022,7 +2022,7 @@ test('P22 Pass B follow-up — a range selection under an active filter only cop
   // --- filter to ids 1/2/3/90 (page rows 0,1,2,89) — a contiguous run plus one far outlier, so a
   // shift-click across all four visible rows spans 86 hidden page rows in between ----------------
   await page.click('[data-testid="toolbar-search"]');
-  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await expect(page.locator('[data-testid="search-bar"]')).toBeVisible();
   await page.click('[data-testid="search-regex"]');
   await page.fill('[data-testid="search-input"]', '^([1-3]|90)$');
   await expect(page.locator('[data-testid="search-count"]')).toContainText('of 4');

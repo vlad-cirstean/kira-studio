@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import type { ShortcutId } from '@shared/domain/shortcuts';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/lib/rowHeight';
-import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -148,10 +149,7 @@ async function rowMenuItems(row: TreeRowVm): Promise<MenuItem[]> {
 
 async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
   // Right-click selects the row (without opening anything) before its menu opens.
-  treeStore.selectRow(row.key);
-  contextMenuStore.openContextMenu(event, await rowMenuItems(row), {
-    onRestoreFocus: () => void nav.focusKey(row.key),
-  });
+  nav.contextMenu(row, event, await rowMenuItems(row));
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
@@ -193,34 +191,24 @@ const nav = useListNavigation<TreeRowVm>({
   rowSelector: () => '[role="treeitem"][tabindex="0"]',
 });
 
-const TREE_SHORTCUTS = [
-  'tree.copyName',
-  'tree.copyUri',
-  'tree.rename',
-  'tree.duplicate',
-  'tree.delete',
-] as const;
-
-// P21 D6/D9: fires only while a tree row holds real DOM focus (the roving tabindex TreeRow.vue
-// already sets) — this is a descendant of ProjectPanel's own type-ahead keydown handler, so it
-// runs first on the bubble path, and every key it claims (Enter, a Cmd or Ctrl combo, F2, Delete) is
-// one the type-ahead handler already ignores (its own single-printable-character guard).
-function onTreeKeydown(e: KeyboardEvent): void {
-  if (e.defaultPrevented || e.isComposing) return;
-  const target = e.target as HTMLElement | null;
-  if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  const id = shortcutFor(e, TREE_SHORTCUTS);
-  if (!id) return;
-  const row = treeStore.visibleRows.find((r) => r.key === treeStore.selected);
-  if (!row) return;
-  if (runMenuShortcut(menuForRow(row), id)) e.preventDefault();
+// Dispatches through the menu builder, so disabled gating and the printed chord stay in one place.
+function viaMenu(id: ShortcutId): (key: string) => void {
+  return (key) => {
+    const row = treeStore.visibleRows.find((r) => r.key === key);
+    if (row) runMenuShortcut(menuForRow(row), id);
+  };
 }
+useTreeShortcuts(nav, {
+  'tree.copyName': viaMenu('tree.copyName'),
+  'tree.copyUri': viaMenu('tree.copyUri'),
+  'tree.rename': viaMenu('tree.rename'),
+  'tree.duplicate': viaMenu('tree.duplicate'),
+  'tree.delete': viaMenu('tree.delete'),
+});
 
-// P105 §5.1: the tree background has no interactive role of its own -- both listeners bind here
-// via VueUse rather than as raw template attributes on a non-interactive div.
+// The tree background has no interactive role of its own: bind its listener via VueUse.
 const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
 useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
-useEventListener(scrollEl, 'keydown', onTreeKeydown);
 </script>
 
 <template>
@@ -272,8 +260,4 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
       </AlertDescription>
     </Alert>
   </div>
-  <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
-       (packages/workbench/src/lib/virtualRows.ts), bound directly as TreeRow's own `class` prop
-       -- `cn()` resolves the position conflict against TreeRow's own `relative` (I2-14 dropped the
-       old unlayered `.tree-row { position: relative }` this used to have to out-specificity). -->
 </template>

@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { t } from '@theme/i18n';
 import { computed, onMounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { type StreamFilterHistoryEntry, useStreamFilterHistoryStore } from './streamFilterHistory';
 
-// A lean sibling of views/shared/FilterHistoryMenu.vue/console/ConsoleSavedMenu.vue: this one has no
-// "Recent" section at all (SavedListMenu's `recent` prop is optional exactly so a caller can omit
-// it) because there is only one list here — session-only history, no separately-persisted saved
-// filters to distinguish it from (streamFilterHistory.ts's own doc comment explains why there's no
-// SQLite table backing a "saved" tier the way the SQL grid has one).
+// Single-list sibling of FilterHistoryMenu: session-only history, no "Recent" section and no
+// persisted saved tier (see streamFilterHistory.ts).
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{
   apply: [offset: string | null, partitions: number[], timestamp: string | null];
@@ -28,14 +25,13 @@ function target(): { connectionId: string; path: string } | null {
 const entries = ref<StreamFilterHistoryEntry[]>([]);
 
 function reload(): void {
-  const t = target();
-  entries.value = t ? streamFilterHistoryStore.listStreamFilterHistory(t.connectionId, t.path) : [];
+  const dest = target();
+  entries.value = dest
+    ? streamFilterHistoryStore.listStreamFilterHistory(dest.connectionId, dest.path)
+    : [];
 }
 onMounted(reload);
 
-// SavedListMenu is keyed generically off whatever `Entry` its caller passes — here that's just
-// StreamFilterHistoryEntry, no union with a second shape (unlike FilterHistoryMenu.vue's saved +
-// recent split).
 const savedEntries = computed<StreamFilterHistoryEntry[]>(() => entries.value);
 
 function summarize(entry: StreamFilterHistoryEntry): string {
@@ -57,16 +53,16 @@ function apply(entry: StreamFilterHistoryEntry): void {
 }
 
 function togglePin(entry: StreamFilterHistoryEntry): void {
-  const t = target();
-  if (!t) return;
-  streamFilterHistoryStore.toggleStreamFilterHistoryPin(t.connectionId, t.path, entry.id);
+  const dest = target();
+  if (!dest) return;
+  streamFilterHistoryStore.toggleStreamFilterHistoryPin(dest.connectionId, dest.path, entry.id);
   reload();
 }
 
 function remove(entry: StreamFilterHistoryEntry): void {
-  const t = target();
-  if (!t) return;
-  streamFilterHistoryStore.deleteStreamFilterHistoryEntry(t.connectionId, t.path, entry.id);
+  const dest = target();
+  if (!dest) return;
+  streamFilterHistoryStore.deleteStreamFilterHistoryEntry(dest.connectionId, dest.path, entry.id);
   reload();
 }
 </script>
@@ -75,30 +71,16 @@ function remove(entry: StreamFilterHistoryEntry): void {
   <SavedListMenu
     :title="t('studio.common.filterHistory.placeholder')"
     :saved="savedEntries"
-    panel-test-id="stream-filter-history"
-    backdrop-test-id="stream-filter-history-backdrop"
-    saved-entry-test-id="stream-filter-history-entry"
+    panel-testid="stream-filter-history"
+    saved-entry-testid="stream-filter-history-entry"
     :empty-saved-text="t('studio.stream.noFilterHistory.empty')"
     :entry-text="summarize"
     @apply="apply"
     @toggle-pin="togglePin"
     @delete="remove"
-    @close="emit('close')"
   >
     <template #entry="{ entry }">
-      <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's
-           own note (the 320px popover is structurally too narrow for a long summary). -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <span
-            class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-            >{{
-              summarize(entry)
-            }}</span
-          >
-        </TooltipTrigger>
-        <TooltipContent>{{ summarize(entry) }}</TooltipContent>
-      </Tooltip>
+      <span class="min-w-0 flex-1 font-data"><TruncatedText :text="summarize(entry)" /></span>
     </template>
   </SavedListMenu>
 </template>

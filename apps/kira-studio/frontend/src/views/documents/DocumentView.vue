@@ -54,6 +54,7 @@ import { setVisibleRows } from '../shared/page/visibleRows';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
+import { writeDisabledReason } from '../shared/writeGate';
 import { confirmDeleteDocument, rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
@@ -115,17 +116,6 @@ const caps = computed(() => {
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
 const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
-// "Connection is read-only" only actually explains the disabled state when the connection's own
-// readOnly toggle is the reason — an adapter that structurally can't write at all would show the
-// same tooltip on a control that toggle could never turn back on. Mirrors KeyValueView.vue's own
-// writeDisabledReason exactly.
-function writeDisabledReason(capFlag: boolean | undefined): string {
-  return t(
-    capFlag === false
-      ? 'studio.common.writeUnsupported.tooltip'
-      : 'studio.common.connectionReadOnly.tooltip',
-  );
-}
 const insertTitle = computed(() =>
   canInsert.value ? t('studio.documents.add.label') : writeDisabledReason(caps.value?.canInsert),
 );

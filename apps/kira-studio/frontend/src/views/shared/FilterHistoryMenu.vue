@@ -1,25 +1,22 @@
 <script setup lang="ts">
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Separator } from '@theme/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
-import { computed, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { control } from '../../bridge/control';
 import SavedListMenu from './SavedListMenu.vue';
 
-// Generic across every filter-bearing view (SQL's FilterToolbar.vue, Document's own filter row) —
-// `queriesList`/`queriesHistoryList`/`queriesSave` are keyed purely on {connectionId, path} in
-// storage, with no SQL-specific shape, so "where"/"orderBy" here just names the two textual halves
-// of whatever a view's filter row holds (a WHERE clause + ORDER BY for SQL, a Mongo filter
-// document + sort document for Document) rather than anything SQL-specific. Living in
-// views/shared/ (not views/grid/) is what makes this legal for Document to import — §11 forbids
-// sideways view imports.
+// Generic across filter-bearing views (SQL's FilterToolbar, Document's filter row): "where"/"orderBy"
+// name the two textual halves of whatever a view's filter row holds. Lives in views/shared/ so
+// Document may import it (§11 forbids sideways view imports).
 const props = defineProps<{
   connectionId: string | null;
   path: string;
@@ -28,16 +25,48 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ apply: [where: string | null, orderBy: SortSpec | null]; close: [] }>();
 
-const saved = ref<SavedFilterQuery[]>([]);
-const history = ref<FilterHistoryEntry[]>([]);
+const queryClient = useQueryClient();
+const listKey = computed(() => ['filterHistory', props.connectionId, props.path] as const);
+const listQuery = useQuery(() => ({
+  queryKey: listKey.value,
+  queryFn: async () => {
+    const connectionId = props.connectionId as string;
+    const [saved, history] = await Promise.all([
+      control.queriesList(connectionId, props.path),
+      control.queriesHistoryList(connectionId, props.path, 20),
+    ]);
+    return { saved, history };
+  },
+  enabled: props.connectionId !== null,
+  staleTime: 0,
+}));
 
-// SavedListMenu's generic Entry parameter is inferred from these two props together — giving
-// both the exact same literal union type here (rather than leaving them as the distinct
-// SavedFilterQuery[]/FilterHistoryEntry[] the refs above carry) avoids Vue's generic-component
-// inference picking one prop's type and rejecting the other's.
+// Both lists share one literal union so the generic SavedListMenu infers a single Entry type.
 type Entry = SavedFilterQuery | FilterHistoryEntry;
-const savedEntries = computed<Entry[]>(() => saved.value);
-const historyEntries = computed<Entry[]>(() => history.value);
+const savedEntries = computed<Entry[]>(() => listQuery.data.value?.saved ?? []);
+const historyEntries = computed<Entry[]>(() => listQuery.data.value?.history ?? []);
+
+const invalidate = () => queryClient.invalidateQueries({ queryKey: ['filterHistory'] });
+const updateMutation = useMutation({
+  mutationFn: (args: { id: string; patch: { pinned?: boolean; name?: string } }) =>
+    control.queriesUpdate(args.id, args.patch),
+  onSuccess: invalidate,
+});
+const deleteMutation = useMutation({
+  mutationFn: (id: string) => control.queriesDelete(id),
+  onSuccess: invalidate,
+});
+const saveMutation = useMutation({
+  mutationFn: (args: { name: string; connectionId: string }) =>
+    control.queriesSave({
+      connectionId: args.connectionId,
+      path: props.path,
+      name: args.name,
+      body: { where: props.currentFilter, orderBy: props.currentSort },
+      pinned: false,
+    }),
+  onSuccess: invalidate,
+});
 
 // P107 T2-19: shared in-app substitute for window.prompt() (Electron's renderer doesn't implement
 // it) — see packages/workbench/src/prompt/useTextPrompt.ts.
@@ -47,17 +76,6 @@ const {
   submit: submitPrompt,
   cancel: cancelPrompt,
 } = useTextPrompt();
-
-async function reload(): Promise<void> {
-  if (!props.connectionId) return;
-  const [savedList, historyList] = await Promise.all([
-    control.queriesList(props.connectionId, props.path),
-    control.queriesHistoryList(props.connectionId, props.path, 20),
-  ]);
-  saved.value = savedList;
-  history.value = historyList;
-}
-onMounted(reload);
 
 function sortLabel(orderBy: SortSpec | null): string | null {
   if (!orderBy) return null;
@@ -73,14 +91,12 @@ function summarize(where: string | null, orderBy: SortSpec | null): string {
   return parts.length > 0 ? parts.join(' / ') : t('studio.filterHistory.noFilter.label');
 }
 
-// SavedListMenu's `apply` fires for both saved and recent rows (its Entry type parameter, here
-// inferred as `SavedFilterQuery | FilterHistoryEntry`, doesn't distinguish them) — branch on the
-// one field that does: only saved entries carry a `body`.
-function isSaved(entry: SavedFilterQuery | FilterHistoryEntry): entry is SavedFilterQuery {
+// `apply` fires for saved and recent rows alike; only saved entries carry a `body`.
+function isSaved(entry: Entry): entry is SavedFilterQuery {
   return 'body' in entry;
 }
 
-async function applyEntry(entry: SavedFilterQuery | FilterHistoryEntry): Promise<void> {
+async function applyEntry(entry: Entry): Promise<void> {
   if (isSaved(entry)) {
     emit('apply', entry.body.where, entry.body.orderBy);
     await control.queriesTouch(entry.id);
@@ -90,38 +106,26 @@ async function applyEntry(entry: SavedFilterQuery | FilterHistoryEntry): Promise
   emit('close');
 }
 
-// togglePin/remove are only wired to the saved section's own controls (SavedListMenu never
-// renders them for a `recent` row) — the Entry-typed parameter is still checked defensively so
-// a `history`-only entry, which has no `id` valid for these calls, can never reach the IPC.
-async function togglePin(entry: SavedFilterQuery | FilterHistoryEntry): Promise<void> {
+// Only saved entries have an id valid for these calls; a history entry never reaches the IPC.
+async function togglePin(entry: Entry): Promise<void> {
   if (!isSaved(entry)) return;
-  await control.queriesUpdate(entry.id, { pinned: !entry.pinned });
-  await reload();
+  await updateMutation.mutateAsync({ id: entry.id, patch: { pinned: !entry.pinned } });
 }
 async function rename(entry: SavedFilterQuery): Promise<void> {
   const name = await promptText(t('studio.filterHistory.renamePrompt.title'), entry.name);
   if (!name || name.trim() === '') return;
-  await control.queriesUpdate(entry.id, { name: name.trim() });
-  await reload();
+  await updateMutation.mutateAsync({ id: entry.id, patch: { name: name.trim() } });
 }
-async function remove(entry: SavedFilterQuery | FilterHistoryEntry): Promise<void> {
+async function remove(entry: Entry): Promise<void> {
   if (!isSaved(entry)) return;
-  await control.queriesDelete(entry.id);
-  await reload();
+  await deleteMutation.mutateAsync(entry.id);
 }
 
 async function saveCurrent(): Promise<void> {
   if (!props.connectionId) return;
   const name = await promptText(t('studio.filterHistory.namePrompt.title'), '');
   if (!name || name.trim() === '') return;
-  await control.queriesSave({
-    connectionId: props.connectionId,
-    path: props.path,
-    name: name.trim(),
-    body: { where: props.currentFilter, orderBy: props.currentSort },
-    pinned: false,
-  });
-  await reload();
+  await saveMutation.mutateAsync({ name: name.trim(), connectionId: props.connectionId });
 }
 </script>
 
@@ -130,9 +134,9 @@ async function saveCurrent(): Promise<void> {
     :title="t('studio.filterHistory.saved.title')"
     :saved="savedEntries"
     :recent="historyEntries"
-    panel-test-id="filter-history"
-    saved-entry-test-id="saved-entry"
-    recent-entry-test-id="history-entry"
+    panel-testid="filter-history"
+    saved-entry-testid="saved-entry"
+    recent-entry-testid="history-entry"
     :empty-saved-text="t('studio.project.menu.savedFilters.empty')"
     :empty-recent-text="t('studio.filterHistory.emptyRecent.empty')"
     :entry-text="(entry) => (isSaved(entry) ? entry.name : summarize(entry.where, entry.orderBy))"
@@ -141,32 +145,11 @@ async function saveCurrent(): Promise<void> {
     @delete="remove"
   >
     <template #entry="{ entry }">
-      <!-- P31 D27/F27: full, untruncated text — the popover is 320px and a WHERE/ORDER BY clause
-           routinely isn't, so truncation here is structural, not a sizing accident. TooltipContent
-           already wraps (P104 §6.2), so a long clause wraps instead. -->
-      <Tooltip v-if="isSaved(entry)">
-        <TooltipTrigger as-child>
-          <span class="entry-name flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            entry.name
-          }}</span>
-        </TooltipTrigger>
-        <TooltipContent class="whitespace-pre-wrap"
-          >{{ entry.name }}&#10;{{
-            summarize(entry.body.where, entry.body.orderBy)
-          }}</TooltipContent
-        >
-      </Tooltip>
-      <Tooltip v-else>
-        <TooltipTrigger as-child>
-          <span
-            class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-            >{{
-              summarize(entry.where, entry.orderBy)
-            }}</span
-          >
-        </TooltipTrigger>
-        <TooltipContent>{{ summarize(entry.where, entry.orderBy) }}</TooltipContent>
-      </Tooltip>
+      <span class="min-w-0 flex-1" :class="{ 'font-data': !isSaved(entry) }"
+        ><TruncatedText
+          :text="isSaved(entry) ? entry.name : summarize(entry.where, entry.orderBy)"
+        /></span
+      >
     </template>
     <template #entry-actions="{ entry }">
       <TooltipIconButton
@@ -189,12 +172,8 @@ async function saveCurrent(): Promise<void> {
         >
         {{ t('studio.filterHistory.saveCurrent.label') }}
       </button>
-      <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
-           (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own
-           imperative focus call on mount would otherwise move focus outside reka's Popover content
-           boundary, which its own dismiss layer reads as an outside interaction and closes the
-           whole menu before the prompt is ever seen (data-view.spec.ts's save-current-filter
-           scenario caught it; see that file's own header comment for why it isn't shadcn's Dialog). -->
+      <!-- Stays inside PopoverContent: a sibling would move focus outside its dismiss layer and
+           close the menu before the prompt shows. -->
       <TextPromptDialog
         v-if="textPrompt"
         :title="textPrompt.title"
