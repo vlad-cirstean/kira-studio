@@ -63,7 +63,30 @@ onMounted(async () => {
     renderLineHighlight: 'none',
     occurrencesHighlight: 'off',
     quickSuggestions: false,
+    autoClosingBrackets: 'never',
+    autoClosingQuotes: 'never',
+    autoSurround: 'never',
     padding: { top: 8, bottom: 8 },
+  });
+  // Select All, Undo and Redo fall through to a native textarea command in WebKit and do nothing
+  // (MonacoHost.vue); run them on the model directly.
+  const { KeyMod, KeyCode } = loaded;
+  const target = model;
+  editor.onKeyDown((e) => {
+    if (e.equals(KeyMod.CtrlCmd | KeyCode.KeyA)) {
+      editor?.setSelection(target.getFullModelRange());
+    } else if (e.equals(KeyMod.CtrlCmd | KeyCode.KeyZ)) {
+      void target.undo();
+    } else if (
+      e.equals(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyZ) ||
+      e.equals(KeyMod.CtrlCmd | KeyCode.KeyY)
+    ) {
+      void target.redo();
+    } else {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
   });
   model.onDidChangeContent(() => {
     if (!applyingExternal && model) text.value = model.getValue();
