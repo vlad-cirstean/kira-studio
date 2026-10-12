@@ -1,4 +1,4 @@
-// P44 F43: shared/domain/sql-split.ts is a hand-written six-regime lexer that decides what SQL
+// P44 F43: shared/domain/sqlSplit.ts is a hand-written six-regime lexer that decides what SQL
 // actually gets sent to the server (views/console/ConsoleView.vue's "Run statement"/"Run all"),
 // and nothing in tests/ calls it directly. The only existing coverage is tests/e2e/console.spec.ts,
 // which is Docker-gated (isDockerAvailable() -> test.skip) and has never run in this sandbox — and
@@ -8,10 +8,7 @@
 // (SqlStatement.start/.end index the *original* source, per the type's own doc comment) is not
 // otherwise checked anywhere.
 import { describe, expect, test } from 'bun:test';
-import {
-  splitSqlStatements,
-  statementAtCursor,
-} from '../../../../packages/shared/domain/sql-split';
+import { splitSqlStatements, statementAtCursor } from '../../../../packages/shared/domain/sqlSplit';
 
 describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
   test('1. a semicolon inside a single-quoted literal is not a boundary', () => {

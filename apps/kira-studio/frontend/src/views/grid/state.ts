@@ -1,6 +1,6 @@
 import type { SortSpec } from '@shared/domain/queries';
 import type { ObjectMeta } from '@shared/domain/tree';
-import type { PageCursor } from '@shared/protocol/data-ops';
+import type { PageCursor } from '@shared/protocol/dataOps';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';

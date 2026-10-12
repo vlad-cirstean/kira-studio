@@ -14,7 +14,7 @@
 // generated *Filter by this value* and FK-navigation predicates (P34 F22). sqlDialectFor is the
 // one place that decision is made now.
 import type { ConnectionKind } from '@shared/domain/connection';
-import type { SqlLexOptions } from '@shared/domain/sql-lex';
+import type { SqlLexOptions } from '@shared/domain/sqlLex';
 
 // P35 D28: SQLite is its own member, not folded into 'mysql' — it double-quotes identifiers
 // (already quoteIdent's own default branch below) but is a genuinely different grammar with its
@@ -56,7 +56,7 @@ export function quoteIdent(dialect: SqlDialect | undefined, name: string): strin
 
 // P2 R2: a backslash inside a standard SQL single-quoted string literal is just an ordinary
 // character — only MySQL/MariaDB (and ClickHouse, F27) treat it as an escape character by
-// default. sql-split.ts/sql-lint.ts's shared quote-scanning loop needs to know which regime it's
+// default. sql-split.ts/sqlLint.ts's shared quote-scanning loop needs to know which regime it's
 // in, or a Postgres/SQLite literal ending in a literal backslash (e.g. `'foo\'`) gets its closing
 // quote mistaken for an escaped character and the scan runs on past the literal's real end.
 const BACKSLASH_ESCAPE_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
@@ -69,7 +69,7 @@ function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || BACKSLASH_ESCAPE_DIALECTS.has(dialect);
 }
 
-// F10/P21 round 1: sql-split.ts/sql-lint.ts's own dollar-quote scanning ($$.../$tag$...$tag$) used
+// F10/P21 round 1: sql-split.ts/sqlLint.ts's own dollar-quote scanning ($$.../$tag$...$tag$) used
 // to run unconditionally, a Postgres-only convention applied to every dialect. A MySQL identifier
 // containing two `$` (legal there — `$` is a valid, if unusual, identifier character) reads as a
 // dollar-quote open tag with no closing match, and the scanner then swallows the rest of the
@@ -125,7 +125,7 @@ export function lexOptionsFor(dialect: SqlDialect | undefined): SqlLexOptions {
 
 // F3/P21 round 1: every generated string literal (Filter by this value, FK navigation, Copy as
 // INSERT) used to escape only `'`, never consulting backslashEscapesFor even though that helper
-// already exists and is already used for sql-split.ts/sql-lint.ts's own quote scanning. On
+// already exists and is already used for sql-split.ts/sqlLint.ts's own quote scanning. On
 // MySQL/MariaDB/ClickHouse a value containing a backslash either silently fails to match (`\n`
 // read as a newline) or produces an unterminated literal (a value ending in `\`) — the exact class
 // P34 F22 already fixed for *identifiers*; this is the literal half of the same fix.

@@ -1,4 +1,4 @@
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import { expect, test } from './fixtures';
 import { acceptConfirm } from './support/dialogs';
 import { readOnlySqsSnapshots, SQS_QUEUE_PATH, SQS_REDRIVE_LIMIT } from './support/sqsFixture';

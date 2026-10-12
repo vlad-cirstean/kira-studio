@@ -241,7 +241,7 @@ export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = bu
 // no-op/empty answer made explicit, not a gap in the fixtures:
 //   - `filtersList`: `project/state/tree.ts` calls it once for every connection the instant it
 //     reaches `connected` (tree.ts:118) — "no filters yet" for a connection never seen before,
-//     `EMPTY_VISIBILITY` (`shared/domain/tree-filter.ts`) made explicit.
+//     `EMPTY_VISIBILITY` (`shared/domain/treeFilter.ts`) made explicit.
 //   - `windowsEnsure` (P8, mode added P22 D12): `main.ts`'s `bootstrap()` awaits this once, before
 //     hydrateTabs() or anything else window-scoped runs — always a no-op (bar the mode read) on the
 //     real native shell (the window's own `windows` row already exists by the time its URL loads),

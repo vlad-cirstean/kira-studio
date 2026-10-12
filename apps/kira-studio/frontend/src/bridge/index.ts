@@ -63,7 +63,7 @@ import type {
 } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
-import type { TreeVisibility } from '@shared/domain/tree-filter';
+import type { TreeVisibility } from '@shared/domain/treeFilter';
 import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
 import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';

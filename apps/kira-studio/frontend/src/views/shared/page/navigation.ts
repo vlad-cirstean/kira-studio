@@ -1,4 +1,4 @@
-import type { PageCursor } from '@shared/protocol/data-ops';
+import type { PageCursor } from '@shared/protocol/dataOps';
 import { stopOp } from '../viewOp';
 
 // P107 I2-14: documents/state.ts, grid/state.ts and shared/keyvalue/state.ts each declared the

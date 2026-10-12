@@ -1,6 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
-import type { TreeVisibility } from '@shared/domain/tree-filter';
+import type { TreeVisibility } from '@shared/domain/treeFilter';
 import { t } from '@theme/i18n';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import { useConnectionsStore } from '../state/connections';

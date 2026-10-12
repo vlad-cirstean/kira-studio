@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, LogicalPage } from '../ipc/support/types';
 import { MD5_ROWS } from '../support/seeds/md5Rows';
 import { expect, test } from './fixtures';

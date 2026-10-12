@@ -37,7 +37,7 @@ export interface ControlSnapshot<T = unknown> {
 /** One bulk-data snapshot. `payload` matches a PortRequest's own payload; `response` is logical,
  *  never the encoded typed-array page — see LogicalPage below (P50 D6). */
 export interface PortSnapshot {
-  /** A value from shared/protocol/data-ops.ts's DATA_OP map. */
+  /** A value from shared/protocol/dataOps.ts's DATA_OP map. */
   op: string;
   payload: unknown;
   response?: LogicalPortResponse;

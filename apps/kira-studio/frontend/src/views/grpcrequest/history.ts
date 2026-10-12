@@ -1,4 +1,4 @@
-import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
+import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpcHistory';
 import { defineStore } from 'pinia';
 import { createHistoryQueries } from '../../api/state/history';
 import { findGrpcRequestTab } from '../../api/tabs';

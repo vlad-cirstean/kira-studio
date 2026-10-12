@@ -14,7 +14,7 @@ import {
   type PreviewResponse,
   type ReadRequestWire,
   type ReadResponse,
-} from '@shared/protocol/data-ops';
+} from '@shared/protocol/dataOps';
 import { assertPageStructure } from '@shared/protocol/page';
 import { onPortEvent, request } from './port';
 

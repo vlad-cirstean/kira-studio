@@ -1,5 +1,5 @@
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
-import type { TreeVisibility } from '@shared/domain/tree-filter';
+import type { TreeVisibility } from '@shared/domain/treeFilter';
 
 // P28 D10/D11: two set lookups replace the old glob/regex rule evaluator. No compiled-pattern
 // cache, no glob translation, no FILTERABLE_KINDS gate — every kind and every path is filterable

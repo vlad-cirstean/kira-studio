@@ -1,5 +1,5 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
 import {
   connectAndExpandControl as sharedConnectAndExpandControl,

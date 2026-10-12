@@ -9,7 +9,7 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
-import type { ExecuteResponse } from '@shared/protocol/data-ops';
+import type { ExecuteResponse } from '@shared/protocol/dataOps';
 import type { Page } from '@shared/protocol/page';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';

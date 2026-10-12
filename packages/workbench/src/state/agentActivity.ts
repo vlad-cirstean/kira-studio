@@ -24,7 +24,7 @@ function emptyActivity(sessionId: string | null, now: number): AgentActivity {
 // producer — each hook is its own `curl` process, so a PostToolUse can legitimately arrive before
 // its own PreToolUse. Pure: (prev, event, now) => next — `now` is injected (P129 Part 1 §4.8) so
 // this stays pure; createAgentSessionsStore passes Date.now(). createAgentSessionsStore applies it
-// below; the unit test (agent-activity-reducer.spec.ts, colocated) calls it directly.
+// below; the unit test (agentActivityReducer.spec.ts, colocated) calls it directly.
 export function reduceAgentActivity(
   prev: AgentActivity | undefined,
   event: AgentEvent,

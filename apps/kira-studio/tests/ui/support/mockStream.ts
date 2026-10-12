@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
-import { DATA_OP, PORT_EVENT } from '@shared/protocol/data-ops';
+import { DATA_OP, PORT_EVENT } from '@shared/protocol/dataOps';
 import {
   createDocumentPageBuilder,
   createKeyValuePageBuilder,
@@ -177,7 +177,7 @@ function prepareSnapshot(snap: StudioPortSnapshot): PreparedPortSnapshot {
 
 // Answers workbench/state/engine.ts's initEngineState ping — no spec's fixture array carries a
 // 'ping' entry (types.ts's own doc comment: PortSnapshot.op is "a value from
-// shared/protocol/data-ops.ts's DATA_OP map", and ping isn't one), so this is built once here
+// shared/protocol/dataOps.ts's DATA_OP map", and ping isn't one), so this is built once here
 // rather than duplicated per spec.
 const PING_FRAME = toJSON(
   encodeFrame({

@@ -1,6 +1,6 @@
 package model
 
-// ObjectDownloadRequest is domain/object-store.ts's ObjectDownloadRequest — adapter-side, built by
+// ObjectDownloadRequest is domain/objectStore.ts's ObjectDownloadRequest — adapter-side, built by
 // the data-op dispatcher from a decoded NodePath plus the wire's own destPath, never parsed whole
 // at a boundary. DestPath is an absolute local path chosen through the save dialog.
 type ObjectDownloadRequest struct {
@@ -8,7 +8,7 @@ type ObjectDownloadRequest struct {
 	DestPath string
 }
 
-// ObjectTransferResult is domain/object-store.ts's ObjectTransferResult.
+// ObjectTransferResult is domain/objectStore.ts's ObjectTransferResult.
 type ObjectTransferResult struct {
 	Bytes int64 `json:"bytes"`
 }

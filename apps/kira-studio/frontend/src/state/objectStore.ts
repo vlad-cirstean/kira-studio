@@ -2,7 +2,7 @@ import {
   OBJECT_CONTENT_TYPE_SENTINEL,
   OBJECT_FILE_SENTINEL,
   OBJECT_KEY_SENTINEL,
-} from '@shared/domain/object-store';
+} from '@shared/domain/objectStore';
 import { decodePath, encodePath, pathTail } from '@shared/domain/tree';
 import { t } from '@theme/i18n';
 import type { MenuItem } from '@workbench/state/contextMenu';

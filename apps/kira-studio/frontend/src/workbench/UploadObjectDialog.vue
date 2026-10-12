@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { contentTypeForFilename } from '@shared/domain/object-store';
+import { contentTypeForFilename } from '@shared/domain/objectStore';
 import { decodePath } from '@shared/domain/tree';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';

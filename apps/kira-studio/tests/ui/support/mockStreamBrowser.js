@@ -139,7 +139,7 @@
     }
     // 'ping' (workbench/state/engine.ts's initEngineState) isn't a DATA_OP — it never appears in a
     // PortSnapshot fixture (types.ts's own doc comment: `op` is "a value from
-    // shared/protocol/data-ops.ts's DATA_OP map") — so no spec's fixture array carries an entry
+    // shared/protocol/dataOps.ts's DATA_OP map") — so no spec's fixture array carries an entry
     // for it, and none needs to: every spec wants the engine pill to read 'ok', never asserts the
     // fake pid's actual value, so answering it unconditionally here removes one boilerplate line
     // from every single ported spec rather than adding a redundant fixture entry to each.

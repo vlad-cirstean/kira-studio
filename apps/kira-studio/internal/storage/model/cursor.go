@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// PageCursor is protocol/data-ops.ts's PageCursor discriminated union, following the same
+// PageCursor is protocol/dataOps.ts's PageCursor discriminated union, following the same
 // Marshal/Unmarshal pattern as SortSpec (queries.go): the struct carries all three arms' fields,
 // but marshalling only ever emits the one matching Mode, and unmarshalling rejects a value
 // carrying the wrong field for its Mode.

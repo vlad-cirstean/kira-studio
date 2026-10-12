@@ -12,7 +12,7 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
-import type { PageCursor } from '@shared/protocol/data-ops';
+import type { PageCursor } from '@shared/protocol/dataOps';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
 import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';

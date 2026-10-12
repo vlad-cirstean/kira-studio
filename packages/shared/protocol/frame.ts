@@ -8,7 +8,7 @@ import type {
   ObjectDownloadResponse,
   PreviewResponse,
   ReadResponse,
-} from './data-ops';
+} from './dataOps';
 import type {
   ColumnDescriptor,
   DocumentPage,

@@ -1,4 +1,4 @@
-import type { CacheStats } from '@shared/protocol/data-ops';
+import type { CacheStats } from '@shared/protocol/dataOps';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { data } from '../bridge/data';

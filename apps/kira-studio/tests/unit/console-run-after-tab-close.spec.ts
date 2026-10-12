@@ -14,7 +14,7 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
-import type { ExecuteResponse } from '@shared/protocol/data-ops';
+import type { ExecuteResponse } from '@shared/protocol/dataOps';
 import type { Page } from '@shared/protocol/page';
 import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { deferred, sleep } from '@workbench/testing/unit/async';

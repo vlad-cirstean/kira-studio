@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HttpFormDataFieldState } from '@shared/domain/http';
-import { contentTypeForFilename } from '@shared/domain/object-store';
+import { contentTypeForFilename } from '@shared/domain/objectStore';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';

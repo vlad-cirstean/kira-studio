@@ -6,7 +6,7 @@ import '@workbench/testing/unit/window';
 
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { HttpCookieWire } from '@shared/domain/http';
-import type { ResponseHistoryEntry } from '@shared/domain/response-history';
+import type { ResponseHistoryEntry } from '@shared/domain/responseHistory';
 import { queryClient } from '@workbench/state/queryClient';
 import { deferred, sleep } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';

@@ -5,7 +5,7 @@ import type {
 } from '@shared/domain/connection';
 import type { SavedFilterQuery } from '@shared/domain/queries';
 import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
-import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
+import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/treeFilter';
 import { refDebounced } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';

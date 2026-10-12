@@ -1,5 +1,5 @@
 import type { PageSize } from '@shared/domain/tabs';
-import type { PageCursor } from '@shared/protocol/data-ops';
+import type { PageCursor } from '@shared/protocol/dataOps';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { data } from '../../../bridge/data';

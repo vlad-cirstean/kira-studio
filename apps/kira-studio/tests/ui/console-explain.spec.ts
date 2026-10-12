@@ -1,4 +1,4 @@
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';

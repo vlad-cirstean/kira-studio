@@ -132,7 +132,7 @@ func endsTransaction(stmt string) bool {
 // EOF — when unterminated, never past it.
 //
 // Backslash is deliberately never treated as an escape here, with one exception (escapeBackslash),
-// unlike sql-lex.ts's own default (packages/shared/domain/sql-lex.ts): this scanner backs every SQL
+// unlike sql-lex.ts's own default (packages/shared/domain/sqlLex.ts): this scanner backs every SQL
 // dialect this app supports without knowing which one is live, and Postgres's own
 // standard-conforming strings (the default since 9.1) do not honour a backslash escape at all.
 // Assuming one unconditionally would extend a quoted span past where a standard-conforming Postgres

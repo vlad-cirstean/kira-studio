@@ -1,6 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
-import { splitSqlStatements } from '@shared/domain/sql-split';
+import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { errorText } from '@workbench/bridge/codedError';
 import { beautifyShellText } from '../shared/document/ejson';
 import type { CatalogReason } from '../shared/document/rawTree';

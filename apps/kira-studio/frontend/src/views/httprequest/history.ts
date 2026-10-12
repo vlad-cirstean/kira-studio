@@ -1,7 +1,4 @@
-import type {
-  ResponseHistoryEntry,
-  ResponseHistorySnapshot,
-} from '@shared/domain/response-history';
+import type { ResponseHistoryEntry, ResponseHistorySnapshot } from '@shared/domain/responseHistory';
 import { defineStore } from 'pinia';
 import { createHistoryQueries } from '../../api/state/history';
 import { findHttpRequestTab } from '../../api/tabs';

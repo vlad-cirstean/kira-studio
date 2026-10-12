@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import type { ReadResponse } from '@shared/protocol/data-ops';
+import type { ReadResponse } from '@shared/protocol/dataOps';
 import { decodeFrame } from '@shared/protocol/frame';
 import { cellText, isNull, type Page, type TextColumnChunk } from '@shared/protocol/page';
 

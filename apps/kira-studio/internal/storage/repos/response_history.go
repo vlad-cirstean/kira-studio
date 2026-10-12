@@ -16,7 +16,7 @@ import (
 const (
 	maxHistoryBodyBytes = 256 * 1024
 	// historyPerScopeLimit is D4's raise from 20 to 30 — mirrored into TS as
-	// HISTORY_PER_SCOPE_LIMIT (packages/shared/domain/response-history.ts) and pinned equal by
+	// HISTORY_PER_SCOPE_LIMIT (packages/shared/domain/responseHistory.ts) and pinned equal by
 	// tests/unit/go-ts-vocabulary-parity.spec.ts (D4), so the two numbers cannot drift the way
 	// ResponseHistoryList.vue's own hand-written "20" already had.
 	historyPerScopeLimit = 30

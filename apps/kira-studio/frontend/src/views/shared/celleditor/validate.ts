@@ -1,4 +1,4 @@
-import { lintSql } from '@shared/domain/sql-lint';
+import { lintSql } from '@shared/domain/sqlLint';
 import { t } from '@theme/i18n';
 import { scanJson, scanXml } from '../../../beautify';
 import { BASE64_STD_RE, BASE64_URL_RE, base64ToStd, pickCsvShape } from './detect';

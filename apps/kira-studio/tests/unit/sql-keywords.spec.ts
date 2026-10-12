@@ -9,7 +9,7 @@ import {
   REQUIRED_MINIMUM,
   type SqlDialect,
   typesFor,
-} from '@shared/domain/sql-keywords';
+} from '@shared/domain/sqlKeywords';
 
 const DIALECTS: readonly SqlDialect[] = ['postgres', 'mysql', 'sqlite', 'clickhouse'];
 

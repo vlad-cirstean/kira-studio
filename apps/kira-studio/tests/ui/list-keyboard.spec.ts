@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import {
   controlSnapshots as redisControl,
   portSnapshots as redisPorts,

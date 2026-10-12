@@ -1,7 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
-import { lintSql } from '@shared/domain/sql-lint';
-import { splitSqlStatements } from '@shared/domain/sql-split';
+import { lintSql } from '@shared/domain/sqlLint';
+import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { t } from '@theme/i18n';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { tryParseShellText } from '../shared/document/ejson';

@@ -1,6 +1,6 @@
 // P21 round 1 functional finding F3: generated SQL string literals (Filter by this value, FK
 // navigation, Copy as INSERT) escaped only `'`, never consulting backslashEscapesFor even though
-// that helper already exists and is already used for sql-split.ts/sql-lint.ts's own quote
+// that helper already exists and is already used for sql-split.ts/sqlLint.ts's own quote
 // scanning. On MySQL/MariaDB/ClickHouse, a value containing a backslash either silently fails to
 // match (`\n` read as a newline) or produces an unterminated literal (a value ending in `\`).
 import { describe, expect, test } from 'bun:test';

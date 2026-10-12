@@ -3,7 +3,7 @@ import { grpcCodeClass, grpcCodeHint } from '@shared/domain/grpc';
 import {
   GRPC_HISTORY_PER_SCOPE_LIMIT,
   type GrpcCallHistoryEntry,
-} from '@shared/domain/grpc-history';
+} from '@shared/domain/grpcHistory';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';

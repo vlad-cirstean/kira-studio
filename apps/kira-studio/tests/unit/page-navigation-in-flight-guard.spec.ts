@@ -9,7 +9,7 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
-import type { PageCursor } from '@shared/protocol/data-ops';
+import type { PageCursor } from '@shared/protocol/dataOps';
 
 const { createPageNavigation } = await import('../../frontend/src/views/shared/page/navigation');
 

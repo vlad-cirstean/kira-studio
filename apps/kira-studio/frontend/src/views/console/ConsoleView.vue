@@ -7,7 +7,7 @@ import {
   statementAtCursor,
   statementAtOffset,
   trimmedStatementStart,
-} from '@shared/domain/sql-split';
+} from '@shared/domain/sqlSplit';
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';

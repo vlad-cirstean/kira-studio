@@ -3,8 +3,8 @@
 // Parens; a `;`/quote/comment interaction; unterminated string/comment/paren never throwing;
 // CompositeIdentifier runs; the MySQL-vs-Postgres double-quote split; backslashEscapes on/off.
 import { describe, expect, test } from 'bun:test';
-import { keywordsFor } from '@shared/domain/sql-keywords';
-import { type SqlTokenOptions, tokenizeSql } from '@shared/domain/sql-tokens';
+import { keywordsFor } from '@shared/domain/sqlKeywords';
+import { type SqlTokenOptions, tokenizeSql } from '@shared/domain/sqlTokens';
 
 function opts(overrides: Partial<SqlTokenOptions> = {}): SqlTokenOptions {
   return {

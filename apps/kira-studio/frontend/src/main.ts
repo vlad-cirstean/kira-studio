@@ -1,4 +1,4 @@
-import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
+import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/dataOps';
 import { pageChunks } from '@shared/protocol/page';
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import { i18n, installCopyTestHook } from '@theme/i18n';

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect } from '../ui/fixtures';
 import { IPC } from '../ui/support/ipcChannels';

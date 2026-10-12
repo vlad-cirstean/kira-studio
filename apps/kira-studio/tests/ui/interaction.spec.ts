@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ObjectMeta } from '@shared/domain/tree';
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { installClipboardShim } from './support/clipboard';

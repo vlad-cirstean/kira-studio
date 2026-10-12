@@ -3,7 +3,7 @@ import { httpMethodToken, statusClass, statusHint } from '@shared/domain/http';
 import {
   HISTORY_PER_SCOPE_LIMIT,
   type ResponseHistoryEntry,
-} from '@shared/domain/response-history';
+} from '@shared/domain/responseHistory';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';

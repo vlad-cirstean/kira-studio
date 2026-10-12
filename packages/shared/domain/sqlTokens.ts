@@ -1,5 +1,5 @@
 // P60b D1: the SQL parse layer for the query console's language service (completion, diagnostics,
-// hover, the DDL extractor) — a third sibling of sql-split.ts/sql-lint.ts, not a new dependency
+// hover, the DDL extractor) — a third sibling of sql-split.ts/sqlLint.ts, not a new dependency
 // (§2's library survey: no candidate covers all five dialects this app supports with the required
 // error tolerance, byte-accurate offsets and MIT-compatible license — sql-parser-cst is the best
 // technical fit but GPL-2.0-or-later, declined on distribution grounds). Produces exactly the
@@ -7,7 +7,7 @@
 // `Statement` nodes, each a flat sibling list of tokens with exactly two groupings (`Parens`,
 // `CompositeIdentifier`) — every real grammar rule lives in `ddl.ts`/`sqlRefs.ts`, unchanged; this
 // file only supplies the tokenizer + those two groupings.
-import { type SqlLexOptions, scanSqlSpan } from './sql-lex';
+import { type SqlLexOptions, scanSqlSpan } from './sqlLex';
 
 export interface LNode {
   readonly name: string;

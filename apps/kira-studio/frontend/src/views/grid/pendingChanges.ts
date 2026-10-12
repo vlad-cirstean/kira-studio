@@ -1,5 +1,5 @@
 import type { MutationRowOp } from '@shared/domain/mutations';
-import type { MutateResponse } from '@shared/protocol/data-ops';
+import type { MutateResponse } from '@shared/protocol/dataOps';
 import { cellText, isNull, type TabularPage } from '@shared/protocol/page';
 import { defineStore } from 'pinia';
 import { reactive, toRaw } from 'vue';

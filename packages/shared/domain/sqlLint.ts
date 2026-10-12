@@ -10,7 +10,7 @@
 // hoisted out of here (and `sql-split.ts`) into one shared scanner both now call. No behaviour
 // change: this file keeps its own paren-balance/issue-reporting logic exactly.
 import { t } from '@theme/i18n';
-import { resolveLexOptions, type SqlScanOptions, scanSqlSpan } from './sql-lex';
+import { resolveLexOptions, type SqlScanOptions, scanSqlSpan } from './sqlLex';
 
 export interface LintIssue {
   from: number;

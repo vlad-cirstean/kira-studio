@@ -16,7 +16,7 @@ const (
 	maxGrpcMessageBytes   = 64 * 1024
 	maxGrpcStoredMessages = 100
 	// grpcHistoryPerScopeCap is P18 D4's raise from 20 to 30 — mirrored into TS as
-	// GRPC_HISTORY_PER_SCOPE_LIMIT (packages/shared/domain/grpc-history.ts) and pinned equal by
+	// GRPC_HISTORY_PER_SCOPE_LIMIT (packages/shared/domain/grpcHistory.ts) and pinned equal by
 	// tests/unit/go-ts-vocabulary-parity.spec.ts.
 	grpcHistoryPerScopeCap = 30
 )

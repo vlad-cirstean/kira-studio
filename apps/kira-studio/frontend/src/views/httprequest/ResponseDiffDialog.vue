@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { statusClass, statusHint } from '@shared/domain/http';
-import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
+import type { ResponseHistorySnapshot } from '@shared/domain/responseHistory';
 import InlineState from '@theme/components/InlineState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';

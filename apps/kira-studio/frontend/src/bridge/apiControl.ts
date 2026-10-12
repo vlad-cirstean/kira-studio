@@ -16,7 +16,7 @@ import type {
   GrpcMetaPairWire,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
-import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
+import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpcHistory';
 import type {
   HttpBodyWire,
   HttpCookieWire,
@@ -24,10 +24,7 @@ import type {
   HttpRequestSettingsWire,
   HttpResponseWire,
 } from '@shared/domain/http';
-import type {
-  ResponseHistoryEntry,
-  ResponseHistorySnapshot,
-} from '@shared/domain/response-history';
+import type { ResponseHistoryEntry, ResponseHistorySnapshot } from '@shared/domain/responseHistory';
 import type {
   ApiEnvironment,
   ApiVariable,

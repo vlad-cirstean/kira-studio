@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NodeKind } from '@shared/domain/tree';
-import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
+import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/treeFilter';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';

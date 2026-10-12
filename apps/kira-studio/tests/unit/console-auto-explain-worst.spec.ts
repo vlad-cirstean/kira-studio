@@ -8,7 +8,7 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
-import type { ExecuteResponse } from '@shared/protocol/data-ops';
+import type { ExecuteResponse } from '@shared/protocol/dataOps';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';

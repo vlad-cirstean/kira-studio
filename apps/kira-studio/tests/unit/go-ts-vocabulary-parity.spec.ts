@@ -15,9 +15,9 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { GRPC_HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/grpc-history';
+import { GRPC_HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/grpcHistory';
 import { opKindSchema } from '../../../../packages/shared/domain/ops';
-import { HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/response-history';
+import { HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/responseHistory';
 import { STUDIO_RENDERABLE_TAB_KINDS } from '../../frontend/src/state/tabDomain';
 
 /** P108 F17: strips a Go `//` line comment from each line before any extractor scans the source —

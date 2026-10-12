@@ -3,7 +3,7 @@
 // `upperCaseKeywords: true`, whose own reasoning stays true: house style, and Monaco's own
 // suggest-widget matcher case-folds the same way CodeMirror's `FuzzyMatcher` did, so typing `sel`
 // still matches `SELECT`).
-import { keywordsFor, typesFor } from '@shared/domain/sql-keywords';
+import { keywordsFor, typesFor } from '@shared/domain/sqlKeywords';
 import type { EditorCompletion, EditorCompletionSource } from '../../editor/completion';
 import type { SqlDialect } from '../shared/sqlIdent';
 

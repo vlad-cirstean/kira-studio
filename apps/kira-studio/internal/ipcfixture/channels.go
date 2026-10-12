@@ -20,7 +20,7 @@ const (
 	channelOpsCancel          = "kira:ops:cancel"
 )
 
-// The two DATA_OP values every committed fixture needs, from packages/shared/protocol/data-ops.ts's
+// The two DATA_OP values every committed fixture needs, from packages/shared/protocol/dataOps.ts's
 // DATA_OP map — same discipline as the channel constants above.
 const (
 	dataOpRead       = "data:read"

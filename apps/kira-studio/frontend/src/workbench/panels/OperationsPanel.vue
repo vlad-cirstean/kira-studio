@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OpRecord } from '@shared/domain/ops';
-import { splitSqlStatements } from '@shared/domain/sql-split';
+import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { displayValue } from '@workbench/behaviour/format';

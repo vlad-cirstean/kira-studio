@@ -1,14 +1,14 @@
 // P18 (v1.1) C3/C6: the DDL extractor (ddl.ts) and the alias/reference walk diagnostics and hovers
-// both share (sqlRefs.ts) walk the same shallow token tree `@shared/domain/sql-tokens.ts` builds.
+// both share (sqlRefs.ts) walk the same shallow token tree `@shared/domain/sqlTokens.ts` builds.
 // This file was `lezerNodes.ts` through P60a — its own tree came from `@codemirror/lang-sql`'s
 // Lezer parser; P60b's `sql-tokens.ts` produces the identical `LNode` shape from this app's own
 // in-house tokenizer instead (docs/v1.6/plans/P60b-sql-language-service-monaco.md §2's library
 // survey), so every helper below — and every consumer's own `LNode`-typed code — is unchanged.
-import { keywordsFor } from '@shared/domain/sql-keywords';
-import { type LNode, tokenizeSql } from '@shared/domain/sql-tokens';
+import { keywordsFor } from '@shared/domain/sqlKeywords';
+import { type LNode, tokenizeSql } from '@shared/domain/sqlTokens';
 import { lexOptionsFor, type SqlDialect } from '../shared/sqlIdent';
 
-export type { LNode } from '@shared/domain/sql-tokens';
+export type { LNode } from '@shared/domain/sqlTokens';
 
 export function childrenOf(node: LNode): LNode[] {
   const out: LNode[] = [];

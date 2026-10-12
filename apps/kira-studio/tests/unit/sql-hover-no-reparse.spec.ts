@@ -14,7 +14,7 @@
 // binding) — a memo hit is instead observable as "the exact same tree object comes back", which a
 // fresh scan could never produce (it always builds new node objects).
 import { describe, expect, test } from 'bun:test';
-import { tokenizeSql } from '@shared/domain/sql-tokens';
+import { tokenizeSql } from '@shared/domain/sqlTokens';
 import type { DdlSchema } from '../../frontend/src/views/console/ddl';
 import { ddlDiagnostics } from '../../frontend/src/views/console/sqlDiagnostics';
 import { sqlHoverSource } from '../../frontend/src/views/console/sqlHover';

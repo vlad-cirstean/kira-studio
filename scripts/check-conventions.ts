@@ -29,6 +29,7 @@ const SKIP_DIR = new Set([
   'dist',
   'bindings',
   'wire',
+  'generated',
   'tests',
   'test',
   '__tests__',
@@ -58,7 +59,8 @@ export function fileNameHit(path: string): Hit | undefined {
       : { rule: 'N1', path, message: 'component file name is not PascalCase' };
   }
   if (!name.endsWith('.ts')) return undefined;
-  const base = name.replace(/\.(?:spec|test)\.ts$|\.ts$/, '');
+  // `.worker` (Vite worker entry) and `.check` (type-level check) are role suffixes, not word breaks.
+  const base = name.replace(/(?:\.(?:worker|check|spec|test))?\.ts$/, '');
   return /^[a-z][a-zA-Z0-9]*$/.test(base)
     ? undefined
     : { rule: 'N1', path, message: 'module file name is not camelCase' };

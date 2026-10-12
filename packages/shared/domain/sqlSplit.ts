@@ -8,7 +8,7 @@
 // P60b §3.1: the quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
 // hoisted out of here (and `sql-lint.ts`) into one shared scanner both now call. No behaviour
 // change: this file keeps its own `;`-splitting/backslash-escape/dollar-quoting semantics exactly.
-import { resolveLexOptions, type SqlScanOptions, scanSqlSpan } from './sql-lex';
+import { resolveLexOptions, type SqlScanOptions, scanSqlSpan } from './sqlLex';
 
 export interface SqlStatement {
   text: string;
