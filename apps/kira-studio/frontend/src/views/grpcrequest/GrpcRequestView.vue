@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
+import { isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
@@ -46,6 +46,7 @@ import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { INLINE_CHARS } from '../../workers/parse/client';
 import { useParseWorker } from '../../workers/parse/useParseWorker';
 import { reasonText } from '../shared/reasonText';
+import { unresolvedOf, unresolvedTooltipOf } from '../shared/request/unresolved';
 import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import GrpcMetadataTable from './GrpcMetadataTable.vue';
@@ -66,18 +67,12 @@ const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
 
-// P108 F14: state.ts's own call() reads `method?.serverStreaming ?? false` from findMethod against
-// whatever schema the schema query holds at that instant — a Call issued before the schema
-// (re)load in flight resolves finds no method at all and silently defaults to unary, so a genuinely
-// server-streaming method got called as one-shot instead. Rather than have call() await a load
-// (a user-visible delay on every single Call, not just the rare early one), Call disables until
-// findMethod can actually resolve the tab's own service+method against the current schema.
+// Call disables until findMethod resolves the tab's method: before the schema loads, call() would
+// default a streaming method to unary.
 const methodResolved = computed(() => {
   return !!findMethod(schema.value, props.tab.state.service, props.tab.state.method);
 });
 
-// P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
-// environment id it reads through while incognito.
 const { railColor, runState, incognito, toggleIncognito, envId } = useRequestChrome(
   () => props.tab,
 );
@@ -98,10 +93,7 @@ function onTargetInput(value: string): void {
   patchGrpcRequestTabState(props.tab.id, { target: value });
 }
 
-// D13: the toolbar's own method picker — a plain native select over the resolved schema, showing
-// "Service/Method" with a streaming badge folded into the option label (F23: no new primitive
-// needed for a value list this shape). The full browsable list with per-service grouping lives in
-// the Schema pane (SchemaBrowser.vue) — this is the fast path once a schema is already loaded.
+// Fast-path method picker over the resolved schema; SchemaBrowser has the grouped list.
 const methodOptions = computed(() => {
   if (!schema.value) return [];
   const out: { value: string; label: string }[] = [];
@@ -124,8 +116,6 @@ function onMethodSelect(rawValue: unknown): void {
   });
 }
 
-// D4/P175: the schema is fetched once a reflection target (or a .proto path) exists, debounced like
-// a fast typist — see schemaQuery.ts.
 const {
   schema,
   loading: schemaLoading,
@@ -133,21 +123,15 @@ const {
   reload: reloadSchema,
 } = useGrpcSchema(() => props.tab);
 
-// P112: HttpRequestView.vue's own useSavedRequest rewrite, mirrored — see its comment for the full
-// rationale (§3.5's reactive-reader rule; subsumes the old ensureSavedGrpcRequestLoaded watch).
 const savedQuery = useSavedGrpcRequest(() => props.tab.state.itemId);
 const saved = computed(() => savedQuery.data.value ?? null);
 const dirty = computed(() => isGrpcDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
-// P108 F4, subsumed by P112: HttpRequestView.vue's own fix, mirrored — see its comment.
 const unresolved = computed(
   () => props.tab.state.itemId !== null && savedQuery.data.value === undefined,
 );
 
-// P71 §3.2/P107 T1-16: HttpRequestView.vue's own pair — see views/shared/request/useRequestTabSave.ts.
-// onSaveAs is only ever reached from onSave's own no-saved-row fallback — no separate UI trigger
-// in this view, so it isn't destructured here.
 const { onSave } = useRequestTabSave({
   tabId: () => props.tab.id,
   incognito: () => incognito.value,
@@ -170,13 +154,8 @@ function onStop(): void {
 }
 
 const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.state));
-// P112: useVariableRows observes each scope's query directly — no explicit ensureVariablesLoaded
-// call; TanStack fetches on first observer and refetches on a kira:api:dataChanged invalidation.
 const colRows = useVariableRows('collection', collectionId);
 const envRows = useVariableRows('environment', envId);
-// P18 D10: HttpRequestView.vue's own one-line computed, over the colRows/envRows this view now
-// observes directly — rangeHighlights/hoverAt/candidates for the target field, the metadata value
-// cells, and (rangeHighlights only) the message editor.
 const variables = computed(() =>
   variableSupport(colRows.data.value ?? [], envRows.data.value ?? []),
 );
@@ -186,22 +165,7 @@ const unresolvedRefs = computed(() => {
     colRows.data.value ?? [],
     envRows.data.value ?? [],
   );
-  const refs = resolveGrpcTabState(props.tab.state, values, secretNames).refs;
-  const byName = new Map(
-    refs
-      // P28 D15(a): a catalogued dynamic reference is either spelling. substitute.ts's own
-      // isDynamicReference classifies both `$name` and `fake.*` as 'dynamic', but this filter
-      // only ever consulted isDynamicName ($-prefixed), so all 57 FAKE_NAMES were counted into the
-      // "unresolved" chip as unknown dynamic values. They are generated at send time, not looked
-      // up, and are never missing.
-      .filter(
-        (r) =>
-          r.kind === 'unknown' ||
-          (r.kind === 'dynamic' && !isDynamicName(r.name) && !isFakeName(r.name)),
-      )
-      .map((r) => [r.name, r]),
-  );
-  return [...byName.values()];
+  return unresolvedOf(resolveGrpcTabState(props.tab.state, values, secretNames).refs);
 });
 const saveTooltip = computed(() => {
   if (incognito.value) return t('studio.api.common.save.incognito.tooltip');
@@ -210,15 +174,7 @@ const saveTooltip = computed(() => {
     canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip',
   );
 });
-const unresolvedTooltip = computed(() =>
-  unresolvedRefs.value
-    .map((r) =>
-      r.kind === 'dynamic'
-        ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name })
-        : r.name,
-    )
-    .join(', '),
-);
+const unresolvedTooltip = computed(() => unresolvedTooltipOf(unresolvedRefs.value));
 
 const REQUEST_PANE_OPTIONS = computed(() => [
   {
@@ -241,9 +197,7 @@ function setRequestPane(pane: 'message' | 'metadata' | 'schema'): void {
   patchGrpcRequestTabState(props.tab.id, { requestPane: pane });
 }
 
-// P16 D13: the metadata table's own filter — same toggle-in-#toolbar-2 idiom as
-// HttpRequestView.vue's request tables (Studio's own toolbar-search precedent). Only relevant on
-// the Metadata pane. Component-local, not tab state — a lens, not a setting.
+// Metadata filter: component-local, a lens rather than tab state.
 const fieldFilterOpen = ref(false);
 const fieldFilterQuery = ref('');
 function toggleFieldFilter(): void {
@@ -251,16 +205,12 @@ function toggleFieldFilter(): void {
   if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
 }
 
-// P22b D7: HttpRequestView.vue's own persisted description-column toggle, mirrored here —
-// fieldDescriptions is a tab-state field (unlike fieldFilterOpen above), so it survives a tab
-// restore (OQ-1).
 function toggleFieldDescriptions(): void {
   patchGrpcRequestTabState(props.tab.id, {
     fieldDescriptions: !props.tab.state.fieldDescriptions,
   });
 }
 
-// P17 D20/item 8: same component-local flag as HttpRequestView.vue's own.
 const overviewOpen = ref(false);
 const overviewAnchorRef = ref<HTMLElement | null>(null);
 
@@ -300,7 +250,6 @@ useShortcut(rootEl, ['form.save'], onSave);
 
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
-  // P108 F5, subsumed by P112: HttpRequestView.vue's own fix, mirrored — see its comment.
   unregisterCommands = [
     registerCommand('view.run', onCall),
     registerCommand('view.refresh', onCall),
@@ -315,7 +264,6 @@ onUnmounted(() => {
 
 <template>
   <div ref="rootEl" class="flex h-full min-h-0 flex-col" data-testid="grpc-request-view">
-    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <ViewToolbar>
       <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span class="size-4 flex items-center justify-center shrink-0"
@@ -352,7 +300,6 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
-      <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
           <Badge variant="chip" data-testid="grpc-incognito-chip">{{
@@ -362,8 +309,6 @@ onUnmounted(() => {
         <TooltipContent>{{ t('studio.api.common.incognitoChip.tooltip') }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto flex items-center gap-1">
-        <!-- P22b D3 (HttpRequestView.vue's own sibling): Save stays ahead of the push, same as the
-             #badges group above, so it shifts position with the dirty mark/unresolved chip. -->
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
@@ -402,14 +347,6 @@ onUnmounted(() => {
           @click="onStop"
         />
       </div>
-      <!-- P18 D14 (P15 D4's gRPC sibling): style="flex: 1" directly on AutocompleteField was a
-           no-op (F14) -- AutocompleteField sets inheritAttrs: false, so a call-site style lands on
-           the inner <input> (already flex: 1) and never on the wrapping box that actually sizes it.
-           The app's existing wrapper (used at ten other call sites, HttpRequestView.vue's own
-           .url-field among them) fixes it here too — the target field now actually grows with the
-           window. P110 B25: the wrapper's own width now lands as a `class="w-full"` prop straight
-           onto AutocompleteField (routed to its own InputGroup box), not a scoped `:deep(.p-input)`
-           rule reaching across the component boundary. -->
       <div class="grpc-target-field min-w-0 flex-1">
         <AutocompleteField
           class="w-full"
@@ -431,11 +368,6 @@ onUnmounted(() => {
         data-testid="grpc-tls-toggle"
         @update:model-value="(v) => setTlsMode(v as 'plaintext' | 'tls')"
       />
-      <!-- P22b D10: the same wrapper idiom .grpc-target-field uses above, for the identical reason
-           — a bare native select has no width rule of its own, so it shrinks to its widest option
-           label (P110 B24: now a class="w-full" passed straight to NativeSelect, not a scoped
-           descendant rule). Both fields are flex: 1 in this one toolbar row, so they share the
-           free space evenly and stay responsive at either extreme of window size. -->
       <div class="min-w-0 flex-1">
         <NativeSelect
           variant="bordered"
@@ -473,8 +405,6 @@ onUnmounted(() => {
       </Tooltip>
       <span class="ml-auto" />
       <RunState :state="runState" />
-      <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
-           icon-only action group, so this is its own toolbar-end group. -->
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="eye-closed"
@@ -604,12 +534,5 @@ onUnmounted(() => {
         <ResponsePane :tab="tab" />
       </div>
     </div>
-    <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
-         Tailwind utilities. `.grpc-target-field` and `.request-pane` stay bare markers:
-         api-ui-consistency.spec.ts selects both directly (no rule of their own attaches to either
-         name any more). `.request-splitter` is the same kind of bare marker (P110 B32) —
-         grpc-request.spec.ts polls its box-shadow via getComputedStyle.
-         P110 I2-17: this file's own <style> block was comment-only (dead, still triggering an
-         @reference/Tailwind compile) -- deleted, comment moved here. -->
   </div>
 </template>

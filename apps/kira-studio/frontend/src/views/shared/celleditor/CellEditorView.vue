@@ -46,6 +46,7 @@ import {
   formatLabel,
 } from './formats';
 import { GENERATORS, type Generator } from './generate';
+import { readOnlyChipText, readOnlyChipTitle } from './readOnlyChip';
 import { useCellEditorFormatStore } from './state';
 import TimestampPane from './TimestampPane.vue';
 import { validateFormat } from './validate';
@@ -55,16 +56,8 @@ const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 const connectionsStore = useConnectionsStore();
 
-// P24 D23: hoisted out of statusLine's own recompute — this sits on the 50 ms cell-selection
-// path (§2.1), and a stateless TextEncoder never needs to be reallocated per keystroke.
 const statusEncoder = new TextEncoder();
 
-// P26 D4: the dock decides whether there is a cell to render at all (its own v-if) — this
-// component is only ever mounted with one, so no downstream code needs to null-guard it. Named
-// `selectedCell` rather than `cell` to avoid colliding with the `cell` prop itself.
-// `readOnly` (P40 D11): forwarded from CellEditorDock — true when the mounting view (the query
-// console) has no write path for its cells at all, distinct from a cell being individually
-// uneditable (readOnlyReasonFor below, unaffected by this flag).
 const props = withDefaults(defineProps<{ cell: SelectedCell; readonly?: boolean }>(), {
   readonly: false,
 });
@@ -79,18 +72,8 @@ const isNullValue = computed(() => selectedCell.value.value === null);
 const isEmptyValue = computed(() => selectedCell.value.value === '');
 const isTruncatedValue = computed(() => selectedCell.value.truncated);
 
-// §5a: a NULL value runs no detector at all.
-//
-// Reads `detectionText` (declared below with the rest of `useEditBuffer` — a forward reference
-// safe here since this is a lazy computed, not eagerly evaluated) rather than the stored value:
-// auto-detection (and so validateFormat's "is my json broken" check below) used to be pinned to
-// whatever the *original* value looked like, so typing a syntax error into an already-valid JSON
-// cell was caught, but typing a fresh JSON/timestamp value into a plain-text or empty cell never
-// was — the auto format never moved off `text` no matter what you typed, since nothing here re-ran
-// against the keystrokes. `detectionText` mirrors the stored value on cell switch and the main
-// editor's own direct edits, exactly reproducing the old "detect against the value in hand"
-// behaviour but live — see its own declaration for why it deliberately does *not* mirror `doc`
-// itself (a translate pane's byte-level round-trip would otherwise fight its own pane).
+// Detection reads `detectionText`, not `doc`: translate panes round-trip bytes through `doc`, and
+// re-detecting those intermediate encodings could hide the pane being typed into.
 const detected = computed<FormatGuess[]>(() => {
   const c = selectedCell.value;
   if (c.value === null) return [];
@@ -112,67 +95,16 @@ const sqlDialect = computed(() => {
   return sqlDialectFor(record?.kind);
 });
 
-// P40 D12: no reason chip in viewer mode — "No primary key" (or any other reason) is a statement
-// about a write that was never on offer here (the query console's results have no addressable
-// row to write back to at all), not an explanation of a refusal. `readOnlyChipText`/`Title` below
-// are unreachable once this is null, since the template's own v-if gates on `readOnlyReason`.
 const readOnlyReason = computed(() =>
   viewerMode.value ? null : cellEditorFormatStore.readOnlyReasonFor(selectedCell.value),
 );
 
-// D4 (revised): editable only when the cell is genuinely writable (`readOnlyReason === null`)
-// *and* whoever published it handed over a way to stage the write (`cell.onEdit`, today set only
-// by `SlickGridHost.vue`). A future publisher that never sets `onEdit` — Document/KeyValue/Stream/
-// Console — keeps its cells read-only here even once `cellEditorFormatStore.readOnlyReasonFor()` says nothing's wrong,
-// since there'd be nowhere for a save to go. `!viewerMode.value` is redundant with that (a viewer
-// mount never sets onEdit either) but stated explicitly so this can't drift if one ever did.
 const isEditable = computed(
   () => !viewerMode.value && readOnlyReason.value === null && !!selectedCell.value.onEdit,
 );
-const readOnlyChipText = computed(() => {
-  switch (readOnlyReason.value) {
-    case 'masked':
-      return t('studio.cellEditor.readOnly.masked.label');
-    case 'connection-read-only':
-      return t('studio.common.connectionReadOnly.tooltip');
-    case 'value-truncated':
-      return t('studio.cellEditor.readOnly.truncated.label');
-    case 'generated-column':
-      return t('studio.cellEditor.readOnly.generated.label');
-    case 'pending-delete':
-      return t('studio.cellEditor.readOnly.pendingDelete.label');
-    case 'no-primary-key':
-      return t('studio.cellEditor.readOnly.noPrimaryKey.label');
-    default:
-      return '';
-  }
-});
-const readOnlyChipTitle = computed(() => {
-  switch (readOnlyReason.value) {
-    case 'masked':
-      // M5 §6.5: the one reason here the user can fix immediately, unlike the other three.
-      return t('studio.cellEditor.readOnly.masked.hint');
-    case 'connection-read-only':
-      return undefined;
-    case 'value-truncated':
-      // P24 D27: the value stays fully readable and copyable — only writing it back is refused,
-      // since the buffer only ever holds the first 64 KB (§0 note 9).
-      return t('studio.cellEditor.readOnly.truncated.hint', { size: formatBytes(64 * 1024) });
-    case 'generated-column':
-      return t('studio.cellEditor.readOnly.generated.hint');
-    case 'pending-delete':
-      return t('studio.cellEditor.readOnly.pendingDelete.hint');
-    case 'no-primary-key':
-      return t('studio.grid.noPrimaryKey.tooltip');
-    default:
-      return undefined;
-  }
-});
+const chipText = computed(() => readOnlyChipText(readOnlyReason.value));
+const chipTitle = computed(() => readOnlyChipTitle(readOnlyReason.value));
 
-// The display buffer (D6): what Beautify/Reset act on. Never the stored value itself, which
-// stays reachable through `cell.value.value` for Reset. P27 D26: the state machine itself
-// (dirty/beautify/bytes/revert) now lives in the shared useEditBuffer — this file only supplies
-// what it means for a cell (the stored value, the beautifier for the effective format).
 const buffer = useEditBuffer({
   original: () => selectedCell.value.value ?? '',
   beautifier: () =>
@@ -195,6 +127,7 @@ const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
 // it stays put for the rest of that cell's editing session, same as before this feature existed;
 // only the plain read-it-directly formats (text/json/xml/csv/sql, none of which own a pane) keep
 // re-detecting live, which is exactly the set item 1's ask cares about ("is my json broken").
+// Formats with a translate pane stay pinned for the cell's editing session.
 const PINNED_FORMATS = new Set<CellFormat>([
   'hex',
   'base64',
@@ -212,30 +145,12 @@ function onMainDocInput(text: string): void {
 let lastKey: string | null = null;
 let lastValue: string | null = null;
 
-// Populate path (§2.1's 50 ms budget): a republication of the same cell with the same value is
-// a no-op — a background page refresh must not silently undo a user's beautify. Changing the
-// format override recomputes `effectiveFormat`/`language` above without touching this watch.
 watch(
   selectedCell,
   (c, prevCell) => {
     const key = cellKey(c);
     if (key === lastKey && c.value === lastValue) return;
-    // F17 (P108 Part 10): mirrors onEditorBlur/onBeforeUnmount/onEditorKeydown's own "stage on
-    // leave" rule — reseeding used to silently discard a dirty (unsaved) buffer whenever the
-    // selected cell changed, or a background republish of the same cell changed its value (F1).
-    //
-    // Dirtiness here is judged against `prevCell.value` — what the buffer was seeded from, and
-    // what the user could have actually diverged from — never the shared `isDirty` computed
-    // (`doc.value !== opts.original()`): `original()` reads `selectedCell.value` live, which by
-    // this point already IS `c`, the cell this watch just received. Comparing against `c.value`
-    // instead of `prevCell.value` made an untouched buffer look "dirty" any time the same cell's
-    // published value swaps representation with no user edit at all — the grid mask preview
-    // toggling the same cell between its real and masked text is exactly that: `onEditorBlur`'s
-    // literal next call (toggling preview back on, which moves focus to the toolbar toggle) would
-    // then stage the buffer's stale-but-"dirty" text as a real edit, straight back into the page's
-    // own unmasked value and bypassing the preview entirely (SlickGridHost.vue's own `dataSource`
-    // extractor prefers a staged edit over `maskTransform`, by design — a real edit is never
-    // masked once committed).
+    // Judge dirtiness against `prevCell.value`: `original()` already reads the new cell.
     const wasDirty = prevCell ? doc.value !== (prevCell.value ?? '') : false;
     if (
       wasDirty &&
@@ -254,8 +169,6 @@ watch(
   { immediate: true },
 );
 
-// P24 D14/D15: dates get the same translate-pane treatment as hex/base64 below — TimestampPane
-// owns its own readings/editing entirely; this file only decides *whether* to show it.
 const isTimestampFormat = computed(
   () =>
     effectiveFormat.value === 'epochSeconds' ||
@@ -263,17 +176,9 @@ const isTimestampFormat = computed(
     effectiveFormat.value === 'iso8601',
 );
 
-// Hex/base64 decoded-text pane: a second, editable view of the same bytes as plaintext. `null`
-// means "not valid UTF-8" — shown as a note instead of a second editor rather than rendering
-// garbled bytes. `skipNextDecode` breaks the encode<->decode cycle: onDecodedInput re-encodes into
-// `doc`, and without the guard that write would immediately re-trigger a decode back into
-// `decodedDoc`, fighting the very keystroke that just landed there (the same shape ConsoleView.vue's
-// `lastEmitted` guard uses for its own doc-decoupling, D20).
 const showDecodedPane = computed(
   () => effectiveFormat.value === 'hex' || effectiveFormat.value === 'base64',
 );
-// P24 D14: the translate pane shown below the encoded value — hex/base64's decoded-text pane or
-// (D15) the timestamp pane — chosen by format, sharing one head/body/staging shape.
 const showTranslatePane = computed(() => showDecodedPane.value || isTimestampFormat.value);
 const decodedDoc = ref<string | null>('');
 let skipNextDecode = false;
@@ -305,9 +210,6 @@ function onDecodedInput(text: string): void {
   if (writeDoc(next)) skipNextDecode = true;
 }
 
-// Stages into the exact same pending-change set the grid's own inline edit and the toolbar's
-// Commit/Discard already operate on (§P5) — nothing here writes to the server directly, and
-// there is no separate "commit" action in this panel.
 function saveEdit(): void {
   const c = selectedCell.value;
   if (!isEditable.value || !c.onEdit) return;
@@ -325,6 +227,7 @@ function saveEdit(): void {
 // whether focus actually left the panel. `relatedTarget` is the element gaining focus, so only
 // treat this as "done editing" when that target is null (focus left the window/app entirely) or
 // sits outside the wrapping div; a same-panel transition must fall through and stage nothing.
+// Stage only when focus leaves the panel; `focusout` also fires for moves between inner controls.
 function onEditorBlur(e: FocusEvent): void {
   const next = e.relatedTarget as Node | null;
   const container = e.currentTarget as HTMLElement | null;
@@ -332,24 +235,10 @@ function onEditorBlur(e: FocusEvent): void {
   if (isEditable.value && isDirty.value) saveEdit();
 }
 
-// P26 OQ1: now that a backgrounded tab keeps its selection (commit 3) instead of losing it to a
-// stale slot, a dirty buffer's destruction on unmount would otherwise become unconditional —
-// mirrors onEditorBlur's own staging rule so switching tabs by keyboard (Ctrl+Tab, which moves no
-// focus and so never fires onEditorBlur) can no longer silently drop an in-flight edit. Staging is
-// not committing: the edit is still reversible via the grid's own Revert/Discard.
 onBeforeUnmount(() => {
   if (isEditable.value && isDirty.value) saveEdit();
 });
 
-// Ctrl/Cmd+Enter alongside blur-to-stage, for staging without needing to move focus away —
-// mirrors the same chord's common meaning elsewhere (submit/run). Caught on the wrapping div:
-// CodeMirror's own keymap binds Enter for newlines, never Ctrl/Cmd+Enter, so the event still
-// bubbles here unconsumed.
-//
-// P24 D26: Escape reverts the buffer, mirroring the deleted DataGrid.vue's own inline editor. CodeMirror's
-// defaultKeymap binds Escape to simplifySelection, which calls preventDefault but does not stop
-// propagation, so this handler still receives it — the same mechanism Ctrl/Cmd+Enter above
-// already relies on.
 function onEditorKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault();
@@ -357,8 +246,6 @@ function onEditorKeydown(e: KeyboardEvent): void {
   }
 }
 
-// P105 §5.1: the wrapping div is not interactive -- both listeners bind via VueUse instead of raw
-// template attributes. `e.currentTarget` inside onEditorBlur is still this same element.
 const editorBodyEl = useTemplateRef<HTMLElement>('editorBodyEl');
 useEventListener(editorBodyEl, 'keydown', onEditorKeydown);
 useShortcut(editorBodyEl, ['form.save', 'form.submit'], saveEdit);
@@ -368,10 +255,6 @@ function closePanel(): void {
   cellSelectionStore.clearSelectedCellFor(selectedCell.value.tabId);
 }
 
-// P22b D14: one cell's own value, often a large JSON blob dumped straight from the console (F21),
-// had no way to search it at all. Mirrors ResponsePane.vue's own find bar exactly — one target,
-// the encoded pane's own doc, over the same editor/findRanges.ts seam. The decoded/timestamp
-// translate pane is a re-encoding of the same bytes, not a second document worth its own search.
 const findOpen = ref(false);
 function toggleFind(): void {
   findOpen.value = !findOpen.value;
@@ -393,22 +276,12 @@ const docHighlights = computed(() => {
   return (text: string) => findRanges(text, query, currentGlobal);
 });
 
-// P42 D26: validated against the *effective* format, on the live buffer — a value that fails
-// says so right beside the status badge, whether the format was auto-detected or overridden.
 const formatProblem = computed(() =>
   isNullValue.value
     ? null
     : validateFormat(effectiveFormat.value, doc.value, isTruncatedValue.value),
 );
 
-// Item 1 (regression pass, task batch P46-2): a red border on the format picker read as "the
-// format choice itself is wrong", which isn't the claim being made — the *value* doesn't parse as
-// whatever format is in effect. Squiggly-underlining the actual offending text is what every code
-// editor does for exactly this ("your JSON is broken, your timestamp is wrong"), and this app
-// already has the whole mechanism built for the console (MonacoHost's `lintSource` prop,
-// editor.setModelMarkers under the hood, P60a) — reused as-is rather than inventing a second lint
-// UI. A validator with no offset (xml/csv/base64/hex/timestamp) underlines the whole value; one
-// with an offset (json/sql) underlines the single character it points at.
 function cellLintSource(): ConsoleDiagnostic[] {
   const problem = formatProblem.value;
   if (!problem) return [];
@@ -418,18 +291,12 @@ function cellLintSource(): ConsoleDiagnostic[] {
   return [{ from, to: Math.max(to, from), severity: 'error', message: problem.message }];
 }
 
-// P42 D28: the trigger's own tooltip explains the effective format, the same map the picker's
-// own rows read (formatHelp) — one source, two surfaces, no way to drift.
 const formatHint = computed(() => formatHelp(effectiveFormat.value));
 
 function setFormat(format: CellFormat | null): void {
   cellEditorFormatStore.setOverride(selectedCell.value, format);
 }
 
-// P42 D27: an app-drawn picker, not a native select — the only way a per-row hover explanation
-// (item 16) can exist at all, since a native <option> is drawn outside the DOM elementFromPoint
-// can reach. An "Auto — X" row first, then FORMAT_GROUPS' own three groups separated, `checked`
-// on whichever is effective right now.
 function openFormatMenu(e: MouseEvent): void {
   if (isNullValue.value) return;
   const rows: MenuItem[] = [
@@ -458,13 +325,6 @@ function openFormatMenu(e: MouseEvent): void {
   contextMenuStore.openContextMenu(e, rows);
 }
 
-// P42 D29: never format-gated — a generator writes text into the buffer, and the buffer does not
-// care what format the value is being read as (the old UUID-only button's disabled tooltip was a
-// false statement precisely because that gate was arbitrary). Applying one overwrites the buffer
-// outright, same as applyBeautify's own "replace doc.value" contract — Reset already exists for
-// "I changed my mind." The button sits outside `.editor-body`, so no focusout ever reaches
-// onEditorBlur — this is a one-shot action like Ctrl+Enter, not a keystroke mid-edit, so it stages
-// immediately rather than waiting on a blur that will never come.
 const generatePanelOpen = ref(false);
 const generateAnchorRef = ref<HTMLElement | null>(null);
 function applyGenerator(gen: Generator): void {
@@ -486,19 +346,8 @@ const dataTypeHint = computed(
   () => typeDescription(selectedCell.value.column.dataType) ?? undefined,
 );
 
-// Item (regression pass, task batch P46-7): reads the column's own typeClass — the adapter's own
-// authoritative typeClassFor() verdict — rather than re-guessing a category from its dataType
-// string a second time (columnTypeTextClass, theme/icons.ts, still does that guess for the one
-// caller, the Structure pane, that has no typeClass at all to read instead).
 const dataTypeClass = computed(() => typeClassTextClass(selectedCell.value.column.typeClass));
 
-// The format itself is never restated here — the format-select right next to this badge already
-// shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
-// "X (manual)" segment here would just repeat what's a few pixels to the right. A timestamp
-// reading runs in its own translate pane below (TimestampPane) rather than sharing this badge —
-// it was crowding out the byte count and truncation/beautify notes that live here.
-// P24 D23/F7e: reads the buffer, not the stored value — the timestamp reading beside it already
-// read the buffer, so the two disagreeing the moment you typed was the bug.
 const statusLine = computed(() => {
   if (isNullValue.value) return t('studio.common.nullValue.label');
   const value = doc.value;
@@ -526,11 +375,6 @@ const statusLine = computed(() => {
     :data-dirty="isDirty"
     :data-invalid="!!formatProblem || undefined"
   >
-    <!-- every non-grid view opens with the same 28px header (LAW 09) — identity, then facts as
-         badges, then this panel's own controls, then the trailing group pushed to the edge.
-         ViewHeader inlined (P104 §3: layout container, no library counterpart) — the row number
-         rides along in the target text itself (cell-editor-target's toContainText assertions
-         don't care about styling). -->
     <ViewToolbar>
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="symbol-string" :size="13" />
@@ -588,10 +432,6 @@ const statusLine = computed(() => {
           <TooltipContent>{{ formatHint }}</TooltipContent>
         </Tooltip>
 
-        <!-- P40 D13: neither affordance serves a purpose in viewer mode — nothing here exists to
-             stage a write. showBytes=false (D31): the status badge above already carries a byte
-             figure, alongside the decoded reading/truncation/beautify-failure notes it already
-             said first — this row's own badge would be the same number shown twice. -->
         <template v-if="!viewerMode">
           <Popover :open="generatePanelOpen" @update:open="generatePanelOpen = $event">
             <span ref="generateAnchorRef" class="relative shrink-0">
@@ -632,18 +472,18 @@ const statusLine = computed(() => {
       </span>
 
       <span class="ml-auto flex items-center gap-1">
-        <Tooltip v-if="readOnlyReason && readOnlyChipTitle">
+        <Tooltip v-if="readOnlyReason && chipTitle">
           <TooltipTrigger as-child>
             <Badge variant="warn">
               <CodiconIcon name="lock" :size="13" />
-              {{ readOnlyChipText }}
+              {{ chipText }}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent>{{ readOnlyChipTitle }}</TooltipContent>
+          <TooltipContent>{{ chipTitle }}</TooltipContent>
         </Tooltip>
         <Badge v-else-if="readOnlyReason" variant="warn">
           <CodiconIcon name="lock" :size="13" />
-          {{ readOnlyChipText }}
+          {{ chipText }}
         </Badge>
         <TooltipIconButton
           icon="search"
@@ -661,17 +501,7 @@ const statusLine = computed(() => {
       </span>
     </ViewToolbar>
 
-    <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
-         (onEditorKeydown) stages without needing to move focus away; neither is on MonacoHost
-         itself, since its own keymap only binds plain Enter (for newlines) and lets everything
-         else bubble. Both are on the wrapping div, so they cover the translate pane too — TimestampPane
-         lives inside here (not in its own strip, as the native picker used to) precisely so it
-         inherits this same staging rule instead of needing its own (P24 D14/D15). -->
     <div ref="editorBodyEl" class="flex-1 min-h-0 flex flex-col">
-      <!-- The translate pane (hex/base64's decoded text, or P24's timestamp pane) stacks below the
-           encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a
-           side-by-side split — this panel is usually too narrow for two columns to read
-           comfortably. -->
       <div
         :class="showTranslatePane ? 'flex-1 basis-7/12 border-b border-border min-h-0' : 'flex-auto min-h-0'"
         data-testid="cell-editor-encoded"
@@ -742,9 +572,6 @@ const statusLine = computed(() => {
       </template>
     </div>
 
-    <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring ResponsePane.vue's own
-         find bar. -->
     <ResponseFindBar v-if="findOpen" ref="findBarRef" :targets="findTargets" @close="closeFind" />
-    <!-- P110 I2-18: `.editor-body.has-translate .encoded-pane` moved to the ternary above. -->
   </div>
 </template>
