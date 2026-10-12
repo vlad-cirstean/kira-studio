@@ -348,7 +348,7 @@
   },
   "DockerService.UpdateContainer#stale": {
     "code": "E_CONFLICT",
-    "message": "container changed since the editor loaded; reload"
+    "message": "This container changed since the editor loaded. Refresh the editor."
   },
   "DockerService.UpdateContainer#stopped": {
     "applied": [
