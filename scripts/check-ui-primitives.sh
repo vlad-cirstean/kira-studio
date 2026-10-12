@@ -144,12 +144,12 @@ U2@@v@@@@<DialogContent class sets width, height, padding or gap (size= owns the
 U3@@v@@TextPromptDialog.vue@@role="dialog" outside TextPromptDialog.vue@@role="dialog"
 U4@@v@@SecondaryTabs.vue@@<ToggleGroup/<ToggleGroupItem outside SecondaryTabs (use <SecondaryTabs>)@@<ToggleGroup(?:Item)?\b
 U5@@v@@AdeShell.vue@@<TabsList/<TabsTrigger outside AdeShell.vue (use <SecondaryTabs>)@@<Tabs(?:List|Trigger)\b
-U6@@vt@@TabStrip.vue|ModeSwitcher.vue|AdeShell.vue|ConsoleView.vue|ConsoleResultStrip.vue|ExecView.vue|AdeSessionStrip.vue@@tabChipVariants( outside primary tab bars@@tabChipVariants\(
+U6@@vt@@TabStrip.vue|ModeSwitcher.vue|AdeShell.vue|ConsoleResultStrip.vue|ExecView.vue|AdeSessionStrip.vue@@tabChipVariants( outside primary tab bars@@tabChipVariants\(
 U7@@v@@@@<Button without variant, or retired variant default/secondary/outline/destructive@@<Button\b(?:(?!(?&t)\s:?variant=)|(?&t)\svariant="(?:default|secondary|outline|destructive)")
 U8@@v@@@@<Button without size, or retired size default/xs/sm/lg/icon/icon-xs/icon-lg/icon-sm@@<Button\b(?:(?!(?&t)\s:?size=)|(?&t)\ssize="(?:default|xs|sm|lg|icon|icon-xs|icon-lg|icon-sm)")
 U9@@v@@NumberStepperInput.vue@@Input/NativeSelect/Textarea/InputGroup with size="default" or h-/rounded-/bg-/border-/px-/py- class@@<(?:Input|NativeSelect|Textarea|InputGroup)\b(?:(?&t)\ssize="default"|(?&t)\s:?class="[^"]*${TOK}(?:h|rounded|bg|border|px|py)-)
 U10@@v@@@@raw <label>/<select> (use FieldLabel/Label, NativeSelect)@@<(?:label|select)\b
-U11@@vt@@PanelHeader.vue@@font-bold or font-semibold (headings use SectionHeading, FieldLegend)@@${TOK}font-(?:bold|semibold)(?![\w-])
+U11@@vt@@@@font-bold or font-semibold (headings use SectionHeading, FieldLegend)@@${TOK}font-(?:bold|semibold)(?![\w-])
 U12@@v@@@@CodiconIcon :size outside 12/13/16/24@@<CodiconIcon\b(?&t)\s:size="(?!(?:12|13|16|24)")\d+"
 U13@@v@@PanelHeader.vue@@hand-rolled panel header/toolbar bar (use PanelHeader/ViewToolbar)@@\bclass="(?=[^"]*${TOK}h-bar(?![\w-]))(?=[^"]*${TOK}gap-1(?![\w.-]))(?=[^"]*${TOK}border-b(?![\w-]))(?:(?=[^"]*${TOK}px-1\.5(?![\w-]))(?=[^"]*${TOK}text-kira-sm(?![\w-]))|(?=[^"]*${TOK}px-2(?![\w-]))(?=[^"]*${TOK}shrink-0(?![\w-])))
 U14@@v@@@@EmptyMedia variant="icon", or Alert faking an empty state@@<EmptyMedia\b(?&t)\svariant="icon"|<Alert\b(?&t)\sclass="[^"]*${TOK}bg-transparent
@@ -166,7 +166,7 @@ U24@@v@@@@Alert class sets width/margin/fill/radius/border/padding, AlertDescrip
 U25@@v@@InlineState.vue@@p/div with text-error (use FieldError or InlineState)@@<(?:p|div)\b(?&t)\s:?class="[^"]*${TOK}text-error(?![\w-])
 U26@@vt@@@@retired tone variant err/destructive/note, or a tone alpha (use Badge, Alert, StatusDot)@@<(?:Badge|Alert|DropdownMenuItem)\b(?&t)\svariant="(?:err|destructive|note)"|${TOK}(?:text|bg|border)-(?:ok|warn|info|error)/\d+
 U27@@v@@StatusDot.vue@@hand-rolled status dot or pill (use StatusDot, Badge)@@\bclass="(?=[^"]*${TOK}rounded-full(?![\w-]))(?:(?=[^"]*${TOK}size-(?:1\.5|2|2\.5)(?![\w.-]))|(?=[^"]*${TOK}w-2(?![\w.-]))(?=[^"]*${TOK}h-2(?![\w.-]))|(?=[^"]*${TOK}w-2\.5(?![\w.-]))(?=[^"]*${TOK}h-2\.5(?![\w.-])))|<span\b(?&t)\s:?class="(?=[^"]*${TOK}(?:rounded-full|rounded-kira-pill)(?![\w-]))(?=[^"]*${TOK}px-)
-U28@@v@@/settings/|MemoryPanel.vue|AdeTaskTab.vue|ReposDialog.vue|SwatchRadio.vue@@raw checkbox/radio input (use Checkbox, RadioGroup)@@type="(?:checkbox|radio)"
+U28@@v@@SwatchRadio.vue@@raw checkbox/radio input (use Checkbox, RadioGroup)@@type="(?:checkbox|radio)"
 U28@@vS@@@@Checkbox in a settings pane (a live boolean is a Switch)@@<Checkbox\b
 U28@@v@@/settings/|MemoryPanel.vue|AdeTaskTab.vue|ReposDialog.vue@@Switch outside settings panes (a form option is a Checkbox)@@<Switch\b
 U29@@v@@@@TooltipProvider with props (the theme owns the delays), or TooltipContent class other than whitespace-pre-wrap@@<TooltipProvider\b(?!\s*>)|<TooltipContent\b(?&t)\s:?class="(?!whitespace-pre-wrap")
@@ -174,49 +174,49 @@ U30@@v@@@@DropdownMenuContent width, or DropdownMenuItem height/padding/gap clas
 U31@@v@@@@hand-written resize cursor or handle look, or a separator without resizeHandleVariants@@${TOK}cursor-(?:col|row|ew|ns)-resize|<ResizeHandle\b(?&t)\s:?class="[^"]*${TOK}(?:w-|h-|bg-|shadow|cursor|outline)|(?s)\A(?!.*resizeHandleVariants).*role="separator"
 U32@@v@@@@scrollbar styling in a component (use scrollbar-none, base.css)@@\[scrollbar-|${TOK}scrollbar-(?!none(?![\w-]))[\w-]+|::-webkit-scrollbar
 U33@@v@@@@keyboard hint text (use Kbd)@@Cmd/Ctrl|\(\{\{\s*formatShortcut
-U34@@vt@@monacoTheme.ts|ansi.ts|/setiFileIcon|/ade/v2/palette.ts@@colour literal in app code (use tokens)@@(?:["'\`\[(]|:\s*)#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|(?=[0-9]*[a-fA-F])[0-9a-fA-F]{3,4}|(?<d>\d)\k<d>\k<d>\k<d>?)\b|${TOK}(?:bg|text|border)-(?:black|white)(?![\w-])
-U35@@v@@CommitGrid.vue|/git-ui/src/App.vue|AdeNotesEditor.vue|ReviewThread.vue|AutocompleteField.vue|InlineEditInput.vue@@outline-none, border-focus, not-allowed cursor or odd disabled opacity (one focus and disabled recipe)@@${TOK}outline-(?:none|hidden|0)(?![\w-])|focus:outline|focus-visible:outline-|${TOK}focus(?:-visible|-within)?:border-focus|${TOK}cursor-not-allowed|${TOK}disabled:opacity-(?!50(?![\w-]))|data-\[off\]
+U34@@vt@@monacoTheme.ts|/setiFileIcon|/ade/v2/palette.ts@@colour literal in app code (use tokens)@@(?:["'\`\[(]|:\s*)#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|(?=[0-9]*[a-fA-F])[0-9a-fA-F]{3,4}|(?<d>\d)\k<d>\k<d>\k<d>?)\b|${TOK}(?:bg|text|border)-(?:black|white)(?![\w-])
+U35@@v@@AdeNotesEditor.vue|AutocompleteField.vue@@outline-none, border-focus, not-allowed cursor or odd disabled opacity (one focus and disabled recipe)@@${TOK}outline-(?:none|hidden|0)(?![\w-])|focus:outline|focus-visible:outline-|${TOK}focus(?:-visible|-within)?:border-focus|${TOK}cursor-not-allowed|${TOK}disabled:opacity-(?!50(?![\w-]))|data-\[off\]
 U36@@v@@PickerTrigger.vue@@hand-rolled box (use Card)@@\bclass="(?=[^"]*${TOK}rounded-kira(?:-sm|-lg)?(?![\w-]))(?=[^"]*${TOK}border(?![\w-]))(?=[^"]*${TOK}(?:p|px|py)-)
-U37@@vt@@createSettingsStore.ts|rowVariants.ts|PickerTrigger.vue@@raw table markup, density formula, or hand-rolled row state (use Table, useRowHeight, rowVariants)@@<(?:table|thead|tbody|tr|th|td)\b|rowDensity\s*===|${TOK}(?:hover:)?bg-(?:select|hover)(?![\w-])
+U37@@vt@@rowVariants.ts|PickerTrigger.vue@@raw table markup, density formula, or hand-rolled row state (use Table, useRowHeight, rowVariants)@@<(?:table|thead|tbody|tr|th|td)\b|rowDensity\s*===|${TOK}(?:hover:)?bg-(?:select|hover)(?![\w-])
 U38@@v@@@@scale leftovers: text-kira-xs, stock text size/radius, text-[Npx], raw h-5..h-12@@${TOK}text-kira-xs(?![\w-])|${TOK}text-(?:xs|sm|base|lg|xl|2xl)(?![\w-])|${TOK}text-\[\d|${TOK}rounded(?:-md|-lg|-xl)?(?![\w-])|${TOK}h-(?:5|6|7|8|9|10|12)(?![\w.-])
-U39@@vt@@/behaviour/|/testing/|codedError.ts@@instanceof Error ? message : String (use errorText)@@instanceof\s+Error\s*\?\s*[\w.]+\.message\s*:\s*String\(
-U40@@vt@@/behaviour/|/testing/|useShortcut.ts@@@keydown.<modifier>, @keydown.context-menu or onKeyStroke (use useShortcut)@@@keydown\.(?:meta|ctrl|alt|shift)|@keydown\.context-menu|\bonKeyStroke\(
-U41@@vt@@/behaviour/|/testing/|keys.ts|useShortcut.ts@@raw metaKey/ctrlKey read (use SHORTCUTS and useShortcut)@@\.(?:metaKey|ctrlKey)\b
-U42@@vt@@/behaviour/|/testing/@@useClipboard or navigator.clipboard (use useCopy, copyText)@@useClipboard\(|navigator\.clipboard
-U43@@vt@@/behaviour/|/testing/@@direct web storage (use usePersistedState)@@use(?:Local)?Storage(?:<[^>]*>)?\(|\blocalStorage\.|\bsessionStorage\b
-U44@@vt@@/behaviour/|/testing/@@useVirtualizer (use useVirtualRows)@@useVirtualizer\(
-U45@@vt@@/behaviour/|/testing/@@reka splitter, pointer capture or useDraggable (use ResizeHandle, usePaneResize)@@<(?:ResizablePanelGroup|ResizablePanel|ResizableHandle|KuiColumnResizeHandle|DockResizeHandle|AdePanelResizeHandle)\b|setPointerCapture|import\b[^;]*\buseDraggable\b[^;]*from '@vueuse/core'
-U46@@vt@@/behaviour/|/testing/@@numeric timer delay or setTimeout/setInterval (use TIMING with VueUse)@@\b(?:useDebounceFn|useThrottleFn|useIntervalFn|useTimeoutFn)\((?:[^()]|\([^()]*\))*,\s*\d[\d_]*\s*[,)]|\b(?:refDebounced|watchDebounced)\((?:[^()]|\([^()]*\))*,\s*(?:\d[\d_]*\s*[,)]|\{[^}]*\bdebounce:\s*\d)|refetchInterval:\s*\d|const \w*(?:DEBOUNCE|DELAY|POLL|TICK|INTERVAL)\w*_MS\s*=\s*\d|(?:debounce|delay):\s*\d{2,}|copiedDuring|\bsetTimeout\(|\bsetInterval\(
-U47@@vt@@/behaviour/|/testing/@@ArrowUp/ArrowDown, or role listbox/tree without useListNavigation/useActiveDescendant@@'Arrow(?:Down|Up)'|(?s)\A(?!.*(?:useListNavigation|useActiveDescendant)).*role="(?:listbox|tree)"
-U48@@vt@@/behaviour/|/testing/@@RowContextMenu or useRowMenu (use the context menu store)@@<RowContextMenu\b|useRowMenu\(
-U49@@v@@/behaviour/|/testing/@@AdeConfirmDialog, window.confirm or a local ConfirmDialog (use the confirm store or ConfirmDialogView)@@<AdeConfirmDialog\b|window\.confirm|import ConfirmDialog from '\.\./components/
-U50@@vt@@/behaviour/|/testing/@@input committing on blur and Enter, or useCommitField (use InlineEditInput, useInlineEdit)@@<(?:input|Input|InputGroupInput)\b(?=(?&t)\s@blur=)(?=(?&t)\s@keydown\.enter)|useCommitField\(
-U51@@vt@@/behaviour/|/testing/@@hand-rolled pending ref (use useAsyncAction or mutation.isPending)@@const \w*(?:[Bb]usy|[Pp]ending|[Ss]aving|[Ll]oading|[Ss]ubmitting|[Rr]unning|[Dd]eleting|[Rr]etrying|[Cc]opying)\s*=\s*ref\b
-U52@@vt@@/behaviour/|/testing/|/theme/src/format.ts|/theme/src/i18n/number.ts@@locale or Intl formatting, useTimeAgo, local format helper (use behaviour/format)@@toLocaleString\(|toLocaleDateString|toLocaleTimeString|Intl\.(?:NumberFormat|DateTimeFormat|RelativeTimeFormat)|useTimeAgo\(|function (?:plural|formatDuration|formatElapsed|formatSize|formatTime|formatMs)\b
-U53@@vt@@/behaviour/|/testing/|queryClient.ts@@own QueryClient or a query option restating the createQueryClient default@@new QueryClient\b|retry:\s*false|refetchOnWindowFocus:\s*false|staleTime:\s*(?:Infinity|Number\.POSITIVE_INFINITY)
-U53@@v@@/behaviour/|/testing/@@explicit queryClient argument in a component (inject it with useQueryClient)@@,\s*queryClient\s*,?\s*\)
-U54@@v@@/behaviour/|/testing/@@v-if on isLoading/isError (use QueryState)@@v-(?:else-)?if="[^"]*\.(?:isLoading|isError)\b
-U55@@vt@@/behaviour/|/testing/@@onMutate (use optimisticUpdate)@@onMutate:
-U56@@vt@@/behaviour/|/testing/@@localeCompare, Collator or lowercase includes (use matchesQuery, compareNatural)@@localeCompare\(|new Intl\.Collator|\.toLowerCase\(\)\.includes\(
-U57@@vt@@/behaviour/|/testing/@@manual scroll-to-end or scrollIntoView (use useFollowTail, revealElement)@@scrollTop\s*=\s*\w+(?:\.value)?\.scrollHeight|scrollIntoView\(
-U58@@vt@@/behaviour/|/testing/@@computeFloatPosition or pointReference (use PointPopover)@@computeFloatPosition|pointReference
-U59@@vt@@/behaviour/|/testing/@@placeholder dash literal (use displayValue)@@(?:\?\?|\|\|)\s*'(?:—|-)'|return\s+'(?:—|-)'
-U60@@vt@@/behaviour/|/testing/@@vue-draggable-plus (use useSortableReorder)@@from 'vue-draggable-plus'
-U61@@vt@@/behaviour/|/testing/@@empty catch (give a reason comment or surface the error)@@catch\s*(?:\(\w*\))?\s*\{\s*\}|\.catch\(\(\)\s*=>\s*(?:\{\s*\}|undefined)\)
-U62@@vt@@/behaviour/|/testing/|SearchField.vue@@manual focus() (use useFocusOnMount, useFocusReturn, useListNavigation)@@\.focus\(\)|nextTick\([^)]*\.focus
-U63@@s@@/behaviour/|/testing/@@side panel with SearchField and no usePanelHeaderSearch@@(?s)\A(?!.*usePanelHeaderSearch).*<SearchField
+U39@@vt@@/behaviour/!|/testing/!@@instanceof Error ? message : String (use errorText)@@instanceof\s+Error\s*\?\s*[\w.]+\.message\s*:\s*String\(
+U40@@vt@@/behaviour/!|/testing/!@@@keydown.<modifier>, @keydown.context-menu or onKeyStroke (use useShortcut)@@@keydown\.(?:meta|ctrl|alt|shift)|@keydown\.context-menu|\bonKeyStroke\(
+U41@@vt@@/behaviour/!|/testing/!|keys.ts@@raw metaKey/ctrlKey read (use SHORTCUTS and useShortcut)@@\.(?:metaKey|ctrlKey)\b
+U42@@vt@@/behaviour/!|/testing/!@@useClipboard or navigator.clipboard (use useCopy, copyText)@@useClipboard\(|navigator\.clipboard
+U43@@vt@@/behaviour/!|/testing/!@@direct web storage (use usePersistedState)@@use(?:Local)?Storage(?:<[^>]*>)?\(|\blocalStorage\.|\bsessionStorage\b
+U44@@vt@@/behaviour/!|/testing/!@@useVirtualizer (use useVirtualRows)@@useVirtualizer\(
+U45@@vt@@/behaviour/!|/testing/!@@reka splitter, pointer capture or useDraggable (use ResizeHandle, usePaneResize)@@<(?:ResizablePanelGroup|ResizablePanel|ResizableHandle|KuiColumnResizeHandle|DockResizeHandle|AdePanelResizeHandle)\b|setPointerCapture|import\b[^;]*\buseDraggable\b[^;]*from '@vueuse/core'
+U46@@vt@@/behaviour/!|/testing/!@@numeric timer delay or setTimeout/setInterval (use TIMING with VueUse)@@\b(?:useDebounceFn|useThrottleFn|useIntervalFn|useTimeoutFn)\((?:[^()]|\([^()]*\))*,\s*\d[\d_]*\s*[,)]|\b(?:refDebounced|watchDebounced)\((?:[^()]|\([^()]*\))*,\s*(?:\d[\d_]*\s*[,)]|\{[^}]*\bdebounce:\s*\d)|refetchInterval:\s*\d|const \w*(?:DEBOUNCE|DELAY|POLL|TICK|INTERVAL)\w*_MS\s*=\s*\d|(?:debounce|delay):\s*\d{2,}|copiedDuring|\bsetTimeout\(|\bsetInterval\(
+U47@@vt@@/behaviour/!|/testing/!@@ArrowUp/ArrowDown, or role listbox/tree without useListNavigation/useActiveDescendant@@'Arrow(?:Down|Up)'|(?s)\A(?!.*(?:useListNavigation|useActiveDescendant)).*role="(?:listbox|tree)"
+U48@@vt@@/behaviour/!|/testing/!@@RowContextMenu or useRowMenu (use the context menu store)@@<RowContextMenu\b|useRowMenu\(
+U49@@v@@/behaviour/!|/testing/!@@AdeConfirmDialog, window.confirm or a local ConfirmDialog (use the confirm store or ConfirmDialogView)@@<AdeConfirmDialog\b|window\.confirm|import ConfirmDialog from '\.\./components/
+U50@@vt@@/behaviour/!|/testing/!@@input committing on blur and Enter, or useCommitField (use InlineEditInput, useInlineEdit)@@<(?:input|Input|InputGroupInput)\b(?=(?&t)\s@blur=)(?=(?&t)\s@keydown\.enter)|useCommitField\(
+U51@@vt@@/behaviour/!|/testing/!@@hand-rolled pending ref (use useAsyncAction or mutation.isPending)@@const \w*(?:[Bb]usy|[Pp]ending|[Ss]aving|[Ll]oading|[Ss]ubmitting|[Rr]unning|[Dd]eleting|[Rr]etrying|[Cc]opying)\s*=\s*ref\b
+U52@@vt@@/behaviour/!|/testing/!|/theme/src/format.ts|/theme/src/i18n/number.ts@@locale or Intl formatting, useTimeAgo, local format helper (use behaviour/format)@@toLocaleString\(|toLocaleDateString|toLocaleTimeString|Intl\.(?:NumberFormat|DateTimeFormat|RelativeTimeFormat)|useTimeAgo\(|function (?:plural|formatDuration|formatElapsed|formatSize|formatTime|formatMs)\b
+U53@@vt@@/behaviour/!|/testing/!|queryClient.ts@@own QueryClient or a query option restating the createQueryClient default@@new QueryClient\b|retry:\s*false|refetchOnWindowFocus:\s*false|staleTime:\s*(?:Infinity|Number\.POSITIVE_INFINITY)
+U53@@v@@/behaviour/!|/testing/!@@explicit queryClient argument in a component (inject it with useQueryClient)@@,\s*queryClient\s*,?\s*\)
+U54@@v@@/behaviour/!|/testing/!@@v-if on isLoading/isError (use QueryState)@@v-(?:else-)?if="[^"]*\.(?:isLoading|isError)\b
+U55@@vt@@/behaviour/!|/testing/!@@onMutate (use optimisticUpdate)@@onMutate:
+U56@@vt@@/behaviour/!|/testing/!@@localeCompare, Collator or lowercase includes (use matchesQuery, compareNatural)@@localeCompare\(|new Intl\.Collator|\.toLowerCase\(\)\.includes\(
+U57@@vt@@/behaviour/!|/testing/!@@manual scroll-to-end or scrollIntoView (use useFollowTail, revealElement)@@scrollTop\s*=\s*\w+(?:\.value)?\.scrollHeight|scrollIntoView\(
+U58@@vt@@/behaviour/!|/testing/!@@computeFloatPosition or pointReference (use PointPopover)@@computeFloatPosition|pointReference
+U59@@vt@@/behaviour/!|/testing/!@@placeholder dash literal (use displayValue)@@(?:\?\?|\|\|)\s*'(?:—|-)'|return\s+'(?:—|-)'
+U60@@vt@@/behaviour/!|/testing/!@@vue-draggable-plus (use useSortableReorder)@@from 'vue-draggable-plus'
+U61@@vt@@/behaviour/!|/testing/!@@empty catch (give a reason comment or surface the error)@@catch\s*(?:\(\w*\))?\s*\{\s*\}|\.catch\(\(\)\s*=>\s*(?:\{\s*\}|undefined)\)
+U62@@vt@@/behaviour/!|/testing/!|SearchField.vue@@manual focus() (use useFocusOnMount, useFocusReturn, useListNavigation)@@\.focus\(\)|nextTick\([^)]*\.focus
+U63@@s@@/behaviour/!|/testing/!@@side panel with SearchField and no usePanelHeaderSearch@@(?s)\A(?!.*usePanelHeaderSearch).*<SearchField
 U72@@vt@@@@@lucide/vue import outside the theme ui primitives (use CodiconIcon, ICON)@@['"]@lucide/vue
-U73@@vt@@CodiconIcon.vue|Spinner.vue|/theme/src/icons.ts@@retired icon name gear/settings/kebab-vertical, or a 'codicon-' string literal (use ICON)@@(?<!<slot )\b(?:name|icon)(?:=|:\s*)["']{1,2}(?:gear|settings|kebab-vertical)["']|['"\x60]codicon-
+U73@@vt@@/theme/src/icons.ts@@retired icon name gear/settings/kebab-vertical, or a 'codicon-' string literal (use ICON)@@(?<!<slot )\b(?:name|icon)(?:=|:\s*)["']{1,2}(?:gear|settings|kebab-vertical)["']|['"\x60]codicon-
 U74@@v@@EmptyState.vue@@<Empty outside EmptyState.vue (use EmptyState)@@<Empty\b
 U75@@vt@@@@duration-, ease-, animate-in, animate-out outside theme (motion tokens own them)@@${TOK}(?:duration|ease)-[\w\[]|${TOK}animate-(?:in|out)(?![\w-])
 U76@@vt@@sortableReorder.ts@@ghostClass/chosenClass outside sortableReorder.ts (use SORTABLE_GHOST_CLASS, SORTABLE_CHOSEN_CLASS)@@\b(?:ghost|chosen)Class:
 U77@@vt@@@@bare void on a bridge call (use fireAndForget)@@\bvoid\s+(?:(?:ctx|props)\.)?(?:control|bridge)\.\w+\(
 U78@@s@@@@Button inside EmptyState in a side panel (the front door has no action button)@@(?s)<EmptyState\b(?&t)(?<!/)>(?:(?!</EmptyState>).)*?<Button\b
-U79@@vt@@openExternal.ts|apps/kira-space/frontend/src/bridge/index.ts|apps/kira-studio/frontend/src/docker/context.ts@@direct linkOpenExternal or LinkService.OpenExternal (use createOpenExternal)@@linkOpenExternal\(|LinkService\.OpenExternal\(
-U80@@v@@ShowMoreButton.vue@@ShowMoreButton without useCappedList@@(?s)\A(?!.*useCappedList\().*ShowMoreButton
-U80@@vt@@/behaviour/|/testing/@@hand-rolled render cap (use useCappedList)@@capRows\(|_ROW_CAP\b
+U79@@vt@@apps/kira-space/frontend/src/bridge/index.ts|apps/kira-studio/frontend/src/docker/context.ts@@direct linkOpenExternal or LinkService.OpenExternal (use createOpenExternal)@@linkOpenExternal\(|LinkService\.OpenExternal\(
+U80@@v@@@@ShowMoreButton without useCappedList@@(?s)\A(?!.*useCappedList\().*ShowMoreButton
+U80@@vt@@/behaviour/!|/testing/!@@hand-rolled render cap (use useCappedList)@@capRows\(|_ROW_CAP\b
 U81@@vt@@@@empty .catch(() => {}) (use fireAndForget or give the error a surface)@@\.catch\(\s*\(\s*\w*\s*\)\s*=>\s*\{\s*\}\s*\)
-U82@@vc@@/lib/sha.ts@@.slice(0, 7|8) on a sha (use shortSha)@@\.slice\(\s*0\s*,\s*[78]\s*\)
+U82@@vc@@@@.slice(0, 7|8) on a sha (use shortSha)@@\.slice\(\s*0\s*,\s*[78]\s*\)
 U82@@vm@@@@h-11, size-11 or min-h-11 in mobile (use h-touch, size-touch, min-h-touch)@@${TOK}(?:h|size|min-h)-11(?![\w.-])
 U83@@v@@@@variant="ghost" outside DialogHeader (use toolbar, link or a tone)@@variant="ghost"|'ghost'
 U84@@v@@@@<Button class sets a size (the size variants own h-touch, size-touch, h-control-sm, h-auto p-0)@@<Button\b(?&t)\s:?class="(?:[^"]*${TOK}(?:h-touch|size-touch|h-control-sm)(?![\w.-])|(?=[^"]*${TOK}h-auto(?![\w-]))(?=[^"]*${TOK}p-0(?![\w-])))
@@ -228,7 +228,7 @@ U89@@vt@@linkify.ts|badgeClass.ts@@cursor-pointer outside link owners, or cursor
 U90@@vt@@@@hover tone override, or opacity as muted (use tone, text-muted-foreground)@@hover:text-(?:ok|error|warn|primary)(?![\w-])|${TOK}opacity-(?:40|60|70|75|80)(?![\w.-])
 U91@@vt@@@@hand-written truncate, or tooltip-wrapped truncate (use TruncatedText)@@overflow-hidden text-ellipsis whitespace-nowrap|<TooltipTrigger\b(?&t)>\s*<(?:span|div|button)\b(?&t)\s:?class="[^"]*${TOK}truncate(?![\w-])
 U92@@v@@SplitButton.vue@@<Button :disabled carries a pending flag, or Spinner inside Button (use pending)@@<Button\b(?&t)\s:disabled="[^"]*(?i:pending|busy|saving|loading|running|installing|committing)|(?s)<Button\b(?&t)(?<!/)>(?:(?!</Button>).)*?<Spinner\b
-U93@@vt@@/theme/src/format.ts|/testing/@@toFixed or {{ }}% (use formatPercent, formatBytes, formatDuration)@@toFixed\(|\}\}%
+U93@@vt@@/theme/src/format.ts|/testing/!@@toFixed or {{ }}% (use formatPercent, formatBytes, formatDuration)@@toFixed\(|\}\}%
 U94@@v@@@@heading element without text-kira-lg font-medium@@<h[1-6]\b(?!(?=(?&t)\sclass="[^"]*${TOK}text-kira-lg(?![\w-]))(?=(?&t)\sclass="[^"]*${TOK}font-medium(?![\w-])))
 U95@@v@@@@hand hint paragraph (use FieldDescription)@@<p\b(?&t)\s:?class="(?=[^"]*${TOK}text-kira-sm(?![\w-]))(?=[^"]*${TOK}text-(?:muted-foreground|subtle)(?![\w-]))
 U96@@v@@@@useListNavigation list with @contextmenu but no nav.contextMenu( (select before the menu)@@(?s)\A(?=.*useListNavigation\()(?=.*@contextmenu=)(?!.*\.contextMenu\()
@@ -322,6 +322,24 @@ while read -r id f; do
     STATUS=1
   fi
 done <"$TMP/perm"
+
+# A built-in exempt name that exempts nothing fails; a trailing `!` (blanket dirs) opts out.
+gn=0
+while IFS= read -r line; do
+  gn=$((gn + 1))
+  rest=${line#*@@}; rest=${rest#*@@}
+  exempt=${rest%%@@*}
+  if [ -z "$exempt" ]; then continue; fi
+  old_ifs=$IFS; IFS='|'
+  for e in $exempt; do
+    case "$e" in *!) continue ;; esac
+    if ! grep -qxF "$gn $e" "$TMP/used_exempt"; then
+      echo "check-ui-primitives: stale built-in exemption: ${line%%@@*} $e" >&2
+      STATUS=1
+    fi
+  done
+  IFS=$old_ifs
+done <"$TMP/guards"
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3 and P266-consistency-audit.md §4.4." >&2
