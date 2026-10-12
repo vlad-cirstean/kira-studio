@@ -2517,6 +2517,7 @@ One decision per cross-cutting concern. Guards: `scripts/check-ui-primitives.sh`
 | Per-device convenience | `usePersistedState`, key `kira.<module>.<name>` |
 | Git view state | `ViewStateStore` |
 | Files under KIRA_HOME | Atomic write (`renameio`) |
+| LLM prompt overrides | `<home>/llm-prompts.json` (`renameio`), see "App prompts" |
 
 - Sections and leaves camelCase; new booleans positive. `api.disableCookieJar` keeps its name (renaming rewrites user data).
 - Inside the Settings dialog every leaf is draft plus Save. A control outside the dialog applies at once through `patchSettings`. `SettingsShell` in both apps: Appearance first, Advanced last. Field anatomy: label row with reset button, control, `FieldError`, description. Booleans are `Switch`.
@@ -4923,6 +4924,55 @@ mask-rule editing in **Privacy**. The grid's own two surfaces are the header men
 PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggle
 (`views/grid/DataToolbar.vue`'s `toolbar-mask-preview`).
 
+## App prompts (P271)
+
+`internal/llmprompts` holds every LLM prompt and LLM-facing instruction both apps send. Not
+`internal/prompts` (P246 popup router).
+
+- **Registry.** `registry.go` is the one file with prompt text. Entry: id, kind, apps, title/purpose/usedBy
+  catalog keys, applies-when, default, required fragments, fixed output schema. Typed handle
+  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 85 entries: Space lists 61,
+  Studio 33. User-authored text (smart-script bodies, workflow stage and step prompts) stays out, as do
+  tool and server names, tool error strings and result data formatting.
+- **Kinds.** `system`, `message`, `suffix`, `instructions`, `tool`, `argument` (one MCP tool property
+  description; carries `Parent` tool and `Field`), `toolResult`, `fragment` (included via `{{template}}`).
+  `InputSchema[T]` sets each tool property's description from its `argument` entry; a mismatch panics at
+  server build. No `jsonschema:"..."` tags.
+- **Templates.** `text/template`, one set per resolve; funcs `inc` and `join` only. An entry with `NoVars`
+  and no fragments is literal, never parsed. Defaults render byte-identical to the pre-P271 output
+  (`testdata/golden`). `RenderParts` wraps each string variable in marker runes and splits, so Settings
+  Preview marks resolved values with `VarText`; a failed self-check returns one literal part.
+- **Store.** `<home>/llm-prompts.json` (`~/.kira-studio/`, `~/.kira-space/`), per app, written with
+  `renameio`, mode 0600. Shape `{version, revision, overrides: {id: {text, defaultHash, updatedAt}}}`.
+  Saving the default text removes the override. Text 1 byte to 32 KiB. A change carries `baseHash`;
+  stale refused with `E_CONFLICT`. Corrupt file, or an override that no longer validates: default used,
+  warn logged, flagged in Settings (`storeError`, `invalid`). `defaultChanged` flags an override made
+  against an older default.
+- **Validation (server side).** Template parses, every `prompt:"required"` variable referenced, every
+  required fragment included (`memory.dataHygiene` in the memory system prompts: injection defence),
+  executes against example vars. Schema-bound prompts (gate, reconcile, import extract and finalize)
+  keep their JSON schema fixed; it shows read-only in Settings.
+- **Source injection.** No global. Consumers get a `llmprompts.Source` (`Resolve`, `Revision`) through
+  their options: `memory.ServiceOptions`, `mcpserver.Options`, `claudeheadless`, `scriptruns`, ADE,
+  `dbmcp`. `Defaults()` is the registry-only source. `Store.Resolve` stats the file per call and re-reads
+  on mtime or size change.
+- **Freshness per consumer.** Gate, reconcile, import, headless suffixes and ADE messages resolve per
+  call: edit applies on the next call. `memory-mcp` (stdio subprocess; `memorycli.Run` gets
+  `<KiraSpaceHome>/llm-prompts.json`) builds server instructions, tool and argument descriptions once per
+  process, so they apply to new Claude sessions (`newSession`, shown in Settings). `dbmcp` rebuilds its
+  MCP server when `Revision()` changes. `claudeheadless` rebuilds its shared server on revision change.
+- **IPC.** `LlmPromptsService` (`List`, `Save`, `Preview`) in both apps; event `kira:llmPrompts:changed`
+  `{revision}`. `Save` is all-or-nothing; per-id errors come back as `E_BAD_REQUEST` payload. `Preview`
+  with real vars also renders the ADE run dialog and step inspector, so no TS copy of a prompt exists.
+- **Settings.** Section `Prompts` before `Advanced` in both apps (`packages/workbench/src/llmPrompts/`):
+  list, Monaco editor, Changes diff against default, Preview, per-entry reset. Drafts in Pinia store
+  `llmPromptDrafts`; dialog Save saves prompts first, then the settings patch.
+- **Guard.** `go run ./internal/llmprompts/cmd/checkprompts` (in `bun run lint`) fails on a `jsonschema`
+  tag, an `mcp.Tool`/`mcp.Prompt`/`mcp.PromptArgument` `Description` or `mcp.ServerOptions`
+  `Instructions` not from `llmprompts`, a `memory.Call` `System` not from `llmprompts`, or a copy of a
+  registry default (first 48 characters; whole text when 24 to 47) in a non-test `.go`, `.ts` or `.vue`
+  file outside `internal/llmprompts` and `internal/flowtest`.
+
 ## Renderer security surface
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what
@@ -5584,6 +5634,7 @@ Performance:
 - **A missing `claude` shows the shell's raw text (P250).** Kira runs a bare `claude` through the user's shell (`ade/command.go`), so a missing CLI surfaces as the shell's own "command not found" in the tab, with no Kira message. Delete once launch checks the CLI first. P277 closes it.
 - **`ui-timing` budgets fail on slow or loaded hosts (P250, P264, P266, P267).** Console keystroke p50 (53 ms vs 50), scroll frame p95 (81-134 ms vs 80), cached tree expand p95 (53 vs 50) and `perf.spec.ts` scroll p95 (112 vs 80) fail on a host about 2x slower than the budgets assume or under load average above ~9, and at the pre-P263 base `d381439d6` and the P267 base `ae1bb8648` (worse there). Not a regression. Budgets are never loosened. Run `--project=ui-timing` on an idle machine; delete once the project passes on the CI runner or a quiet host. P277 closes it.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
+- **Visual baseline of the ADE workflow graph shows the Preview placeholder (P271).** The finish note is rendered by `LlmPromptsService.Preview`, unmocked in that spec. The PNG does not show the real note text.
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
 - **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251, P264).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), Space repo-graph refresh, paging, columns, badges and workspace specs (1 s-class budgets), `ade-v2-panel` handle-drag width, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked. P277 closes it.

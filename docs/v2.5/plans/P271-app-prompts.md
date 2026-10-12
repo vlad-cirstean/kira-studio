@@ -509,3 +509,12 @@ Real `claude` rows (haiku, temp HOME, under $0.05 cap each): space `TestMemoryGa
 `TestMemoryMcpThroughClaude|TestMemoryInstallRegisters`, `TestMemoryImport`, `TestAdeHeadlessRun|
 TestAdeStepResults|TestAdeStageSession|TestAdeRebaseRun`, `TestSmartScriptRun`; studio full module
 (`TestDbMcpThroughClaude`, `TestDbMcpInstallRegisters`, `TestSmartScriptRun`). All PASS. Spend not measured.
+
+## Result
+
+Done. Registry of 85 entries (Space 61, Studio 33) in `internal/llmprompts/registry.go`; override store
+`<home>/llm-prompts.json`; `LlmPromptsService` and Prompts section in both apps; TS prompt mirrors
+deleted; `checkprompts` guard in `bun run lint`. Foundation, streams A and B, test and fix landed in
+order. `docs/ARCHITECTURE.md` "App prompts", settings table row, `docs/DEV_ENVIRONMENT.md` real `claude`
+row added. One Known open item added: ADE workflow graph baseline shows the Preview placeholder.
+

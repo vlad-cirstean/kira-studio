@@ -459,6 +459,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
 | Memory import: `internal/memory/importer/**` | `bun run test:claude:space -run TestMemoryImport` (about 50 s, 0.14 USD, P211) |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
+| Prompt registry, store, templates: `internal/llmprompts/**` | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters\|TestMemoryImport\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestSmartScriptRun'` and `bun run test:claude:studio` |
 | Claude CLI upgrade | `bun run test:claude` |
 
 Sandbox notes:
