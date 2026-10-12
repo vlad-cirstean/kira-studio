@@ -16,10 +16,10 @@ import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
 import type { MenuSection } from '../lib/menuModel.ts';
+import type { PickerList } from '../lib/pickerModel.ts';
+import { useSectionMenu } from '../lib/useSectionMenu.ts';
 import type { StashState } from '../state/stash.ts';
-import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
-import { useSectionMenu } from './useSectionMenu.ts';
 
 const UNTRACKED_FLAG = '-u';
 

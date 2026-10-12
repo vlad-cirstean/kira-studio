@@ -43,14 +43,7 @@ import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
-import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
-import type { RefsState } from '../state/refs.ts';
-import type { StackState } from '../state/stack.ts';
-import type { StashState } from '../state/stash.ts';
-import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
-import { prBadgeClass } from './badgeClass.ts';
-import GlobalStashList from './GlobalStashList.vue';
+import { prBadgeClass } from '../lib/badgeClass.ts';
 import {
   filterPickerInput,
   orderTab,
@@ -58,23 +51,30 @@ import {
   type PickerList,
   type PickerTab,
   pickerRowIds,
-} from './pickerModel.ts';
-import { prStateLabel } from './prStateLabel.ts';
-import RowActionsButton from './RowActionsButton.vue';
+} from '../lib/pickerModel.ts';
+import { prStateLabel } from '../lib/prStateLabel.ts';
 import {
   formatTrack,
   localNameForRemoteBranch,
   REF_LIST_SECTION_CAP,
   remoteCheckoutLabel,
   remoteCheckoutTarget,
-} from './refListModel.ts';
-import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
+} from '../lib/refListModel.ts';
+import { buildRefMenu, remoteNamesFrom } from '../lib/rowMenuModel.ts';
+import { childOf, parentOf } from '../lib/stackListModel.ts';
+import { useFieldFocus } from '../lib/useFieldFocus.ts';
+import { useSectionMenu } from '../lib/useSectionMenu.ts';
+import type { OpsState } from '../state/ops.ts';
+import type { PrState } from '../state/pr.ts';
+import type { RefsState } from '../state/refs.ts';
+import type { StackState } from '../state/stack.ts';
+import type { StashState } from '../state/stash.ts';
+import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
+import GlobalStashList from './GlobalStashList.vue';
+import RowActionsButton from './RowActionsButton.vue';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
-import { childOf, parentOf } from './stackListModel.ts';
 import TagList from './TagList.vue';
-import { useFieldFocus } from './useFieldFocus.ts';
-import { useSectionMenu } from './useSectionMenu.ts';
 import WorktreeList from './WorktreeList.vue';
 
 const props = defineProps<{

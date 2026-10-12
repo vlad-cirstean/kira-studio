@@ -28,9 +28,9 @@ import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { BADGE_ICONS } from '../icons/index.ts';
-import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
-import type { SearchOption, SearchResultsModel } from './searchResultsModel.ts';
-import { fieldLabel } from './searchResultsModel.ts';
+import { SEARCH_LISTBOX_ID } from '../lib/searchListboxId.ts';
+import type { SearchOption, SearchResultsModel } from '../lib/searchResultsModel.ts';
+import { fieldLabel } from '../lib/searchResultsModel.ts';
 
 const REF_ICON = {
   branch: BADGE_ICONS.localBranch,

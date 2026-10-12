@@ -17,9 +17,9 @@ import { t } from '@theme/i18n';
 // of the retired Kui context-menu model -- P131 Part 3
 // §6.1) -- re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
 // unchanged.
-import type { MenuItem, MenuSection } from '../lib/menuModel.ts';
-import { renderText } from '../lib/text.ts';
+import type { MenuItem, MenuSection } from './menuModel.ts';
 import { applyMenuLabel, originLabel } from './stashListModel.ts';
+import { renderText } from './text.ts';
 
 export type { MenuSection };
 

@@ -21,7 +21,7 @@ import type {
 import { type MessageKey, t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { customRef, type Ref } from 'vue';
-import { originLabel, stashLabel } from '../components/stashListModel.ts';
+import { originLabel, stashLabel } from '../lib/stashListModel.ts';
 
 /** A string ref that notifies on every assignment, equal text included. Watch it with
  *  `{ deep: true }` (which forces the callback): a repeated identical failure must still reach the

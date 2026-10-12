@@ -18,12 +18,12 @@ import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
+import type { PickerList } from '../lib/pickerModel.ts';
+import { buildGlobalStashMenu } from '../lib/rowMenuModel.ts';
+import { globalRowModel } from '../lib/stashListModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
-import type { PickerList } from './pickerModel.ts';
-import { buildGlobalStashMenu } from './rowMenuModel.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
-import { globalRowModel } from './stashListModel.ts';
 
 const props = defineProps<{
   section: PickerList<StashEntry>;

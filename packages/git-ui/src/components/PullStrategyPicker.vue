@@ -25,9 +25,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
+import { describePullStrategySource, pullStrategyLabel } from '../lib/pullStrategyModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import MenuSections from './MenuSections.vue';
-import { describePullStrategySource, pullStrategyLabel } from './pullStrategyModel.ts';
 
 const props = defineProps<{
   ops: OpsState;

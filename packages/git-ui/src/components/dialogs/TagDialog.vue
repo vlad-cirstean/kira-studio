@@ -28,9 +28,9 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref, useId, watch } from 'vue';
+import { canSubmitTagCreate, classifyTagName } from '../../lib/tagDialogModel.ts';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
-import { canSubmitTagCreate, classifyTagName } from './tagDialogModel.ts';
 
 const props = defineProps<{
   open: boolean;

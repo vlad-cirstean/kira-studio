@@ -28,13 +28,13 @@ import { formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, useTemplateRef } from 'vue';
+import { openAllChangesAnnounced } from '../../lib/openAllChangesAnnounced.ts';
+import { buildReadOnlyRowMenu } from '../../lib/rowMenuModel.ts';
+import { useSectionMenu } from '../../lib/useSectionMenu.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
 import FileTree from '../FileTree.vue';
-import { openAllChangesAnnounced } from '../openAllChangesAnnounced.ts';
-import { buildReadOnlyRowMenu } from '../rowMenuModel.ts';
-import { useSectionMenu } from '../useSectionMenu.ts';
 
 const props = defineProps<{
   sha: string;

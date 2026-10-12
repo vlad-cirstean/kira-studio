@@ -13,11 +13,11 @@ import { rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import type { RefListSection } from '../lib/refListModel.ts';
+import { buildRefMenu } from '../lib/rowMenuModel.ts';
+import { useSectionMenu } from '../lib/useSectionMenu.ts';
 import type { OpsState } from '../state/ops.ts';
 import RowActionsButton from './RowActionsButton.vue';
-import type { RefListSection } from './refListModel.ts';
-import { buildRefMenu } from './rowMenuModel.ts';
-import { useSectionMenu } from './useSectionMenu.ts';
 
 const props = defineProps<{
   section: RefListSection;

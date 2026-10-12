@@ -24,12 +24,12 @@ import { shortSha } from '@kira/git-core';
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
+import type { PickerList } from '../lib/pickerModel.ts';
+import { buildStashMenu } from '../lib/rowMenuModel.ts';
+import { isAutoStash, originLabel, stashLabel } from '../lib/stashListModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
-import type { PickerList } from './pickerModel.ts';
-import { buildStashMenu } from './rowMenuModel.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
-import { isAutoStash, originLabel, stashLabel } from './stashListModel.ts';
 
 const props = defineProps<{
   /** P77 §11: already filtered/ordered/capped by `pickerModel.ts` — this component only renders

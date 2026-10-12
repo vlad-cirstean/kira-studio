@@ -27,6 +27,7 @@ import Spinner from '@theme/components/Spinner.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
+import { openFileAnnounced } from '../lib/openFileAnnounced.ts';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { PrState } from '../state/pr.ts';
@@ -35,7 +36,6 @@ import CommitMeta from './CommitMeta.vue';
 // type` erases it, and Vue then renders <FileTree> as an unknown element with nothing inside it
 // (G14 F1/F3).
 import FileTree from './FileTree.vue';
-import { openFileAnnounced } from './openFileAnnounced.ts';
 
 const props = defineProps<{
   detailState: DetailState;

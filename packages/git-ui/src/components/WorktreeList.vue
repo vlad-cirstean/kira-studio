@@ -33,9 +33,9 @@ import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref } from 'vue';
+import { type PickerList, worktreeLabel } from '../lib/pickerModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
-import { type PickerList, worktreeLabel } from './pickerModel.ts';
 
 const props = defineProps<{
   section: PickerList<WorktreeEntry>;

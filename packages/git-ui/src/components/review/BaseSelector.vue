@@ -21,9 +21,9 @@ import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
+import { buildRefListSections } from '../../lib/refListModel.ts';
+import { useFieldFocus } from '../../lib/useFieldFocus.ts';
 import type { RefsState } from '../../state/refs.ts';
-import { buildRefListSections } from '../refListModel.ts';
-import { useFieldFocus } from '../useFieldFocus.ts';
 
 const props = defineProps<{
   resolution: BaseResolution | undefined;

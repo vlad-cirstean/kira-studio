@@ -28,6 +28,23 @@ import { graphColumnWidth } from '../graph/geometry.ts';
 import { createGraphFormatter } from '../graph/graphColumn.ts';
 import { laneAt } from '../graph/hitTest.ts';
 import { useGraphVisible } from '../graphVisibility.ts';
+import {
+  type ColumnFit,
+  type ColumnFitInput,
+  effectiveGraphWidth,
+  fitColumns,
+  MAX_COLUMN_WIDTH,
+  maxDragWidth,
+} from '../lib/columnFit.ts';
+import {
+  buildColumns,
+  collapsedMessageText,
+  createCommitDataView,
+  GRAPH_COLUMN_ID,
+} from '../lib/columns.ts';
+import { measureAbsoluteDateWidth } from '../lib/dateFormat.ts';
+import { type GridKeyboardDeps, handleGridKeyDown } from '../lib/gridKeyboard.ts';
+import { composeRowLabel } from '../lib/rowAccessibility.ts';
 import type { GraphOrderState } from '../state/graphOrder.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
 import type { PrState } from '../state/pr.ts';
@@ -36,23 +53,6 @@ import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
-import {
-  type ColumnFit,
-  type ColumnFitInput,
-  effectiveGraphWidth,
-  fitColumns,
-  MAX_COLUMN_WIDTH,
-  maxDragWidth,
-} from './columnFit.ts';
-import {
-  buildColumns,
-  collapsedMessageText,
-  createCommitDataView,
-  GRAPH_COLUMN_ID,
-} from './columns.ts';
-import { measureAbsoluteDateWidth } from './dateFormat.ts';
-import { type GridKeyboardDeps, handleGridKeyDown } from './gridKeyboard.ts';
-import { composeRowLabel } from './rowAccessibility.ts';
 
 const props = defineProps<{
   graphView: GraphViewState;

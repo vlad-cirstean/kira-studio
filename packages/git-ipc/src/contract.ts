@@ -596,7 +596,7 @@ export interface WorktreeRemovePreflight {
 // for `previewResetMode`'s no-round-trip mode-radio recompute), `ClassifyRestack` itself is NOT
 // ported to `@kira/git-core`: nothing in `StackDialog.vue` recomputes a preflight verdict
 // client-side ahead of a round trip, so `gitpreflight.ClassifyRestack` (Go) is the ONLY
-// implementation — `packages/git-ui/src/components/stackListModel.ts` is a pure presentation
+// implementation — `packages/git-ui/src/lib/stackListModel.ts` is a pure presentation
 // layer over whatever `stack.list`/`preflight.restack` already returned, never a second
 // classifier.
 //

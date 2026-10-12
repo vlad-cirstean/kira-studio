@@ -25,10 +25,10 @@ import { t } from '@theme/i18n';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
+import { openFileAnnounced } from '../lib/openFileAnnounced.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { StashState } from '../state/stash.ts';
 import FileTree from './FileTree.vue';
-import { openFileAnnounced } from './openFileAnnounced.ts';
 
 const props = defineProps<{
   stash: StashState;

@@ -59,20 +59,20 @@ import GitBlockedPanel from './components/GitBlockedPanel.vue';
 import GitViewHead, { type RepoHead } from './components/GitViewHead.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
 import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
-import { localNameForRemoteBranch, remoteCheckoutTarget } from './components/refListModel.ts';
-import { buildRefMenu, buildRowMenu, buildStashMenu } from './components/rowMenuModel.ts';
 // The template instantiates this (InstanceType<typeof SearchBox> is the script's only other
 // reference) — see AppToolbar.vue's own note on this exact pattern; `biome.json`'s own `**/*.vue`
 // override turns `useImportType` off for exactly this class of false positive (P96 §5.2).
 import SearchBox from './components/SearchBox.vue';
 import StashDetailPane from './components/StashDetailPane.vue';
-import type { SearchOption } from './components/searchResultsModel.ts';
-import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
-import { useSectionMenu } from './components/useSectionMenu.ts';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { useGraphVisible } from './graphVisibility.ts';
+import { localNameForRemoteBranch, remoteCheckoutTarget } from './lib/refListModel.ts';
+import { buildRefMenu, buildRowMenu, buildStashMenu } from './lib/rowMenuModel.ts';
+import type { SearchOption } from './lib/searchResultsModel.ts';
+import { childOf, parentOf } from './lib/stackListModel.ts';
 import { renderText } from './lib/text.ts';
+import { useSectionMenu } from './lib/useSectionMenu.ts';
 import { ASYNC_FAILURES, type AsyncFailure } from './state/asyncFailures.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';

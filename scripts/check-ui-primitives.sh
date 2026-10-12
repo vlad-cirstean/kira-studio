@@ -124,8 +124,8 @@ U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording i
 U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
 U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
 U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
-U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
-U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
+U41 packages/git-ui/src/lib/gridKeyboard.ts # SlickGrid engine host reads modifier keys
+U47 packages/git-ui/src/lib/gridKeyboard.ts # grid cell navigation, not list semantics
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not

@@ -3,7 +3,7 @@ import {
   type MenuItem,
   useContextMenuStore,
 } from '@workbench/state/contextMenu';
-import { type MenuSection, sectionsToMenuItems } from '../lib/menuModel.ts';
+import { type MenuSection, sectionsToMenuItems } from './menuModel.ts';
 
 interface SectionMenuOptions extends ContextMenuOptions {
   /** A heading row above the sections (names what the menu acts on). */

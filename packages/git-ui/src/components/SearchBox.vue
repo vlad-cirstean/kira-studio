@@ -68,13 +68,13 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { t } from '@theme/i18n';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
+import { SEARCH_LISTBOX_ID } from '../lib/searchListboxId.ts';
+import type { SearchOption } from '../lib/searchResultsModel.ts';
+import { buildSearchResultsModel } from '../lib/searchResultsModel.ts';
+import { useFieldFocus } from '../lib/useFieldFocus.ts';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
 import SearchResults from './SearchResults.vue';
-import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
-import type { SearchOption } from './searchResultsModel.ts';
-import { buildSearchResultsModel } from './searchResultsModel.ts';
-import { useFieldFocus } from './useFieldFocus.ts';
 
 const props = defineProps<{ search: SearchState }>();
 const emit = defineEmits<{

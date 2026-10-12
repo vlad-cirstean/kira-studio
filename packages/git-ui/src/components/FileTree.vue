@@ -39,9 +39,6 @@ import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useId, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
-import { sectionsToMenuItems } from '../lib/menuModel.ts';
-import type { FileListMode } from '../state/detail.ts';
-import type { DetailActions } from '../state/detailActions.ts';
 import {
   buildFileTree,
   buildFlatList,
@@ -53,8 +50,11 @@ import {
   renameDisplay,
   STATUS_COLOR_CLASS,
   STATUS_LETTERS,
-} from './fileTreeModel.ts';
-import { buildFileRowMenu } from './rowMenuModel.ts';
+} from '../lib/fileTreeModel.ts';
+import { sectionsToMenuItems } from '../lib/menuModel.ts';
+import { buildFileRowMenu } from '../lib/rowMenuModel.ts';
+import type { FileListMode } from '../state/detail.ts';
+import type { DetailActions } from '../state/detailActions.ts';
 
 const props = defineProps<{
   files: readonly FileChange[];

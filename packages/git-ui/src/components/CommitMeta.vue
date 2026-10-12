@@ -34,13 +34,13 @@ import { errorText } from '@workbench/bridge/codedError';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
+import { prBadgeClass } from '../lib/badgeClass.ts';
+import { appendLinkifiedText } from '../lib/linkify.ts';
+import { openAllChangesAnnounced } from '../lib/openAllChangesAnnounced.ts';
+import { prStateLabel } from '../lib/prStateLabel.ts';
+import { buildRefBadges } from '../lib/refBadges.ts';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
-import { prBadgeClass } from './badgeClass.ts';
-import { appendLinkifiedText } from './linkify.ts';
-import { openAllChangesAnnounced } from './openAllChangesAnnounced.ts';
-import { prStateLabel } from './prStateLabel.ts';
-import { buildRefBadges } from './refBadges.ts';
 
 const props = defineProps<{
   detail: CommitDetail | undefined;

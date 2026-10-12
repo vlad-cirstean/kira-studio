@@ -16,10 +16,10 @@ import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
+import { openFileAnnounced } from '../lib/openFileAnnounced.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { WorkingDetailState } from '../state/working.ts';
 import FileTree from './FileTree.vue';
-import { openFileAnnounced } from './openFileAnnounced.ts';
 
 const props = defineProps<{
   workingState: WorkingDetailState;

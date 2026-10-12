@@ -47,9 +47,9 @@ import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId, watch } from 'vue';
+import { stashLabel } from '../../lib/stashListModel.ts';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
-import { stashLabel } from '../stashListModel.ts';
 
 const props = defineProps<{
   ops: OpsState;

@@ -20,11 +20,16 @@ import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { prBadgeClass, refBadgeClass } from '../lib/badgeClass.ts';
+import type { PickerList, PickerStackGroup } from '../lib/pickerModel.ts';
+import {
+  buildOrphanRows,
+  buildStackRows,
+  prBadgeLabel,
+  type StackRow,
+} from '../lib/stackListModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
-import { prBadgeClass, refBadgeClass } from './badgeClass.ts';
-import type { PickerList, PickerStackGroup } from './pickerModel.ts';
-import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
 const props = defineProps<{
   stacks: PickerList<PickerStackGroup>;

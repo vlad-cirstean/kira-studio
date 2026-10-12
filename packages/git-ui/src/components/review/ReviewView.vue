@@ -59,6 +59,8 @@ import {
 } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
+import { buildRefListSections } from '../../lib/refListModel.ts';
+import { useFieldFocus } from '../../lib/useFieldFocus.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
@@ -69,8 +71,6 @@ import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
-import { buildRefListSections } from '../refListModel.ts';
-import { useFieldFocus } from '../useFieldFocus.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';

@@ -38,6 +38,8 @@ import { ICON } from '@theme/icons';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
+import type { PickerTab } from '../lib/pickerModel.ts';
+import { defaultRemoteFor, remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import type { AsyncFailure } from '../state/asyncFailures.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -61,9 +63,7 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 import BranchPicker from './BranchPicker.vue';
 import MenuSections from './MenuSections.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
-import type { PickerTab } from './pickerModel.ts';
 import RefreshButton from './RefreshButton.vue';
-import { defaultRemoteFor, remoteNamesFrom } from './rowMenuModel.ts';
 import UndoButton from './UndoButton.vue';
 
 const props = defineProps<{

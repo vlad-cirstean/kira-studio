@@ -33,7 +33,7 @@ import { createLatestRequest } from '@workbench/behaviour/latest';
 import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { stashLabel } from '../components/stashListModel.ts';
+import { stashLabel } from '../lib/stashListModel.ts';
 import { composeFailureNotice, type FailureNotice } from './failureNotice.ts';
 import { isCancelledTransport } from './isCancelled.ts';
 import {

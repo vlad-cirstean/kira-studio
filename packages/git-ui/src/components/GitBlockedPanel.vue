@@ -9,7 +9,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { computed } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
-import { type BlockedGitStatus, detectPlatform, gitBlockedCopy } from './gitBlockedCopy.ts';
+import { type BlockedGitStatus, detectPlatform, gitBlockedCopy } from '../lib/gitBlockedCopy.ts';
 
 const props = defineProps<{ status: GitStatus }>();
 
