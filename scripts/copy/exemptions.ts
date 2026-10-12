@@ -14,11 +14,6 @@ export const EXEMPTIONS: readonly Exemption[] = [
   },
   {
     rule: 'U67',
-    path: 'apps/kira-studio/frontend/src/fonts.ts',
-    reason: 'font family names (system and installed typefaces are proper names, not wording)',
-  },
-  {
-    rule: 'U67',
     path: 'apps/kira-studio/frontend/src/views/console/completion.ts',
     reason: 'Redis command syntax hints (command grammar, not wording)',
   },

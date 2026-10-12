@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// P104 §6.1: every converted call site reaches timing (delayDuration/skipDelayDuration) through
-// this one provider.
+// P104 §6.1: TooltipProvider is the one place call sites reach tooltip timing
+// (delayDuration/skipDelayDuration) through.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { automationsModuleKey } from '@workbench/automations/module';
 import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
 import AppLiveRegion from '@workbench/components/AppLiveRegion.vue';
@@ -12,7 +13,9 @@ import { workbenchHostKey } from '@workbench/host';
 import PromptHost from '@workbench/prompts/PromptHost.vue';
 import { promptsControlKey } from '@workbench/prompts/promptsQueries';
 import UpdatePrompt from '@workbench/prompts/UpdatePrompt.vue';
+import CommandPalette from '@workbench/shortcuts/CommandPalette.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
+import { providePaletteCommands, usePaletteStore } from '@workbench/shortcuts/palette';
 import { appUpdateStoreKey } from '@workbench/state/createAppUpdateStore';
 import { markRaw, onMounted, onUnmounted, provide } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
@@ -21,8 +24,7 @@ import { openApiRequestTab } from './api/tabs';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
-import CommandPalette from './shortcuts/CommandPalette.vue';
-import { usePaletteStore } from './shortcuts/state';
+import { studioPaletteCommands } from './shortcuts/studioCommands';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useConnectionDialogStore } from './state/connections';
 import { useDatagripImportStore } from './state/datagripImport';
@@ -57,6 +59,7 @@ const promptKinds = {
   update: markRaw(UpdatePrompt),
 };
 const paletteStore = usePaletteStore();
+providePaletteCommands(studioPaletteCommands());
 const modeStore = useModeStore();
 const datagripImportStore = useDatagripImportStore();
 const fakeDataStore = useFakeDataStore();
@@ -131,6 +134,6 @@ onUnmounted(() => {
     <AppLiveRegion />
     <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />
-    <CommandPalette />
+    <CommandPalette :placeholder="t('studio.shortcuts.palette.placeholder')" :empty-label="t('studio.shortcuts.palette.empty')" />
   </TooltipProvider>
 </template>

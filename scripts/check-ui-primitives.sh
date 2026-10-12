@@ -93,7 +93,6 @@ PANELS
 
 # "U<n> path # reason": one guard exempt for one file.
 cat >"$TMP/perm" <<'PERMANENT'
-U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 section 2.2 exempt)
 U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
 U9 apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue # inline edit input blends into the row until focused
 U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc

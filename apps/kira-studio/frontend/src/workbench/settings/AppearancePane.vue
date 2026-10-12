@@ -1,46 +1,19 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLegend } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
+import FontFamilyField from '@workbench/settings/fields/FontFamilyField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
 import { computed, useId } from 'vue';
-import { FONT_CHOICES, type FontChoice, fontStackAvailable, resolveFontFallback } from '../../fonts';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Appearance'"` branch — markup, classes and data-testids unchanged.
 const props = defineProps<SettingsPaneProps>();
-
-const fontFamilyUnavailable = computed(() => !fontStackAvailable(props.draft.appearance.fontFamily));
-const fontFamilyFallback = computed(() => resolveFontFallback(props.draft.appearance.fontFamily));
-
-// P28 §1.2: computed once — fontStackAvailable's canvas probe is a per-call measurement, but the
-// pane is created on open and destroyed on close (P17 D1), so no invalidation is needed for its
-// lifetime.
-function fontLabel(f: FontChoice): string {
-  return f.system ? t('studio.settings.appearance.fontSystem.label') : f.label;
-}
-
-const availableStacks = computed(() => {
-  const on = FONT_CHOICES.filter((f) => fontStackAvailable(f.stack));
-  const off = FONT_CHOICES.filter((f) => !fontStackAvailable(f.stack));
-  return { on, off };
-});
-
-// An already-stored value outside FONT_CHOICES must not be silently discarded by the dropdown —
-// prepended as its own "Current" option so the select always has a matching value.
-const currentFontIsListed = computed(() =>
-  FONT_CHOICES.some((f) => f.stack === props.draft.appearance.fontFamily),
-);
-
-function onFontFamilyChange(value: unknown): void {
-  props.draft.appearance.fontFamily = String(value);
-}
 
 function onRowColoringChange(checked: boolean): void {
   props.draft.appearance.rowColoring = checked;
@@ -60,72 +33,13 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
 
 // P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
-const fontFamilyId = useId();
 const rowColoringId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
     <FieldLegend class="pt-0">{{ t('common.typography.label') }}</FieldLegend>
-    <Field>
-      <div class="flex items-center justify-between gap-1">
-        <Label :for="fontFamilyId">{{ t('studio.settings.appearance.dataFont.label') }}</Label>
-        <TooltipIconButton
-          icon="discard"
-          :label="t('common.action.resetToDefault.label')"
-          data-testid="settings-reset-appearance-fontFamily"
-          :disabled-trigger="isAtDefault('appearance', 'fontFamily')"
-          :disabled="isAtDefault('appearance', 'fontFamily')"
-          @click="resetLeaf('appearance', 'fontFamily')"
-       />
-      </div>
-      <NativeSelect
-        :id="fontFamilyId"
-        variant="bordered"
-        size="kira-lg"
-        class="self-start"
-        data-testid="settings-font-family"
-        :model-value="draft.appearance.fontFamily"
-        @update:model-value="onFontFamilyChange"
-      >
-        <optgroup v-if="!currentFontIsListed" :label="t('studio.settings.appearance.fontCurrent.label')">
-          <option :value="draft.appearance.fontFamily">{{ draft.appearance.fontFamily }}</option>
-        </optgroup>
-        <optgroup :label="t('studio.settings.appearance.fontInstalled.label')">
-          <option
-            v-for="f in availableStacks.on"
-            :key="f.stack"
-            :value="f.stack"
-            :style="{ fontFamily: f.stack }"
-          >
-            {{ fontLabel(f) }}
-          </option>
-        </optgroup>
-        <optgroup :label="t('studio.settings.appearance.fontNotInstalled.label')">
-          <option
-            v-for="f in availableStacks.off"
-            :key="f.stack"
-            :value="f.stack"
-            :style="{ fontFamily: f.stack }"
-          >
-            {{ fontLabel(f) }}
-          </option>
-        </optgroup>
-      </NativeSelect>
-      <span
-        class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-fg"
-        data-testid="font-preview"
-        :style="{ fontFamily: draft.appearance.fontFamily }"
-        >{{ t('studio.settings.appearance.fontPreview.label') }}</span
-      >
-      <FieldError v-if="fontFamilyUnavailable" data-testid="font-unavailable">
-        <template v-if="fontFamilyFallback">{{
-          t('studio.settings.appearance.fontUnavailable.fallback.error', { fallback: fontFamilyFallback })
-        }}</template>
-        <template v-else>{{ t('studio.settings.appearance.fontUnavailable.error') }}</template>
-      </FieldError>
-      <FieldDescription v-else>{{ t('studio.settings.appearance.dataFont.description') }}</FieldDescription>
-    </Field>
+    <FontFamilyField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
 
     <FontSizeField
       :appearance="draft.appearance"

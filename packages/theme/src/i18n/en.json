@@ -10298,31 +10298,6 @@
         }
       },
       "appearance": {
-        "dataFont": {
-          "description": "Grid cells, editors, anything that came out of a database.",
-          "label": "Data font"
-        },
-        "fontCurrent": {
-          "label": "Current"
-        },
-        "fontInstalled": {
-          "label": "Installed"
-        },
-        "fontNotInstalled": {
-          "label": "Not installed"
-        },
-        "fontPreview": {
-          "label": "The quick brown fox jumps over the lazy dog. 0123456789"
-        },
-        "fontSystem": {
-          "label": "System monospace"
-        },
-        "fontUnavailable": {
-          "error": "Not installed. Text falls back to the browser’s default.",
-          "fallback": {
-            "error": "Not installed. Text falls back to the browser’s {fallback} default."
-          }
-        },
         "rowColoring": {
           "description": "Colour grid values by their column’s data type. Off renders every row in the plain text colour.",
           "label": "Row colouring"

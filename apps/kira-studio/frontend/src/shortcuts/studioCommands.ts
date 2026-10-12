@@ -1,7 +1,6 @@
 import { t } from '@theme/i18n';
 import { runCommand } from '@workbench/shortcuts/commands';
-import { defineStore } from 'pinia';
-import { reactive, toRefs } from 'vue';
+import type { PaletteCommand } from '@workbench/shortcuts/palette';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
 import { useConnectionDialogStore } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
@@ -9,13 +8,8 @@ import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 
-interface PaletteCommand {
-  id: string;
-  label: string;
-  run: () => void;
-}
-
-export const usePaletteStore = defineStore('palette', () => {
+/** Studio's palette commands; call once from App setup (the stores resolve there). */
+export function studioPaletteCommands(): PaletteCommand[] {
   const layoutStore = useLayoutStore();
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
@@ -24,7 +18,7 @@ export const usePaletteStore = defineStore('palette', () => {
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
   // worth a name in the palette. No fuzzy scoring, no "go to anything" navigation (§8.15 calls
   // for "minimal").
-  const paletteCommands: PaletteCommand[] = [
+  return [
     {
       id: 'new-connection',
       label: t('studio.project.connectionDialog.newConnection.title'),
@@ -163,21 +157,4 @@ export const usePaletteStore = defineStore('palette', () => {
       },
     },
   ];
-
-  const state = reactive({ open: false });
-
-  function openPalette(): void {
-    state.open = true;
-  }
-
-  function closePalette(): void {
-    state.open = false;
-  }
-
-  function togglePalette(): void {
-    if (state.open) closePalette();
-    else openPalette();
-  }
-
-  return { paletteCommands, ...toRefs(state), closePalette, togglePalette };
-});
+}
