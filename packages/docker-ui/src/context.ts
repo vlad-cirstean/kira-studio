@@ -1,3 +1,4 @@
+import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { createTerminalsStore, type TerminalsControl } from '@workbench/state/createTerminalsStore';
 import type { TerminalHostDeps } from '@workbench/terminal/terminalHost';
 import type { InjectionKey } from 'vue';
@@ -44,7 +45,13 @@ export function createDockerContext(
     openTerminalSession: execStore.openTerminalSession,
     resizeTerminal: execStore.resizeTerminal,
   };
-  return { control, execStore, execHostDeps, execContainers, openExternal: options.openExternal };
+  return {
+    control,
+    execStore,
+    execHostDeps,
+    execContainers,
+    openExternal: createOpenExternal(options.openExternal),
+  };
 }
 
 export function provideDocker(ctx: DockerContext): void {

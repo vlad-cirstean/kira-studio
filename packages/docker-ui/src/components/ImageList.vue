@@ -32,9 +32,7 @@ function open(row: { image: { id: string } }): void {
 }
 
 function openRegistry(url: string): void {
-  docker.openExternal(url).catch(() => {
-    // The OS refused to open the link; nothing on screen depends on it.
-  });
+  void docker.openExternal(url);
 }
 </script>
 

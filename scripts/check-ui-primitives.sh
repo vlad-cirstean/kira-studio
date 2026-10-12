@@ -116,7 +116,6 @@ U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task c
 U25 apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue # failed log line colours run output (stderr), not an error sentence
 U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
 U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
-U25 packages/workbench/src/automations/runs/RunLog.vue # stderr line colour is log data, not chrome
 U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
 U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 U46 apps/kira-studio/frontend/src/bridge/port.ts # bridge transport timeout

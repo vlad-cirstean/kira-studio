@@ -12,10 +12,9 @@ import { Skeleton } from '@theme/components/ui/skeleton';
 import { type MessageKey, t } from '@theme/i18n';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
-import { errorText } from '@workbench/bridge/codedError';
 import QueryState from '@workbench/components/QueryState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, watch } from 'vue';
 import { useDocker } from '../context';
 import { publishedPorts, shortId, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainerDetail } from '../queries';
@@ -34,7 +33,6 @@ const props = defineProps<{ containerId: string }>();
 
 const ui = useDockerUiStore();
 const docker = useDocker();
-const linkError = ref<string | null>(null);
 const stats = useDockerStatsStore();
 const edits = useDockerEditStore();
 const id = computed(() => props.containerId);
@@ -89,10 +87,7 @@ watch([running, c], () => {
 });
 
 function openRegistry(url: string): void {
-  linkError.value = null;
-  docker.openExternal(url).catch((e: unknown) => {
-    linkError.value = errorText(e);
-  });
+  void docker.openExternal(url);
 }
 
 function act(action: 'start' | 'stop' | 'restart'): void {
@@ -170,8 +165,8 @@ function act(action: 'start' | 'stop' | 'restart'): void {
           </span>
         </div>
       </div>
-      <FieldError v-if="actions.error.value || linkError" class="shrink-0 border-b border-border px-3 py-1" data-testid="docker-action-error">
-        {{ actions.error.value ? (actions.error.value as Error).message : linkError }}
+      <FieldError v-if="actions.error.value" class="shrink-0 border-b border-border px-3 py-1" data-testid="docker-action-error">
+        {{ (actions.error.value as Error).message }}
       </FieldError>
       <ViewToolbar class="overflow-x-auto">
         <SecondaryTabs

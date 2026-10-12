@@ -50,9 +50,7 @@ const title = computed(() => {
 const registryUrl = computed(() => (props.kind === 'image' ? (image.value?.registryUrl ?? '') : ''));
 
 function openRegistry(): void {
-  docker.openExternal(registryUrl.value).catch(() => {
-    // The OS refused to open the link; nothing on screen depends on it.
-  });
+  void docker.openExternal(registryUrl.value);
 }
 
 const facts = computed<Array<[string, string]>>(() => {
