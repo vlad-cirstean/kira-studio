@@ -1,4 +1,4 @@
-G3 apps/kira-studio/internal/storage/repos/variables.go
+# Permanent: test tooling writes throwaway fixtures; a torn write only fails the test run.
 G4 apps/kira-studio/internal/flowharness/harness.go
 G4 apps/kira-studio/internal/flowharness/servers/ca.go
 G4 apps/kira-studio/internal/flowharness/servers/grpc.go

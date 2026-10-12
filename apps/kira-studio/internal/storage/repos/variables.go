@@ -53,7 +53,7 @@ func coerceEnvironmentColor(id, color string) string {
 	if model.ValidPaletteColor(color) {
 		return color
 	}
-	slog.Warn("repos/variables: environment has unrecognised colour, coercing to none", "id", id, "color", color)
+	slog.Warn("repos/variables: environment has unrecognised colour, coercing to none", "scope", "storage/variables", "id", id, "color", color)
 	return "none"
 }
 
