@@ -5,8 +5,8 @@ import VarText from '@theme/components/VarText.vue';
 import { type MessageKey, t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import type { TextPart } from '@theme/varText';
+import { formatCurrency } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { costText } from '../runs/runText';
 
 const props = defineProps<{ preview: ScriptRunPreview }>();
 
@@ -43,7 +43,7 @@ function envParts(e: ScriptRunPreview['env'][number]): TextPart[] {
     <template v-if="preview.kind === 'smart'">
       <div class="text-muted-foreground" data-testid="run-limits">
         {{
-          t('automations.run.limits.label', { model: preview.model, budget: costText(preview.maxBudgetUsd), timeout: preview.timeout })
+          t('automations.run.limits.label', { model: preview.model, budget: formatCurrency(preview.maxBudgetUsd), timeout: preview.timeout })
         }}
       </div>
       <div class="font-data" data-testid="run-tools">--tools {{ preview.tools.join(',') }}</div>

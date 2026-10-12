@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { FieldError } from '@theme/components/ui/field';
 import LogLines from '@workbench/components/LogLines.vue';
 import QueryState from '@workbench/components/QueryState.vue';
 import { useRunLog } from './runsQueries';
@@ -15,7 +14,7 @@ const log = useRunLog(() => props.runId);
   <div class="flex min-h-0 flex-1 flex-col">
     <QueryState :query="log" variant="inline" :is-empty="() => false">
       <template #error="{ message }">
-        <FieldError data-testid="run-log-error">{{ message }}</FieldError>
+        <LogLines testid="run-log" max-height="none" :lines="[]" :error="message" />
       </template>
       <template #default="{ data }">
         <LogLines

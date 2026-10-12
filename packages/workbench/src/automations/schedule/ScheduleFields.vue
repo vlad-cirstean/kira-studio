@@ -21,16 +21,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/po
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
+import { formatZonedWeekdayClock } from '@workbench/behaviour/format';
 import { TIMING } from '@workbench/behaviour/timing';
 import QueryState from '@workbench/components/QueryState.vue';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId, watch } from 'vue';
 import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
 import AdeContextFields from '../run/AdeContextFields.vue';
 import ParamsForm from '../run/ParamsForm.vue';
 import { useNextFires } from './scheduleQueries';
-import { fireText, schedulePresets, timezones } from './scheduleText';
+import { schedulePresets, timezones } from './scheduleText';
 
 // The recurring-script part of the script editor: when, where and how a scheduled run starts.
 // `scriptId` is null for a script not saved yet; the ADE task picker needs a saved script.
@@ -53,7 +53,9 @@ const cronNow = computed(() => schedule.value.cron);
 const cron = refDebounced(cronNow, TIMING.preview);
 const fires = useNextFires(cron, () => schedule.value.timezone, 3);
 const nextText = computed(() =>
-  (fires.data.value ?? []).map((ms) => fireText(ms, schedule.value.timezone)).join(', '),
+  (fires.data.value ?? [])
+    .map((ms) => formatZonedWeekdayClock(ms, schedule.value.timezone))
+    .join(', '),
 );
 const cronError = computed(() => {
   if (!fires.isError.value) return null;
@@ -97,30 +99,27 @@ function setWhere(w: 'folder' | 'task'): void {
   if (w === 'folder') patch({ taskId: '', branchId: '' });
 }
 
-const tasks = useQuery(
-  {
-    queryKey: computed(() => [
-      'scriptRuns',
-      'scheduleTasks',
-      props.scriptId,
-      schedule.value.taskId,
-      schedule.value.branchId,
-    ]),
-    queryFn: () =>
-      ctx.runs.preview({
-        scriptId: props.scriptId ?? '',
-        params: {},
-        prompt: null,
-        taskId: schedule.value.taskId,
-        branchId: schedule.value.branchId,
-        listTasks: true,
-      }),
-    enabled: computed(() => ctx.ade && where.value === 'task' && props.scriptId !== null),
-    placeholderData: keepPreviousData,
-    staleTime: 0,
-  },
-  queryClient,
-);
+const tasks = useQuery({
+  queryKey: computed(() => [
+    'scriptRuns',
+    'scheduleTasks',
+    props.scriptId,
+    schedule.value.taskId,
+    schedule.value.branchId,
+  ]),
+  queryFn: () =>
+    ctx.runs.preview({
+      scriptId: props.scriptId ?? '',
+      params: {},
+      prompt: null,
+      taskId: schedule.value.taskId,
+      branchId: schedule.value.branchId,
+      listTasks: true,
+    }),
+  enabled: computed(() => ctx.ade && where.value === 'task' && props.scriptId !== null),
+  placeholderData: keepPreviousData,
+  staleTime: 0,
+});
 const taskId = computed({
   get: () => schedule.value.taskId,
   set: (v: string) => patch({ taskId: v }),
@@ -184,7 +183,7 @@ const appName = computed(() =>
             <CodiconIcon name="chevron-down" :size="12" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-96 max-w-[80vw] p-0">
+        <PopoverContent class="w-96 p-0">
           <Command
             :model-value="schedule.timezone"
             @update:model-value="(v) => pickZone(String(v))"

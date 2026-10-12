@@ -4,19 +4,19 @@ import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { FieldError } from '@theme/components/ui/field';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
-import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import { useCopy } from '@workbench/behaviour/clipboard';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { usePersistedState } from '@workbench/behaviour/persisted';
+import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -28,15 +28,13 @@ import { computed, ref, useTemplateRef } from 'vue';
 import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
 import { useRerun, useRunScript } from './runScript';
-import RunElapsed from './runs/RunElapsed.vue';
 import RunsSection from './runs/RunsSection.vue';
 import { useScriptRuns } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
+import ScriptRow from './ScriptRow.vue';
 import { useScheduleConfirmStore } from './schedule/confirmDialog';
-import ScriptScheduleLine from './schedule/ScriptScheduleLine.vue';
 import { useRemoveScript } from './scriptActions';
 import type { EditorTab } from './scriptErrors';
-import SmartBadge from './smart/SmartBadge.vue';
 
 const contextMenuStore = useContextMenuStore();
 const confirmDialogStore = useConfirmDialogStore();
@@ -200,10 +198,92 @@ function onAddClick(e: MouseEvent): void {
   contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, newScriptItems(null));
 }
 
-function firstLine(command: string): string {
-  const [first = '', ...rest] = command.split('\n');
-  return rest.length > 0 ? `${first}…` : first;
+interface NavItem {
+  key: string;
+  kind: 'script' | 'group';
+  id: string;
+  depth: 0 | 1;
 }
+
+const navItems = computed<NavItem[]>(() => [
+  ...view.value.ungrouped.map(
+    (s): NavItem => ({ key: `script:${s.id}`, kind: 'script', id: s.id, depth: 0 }),
+  ),
+  ...view.value.groups.flatMap(({ collection, rows }): NavItem[] => [
+    { key: `group:${collection.id}`, kind: 'group', id: collection.id, depth: 0 },
+    ...(isOpen(collection.id)
+      ? rows.map((s): NavItem => ({ key: `script:${s.id}`, kind: 'script', id: s.id, depth: 1 }))
+      : []),
+  ]),
+]);
+
+const treeEl = useTemplateRef<HTMLElement>('treeEl');
+const activeKey = ref<string | null>(null);
+
+function scriptById(id: string): CustomScript | undefined {
+  return scripts.records().find((s) => s.id === id);
+}
+function collectionById(id: string): ScriptCollection | undefined {
+  return scripts.collections().find((c) => c.id === id);
+}
+
+function openItem(item: NavItem): void {
+  if (item.kind === 'group') toggleGroup(item.id);
+  else {
+    const script = scriptById(item.id);
+    if (script) void runScript(script);
+  }
+}
+
+const nav = useListNavigation<NavItem>({
+  container: treeEl,
+  items: () => navItems.value,
+  key: (i) => i.key,
+  activeKey,
+  onOpen: openItem,
+  tree: {
+    depth: (i) => i.depth,
+    isExpanded: (i) => i.kind === 'group' && isOpen(i.id),
+    hasChildren: (i) => i.kind === 'group' && (collectionById(i.id) ? groupSize(i.id) > 0 : false),
+    expand: (i) => openGroup(i.id),
+    collapse: (i) => {
+      if (!collapsed.value.includes(i.id)) collapsed.value = [...collapsed.value, i.id];
+    },
+  },
+  rendered: () => navItems.value,
+});
+
+function groupSize(id: string): number {
+  return view.value.groups.find((g) => g.collection.id === id)?.rows.length ?? 0;
+}
+
+const { copy } = useCopy();
+useTreeShortcuts(
+  { container: treeEl, activeKey },
+  {
+    'tree.copyName': (key) => {
+      const item = navItems.value.find((i) => i.key === key);
+      const name =
+        item?.kind === 'group' ? collectionById(item.id)?.name : scriptById(item?.id ?? '')?.name;
+      if (name !== undefined) void copy(name);
+    },
+    'tree.rename': (key) => {
+      const item = navItems.value.find((i) => i.key === key);
+      if (item?.kind === 'group') renamingId.value = item.id;
+    },
+    'tree.delete': (key) => {
+      const item = navItems.value.find((i) => i.key === key);
+      if (!item) return;
+      if (item.kind === 'group') {
+        const collection = collectionById(item.id);
+        if (collection) void confirmDeleteCollection(collection);
+      } else {
+        const script = scriptById(item.id);
+        if (script) void onRemove(script);
+      }
+    },
+  },
+);
 
 const confirmStore = useScheduleConfirmStore();
 const startScript = useRunScript();
@@ -229,6 +309,22 @@ async function onRemove(script: CustomScript): Promise<void> {
   await guarded(async () => {
     await removeScript(scripts, script);
   });
+}
+
+function openMenu(item: NavItem, e: MouseEvent, items: MenuItem[]): void {
+  void nav.focusKey(item.key);
+  nav.contextMenu(item, e, items);
+}
+
+function navItemOf(kind: 'script' | 'group', id: string): NavItem {
+  return (
+    navItems.value.find((i) => i.kind === kind && i.id === id) ?? {
+      key: `${kind}:${id}`,
+      kind,
+      id,
+      depth: 0,
+    }
+  );
 }
 
 function onContextMenu(e: MouseEvent, script: CustomScript): void {
@@ -291,11 +387,11 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       run: () => onRemove(script),
     },
   ];
-  contextMenuStore.openContextMenu(e, items);
+  openMenu(navItemOf('script', script.id), e, items);
 }
 
 function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): void {
-  contextMenuStore.openContextMenu(e, [
+  openMenu(navItemOf('group', collection.id), e, [
     ...newScriptItems(collection.id),
     {
       type: 'item',
@@ -374,59 +470,17 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           <InlineState v-if="actionError" kind="error" data-testid="script-error">{{
             actionError
           }}</InlineState>
-          <div class="flex flex-col" data-testid="script-list">
-            <template v-for="script in view.ungrouped" :key="script.id">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <button
-                    type="button"
-                    :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
-                    :style="rowIndent(0)"
-                    :data-testid="`script-${script.id}`"
-                    @click="runScript(script)"
-                    @contextmenu.prevent.stop="onContextMenu($event, script)"
-                  >
-                    <span
-                      :class="colorMarkClass('rail', script.color)"
-                      data-testid="script-rail"
-                      aria-hidden="true"
-                    />
-                    <div class="flex-1 min-w-0 flex flex-col">
-                      <span class="flex min-w-0 items-center gap-1">
-                        <SmartBadge v-if="script.kind === 'smart'" />
-                        <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
-                          script.name
-                        }}</span>
-                      </span>
-                      <span
-                        class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm"
-                        >{{
-                          firstLine(script.command)
-                        }}</span
-                      >
-                      <ScriptScheduleLine v-if="script.schedule" :script="script" />
-                    </div>
-                    <RunElapsed
-                      v-if="liveRunByScript.get(script.id)"
-                      :run="liveRunByScript.get(script.id)!"
-                      class="shrink-0 text-kira-sm text-muted-foreground"
-                    />
-                    <span
-                      class="flex w-5 shrink-0 items-center justify-center"
-                      data-testid="script-run-slot"
-                    >
-                      <Spinner
-                        v-if="liveRunByScript.get(script.id)"
-                        label=""
-                        data-testid="script-running"
-                      />
-                      <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
-              </Tooltip>
-            </template>
+          <div ref="treeEl" class="flex flex-col" data-testid="script-list">
+            <ScriptRow
+              v-for="script in view.ungrouped"
+              :key="script.id"
+              :script="script"
+              :depth="0"
+              :live-run="liveRunByScript.get(script.id)"
+              v-bind="nav.rowProps(`script:${script.id}`)"
+              @run="runScript(script)"
+              @menu="onContextMenu($event, script)"
+            />
             <template v-for="group in view.groups" :key="group.collection.id">
               <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
               <div
@@ -435,6 +489,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 data-testid="script-group"
                 :data-id="group.collection.id"
                 :data-name="group.collection.name"
+                v-bind="nav.rowProps(`group:${group.collection.id}`)"
                 @contextmenu.prevent.stop="onCollectionContextMenu($event, group.collection)"
               >
                 <TreeTwisty
@@ -457,73 +512,31 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 <button
                   v-else
                   type="button"
-                  class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
+                  class="flex-1 min-w-0 cursor-default border-0 bg-transparent p-0 text-left font-medium text-inherit"
                   :aria-expanded="isOpen(group.collection.id)"
                   @click="toggleGroup(group.collection.id)"
-                  >{{
-                    group.collection.name
-                  }}</button
+                  ><TruncatedText :text="group.collection.name" /></button
                 >
-                <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
+                <span :class="rowMeta">{{ group.rows.length }}</span>
               </div>
               <div v-if="isOpen(group.collection.id)" class="flex flex-col">
-                <Tooltip v-for="script in group.rows" :key="script.id">
-                  <TooltipTrigger as-child>
-                    <button
-                      type="button"
-                      :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
-                      :style="rowIndent(1)"
-                      :data-testid="`script-${script.id}`"
-                      @click="runScript(script)"
-                      @contextmenu.prevent.stop="onContextMenu($event, script)"
-                    >
-                      <span
-                        :class="colorMarkClass('rail', script.color)"
-                        data-testid="script-rail"
-                        aria-hidden="true"
-                      />
-                      <div class="flex-1 min-w-0 flex flex-col">
-                        <span class="flex min-w-0 items-center gap-1">
-                          <SmartBadge v-if="script.kind === 'smart'" />
-                          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
-                            script.name
-                          }}</span>
-                        </span>
-                        <span
-                          class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm"
-                          >{{
-                            firstLine(script.command)
-                          }}</span
-                        >
-                        <ScriptScheduleLine v-if="script.schedule" :script="script" />
-                      </div>
-                      <RunElapsed
-                        v-if="liveRunByScript.get(script.id)"
-                        :run="liveRunByScript.get(script.id)!"
-                        class="shrink-0 text-kira-sm text-muted-foreground"
-                      />
-                      <span
-                        class="flex w-5 shrink-0 items-center justify-center"
-                        data-testid="script-run-slot"
-                      >
-                        <Spinner
-                          v-if="liveRunByScript.get(script.id)"
-                          label=""
-                          data-testid="script-running"
-                        />
-                        <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
-                      </span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
-                </Tooltip>
+                <ScriptRow
+                  v-for="script in group.rows"
+                  :key="script.id"
+                  :script="script"
+                  :depth="1"
+                  :live-run="liveRunByScript.get(script.id)"
+                  v-bind="nav.rowProps(`script:${script.id}`)"
+                  @run="runScript(script)"
+                  @menu="onContextMenu($event, script)"
+                />
               </div>
             </template>
           </div>
         </div>
         <EmptyState
           v-else
-          class="h-full"
+          fill
           icon="terminal-bash"
           :title="t('automations.panel.none.empty')"
           :description="t('automations.panel.none.emptyHint')"

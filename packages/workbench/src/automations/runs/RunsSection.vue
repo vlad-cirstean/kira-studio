@@ -88,7 +88,7 @@ function toggle(run: ScriptRun): void {
           >
             <RunStatusBadge :state="run.state" />
             <SmartBadge v-if="run.kind === 'smart'" />
-            <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+            <span class="min-w-0 flex-1 truncate">
               {{ run.scriptName }}
               <span
                 v-if="run.trigger === 'ade'"

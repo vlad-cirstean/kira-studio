@@ -1,7 +1,9 @@
 import type { ScriptRun, ScriptRunLogChunk, ScriptRunLogPage } from '@shared/domain/scriptRuns';
 import type { ScriptDir } from '@shared/domain/scripts';
 import { useMutation, useQuery } from '@tanstack/vue-query';
-import { tryOnScopeDispose, useStorage } from '@vueuse/core';
+import { tryOnScopeDispose } from '@vueuse/core';
+import { compareNatural } from '@workbench/behaviour/match';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -13,7 +15,7 @@ const LIST_LIMIT = 200;
 
 function upsert(runs: readonly ScriptRun[], run: ScriptRun): ScriptRun[] {
   const rest = runs.filter((r) => r.id !== run.id);
-  return [run, ...rest].sort((a, b) => b.createdAt - a.createdAt);
+  return [run, ...rest].sort((a, b) => b.createdAt - a.createdAt || compareNatural(a.id, b.id));
 }
 
 let feeds = 0;
@@ -76,7 +78,7 @@ const SEEN_LIMIT = 200;
 
 /** Run ids the person has opened; an ended run not in it still wants a look. Per-viewer, so local. */
 export function useSeenRuns() {
-  const seen = useStorage<string[]>('kira.automations.seenRuns', []);
+  const seen = usePersistedState<string[]>('kira.automations.seenRuns', []);
   return {
     seen,
     markSeen(id: string): void {

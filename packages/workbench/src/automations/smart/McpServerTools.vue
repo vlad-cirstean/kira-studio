@@ -9,7 +9,6 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import QueryState from '@workbench/components/QueryState.vue';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, useId } from 'vue';
 import { useAutomationsModule } from '../module';
 
@@ -20,14 +19,11 @@ const emit = defineEmits<{ tool: [name: string, on: boolean]; typed: [value: str
 const { runs } = useAutomationsModule();
 const idBase = useId();
 
-const tools = useQuery(
-  {
-    queryKey: ['scriptRuns', 'mcp', props.server],
-    queryFn: () => runs.mcpTools(props.server),
-    staleTime: 0,
-  },
-  queryClient,
-);
+const tools = useQuery({
+  queryKey: ['scriptRuns', 'mcp', props.server],
+  queryFn: () => runs.mcpTools(props.server),
+  staleTime: 0,
+});
 const listed = computed(() => tools.data.value ?? []);
 // Ticked tools the server did not list (typed by name).
 const extra = computed(() =>

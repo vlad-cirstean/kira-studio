@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useMutation, useQuery } from '@tanstack/vue-query';
+import CodeBlock from '@theme/components/CodeBlock.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Card } from '@theme/components/ui/card';
 import {
   Dialog,
   DialogBody,
@@ -20,7 +20,6 @@ import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import QueryState from '@workbench/components/QueryState.vue';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, watch } from 'vue';
 import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
@@ -39,18 +38,16 @@ const ctx = useAutomationsModule();
 const script = computed(() => ctx.scripts.records().find((s) => s.id === props.scriptId) ?? null);
 const secretParams = computed(() => (script.value?.params ?? []).filter((p) => p.secret));
 const secrets = ref<Record<string, string[]>>({});
+const dirty = computed(() => Object.values(secrets.value).some((v) => v.some((x) => x !== '')));
 const debounced = refDebounced(secrets, TIMING.preview);
 
 // Secret values stay out of the query key; a change refetches by hand.
-const preview = useQuery(
-  {
-    queryKey: ['scriptRuns', 'schedulePreview', props.scriptId, props.runId ?? 'now'],
-    queryFn: () => ctx.runs.schedulePreview(props.scriptId, secrets.value),
-    staleTime: 0,
-    gcTime: 0,
-  },
-  queryClient,
-);
+const preview = useQuery({
+  queryKey: ['scriptRuns', 'schedulePreview', props.scriptId, props.runId ?? 'now'],
+  queryFn: () => ctx.runs.schedulePreview(props.scriptId, secrets.value),
+  staleTime: 0,
+  gcTime: 0,
+});
 watch(debounced, () => void preview.refetch());
 const pv = computed(() => preview.data.value ?? null);
 const settled = computed(
@@ -69,40 +66,34 @@ const due = computed(() => {
 });
 
 const error = ref<string | null>(null);
-const accept = useMutation(
-  {
-    mutationKey: ['scriptRuns', 'confirmAccept'],
-    mutationFn: async () => {
-      const current = pv.value;
-      if (!current) throw new Error(t('automations.error.nothingToRun.error'));
-      return props.runId
-        ? ctx.runs.confirmAccept(props.runId, current.hash, secrets.value)
-        : ctx.runs.runScheduleNow(props.scriptId, current.hash, secrets.value);
-    },
-    onSuccess: (started) => {
-      ctx.openRunTab(started.runId, script.value?.name ?? t('common.script.label'));
-      emit('close');
-    },
-    onError: (err) => {
-      error.value = errorText(err);
-      void preview.refetch();
-    },
+const accept = useMutation({
+  mutationKey: ['scriptRuns', 'confirmAccept'],
+  mutationFn: async () => {
+    const current = pv.value;
+    if (!current) throw new Error(t('automations.error.nothingToRun.error'));
+    return props.runId
+      ? ctx.runs.confirmAccept(props.runId, current.hash, secrets.value)
+      : ctx.runs.runScheduleNow(props.scriptId, current.hash, secrets.value);
   },
-  queryClient,
-);
-const decline = useMutation(
-  {
-    mutationKey: ['scriptRuns', 'confirmDecline'],
-    mutationFn: async () => {
-      if (props.runId) await ctx.runs.confirmDecline(props.runId);
-    },
-    onSuccess: () => emit('close'),
-    onError: (err) => {
-      error.value = errorText(err);
-    },
+  onSuccess: (started) => {
+    ctx.openRunTab(started.runId, script.value?.name ?? t('common.script.label'));
+    emit('close');
   },
-  queryClient,
-);
+  onError: (err) => {
+    error.value = errorText(err);
+    void preview.refetch();
+  },
+});
+const decline = useMutation({
+  mutationKey: ['scriptRuns', 'confirmDecline'],
+  mutationFn: async () => {
+    if (props.runId) await ctx.runs.confirmDecline(props.runId);
+  },
+  onSuccess: () => emit('close'),
+  onError: (err) => {
+    error.value = errorText(err);
+  },
+});
 
 const canRun = computed(
   () =>
@@ -132,7 +123,7 @@ useShortcut(window, ['form.submit'], run);
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="lg" data-testid="schedule-confirm">
+    <DialogContent size="lg" :dirty="dirty" data-testid="schedule-confirm">
       <DialogHeader close-testid="schedule-confirm-close">
         <DialogTitle>{{
           script
@@ -168,10 +159,10 @@ useShortcut(window, ['form.submit'], run);
           </div>
           <Field v-if="script.kind === 'smart' && pv" data-testid="schedule-confirm-prompt">
             <FieldLabel>{{ t('common.prompt.label') }}</FieldLabel>
-            <Card class="font-data text-kira-sm">
+            <CodeBlock>
               <VarText :parts="promptParts" />
-            </Card>
-            <div class="font-data text-kira-sm text-muted-foreground">{{ pv.suffix }}</div>
+            </CodeBlock>
+            <CodeBlock class="text-muted-foreground">{{ pv.suffix }}</CodeBlock>
           </Field>
           <ParamsForm v-if="secretParams.length > 0" v-model="secrets" :params="secretParams" />
           <QueryState :query="preview" variant="inline" :is-empty="() => false">
@@ -206,7 +197,7 @@ useShortcut(window, ['form.submit'], run);
         <Button
           variant="dialog"
           size="kira-lg"
-          :disabled="decline.isPending.value"
+          :pending="decline.isPending.value"
           data-testid="schedule-confirm-decline"
           @click="runId ? decline.mutate() : emit('close')"
         >
@@ -216,6 +207,7 @@ useShortcut(window, ['form.submit'], run);
           variant="dialog-primary"
           size="kira-lg"
           :disabled="!canRun"
+          :pending="accept.isPending.value"
           data-testid="schedule-confirm-run"
           @click="run"
         >

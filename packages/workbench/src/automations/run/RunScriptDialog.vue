@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { ScriptRunArgs } from '@shared/domain/scriptRuns';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
+import CodeBlock from '@theme/components/CodeBlock.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Card } from '@theme/components/ui/card';
 import {
   Dialog,
   DialogBody,
@@ -22,7 +22,6 @@ import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import QueryState from '@workbench/components/QueryState.vue';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
 import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
@@ -54,6 +53,11 @@ const oneOff = ref<string | null>(null);
 const taskId = ref(props.taskId ?? '');
 const branchId = ref(props.branchId ?? '');
 
+const initialValues = JSON.stringify(values.value);
+const dirty = computed(
+  () => oneOff.value !== null || JSON.stringify(values.value) !== initialValues,
+);
+
 const args = computed<ScriptRunArgs>(() => ({
   scriptId: props.scriptId,
   params: values.value,
@@ -63,57 +67,51 @@ const args = computed<ScriptRunArgs>(() => ({
 }));
 const debounced = refDebounced(args, TIMING.preview);
 
-const preview = useQuery(
-  {
-    queryKey: ['scriptRuns', 'preview', debounced],
-    queryFn: () => ctx.runs.preview(debounced.value),
-    placeholderData: keepPreviousData,
-    staleTime: 0,
-  },
-  queryClient,
-);
+const preview = useQuery({
+  queryKey: ['scriptRuns', 'preview', debounced],
+  queryFn: () => ctx.runs.preview(debounced.value),
+  placeholderData: keepPreviousData,
+  staleTime: 0,
+});
 const pv = computed(() => preview.data.value ?? null);
 const settled = computed(
   () => JSON.stringify(debounced.value) === JSON.stringify(args.value) && !preview.isFetching.value,
 );
 
 const startError = ref<string | null>(null);
-const start = useMutation(
-  {
-    mutationKey: ['scriptRuns', 'start'],
-    mutationFn: async () => {
-      const current = pv.value;
-      if (!current) throw new Error(t('automations.error.nothingToRun.error'));
-      return ctx.runs.start(args.value, current.hash);
-    },
-    onSuccess: (started) => {
-      const s = script.value;
-      if (!s) return;
-      if (started.terminal) {
-        if (props.from === 'ade') ctx.showAutomations();
-        ctx.openTerminalTab({
-          cwd: started.terminal.cwd,
-          launch: {
-            command: s.command,
-            label: s.name,
-            color: s.color,
-            kind: 'script',
-            scriptId: s.id,
-            launchToken: started.terminal.token,
-          },
-        });
-      } else {
-        ctx.openRunTab(started.runId, s.name);
-      }
-      emit('close');
-    },
-    onError: (err) => {
-      startError.value = errorText(err);
-      void preview.refetch();
-    },
+const start = useMutation({
+  mutationKey: ['scriptRuns', 'start'],
+  mutationFn: async () => {
+    const current = pv.value;
+    if (!current) throw new Error(t('automations.error.nothingToRun.error'));
+    return ctx.runs.start(args.value, current.hash);
   },
-  queryClient,
-);
+  onSuccess: (started) => {
+    const s = script.value;
+    if (!s) return;
+    if (started.terminal) {
+      if (props.from === 'ade') ctx.showAutomations();
+      ctx.openTerminalTab({
+        cwd: started.terminal.cwd,
+        launch: {
+          command: s.command,
+          label: s.name,
+          color: s.color,
+          kind: 'script',
+          scriptId: s.id,
+          launchToken: started.terminal.token,
+        },
+      });
+    } else {
+      ctx.openRunTab(started.runId, s.name);
+    }
+    emit('close');
+  },
+  onError: (err) => {
+    startError.value = errorText(err);
+    void preview.refetch();
+  },
+});
 
 const canRun = computed(
   () =>
@@ -143,7 +141,7 @@ useShortcut(window, ['form.submit'], run);
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="lg" data-testid="run-dialog">
+    <DialogContent size="lg" :dirty="dirty" data-testid="run-dialog">
       <DialogHeader>
         <DialogTitle>{{
           script ? t('automations.dialog.run.title', { name: script.name }) : t('automations.dialog.run.untitled.title')
@@ -161,9 +159,9 @@ useShortcut(window, ['form.submit'], run);
           <Field v-if="isSmart && pv" data-testid="run-prompt">
             <FieldLabel>{{ t('common.prompt.label') }}</FieldLabel>
             <template v-if="oneOff === null">
-              <Card class="font-data text-kira-sm" data-testid="run-prompt-text">
+              <CodeBlock data-testid="run-prompt-text">
                 <VarText :parts="promptParts" />
-              </Card>
+              </CodeBlock>
               <Button
                 variant="dialog"
                 size="kira-lg"
@@ -199,9 +197,9 @@ useShortcut(window, ['form.submit'], run);
             <FieldLabel class="mt-1 text-muted-foreground">{{
               t('automations.dialog.run.suffix.label')
             }}</FieldLabel>
-            <div class="font-data text-kira-sm text-muted-foreground" data-testid="run-suffix">{{
+            <CodeBlock class="text-muted-foreground" data-testid="run-suffix">{{
               pv.suffix
-            }}</div>
+            }}</CodeBlock>
           </Field>
 
           <AdeContextFields

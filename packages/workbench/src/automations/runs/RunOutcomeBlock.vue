@@ -3,7 +3,8 @@ import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
-import { costText, runReportText } from './runText';
+import { formatCurrency } from '@workbench/behaviour/format';
+import { runReportText } from './runText';
 
 // The run's result: reason, exit code, and the two actions. `tail` supplies the last terminal
 // lines for Copy for agent; `compact` drops the detail lines for the terminal tab strip.
@@ -37,7 +38,7 @@ async function copyForAgent(): Promise<void> {
       class="text-muted-foreground"
       data-testid="run-outcome-cost"
     >
-      {{ t('common.cost.label', { value: costText(run.outcome.costUsd) }) }}
+      {{ t('common.cost.label', { value: formatCurrency(run.outcome.costUsd) }) }}
     </span>
     <span
       v-if="run.outcome?.permissionDenials?.length"

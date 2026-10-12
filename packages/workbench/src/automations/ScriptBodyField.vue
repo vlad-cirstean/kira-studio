@@ -18,6 +18,7 @@ const props = defineProps<{
   params: readonly ScriptParam[];
   ade: boolean;
   error?: string;
+  errorId?: string;
 }>();
 const body = defineModel<string>({ required: true });
 // Same chord as view.run: the dialog's save key.
@@ -49,11 +50,14 @@ const used = computed(() => parts.value.length > 1);
       :range-highlights="highlights"
       :hover-at="hover"
       :invalid="!!error"
+      :aria-describedby="error ? errorId : undefined"
       :placeholder="isSmart ? t('automations.script.promptExample.example') : t('automations.script.commandExample.example')"
       class="w-full"
       data-testid="script-dialog-command"
     />
-    <FieldError v-if="error" data-testid="script-dialog-command-error">{{ error }}</FieldError>
+    <FieldError v-if="error" :id="errorId" data-testid="script-dialog-command-error">{{
+      error
+    }}</FieldError>
     <FieldDescription v-if="used" data-testid="script-dialog-uses"
       ><VarText :parts="parts" /></FieldDescription
     >

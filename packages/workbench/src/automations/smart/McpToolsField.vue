@@ -7,7 +7,6 @@ import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/fi
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import QueryState from '@workbench/components/QueryState.vue';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useId } from 'vue';
 import { useAutomationsModule } from '../module';
 import McpServerTools from './McpServerTools.vue';
@@ -17,10 +16,11 @@ const smart = defineModel<SmartSettings>({ required: true });
 const { runs } = useAutomationsModule();
 const idBase = useId();
 
-const servers = useQuery(
-  { queryKey: ['scriptRuns', 'mcp'], queryFn: () => runs.mcpServers(), staleTime: 0 },
-  queryClient,
-);
+const servers = useQuery({
+  queryKey: ['scriptRuns', 'mcp'],
+  queryFn: () => runs.mcpServers(),
+  staleTime: 0,
+});
 
 function chosen(server: string): string[] | null {
   return smart.value.mcp.find((c) => c.server === server)?.tools ?? null;

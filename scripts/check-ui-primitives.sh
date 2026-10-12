@@ -117,7 +117,6 @@ U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
 U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
-U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording is domain text, not a display format
 U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
 U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
 U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones

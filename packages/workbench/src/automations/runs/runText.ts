@@ -1,5 +1,6 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { type MessageKey, t } from '@theme/i18n';
+import { formatCurrency } from '@workbench/behaviour/format';
 
 const STATE_LABEL: Record<ScriptRun['state'], MessageKey> = {
   running: 'common.state.running.status',
@@ -13,11 +14,6 @@ const STATE_LABEL: Record<ScriptRun['state'], MessageKey> = {
 
 export function stateLabel(state: ScriptRun['state']): string {
   return t(STATE_LABEL[state]);
-}
-
-/** "0.12 USD". */
-export function costText(usd: number): string {
-  return `${usd.toFixed(2)} USD`;
 }
 
 /** Elapsed for a run at `now`: live while running, fixed once finished. */
@@ -44,7 +40,7 @@ export function runReportText(run: ScriptRun, tail: string): string {
   ];
   if (out?.summary) lines.push(t('automations.run.report.summary.label', { value: out.summary }));
   if (out?.costUsd !== undefined)
-    lines.push(t('automations.run.report.cost.label', { value: costText(out.costUsd) }));
+    lines.push(t('automations.run.report.cost.label', { value: formatCurrency(out.costUsd) }));
   if (out?.permissionDenials?.length)
     lines.push(
       t('automations.run.report.deniedTools.label', { value: out.permissionDenials.join(', ') }),

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query';
+import CodeBlock from '@theme/components/CodeBlock.vue';
+import Disclosure from '@theme/components/Disclosure.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { useClaimPrompt } from '@workbench/prompts/promptsQueries';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, onMounted, ref } from 'vue';
 import { useAutomationsModule } from '../module';
 import { useRerun } from '../runScript';
@@ -19,13 +22,10 @@ const props = defineProps<{ tab: { id: string; state: { runId: string; label?: s
 const ctx = useAutomationsModule();
 const { run, query } = useScriptRun(() => props.tab.state.runId);
 const stop = useStopScriptRun();
-const decline = useMutation(
-  {
-    mutationKey: ['scriptRuns', 'decline'],
-    mutationFn: (id: string) => ctx.runs.confirmDecline(id),
-  },
-  queryClient,
-);
+const decline = useMutation({
+  mutationKey: ['scriptRuns', 'decline'],
+  mutationFn: (id: string) => ctx.runs.confirmDecline(id),
+});
 const rerunRun = useRerun();
 const error = ref<string | null>(null);
 const { markSeen } = useSeenRuns();
@@ -67,11 +67,15 @@ async function rerun(): Promise<void> {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-2 p-3" data-testid="script-run-view">
-    <div v-if="!run" class="text-kira-sm text-muted-foreground" data-testid="script-run-missing">
+    <InlineState
+      v-if="!run"
+      :kind="query.isPending.value ? 'loading' : 'empty'"
+      data-testid="script-run-missing"
+    >
       {{
         query.isPending.value ? t('common.state.loading.loading') : t('automations.run.missing.emptyHint')
       }}
-    </div>
+    </InlineState>
     <template v-else>
       <div class="flex items-center gap-2" data-testid="script-run-header">
         <SmartBadge v-if="isSmart" />
@@ -123,21 +127,17 @@ async function rerun(): Promise<void> {
         >
           {{ t('automations.run.continue.label') }}
         </Button>
-        <span v-if="error" class="text-kira-sm text-error">{{ error }}</span>
+        <Alert v-if="error" variant="error"><AlertDescription>{{ error }}</AlertDescription></Alert>
       </div>
-      <div
-        v-if="!isSmart"
-        class="font-data text-kira-sm whitespace-pre-wrap break-words"
-        data-testid="script-run-command"
+      <CodeBlock v-if="!isSmart" data-testid="script-run-command">{{ run.command }}</CodeBlock>
+      <Disclosure
+        v-if="isSmart"
+        :label="t('automations.run.promptSent.label')"
+        trigger-class="text-kira-sm text-muted-foreground"
+        data-testid="script-run-prompt"
       >
-        {{ run.command }}
-      </div>
-      <details v-if="isSmart" class="text-kira-sm" data-testid="script-run-prompt">
-        <summary class="cursor-default text-muted-foreground">{{
-          t('automations.run.promptSent.label')
-        }}</summary>
-        <pre class="mt-1 whitespace-pre-wrap break-words font-data">{{ run.prompt }}</pre>
-      </details>
+        <CodeBlock class="mt-1">{{ run.prompt }}</CodeBlock>
+      </Disclosure>
       <RunLog v-if="run.state !== 'waiting' && run.state !== 'skipped'" :run-id="run.id" />
     </template>
   </div>

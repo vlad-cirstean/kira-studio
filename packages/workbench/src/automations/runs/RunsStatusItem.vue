@@ -23,8 +23,7 @@ function show(): void {
   <Button
     v-if="running > 0"
     variant="toolbar"
-    size="kira"
-    class="h-control-sm gap-1 px-1.5 text-fg text-kira-sm font-normal"
+    size="status"
     data-testid="status-runs"
     @click="show"
   >

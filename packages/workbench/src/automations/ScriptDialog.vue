@@ -12,6 +12,7 @@ import type {
 } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -38,18 +39,10 @@ import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
 import { useFocus } from '@vueuse/core';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
-import { queryClient } from '@workbench/state/queryClient';
-import {
-  type ComponentPublicInstance,
-  computed,
-  reactive,
-  ref,
-  toRaw,
-  useTemplateRef,
-  watch,
-} from 'vue';
+import { type ComponentPublicInstance, computed, ref, toRaw, useTemplateRef } from 'vue';
 import { errorText } from '../bridge/codedError';
 import type { ScriptsSeam } from './module';
 import ParamsEditor from './ParamsEditor.vue';
@@ -111,14 +104,11 @@ const command = ref(props.script?.command ?? '');
 const dirMode = ref<ScriptDirMode>(props.script?.dirMode ?? 'kira');
 const workingDir = ref(props.script?.workingDir ?? '');
 const useAdeDir = ref(props.script?.useAdeDir ?? true);
-const dir = useQuery(
-  {
-    queryKey: ['scriptRuns', 'dir', props.script?.id ?? ''],
-    queryFn: () => props.resolveDir(props.script?.id ?? ''),
-    staleTime: 0,
-  },
-  queryClient,
-);
+const dir = useQuery({
+  queryKey: ['scriptRuns', 'dir', props.script?.id ?? ''],
+  queryFn: () => props.resolveDir(props.script?.id ?? ''),
+  staleTime: 0,
+});
 const blocker = computed(() =>
   dirMode.value === props.script?.dirMode ? (dir.data.value?.blocker ?? '') : '',
 );
@@ -153,11 +143,6 @@ const tabItems = computed(() =>
   })),
 );
 
-// Empty-field errors show once the field was edited; Save stays disabled until none remain.
-const shown = reactive({ name: false, body: false, folder: false });
-watch(name, () => (shown.name = true));
-watch(command, () => (shown.body = true));
-watch(dirMode, () => (shown.folder = true));
 const draft = computed(() => ({
   kind,
   name: name.value,
@@ -169,11 +154,39 @@ const draft = computed(() => ({
   schedule: schedule.value,
   scheduleOk: scheduleOk.value,
 }));
-const errors = computed(() => editorErrors(draft.value, shown));
-const canSave = computed(() => {
-  const all = editorErrors(draft.value, ALL_SHOWN);
-  return TAB_IDS.every((id) => tabErrorCount(all, id) === 0);
-});
+const all = computed(() => editorErrors(draft.value, ALL_SHOWN));
+const form = useFormErrors(
+  {
+    name: { value: () => name.value, error: () => all.value.name ?? null, tab: 'script' },
+    body: { value: () => command.value, error: () => all.value.body ?? null, tab: 'script' },
+    folder: { value: () => dirMode.value, error: () => all.value.folder ?? null, tab: 'script' },
+  },
+  { onTab: (id) => (tab.value = id as EditorTab) },
+);
+// Name, body and folder reveal on first edit or failed Save; the rest always show.
+const errors = computed(() => ({
+  ...all.value,
+  name: form.errorFor('name') ?? undefined,
+  body: form.errorFor('body') ?? undefined,
+  folder: form.errorFor('folder') ?? undefined,
+}));
+const firstBadTab = computed(() => TAB_IDS.find((id) => tabErrorCount(all.value, id) > 0));
+
+const snapshot = (): string =>
+  JSON.stringify([
+    name.value,
+    command.value,
+    params.value,
+    smart.value,
+    schedule.value,
+    dirMode.value,
+    workingDir.value,
+    useAdeDir.value,
+    collection.value,
+    color.value,
+  ]);
+const initial = snapshot();
+const dirty = computed(() => snapshot() !== initial);
 
 async function chooseWorkingDir(): Promise<void> {
   error.value = null;
@@ -194,8 +207,13 @@ const persist = useAsyncAction(async (fields: CustomScriptFields) => {
 const saving = persist.pending;
 
 async function save(): Promise<void> {
-  if (!canSave.value || saving.value) return;
+  if (saving.value) return;
   error.value = null;
+  if (!(await form.submit())) return;
+  if (firstBadTab.value !== undefined) {
+    tab.value = firstBadTab.value;
+    return;
+  }
   const ok = await persist.run({
     name: name.value.trim(),
     command: command.value.trim(),
@@ -225,7 +243,12 @@ useShortcut(window, ['form.submit'], () => void save());
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="lg" data-testid="script-dialog" @open-auto-focus="onOpenAutoFocus">
+    <DialogContent
+      size="lg"
+      data-testid="script-dialog"
+      :dirty="dirty"
+      @open-auto-focus="onOpenAutoFocus"
+    >
       <DialogHeader close-testid="script-dialog-close">
         <DialogTitle>{{ title }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
@@ -266,12 +289,17 @@ useShortcut(window, ['form.submit'], () => void save());
                 ref="nameEl"
                 v-model="name"
                 :placeholder="t('automations.dialog.script.nameExample.example')"
-                :aria-invalid="!!errors.name"
+                v-bind="form.invalidAttrs('name')"
                 data-testid="script-dialog-name"
               />
-              <FieldError v-if="errors.name" data-testid="script-dialog-name-error">{{
-                errors.name
-              }}</FieldError>
+              <FieldError
+                v-if="errors.name"
+                :id="form.errorId('name')"
+                data-testid="script-dialog-name-error"
+                >{{
+                  errors.name
+                }}</FieldError
+              >
             </Field>
 
             <div class="flex items-end gap-3">
@@ -317,6 +345,7 @@ useShortcut(window, ['form.submit'], () => void save());
               :params="params"
               :ade="!!ade"
               :error="errors.body"
+              :error-id="form.errorId('body')"
             />
 
             <template v-if="isSmart">
@@ -348,6 +377,7 @@ useShortcut(window, ['form.submit'], () => void save());
                   <RadioGroupItem
                     id="script-dir-fixed"
                     value="fixed"
+                    v-bind="form.invalidAttrs('folder')"
                     data-testid="script-dialog-dir-fixed"
                   />
                   <Label for="script-dir-fixed">{{
@@ -397,9 +427,14 @@ useShortcut(window, ['form.submit'], () => void save());
               <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{
                 blocker
               }}</FieldError>
-              <FieldError v-if="errors.folder" data-testid="script-dialog-folder-error">{{
-                errors.folder
-              }}</FieldError>
+              <FieldError
+                v-if="errors.folder"
+                :id="form.errorId('folder')"
+                data-testid="script-dialog-folder-error"
+                >{{
+                  errors.folder
+                }}</FieldError
+              >
             </Field>
 
             <Field v-if="ade" orientation="horizontal">
@@ -444,7 +479,9 @@ useShortcut(window, ['form.submit'], () => void save());
             }}</FieldError>
           </TabsContent>
 
-          <FieldError v-if="error" data-testid="script-dialog-error">{{ error }}</FieldError>
+          <Alert v-if="error" variant="error" data-testid="script-dialog-error"
+            ><AlertDescription>{{ error }}</AlertDescription></Alert
+          >
         </DialogBody>
       </Tabs>
 
@@ -457,7 +494,7 @@ useShortcut(window, ['form.submit'], () => void save());
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          :disabled="!canSave || saving"
+          :pending="saving"
           data-testid="script-dialog-save"
           @click="save"
         >
