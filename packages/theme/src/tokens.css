@@ -235,8 +235,8 @@
      follow-through. */
   --kira-warn-text: #d9c47a;
   --kira-note-text: #a8c8ee;
-  --kira-z-popover: 100;
-  --kira-z-dialog: 200;
+  --kira-z-dialog: 100;
+  --kira-z-popover: 200;
   --kira-z-menu: 300;
   --kira-z-autocomplete: 350;
   /* P110 B30: this same popup's own max-width -- a deliberate single-purpose seam, same reasoning

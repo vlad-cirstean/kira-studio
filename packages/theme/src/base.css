@@ -99,3 +99,81 @@ textarea,
     animation: none;
   }
 }
+
+/* P267: while a pane-resize drag runs, usePaneResize marks <html> so the resize cursor shows
+   everywhere, over every surface the pointer crosses. */
+html.kira-resizing-x,
+html.kira-resizing-x * {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+html.kira-resizing-y,
+html.kira-resizing-y * {
+  cursor: ns-resize;
+  user-select: none;
+}
+
+/* P267: the one rendered-prose layer (markdown reading view, notes editor). Headings scale in em, so
+   the scale follows the Appearance font size. Uses @layer components so utility classes on the
+   host still win. Tailwind's preflight zeroes margins, heading sizes and list styles, so each block
+   restates its own. */
+@layer components {
+  .kira-prose :is(h1, h2, h3, h4, h5, h6) {
+    @apply font-medium leading-tight mt-4 mx-0 mb-1.5;
+  }
+  .kira-prose h1 {
+    @apply border-b border-border text-[1.6em] pb-1.5;
+  }
+  .kira-prose h2 {
+    @apply text-[1.4em];
+  }
+  .kira-prose h3 {
+    @apply text-[1.2em];
+  }
+  .kira-prose h4 {
+    @apply text-[1.05em];
+  }
+  .kira-prose :is(h5, h6) {
+    @apply text-[1em];
+  }
+  .kira-prose p {
+    @apply mt-0 mx-0 mb-2;
+  }
+  .kira-prose :is(ul, ol) {
+    @apply list-[revert] mt-0 mx-0 mb-2 pl-4;
+  }
+  .kira-prose li {
+    @apply my-0.5 mx-0;
+  }
+  .kira-prose a {
+    @apply text-info;
+  }
+  .kira-prose blockquote {
+    @apply border-l-4 border-border text-muted-foreground mt-0 mx-0 mb-2 py-0 px-2;
+  }
+  .kira-prose hr {
+    @apply border-0 border-t border-border my-4 mx-0;
+  }
+  .kira-prose code {
+    @apply bg-field rounded-kira-sm font-data text-kira-sm py-[0.1em] px-[0.35em];
+  }
+  .kira-prose pre {
+    @apply overflow-auto bg-field rounded-kira-sm mt-0 mx-0 mb-2 p-2;
+  }
+  .kira-prose pre code {
+    @apply bg-none p-0 text-kira-md;
+  }
+  .kira-prose table {
+    @apply border-collapse mt-0 mx-0 mb-2;
+  }
+  .kira-prose :is(th, td) {
+    @apply border border-border text-left py-1 px-2;
+  }
+  .kira-prose thead {
+    @apply border-b border-border;
+  }
+  .kira-prose img {
+    @apply max-w-full;
+  }
+}

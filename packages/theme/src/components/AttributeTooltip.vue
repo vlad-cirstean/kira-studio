@@ -123,7 +123,7 @@ useEventListener(containerRef, 'focusout', onFocusOut);
       <TooltipContent>
         <template v-if="parts">
           <div class="flex items-baseline gap-1.5">
-            <span class="font-semibold" data-testid="tooltip-title">{{ parts.title }}</span>
+            <span class="font-medium" data-testid="tooltip-title">{{ parts.title }}</span>
             <span
               v-if="parts.meta"
               data-testid="tooltip-meta"

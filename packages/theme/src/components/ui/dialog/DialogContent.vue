@@ -93,7 +93,7 @@ function onPointerDownOutside(event: Event): void {
 
 const contentClass = computed(() =>
   cn(
-    'bg-elevated text-fg data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-fg/10 rounded-kira-pill text-kira-md ring-1 duration-100 fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 outline-none',
+    'bg-elevated text-fg data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-fg/10 rounded-kira-pill text-kira-md ring-1 duration-100 fixed top-1/2 left-1/2 z-(--kira-z-dialog) shadow-kira-dialog -translate-x-1/2 -translate-y-1/2 outline-none',
     dialogContentSizeVariants({ size: props.size, fixedHeight: props.fixedHeight }),
     props.class,
   ),

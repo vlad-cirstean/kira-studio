@@ -62,6 +62,12 @@ export function usePaneResize(options: PaneResizeOptions) {
     };
   }
 
+  // Shell-wide resize cursor for the length of the drag (base.css `kira-resizing-*`).
+  const cursorClass = `kira-resizing-${axis}`;
+  const setCursor = (on: boolean): void => {
+    document.documentElement.classList.toggle(cursorClass, on);
+  };
+
   let origin = 0;
   let startSize = 0;
   let last: number | undefined;
@@ -71,6 +77,7 @@ export function usePaneResize(options: PaneResizeOptions) {
     axis,
     preventDefault: true,
     onStart: (_pos, e) => {
+      setCursor(true);
       origin = pointerOf(e);
       startSize = toValue(options.size);
       last = undefined;
@@ -82,6 +89,7 @@ export function usePaneResize(options: PaneResizeOptions) {
     onEnd: (_pos, e) => {
       const done = last;
       last = undefined;
+      setCursor(false);
       if (e.type === 'pointercancel') options.onCancel?.();
       else if (done !== undefined) options.onCommit?.(done);
     },
@@ -90,6 +98,7 @@ export function usePaneResize(options: PaneResizeOptions) {
   function abort(): void {
     if (!isDragging.value) return;
     last = undefined;
+    setCursor(false);
     options.onCancel?.();
   }
   // A release can vanish with the window itself (focus moved to another app); end the drag.
