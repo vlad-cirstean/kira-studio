@@ -9,11 +9,6 @@ export const EXEMPTIONS: readonly Exemption[] = [
   },
   {
     rule: 'U67',
-    path: 'packages/theme/src/components/ui/button/index.ts',
-    reason: '`title` is a button variant name, not text',
-  },
-  {
-    rule: 'U67',
     path: 'apps/kira-studio/frontend/src/views/console/completion.ts',
     reason: 'Redis command syntax hints (command grammar, not wording)',
   },

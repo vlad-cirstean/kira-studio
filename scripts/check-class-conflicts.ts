@@ -38,6 +38,13 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import {
+  type ElementNode,
+  type IfBranchNode,
+  NodeTypes,
+  type RootNode,
+  type TemplateChildNode,
+} from '@vue/compiler-core';
 import { parse as parseSFC } from '@vue/compiler-sfc';
 import { cn } from '../packages/theme/src/lib/utils';
 
@@ -137,25 +144,27 @@ function isCnRootCall(ast: unknown): boolean {
   return callee?.type === 'Identifier' && callee.name === 'cn';
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: compiler-sfc's compiled-template AST node shape
-type TemplateNode = any;
-
-function findClassAttrs(node: TemplateNode): {
+function findClassAttrs(node: ElementNode): {
   staticClass: string;
   classExpAst: unknown;
   line: number;
 } {
   let staticClass = '';
   let classExpAst: unknown = null;
-  let line = node.loc?.start?.line ?? 0;
-  for (const p of node.props ?? []) {
-    if (p.type === 6 && p.name === 'class') {
+  let line = node.loc.start.line;
+  for (const p of node.props) {
+    if (p.type === NodeTypes.ATTRIBUTE && p.name === 'class') {
       staticClass = p.value?.content ?? '';
-      line = p.loc?.start?.line ?? line;
+      line = p.loc.start.line;
     }
-    if (p.type === 7 && p.name === 'bind' && p.arg?.content === 'class') {
-      classExpAst = p.exp?.ast ?? null;
-      line = p.loc?.start?.line ?? line;
+    if (
+      p.type === NodeTypes.DIRECTIVE &&
+      p.name === 'bind' &&
+      p.arg?.type === NodeTypes.SIMPLE_EXPRESSION &&
+      p.arg.content === 'class'
+    ) {
+      classExpAst = p.exp?.type === NodeTypes.SIMPLE_EXPRESSION ? (p.exp.ast ?? null) : null;
+      line = p.loc.start.line;
     }
   }
   return { staticClass, classExpAst, line };
@@ -208,7 +217,7 @@ function checkStaticVsConditional(
   }
 }
 
-function checkElement(node: TemplateNode, relPath: string, hits: Hit[]): void {
+function checkElement(node: ElementNode, relPath: string, hits: Hit[]): void {
   const { staticClass, classExpAst, line } = findClassAttrs(node);
   if (!staticClass) return;
   if (classExpAst && isCnRootCall(classExpAst)) return; // merges at runtime, §3.1
@@ -218,21 +227,24 @@ function checkElement(node: TemplateNode, relPath: string, hits: Hit[]): void {
   if (classExpAst) checkStaticVsConditional(classExpAst, staticTokens, relPath, line, hits);
 }
 
-function walk(node: TemplateNode, relPath: string, hits: Hit[]): void {
-  if (!node) return;
-  if (node.type === 1) {
-    checkElement(node, relPath, hits);
-  }
-  for (const child of node.children ?? []) {
-    walk(child, relPath, hits);
-  }
-  // Element nodes can also carry v-if/v-else branch content under `branches` (IfNode) — compiler
-  // AST already flattens those into `children` on the containing IfBranchNode, which itself has
-  // type 1-shaped `props`/`children`, so the same recursion covers them; templateChildren of
-  // ForNode/IfNode are covered by the generic `children` walk above since both node kinds expose
-  // a `children` (or `branches[].children`) array. Cover `branches` explicitly for completeness.
-  if (Array.isArray(node.branches)) {
-    for (const branch of node.branches) walk(branch, relPath, hits);
+type WalkNode = RootNode | TemplateChildNode | IfBranchNode;
+
+// `v-if` chains hold their content under `branches[].children`; `v-for` and elements under `children`.
+function walk(node: WalkNode, relPath: string, hits: Hit[]): void {
+  switch (node.type) {
+    case NodeTypes.ELEMENT:
+      checkElement(node, relPath, hits);
+      for (const child of node.children) walk(child, relPath, hits);
+      break;
+    case NodeTypes.ROOT:
+    case NodeTypes.FOR:
+    case NodeTypes.IF_BRANCH:
+      for (const child of node.children) walk(child, relPath, hits);
+      break;
+    case NodeTypes.IF:
+      for (const branch of node.branches) walk(branch, relPath, hits);
+      break;
+    default:
   }
 }
 

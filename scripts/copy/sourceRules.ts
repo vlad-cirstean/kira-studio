@@ -4,6 +4,13 @@
  * Pure: `scanSource` takes the file text and the catalog's placeholder table, returns hits.
  */
 import { parse as parseBabel, parseExpression } from '@babel/parser';
+import {
+  type ElementNode,
+  type ExpressionNode,
+  NodeTypes,
+  type RootNode,
+  type TemplateChildNode,
+} from '@vue/compiler-core';
 import { parse as parseSFC } from '@vue/compiler-sfc';
 
 export const SOURCE_RULES = ['U64', 'U65', 'U66', 'U67', 'U68', 'U69', 'U70', 'U71'] as const;
@@ -30,9 +37,6 @@ interface Node {
   loc?: { start: { line: number } };
   [key: string]: unknown;
 }
-
-// biome-ignore lint/suspicious/noExplicitAny: compiler-sfc template AST node shape
-type TplNode = any;
 
 const SKIP_KEYS = new Set([
   'loc',
@@ -366,6 +370,8 @@ function checkTextProperty(
   const inTParams =
     grand !== undefined && isIdentCall(grand, 't') && objectParent?.type === 'ObjectExpression';
   if (name === undefined || !TEXT_PROPS.has(name) || inTParams) return;
+  // A cva variant key (`title: '…'` under `variants`) names a variant, not text.
+  if (ancestors.some((a) => isIdentCall(a, 'cva'))) return;
   for (const lit of terminalLiterals(node.value)) {
     if (looksLikeText(lit)) {
       c.add('U67', lineOf(lit, offset), `literal text in "${name}"; move to the catalog`);
@@ -485,71 +491,68 @@ function isTextAttr(rawName: string): boolean {
   return TEXT_ATTRS.has(name) || TEXT_ATTR_SUFFIX.test(name);
 }
 
-function scanExp(c: Collector, exp: TplNode, textMode: boolean): void {
-  const content = str(exp?.content);
-  if (content === undefined || content.trim() === '') return;
-  const ast = parseExpr(content);
-  if (ast) scanTemplateExpression(c, ast, (exp.loc?.start?.line ?? 1) - 1, textMode);
+function scanExp(c: Collector, exp: ExpressionNode | undefined, textMode: boolean): void {
+  if (exp?.type !== NodeTypes.SIMPLE_EXPRESSION || exp.content.trim() === '') return;
+  const ast = parseExpr(exp.content);
+  if (ast) scanTemplateExpression(c, ast, exp.loc.start.line - 1, textMode);
 }
 
-function scanProps(c: Collector, el: TplNode): void {
-  for (const p of el.props ?? []) {
-    const line = p.loc?.start?.line ?? el.loc?.start?.line ?? 1;
-    if (p.type === 6) {
-      if (isTextAttr(String(p.name)) && HAS_LETTER.test(p.value?.content ?? '')) {
+function scanProps(c: Collector, el: ElementNode): void {
+  for (const p of el.props) {
+    const line = p.loc.start.line;
+    if (p.type === NodeTypes.ATTRIBUTE) {
+      if (isTextAttr(p.name) && HAS_LETTER.test(p.value?.content ?? '')) {
         c.add('U65', line, `static text in "${p.name}"; bind a catalog message`);
       }
-    } else if (p.type === 7 && p.exp) {
+    } else if (p.exp) {
       if (p.name === 'for' || p.name === 'slot') continue;
-      const argName = p.arg && p.arg.isStatic !== false ? String(p.arg.content) : undefined;
-      const textual = p.name === 'bind' && argName !== undefined && isTextAttr(argName);
+      const arg = p.arg?.type === NodeTypes.SIMPLE_EXPRESSION && p.arg.isStatic ? p.arg : undefined;
+      const textual = p.name === 'bind' && arg !== undefined && isTextAttr(arg.content);
       scanExp(c, p.exp, textual);
     }
   }
 }
 
-function hasSlotDirective(el: TplNode): boolean {
-  return (el.props ?? []).some((p: TplNode) => p.type === 7 && p.name === 'slot');
+function hasSlotDirective(el: ElementNode): boolean {
+  return el.props.some((p) => p.type === NodeTypes.DIRECTIVE && p.name === 'slot');
 }
 
 function scanTemplateNode(
   c: Collector,
-  node: TplNode,
+  node: RootNode | TemplateChildNode,
   parentTag: string | undefined,
   inCatalogSlot: boolean,
 ): void {
-  const line = node.loc?.start?.line ?? 1;
-  if (node.type === 2) {
-    const text = String(node.content);
+  const line = node.loc.start.line;
+  if (node.type === NodeTypes.TEXT) {
+    const text = node.content;
     const exempt = inCatalogSlot && (parentTag === 'code' || parentTag === 'kbd');
     if (HAS_LETTER.test(text) && !exempt) {
       c.add('U64', line, `literal text "${text.trim().slice(0, 40)}"; move to the catalog`);
     }
     return;
   }
-  if (node.type === 5) {
+  if (node.type === NodeTypes.INTERPOLATION) {
     scanExp(c, node.content, true);
     return;
   }
-  if (node.type !== 1 && node.type !== 0) return;
-  let slot = inCatalogSlot;
-  if (node.type === 1) {
-    const tag = String(node.tag);
+  if (node.type === NodeTypes.ELEMENT) {
+    const tag = node.tag;
     if (I18N_TAGS.has(tag))
       c.add('U68', line, `<${tag}> is reserved for packages/theme/src/i18n; use CatalogText`);
     scanProps(c, node);
-    if (
-      tag === 'template' &&
-      hasSlotDirective(node) &&
-      parentTag !== undefined &&
-      CATALOG_TEXT_TAGS.has(parentTag)
-    ) {
-      slot = true;
-    }
-    for (const child of node.children ?? []) scanTemplateNode(c, child, tag, slot);
+    const slot =
+      inCatalogSlot ||
+      (tag === 'template' &&
+        hasSlotDirective(node) &&
+        parentTag !== undefined &&
+        CATALOG_TEXT_TAGS.has(parentTag));
+    for (const child of node.children) scanTemplateNode(c, child, tag, slot);
     return;
   }
-  for (const child of node.children ?? []) scanTemplateNode(c, child, undefined, slot);
+  if (node.type === NodeTypes.ROOT) {
+    for (const child of node.children) scanTemplateNode(c, child, undefined, inCatalogSlot);
+  }
 }
 
 function parseTs(code: string): Node {
@@ -567,7 +570,7 @@ export function scanSource(file: string, source: string, ctx: ScanContext): Hit[
       const { descriptor } = parseSFC(source, { filename: file });
       if (descriptor.template?.ast) {
         // The template tag's own children carry file-relative lines.
-        for (const child of (descriptor.template.ast as TplNode).children ?? []) {
+        for (const child of descriptor.template.ast.children) {
           scanTemplateNode(c, child, undefined, false);
         }
       }

@@ -18,15 +18,20 @@ import (
 
 // permanentExemptions are `G<n> <path>` pairs that stay forever, each with its reason.
 var permanentExemptions = map[string]string{
-	"G4 apps/kira-studio/internal/flowharness/harness.go":      "test tooling writes throwaway fixtures; a torn write only fails the test run",
-	"G4 apps/kira-studio/internal/flowharness/servers/ca.go":   "test tooling writes throwaway fixtures; a torn write only fails the test run",
-	"G4 apps/kira-studio/internal/flowharness/servers/grpc.go": "test tooling writes throwaway fixtures; a torn write only fails the test run",
-	"G4 apps/kira-studio/internal/ipcfixture/write.go":         "test tooling writes throwaway fixtures; a torn write only fails the test run",
-	"G4 apps/kira-space/internal/flowharness/gitrepo.go":       "test tooling writes throwaway fixtures; no reader to protect from a torn write",
-	"G4 apps/kira-space/internal/flowharness/harness.go":       "test tooling writes throwaway fixtures; no reader to protect from a torn write",
-	"G4 apps/kira-space/internal/gitsession/incremental.go":    "writes temp files into a per-call os.MkdirTemp dir that is deleted before return; nothing else reads them",
-	"G4 internal/flowtest/contract.go":                         "test-only harness writes fixtures straight to a temp dir; no crash-safety need",
-	"G4 internal/flowtest/fakeagent/fakeagent.go":              "test-only harness writes fixtures straight to a temp dir; no crash-safety need",
+	"G4 apps/kira-space/internal/gitsession/incremental.go": "writes temp files into a per-call os.MkdirTemp dir that is deleted before return; nothing else reads them",
+}
+
+// testToolingPackages hold throwaway test fixtures; G4 skips any file under a directory with one
+// of these names (a torn write only fails the test run).
+var testToolingPackages = map[string]bool{"flowharness": true, "flowtest": true, "ipcfixture": true}
+
+func isTestTooling(rel string) bool {
+	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+		if testToolingPackages[seg] {
+			return true
+		}
+	}
+	return false
 }
 
 // ipcerrMsg maps an ipcerr constructor to its message argument index.
@@ -211,6 +216,9 @@ func TestGoConventions(t *testing.T) {
 	var failures []string
 	for _, rel := range goFiles(t, root) {
 		for _, f := range scan(t, root, rel) {
+			if f.rule == "G4" && isTestTooling(rel) {
+				continue
+			}
 			key := f.rule + " " + f.path
 			hit[key] = true
 			if permanentExemptions[key] != "" {
