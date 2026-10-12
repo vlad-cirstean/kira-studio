@@ -115,7 +115,7 @@ func mysqlTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) No
 	if table.UsingFilesort != nil && *table.UsingFilesort {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "filesort",
-			Message: fmt.Sprintf("%q was sorted with a temporary file (filesort)", relationOrPlaceholder),
+			Message: fmt.Sprintf("“%s” was sorted with a temporary file (filesort).", relationOrPlaceholder),
 		})
 	}
 	// D15: a derived table materialized into a temp table.
@@ -123,7 +123,7 @@ func mysqlTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) No
 	if (table.UsingTemporaryTable != nil && *table.UsingTemporaryTable) || materializedTemp {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "temp-table",
-			Message: fmt.Sprintf("%q was materialized into a temporary table", relationOrPlaceholder),
+			Message: fmt.Sprintf("“%s” was materialised into a temporary table.", relationOrPlaceholder),
 		})
 	}
 
@@ -162,7 +162,7 @@ func mysqlBlockNodes(raw json.RawMessage, thresholdRows int, scans *[]float64) [
 		_ = json.Unmarshal(block.OrderingOperation, &op)
 		var issues []Issue
 		if op.UsingFilesort != nil && *op.UsingFilesort {
-			issues = []Issue{{Severity: "warn", Code: "filesort", Message: "a temporary sort file (filesort) was used"}}
+			issues = []Issue{{Severity: "warn", Code: "filesort", Message: "A temporary sort file (filesort) was used."}}
 		}
 		return []Node{mysqlWrap("Sort", mysqlBlockNodes(block.OrderingOperation, thresholdRows, scans), issues)}
 	}

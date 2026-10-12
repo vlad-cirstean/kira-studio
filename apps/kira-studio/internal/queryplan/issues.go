@@ -41,7 +41,7 @@ func pushWideScanIssueTo(issues *[]Issue, label string, rows float64, thresholdR
 	*issues = append(*issues, Issue{
 		Severity: "warn",
 		Code:     "wide-scan",
-		Message:  fmt.Sprintf("%s is estimated to read %s rows", label, commaFormat(rows)),
+		Message:  fmt.Sprintf("%s is estimated to read %s %s.", label, commaFormat(rows), rowNoun(rows)),
 	})
 }
 
@@ -78,13 +78,13 @@ func pushIndexIssues(node *Node, relation string, accessType *string, possibleKe
 	if accessType != nil && *accessType == "ALL" {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "full-scan",
-			Message: fmt.Sprintf("full table scan on %q — no index was used", relation),
+			Message: fmt.Sprintf("Full table scan on “%s”. No index was used.", relation),
 		})
 	}
 	if len(possibleKeys) > 0 && key == nil {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "unused-index",
-			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relation, strings.Join(possibleKeys, ", ")),
+			Message: fmt.Sprintf("“%s” has an index (%s) the planner didn’t choose.", relation, strings.Join(possibleKeys, ", ")),
 		})
 	}
 }
@@ -139,4 +139,12 @@ func isOverThreshold(estimatedRowsRead *float64, thresholdRows int) bool {
 func sortMetricsByLabel(metrics []Metric) []Metric {
 	sort.Slice(metrics, func(i, j int) bool { return metrics[i].Label < metrics[j].Label })
 	return metrics
+}
+
+// rowNoun matches the catalog's one/other plural split for "row".
+func rowNoun(n float64) string {
+	if n == 1 {
+		return "row"
+	}
+	return "rows"
 }

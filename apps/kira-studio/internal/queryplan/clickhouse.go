@@ -149,7 +149,7 @@ func chMergeTreeIssues(b *chBuilderNode, typed chRawNode) {
 	if pk.SelectedGranules != nil && pk.InitialGranules != nil && *pk.SelectedGranules == *pk.InitialGranules {
 		b.issues = append(b.issues, Issue{
 			Severity: "warn", Code: "pk-not-narrowed",
-			Message: fmt.Sprintf("the primary key on %q did not narrow the read — every granule was selected", relationOrPlaceholder),
+			Message: fmt.Sprintf("The primary key on “%s” didn’t narrow the read. Every granule was selected.", relationOrPlaceholder),
 		})
 	}
 	// D15: every part read.
@@ -160,7 +160,7 @@ func chMergeTreeIssues(b *chBuilderNode, typed chRawNode) {
 	if pk.SelectedParts != nil && pk.InitialParts != nil && *pk.SelectedParts == *pk.InitialParts && initialParts > 1 {
 		b.issues = append(b.issues, Issue{
 			Severity: "warn", Code: "all-parts-read",
-			Message: fmt.Sprintf("every part of %q was read (%d parts)", relationOrPlaceholder, initialParts),
+			Message: fmt.Sprintf("Every part of “%s” was read (%d parts).", relationOrPlaceholder, initialParts),
 		})
 	}
 }

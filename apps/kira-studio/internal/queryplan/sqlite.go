@@ -33,7 +33,7 @@ func sqliteNodeForRow(detail string) Node {
 	if strings.HasPrefix(detail, "SCAN ") {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "full-scan",
-			Message: fmt.Sprintf("%s — a full scan, no index narrowed the read", detail),
+			Message: fmt.Sprintf("%s is a full scan. No index narrowed the read.", detail),
 		})
 	}
 	if strings.Contains(detail, "USE TEMP B-TREE FOR ") {

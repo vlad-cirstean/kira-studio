@@ -101,14 +101,14 @@ func pgBuildNode(raw json.RawMessage, thresholdRows int, scans *[]float64) Node 
 	if nodeType == "Seq Scan" && typed.Filter != nil {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "full-scan",
-			Message: fmt.Sprintf("full table scan on %q with a filter — no index was used", relationOrPlaceholder),
+			Message: fmt.Sprintf("Full table scan on “%s” with a filter. No index was used.", relationOrPlaceholder),
 		})
 	}
 	// D15 (info): index-only scan is a good sign, not a problem.
 	if nodeType == "Index Only Scan" {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "info", Code: "index-only-scan",
-			Message: fmt.Sprintf("%q is read entirely from its index — no heap access needed", relationOrPlaceholder),
+			Message: fmt.Sprintf("“%s” is read entirely from its index. No heap access needed.", relationOrPlaceholder),
 		})
 	}
 	// D15: a nested loop whose inner side is wide re-executes that inner scan once per outer row.
@@ -121,7 +121,7 @@ func pgBuildNode(raw json.RawMessage, thresholdRows int, scans *[]float64) Node 
 			if rows >= 10_000 {
 				node.Issues = append(node.Issues, Issue{
 					Severity: "warn", Code: "nested-loop-wide-inner",
-					Message: fmt.Sprintf("nested loop repeats a scan estimated at %s rows for every outer row", commaFormat(*c.EstimatedRows)),
+					Message: fmt.Sprintf("Nested loop repeats a scan estimated at %s %s for every outer row.", commaFormat(*c.EstimatedRows), rowNoun(*c.EstimatedRows)),
 				})
 				break
 			}

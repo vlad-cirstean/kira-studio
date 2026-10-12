@@ -115,9 +115,9 @@ func mariadbEntryNode(entry mariadbLoopEntry, scans *[]float64, thresholdRows in
 		if child != nil {
 			children = []Node{*child}
 		}
-		message := "a temporary sort file (filesort) was used"
+		message := "A temporary sort file (filesort) was used."
 		if fs.SortKey != nil {
-			message = fmt.Sprintf("a temporary sort file (filesort) was used — sort key %s", *fs.SortKey)
+			message = fmt.Sprintf("A temporary sort file (filesort) was used. Sort key %s.", *fs.SortKey)
 		}
 		n := mysqlWrap("Sort (filesort)", children, []Issue{{Severity: "warn", Code: "filesort", Message: message}})
 		return &n
