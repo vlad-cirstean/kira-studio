@@ -10,10 +10,7 @@
 #
 # U39-U63 never scan `/behaviour/` (the owning modules) or `/testing/`.
 #
-# P266 pending lists (scripts/consistency-allowlist/*.txt): a line `U<n> path` (n >= 72) exempts that
-# whole file from that one guard while it is unmigrated. Lines for other ids (N*, G*, U64-U71) belong
-# to the other checkers and are ignored here. An entry that exempts nothing fails the run, so each
-# list only shrinks. Guards U72-U82: docs/v2.2/plans/P266-consistency-audit.md section 4.4.
+# Guards U72-U82: docs/v2.2/plans/P266-consistency-audit.md section 4.4.
 #
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
@@ -34,8 +31,6 @@ if [ -z "$GNU_GREP" ]; then
   echo "check-ui-primitives: GNU grep with -P is required (macOS: brew install grep, provides ggrep)." >&2
   exit 1
 fi
-
-ALLOW_DIR=scripts/consistency-allowlist
 
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
 CORE_DIRS="packages/git-core/src packages/git-ipc/src packages/api-core/src"
@@ -151,6 +146,7 @@ U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox 
 U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
 U41 packages/git-ui/src/components/gridKeyboard.ts # SlickGrid engine host reads modifier keys
 U47 packages/git-ui/src/components/gridKeyboard.ts # grid cell navigation, not list semantics
+U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not
@@ -297,25 +293,11 @@ mv "$TMP/perm_ids" "$TMP/perm"
 
 sort -u "$TMP/perm" -o "$TMP/perm"
 
-# pending lists: `U<n> path` (n >= 72); lines for other ids are another checker's
-: >"$TMP/pending"
-if [ -d "$ALLOW_DIR" ]; then
-  for list in "$ALLOW_DIR"/*.txt; do
-    [ -f "$list" ] || continue
-    sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//' "$list" |
-      grep -E '^U(7[2-9]|8[0-9]|9[0-9]) ' >>"$TMP/pending" || true
-  done
-fi
-sort -u "$TMP/pending" -o "$TMP/pending"
-
 STATUS=0
 : >"$TMP/used_perm"
-: >"$TMP/used_pending"
 while read -r id f; do
   if grep -qxF "$id $f" "$TMP/perm"; then
     echo "$id $f" >>"$TMP/used_perm"
-  elif grep -qxF "$id $f" "$TMP/pending"; then
-    echo "$id $f" >>"$TMP/used_pending"
   else
     msg=$(grep "^$id@@" "$TMP/guards" | head -1 | awk -F'@@' '{print $4}')
     echo "check-ui-primitives: $f: $id $msg" >&2
@@ -330,13 +312,6 @@ while read -r id f; do
     STATUS=1
   fi
 done <"$TMP/perm"
-sort -u "$TMP/used_pending" -o "$TMP/used_pending"
-while read -r id f; do
-  if ! grep -qxF "$id $f" "$TMP/used_pending"; then
-    echo "check-ui-primitives: stale pending entry (no $id hit left or file gone): $id $f" >&2
-    STATUS=1
-  fi
-done <"$TMP/pending"
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3 and P266-consistency-audit.md §4.4." >&2

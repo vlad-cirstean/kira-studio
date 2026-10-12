@@ -1,5 +1,0 @@
-# PERMANENT G4 apps/kira-space/internal/flowharness/*.go: test tooling writes throwaway fixtures; no reader to protect from a torn write.
-G4 apps/kira-space/internal/flowharness/gitrepo.go
-G4 apps/kira-space/internal/flowharness/harness.go
-# PERMANENT G4 gitsession/incremental.go: writes temp files into a per-call os.MkdirTemp dir that is deleted before return; nothing else reads them.
-G4 apps/kira-space/internal/gitsession/incremental.go

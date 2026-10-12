@@ -6,7 +6,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { applyExemptions, loadPending } from './allowlist';
+import { applyExemptions } from './allowlist';
 import { flattenCatalog, isPlural, placeholdersOf } from './catalogRules';
 import { EXEMPTIONS } from './exemptions';
 import { type Hit, type MessageShape, scanSource } from './sourceRules';
@@ -60,10 +60,7 @@ function main(): number {
   for (const file of listSources()) {
     hits.push(...scanSource(file, readFileSync(join(REPO_ROOT, file), 'utf8'), { messages }));
   }
-  const { remaining, errors } = applyExemptions(hits, [
-    ...EXEMPTIONS,
-    ...loadPending(join(REPO_ROOT, 'scripts/consistency-allowlist')),
-  ]);
+  const { remaining, errors } = applyExemptions(hits, EXEMPTIONS);
   const limit = process.argv.includes('--all') ? remaining.length : MAX_PRINTED;
   for (const h of remaining.slice(0, limit)) {
     console.error(`check-copy: ${h.file}:${h.line}: ${h.rule} ${h.message}`);

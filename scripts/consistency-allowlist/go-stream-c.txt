@@ -1,3 +1,0 @@
-# Permanent: test-only harness writes fixtures straight to a temp dir; no crash-safety need.
-G4 internal/flowtest/contract.go
-G4 internal/flowtest/fakeagent/fakeagent.go

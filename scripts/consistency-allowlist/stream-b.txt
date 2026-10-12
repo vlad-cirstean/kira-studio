@@ -1,2 +1,0 @@
-# PERMANENT U82 mobile/state/useAdeWrites.ts: slices a UUID into its 8-4-4-4-12 groups, not a commit sha.
-U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts

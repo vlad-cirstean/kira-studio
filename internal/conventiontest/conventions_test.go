@@ -1,15 +1,13 @@
-// Package conventiontest guards Go-wide conventions (P266). Existing violations sit in
-// scripts/consistency-allowlist/go-*.txt as `G<n> <path>` lines (whole file); a line whose file
-// no longer violates fails the test, so the lists only shrink.
+// Package conventiontest guards Go-wide conventions (P266). A file a guard cannot apply to sits in
+// permanentExemptions with its reason; an entry whose file no longer violates fails the test, so
+// the list only shrinks.
 package conventiontest
 
 import (
-	"bufio"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -19,7 +17,17 @@ import (
 )
 
 // permanentExemptions are `G<n> <path>` pairs that stay forever, each with its reason.
-var permanentExemptions = map[string]string{}
+var permanentExemptions = map[string]string{
+	"G4 apps/kira-studio/internal/flowharness/harness.go":      "test tooling writes throwaway fixtures; a torn write only fails the test run",
+	"G4 apps/kira-studio/internal/flowharness/servers/ca.go":   "test tooling writes throwaway fixtures; a torn write only fails the test run",
+	"G4 apps/kira-studio/internal/flowharness/servers/grpc.go": "test tooling writes throwaway fixtures; a torn write only fails the test run",
+	"G4 apps/kira-studio/internal/ipcfixture/write.go":         "test tooling writes throwaway fixtures; a torn write only fails the test run",
+	"G4 apps/kira-space/internal/flowharness/gitrepo.go":       "test tooling writes throwaway fixtures; no reader to protect from a torn write",
+	"G4 apps/kira-space/internal/flowharness/harness.go":       "test tooling writes throwaway fixtures; no reader to protect from a torn write",
+	"G4 apps/kira-space/internal/gitsession/incremental.go":    "writes temp files into a per-call os.MkdirTemp dir that is deleted before return; nothing else reads them",
+	"G4 internal/flowtest/contract.go":                         "test-only harness writes fixtures straight to a temp dir; no crash-safety need",
+	"G4 internal/flowtest/fakeagent/fakeagent.go":              "test-only harness writes fixtures straight to a temp dir; no crash-safety need",
+}
 
 // ipcerrMsg maps an ipcerr constructor to its message argument index.
 var ipcerrMsg = map[string]int{"New": 1, "BadRequest": 0, "NotFound": 0, "Internal": 0, "SecretStore": 0}
@@ -86,10 +94,25 @@ func scan(t *testing.T, root, rel string) []finding {
 	add := func(rule string, pos token.Pos, msg string) {
 		out = append(out, finding{rule, filepath.ToSlash(rel), fset.Position(pos).Line, msg})
 	}
+	// codes.go may only declare `Code = "E_..."` constants: a retired-code map or any other
+	// code literal there is a legacy code and fails like one anywhere else.
+	declared := map[token.Pos]bool{}
+	if isCodes {
+		ast.Inspect(f, func(n ast.Node) bool {
+			if vs, ok := n.(*ast.ValueSpec); ok {
+				if id, ok := vs.Type.(*ast.Ident); ok && id.Name == "Code" {
+					for _, v := range vs.Values {
+						declared[v.Pos()] = true
+					}
+				}
+			}
+			return true
+		})
+	}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.BasicLit:
-			if !isCodes && x.Kind == token.STRING && isErrorCodeLiteral(x.Value) {
+			if x.Kind == token.STRING && isErrorCodeLiteral(x.Value) && !declared[x.Pos()] {
 				add("G2", x.Pos(), "error code literal "+x.Value+"; use the ipcerr constant")
 			}
 		case *ast.CallExpr:
@@ -182,46 +205,23 @@ func goFiles(t *testing.T, root string) []string {
 	return files
 }
 
-func loadAllowlist(t *testing.T, root string) map[string]bool {
-	t.Helper()
-	paths, _ := filepath.Glob(filepath.Join(root, "scripts", "consistency-allowlist", "go-*.txt"))
-	allowed := map[string]bool{}
-	for _, p := range paths {
-		fh, err := os.Open(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sc := bufio.NewScanner(fh)
-		for sc.Scan() {
-			line := strings.TrimSpace(sc.Text())
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			allowed[line] = true
-		}
-		fh.Close()
-	}
-	return allowed
-}
-
 func TestGoConventions(t *testing.T) {
 	root := repoRoot(t)
-	allowed := loadAllowlist(t, root)
 	hit := map[string]bool{}
 	var failures []string
 	for _, rel := range goFiles(t, root) {
 		for _, f := range scan(t, root, rel) {
 			key := f.rule + " " + f.path
 			hit[key] = true
-			if allowed[key] || permanentExemptions[key] != "" {
+			if permanentExemptions[key] != "" {
 				continue
 			}
 			failures = append(failures, f.path+":"+strconv.Itoa(f.line)+": "+f.rule+" "+f.msg)
 		}
 	}
-	for key := range allowed {
+	for key := range permanentExemptions {
 		if !hit[key] {
-			failures = append(failures, "stale allowlist line: "+key)
+			failures = append(failures, "stale exemption: "+key)
 		}
 	}
 	sort.Strings(failures)
