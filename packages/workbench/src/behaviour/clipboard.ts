@@ -63,6 +63,11 @@ export async function copyOrReportErrorLazy(
   }
 }
 
+/** Reads clipboard text; throws when the permission is denied or the window is unfocused. */
+export function readClipboardText(): Promise<string> {
+  return navigator.clipboard.readText();
+}
+
 async function copyWithAnnouncement(text: string, message?: string): Promise<string | null> {
   try {
     await copyText(text);

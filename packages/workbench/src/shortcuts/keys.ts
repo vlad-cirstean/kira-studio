@@ -5,6 +5,11 @@ import { type Binding, type Chord, SHORTCUTS, type ShortcutId } from '@shared/do
 // process's lifetime.
 const isMac = navigator.userAgent.includes('Mac');
 
+/** The platform's primary modifier: Cmd on mac, Ctrl elsewhere. */
+export function isPrimaryModifier(e: KeyboardEvent): boolean {
+  return isMac ? e.metaKey : e.ctrlKey;
+}
+
 function resolveChord(id: ShortcutId): Chord {
   const binding: Binding = SHORTCUTS[id];
   return isMac ? (binding.mac ?? binding.chord) : binding.chord;
@@ -21,6 +26,10 @@ const MAC_KEY_GLYPH: Record<string, string> = {
 const KEY_DISPLAY: Record<string, string> = {
   Return: 'Enter',
   Escape: 'Esc',
+  ArrowUp: 'Up',
+  ArrowDown: 'Down',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
 };
 
 /** 'Ctrl+C' / '⌘C', matching VS Code's own display order and glyphs. */
@@ -43,7 +52,7 @@ export function formatShortcut(id: ShortcutId): string {
   return [...mods, KEY_DISPLAY[chord.key] ?? chord.key].join('+');
 }
 
-const DOM_KEY: Record<string, string> = { Return: 'Enter' };
+const DOM_KEY: Record<string, string> = { Return: 'Enter', Space: ' ' };
 
 // Layout-correct match: `e.key` first, so Dvorak/Colemak follow the printed label. Falls back to
 // the physical `e.code` only when `e.key` is not ASCII — macOS composes Option+letter into a symbol
@@ -54,16 +63,13 @@ function domCodeForKey(key: string): string | null {
   return null;
 }
 
-// `chord.ctrl` (a literal Control, distinct from cmdOrCtrl) only appears on the two
-// tab-navigation bindings (shared/domain/shortcuts.ts), which the Go menu accelerator owns, never a
-// local keydown handler — so a local match only needs cmdOrCtrl/shift/alt.
+// `chord.ctrl` is a literal Control on every platform, distinct from cmdOrCtrl.
 function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
   if (id === 'menu.open' && e.key === 'ContextMenu') return true;
   const chord = resolveChord(id);
-  const cmdOrCtrlPressed = isMac ? e.metaKey : e.ctrlKey;
-  const otherPlatformModPressed = isMac ? e.ctrlKey : e.metaKey;
-  if (Boolean(chord.cmdOrCtrl) !== cmdOrCtrlPressed) return false;
-  if (otherPlatformModPressed) return false;
+  const wantsCtrl = Boolean(chord.ctrl) || (!isMac && Boolean(chord.cmdOrCtrl));
+  const wantsMeta = isMac && Boolean(chord.cmdOrCtrl);
+  if (wantsCtrl !== e.ctrlKey || wantsMeta !== e.metaKey) return false;
   if (Boolean(chord.shift) !== e.shiftKey) return false;
   if (Boolean(chord.alt) !== e.altKey) return false;
   const domCode = domCodeForKey(chord.key);

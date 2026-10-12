@@ -14,7 +14,7 @@ export interface Chord {
 
 /** Where a chord is live. A chord may repeat across scopes (Cmd+C copies a tree name in `tree`, a cell
  *  in `grid`), never inside one scope or between `global` and any other. */
-export type ShortcutScope = 'global' | 'view' | 'tree' | 'grid' | 'form' | 'editor';
+export type ShortcutScope = 'global' | 'view' | 'tree' | 'grid' | 'form' | 'editor' | 'list';
 
 export interface Binding {
   chord: Chord;
@@ -58,6 +58,14 @@ export const SHORTCUTS = {
   'form.save': { scope: 'form', chord: { key: 'S', cmdOrCtrl: true } },
   // The ContextMenu key opens the same menu (matched alongside in shortcutFor).
   'menu.open': { scope: 'view', chord: { key: 'F10', shift: true } },
+
+  // Keyboard reorder of a sortable list: Alt+arrow moves the focused item.
+  'list.moveUp': { scope: 'list', chord: { key: 'ArrowUp', alt: true } },
+  'list.moveDown': { scope: 'list', chord: { key: 'ArrowDown', alt: true } },
+  'list.moveLeft': { scope: 'list', chord: { key: 'ArrowLeft', alt: true } },
+  'list.moveRight': { scope: 'list', chord: { key: 'ArrowRight', alt: true } },
+
+  'editor.suggest': { scope: 'editor', chord: { key: 'Space', ctrl: true } },
 
   'tree.open': { scope: 'tree', chord: { key: 'Return' } },
   'tree.copyName': { scope: 'tree', chord: { key: 'C', cmdOrCtrl: true } },

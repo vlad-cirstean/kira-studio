@@ -1,9 +1,9 @@
 import { type MaybeElementRef, unrefElement, useFocus } from '@vueuse/core';
 import { nextTick, onMounted } from 'vue';
 
-/** Scroll `el` into view, nearest edge: the one `scrollIntoView` recipe. */
-export function revealElement(el: Element): void {
-  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+/** Scroll `el` into view, nearest edge by default: the one `scrollIntoView` recipe. */
+export function revealElement(el: Element, opts: { block?: ScrollLogicalPosition } = {}): void {
+  el.scrollIntoView({ block: opts.block ?? 'nearest', inline: 'nearest' });
 }
 
 /** Focus `target` (an element or a component instance) as soon as it mounts. `select` also selects
