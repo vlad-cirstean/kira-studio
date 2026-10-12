@@ -15,6 +15,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const serverVersion = "1"
@@ -24,6 +25,18 @@ type storeInput struct {
 	Clarifications []memory.Clarification `json:"clarifications,omitempty"`
 	Session        string                 `json:"session,omitempty"`
 	Groups         []memory.GroupRef      `json:"groups,omitempty"`
+	// AsComment is the path or extension of the file a comment goes in; set means store nothing.
+	AsComment string `json:"asComment,omitempty"`
+}
+
+// storeOutput is store_memory's structured result: the stored outcomes, or with asComment the
+// prepared facts and their comment.
+type storeOutput struct {
+	Status     string                 `json:"status"` // "stored" | "challenged" | "prepared"
+	Challenges []memory.ItemChallenge `json:"challenges"`
+	Outcomes   []memory.FactOutcome   `json:"outcomes"`
+	Comment    string                 `json:"comment,omitempty"`
+	Prepared   []memory.PreparedFact  `json:"prepared,omitempty"`
 }
 
 type searchInput struct {
@@ -79,7 +92,7 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 		Description: llmprompts.MemoryToolStoreMemory.Text(src, llmprompts.NoVars{}),
 		InputSchema: storeSchema(src),
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: false},
-	}, recovering("store_memory", func(ctx context.Context, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
+	}, recovering("store_memory", func(ctx context.Context, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, storeOutput, error) {
 		return storeMemory(ctx, svc, opts, req, in)
 	}))
 	mcp.AddTool(srv, &mcp.Tool{
@@ -203,10 +216,14 @@ func requestFor(ctx context.Context, svc *memory.Service, opts Options, in store
 	return sr, nil
 }
 
-func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
+func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, storeOutput, error) {
+	marker, err := commentMarker(opts, in)
+	if err != nil {
+		return nil, storeOutput{}, err
+	}
 	sr, err := requestFor(ctx, svc, opts, in)
 	if err != nil {
-		return nil, memory.StoreResult{}, err
+		return nil, storeOutput{}, err
 	}
 	if token := req.Params.GetProgressToken(); token != nil && req.Session != nil {
 		step := 0.0
@@ -217,11 +234,51 @@ func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mc
 			})
 		}
 	}
+	if marker != nil {
+		return prepareMemory(ctx, svc, opts, sr, *marker)
+	}
 	res, err := svc.Store(ctx, sr)
 	if err != nil {
-		return nil, memory.StoreResult{}, err
+		return nil, storeOutput{}, err
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderStore(opts.Prompts, res)}}}, res, nil
+	out := storeOutput{Status: res.Status, Challenges: res.Challenges, Outcomes: res.Outcomes}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderStore(opts.Prompts, res)}}}, out, nil
+}
+
+// commentMarker resolves asComment to a comment syntax; nil when the call stores normally.
+func commentMarker(opts Options, in storeInput) (*memfmt.Marker, error) {
+	if in.AsComment == "" {
+		return nil, nil
+	}
+	bad := func(format string, a ...any) error {
+		return fmt.Errorf("%w: %s", memory.ErrInvalid, fmt.Sprintf(format, a...))
+	}
+	switch {
+	case opts.ImportRef != "":
+		return nil, bad("asComment is not available in import mode")
+	case len(in.Groups) > 0:
+		return nil, bad("asComment stores nothing, so groups are not allowed")
+	case memfmt.IsDocPath(in.AsComment):
+		return nil, bad("asComment writes code comments, not %s docs", in.AsComment)
+	}
+	markers, ok := memfmt.MarkersFor(in.AsComment)
+	if !ok {
+		return nil, bad("asComment %q has no known comment syntax; supported: %s", in.AsComment, strings.Join(memfmt.Supported(), ", "))
+	}
+	return &markers[0], nil
+}
+
+func prepareMemory(ctx context.Context, svc *memory.Service, opts Options, sr memory.StoreRequest, m memfmt.Marker) (*mcp.CallToolResult, storeOutput, error) {
+	res, err := svc.Prepare(ctx, sr, m)
+	if err != nil {
+		return nil, storeOutput{}, err
+	}
+	out := storeOutput{Status: res.Status, Challenges: res.Challenges, Outcomes: []memory.FactOutcome{}, Comment: res.Comment, Prepared: res.Facts}
+	text := llmprompts.MemoryStorePrepared.Text(opts.Prompts, llmprompts.NoVars{}) + "\n\n" + res.Comment
+	if res.Status == "challenged" {
+		text = renderStore(opts.Prompts, memory.StoreResult{Status: res.Status, Challenges: res.Challenges})
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, out, nil
 }
 
 func renderStore(src llmprompts.Source, res memory.StoreResult) string {
@@ -252,17 +309,8 @@ func renderStore(src llmprompts.Source, res memory.StoreResult) string {
 	return b.String()
 }
 
-// provenance renders origin and scope: "user project:github.com/acme/billing", "external:slack company".
-func provenance(m memory.Memory) string {
-	origin, scope := m.Origin, m.Scope
-	if m.SourceTag != nil {
-		origin += ":" + *m.SourceTag
-	}
-	if m.Project != nil {
-		scope += ":" + *m.Project
-	}
-	return origin + " " + scope
-}
+// oneLine folds whitespace runs to one space so a field stays on its own line.
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 func renderMemories(ms []memory.Memory) string {
 	if len(ms) == 0 {
@@ -275,15 +323,24 @@ func renderMemories(ms []memory.Memory) string {
 	return b.String()
 }
 
+// writeMemory prints the grep-first grammar shared with the comment and doc formats, plus a meta
+// line with the per-result provenance: "<id> fact: ...", "<id> reason: ...", "<id> meta: ...".
 func writeMemory(b *strings.Builder, m memory.Memory) {
-	flag := ""
+	meta := []string{fmt.Sprintf("v%d", m.Version), "origin=" + m.Origin}
+	if m.SourceTag != nil {
+		meta = append(meta, "source="+*m.SourceTag)
+	}
+	meta = append(meta, "scope="+m.Scope)
+	if m.Project != nil {
+		meta = append(meta, "project="+*m.Project)
+	}
+	if m.Match != "" {
+		meta = append(meta, "match="+m.Match)
+	}
 	if m.Historical {
-		flag = " [historical]"
+		meta = append(meta, "historical")
 	}
-	if m.Match == "semantic" {
-		flag += " [semantic]"
-	}
-	fmt.Fprintf(b, "- %s v%d %s: %s%s\n  reason: %s\n", m.LineageID, m.Version, provenance(m), m.Fact, flag, m.Reason)
+	fmt.Fprintf(b, "%s fact: %s\n%s reason: %s\n%s meta: %s\n\n", m.LineageID, oneLine(m.Fact), m.LineageID, oneLine(m.Reason), m.LineageID, strings.Join(meta, " "))
 }
 
 // renderContext lists the fact, then one block per group with the group's other facts.
@@ -294,14 +351,14 @@ func renderContext(c memory.Context) string {
 		b.WriteString("This fact belongs to no group.\n")
 	}
 	for _, g := range c.Groups {
-		fmt.Fprintf(&b, "group %s %s", g.Kind, g.Key)
+		fmt.Fprintf(&b, "group %s %s %s", g.ID, g.Kind, oneLine(g.Key))
 		if g.Title != "" {
-			fmt.Fprintf(&b, " (%s)", g.Title)
+			fmt.Fprintf(&b, " (%s)", oneLine(g.Title))
 		}
 		if g.Total > len(g.Facts) {
 			fmt.Fprintf(&b, " [%d of %d other facts]", len(g.Facts), g.Total)
 		}
-		b.WriteString("\n")
+		b.WriteString("\n\n")
 		for _, m := range g.Facts {
 			writeMemory(&b, m)
 		}
