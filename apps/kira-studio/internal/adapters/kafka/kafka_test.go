@@ -1026,8 +1026,8 @@ func TestKafka_Read_OversizedOffsetTokenIsRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
-		t.Errorf("code = %v, want E_QUERY", code)
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeContract {
+		t.Errorf("code = %v, want E_CONTRACT", code)
 	}
 	if ae, ok := err.(*adapters.Error); ok && !strings.Contains(ae.Message, "malformed page token") {
 		t.Errorf("message = %q, want to mention %q", ae.Message, "malformed page token")
