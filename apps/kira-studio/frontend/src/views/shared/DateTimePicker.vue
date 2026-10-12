@@ -11,8 +11,8 @@ import { computed, ref, watch } from 'vue';
 // removed the native tooltip (F9). Pure content, no trigger and no PopoverPanel of its own:
 // TimestampPane.vue owns the calendar button, the open/close state and the PopoverPanel wrapping
 // this — the same trigger/content split ColumnsMenu.vue's own consumer already uses.
-const props = defineProps<{ modelValue: Date; zone: 'local' | 'utc' }>();
-const emit = defineEmits<{ 'update:modelValue': [Date] }>();
+const props = defineProps<{ zone: 'local' | 'utc' }>();
+const model = defineModel<Date>({ required: true });
 
 interface Parts {
   y: number;
@@ -53,7 +53,7 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-const selected = computed(() => partsOf(props.modelValue));
+const selected = computed(() => partsOf(model.value));
 const today = computed(() => partsOf(new Date()));
 
 // P42 D33a: the label cycles three views of the same navigation, days -> months -> years,
@@ -193,11 +193,11 @@ const days = computed<DayCell[]>(() => {
 
 function pickDay(cell: DayCell): void {
   const p = selected.value;
-  emit('update:modelValue', buildDate(cell.year, cell.month, cell.day, p.h, p.mi, p.s));
+  model.value = buildDate(cell.year, cell.month, cell.day, p.h, p.mi, p.s);
 }
 
 function pickNow(): void {
-  emit('update:modelValue', new Date());
+  model.value = new Date();
 }
 
 const labelText = computed(() => {
@@ -230,7 +230,7 @@ const hourText = computed<string>({
     const n = Number(v);
     if (!Number.isFinite(n)) return;
     const p = selected.value;
-    emit('update:modelValue', buildDate(p.y, p.mo, p.day, clamp(n, 0, 23), p.mi, p.s));
+    model.value = buildDate(p.y, p.mo, p.day, clamp(n, 0, 23), p.mi, p.s);
   },
 });
 const minuteText = computed<string>({
@@ -239,7 +239,7 @@ const minuteText = computed<string>({
     const n = Number(v);
     if (!Number.isFinite(n)) return;
     const p = selected.value;
-    emit('update:modelValue', buildDate(p.y, p.mo, p.day, p.h, clamp(n, 0, 59), p.s));
+    model.value = buildDate(p.y, p.mo, p.day, p.h, clamp(n, 0, 59), p.s);
   },
 });
 const secondText = computed<string>({
@@ -248,7 +248,7 @@ const secondText = computed<string>({
     const n = Number(v);
     if (!Number.isFinite(n)) return;
     const p = selected.value;
-    emit('update:modelValue', buildDate(p.y, p.mo, p.day, p.h, p.mi, clamp(n, 0, 59)));
+    model.value = buildDate(p.y, p.mo, p.day, p.h, p.mi, clamp(n, 0, 59));
   },
 });
 </script>

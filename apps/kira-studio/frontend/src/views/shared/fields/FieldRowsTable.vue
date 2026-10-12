@@ -26,7 +26,6 @@ import type { VariableSupport } from '../../../api/state/variableCompletion';
 // optional checkbox column, and the always-disabled-on-the-trailing-row remove button.
 const props = withDefaults(
   defineProps<{
-    rows: T[];
     /** A fresh blank row — each wrapper's own row shape (headers default `enabled: true`, params
      *  carry no `enabled` at all), so this can't be derived generically. */
     blankRow: () => T;
@@ -72,7 +71,7 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{ 'update:rows': [rows: T[]] }>();
+const rows = defineModel<T[]>('rows', { required: true });
 
 // P28 D10: a frozen module-level constant, not an inline `[]` in the template — a fresh array
 // literal per render would change `candidates`' identity on every patch.
@@ -90,10 +89,10 @@ const gridTemplateColumns = computed(() => {
   return `${checkbox}1.2fr 2fr ${description}auto auto`;
 });
 
-// P16 D13/F11: `index` is the row's position in `props.rows` — i.e. its real write-through index
+// P16 D13/F11: `index` is the row's position in `rows.value` — i.e. its real write-through index
 // — carried alongside the row through filtering, never the position in `displayRows` (which a
 // filter can move). The trailing blank row is appended last and unconditionally, at
-// `index: props.rows.length`: it is the add affordance, not data, and hiding it under a filter
+// `index: rows.value.length`: it is the add affordance, not data, and hiding it under a filter
 // would make a filtered table un-appendable.
 interface DisplayEntry {
   row: T;
@@ -102,10 +101,10 @@ interface DisplayEntry {
 
 const displayRows = computed<DisplayEntry[]>(() => {
   const q = props.filterQuery ?? '';
-  const filtered = props.rows
+  const filtered = rows.value
     .map((row, index) => ({ row, index }))
     .filter(({ row }) => matchesQuery(row.name, q) || matchesQuery(row.value, q));
-  return [...filtered, { row: props.blankRow(), index: props.rows.length }];
+  return [...filtered, { row: props.blankRow(), index: rows.value.length }];
 });
 
 // P22b D2: composes with templateToken rather than replacing it — a bare position (outside any
@@ -132,24 +131,21 @@ function rowValueCandidates(
 }
 
 function updateField(index: number, field: 'name' | 'value' | 'description', value: string): void {
-  const next = [...props.rows];
+  const next = [...rows.value];
   if (index === next.length) next.push(props.blankRow());
   next[index] = { ...next[index], [field]: value };
-  emit('update:rows', next);
+  rows.value = next;
 }
 
 function toggleEnabled(index: number): void {
-  if (index >= props.rows.length) return;
-  const next = [...props.rows];
+  if (index >= rows.value.length) return;
+  const next = [...rows.value];
   next[index] = { ...next[index], enabled: !next[index].enabled };
-  emit('update:rows', next);
+  rows.value = next;
 }
 
 function removeRow(index: number): void {
-  emit(
-    'update:rows',
-    props.rows.filter((_, i) => i !== index),
-  );
+  rows.value = rows.value.filter((_, i) => i !== index);
 }
 
 // P22b D16: the trailing blank row IS the add affordance (displayRows' own comment above), so the
@@ -159,7 +155,7 @@ function removeRow(index: number): void {
 // a removal shrinking `rows.length` must leave the viewport alone.
 const containerRef = ref<HTMLElement | null>(null);
 watch(
-  () => props.rows.length,
+  () => rows.value.length,
   (next, prev) => {
     if (next <= prev) return;
     void nextTick(() => {

@@ -31,8 +31,8 @@ import {
 // `doc` (hand-typed in the main editor, Reset, a fresh cell) re-renders this pane — never a
 // one-shot commit. Stages nothing itself; staging is `.editor-body`'s existing focusout/
 // Ctrl+Enter rule, which this pane inherits by living inside it.
-const props = defineProps<{ doc: string; format: CellFormat; readonly?: boolean }>();
-const emit = defineEmits<{ 'update:doc': [string] }>();
+const props = defineProps<{ format: CellFormat; readonly?: boolean }>();
+const doc = defineModel<string>('doc', { required: true });
 
 const zone = ref<'local' | 'utc'>('local');
 function setZone(v: string): void {
@@ -52,8 +52,8 @@ const zoneOptions = computed(() => [
   },
 ]);
 
-const parsed = computed(() => parseTimestamp(props.format, props.doc));
-const reading = computed(() => describeTimestamp(props.format, props.doc));
+const parsed = computed(() => parseTimestamp(props.format, doc.value));
+const reading = computed(() => describeTimestamp(props.format, doc.value));
 
 function shapeOrDefault() {
   return (
@@ -74,18 +74,18 @@ function syncFieldFromDoc(): void {
   const next = p ? toEditableText(p.date, zone.value, p.shape.fractionDigits) : '';
   if (next !== fieldText.value) fieldText.value = next;
 }
-watch(() => [props.doc, props.format] as const, syncFieldFromDoc, { immediate: true });
+watch(() => [doc.value, props.format] as const, syncFieldFromDoc, { immediate: true });
 watch(zone, syncFieldFromDoc);
 
 function onFieldInput(text: string): void {
   fieldText.value = text;
   const date = fromEditableText(text, zone.value);
   if (!date) return; // incomplete/invalid mid-typing — wait for more input, emit nothing (D15)
-  emit('update:doc', encodeTimestamp(shapeOrDefault(), date));
+  doc.value = encodeTimestamp(shapeOrDefault(), date);
 }
 
 function onPick(date: Date): void {
-  emit('update:doc', encodeTimestamp(shapeOrDefault(), date));
+  doc.value = encodeTimestamp(shapeOrDefault(), date);
 }
 
 const calendarOpen = ref(false);

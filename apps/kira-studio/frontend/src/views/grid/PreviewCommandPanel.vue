@@ -6,6 +6,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -63,21 +64,18 @@ function close(): void {
 <template>
   <PopoverContent align="end" class="w-120 gap-0 p-0" data-testid="preview-command-panel">
     <div class="max-h-96 flex flex-col">
-      <div
-        class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground"
-      >
-        <span class="size-4 flex items-center justify-center shrink-0"
-          ><CodiconIcon name="code" :size="13" /></span
-        >
-        <span>{{ t('studio.grid.previewCommand.title') }}</span>
-        <TooltipIconButton
-          icon="close"
-          :label="t('common.action.close.label')"
-          class="ml-auto"
-          data-testid="preview-command-close"
-          @click="close"
-        />
-      </div>
+      <PanelHeader>
+        <template #start><CodiconIcon name="code" :size="13" /></template>
+        {{ t('studio.grid.previewCommand.title') }}
+        <template #actions>
+          <TooltipIconButton
+            icon="close"
+            :label="t('common.action.close.label')"
+            data-testid="preview-command-close"
+            @click="close"
+          />
+        </template>
+      </PanelHeader>
       <InlineState v-if="isLoading" kind="loading">{{
         t('common.state.loading.loading')
       }}</InlineState>

@@ -9,6 +9,7 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
@@ -51,20 +52,17 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="flex flex-col">
-    <div
-      class="flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground normal-case tracking-normal"
-    >
-      <span class="size-4 flex items-center justify-center shrink-0"
-        ><CodiconIcon name="add" :size="13" /></span
-      >
-      <span>{{ t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label') }}</span>
-      <TooltipIconButton
-        icon="close"
-        :label="t('common.action.close.label')"
-        class="ml-auto"
-        @click="emit('close')"
-      />
-    </div>
+    <PanelHeader>
+      <template #start><CodiconIcon name="add" :size="13" /></template>
+      {{ t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label') }}
+      <template #actions>
+        <TooltipIconButton
+          icon="close"
+          :label="t('common.action.close.label')"
+          @click="emit('close')"
+        />
+      </template>
+    </PanelHeader>
 
     <div class="flex flex-col gap-1.5 p-2">
       <Label v-if="isKafka" class="flex flex-col gap-0.5">

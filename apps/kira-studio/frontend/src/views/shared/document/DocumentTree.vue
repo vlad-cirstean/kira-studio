@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { t } from '@theme/i18n';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { wheelToHorizontal } from '@workbench/lib/wheelScroll';
 import { computed, ref } from 'vue';
 import { useDocumentRowsStore } from './rows';
@@ -9,7 +8,7 @@ import { useDocumentRowsStore } from './rows';
 // (P27 D19) — no CodeMirror, no per-node component recursion, so the DOM cost here is linear in
 // what is actually on screen rather than in the document's total node count.
 const props = defineProps<{ tabId: string; row: number }>();
-const emit = defineEmits<{ 'toggle-path': [path: string] }>();
+const emit = defineEmits<{ togglePath: [path: string] }>();
 
 const documentRowsStore = useDocumentRowsStore();
 
@@ -60,16 +59,13 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
       :data-path="line.node.path"
       :data-depth="line.depth"
     >
-      <button
+      <TreeTwisty
         v-if="line.expandable"
-        type="button"
-        class="flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground"
-        data-testid="document-tree-twisty"
-        :aria-label="t(line.expanded ? 'common.action.collapse.label' : 'common.action.expand.label')"
-        @click="emit('toggle-path', line.node.path)"
-      >
-        <CodiconIcon :name="line.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
-      </button>
+        :expanded="line.expanded"
+        has-children
+        testid="document-tree-twisty"
+        @toggle="emit('togglePath', line.node.path)"
+      />
       <span v-else class="shrink-0 w-3.5"></span>
       <span v-if="line.node.key !== ''" class="shrink-0 text-syntax-property"
         >{{ line.node.key }}:</span

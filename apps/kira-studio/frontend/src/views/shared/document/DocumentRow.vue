@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import type { DocumentRowView } from './rows';
 
 // P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
@@ -48,7 +48,7 @@ function onHeadKeydown(e: KeyboardEvent): void {
   >
     <div
       class="doc-head"
-      :class="cn(rowVariants({ layout: 'tree', selected: expanded }), 'shrink-0 cursor-pointer gap-1.5 px-2', selected && 'shadow-[inset_2px_0_0_var(--primary)]')"
+      :class="cn(rowVariants({ layout: 'tree', selected: expanded }), 'shrink-0 gap-1.5 px-2', selected && 'shadow-[inset_2px_0_0_var(--primary)]')"
       role="option"
       v-bind="navProps"
       :tabindex="navProps?.tabindex ?? 0"
@@ -56,17 +56,14 @@ function onHeadKeydown(e: KeyboardEvent): void {
       @click="$emit('select')"
       @keydown="onHeadKeydown"
     >
-      <button
-        type="button"
-        class="flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground"
-        data-testid="document-toggle-expand"
-        :aria-label="t(expanded ? 'common.action.collapse.label' : 'common.action.expand.label')"
-        @click.stop="$emit('toggle')"
-      >
-        <CodiconIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-      </button>
+      <TreeTwisty
+        :expanded="expanded"
+        has-children
+        testid="document-toggle-expand"
+        @toggle="$emit('toggle')"
+      />
       <span
-        class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-data"
+        class="shrink-0 max-w-56 truncate text-fg text-kira-md font-data"
         data-testid="document-id"
         >{{
           view.idLabel
