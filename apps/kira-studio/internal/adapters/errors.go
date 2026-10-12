@@ -8,6 +8,9 @@ import (
 	"strings"
 	"syscall"
 	"unicode"
+
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // ErrorCode is the Go analogue of errors.ts's AdapterErrorCode — a closed set, verbatim from
@@ -17,14 +20,16 @@ import (
 type ErrorCode string
 
 const (
-	CodeConnect     ErrorCode = "E_CONNECT"
-	CodeAuth        ErrorCode = "E_AUTH"
-	CodeCancelled   ErrorCode = "E_CANCELLED"
-	CodeTimeout     ErrorCode = "E_TIMEOUT"
-	CodeNotFound    ErrorCode = "E_NOT_FOUND"
-	CodeQuery       ErrorCode = "E_QUERY"
-	CodeUnsupported ErrorCode = "E_UNSUPPORTED"
-	CodeEngineDown  ErrorCode = "E_ENGINE_DOWN"
+	CodeConnect     = ErrorCode(ipcerr.CodeConnect)
+	CodeAuth        = ErrorCode(ipcerr.CodeAuth)
+	CodeCancelled   = ErrorCode(ipcerr.CodeCancelled)
+	CodeTimeout     = ErrorCode(ipcerr.CodeTimeout)
+	CodeNotFound    = ErrorCode(ipcerr.CodeNotFound)
+	CodeQuery       = ErrorCode(ipcerr.CodeQuery)
+	CodeUnsupported = ErrorCode(ipcerr.CodeUnsupported)
+	CodeEngineDown  = ErrorCode(ipcerr.CodeEngineDown)
+	CodeInternal    = ErrorCode(ipcerr.CodeInternal)
+	CodeContract    = ErrorCode(ipcerr.CodeContract)
 )
 
 // Error is the Go analogue of errors.ts's AdapterError (named Error, not AdapterError, per A1 —
@@ -42,6 +47,17 @@ func (e *Error) Unwrap() error { return e.Cause }
 // New constructs an *Error. cause may be nil.
 func New(code ErrorCode, message string, cause error) *Error {
 	return &Error{Code: code, Message: message, Cause: cause}
+}
+
+// T builds an Error whose message is catalog text for key. cause may be nil.
+func T(code ErrorCode, key string, params map[string]string, cause error) *Error {
+	return New(code, i18n.T(key, params), cause)
+}
+
+// Contract reports a Kira bug (an invariant the UI or the adapter itself must uphold). The text is
+// English developer text; the UI wraps it in common.error.contract.body. cause may be nil.
+func Contract(message string, cause error) *Error {
+	return New(CodeContract, message, cause)
 }
 
 // CodeOf reports the ErrorCode of err via errors.As, for the dispatcher and the router to branch

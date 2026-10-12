@@ -71,7 +71,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			r.deps.Log("error", fmt.Sprintf("data frame panic: %v\n%s", rec, debug.Stack()))
-			r.respondError(session, probe.ID, adapters.New(adapters.ErrorCode("E_INTERNAL"), fmt.Sprintf("internal error: %v", rec), nil))
+			r.respondError(session, probe.ID, adapters.Contract(fmt.Sprintf("internal error: %v", rec), nil))
 		}
 	}()
 
@@ -238,18 +238,18 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 	// doesn't cover (or underestimates).
 	if oversizedPagePayload(payload) {
 		r.deps.Log("error", "response frame exceeds the size limit, substituting an error response")
-		r.respondError(session, id, adapters.New(adapters.CodeQuery, "the response was too large to return", nil))
+		r.respondError(session, id, adapters.T(adapters.CodeQuery, "backend.studio.adapter.responseTooLarge.body", nil, nil))
 		return
 	}
 	body, encErr := encodeResponse(id, payload)
 	if encErr != nil {
 		r.deps.Log("error", "failed to encode a response frame: "+encErr.Error())
-		r.respondError(session, id, adapters.New(adapters.ErrorCode("E_INTERNAL"), "failed to encode the response", nil))
+		r.respondError(session, id, adapters.Contract("failed to encode the response", nil))
 		return
 	}
 	if len(body) > maxResponsePayloadBytes {
 		r.deps.Log("error", "response frame exceeds the size limit, substituting an error response")
-		r.respondError(session, id, adapters.New(adapters.CodeQuery, "the response was too large to return", nil))
+		r.respondError(session, id, adapters.T(adapters.CodeQuery, "backend.studio.adapter.responseTooLarge.body", nil, nil))
 		return
 	}
 	session.enqueueResponse(body)
@@ -301,7 +301,7 @@ func (r *Router) respondError(session *Session, id int, err error) {
 func (r *Router) respondCacheStats(session *Session, id int) {
 	body, err := encodeResponse(id, r.cache.Stats())
 	if err != nil {
-		r.respondError(session, id, adapters.New(adapters.ErrorCode("E_INTERNAL"), "failed to encode the response", nil))
+		r.respondError(session, id, adapters.Contract("failed to encode the response", nil))
 		return
 	}
 	session.enqueueResponse(body)

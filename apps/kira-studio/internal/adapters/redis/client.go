@@ -44,7 +44,7 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
 		u, err := url.Parse(*cfg.URI)
 		if err != nil {
-			return connectFields{}, 0, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
+			return connectFields{}, 0, adapters.T(adapters.CodeConnect, "backend.studio.adapter.uriParseFailed.body", nil, err)
 		}
 		uriWantsTLS = u.Scheme == "rediss"
 		host = u.Hostname()

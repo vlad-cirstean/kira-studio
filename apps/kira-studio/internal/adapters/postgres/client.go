@@ -198,7 +198,7 @@ func verifyChainSkipHostname(rawCerts [][]byte, roots *x509.CertPool) error {
 		chain = append(chain, cert)
 	}
 	if len(chain) == 0 {
-		return adapters.New(adapters.CodeConnect, "postgres: server presented no certificate", nil)
+		return adapters.T(adapters.CodeConnect, "backend.studio.adapter.serverCertificateMissing.body", nil, nil)
 	}
 	opts := x509.VerifyOptions{Roots: roots, Intermediates: x509.NewCertPool()}
 	for _, cert := range chain[1:] {

@@ -226,7 +226,7 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 	if _, err := conn.Exec(cleanupCtx, "SET default_transaction_read_only = on"); err != nil {
 		return mapError(err)
 	}
-	return adapters.New(adapters.CodeUnsupported, "connection is read-only", nil)
+	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 }
 
 // execute is console.ts's execute. readOnly closes the gap client.go's own
@@ -239,7 +239,7 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 // AssertNoTransactionEscalation rejects outright before anything runs.
 func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 	if readOnly {
 		if err := adapters.AssertNoTransactionEscalation(statements, adapters.PostgresDialect); err != nil {

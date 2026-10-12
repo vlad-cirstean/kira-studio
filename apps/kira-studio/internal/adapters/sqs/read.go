@@ -131,12 +131,10 @@ func (r *receiptHandles) forDelete(messageID string) (string, error) {
 	defer r.mu.Unlock()
 	e, ok := r.entries[messageID]
 	if !ok {
-		return "", adapters.New(adapters.CodeQuery,
-			"this message was not received in the current session (its receipt handle is gone) — poll again before deleting", nil)
+		return "", adapters.T(adapters.CodeQuery, "backend.studio.adapter.sqsReceiptGone.body", nil, nil)
 	}
 	if time.Since(e.receivedAt) >= e.visibilityTimeout {
-		return "", adapters.New(adapters.CodeQuery,
-			"this message's receipt handle may have expired (past its visibility timeout) — poll again before deleting", nil)
+		return "", adapters.T(adapters.CodeQuery, "backend.studio.adapter.sqsReceiptExpired.body", nil, nil)
 	}
 	return e.handle, nil
 }
@@ -264,17 +262,17 @@ func parseStreamFilter(raw *string) (int, error) {
 	dec := json.NewDecoder(strings.NewReader(*raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&f); err != nil {
-		return 0, adapters.New(adapters.CodeQuery, "malformed stream filter", err)
+		return 0, adapters.Contract("malformed stream filter", err)
 	}
 	if dec.More() {
-		return 0, adapters.New(adapters.CodeQuery, "malformed stream filter", nil)
+		return 0, adapters.Contract("malformed stream filter", nil)
 	}
 	if f.VisibilityTimeoutSeconds == nil {
 		return defaultBrowseVisibilityTimeout, nil
 	}
 	n := *f.VisibilityTimeoutSeconds
 	if n < minBrowseVisibilityTimeout || n > maxVisibilityTimeout {
-		return 0, adapters.New(adapters.CodeQuery, "visibility timeout must be a whole number of seconds from 1 to 43200", nil)
+		return 0, adapters.T(adapters.CodeQuery, "backend.studio.adapter.sqsVisibilityTimeout.body", nil, nil)
 	}
 	return n, nil
 }

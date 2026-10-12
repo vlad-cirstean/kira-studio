@@ -1242,6 +1242,80 @@
       }
     },
     "studio": {
+      "adapter": {
+        "cancelledBeforeStart": {
+          "body": "The operation was cancelled before it started."
+        },
+        "cancelledWaitingForRateLimit": {
+          "body": "The operation was cancelled while waiting for the connection’s rate limit."
+        },
+        "closingQuoteFollow": {
+          "body": "A closing quote must be followed by a space or the end of the line."
+        },
+        "databaseFileMissing": {
+          "body": "No database file path was given."
+        },
+        "databasePathCharacters": {
+          "body": "The database file path must not contain “?”, “#” or “%”."
+        },
+        "multipleStatements": {
+          "body": "Multiple statements aren’t supported in a single statement."
+        },
+        "noStatements": {
+          "body": "There are no statements to run."
+        },
+        "notConnected": {
+          "body": "This connection isn’t open."
+        },
+        "quotedStringUnterminated": {
+          "body": "Unterminated quoted string."
+        },
+        "readOnly": {
+          "body": "This connection is read-only."
+        },
+        "redisBlockTimeout": {
+          "body": "{command} needs a finite block timeout of at most {seconds} seconds."
+        },
+        "redisClientReply": {
+          "body": "{command} changes this connection’s reply mode for every later command sharing it. It isn’t supported in the console."
+        },
+        "redisCursorForwardOnly": {
+          "body": "Redis cursor pagination is forward-only. There is no previous page."
+        },
+        "redisListOffsetOnly": {
+          "body": "Redis list pagination supports offset paging only."
+        },
+        "redisSelect": {
+          "body": "{command} isn’t supported in the console. Use the database selector instead."
+        },
+        "redisSharedState": {
+          "body": "{command} changes state shared by every later command on this connection. It isn’t supported in the console."
+        },
+        "redisStreamForwardOnly": {
+          "body": "Redis stream pagination is forward-only. There is no previous page."
+        },
+        "responseTooLarge": {
+          "body": "The response was too large to return."
+        },
+        "serverCertificateMissing": {
+          "body": "The server presented no certificate."
+        },
+        "sqsNoUpdate": {
+          "body": "SQS has no update operation. Delete the message and send it again instead."
+        },
+        "sqsReceiptExpired": {
+          "body": "This message’s receipt handle may have expired (past its visibility timeout). Poll again before deleting."
+        },
+        "sqsReceiptGone": {
+          "body": "This message wasn’t received in the current session, so its receipt handle is gone. Poll again before deleting."
+        },
+        "sqsVisibilityTimeout": {
+          "body": "The visibility timeout must be a whole number of seconds from 1 to 43200."
+        },
+        "uriParseFailed": {
+          "body": "Couldn’t parse the connection URI."
+        }
+      },
       "collection": {
         "finishWriteFailed": {
           "error": "Couldn’t finish writing {path}: {detail}"

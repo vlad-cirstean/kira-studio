@@ -121,7 +121,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}
 	if !found {
 		_ = a.Disconnect(context.Background())
-		return adapters.ConnectInfo{}, adapters.New(adapters.CodeConnect, "connect probe returned no rows", nil)
+		return adapters.ConnectInfo{}, adapters.Contract("connect probe returned no rows", nil)
 	}
 
 	// D6: read-only pragma reads for the connection tooltip — never written by this adapter.
@@ -208,7 +208,7 @@ func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(cont
 	var zero T
 	db := a.state.Load().db
 	if db == nil || !a.beginOp() {
-		return zero, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
+		return zero, adapters.T(adapters.CodeConnect, "backend.studio.adapter.notConnected.body", nil, nil)
 	}
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -232,7 +232,7 @@ func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(cont
 		cancel()
 		_ = conn.Close()
 		a.inFlight.Done()
-		return zero, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
+		return zero, adapters.T(adapters.CodeConnect, "backend.studio.adapter.notConnected.body", nil, nil)
 	}
 	if a.runningByOp == nil {
 		a.runningByOp = make(map[string]context.CancelFunc)
@@ -303,7 +303,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 			return adapters.LeafChildren(objectSegment.Kind, leafObjectKinds)
 		}
 
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
+		return adapters.TreeChildren{}, adapters.Contract("unrecognized path depth", nil)
 	})
 }
 

@@ -138,7 +138,7 @@ func assertSingleStatement(sqlText string) error {
 	remainder = commentBlock.ReplaceAllString(remainder, "")
 	remainder = whitespaceOrSemicolon.ReplaceAllString(remainder, "")
 	if remainder != "" {
-		return adapters.New(adapters.CodeQuery, "multiple statements are not supported in a single statement", nil)
+		return adapters.T(adapters.CodeQuery, "backend.studio.adapter.multipleStatements.body", nil, nil)
 	}
 	return nil
 }

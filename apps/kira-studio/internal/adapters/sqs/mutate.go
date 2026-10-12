@@ -91,7 +91,7 @@ func renderOpText(op model.MutationRowOp, queueName string) (string, error) {
 	case "delete":
 		return "DeleteMessage(" + queueName + ")", nil
 	default: // update — a delivered message can't be edited in place, only replaced by delete+resend.
-		return "", adapters.New(adapters.CodeUnsupported, "sqs has no update operation — delete and resend instead", nil)
+		return "", adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.sqsNoUpdate.body", nil, nil)
 	}
 }
 
@@ -149,7 +149,7 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 				return 0, adapters.New(adapters.CodeQuery, "a delete requires the message's "+idField, nil)
 			}
 			if handles == nil {
-				return 0, adapters.New(adapters.CodeConnect, "not connected", nil)
+				return 0, adapters.T(adapters.CodeConnect, "backend.studio.adapter.notConnected.body", nil, nil)
 			}
 			// F10: forDelete refuses a stale receipt handle outright (past its own visibility
 			// timeout) rather than letting AWS silently accept it and report a false success.
@@ -165,7 +165,7 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 			return 1, nil
 
 		default:
-			return 0, adapters.New(adapters.CodeUnsupported, "sqs has no update operation — delete and resend instead", nil)
+			return 0, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.sqsNoUpdate.body", nil, nil)
 		}
 	})
 }

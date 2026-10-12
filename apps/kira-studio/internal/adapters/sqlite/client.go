@@ -25,11 +25,11 @@ func resolveFilePath(cfg model.ResolvedConnectionConfig) (string, error) {
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
 		u, err := url.Parse(*cfg.URI)
 		if err != nil {
-			return "", adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
+			return "", adapters.T(adapters.CodeConnect, "backend.studio.adapter.uriParseFailed.body", nil, err)
 		}
 		path := strings.TrimPrefix(u.Path, "/")
 		if path == "" {
-			return "", adapters.New(adapters.CodeConnect, "could not parse the connection URI", nil)
+			return "", adapters.T(adapters.CodeConnect, "backend.studio.adapter.uriParseFailed.body", nil, nil)
 		}
 		if err := rejectDSNMetacharacters(path); err != nil {
 			return "", err
@@ -41,7 +41,7 @@ func resolveFilePath(cfg model.ResolvedConnectionConfig) (string, error) {
 		path = strings.TrimSpace(*cfg.Database)
 	}
 	if path == "" {
-		return "", adapters.New(adapters.CodeConnect, "no database file path was given", nil)
+		return "", adapters.T(adapters.CodeConnect, "backend.studio.adapter.databaseFileMissing.body", nil, nil)
 	}
 	if err := rejectDSNMetacharacters(path); err != nil {
 		return "", err
@@ -68,7 +68,7 @@ func resolveFilePath(cfg model.ResolvedConnectionConfig) (string, error) {
 // literal byte.
 func rejectDSNMetacharacters(path string) error {
 	if strings.ContainsAny(path, "?#%") {
-		return adapters.New(adapters.CodeConnect, "the database file path must not contain \"?\", \"#\" or \"%\"", nil)
+		return adapters.T(adapters.CodeConnect, "backend.studio.adapter.databasePathCharacters.body", nil, nil)
 	}
 	return nil
 }

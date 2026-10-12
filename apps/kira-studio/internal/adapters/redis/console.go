@@ -81,12 +81,11 @@ func scanQuotedToken(runes []rune, i int) (string, int, error) {
 		i++
 	}
 	if i >= n {
-		return "", i, adapters.New(adapters.CodeQuery, "unterminated quoted string", nil)
+		return "", i, adapters.T(adapters.CodeQuery, "backend.studio.adapter.quotedStringUnterminated.body", nil, nil)
 	}
 	i++ // closing quote
 	if i < n && !unicode.IsSpace(runes[i]) {
-		return "", i, adapters.New(adapters.CodeQuery,
-			"a closing quote must be followed by a space or the end of the line", nil)
+		return "", i, adapters.T(adapters.CodeQuery, "backend.studio.adapter.closingQuoteFollow.body", nil, nil)
 	}
 	return out.String(), i, nil
 }
@@ -330,18 +329,15 @@ var deniedConsoleCommands = map[string]bool{
 func rejectConnectionStateCommand(command string, args []string) error {
 	upper := strings.ToUpper(command)
 	if upper == "CLIENT" && len(args) > 0 && strings.EqualFold(args[0], "REPLY") {
-		return adapters.New(adapters.CodeUnsupported,
-			"CLIENT REPLY changes this connection's reply mode for every later command sharing it; not supported in the console", nil)
+		return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.redisClientReply.body", map[string]string{"command": "CLIENT REPLY"}, nil)
 	}
 	if !deniedConsoleCommands[upper] {
 		return nil
 	}
 	if upper == "SELECT" {
-		return adapters.New(adapters.CodeUnsupported,
-			"SELECT is not supported in the console; use the app's own database selector instead", nil)
+		return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.redisSelect.body", map[string]string{"command": "SELECT"}, nil)
 	}
-	return adapters.New(adapters.CodeUnsupported,
-		upper+" changes state shared by every later command on this connection; not supported in the console", nil)
+	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.redisSharedState.body", map[string]string{"command": upper}, nil)
 }
 
 // consoleCommand is one already-parsed, already-validated console line (F11): execute below parses
@@ -416,8 +412,7 @@ func consoleReadTimeoutFor(command string, args []string) (time.Duration, error)
 		return consoleReadTimeout, nil
 	}
 	if d == 0 || d > maxBlockSeconds*time.Second {
-		return 0, adapters.New(adapters.CodeQuery,
-			fmt.Sprintf("%s: use a finite block timeout of at most %d seconds", strings.ToUpper(command), maxBlockSeconds), nil)
+		return 0, adapters.T(adapters.CodeQuery, "backend.studio.adapter.redisBlockTimeout.body", map[string]string{"command": strings.ToUpper(command), "seconds": fmt.Sprint(maxBlockSeconds)}, nil)
 	}
 	return d + blockMargin, nil
 }
@@ -454,7 +449,7 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 		}
 	}
 	if len(lines) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 	op.SetCommand(strings.Join(lines, "\n"))
 
@@ -487,7 +482,7 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 		commands = append(commands, consoleCommand{line: line, command: command, args: args, readTimeout: readTimeout})
 	}
 	if len(commands) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 
 	pages := make([]page.Page, 0, len(commands))

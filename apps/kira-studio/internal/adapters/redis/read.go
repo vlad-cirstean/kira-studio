@@ -93,17 +93,17 @@ func decodeScanCursor(req readReq, pairSize int, fingerprint string) (cursor uin
 		wantFields = 2
 	}
 	if len(keyValues) != wantFields {
-		return 0, 0, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+		return 0, 0, adapters.Contract("malformed page token", nil)
 	}
 	parsed, err := strconv.ParseUint(keyValues[0], 10, 64)
 	if err != nil {
-		return 0, 0, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+		return 0, 0, adapters.Contract("malformed page token", nil)
 	}
 	cursor = parsed
 	if pairSize == 1 {
 		offset, err := strconv.Atoi(keyValues[1])
 		if err != nil {
-			return 0, 0, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+			return 0, 0, adapters.Contract("malformed page token", nil)
 		}
 		rowOffset = offset
 	}
@@ -141,8 +141,7 @@ func scanFamilyRound(ctx context.Context, scanOnce scanRoundFn, cursor uint64, p
 // counter: without it every page's index restarted at 0, relabelling page 2's rows over page 1's.
 func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, redisType string, meta keyMeta, req readReq, fingerprint string) (page.KeyValuePage, error) {
 	if req.Cursor.Mode == "before" {
-		return page.KeyValuePage{}, adapters.New(adapters.CodeUnsupported,
-			"redis cursor pagination is forward-only; there is no previous page", nil)
+		return page.KeyValuePage{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.redisCursorForwardOnly.body", nil, nil)
 	}
 	cursor, rowOffset, err := decodeScanCursor(req, pairSize, fingerprint)
 	if err != nil {
@@ -215,7 +214,7 @@ func readZSet(ctx context.Context, conn *goredis.Client, key string, meta keyMet
 // requested page size in full (P43 iter2 D25/F18 — no LIST_WINDOW clamp).
 func readList(ctx context.Context, conn *goredis.Client, key string, meta keyMeta, req readReq) (page.KeyValuePage, error) {
 	if req.Cursor.Mode != "offset" {
-		return page.KeyValuePage{}, adapters.New(adapters.CodeUnsupported, "redis list pagination only supports offset paging", nil)
+		return page.KeyValuePage{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.redisListOffsetOnly.body", nil, nil)
 	}
 	offset := req.Cursor.Offset
 	elements, err := conn.LRange(ctx, key, int64(offset), int64(offset+req.PageSize-1)).Result()
@@ -271,25 +270,25 @@ func (f streamFields) MarshalJSON() ([]byte, error) {
 func parseStreamEntry(raw any) (id string, fields streamFields, err error) {
 	tuple, ok := raw.([]interface{})
 	if !ok || len(tuple) != 2 {
-		return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: expected a 2-element entry tuple", nil)
+		return "", nil, adapters.Contract("malformed XRANGE reply: expected a 2-element entry tuple", nil)
 	}
 	id, ok = tuple[0].(string)
 	if !ok {
-		return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: entry id is not a string", nil)
+		return "", nil, adapters.Contract("malformed XRANGE reply: entry id is not a string", nil)
 	}
 	if tuple[1] == nil {
 		return id, streamFields{}, nil
 	}
 	rawFields, ok := tuple[1].([]interface{})
 	if !ok {
-		return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: entry fields are not an array", nil)
+		return "", nil, adapters.Contract("malformed XRANGE reply: entry fields are not an array", nil)
 	}
 	fields = make(streamFields, 0, len(rawFields)/2)
 	for i := 0; i+1 < len(rawFields); i += 2 {
 		field, fok := rawFields[i].(string)
 		value, vok := rawFields[i+1].(string)
 		if !fok || !vok {
-			return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: field/value is not a string", nil)
+			return "", nil, adapters.Contract("malformed XRANGE reply: field/value is not a string", nil)
 		}
 		fields = append(fields, streamFieldValue{Field: field, Value: value})
 	}
@@ -301,8 +300,7 @@ func parseStreamEntry(raw any) (id string, fields streamFields, err error) {
 // streamFields above).
 func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyMeta, req readReq, fingerprint string) (page.KeyValuePage, error) {
 	if req.Cursor.Mode == "before" {
-		return page.KeyValuePage{}, adapters.New(adapters.CodeUnsupported,
-			"redis stream pagination is forward-only; there is no previous page", nil)
+		return page.KeyValuePage{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.redisStreamForwardOnly.body", nil, nil)
 	}
 	startID := "-"
 	if req.Cursor.Mode == "after" {
@@ -311,7 +309,7 @@ func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyM
 			return page.KeyValuePage{}, err
 		}
 		if len(keyValues) != 1 {
-			return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+			return page.KeyValuePage{}, adapters.Contract("malformed page token", nil)
 		}
 		startID = "(" + keyValues[0] // exclusive lower bound, per XRANGE syntax
 	}
@@ -326,7 +324,7 @@ func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyM
 	}
 	entries, ok := raw.([]interface{})
 	if !ok {
-		return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: expected an array", nil)
+		return page.KeyValuePage{}, adapters.Contract("malformed XRANGE reply: expected an array", nil)
 	}
 
 	probedExtra := len(entries) > req.PageSize

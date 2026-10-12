@@ -129,7 +129,7 @@ func TestTokenize_UnterminatedQuoteIsError(t *testing.T) {
 	if code != adapters.CodeQuery {
 		t.Errorf("code = %v, want E_QUERY", code)
 	}
-	if err.Error() != "unterminated quoted string" {
+	if err.Error() != "Unterminated quoted string." {
 		t.Errorf("message = %q, want the verbatim adapter message", err.Error())
 	}
 }

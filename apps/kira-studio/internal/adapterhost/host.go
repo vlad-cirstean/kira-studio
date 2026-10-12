@@ -218,7 +218,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 		delete(h.earlyCancels, opID)
 		if time.Now().Before(expiry) {
 			h.mu.Unlock()
-			return "", nil, adapters.New(adapters.CodeCancelled, "operation was cancelled before it started", nil)
+			return "", nil, adapters.T(adapters.CodeCancelled, "backend.studio.adapter.cancelledBeforeStart.body", nil, nil)
 		}
 	}
 	derived, cancel := context.WithCancel(ctx)
@@ -244,7 +244,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 			waitCancel()
 			if waitErr != nil {
 				if derived.Err() == context.Canceled {
-					return "", nil, adapters.New(adapters.CodeCancelled, "operation was cancelled while waiting for the connection's rate limit", waitErr)
+					return "", nil, adapters.T(adapters.CodeCancelled, "backend.studio.adapter.cancelledWaitingForRateLimit.body", nil, waitErr)
 				}
 				msg := fmt.Sprintf("timed out after %s waiting for the connection's rate limit (%.4g/s)", throttleMaxWait, float64(limiter.Limit()))
 				return "", nil, adapters.New(adapters.CodeTimeout, msg, waitErr)
@@ -328,7 +328,7 @@ func (h *Host) safeRun(ctx context.Context, op *adapters.OpCtx, fn func(context.
 				err = adapterErr
 				return
 			}
-			err = adapters.New(adapters.ErrorCode("E_INTERNAL"), fmt.Sprintf("internal error: %v", r), nil)
+			err = adapters.Contract(fmt.Sprintf("internal error: %v", r), nil)
 		}
 	}()
 	return fn(ctx, op)

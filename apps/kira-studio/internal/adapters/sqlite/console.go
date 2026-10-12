@@ -97,7 +97,7 @@ func runOneStatement(ctx context.Context, conn *sql.Conn, sqlText string, limit 
 // execute is console.ts's own execute.
 func execute(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 	// One op-log row for the whole batch (P5 D9's precedent), not one per statement.
 	op.SetCommand(adapters.JoinConsoleStatements(statements, "--"))

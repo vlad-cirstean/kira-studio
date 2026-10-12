@@ -233,7 +233,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 		return model.MutationResult{}, err
 	}
 	if len(plan.Path.Segments) == 0 || plan.Path.Segments[0].Kind != "database" {
-		return model.MutationResult{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind", nil)
+		return model.MutationResult{}, adapters.Contract("unexpected root path segment kind", nil)
 	}
 	dbIndex, err := dbIndexFromName(plan.Path.Segments[0].Name)
 	if err != nil {
