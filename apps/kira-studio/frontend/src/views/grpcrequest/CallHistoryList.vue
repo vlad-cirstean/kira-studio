@@ -5,15 +5,16 @@ import {
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpcHistory';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
@@ -117,7 +118,7 @@ async function onClear(): Promise<void> {
         data-testid="grpc-history-clear"
         @click="onClear"
       >
-        <CodiconIcon name="trash" :size="13" />
+        <CodiconIcon :name="ICON.delete" :size="13" />
         {{ t('common.action.clearHistory.label') }}
       </Button>
     </ViewToolbar>
@@ -125,20 +126,11 @@ async function onClear(): Promise<void> {
     <Alert v-if="errorMessage" variant="error">
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
-    <Empty v-else-if="entries.length === 0">
-      <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ incognito ? t('studio.grpc.history.incognito.empty') : t('studio.grpc.history.empty') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else-if="entries.length === 0" :icon="ICON.history" :title="incognito ? t('studio.grpc.history.incognito.empty') : t('studio.grpc.history.empty')" />
 
     <template v-else>
       <SearchField v-model="filterQuery" :placeholder="t('studio.common.filterHistory.placeholder')" data-testid="grpc-history-filter" />
-      <Empty
-        v-if="isFiltered && filteredEntries.length === 0"
-        data-testid="grpc-history-filter-empty"
-      >
-        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
-      </Empty>
+      <EmptyState v-if="isFiltered && filteredEntries.length === 0" data-testid="grpc-history-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
     </template>
 
     <div
@@ -175,7 +167,7 @@ async function onClear(): Promise<void> {
         </Tooltip>
         <span class="ml-auto" />
         <TooltipIconButton
-          icon="trash"
+          :icon="ICON.delete"
           :label="t('common.action.delete.label')"
           data-testid="grpc-history-delete"
           @click.stop="onDelete(entry.id)"

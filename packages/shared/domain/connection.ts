@@ -84,7 +84,7 @@ export type ConnectionColor = PaletteColor;
  *  lightness/chroma (`oklch(0.72 0.09 h)`) — roughly double the full eleven-hue ring's own worst
  *  gap (25.6°, blue↔indigo), which is what makes a 2px tab rail or a 5px status dot legible at
  *  all. Retired from the picker: `orange`, `olive`, `teal`, `indigo`, `violet`. */
-export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = PALETTE_COLOR_CHOICES;
+export const CONNECTION_COLOR_CHOICES = PALETTE_COLOR_CHOICES;
 
 export const connectionModeSchema = /*#__PURE__*/ z.enum(['fields', 'uri']);
 export type ConnectionMode = z.infer<typeof connectionModeSchema>;

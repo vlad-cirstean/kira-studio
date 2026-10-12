@@ -8,6 +8,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { useEventListener } from '@vueuse/core';
 import { revealElement } from '@workbench/behaviour/focus';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -375,7 +376,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
         <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
       </div>
       <TooltipIconButton
-        icon="close"
+        :icon="ICON.close"
         :label="t('common.action.remove.label')"
         :data-testid="`${testidPrefix}-remove`"
         :disabled-trigger="entry.index >= rows.length"

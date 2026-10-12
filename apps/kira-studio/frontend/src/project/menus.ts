@@ -1,7 +1,9 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { AWS_STYLE_KINDS, CONNECTION_COLOR_CHOICES, FILE_KINDS } from '@shared/domain/connection';
 import { formatConnectionUri } from '@shared/domain/uri';
+import { colourLabel } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -131,14 +133,14 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'refresh',
       label: t('common.action.refresh.label'),
-      icon: 'refresh',
+      icon: ICON.refresh,
       run: () => useTreeStore().refreshConnection(row.connectionId),
     },
     {
       type: 'item',
       id: 'edit',
       label: t('common.action.edit.label'),
-      icon: 'edit',
+      icon: ICON.edit,
       shortcut: 'tree.rename',
       run: () => useConnectionDialogStore().openEditDialog(row.connectionId),
     },
@@ -157,7 +159,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'duplicate',
       label: t('common.action.duplicate.label'),
-      icon: 'copy',
+      icon: ICON.duplicate,
       shortcut: 'tree.duplicate',
       run: async () => {
         await useConnectionsStore().duplicateConnection(row.connectionId);
@@ -190,7 +192,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'filters',
       label: t('studio.project.menu.filters.label'),
-      icon: 'filter',
+      icon: ICON.filter,
       run: () => useFiltersDialogStore().openFiltersDialog(row.connectionId, row.path),
     },
     // P18 (v1.1) D3: a SQL-only surface, same gate the console's own SQL behaviours use.
@@ -217,7 +219,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       items: CONNECTION_COLOR_CHOICES.map((color) => ({
         type: 'item' as const,
         id: `color-${color}`,
-        label: color,
+        label: colourLabel(color),
         swatch: color,
         checked: record?.color === color,
         run: () => useConnectionsStore().setConnectionColor(row.connectionId, color),
@@ -251,7 +253,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'delete',
       label: t('common.action.delete.label'),
-      icon: 'trash',
+      icon: ICON.delete,
       danger: true,
       shortcut: 'tree.delete',
       run: async () => {
@@ -321,7 +323,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'refresh',
       label: t('common.action.refresh.label'),
-      icon: 'refresh',
+      icon: ICON.refresh,
       run: () => useTreeStore().refresh(row.connectionId, row.path),
     },
     ...copyNameItems(row),
@@ -329,7 +331,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'filters',
       label: t('studio.project.menu.filters.label'),
-      icon: 'filter',
+      icon: ICON.filter,
       run: () => useFiltersDialogStore().openFiltersDialog(row.connectionId, row.path),
     },
     ...consoleMenuItem(row),
@@ -414,7 +416,7 @@ function groupMenu(row: TreeRowVm): MenuItem[] {
       type: 'item',
       id: 'refresh',
       label: t('common.action.refresh.label'),
-      icon: 'refresh',
+      icon: ICON.refresh,
       run: () => useTreeStore().refresh(row.connectionId, groupParentPath(row.path)),
     },
     {
@@ -496,7 +498,7 @@ export function emptyBackgroundMenu(): MenuItem[] {
       type: 'item',
       id: 'new-connection',
       label: t('studio.project.connectionDialog.newConnection.title'),
-      icon: 'add',
+      icon: ICON.add,
       shortcut: 'app.newConnection',
       run: () => useConnectionDialogStore().openCreateDialog(),
     },
@@ -504,7 +506,7 @@ export function emptyBackgroundMenu(): MenuItem[] {
       type: 'item',
       id: 'refresh-all',
       label: t('common.refreshAll.label'),
-      icon: 'refresh',
+      icon: ICON.refresh,
       run: () => useTreeStore().refreshAllConnections(),
     },
     {

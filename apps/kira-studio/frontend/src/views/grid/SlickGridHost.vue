@@ -4,13 +4,13 @@ import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
 import { copyText } from '@workbench/behaviour/clipboard';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { useRowHeight } from '@workbench/lib/rowHeight';
 import { shortcutFor } from '@workbench/shortcuts/keys';
@@ -802,13 +802,13 @@ function onViewportScroll(): void {
 }
 
 // SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted replaces the
-// clearTimeout below. 300 ms, not TIMING.persist (150): the patch lands mid-scroll at 150 and
-// breaks cell-editor.spec's column scan.
+// clearTimeout below. TIMING.scrollPersist, not TIMING.persist: the patch lands mid-scroll at 150
+// ms and breaks cell-editor.spec's column scan.
 const persistScroll = useDebounceFn(() => {
   const el = viewportEl;
   if (!el) return;
   tabsStore.patchDataTabState(props.tabId, { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
-}, 300);
+}, TIMING.scrollPersist);
 function onViewportScrollPersist(): void {
   void persistScroll();
 }
@@ -2708,12 +2708,7 @@ defineExpose({
   >
     <div ref="rootRef" class="slick-grid-mount h-full w-full"></div>
     <AttributeTooltip :container="headerRowEls" />
-    <Empty v-if="showNoRows" class="no-rows absolute inset-0" data-testid="grid-no-rows">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="table" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.common.noRows.empty') }}</EmptyTitle>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState v-if="showNoRows" class="no-rows absolute inset-0" data-testid="grid-no-rows" icon="table" :title="t('studio.common.noRows.empty')" />
     <SearchFilterNotice
       v-else-if="showNoMatchingRows"
       class="no-rows absolute inset-0"

@@ -3,6 +3,7 @@ import type { SortSpec } from '@shared/domain/queries';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
@@ -10,17 +11,18 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatBytes } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -267,11 +269,9 @@ function onSortEscape(): void {
 function recordFilterHistory(search: string, sort: SortSpec | null): void {
   const connectionId = props.tab.connectionId;
   if (!connectionId) return;
-  void control.queriesHistoryRecord(
-    connectionId,
-    props.tab.path,
-    search === '' ? null : search,
-    sort,
+  fireAndForget(
+    control.queriesHistoryRecord(connectionId, props.tab.path, search === '' ? null : search, sort),
+    'record filter history',
   );
 }
 
@@ -794,13 +794,13 @@ onUnmounted(() => {
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           data-testid="document-refresh"
           @click="onRefresh"
         />
         <TooltipIconButton
-          icon="debug-stop"
+          :icon="ICON.stop"
           :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': running }"
@@ -911,7 +911,7 @@ onUnmounted(() => {
            affordance in the toolbar (deletion lives on the row's own context menu). -->
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="add"
+          :icon="ICON.add"
           :label="insertTitle"
           :aria-label="t('studio.documents.add.label')"
           disabled-trigger
@@ -920,7 +920,7 @@ onUnmounted(() => {
           @click="onAddDocument"
         />
         <TooltipIconButton
-          icon="search"
+          :icon="ICON.search"
           :label="t('studio.common.searchPage.label')"
           :class="{ 'bg-field text-fg': rt?.searchOpen }"
           data-testid="document-toolbar-search"
@@ -944,7 +944,7 @@ onUnmounted(() => {
     <ViewToolbar border="none">
       <div class="relative">
         <TooltipIconButton
-          icon="history"
+          :icon="ICON.history"
           :label="t('studio.common.savedAndRecentFilters.label')"
           ref="filterHistoryTriggerEl"
           data-testid="document-filter-history-button"
@@ -1037,7 +1037,7 @@ onUnmounted(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that actually needs a live connection — swaps for the gate. -->
-    <Empty v-if="needsReconnect" data-testid="document-reconnect">
+    <EmptyState v-if="needsReconnect" data-testid="document-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -1046,7 +1046,7 @@ onUnmounted(() => {
       >
         {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
-    </Empty>
+    </EmptyState>
     <template v-else>
     <div v-if="creatingNew" class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated" data-testid="document-new">
       <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
@@ -1063,12 +1063,14 @@ onUnmounted(() => {
     </div>
 
     <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
-      <Empty v-if="!rt || rt.rowCount === 0" class="h-full">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon v-if="rt" name="json" :size="24" /><Spinner v-else :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ rt ? t('studio.documents.empty') : t('common.state.loading.loading') }}</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState
+        v-if="!rt || rt.rowCount === 0"
+        class="h-full"
+        :icon="rt ? 'json' : undefined"
+        :title="rt ? t('studio.documents.empty') : t('common.state.loading.loading')"
+      >
+        <template v-if="!rt" #media><Spinner :size="24" /></template>
+      </EmptyState>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no documents loaded". -->
       <SearchFilterNotice
@@ -1137,7 +1139,7 @@ onUnmounted(() => {
                 <div class="flex shrink-0 items-center gap-1">
                   <Badge v-if="editingRow === rows[vi.index]" variant="warn">{{ t('studio.documents.editing.status') }}</Badge>
                   <RowActionButton
-                    icon="edit"
+                    :icon="ICON.edit"
                     :label="editGateFor(rows[vi.index]).label"
                     :aria-label="t('common.action.edit.label')"
                     :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
@@ -1146,7 +1148,7 @@ onUnmounted(() => {
                     @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
                   />
                   <RowActionButton
-                    icon="trash"
+                    :icon="ICON.delete"
                     :label="deleteTitle"
                     :aria-label="t('common.action.delete.label')"
                     :disabled="!canDelete"

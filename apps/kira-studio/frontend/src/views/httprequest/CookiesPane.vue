@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import { useMutation } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { queryClient } from '@workbench/state/queryClient';
@@ -110,15 +110,11 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 
 <template>
   <div v-if="mode === 'request'" class="flex flex-1 min-h-0 flex-col overflow-auto" data-testid="http-request-cookies">
-    <Empty v-if="disableCookieJar" data-testid="http-cookies-jar-off">
-      <EmptyMedia><CodiconIcon name="circle-slash" :size="24" /></EmptyMedia>
-      <EmptyTitle>
-        {{ t('studio.http.cookies.jarOff.empty') }}
-      </EmptyTitle>
+    <EmptyState v-if="disableCookieJar" data-testid="http-cookies-jar-off" icon="circle-slash" :title="t('studio.http.cookies.jarOff.empty')">
       <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
         {{ t('studio.http.settings.editGlobal.label') }}
       </button>
-    </Empty>
+    </EmptyState>
     <template v-else>
       <div class="flex items-center gap-1">
         <SearchField v-model="filter" :placeholder="t('studio.http.cookies.filter.placeholder')" data-testid="http-cookies-filter" />
@@ -151,7 +147,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
             <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-sm font-data">{{ attributeLine(c) }}</span>
           </div>
           <TooltipIconButton
-            icon="close"
+            :icon="ICON.close"
             :label="t('common.action.remove.label')"
             :aria-label="t('studio.http.cookies.remove.aria')"
             :data-testid="`http-cookies-remove-${c.name}-${c.domain}${c.path}`"
@@ -159,11 +155,9 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           />
         </div>
       </div>
-      <Empty v-else data-testid="http-cookies-empty">
-        <EmptyMedia><CodiconIcon name="symbol-key" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.http.cookies.none.empty') }}</EmptyTitle>
+      <EmptyState v-else data-testid="http-cookies-empty" icon="symbol-key" :title="t('studio.http.cookies.none.empty')">
         <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-cookies-retry" @click="emit('refresh')">{{ t('common.action.refresh.label') }}</button>
-      </Empty>
+      </EmptyState>
     </template>
   </div>
 
@@ -203,14 +197,8 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </div>
         </div>
       </template>
-      <Empty v-else data-testid="http-response-cookies-empty">
-        <EmptyMedia><CodiconIcon name="symbol-key" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.http.cookies.noneReceived.empty') }}</EmptyTitle>
-      </Empty>
+      <EmptyState v-else data-testid="http-response-cookies-empty" icon="symbol-key" :title="t('studio.http.cookies.noneReceived.empty')" />
     </template>
-    <Empty v-else>
-      <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
   </div>
 </template>

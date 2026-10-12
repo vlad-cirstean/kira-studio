@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import Spinner from '@theme/components/Spinner.vue';
@@ -8,12 +9,12 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -335,7 +336,7 @@ onMounted(() => {
     <ViewToolbar border="none">
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           data-testid="browse-refresh"
           @click="onReload"
@@ -345,7 +346,7 @@ onMounted(() => {
              pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps
              only what is view-scoped: filter, upload, and the refresh/stop group above. -->
         <TooltipIconButton
-          icon="search"
+          :icon="ICON.search"
           :label="t('common.action.filter.label')"
           :class="{ 'bg-field text-fg': filterOpen }"
           data-testid="browse-filter-toggle"
@@ -391,11 +392,11 @@ onMounted(() => {
            the body — the part that actually needs a live connection — swaps for the gate.
            P63 §2.1: "the body" is now the whole split (list pane + splitter + detail pane), never
            just the list — a disconnected connection means neither side has anything live to show. -->
-      <Empty v-if="needsReconnect" data-testid="browse-reconnect">
+      <EmptyState v-if="needsReconnect" data-testid="browse-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
         <Button variant="dialog-primary" size="kira-lg" data-testid="browse-reconnect-load" @click="onReconnectAndLoad">
           {{ t('studio.common.reconnectAndLoad.label') }}
         </Button>
-      </Empty>
+      </EmptyState>
       <div v-else class="flex flex-row flex-1 min-h-0">
         <div class="min-w-0 flex flex-col min-h-0" :style="{ flex: `0 1 ${listPane.size.value}px` }">
           <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
@@ -404,7 +405,7 @@ onMounted(() => {
                rather than inventing a header. -->
           <ViewToolbar data-testid="browse-list-head">
             <TooltipIconButton
-              icon="chevron-left"
+              :icon="ICON.back"
               :label="t('common.action.back.label')"
               disabled-trigger
               :disabled="atRoot"
@@ -432,10 +433,9 @@ onMounted(() => {
             <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </ViewToolbar>
           <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
-            <Empty v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full">
-              <EmptyMedia><Spinner :size="24" /></EmptyMedia>
-              <EmptyTitle>{{ t('common.state.loading.loading') }}</EmptyTitle>
-            </Empty>
+            <EmptyState v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full" :title="t('common.state.loading.loading')">
+              <template #media><Spinner :size="24" /></template>
+            </EmptyState>
             <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-md text-muted-foreground" data-testid="browse-empty">
               {{ t('studio.browse.items.empty') }}
             </div>
@@ -522,12 +522,7 @@ onMounted(() => {
 
         <div class="min-w-0 flex flex-1 flex-col min-h-0" data-testid="browse-detail-pane">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
-          <Empty v-else class="min-h-0 flex-1" data-testid="browse-preview-empty">
-            <EmptyHeader>
-              <EmptyMedia><CodiconIcon :name="emptyPreviewIcon" :size="24" /></EmptyMedia>
-              <EmptyTitle>{{ emptyPreviewLabel }}</EmptyTitle>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState v-else class="min-h-0 flex-1" data-testid="browse-preview-empty" :icon="emptyPreviewIcon" :title="emptyPreviewLabel" />
         </div>
       </div>
   </div>

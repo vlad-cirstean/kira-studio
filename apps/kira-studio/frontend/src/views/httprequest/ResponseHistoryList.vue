@@ -5,6 +5,7 @@ import {
   type ResponseHistoryEntry,
 } from '@shared/domain/responseHistory';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -12,9 +13,9 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
 import { formatBytes, formatDuration, formatRelative } from '@workbench/behaviour/format';
@@ -47,6 +48,11 @@ const isScratch = computed(() => !props.tab.state.itemId);
 // P71 §3.5: nothing is suppressed here — with nothing recorded, historyList simply returns the
 // empty set, so this only exists to explain the silence rather than leave it looking broken.
 const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
+const emptyDescription = computed(() => {
+  if (incognito.value) return t('studio.http.history.incognito.description');
+  const hint = t('studio.http.history.recordHint.description');
+  return isScratch.value ? `${hint} ${t('studio.http.history.scratchHint.description')}` : hint;
+});
 // P18 D6: the list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list
 // is full" is exactly this predicate — not a stored eviction count (rejected in the plan: List can
 // never say more than "the list is full" without a new column and write path). Not suppressed by
@@ -148,7 +154,7 @@ async function onClear(): Promise<void> {
         data-testid="http-history-clear"
         @click="onClear"
       >
-        <CodiconIcon name="trash" :size="13" />
+        <CodiconIcon :name="ICON.delete" :size="13" />
         {{ t('common.action.clearHistory.label') }}
       </Button>
     </ViewToolbar>
@@ -156,29 +162,17 @@ async function onClear(): Promise<void> {
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
 
-    <Empty v-if="entries.length === 0" data-testid="http-history-empty">
-      <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.http.history.empty') }}</EmptyTitle>
-      <EmptyDescription>
-        <template v-if="incognito">{{ t('studio.http.history.incognito.description') }}</template>
-        <template v-else>
-          {{ t('studio.http.history.recordHint.description') }}
-          <template v-if="isScratch">
-            {{ t('studio.http.history.scratchHint.description') }}
-          </template>
-        </template>
-      </EmptyDescription>
-    </Empty>
+    <EmptyState
+      v-if="entries.length === 0"
+      data-testid="http-history-empty"
+      :icon="ICON.history"
+      :title="t('studio.http.history.empty')"
+      :description="emptyDescription"
+    />
 
     <template v-else>
       <SearchField v-model="filterQuery" :placeholder="t('studio.common.filterHistory.placeholder')" data-testid="http-history-filter" />
-      <Empty
-        v-if="isFiltered && filteredEntries.length === 0"
-        data-testid="http-history-filter-empty"
-      >
-        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
-      </Empty>
+      <EmptyState v-if="isFiltered && filteredEntries.length === 0" data-testid="http-history-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
     </template>
 
     <div
@@ -229,7 +223,7 @@ async function onClear(): Promise<void> {
             <span v-if="entry.environment" class="text-kira-sm text-subtle">{{ entry.environment }}</span>
             <span class="ml-auto" />
             <TooltipIconButton
-              icon="trash"
+              :icon="ICON.delete"
               :label="t('common.action.delete.label')"
               data-testid="http-history-delete"
               @click.stop="onDelete(entry.id)"

@@ -12,6 +12,7 @@ import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
@@ -186,7 +187,7 @@ async function onGenerate(): Promise<void> {
 
 function onStop(): void {
   abortController?.abort();
-  if (currentOpId.value) void control.opsCancel(currentOpId.value);
+  if (currentOpId.value) fireAndForget(control.opsCancel(currentOpId.value), 'cancel generate data');
 }
 
 type RecipeSelectValue = 'skip' | 'null' | 'constant' | 'sequence' | GeneratorId;

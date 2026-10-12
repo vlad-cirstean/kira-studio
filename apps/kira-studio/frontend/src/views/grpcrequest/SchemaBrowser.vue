@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -8,10 +9,10 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -136,7 +137,7 @@ function selectMethod(service: string, method: string): void {
         :disabled="loading"
         @click="emit('reload')"
       >
-        <CodiconIcon name="refresh" :size="13" />
+        <CodiconIcon :name="ICON.refresh" :size="13" />
         {{ t('common.action.refresh.label') }}
       </Button>
     </ViewToolbar>
@@ -154,7 +155,7 @@ function selectMethod(service: string, method: string): void {
             <TooltipContent>{{ p }}</TooltipContent>
           </Tooltip>
           <TooltipIconButton
-            icon="close"
+            :icon="ICON.close"
             :label="t('common.action.remove.label')"
             class="ml-auto"
             @click="removeImportPath(i)"
@@ -210,17 +211,13 @@ function selectMethod(service: string, method: string): void {
           </button>
         </div>
       </template>
-      <Empty
+      <EmptyState
         v-else-if="isFiltered && schema && schema.services.length > 0"
         data-testid="grpc-schema-filter-empty"
-      >
-        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
-      </Empty>
-      <Empty v-else-if="!loading">
-        <EmptyMedia><CodiconIcon name="symbol-interface" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.grpc.schema.chooseSource.empty') }}</EmptyTitle>
-      </Empty>
+        :icon="ICON.search"
+        :title="t('common.state.noMatches.empty')"
+      />
+      <EmptyState v-else-if="!loading" icon="symbol-interface" :title="t('studio.grpc.schema.chooseSource.empty')" />
     </div>
   </div>
 </template>

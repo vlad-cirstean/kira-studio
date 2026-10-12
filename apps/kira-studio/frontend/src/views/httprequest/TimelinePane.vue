@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { formatDuration } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
@@ -316,18 +316,9 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </div>
     </template>
 
-    <Empty v-else-if="response" data-testid="http-timeline-empty">
-      <EmptyMedia><CodiconIcon name="watch" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.http.timeline.none.empty') }}</EmptyTitle>
-    </Empty>
-    <Empty v-else-if="rt?.status === 'error'" data-testid="http-timeline-empty">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.http.timeline.failed.empty') }}</EmptyTitle>
-    </Empty>
-    <Empty v-else>
-      <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else-if="response" data-testid="http-timeline-empty" icon="watch" :title="t('studio.http.timeline.none.empty')" />
+    <EmptyState v-else-if="rt?.status === 'error'" data-testid="http-timeline-empty" :icon="ICON.warning" :title="t('studio.http.timeline.failed.empty')" />
+    <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
     <!-- P110 I2-17: `.hop-phase[data-present='false']` moved onto the span's own
          `data-[present=false]:opacity-60` (compile-verified) -- no test locates by `.hop-phase`. -->
   </div>

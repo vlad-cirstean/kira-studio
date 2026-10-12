@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -220,7 +221,7 @@ function onCloseSearch(): void {
     <ViewToolbar data-testid="data-toolbar">
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           disabled-trigger
           data-testid="toolbar-refresh"
@@ -228,7 +229,7 @@ function onCloseSearch(): void {
           @click="onRefresh"
         />
         <TooltipIconButton
-          icon="debug-stop"
+          :icon="ICON.stop"
           :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': !!rt?.opId }"
@@ -270,7 +271,7 @@ function onCloseSearch(): void {
             <PreviewCommandPanel v-if="previewOpen" :tab-id="tab.id" @close="previewOpen = false" />
           </Popover>
           <TooltipIconButton
-            icon="discard"
+            :icon="ICON.reset"
             :label="t('studio.grid.discardPending.label')"
             disabled-trigger
             data-testid="toolbar-discard-changes"
@@ -309,7 +310,7 @@ function onCloseSearch(): void {
 
     <div class="flex flex-1 min-h-0 flex-col">
       <div class="flex min-h-0 flex-1 flex-col">
-        <Empty v-if="needsReconnect" data-testid="reconnect-panel">
+        <EmptyState v-if="needsReconnect" data-testid="reconnect-panel" icon="plug" :title="t('studio.common.disconnected.empty')">
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -318,7 +319,7 @@ function onCloseSearch(): void {
           >
             {{ t('studio.common.reconnectAndLoad.label') }}
           </Button>
-        </Empty>
+        </EmptyState>
         <template v-else>
           <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
                that started it (RunState, above), never a bar across the top of the view — §8.5's

@@ -8708,6 +8708,9 @@
       "countFailed": {
         "tooltip": "Count failed: {error}"
       },
+      "disconnected": {
+        "empty": "This connection isn’t open"
+      },
       "documents": {
         "aria": "Documents"
       },

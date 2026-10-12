@@ -16,6 +16,7 @@
 // Usage (Web Inspector console, one hard two-finger flick between the two calls):
 //   __kiraScrollTrace.start()
 //   copy(JSON.stringify(__kiraScrollTrace.stop()))
+import { logWarn } from '@workbench/bridge/log';
 
 interface ScrollTraceEvent {
   /** el.scrollTop at the moment this native `scroll` event was handled. */
@@ -354,7 +355,9 @@ export function stop(): ScrollTraceResult | null {
   // the API exists and would throw where this deliberately swallows. Declined, named per
   // CLAUDE.md's library rule.
   try {
-    navigator.clipboard?.writeText(JSON.stringify(result))?.catch(() => {});
+    navigator.clipboard
+      ?.writeText(JSON.stringify(result))
+      ?.catch((err: unknown) => logWarn('scrollTrace', 'clipboard write failed', err));
   } catch {
     // ignore — clipboard access can throw synchronously outside a secure/focused context.
   }

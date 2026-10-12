@@ -2,16 +2,17 @@
 import { definitionText } from '@shared/domain/definition';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -252,7 +253,7 @@ const breadcrumb = computed(() => {
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           disabled-trigger
           :disabled="loading"
@@ -267,7 +268,7 @@ const breadcrumb = computed(() => {
       <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
            all — a find-in-document bar for Source, a plain substring filter for Structure. -->
       <TooltipIconButton
-        icon="search"
+        :icon="ICON.search"
         :label="pane === 'source' ? t('studio.definition.search.source.tooltip') : t('studio.definition.structureFilter.placeholder')"
         :aria-label="t('common.action.search.label')"
         :data-active="searchOpen"
@@ -284,7 +285,7 @@ const breadcrumb = computed(() => {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button variant="toolbar" size="kira" data-testid="definition-copy" @click="onCopy">
-                <CodiconIcon name="copy" :size="13" />
+                <CodiconIcon :name="ICON.copy" :size="13" />
                 {{ t('common.action.copy.label') }}
               </Button>
             </TooltipTrigger>
@@ -327,11 +328,11 @@ const breadcrumb = computed(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above always renders; only the body — the part that actually needs
          a live connection — swaps for the gate. -->
-    <Empty v-if="needsReconnect" data-testid="definition-reconnect">
+    <EmptyState v-if="needsReconnect" data-testid="definition-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
       <Button variant="dialog-primary" size="kira-lg" data-testid="definition-reconnect-load" @click="onReconnectAndLoad">
         {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
-    </Empty>
+    </EmptyState>
     <template v-else>
     <div v-if="pane === 'source'" class="flex-1 min-h-0">
       <MonacoHost

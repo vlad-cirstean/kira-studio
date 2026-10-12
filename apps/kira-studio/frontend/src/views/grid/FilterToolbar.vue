@@ -5,6 +5,8 @@ import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -82,7 +84,10 @@ watch(
 function recordHistory(where: string | null, orderBy: SortSpec | null): void {
   if (!props.tab.connectionId) return;
   // A no-op filter (both null) is dropped server-side (D19) — nothing to special-case here.
-  void control.queriesHistoryRecord(props.tab.connectionId, props.tab.path, where, orderBy);
+  fireAndForget(
+    control.queriesHistoryRecord(props.tab.connectionId, props.tab.path, where, orderBy),
+    'record filter history',
+  );
 }
 
 async function applyWhere(): Promise<void> {
@@ -142,7 +147,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
        a close button that would make the grid change height under you. -->
   <div class="relative">
     <TooltipIconButton
-      icon="history"
+      :icon="ICON.history"
       :label="t('studio.common.savedAndRecentFilters.label')"
       ref="historyTriggerEl"
       :class="{ 'bg-field text-fg': historyOpen }"

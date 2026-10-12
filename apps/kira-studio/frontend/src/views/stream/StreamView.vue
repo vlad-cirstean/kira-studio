@@ -6,6 +6,7 @@ import {
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -14,7 +15,6 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
@@ -23,6 +23,7 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { type MessageKey, t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
@@ -791,7 +792,7 @@ onUnmounted(() => {
     <ViewToolbar :border="isKafka ? 'bottom' : 'none'">
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           disabled-trigger
           data-testid="stream-refresh"
@@ -799,7 +800,7 @@ onUnmounted(() => {
           @click="onRefresh"
         />
         <TooltipIconButton
-          icon="debug-stop"
+          :icon="ICON.stop"
           :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': running }"
@@ -904,7 +905,7 @@ onUnmounted(() => {
         <div class="relative">
           <TooltipIconButton
             v-if="canInsert"
-            icon="add"
+            :icon="ICON.add"
             :label="t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
             :aria-label="t('studio.stream.addMessage.aria')"
             ref="addMessageTriggerEl"
@@ -924,7 +925,7 @@ onUnmounted(() => {
         </div>
         <TooltipIconButton
           v-if="canDelete"
-          icon="trash"
+          :icon="ICON.delete"
           :label="t(hasSelectedRow ? 'studio.stream.deleteSelected.tooltip' : 'studio.stream.selectFirst.tooltip')"
           :aria-label="t('studio.stream.deleteMessage.aria')"
           disabled-trigger
@@ -933,7 +934,7 @@ onUnmounted(() => {
           @click="onDeleteMessage"
         />
         <TooltipIconButton
-          icon="search"
+          :icon="ICON.search"
           :label="t('studio.common.searchPage.label')"
           :class="{ 'bg-field text-fg': rt?.searchOpen }"
           data-testid="stream-search-toggle"
@@ -955,7 +956,7 @@ onUnmounted(() => {
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
         <div class="relative">
           <TooltipIconButton
-            icon="history"
+            :icon="ICON.history"
             :label="t('studio.common.filterHistory.placeholder')"
             data-testid="stream-filter-history-button"
             @click="filterHistoryOpen = !filterHistoryOpen"
@@ -996,7 +997,7 @@ onUnmounted(() => {
                 :class="selectedPartitions.length ? 'text-state-on' : ''"
                 @click="onTogglePartitionMenu"
               >
-                <CodiconIcon name="filter" :size="13" />
+                <CodiconIcon :name="ICON.filter" :size="13" />
                 {{ partitionButtonLabel }}
               </Button>
             </TooltipTrigger>
@@ -1125,11 +1126,11 @@ onUnmounted(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that actually needs a live connection — swaps for the gate. -->
-    <Empty v-if="needsReconnect" data-testid="stream-reconnect">
+    <EmptyState v-if="needsReconnect" data-testid="stream-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
       <Button variant="dialog-primary" size="kira-lg" data-testid="stream-reconnect-load" @click="onReconnectAndLoad">
         {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
-    </Empty>
+    </EmptyState>
     <template v-else>
     <!-- Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
          unscoped `position: absolute; inset: 0` rule) — the `relative` utility already on this div
@@ -1140,18 +1141,15 @@ onUnmounted(() => {
          stays a bare marker -- polled directly by interaction.spec.ts/sqs.frontend.spec.ts/
          kafka.frontend.spec.ts. -->
     <div class="relative flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="stream-list">
-      <Empty v-if="isBatch && !rt?.polled" class="no-rows absolute inset-0">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="arrow-swap" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('studio.stream.pollPrompt.empty') }}</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
-      <Empty v-else-if="!rt || rt.rowCount === 0" class="no-rows absolute inset-0">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="inbox" :size="24" /></EmptyMedia>
-          <EmptyTitle v-if="rt">{{ t('studio.stream.noMessages.empty') }}</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState v-if="isBatch && !rt?.polled" class="no-rows absolute inset-0" icon="arrow-swap" :title="t('studio.stream.pollPrompt.empty')" />
+      <EmptyState
+        v-else-if="!rt || rt.rowCount === 0"
+        class="no-rows absolute inset-0"
+        :icon="rt ? 'inbox' : undefined"
+        :title="rt ? t('studio.stream.noMessages.empty') : t('common.state.loading.loading')"
+      >
+        <template v-if="!rt" #media><Spinner :size="24" /></template>
+      </EmptyState>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no messages loaded". -->
       <SearchFilterNotice

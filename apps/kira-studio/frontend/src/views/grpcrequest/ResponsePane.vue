@@ -6,15 +6,16 @@ import {
   grpcCodeHint,
 } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import { formatBytes, formatClockTime, formatDuration } from '@workbench/behaviour/format';
 import { useVirtualRows } from '@workbench/behaviour/virtualRows';
@@ -300,7 +301,7 @@ onUnmounted(() => {
            search (Metadata is a plain key-value list, History is a row list). -->
       <TooltipIconButton
         v-if="tab.state.responsePane === 'messages'"
-        icon="search"
+        :icon="ICON.search"
         :label="t('studio.grpc.response.find.label')"
         :class="{ 'bg-field text-fg': findOpen }"
         data-testid="grpc-find-toggle"
@@ -418,7 +419,7 @@ onUnmounted(() => {
               <Tooltip v-if="entry.m.truncated">
                 <TooltipTrigger as-child>
                   <CodiconIcon
-                    name="warning"
+                    :name="ICON.warning"
                     :size="12"
                     data-testid="grpc-message-truncated"
                   />
@@ -444,9 +445,7 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      <Empty v-if="messages.length === 0">
-        <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.grpc.response.empty') }}</EmptyTitle>
+      <EmptyState v-if="messages.length === 0" icon="arrow-right" :title="t('studio.grpc.response.empty')">
         <button
           v-if="hasHistory"
           type="button"
@@ -456,7 +455,7 @@ onUnmounted(() => {
         >
           {{ t('studio.grpc.response.viewHistory.label', { count: historyCount }) }}
         </button>
-      </Empty>
+      </EmptyState>
     </div>
 
     <!-- D14: docked below the pane it searches (LAW 03), mirroring HTTP's own ResponsePane.vue. -->

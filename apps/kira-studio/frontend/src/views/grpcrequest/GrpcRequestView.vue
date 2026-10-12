@@ -15,6 +15,7 @@ import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -336,13 +337,13 @@ onUnmounted(() => {
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           data-testid="grpc-request-refresh"
           @click="onCall"
         />
         <TooltipIconButton
-          icon="debug-stop"
+          :icon="ICON.stop"
           :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'is-live': running }"
@@ -402,7 +403,7 @@ onUnmounted(() => {
               :disabled="running || !tab.state.service || !tab.state.method || !methodResolved"
               @click="onCall"
             >
-              <CodiconIcon name="play" :size="13" />
+              <CodiconIcon :name="ICON.run" :size="13" />
               {{ t('studio.grpc.call.label') }}
             </Button>
           </TooltipDisabledTrigger>
@@ -436,7 +437,7 @@ onUnmounted(() => {
       />
       <TooltipIconButton
         v-if="tab.state.requestPane === 'metadata'"
-        icon="search"
+        :icon="ICON.search"
         :label="t('common.action.filter.label')"
         :class="{ 'bg-field text-fg': fieldFilterOpen }"
         data-testid="grpc-field-filter-toggle"
@@ -454,7 +455,7 @@ onUnmounted(() => {
       <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
         <div ref="overviewAnchorRef" class="relative flex">
           <TooltipIconButton
-            icon="variable-group"
+            :icon="ICON.variables"
             :label="t('common.module.variables.label')"
             :class="{ 'bg-field text-fg': overviewOpen }"
             data-testid="grpc-variables-overview-toggle"

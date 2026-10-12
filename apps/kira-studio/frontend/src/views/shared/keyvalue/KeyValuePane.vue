@@ -29,6 +29,7 @@ import {
   SINGLE_ROW_MAX_BYTES,
 } from '@shared/protocol/page';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import Spinner from '@theme/components/Spinner.vue';
@@ -36,13 +37,13 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { formatBytes, formatCount } from '@workbench/behaviour/format';
@@ -785,13 +786,13 @@ onUnmounted(() => {
       <ViewToolbar border="none">
         <div class="flex items-center gap-1.5 min-w-0">
           <TooltipIconButton
-            icon="refresh"
+            :icon="ICON.refresh"
             :label="t('common.action.refresh.label')"
             data-testid="keyvalue-refresh"
             @click="onRefresh"
           />
           <TooltipIconButton
-            icon="debug-stop"
+            :icon="ICON.stop"
             :label="t('common.action.stop.label')"
             disabled-trigger
             :class="{ 'is-live': !!running }"
@@ -811,11 +812,11 @@ onUnmounted(() => {
     <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
          renders its own header, same discipline every other main-tab view follows.
          P104 §3: ReconnectGate inlined (no library counterpart). -->
-    <Empty v-if="needsReconnect" data-testid="keyvalue-reconnect">
+    <EmptyState v-if="needsReconnect" data-testid="keyvalue-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
       <Button variant="dialog-primary" size="kira-lg" data-testid="keyvalue-reconnect-load" @click="onReconnectAndLoad">
         {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
-    </Empty>
+    </EmptyState>
     <template v-else>
       <ViewToolbar v-if="page" data-testid="keyvalue-badges">
         <Badge data data-testid="keyvalue-type">{{ page.redisType }}</Badge>
@@ -827,7 +828,7 @@ onUnmounted(() => {
           <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                vanish should look like one (see the mockup's KeyValue.html). -->
           <Badge data :variant="page.ttlMs !== null ? 'warn' : 'chip'" data-testid="keyvalue-ttl">
-            <CodiconIcon name="history" :size="13" />
+            <CodiconIcon :name="ICON.history" :size="13" />
             {{ page.ttlMs !== null ? t('studio.keyValue.expires.status', { time: ttlText(page.ttlMs) }) : t('studio.keyValue.noExpiry.status') }}
           </Badge>
         </template>
@@ -891,7 +892,7 @@ onUnmounted(() => {
           <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
             <div ref="addAnchorRef" class="relative">
               <TooltipIconButton
-                icon="add"
+                :icon="ICON.add"
                 :label="addTitle"
                 :aria-label="t('common.action.add.label')"
                 disabled-trigger
@@ -932,7 +933,7 @@ onUnmounted(() => {
           <Popover :open="editOpen && !isSingleObjectPage" @update:open="(v) => !v && closeEdit()">
             <div ref="editAnchorRef" class="relative">
               <TooltipIconButton
-                icon="edit"
+                :icon="ICON.edit"
                 :label="editTitle"
                 :aria-label="t('common.action.edit.label')"
                 disabled-trigger
@@ -969,7 +970,7 @@ onUnmounted(() => {
           </Popover>
 
           <TooltipIconButton
-            icon="trash"
+            :icon="ICON.delete"
             :label="deleteTitle"
             :aria-label="t('common.action.delete.label')"
             disabled-trigger
@@ -988,7 +989,7 @@ onUnmounted(() => {
           />
 
           <TooltipIconButton
-            icon="search"
+            :icon="ICON.search"
             :label="t('studio.common.searchPage.label')"
             :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
             data-testid="keyvalue-search"
@@ -1073,10 +1074,13 @@ onUnmounted(() => {
              scrolling now, against this flex:1/min-height:0 parent — EmptyState's two branches
              above never needed to scroll either. -->
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
-          <Empty v-if="!rt || rt.rowCount === 0">
-            <EmptyMedia><CodiconIcon v-if="rt" name="database" :size="24" /><Spinner v-else :size="24" /></EmptyMedia>
-            <EmptyTitle>{{ rt ? t('studio.keyValue.noData.empty') : t('common.state.loading.loading') }}</EmptyTitle>
-          </Empty>
+          <EmptyState
+            v-if="!rt || rt.rowCount === 0"
+            :icon="rt ? 'database' : undefined"
+            :title="rt ? t('studio.keyValue.noData.empty') : t('common.state.loading.loading')"
+          >
+            <template v-if="!rt" #media><Spinner :size="24" /></template>
+          </EmptyState>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
           <SearchFilterNotice

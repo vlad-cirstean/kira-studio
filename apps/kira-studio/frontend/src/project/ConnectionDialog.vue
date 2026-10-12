@@ -33,6 +33,7 @@ import { RadioGroup } from '@theme/components/ui/radio-group';
 import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { colourLabel } from '@theme/connColor';
 import { type MessageKey, t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
@@ -750,7 +751,7 @@ const preconnectText = computed({
                       @change="draft.color = color"
                     />
                   </TooltipTrigger>
-                  <TooltipContent>{{ color === 'none' ? t('common.field.noColour.label') : color }}</TooltipContent>
+                  <TooltipContent>{{ colourLabel(color) }}</TooltipContent>
                 </Tooltip>
               </fieldset>
             </Field>

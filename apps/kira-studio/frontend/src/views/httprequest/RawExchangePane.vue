@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-core';
 import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { type MessageKey, t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { formatBytes } from '@workbench/behaviour/format';
 import type { RangeHighlight } from '@workbench/editor/ranges';
@@ -251,7 +251,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
             </span>
             <span class="ml-auto" />
             <TooltipIconButton
-              icon="copy"
+              :icon="ICON.copy"
               :label="section.copyLabel"
               :data-testid="section.copyTestid"
               @click="section.onCopy"
@@ -278,14 +278,8 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
     </template>
 
     <template v-else-if="emptyLabel">
-      <Empty>
-        <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ emptyLabel }}</EmptyTitle>
-      </Empty>
+      <EmptyState icon="file-binary" :title="emptyLabel" />
     </template>
-    <Empty v-else>
-      <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
   </div>
 </template>

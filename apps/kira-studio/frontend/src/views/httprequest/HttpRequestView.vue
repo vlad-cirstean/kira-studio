@@ -25,6 +25,7 @@ import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
 import { refDebounced } from '@vueuse/core';
@@ -537,13 +538,13 @@ onUnmounted(() => {
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
-          icon="refresh"
+          :icon="ICON.refresh"
           :label="t('common.action.refresh.label')"
           data-testid="http-request-refresh"
           @click="onSend"
         />
         <TooltipIconButton
-          icon="debug-stop"
+          :icon="ICON.stop"
           :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'is-live': running }"
@@ -591,7 +592,7 @@ onUnmounted(() => {
               :disabled="running"
               @click="onSend"
             >
-              <CodiconIcon name="play" :size="13" />
+              <CodiconIcon :name="ICON.run" :size="13" />
               {{ t('common.action.send.label') }}
             </Button>
           </TooltipDisabledTrigger>
@@ -639,7 +640,7 @@ onUnmounted(() => {
       <SecondaryTabs :model-value="tab.state.requestPane" :items="REQUEST_PANE_OPTIONS" data-testid="http-request-pane-toggle" @update:model-value="(v) => setRequestPane(v as HttpRequestPane)" />
       <TooltipIconButton
         v-if="showFieldFilterToggle"
-        icon="search"
+        :icon="ICON.search"
         :label="t('common.action.filter.label')"
         :class="{ 'bg-field text-fg': fieldFilterOpen }"
         data-testid="http-field-filter-toggle"
@@ -655,7 +656,7 @@ onUnmounted(() => {
         @click="toggleFieldDescriptions"
       />
       <TooltipIconButton
-        icon="search"
+        :icon="ICON.search"
         :label="t('studio.http.request.find.label')"
         :aria-label="t('studio.http.request.find.label')"
         :class="{ 'bg-field text-fg': requestFindOpen }"
@@ -665,7 +666,7 @@ onUnmounted(() => {
       <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
         <div ref="overviewAnchorRef" class="relative flex">
           <TooltipIconButton
-            icon="variable-group"
+            :icon="ICON.variables"
             :label="t('common.module.variables.label')"
             :class="{ 'bg-field text-fg': overviewOpen }"
             data-testid="http-variables-overview-toggle"

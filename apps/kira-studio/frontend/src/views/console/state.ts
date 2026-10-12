@@ -2,6 +2,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import type { Page } from '@shared/protocol/page';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
@@ -317,8 +318,8 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
       // (or auto-explain's EXPLAIN batch) fires server-side after the tab is already gone. Cancel
       // both possible in-flight ops and flip status so every such guard sees the close.
       if (rt.status === 'running') {
-        if (rt.explainOpId) void control.opsCancel(rt.explainOpId);
-        if (rt.opId) void control.opsCancel(rt.opId);
+        if (rt.explainOpId) fireAndForget(control.opsCancel(rt.explainOpId), 'cancel explain');
+        if (rt.opId) fireAndForget(control.opsCancel(rt.opId), 'cancel query');
         rt.status = 'cancelled';
       }
     }
@@ -540,7 +541,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     if (rt?.status === 'running') rt.status = 'cancelled';
     // The auto-explain batch's own op id — the real run's opId isn't registered on the backend yet
     // while this batch is in flight, so cancelling only opId (below) would be a no-op (finding #5).
-    if (rt?.explainOpId) void control.opsCancel(rt.explainOpId);
+    if (rt?.explainOpId) fireAndForget(control.opsCancel(rt.explainOpId), 'cancel explain');
     stopOp(rt);
   }
 

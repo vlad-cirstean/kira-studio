@@ -1,3 +1,4 @@
+import type { OfferedColor } from '@shared/domain/color';
 import { t } from './i18n/index.ts';
 
 // 'none' is a real, storable ConnectionColor (D18's default) — not merely a falsy value — so
@@ -70,9 +71,7 @@ export function colorMarkClass(mark: ColorMark, color: string | null | undefined
   return mark === 'dot' ? `${MARK_SHAPE.dot} bg-none border border-disabled` : MARK_SHAPE[mark];
 }
 
-type OfferedColour = 'red' | 'amber' | 'green' | 'cyan' | 'blue' | 'magenta' | 'grey';
-
 /** The picker's name for a palette colour ('Blue'); `none` reads as "No colour". */
-export function colourLabel(color: OfferedColour | 'none'): string {
+export function colourLabel(color: OfferedColor): string {
   return color === 'none' ? t('common.field.noColour.label') : t(`common.colour.${color}.label`);
 }

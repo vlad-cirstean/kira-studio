@@ -7,6 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { t } from '@theme/i18n';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import PointPopover from '@workbench/components/PointPopover.vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
@@ -83,7 +84,7 @@ onUnmounted(() => {
   // has already finished.
   if (signal.opId && state.value.status === 'loading') {
     signal.cancelled = true;
-    void control.opsCancel(signal.opId);
+    fireAndForget(control.opsCancel(signal.opId), 'cancel fk preview');
   }
 });
 </script>

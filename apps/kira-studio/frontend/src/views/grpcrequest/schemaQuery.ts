@@ -2,6 +2,7 @@ import { loadDynamicGenerator } from '@kira/api-core';
 import type { GrpcMetadataState, GrpcMetaPairWire, GrpcSchemaWire } from '@shared/domain/grpc';
 import { useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { loadVariableRows } from '../../api/state/apiQueries';
@@ -104,7 +105,11 @@ async function describeSchema(
   // A listener added after an abort never fires, so bail out before dialling.
   signal?.throwIfAborted();
   const opId = crypto.randomUUID();
-  signal?.addEventListener('abort', () => void control.opsCancel(opId), { once: true });
+  signal?.addEventListener(
+    'abort',
+    () => fireAndForget(control.opsCancel(opId), 'cancel schema query'),
+    { once: true },
+  );
   return control.grpcDescribe({
     descriptorMode: source.mode,
     target,

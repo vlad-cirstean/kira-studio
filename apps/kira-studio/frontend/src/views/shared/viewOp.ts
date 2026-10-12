@@ -1,4 +1,5 @@
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabsStore } from '../../state/tabs';
@@ -37,7 +38,7 @@ export function classifyLoadError(err: unknown): LoadFailure {
 
 /** `control.opsCancel(rt.opId)` when there is one — the body all five `stop()` functions share. */
 export function stopOp(rt: { opId: string | null } | undefined): void {
-  if (rt?.opId) void control.opsCancel(rt.opId);
+  if (rt?.opId) fireAndForget(control.opsCancel(rt.opId), 'cancel op');
 }
 
 /** The per-tab runtime record every view state module keeps, plus the one accessor that creates

@@ -127,11 +127,9 @@ U62 apps/kira-studio/frontend/src/views/grid/slick/editor.ts # SlickGrid cell ed
 U41 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue # editor host reads modifier keys
 U52 apps/kira-studio/frontend/src/views/shared/celleditor/timestamp.ts # spelling-preserving timestamp re-encoding
 U42 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
-U61 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts # dev trace output
 U47 apps/kira-studio/frontend/src/api/EnvironmentsView.vue # Alt+Up/Down row reorder chord, not list navigation
 U47 apps/kira-studio/frontend/src/api/VariableRow.vue # Alt+Up/Down row reorder chord, not list navigation
 U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host exposes focus(); not a DOM element focus
-U46 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # scroll persist stays 300 ms: TIMING.persist (150) fires mid-scroll and breaks cell-editor.spec
 U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
 U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret
 U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge

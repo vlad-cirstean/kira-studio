@@ -31,7 +31,7 @@ export type PaletteColor = z.infer<typeof paletteColorSchema>;
  *  (`oklch(0.72 0.09 h)`) — roughly double the full eleven-hue ring's own worst gap (25.6°,
  *  blue↔indigo), which is what makes a 2px rail or a 5px status dot legible at all. Retired from
  *  the picker: `orange`, `olive`, `teal`, `indigo`, `violet`. */
-export const PALETTE_COLOR_CHOICES: readonly PaletteColor[] = [
+export const PALETTE_COLOR_CHOICES = [
   'none',
   'red',
   'amber',
@@ -40,4 +40,7 @@ export const PALETTE_COLOR_CHOICES: readonly PaletteColor[] = [
   'blue',
   'magenta',
   'grey',
-];
+] as const satisfies readonly PaletteColor[];
+
+/** One of the offered palette colours (`none` included). */
+export type OfferedColor = (typeof PALETTE_COLOR_CHOICES)[number];

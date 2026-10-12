@@ -8,6 +8,7 @@ import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { useEventListener } from '@vueuse/core';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
@@ -220,7 +221,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
     >
       <div class="relative flex">
         <TooltipIconButton
-          icon="history"
+          :icon="ICON.history"
           :label="t('common.module.history.label')"
           ref="historyAnchorRef"
           disabled-trigger
@@ -233,7 +234,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
       <VariableHistoryMenu v-if="variableSetStore.variableId === row.id" />
     </Popover>
     <TooltipIconButton
-      icon="trash"
+      :icon="ICON.remove"
       :label="t('common.action.remove.label')"
       disabled-trigger
       :disabled="props.trailing"

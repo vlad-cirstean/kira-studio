@@ -10,7 +10,7 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { colorMarkClass } from '@theme/connColor';
+import { colorMarkClass, colourLabel } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
@@ -608,7 +608,7 @@ function onBulkClose(): void {
                 @change="onEnvColorChange(color)"
               />
             </TooltipTrigger>
-            <TooltipContent>{{ color === 'none' ? t('common.field.noColour.label') : color }}</TooltipContent>
+            <TooltipContent>{{ colourLabel(color) }}</TooltipContent>
           </Tooltip>
         </fieldset>
         <Button variant="toolbar" size="kira" data-testid="environment-duplicate" @click="onDuplicateEnvironment">

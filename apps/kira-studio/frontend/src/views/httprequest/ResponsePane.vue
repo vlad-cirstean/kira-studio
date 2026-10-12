@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { formatBytes, formatClockTime, formatDuration } from '@workbench/behaviour/format';
 import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -296,7 +296,7 @@ onUnmounted(() => {
            lists, not one searchable document. -->
       <TooltipIconButton
         v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'"
-        icon="search"
+        :icon="ICON.search"
         :label="t('studio.http.response.find.label')"
         :class="{ 'bg-field text-fg': findOpen }"
         data-testid="http-find-toggle"
@@ -392,10 +392,7 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-      <Empty v-else>
-        <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
-      </Empty>
+      <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
     </div>
     <RawExchangePane
       v-else-if="tab.state.responsePane === 'raw'"
@@ -433,9 +430,7 @@ onUnmounted(() => {
           :range-highlights="bodyHighlights"
         />
       </template>
-      <Empty v-else>
-        <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.common.responseEmpty.empty') }}</EmptyTitle>
+      <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')">
         <button
           v-if="hasHistory"
           type="button"
@@ -445,7 +440,7 @@ onUnmounted(() => {
         >
           {{ t('studio.http.response.viewHistory.label', { count: historyCount }) }}
         </button>
-      </Empty>
+      </EmptyState>
     </div>
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
