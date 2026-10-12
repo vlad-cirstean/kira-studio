@@ -207,7 +207,7 @@ func checkDecision(d reconcileDecision, w *work, cands map[string]Memory) decisi
 		if GradeOf(cand.Origin) > GradeOf(w.Origin) {
 			return decision{Action: ActionAdd, Fact: w.Fact, Reason: w.Reason, Why: keptBesideWhy}
 		}
-		fact, reason := strings.TrimSpace(d.Fact), strings.TrimSpace(d.Reason)
+		fact, reason := collapse(d.Fact), collapse(d.Reason)
 		if fact == "" || len([]rune(fact)) > MaxFactLen || reason == "" || len([]rune(reason)) > MaxReasonLen {
 			return fail("updated fact or reason is empty or too long")
 		}

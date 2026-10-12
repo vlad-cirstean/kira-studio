@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const (
@@ -263,6 +264,54 @@ func (s *Service) progress(req StoreRequest, stage string) {
 	}
 }
 
+// decide runs the read-only front of the pipeline: gate, then candidate lookup and reconcile. The
+// caller holds the semaphore. A challenge returns early with Status "challenged" and no works.
+func (s *Service) decide(ctx context.Context, req StoreRequest) (works []*work, rev int64, res StoreResult, err error) {
+	s.progress(req, "checking")
+	verdicts, err := s.runGate(ctx, req)
+	if err != nil {
+		return nil, 0, StoreResult{}, err
+	}
+	res = StoreResult{Challenges: []ItemChallenge{}, Outcomes: []FactOutcome{}}
+	for _, v := range verdicts {
+		if v.Verdict == "challenge" {
+			res.Challenges = append(res.Challenges, ItemChallenge{Index: v.Index, Fact: req.Items[v.Index].Fact, Questions: v.Questions})
+		}
+	}
+	if len(res.Challenges) > 0 {
+		res.Status = "challenged"
+		return nil, 0, res, nil
+	}
+	res.Status = "stored"
+
+	for _, v := range verdicts {
+		it := req.Items[v.Index]
+		for _, f := range v.Facts {
+			works = append(works, &work{Fact: f.Fact, Reason: f.Reason, Keywords: f.Keywords,
+				Origin: it.Origin, SourceTag: it.SourceTag, Scope: it.Scope, Project: it.Project})
+		}
+	}
+
+	s.progress(req, "reconciling")
+	if rev, err = s.store.Revision(ctx); err != nil {
+		return nil, 0, StoreResult{}, err
+	}
+	var pending []*work
+	for _, w := range works {
+		need, err := s.prepare(ctx, w)
+		if err != nil {
+			return nil, 0, StoreResult{}, err
+		}
+		if need {
+			pending = append(pending, w)
+		}
+	}
+	if err := s.reconcile(ctx, pending); err != nil {
+		return nil, 0, StoreResult{}, err
+	}
+	return works, rev, res, nil
+}
+
 // Store gates, reconciles and commits. A challenge stores nothing. A runner error fails the whole
 // request; per-fact failures land in Outcomes.
 func (s *Service) Store(ctx context.Context, req StoreRequest) (StoreResult, error) {
@@ -275,49 +324,9 @@ func (s *Service) Store(ctx context.Context, req StoreRequest) (StoreResult, err
 	}
 	defer s.sem.Release(1)
 
-	s.progress(req, "checking")
-	verdicts, err := s.runGate(ctx, req)
-	if err != nil {
-		return StoreResult{}, err
-	}
-	res := StoreResult{Challenges: []ItemChallenge{}, Outcomes: []FactOutcome{}}
-	for _, v := range verdicts {
-		if v.Verdict == "challenge" {
-			res.Challenges = append(res.Challenges, ItemChallenge{Index: v.Index, Fact: req.Items[v.Index].Fact, Questions: v.Questions})
-		}
-	}
-	if len(res.Challenges) > 0 {
-		res.Status = "challenged"
-		return res, nil
-	}
-	res.Status = "stored"
-
-	var works []*work
-	for _, v := range verdicts {
-		it := req.Items[v.Index]
-		for _, f := range v.Facts {
-			works = append(works, &work{Fact: f.Fact, Reason: f.Reason, Keywords: f.Keywords,
-				Origin: it.Origin, SourceTag: it.SourceTag, Scope: it.Scope, Project: it.Project})
-		}
-	}
-
-	s.progress(req, "reconciling")
-	rev, err := s.store.Revision(ctx)
-	if err != nil {
-		return StoreResult{}, err
-	}
-	var pending []*work
-	for _, w := range works {
-		need, err := s.prepare(ctx, w)
-		if err != nil {
-			return StoreResult{}, err
-		}
-		if need {
-			pending = append(pending, w)
-		}
-	}
-	if err := s.reconcile(ctx, pending); err != nil {
-		return StoreResult{}, err
+	works, rev, res, err := s.decide(ctx, req)
+	if err != nil || res.Status == "challenged" {
+		return res, err
 	}
 
 	s.progress(req, "saving")
@@ -336,6 +345,126 @@ func (s *Service) Store(ctx context.Context, req StoreRequest) (StoreResult, err
 		s.kickBackfill()
 	}
 	return res, nil
+}
+
+// PreparedFact is one fact Prepare would store. ID is the fact id its comment carries: the
+// stored fact's for a noop or update, a fresh unwritten one for an add.
+type PreparedFact struct {
+	ID        string   `json:"id"`
+	Fact      string   `json:"fact"`
+	Reason    string   `json:"reason"`
+	Keywords  []string `json:"keywords"`
+	Origin    string   `json:"origin"`
+	SourceTag string   `json:"sourceTag,omitempty"`
+	Scope     string   `json:"scope"`
+	Project   string   `json:"project,omitempty"`
+	Action    string   `json:"action"` // add | update | noop
+	Why       string   `json:"why"`
+}
+
+// PrepareResult is what Prepare returns: Status "prepared" with Facts and Comment, or "challenged".
+type PrepareResult struct {
+	Status     string          `json:"status"`
+	Challenges []ItemChallenge `json:"challenges"`
+	Facts      []PreparedFact  `json:"facts"`
+	Comment    string          `json:"comment,omitempty"`
+}
+
+// Prepare runs the store pipeline up to the commit and persists nothing: no row, event, revision
+// bump, change callback or backfill. The comment uses marker m.
+func (s *Service) Prepare(ctx context.Context, req StoreRequest, m memfmt.Marker) (PrepareResult, error) {
+	req.Items = normalizeItems(req.Items)
+	if err := validateRequest(req); err != nil {
+		return PrepareResult{}, err
+	}
+	if len(req.Groups) > 0 || req.Source == SourceImport {
+		return PrepareResult{}, invalid("preparing stores nothing, so groups and import mode are not allowed")
+	}
+	if err := s.sem.Acquire(ctx, 1); err != nil {
+		return PrepareResult{}, err
+	}
+	defer s.sem.Release(1)
+
+	works, _, res, err := s.decide(ctx, req)
+	if err != nil {
+		return PrepareResult{}, err
+	}
+	if res.Status == "challenged" {
+		return PrepareResult{Status: "challenged", Challenges: res.Challenges, Facts: []PreparedFact{}}, nil
+	}
+	out := PrepareResult{Status: "prepared", Challenges: []ItemChallenge{}, Facts: make([]PreparedFact, 0, len(works))}
+	for _, w := range works {
+		pf, err := preparedFact(w)
+		if err != nil {
+			return PrepareResult{}, err
+		}
+		out.Facts = append(out.Facts, pf)
+	}
+	if out.Comment, err = commentFor(m, out.Facts); err != nil {
+		return PrepareResult{}, err
+	}
+	return out, nil
+}
+
+// preparedFact maps a work's decision to the id and text a comment carries.
+func preparedFact(w *work) (PreparedFact, error) {
+	pf := PreparedFact{Fact: w.Fact, Reason: w.Reason, Keywords: w.Keywords, Origin: w.Origin, SourceTag: w.SourceTag,
+		Scope: w.Scope, Project: w.Project, Action: w.dec.Action, Why: w.dec.Why}
+	switch {
+	case w.dec.Err == nil && (w.dec.Action == ActionNoop || w.dec.Action == ActionUpdate):
+		pf.ID, _, _ = strings.Cut(w.dec.Target, ".")
+		pf.Fact, pf.Reason = w.dec.factOr(w.Fact), w.dec.reasonOr(w.Reason)
+	default:
+		id, err := newFactID()
+		if err != nil {
+			return PreparedFact{}, err
+		}
+		pf.ID, pf.Action = id, ActionAdd
+		if w.dec.Err != nil {
+			pf.Why = w.dec.Err.Error()
+		}
+	}
+	var err error
+	if pf.Fact, err = cleanText(pf.Fact); err != nil {
+		return PreparedFact{}, err
+	}
+	if pf.Reason, err = cleanText(pf.Reason); err != nil {
+		return PreparedFact{}, err
+	}
+	return pf, nil
+}
+
+// cleanText returns s when it passes memfmt.CheckText, else s without its Markdown markup when
+// that fixes it, else ErrClaudeOutput: a comment the validator rejects never ships.
+func cleanText(s string) (string, error) {
+	if memfmt.CheckText(s) == "" {
+		return s, nil
+	}
+	if t := memfmt.StripMarkup(s); memfmt.CheckText(t) == "" {
+		return t, nil
+	}
+	return "", fmt.Errorf("%w: prepared text breaks the comment format: %s", ErrClaudeOutput, memfmt.CheckText(s))
+}
+
+// commentFor groups facts into one block per distinct origin, source tag and scope, in item order.
+func commentFor(m memfmt.Marker, facts []PreparedFact) (string, error) {
+	var blocks []memfmt.Block
+	index := map[[3]string]int{}
+	for _, f := range facts {
+		key := [3]string{f.Origin, f.SourceTag, f.Scope}
+		i, ok := index[key]
+		if !ok {
+			i = len(blocks)
+			index[key] = i
+			blocks = append(blocks, memfmt.Block{Provenance: memfmt.Provenance{Origin: f.Origin, Source: f.SourceTag, Scope: f.Scope}})
+		}
+		blocks[i].Facts = append(blocks[i].Facts, memfmt.Fact{ID: f.ID, Fact: f.Fact, Reason: f.Reason})
+	}
+	comment, err := memfmt.FormatComment(m, blocks)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrClaudeOutput, err)
+	}
+	return comment, nil
 }
 
 // requestGroups are the groups every fact of a call joins: its session, the call itself, and the

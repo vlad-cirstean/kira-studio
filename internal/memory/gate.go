@@ -108,7 +108,7 @@ func validateGate(n int, items []gateVerdict) ([]gateVerdict, error) {
 			}
 			for j := range v.Facts {
 				f := &v.Facts[j]
-				f.Fact, f.Reason = strings.TrimSpace(f.Fact), strings.TrimSpace(f.Reason)
+				f.Fact, f.Reason = collapse(f.Fact), collapse(f.Reason)
 				f.Keywords = cleanKeywords(f.Keywords)
 				if f.Fact == "" || len([]rune(f.Fact)) > MaxFactLen || f.Reason == "" || len([]rune(f.Reason)) > MaxReasonLen {
 					return nil, bad("fact or reason of item %d is empty or too long", v.Index)
@@ -125,6 +125,10 @@ func validateGate(n int, items []gateVerdict) ([]gateVerdict, error) {
 	}
 	return items, nil
 }
+
+// collapse trims s and folds every whitespace run, newlines included, to one space: formats hold
+// one field per line.
+func collapse(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 func trimAll(in []string) []string {
 	out := []string{}
