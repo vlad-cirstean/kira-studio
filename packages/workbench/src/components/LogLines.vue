@@ -6,9 +6,11 @@ import { cn } from '@theme/lib/utils';
 import { computed, useTemplateRef } from 'vue';
 import { useFollowTail } from '../behaviour/followTail';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
+import { type AnsiSegment, parseAnsi } from '../lib/ansi';
 
-// The one log viewer (run logs, worktree setup): virtualized, follows the tail until the reader
-// scrolls up. Callers own loading and fetching; `testid` keeps each caller's own locator ids.
+// The one log viewer (run logs, worktree setup, container logs): virtualized, ANSI-coloured,
+// follows the tail until the reader scrolls up. Callers own loading and fetching; `testid` keeps
+// each caller's own locator ids. The `line` slot replaces a line's content (match highlighting).
 export interface LogLine {
   id: string | number;
   text: string;
@@ -21,6 +23,8 @@ const props = defineProps<{
   error?: string;
   truncated?: boolean;
   maxHeight?: string;
+  /** Wrap long lines (default); false keeps one row per line and scrolls sideways. */
+  wrap?: boolean;
 }>();
 
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl');
@@ -36,6 +40,19 @@ const style = computed(() => (props.maxHeight ? { maxHeight: props.maxHeight } :
 
 function measure(el: unknown): void {
   if (el instanceof Element) virtualizer.value.measureElement(el);
+}
+
+function segmentsOf(index: number): AnsiSegment[] {
+  return parseAnsi((props.lines[index]?.text ?? '').replace(/\n$/, ''));
+}
+
+function segmentStyle(seg: AnsiSegment): Record<string, string> | undefined {
+  if (!seg.color && !seg.background && !seg.faint) return undefined;
+  return {
+    ...(seg.color && { color: seg.color }),
+    ...(seg.background && { backgroundColor: seg.background }),
+    ...(seg.faint && { opacity: '0.6' }),
+  };
 }
 
 function streamClass(stream: string): string {
@@ -64,14 +81,28 @@ function streamClass(stream: string): string {
           :key="lines[item.index]?.id ?? item.key"
           :ref="measure"
           :data-index="item.index"
-          :class="cn(VIRTUAL_ROW_CLASS, 'whitespace-pre-wrap break-words', streamClass(lines[item.index]?.stream ?? ''))"
+          :class="cn(VIRTUAL_ROW_CLASS, wrap === false ? 'whitespace-pre' : 'whitespace-pre-wrap break-words', streamClass(lines[item.index]?.stream ?? ''))"
           :style="{ transform: `translateY(${item.start}px)` }"
           :data-testid="`${testid}-line`"
           :data-stream="lines[item.index]?.stream"
-          >{{
-            lines[item.index]?.text.replace(/\n$/, '')
-          }}</div
         >
+          <slot
+            name="line"
+            :line="lines[item.index]"
+            :segments="segmentsOf(item.index)"
+            :index="item.index"
+          >
+            <span
+              v-for="(seg, i) in segmentsOf(item.index)"
+              :key="i"
+              :class="seg.bold && 'font-bold'"
+              :style="segmentStyle(seg)"
+              >{{
+                seg.text
+              }}</span
+            >
+          </slot>
+        </div>
       </div>
     </template>
   </div>
