@@ -184,7 +184,9 @@ test('the pre-connect textarea round-trips a multi-line value, and a valid throt
   await expect(page.locator('[data-testid="connection-throttle"]')).toHaveValue('5');
 });
 
-test('an out-of-range throttle blocks Save and shows its own error', async ({ relaunch }) => {
+test('an out-of-range throttle is refused on Save and shows its own error', async ({
+  relaunch,
+}) => {
   const { window: page } = await relaunch({
     control: [{ channel: IPC.connectionsList, response: [] }],
   });
@@ -195,22 +197,21 @@ test('an out-of-range throttle blocks Save and shows its own error', async ({ re
   await expect(page.locator('[data-testid="connection-save"]')).toBeEnabled();
 
   await page.fill('[data-testid="connection-throttle"]', '5000'); // above CONNECTION_THROTTLE_RANGE.max
-  await expect(page.locator('[data-testid="connection-save"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="connection-save"]')).toBeEnabled();
+  await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-throttle-error"]')).toBeVisible();
+  await expect(page.locator('[data-testid="connection-throttle"]')).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
 
   await page.fill('[data-testid="connection-throttle"]', '0'); // 0 (unlimited) is always valid
   await expect(page.locator('[data-testid="connection-save"]')).toBeEnabled();
   await expect(page.locator('[data-testid="connection-throttle-error"]')).toHaveCount(0);
 });
 
-// The Save button is disabled whenever connectionInputSchema itself rejects the draft (isValid
-// uses the identical schema), so a genuinely invalid draft can never be clicked through by a real
-// user — there is nothing to switch tabs *for* in that path. This test exercises the
-// TAB_FOR_FIELD switch in onSave directly (a pre-connect value validation would otherwise reject
-// it, per the schema's max(2000)) by removing the button's disabled attribute immediately before
-// the click, the one way to reach that internal branch without relying on a state a real user
-// could produce — the switch itself, once reached, is exactly what a real out-of-band failure
-// (e.g. a field made invalid by something other than this schema) would also hit.
+// Save stays enabled; a rejected draft focuses its field and switches to the tab holding it.
 test('a save that fails validation on a Pre-connect-tab field switches to that tab', async ({
   relaunch,
 }) => {
@@ -229,10 +230,7 @@ test('a save that fails validation on a Pre-connect-tab field switches to that t
   }, tooLong);
 
   await page.click('[data-testid="connection-tab-general"]');
-  const saveButton = page.locator('[data-testid="connection-save"]');
-  await expect(saveButton).toBeDisabled();
-  await saveButton.evaluate((el) => el.removeAttribute('disabled'));
-  await saveButton.click();
+  await page.locator('[data-testid="connection-save"]').click();
 
   await expect(page.locator('[data-testid="connection-tab-preconnect"]')).toHaveAttribute(
     'data-state',

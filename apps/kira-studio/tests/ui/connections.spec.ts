@@ -391,7 +391,9 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="mode-fields"]');
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
   await expect(page.locator('[data-testid="connection-host"]')).toHaveCount(0);
-  await expect(page.locator('.uri-note')).toContainText('can’t be represented as fields');
+  await expect(page.locator('[data-testid="connection-uri-note"]')).toContainText(
+    'can’t be represented as fields',
+  );
 
   // Discard — do not persist this exotic-URI draft.
   await page.click('[data-testid="connection-cancel"]');
@@ -434,7 +436,9 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await expect(uriField).toHaveAttribute('placeholder', 'Unchanged; click the eye to reveal');
   await page.click('[data-testid="mode-fields"]');
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
-  await expect(page.locator('.uri-note')).toContainText('Show the URI first');
+  await expect(page.locator('[data-testid="connection-uri-note"]')).toContainText(
+    'Show the URI first',
+  );
   expect(revealCalls()).toHaveLength(0);
 
   // Save with the URI never shown: the matching snapshot above only answers uri: null.

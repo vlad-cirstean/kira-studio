@@ -104,6 +104,7 @@ defineSlots<{
             <TooltipTrigger as-child>
               <button
                 type="button"
+                data-testid="saved-entry-pin"
                 class="flex shrink-0 border-0 bg-transparent p-0"
                 :class="isPinned(entry) ? 'text-warn' : 'text-subtle'"
                 @click.stop="emit('togglePin', entry)"

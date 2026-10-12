@@ -372,7 +372,9 @@ async function onBrowseDatabaseFile(): Promise<void> {
         </div>
         <FieldError v-if="errorFor('uri')" :id="errorId('uri')">{{ errorFor('uri') }}</FieldError>
       </Field>
-      <FieldDescription class="font-data">{{ uriNote }}</FieldDescription>
+      <FieldDescription class="font-data" data-testid="connection-uri-note">{{
+        uriNote
+      }}</FieldDescription>
     </template>
   </TabsContent>
 </template>
