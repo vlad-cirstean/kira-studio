@@ -66,6 +66,9 @@ const path = ref('');
 const mode = ref<Mode>('newBranch');
 const branch = ref('');
 const startPoint = ref('');
+// Seeded/suggested values are not user edits; `dirty` compares against them.
+const seededBranch = ref('');
+const suggestedPath = ref('');
 const preflight = ref<WorktreeAddPreflight | undefined>(undefined);
 const pathId = useId();
 const modeId = useId();
@@ -78,8 +81,10 @@ watch(
   (seed) => {
     if (!seed) return;
     path.value = '';
+    suggestedPath.value = '';
     mode.value = seed.mode ?? 'newBranch';
     branch.value = seed.branch ?? '';
+    seededBranch.value = branch.value;
     startPoint.value =
       seed.startPoint ??
       (props.refs.head.value?.kind === 'branch' ? props.refs.head.value.name : '');
@@ -98,6 +103,7 @@ watch([branch, startPoint], ([b, s]) => {
   const base = props.basePathDefault.trim();
   path.value =
     base === '' ? suggestion.trim() : `${base.replace(/[/\\]+$/, '')}/${suggestion.trim()}`;
+  suggestedPath.value = path.value;
 });
 
 const newBranchNameError = computed(() => {
@@ -186,7 +192,11 @@ function onClose(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && onClose()">
-    <DialogContent :aria-describedby="undefined" size="md" :dirty="path !== '' || branch !== ''">
+    <DialogContent
+      :aria-describedby="undefined"
+      size="md"
+      :dirty="path !== suggestedPath || branch !== seededBranch"
+    >
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.worktree.title') }}</DialogTitle>
       </DialogHeader>
