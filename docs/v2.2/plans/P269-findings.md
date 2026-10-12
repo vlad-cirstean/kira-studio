@@ -149,3 +149,12 @@ All five findings real on re-trace; fixed. Base `44e429b1c`.
 - P269-5: `ca25ed992` `String(p)` at the three partition sites.
 
 Verified: `bun test` format.spec, `go test ./apps/kira-space/...`, lint and typecheck via hooks, Playwright `claude-usage` and `ade-v2-launch` (ui), mobile-ios `agents`. Not run: studio stream UI specs (none cover partitions), full suites.
+
+## Review rounds test result
+
+Base `79ca099cd`, run serially, 2-3 workers.
+
+- unit 1903 pass. ui studio 532 pass (cell-editor autodetect, row-coloring boot flaked once under load; pass alone). ui space 555: 554 pass, 1 fail (fixed, below). mobile ios+android 81 pass, 1 skipped. visual studio 13, visual space 13 pass, no diff images, no baseline updated.
+- flows studio+space (`-count=1`) pass. `go test ./...` pass (124 ok packages). `lint`, `typecheck`, `lint:go`, `lint:dead` clean.
+- format.spec day step, KeyValue TTL `Nd Nh`, mobile discard 44px, E_BAD_REQUEST ADE inputs, dropTabs, ScriptDialog Cmd/Ctrl+Enter: all green.
+- Fix `1f74e4f1e`: `WorktreeDialog` counted its suggested path as a user edit. P268-1 provides the discard confirm in git-ui, so Esc on an untouched Create worktree dialog asked "Discard unsaved edits" (`copy-coverage-git` createWorktreeHere, deterministic). Dirty now compares to seeded branch and suggested path. Space ui rerun of copy-coverage-git and consistency-git: 26 pass.
