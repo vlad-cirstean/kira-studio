@@ -77,7 +77,7 @@ func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	call := func(name string, args map[string]any, out any) { t.Helper(); callOn(cs, name, args, out) }
 
 	var stored memory.StoreResult
-	call("store_memory", map[string]any{"author": "agent", "items": []map[string]any{{"fact": "the cache is redis", "reason": "ops runbook"}}}, &stored)
+	call("store_memory", map[string]any{"items": []map[string]any{{"fact": "the cache is redis", "reason": "ops runbook", "origin": "agent", "scope": "personal"}}}, &stored)
 	if stored.Status != "stored" || len(stored.Outcomes) != 1 || stored.Outcomes[0].Action != "add" {
 		t.Fatalf("stored = %+v", stored)
 	}
@@ -95,7 +95,7 @@ func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	// Import mode forces attribution: the agent cannot claim to be the user.
 	var imported memory.StoreResult
 	callOn(connect(Options{ImportRef: "file-1"}), "store_memory",
-		map[string]any{"author": "user", "items": []map[string]any{{"fact": "the queue is nats", "reason": "Stated in docs/ops.md"}}}, &imported)
+		map[string]any{"items": []map[string]any{{"fact": "the queue is nats", "reason": "Stated in docs/ops.md", "origin": "user", "scope": "company"}}}, &imported)
 	if len(imported.Outcomes) != 1 {
 		t.Fatalf("imported = %+v", imported)
 	}
@@ -103,6 +103,39 @@ func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	call("memory_history", map[string]any{"id": imported.Outcomes[0].ID}, &ih)
 	if ev := ih.Events[0]; ev.Source != memory.SourceImport || ev.Origin != memory.OriginExternal || ev.SourceRef == nil || *ev.SourceRef != "file-1" {
 		t.Fatalf("import event = %+v", ev)
+	}
+
+	if ih.Memories[0].Scope != memory.ScopePersonal || ih.Memories[0].SessionID != nil {
+		t.Fatalf("import mode keeps caller scope or session: %+v", ih.Memories[0])
+	}
+
+	// Session and project default from the server; memory_context reads the session group.
+	var scoped memory.StoreResult
+	sess := connect(Options{SessionID: "sess-1", Project: "github.com/acme/billing"})
+	callOn(sess, "store_memory", map[string]any{"items": []map[string]any{
+		{"fact": "billing retries twice", "reason": "runbook", "origin": "external", "sourceTag": "Slack", "scope": "project"},
+		{"fact": "billing owns invoices", "reason": "org chart", "origin": "user", "scope": "project"},
+	}}, &scoped)
+	if len(scoped.Outcomes) != 2 {
+		t.Fatalf("scoped = %+v", scoped)
+	}
+	var cx memory.Context
+	callOn(sess, "memory_context", map[string]any{"id": scoped.Outcomes[0].LineageID}, &cx)
+	m := cx.Memory
+	if m.Origin != memory.OriginExternal || m.SourceTag == nil || *m.SourceTag != "slack" || m.Project == nil ||
+		*m.Project != "github.com/acme/billing" || m.SessionID == nil || *m.SessionID != "sess-1" {
+		t.Fatalf("memory = %+v", m)
+	}
+	kinds := map[string]memory.GroupContext{}
+	for _, g := range cx.Groups {
+		kinds[g.Kind] = g
+	}
+	if g := kinds[memory.GroupSession]; g.Key != "sess-1" || len(g.Facts) != 1 || g.Facts[0].LineageID != scoped.Outcomes[1].LineageID {
+		t.Fatalf("session group = %+v", g)
+	}
+	if res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "store_memory", Arguments: map[string]any{"items": []map[string]any{
+		{"fact": "x", "reason": "y", "origin": "bogus", "scope": "project"}}}}); err == nil && !res.IsError {
+		t.Fatal("origin outside the enum accepted")
 	}
 
 	prompts, err := cs.ListPrompts(ctx, nil)

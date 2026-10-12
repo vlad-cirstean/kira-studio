@@ -355,23 +355,37 @@ var MemoryMcpInstructions = define(Entry{
 	UsedByKey:  "llmPrompts.entry.memoryMcpInstructions.usedBy.body",
 	Default: `Long-term memory for the user and their agents.
 
-Store a memory when the user states a durable fact, or when you learn one worth keeping across sessions, with the reason it is true. Call store_memory with one item per fact; set author to "user" when the user said it and "agent" when you concluded it. Never store secrets.
+Store a memory when the user states a durable fact, or when you learn one worth keeping across sessions, with the reason it is true. Call store_memory with one item per fact. Each item names its origin: "user" when the user decided or stated it, "agent" when you concluded it, "external" with a sourceTag when it comes from a source such as slack, jira or a doc. Each item also names its scope: "company", "project" or "personal". Never store secrets.
+
+Origins rank user, then external, then agent. An agent fact never replaces a user fact.
 
 store_memory challenges an item that is ambiguous, has no real reason or does not make sense. A challenge stores nothing: ask the user the returned questions, or fix the item yourself, then call store_memory again with the revised items and the answers in "clarifications".
 
-search_memories is recall-oriented: it matches words and meaning, and returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.`,
+search_memories is recall-oriented: it matches words and meaning, and returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.
+
+Cite a memory by its fact id (km_...). Pass a fact id to memory_context to read the facts stored alongside it: same session, request, task, document or thread.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store one or more facts, each with its reason. Every item is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored updates it; the old version stays as history.`,
+	Default: `Store one or more facts, each with its reason. Every item names its origin and scope and is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored in the same scope updates it, unless the stored fact ranks higher by origin; the old version stays as history. Returns the fact id of each stored fact.`,
 }, NoVars{})
 
 var (
-	_ = arg(MemoryToolStoreMemory.id, "items", spaceApp, NewSession, `facts to store, 1 to {{.Max}}; each with its reason`, MaxVars{Max: 20})
-	_ = arg(MemoryToolStoreMemory.id, "author", spaceApp, NewSession, `user when the user stated the facts, agent when the agent concluded them`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items", spaceApp, NewSession, `facts to store, 1 to {{.Max}}; each with its reason, origin and scope`, MaxVars{Max: 20})
+	_ = arg(MemoryToolStoreMemory.id, "items.fact", spaceApp, NewSession, `one claim, written to stand alone`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.reason", spaceApp, NewSession, `why the fact is true`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.origin", spaceApp, NewSession, `who decided the fact: user (the user stated or confirmed it), agent (you concluded it) or external (it comes from a source outside this conversation; set sourceTag)`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.sourceTag", spaceApp, NewSession, `required for origin external, forbidden otherwise; the source name in lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.scope", spaceApp, NewSession, `how far the fact holds: company (the whole company), project (one project) or personal (the user only)`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit it to use the project of the current directory; forbidden for other scopes`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "clarifications", spaceApp, NewSession, `question and answer pairs resolving an earlier challenge`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "session", spaceApp, NewSession, `Claude Code session id; omit it to use this session's id`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups", spaceApp, NewSession, `up to 5 groups every item joins, besides the automatic session and request groups; memory_context reads a group's other facts`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups.kind", spaceApp, NewSession, `task, document or thread`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups.key", spaceApp, NewSession, `stable identifier: a task id such as PROJ-123, an absolute document path or a thread URL`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups.title", spaceApp, NewSession, `optional label shown to people`, NoVars{})
 )
 
 // MemoryToolSearchMemories describes the search_memories tool.
@@ -392,7 +406,18 @@ var MemoryToolMemoryHistory = define(Entry{
 	Default: `Return every version of one memory, oldest first, each flagged historical when replaced, with the events that explain each change.`,
 }, NoVars{})
 
-var _ = arg(MemoryToolMemoryHistory.id, "id", spaceApp, NewSession, `id of any version of the memory`, NoVars{})
+var _ = arg(MemoryToolMemoryHistory.id, "id", spaceApp, NewSession, `fact id of the memory, or the id of any version`, NoVars{})
+
+// MemoryToolMemoryContext describes the memory_context tool.
+var MemoryToolMemoryContext = define(Entry{
+	ID: "memory.mcp.tool.memory_context", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "memory_context",
+	Default: `Return the facts stored alongside one fact. For each group the fact belongs to (session, request, task, document, thread) it lists the group's other current facts, newest first. Use it as a second step when a fact from search_memories needs its surroundings.`,
+}, NoVars{})
+
+var (
+	_ = arg(MemoryToolMemoryContext.id, "id", spaceApp, NewSession, `fact id of the memory, or the id of any version`, NoVars{})
+	_ = arg(MemoryToolMemoryContext.id, "limit", spaceApp, NewSession, `maximum facts per group, default {{.Default}}, maximum {{.Max}}`, LimitVars{Default: 20, Max: 100})
+)
 
 // MemoryRememberDescription describes the remember prompt of the memory MCP server.
 var MemoryRememberDescription = define(Entry{
@@ -408,7 +433,7 @@ var MemoryRememberMessage = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpRememberMessage.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpRememberMessage.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpRememberMessage.usedBy.body",
-	Default: `Extract the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}}, each with the reason it is true, and store them with the store_memory tool (author "user" for what the user stated, "agent" for what you concluded). If store_memory returns questions, ask the user those questions, then call it again with the revised items and the answers as clarifications. Report what was stored.{{if .Text}}
+	Default: `Extract the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}}, each with the reason it is true, and store them with the store_memory tool. Give each fact an origin ("user" for what the user stated, "agent" for what you concluded, "external" with a sourceTag for what a source such as slack or jira states) and a scope ("company", "project" or "personal"). If store_memory returns questions, ask the user those questions, then call it again with the revised items and the answers as clarifications. Report what was stored.{{if .Text}}
 
 {{.Text}}{{end}}`,
 }, RememberVars{Text: "We use pnpm, not npm."})

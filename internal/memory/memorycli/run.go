@@ -47,9 +47,26 @@ func Run(args []string, promptsPath string) int {
 	}
 	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
 	defer svc.Close()
-	if err := mcpserver.RunStdio(ctx, svc, mcpserver.Options{ImportRef: *importRef, Prompts: prompts}); err != nil && ctx.Err() == nil {
+	opts := mcpserver.Options{ImportRef: *importRef, Prompts: prompts, Project: detectProject(ctx)}
+	if id := os.Getenv("CLAUDE_CODE_SESSION_ID"); memory.ValidSession(id) {
+		opts.SessionID = id
+	}
+	if err := mcpserver.RunStdio(ctx, svc, opts); err != nil && ctx.Err() == nil {
 		fmt.Fprintln(os.Stderr, "kira-memory:", err)
 		return 1
 	}
 	return 0
+}
+
+// detectProject is the project key of the working directory, empty outside a git repository.
+func detectProject(ctx context.Context) string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	key, err := memory.DetectProject(ctx, dir)
+	if err != nil {
+		return ""
+	}
+	return key
 }

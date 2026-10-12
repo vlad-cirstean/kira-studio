@@ -1,5 +1,5 @@
-// Package mcpserver is the kira-memory MCP server: store_memory, search_memories and
-// memory_history tools plus the `remember` prompt, over a memory.Service.
+// Package mcpserver is the kira-memory MCP server: store_memory, search_memories, memory_history
+// and memory_context tools plus the `remember` prompt, over a memory.Service.
 package mcpserver
 
 import (
@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
@@ -18,16 +19,11 @@ import (
 
 const serverVersion = "1"
 
-// legacyItem is the transitional item shape: origin and scope arrive with the new item fields.
-type legacyItem struct {
-	Fact   string `json:"fact"`
-	Reason string `json:"reason"`
-}
-
 type storeInput struct {
-	Items          []legacyItem           `json:"items"`
-	Author         string                 `json:"author"`
+	Items          []memory.Item          `json:"items"`
 	Clarifications []memory.Clarification `json:"clarifications,omitempty"`
+	Session        string                 `json:"session,omitempty"`
+	Groups         []memory.GroupRef      `json:"groups,omitempty"`
 }
 
 type searchInput struct {
@@ -46,11 +42,23 @@ type historyInput struct {
 	ID string `json:"id"`
 }
 
+type contextInput struct {
+	ID    string `json:"id"`
+	Limit int    `json:"limit,omitempty"`
+}
+
 // Options tune a server instance.
 type Options struct {
-	// ImportRef puts the server in import mode: every stored memory is attributed to the agent with
-	// source "import" and this import file id, whatever author the caller sends.
+	// ImportRef puts the server in import mode: every stored memory is external with source tag
+	// "doc", personal, source "import" and this import file id, and joins the file's document group,
+	// whatever provenance the caller sends.
 	ImportRef string
+	// SessionID is the Claude Code session of this server; a store call without a session argument
+	// uses it. Empty stores no session.
+	SessionID string
+	// Project is the project key of the server's working directory; an item of scope project without
+	// a project uses it. Empty means undetected.
+	Project string
 	// Prompts resolves the texts the server shows; nil means the registry defaults. Instructions,
 	// tool and argument descriptions are read once here, so an edit reaches the next session.
 	Prompts llmprompts.Source
@@ -69,9 +77,7 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "store_memory",
 		Description: llmprompts.MemoryToolStoreMemory.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[storeInput](src, llmprompts.MemoryToolStoreMemory.ID(), map[string]any{
-			"items": llmprompts.MaxVars{Max: memory.MaxItems},
-		}),
+		InputSchema: storeSchema(src),
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: false},
 	}, recovering("store_memory", func(ctx context.Context, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
 		return storeMemory(ctx, svc, opts, req, in)
@@ -108,6 +114,21 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderMemories(h.Memories)}}}, h, nil
 	}))
 
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "memory_context",
+		Description: llmprompts.MemoryToolMemoryContext.Text(src, llmprompts.NoVars{}),
+		InputSchema: llmprompts.InputSchema[contextInput](src, llmprompts.MemoryToolMemoryContext.ID(), map[string]any{
+			"limit": llmprompts.LimitVars{Default: memory.DefaultContextLimit, Max: memory.MaxContextLimit},
+		}),
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, recovering("memory_context", func(ctx context.Context, _ *mcp.CallToolRequest, in contextInput) (*mcp.CallToolResult, memory.Context, error) {
+		c, err := svc.Context(ctx, in.ID, in.Limit)
+		if err != nil {
+			return nil, memory.Context{}, err
+		}
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderContext(c)}}}, c, nil
+	}))
+
 	srv.AddPrompt(&mcp.Prompt{
 		Name:        "remember",
 		Title:       "Remember",
@@ -130,18 +151,62 @@ func rememberText(src llmprompts.Source, text string) string {
 	return llmprompts.MemoryRememberMessage.Text(src, llmprompts.RememberVars{Text: text})
 }
 
-func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
-	// Transitional: the author argument still sets each item's origin until the item fields land.
-	items := make([]memory.Item, len(in.Items))
-	for i, it := range in.Items {
-		items[i] = memory.Item{Fact: it.Fact, Reason: it.Reason, Origin: in.Author, Scope: memory.ScopePersonal}
-	}
-	sr := memory.StoreRequest{Items: items, Clarifications: in.Clarifications, Source: memory.SourceMCP}
-	if opts.ImportRef != "" {
-		sr.Source, sr.SourceRef = memory.SourceImport, opts.ImportRef
-		for i := range sr.Items {
-			sr.Items[i].Origin, sr.Items[i].SourceTag = memory.OriginExternal, "doc"
+// storeSchema is store_memory's input schema with the closed value sets of origin, scope and group
+// kind as enums.
+func storeSchema(src llmprompts.Source) *jsonschema.Schema {
+	sch := llmprompts.InputSchema[storeInput](src, llmprompts.MemoryToolStoreMemory.ID(), map[string]any{
+		"items": llmprompts.MaxVars{Max: memory.MaxItems},
+	})
+	enum := func(prop *jsonschema.Schema, values ...string) {
+		for _, v := range values {
+			prop.Enum = append(prop.Enum, v)
 		}
+	}
+	item := sch.Properties["items"].Items.Properties
+	enum(item["origin"], memory.OriginUser, memory.OriginAgent, memory.OriginExternal)
+	enum(item["scope"], memory.ScopeCompany, memory.ScopeProject, memory.ScopePersonal)
+	enum(sch.Properties["groups"].Items.Properties["kind"], memory.GroupTask, memory.GroupDocument, memory.GroupThread)
+	return sch
+}
+
+// requestFor builds the service request of one store call: server defaults for session and
+// project, or the fixed provenance and document group of import mode.
+func requestFor(ctx context.Context, svc *memory.Service, opts Options, in storeInput) (memory.StoreRequest, error) {
+	sr := memory.StoreRequest{Clarifications: in.Clarifications, Session: in.Session, Groups: in.Groups, Source: memory.SourceMCP}
+	if sr.Session == "" {
+		sr.Session = opts.SessionID
+	}
+	sr.Items = make([]memory.Item, len(in.Items))
+	for i, it := range in.Items {
+		if it.Scope == memory.ScopeProject && it.Project == "" {
+			it.Project = opts.Project
+		}
+		sr.Items[i] = it
+	}
+	if opts.ImportRef == "" {
+		return sr, nil
+	}
+	sr.Source, sr.SourceRef, sr.Session = memory.SourceImport, opts.ImportRef, ""
+	for i := range sr.Items {
+		sr.Items[i].Origin, sr.Items[i].SourceTag = memory.OriginExternal, "doc"
+		sr.Items[i].Scope, sr.Items[i].Project = memory.ScopePersonal, ""
+	}
+	doc := memory.GroupRef{Kind: memory.GroupDocument, Key: opts.ImportRef}
+	path, rel, err := svc.ImportDocument(ctx, opts.ImportRef)
+	switch {
+	case err == nil:
+		doc.Key, doc.Title = path, rel
+	case !errors.Is(err, memory.ErrNotFound):
+		return memory.StoreRequest{}, err
+	}
+	sr.Groups = []memory.GroupRef{doc}
+	return sr, nil
+}
+
+func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
+	sr, err := requestFor(ctx, svc, opts, in)
+	if err != nil {
+		return nil, memory.StoreResult{}, err
 	}
 	if token := req.Params.GetProgressToken(); token != nil && req.Session != nil {
 		step := 0.0
@@ -175,16 +240,28 @@ func renderStore(src llmprompts.Source, res memory.StoreResult) string {
 	for _, o := range res.Outcomes {
 		switch o.Action {
 		case memory.ActionAdd:
-			fmt.Fprintf(&b, "Added: %s (id %s)\n", o.Fact, o.ID)
+			fmt.Fprintf(&b, "Added %s v%d: %s\n", o.LineageID, o.Version, o.Fact)
 		case memory.ActionUpdate:
-			fmt.Fprintf(&b, "Updated to v%d: %s (id %s; previous %s kept as history)\n", o.Version, o.Fact, o.ID, o.PreviousID)
+			fmt.Fprintf(&b, "Updated %s to v%d: %s (previous version kept as history)\n", o.LineageID, o.Version, o.Fact)
 		case memory.ActionNoop:
-			fmt.Fprintf(&b, "Already known: %s (id %s)\n", o.Fact, o.ID)
+			fmt.Fprintf(&b, "Already known %s v%d: %s\n", o.LineageID, o.Version, o.Fact)
 		default:
 			fmt.Fprintf(&b, "Failed: %s: %s\n", o.Fact, o.Error)
 		}
 	}
 	return b.String()
+}
+
+// provenance renders origin and scope: "user project:github.com/acme/billing", "external:slack company".
+func provenance(m memory.Memory) string {
+	origin, scope := m.Origin, m.Scope
+	if m.SourceTag != nil {
+		origin += ":" + *m.SourceTag
+	}
+	if m.Project != nil {
+		scope += ":" + *m.Project
+	}
+	return origin + " " + scope
 }
 
 func renderMemories(ms []memory.Memory) string {
@@ -193,14 +270,41 @@ func renderMemories(ms []memory.Memory) string {
 	}
 	var b strings.Builder
 	for _, m := range ms {
-		flag := ""
-		if m.Historical {
-			flag = " [historical]"
+		writeMemory(&b, m)
+	}
+	return b.String()
+}
+
+func writeMemory(b *strings.Builder, m memory.Memory) {
+	flag := ""
+	if m.Historical {
+		flag = " [historical]"
+	}
+	if m.Match == "semantic" {
+		flag += " [semantic]"
+	}
+	fmt.Fprintf(b, "- %s v%d %s: %s%s\n  reason: %s\n", m.LineageID, m.Version, provenance(m), m.Fact, flag, m.Reason)
+}
+
+// renderContext lists the fact, then one block per group with the group's other facts.
+func renderContext(c memory.Context) string {
+	var b strings.Builder
+	writeMemory(&b, c.Memory)
+	if len(c.Groups) == 0 {
+		b.WriteString("This fact belongs to no group.\n")
+	}
+	for _, g := range c.Groups {
+		fmt.Fprintf(&b, "group %s %s", g.Kind, g.Key)
+		if g.Title != "" {
+			fmt.Fprintf(&b, " (%s)", g.Title)
 		}
-		if m.Match == "semantic" {
-			flag += " [semantic]"
+		if g.Total > len(g.Facts) {
+			fmt.Fprintf(&b, " [%d of %d other facts]", len(g.Facts), g.Total)
 		}
-		fmt.Fprintf(&b, "- %s%s (v%d, %s, id %s)\n  reason: %s\n", m.Fact, flag, m.Version, m.Origin, m.ID, m.Reason)
+		b.WriteString("\n")
+		for _, m := range g.Facts {
+			writeMemory(&b, m)
+		}
 	}
 	return b.String()
 }

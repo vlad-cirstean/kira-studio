@@ -144,6 +144,9 @@ func (s *Service) Close() {
 	}
 }
 
+// ValidSession reports whether s is usable as a session id.
+func ValidSession(s string) bool { return sessionPattern.MatchString(s) }
+
 func invalid(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, a...))
 }
