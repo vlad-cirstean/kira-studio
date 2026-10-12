@@ -9,6 +9,8 @@ export type MenuItem =
       type: 'item';
       id: string;
       label: string;
+      /** A second, muted line under the label. */
+      detail?: string;
       icon?: string;
       /** Replaces the default muted icon colour (a Tailwind text-colour class). */
       iconClass?: string;
