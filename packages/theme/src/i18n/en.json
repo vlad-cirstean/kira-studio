@@ -531,8 +531,14 @@
       }
     },
     "error": {
+      "disconnected": {
+        "body": "{name} is not connected."
+      },
       "internal": {
         "body": "Something went wrong."
+      },
+      "notFound": {
+        "body": "{name} no longer exists."
       }
     },
     "git": {
@@ -1108,7 +1114,10 @@
     },
     "error": {
       "contract": {
-        "body": "The response did not match the expected shape."
+        "body": "Something went wrong inside Kira ({detail})."
+      },
+      "openLink": {
+        "announce": "Couldn’t open the link"
       }
     },
     "expiresIn": {

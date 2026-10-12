@@ -2,6 +2,8 @@
 // carrying ipcerr.Error's `code` and optional `details`. No Wails import: the mobile web app
 // shares it.
 
+import { t } from '@theme/i18n';
+
 export type CodedError = Error & { code?: string; details?: unknown };
 
 // Wails delivers a bound method's error as a RuntimeError whose .message is ipcerr.Error's own
@@ -41,8 +43,11 @@ export function toCodedError(err: unknown): CodedError {
   return out;
 }
 
-/** Display text of anything a bridge call threw: the unwrapped `message` of `toCodedError`. */
+/** Display text of anything a bridge call threw: the unwrapped `message` of `toCodedError`;
+ *  a contract violation (a Kira bug) is wrapped in a fixed sentence. */
 export function errorText(err: unknown): string {
   if (err === null || err === undefined) return String(err);
-  return toCodedError(err).message;
+  const e = toCodedError(err);
+  if (e.code === 'E_CONTRACT') return t('common.error.contract.body', { detail: e.message });
+  return e.message;
 }

@@ -47,9 +47,15 @@ func BadRequest(message string) *Error { return New("E_BAD_REQUEST", message) }
 // can tell it from a transient E_INTERNAL failure.
 func NotFound(message string) *Error { return New("E_NOT_FOUND", message) }
 
-// Disconnected mirrors tree-service.ts:77's exact message (P55 D11 — this constructor had zero
-// callers before P55, so the message correction is free).
-func Disconnected(name string) *Error { return New("E_DISCONNECTED", name+" is not connected") }
+// Disconnected reports a connection the caller named that is not currently connected.
+func Disconnected(name string) *Error {
+	return T(CodeDisconnected, "backend.error.disconnected.body", map[string]string{"name": name})
+}
+
+// NotFoundNamed reports a named object that no longer exists.
+func NotFoundNamed(name string) *Error {
+	return T(CodeNotFound, "backend.error.notFound.body", map[string]string{"name": name})
+}
 
 // SecretStore mirrors secret-cipher.ts's SecretStoreError code.
 func SecretStore(message string) *Error { return New("E_SECRET_STORE", message) }
