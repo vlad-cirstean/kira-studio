@@ -58,7 +58,7 @@ function streamClass(stream: string): string {
     <template v-else>
       <div v-if="truncated" class="text-subtle">{{ t('common.truncated.status') }}</div>
       <div v-if="lines.length === 0" class="text-subtle">{{ t('common.noOutput.emptyHint') }}</div>
-      <div v-else class="relative w-full" :style="{ height: `${totalSize}px` }">
+      <div v-else class="relative w-full shrink-0" :style="{ height: `${totalSize}px` }">
         <div
           v-for="item in virtualItems"
           :key="lines[item.index]?.id ?? item.key"
