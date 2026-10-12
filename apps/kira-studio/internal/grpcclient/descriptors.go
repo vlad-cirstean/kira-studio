@@ -1,10 +1,12 @@
 package grpcclient
 
 import (
+	"bytes"
 	"container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -435,7 +437,12 @@ func requestTemplate(input protoreflect.MessageDescriptor) string {
 	if err != nil {
 		return "{}"
 	}
-	return string(b)
+	// protojson randomises its whitespace per build; re-indent for stable text.
+	var out bytes.Buffer
+	if err := json.Indent(&out, b, "", "  "); err != nil {
+		return "{}"
+	}
+	return out.String()
 }
 
 func splitFullMethod(fullMethod string) (service protoreflect.FullName, method protoreflect.Name, err error) {

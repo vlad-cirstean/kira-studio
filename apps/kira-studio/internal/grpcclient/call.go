@@ -1,7 +1,9 @@
 package grpcclient
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -104,7 +106,17 @@ func marshalResponseJSON(msg *dynamicpb.Message) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return compactJSON(b)
+}
+
+// compactJSON strips the deliberate, per-build random whitespace protojson emits, so the same
+// message always renders the same text.
+func compactJSON(b []byte) (string, error) {
+	var out bytes.Buffer
+	if err := json.Compact(&out, b); err != nil {
+		return "", err
+	}
+	return out.String(), nil
 }
 
 // terminalOutcome is D16's own dispatch: nil for OK, a *Error for the two cases that mean "the
