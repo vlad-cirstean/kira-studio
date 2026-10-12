@@ -489,6 +489,11 @@
     }
   },
   "backend": {
+    "core": {
+      "seed": {
+        "body": "Core seed placeholder."
+      }
+    },
     "definition": {
       "section": {
         "attributes": {
@@ -523,6 +528,11 @@
       },
       "importFolder": {
         "title": "Import folder"
+      }
+    },
+    "error": {
+      "internal": {
+        "body": "Something went wrong."
       }
     },
     "git": {
@@ -729,6 +739,16 @@
         "queryPlan": {
           "label": "Query plan"
         }
+      }
+    },
+    "space": {
+      "seed": {
+        "body": "Space seed placeholder."
+      }
+    },
+    "studio": {
+      "seed": {
+        "body": "Studio seed placeholder."
       }
     }
   },
@@ -999,6 +1019,11 @@
     "collection": {
       "label": "Collection"
     },
+    "colour": {
+      "blue": {
+        "label": "Blue"
+      }
+    },
     "command": {
       "label": "Command: {value}"
     },
@@ -1080,6 +1105,11 @@
     },
     "environmentName": {
       "aria": "Environment name"
+    },
+    "error": {
+      "contract": {
+        "body": "The response did not match the expected shape."
+      }
     },
     "expiresIn": {
       "status": "Expires in {seconds}s"
@@ -2215,6 +2245,9 @@
     }
   },
   "format": {
+    "age": {
+      "now": "Moments ago"
+    },
     "duration": {
       "hoursMinutes": "{hours}h {minutes}m",
       "minutesSeconds": "{minutes}m {seconds}s",
@@ -6809,6 +6842,11 @@
         "tooLargePreview": {
           "empty": "This file is too large to preview (over 8 megabytes)"
         }
+      }
+    },
+    "settings": {
+      "seed": {
+        "label": "Settings seed placeholder"
       }
     },
     "workbench": {

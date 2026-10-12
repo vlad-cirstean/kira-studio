@@ -116,3 +116,8 @@ export const capsSchema = /*#__PURE__*/ z.object({
   fileTransfer: z.boolean(),
   maxPageSize: z.number().int().positive().optional(),
 });
+
+// P266 F0 catalog seeds (deleted by their stream once a real key lands):
+// 'backend.error.internal.body' 'backend.studio.seed.body' 'backend.space.seed.body'
+// 'backend.core.seed.body' 'common.error.contract.body' 'common.colour.blue.label'
+// 'format.age.now' 'space.settings.seed.label'
