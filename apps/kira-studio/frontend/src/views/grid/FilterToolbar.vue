@@ -88,7 +88,7 @@ function recordHistory(where: string | null, orderBy: SortSpec | null): void {
   // A no-op filter (both null) is dropped server-side (D19) — nothing to special-case here.
   fireAndForget(
     control.queriesHistoryRecord(props.tab.connectionId, props.tab.path, where, orderBy),
-    'record filter history',
+    'recordFilterHistory',
   );
 }
 

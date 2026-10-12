@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import InlineState from '@theme/components/InlineState.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Field,
@@ -248,21 +249,15 @@ async function chooseColor(next: PaletteColor): Promise<void> {
       <dl class="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-kira-md">
         <dt class="text-muted-foreground">{{ t('space.repo.config.repository.label') }}</dt>
         <dd class="m-0 min-w-0">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <span class="block truncate font-data" data-testid="repo-full">{{ repo.name }}</span>
-            </TooltipTrigger>
-            <TooltipContent>{{ repo.name }}</TooltipContent>
-          </Tooltip>
+          <span class="block font-data min-w-0" data-testid="repo-full"
+            ><TruncatedText :text="repo.name" /></span
+          >
         </dd>
         <dt class="text-muted-foreground">{{ t('common.path.label') }}</dt>
         <dd class="m-0 min-w-0">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <span class="block truncate font-data" data-testid="repo-path">{{ repo.path }}</span>
-            </TooltipTrigger>
-            <TooltipContent>{{ repo.path }}</TooltipContent>
-          </Tooltip>
+          <span class="block font-data min-w-0" data-testid="repo-path"
+            ><TruncatedText :text="repo.path" /></span
+          >
         </dd>
         <dt class="text-muted-foreground">{{ t('common.field.source.label') }}</dt>
         <dd class="m-0" data-testid="repo-source">

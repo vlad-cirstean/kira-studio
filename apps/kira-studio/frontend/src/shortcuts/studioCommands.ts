@@ -154,7 +154,7 @@ export function studioPaletteCommands(): () => PaletteCommand[] {
       label: t('studio.shortcuts.palette.closeTab.label'),
       run: () => {
         const active = useModeStore().activeTab;
-        if (active) fireAndForget(tabsStore.closeTab(active.id), 'close tab');
+        if (active) fireAndForget(tabsStore.closeTab(active.id), 'closeTab');
       },
     },
   ];

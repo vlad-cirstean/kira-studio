@@ -79,18 +79,18 @@ let unsubscribe: Array<() => void> = [];
 
 // A rejection (e.g. a `-tags server` build) logs, no UI. The button shows only the manual source.
 function onNewWindow(): void {
-  fireAndForget(control.windowsOpenNew(), 'new window');
+  fireAndForget(control.windowsOpenNew(), 'newWindow');
 }
 
 function onToggleKeepAwake(): void {
   fireAndForget(
     keepAwakeStore.setKeepAwakeManual(!keepAwakeStore.status.manual),
-    'toggle keep-awake',
+    'toggleKeepAwake',
   );
 }
 
 function closeActiveTab(): void {
-  if (modeStore.activeTab) fireAndForget(tabsStore.closeTab(modeStore.activeTab.id), 'close tab');
+  if (modeStore.activeTab) fireAndForget(tabsStore.closeTab(modeStore.activeTab.id), 'closeTab');
 }
 
 onMounted(() => {

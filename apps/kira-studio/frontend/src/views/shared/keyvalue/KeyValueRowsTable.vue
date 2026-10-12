@@ -2,6 +2,7 @@
 import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -217,40 +218,30 @@ function cellClass(row: number, col: 'field' | 'value') {
                   entry.i + 1
                 }}</div
               >
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <div
-                    class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate w-56 shrink-0"
-                    :class="cellClass(entry.i, 'field')"
-                    data-testid="keyvalue-field"
-                  >
-                    {{ rowAt(entry.i)?.field }}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{{ rowAt(entry.i)?.field }}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <div
-                    class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate flex-1 min-w-0"
-                    :class="cellClass(entry.i, 'value')"
-                    data-testid="keyvalue-value"
-                  >
-                    {{ rowAt(entry.i)?.value }}
-                    <Tooltip v-if="rowAt(entry.i)?.isTruncated">
-                      <TooltipTrigger as-child>
-                        <Badge variant="chip" class="bg-field text-subtle ml-1.5 shrink-0">{{
-                          t('studio.common.truncated.status')
-                        }}</Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>{{
-                        t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) })
-                      }}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{{ rowAt(entry.i)?.value }}</TooltipContent>
-              </Tooltip>
+              <div
+                class="flex items-center px-2 border-r border-b border-border font-data text-kira-md w-56 shrink-0"
+                :class="cellClass(entry.i, 'field')"
+                data-testid="keyvalue-field"
+              >
+                <TruncatedText :text="rowAt(entry.i)?.field ?? ''" />
+              </div>
+              <div
+                class="flex items-center px-2 border-r border-b border-border font-data text-kira-md flex-1 min-w-0"
+                :class="cellClass(entry.i, 'value')"
+                data-testid="keyvalue-value"
+              >
+                <TruncatedText :text="rowAt(entry.i)?.value ?? ''" />
+                <Tooltip v-if="rowAt(entry.i)?.isTruncated">
+                  <TooltipTrigger as-child>
+                    <Badge variant="chip" class="bg-field text-subtle ml-1.5 shrink-0">{{
+                      t('studio.common.truncated.status')
+                    }}</Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>{{
+                    t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) })
+                  }}</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
           </template>
         </div>

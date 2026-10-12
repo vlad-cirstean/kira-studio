@@ -20,7 +20,6 @@
  * one `hasPendingChange` state.
  */
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Button } from '@theme/components/ui/button';
 import { Kbd } from '@theme/components/ui/kbd';
@@ -60,6 +59,7 @@ watch(
 
 const isBusy = computed(() => props.graphView.loading.value !== 'idle');
 const isRefreshing = computed(() => props.graphView.loading.value === 'refreshing');
+const blockedByLoad = computed(() => isBusy.value && !isRefreshing.value);
 
 async function doRefresh(): Promise<void> {
   if (isBusy.value) return;
@@ -80,12 +80,12 @@ defineExpose({ refresh: doRefresh });
         variant="toolbar"
         size="kira-icon"
         class="relative"
-        :disabled="isBusy"
+        :pending="isRefreshing"
+        :disabled="blockedByLoad"
         :aria-label="t('common.action.refresh.label')"
         @click="doRefresh"
       >
-        <Spinner v-if="isRefreshing" icon="refresh" label="" />
-        <CodiconIcon v-else name="refresh" :size="13" />
+        <CodiconIcon name="refresh" :size="13" />
         <StatusDot
           v-if="hasPendingChange"
           class="absolute top-0.5 right-0.5"

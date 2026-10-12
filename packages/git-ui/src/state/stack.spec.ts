@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { StackListResult } from '@kira/git-ipc';
+import { compareNatural } from '@workbench/behaviour/match';
 import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
 import { FakeTransport } from '../testing/fakeTransport.ts';
@@ -156,7 +157,7 @@ describe('StackState — PrState.ensureSnapshot (F13)', () => {
     stack.setRepoId(REPO_A);
     await sleep();
 
-    expect(prCalls.sort()).toEqual(['feat1', 'feat2']);
+    expect(prCalls.sort(compareNatural)).toEqual(['feat1', 'feat2']);
     stack.dispose();
     pr.dispose();
   });

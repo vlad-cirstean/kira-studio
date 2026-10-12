@@ -208,8 +208,7 @@ async function onGenerate(): Promise<void> {
 
 function onStop(): void {
   abortController?.abort();
-  if (currentOpId.value)
-    fireAndForget(control.opsCancel(currentOpId.value), 'cancel generate data');
+  if (currentOpId.value) fireAndForget(control.opsCancel(currentOpId.value), 'cancelGenerateData');
 }
 
 type RecipeSelectValue = 'skip' | 'null' | 'constant' | 'sequence' | GeneratorId;

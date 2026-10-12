@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { RefRow, StackBranch, StashEntry, WorktreeEntry } from '@kira/git-ipc';
+import { compareNatural } from '@workbench/behaviour/match';
 import {
   filterPickerInput,
   orderTab,
@@ -194,7 +195,10 @@ describe('buildPickerModel — filter scope per tab', () => {
       ],
     });
     const model = buildPickerModel(input, 'auth', 'stashes');
-    expect(model.stashStack.map((e) => e.sha).sort()).toEqual(['match-branch', 'match-label']);
+    expect(model.stashStack.map((e) => e.sha).sort(compareNatural)).toEqual([
+      'match-branch',
+      'match-label',
+    ]);
   });
 
   test('10: worktree filtering matches both the label and the path', () => {

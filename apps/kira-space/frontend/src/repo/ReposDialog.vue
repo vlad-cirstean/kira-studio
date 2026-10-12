@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -277,18 +278,13 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 >
                   <CodiconIcon name="repo" :size="13" />
                 </span>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <span
-                      class="min-w-0 truncate text-kira-md text-fg"
-                      data-testid="repos-dialog-selected"
-                      ><span v-if="parentDir(selected.root)" class="text-subtle">{{
-                        parentDir(selected.root)
-                      }}</span>{{ selected.name }}</span
-                    >
-                  </TooltipTrigger>
-                  <TooltipContent>{{ selected.root }}</TooltipContent>
-                </Tooltip>
+                <span class="min-w-0 text-kira-md text-fg" data-testid="repos-dialog-selected"
+                  ><TruncatedText :text="selected.root"
+                    ><span v-if="parentDir(selected.root)" class="text-subtle">{{
+                      parentDir(selected.root)
+                    }}</span>{{ selected.name }}</TruncatedText
+                  ></span
+                >
                 <Tooltip v-if="selectedConfig" :disabled="selectedConfig.source === 'added'">
                   <TooltipTrigger as-child>
                     <Badge class="shrink-0" data-testid="repos-dialog-repo-source">{{
@@ -360,12 +356,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               data-testid="repos-dialog-folder"
               :data-path="f.path"
             >
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <span class="min-w-0 flex-1 truncate font-data">{{ f.path }}</span>
-                </TooltipTrigger>
-                <TooltipContent>{{ f.path }}</TooltipContent>
-              </Tooltip>
+              <span class="min-w-0 flex-1 font-data"><TruncatedText :text="f.path" /></span>
               <span
                 class="shrink-0 text-kira-sm text-muted-foreground"
                 data-testid="repos-dialog-folder-count"

@@ -118,7 +118,7 @@ describe('LayoutStore — long-edge segment collection stays correct after a pat
     const colorsAt1 = out2
       .slice(0, 2)
       .map((s) => s.color)
-      .sort();
+      .sort((a, b) => a - b);
     expect(colorsAt1).toEqual([1, 2]);
 
     // Row 2: one past edge0's toRow=1 — edge0 must already be excluded here, not just from row

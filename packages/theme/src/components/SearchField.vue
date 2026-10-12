@@ -15,9 +15,8 @@ import { useTemplateRef } from 'vue';
 // focus() (biome noAutofocus forbids the attribute).
 defineOptions({ inheritAttrs: false });
 
-const props = withDefaults(
+const _props = withDefaults(
   defineProps<{
-    modelValue: string;
     placeholder?: string;
     ariaLabel?: string;
     size?: 'kira' | 'kira-lg';
@@ -29,7 +28,7 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
+const model = defineModel<string>({ required: true });
 
 const input = useTemplateRef<{ $el: HTMLInputElement }>('input');
 
@@ -38,13 +37,13 @@ function focus(): void {
 }
 
 function onEscape(e: KeyboardEvent): void {
-  if (e.isComposing || e.defaultPrevented || props.modelValue === '') return;
+  if (e.isComposing || e.defaultPrevented || model.value === '') return;
   e.stopPropagation();
-  emit('update:modelValue', '');
+  model.value = '';
 }
 
 function clear(): void {
-  emit('update:modelValue', '');
+  model.value = '';
   focus();
 }
 
@@ -59,14 +58,14 @@ defineExpose({ focus });
     <InputGroupInput
       ref="input"
       v-bind="$attrs"
-      :model-value="modelValue"
+      :model-value="model"
       :placeholder="placeholder"
       :aria-label="ariaLabel ?? placeholder"
       :size="size"
-      @update:model-value="emit('update:modelValue', String($event))"
+      @update:model-value="model = String($event)"
       @keydown.escape="onEscape"
     />
-    <InputGroupAddon v-if="modelValue !== ''" align="inline-end">
+    <InputGroupAddon v-if="model !== ''" align="inline-end">
       <InputGroupButton
         size="icon-xs"
         class="size-4"

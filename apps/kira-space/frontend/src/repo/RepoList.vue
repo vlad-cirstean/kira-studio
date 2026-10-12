@@ -587,6 +587,6 @@ useTreeShortcuts(nav, {
     :model-value="textPrompt.value"
     @update:model-value="(v) => textPrompt && (textPrompt.value = v)"
     @submit="submitPrompt"
-    @cancel="cancelPrompt"
+    @close="cancelPrompt"
   />
 </template>

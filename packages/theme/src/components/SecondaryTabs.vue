@@ -18,7 +18,6 @@ export interface SecondaryTabItem {
 
 withDefaults(
   defineProps<{
-    modelValue: string;
     items: readonly SecondaryTabItem[];
     variant?: 'tabs' | 'segmented';
     size?: 'kira' | 'kira-lg';
@@ -31,11 +30,11 @@ withDefaults(
   },
 );
 
-const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
+const model = defineModel<string>({ required: true });
 
 function onUpdate(v: unknown): void {
   if (typeof v === 'string' && v !== '') {
-    emit('update:modelValue', v);
+    model.value = v;
   }
 }
 </script>
@@ -46,7 +45,7 @@ function onUpdate(v: unknown): void {
     data-slot="secondary-tabs"
     :variant="variant === 'segmented' ? 'outline' : 'default'"
     :size="size"
-    :model-value="modelValue"
+    :model-value="model"
     :aria-label="ariaLabel"
     @update:model-value="onUpdate"
   >
@@ -62,7 +61,7 @@ function onUpdate(v: unknown): void {
               :data-testid="item.testid"
               :class="cn(variant === 'tabs' && 'text-muted-foreground data-[state=on]:text-fg')"
             >
-              <slot name="item" :item="item" :active="item.value === modelValue">
+              <slot name="item" :item="item" :active="item.value === model">
                 <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
                 <span>{{ item.label }}</span>
                 <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{
@@ -81,7 +80,7 @@ function onUpdate(v: unknown): void {
         :data-testid="item.testid"
         :class="cn(variant === 'tabs' && 'text-muted-foreground data-[state=on]:text-fg')"
       >
-        <slot name="item" :item="item" :active="item.value === modelValue">
+        <slot name="item" :item="item" :active="item.value === model">
           <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
           <span>{{ item.label }}</span>
           <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{

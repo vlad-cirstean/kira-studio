@@ -20,7 +20,7 @@ import { useFocusOnMount, useFocusReturn } from '../behaviour/focus';
 // (GitPanel.vue) call site.
 defineProps<{ title: string }>();
 const value = defineModel<string>({ required: true });
-const emit = defineEmits<{ submit: []; cancel: [] }>();
+const emit = defineEmits<{ submit: []; close: [] }>();
 const titleId = useId();
 
 // ui/input's root IS the <input> element itself — no querySelector needed. onMounted fires each
@@ -69,7 +69,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
             data-testid="text-prompt-input"
             @keydown="wrapSelectionOnType"
             @keydown.enter="(e: KeyboardEvent) => !e.isComposing && emit('submit')"
-            @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('cancel')"
+            @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('close')"
           />
         </div>
         <div :class="dialogFooterClass">
@@ -77,7 +77,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
             variant="dialog"
             size="kira-lg"
             data-testid="text-prompt-cancel"
-            @click="emit('cancel')"
+            @click="emit('close')"
             >{{
               t('common.action.cancel.label')
             }}</Button

@@ -145,7 +145,7 @@ function attachWrapOnType(ed: StandaloneCodeEditor, m: TextModel): MonacoDisposa
     // `.toLowerCase()`, not a literal character: a real keypress always reports a lowercase
     // `key` when unshifted, but `page.keyboard.press('Control+A')` (several specs' own
     // capitalised `SELECT_ALL` constant) makes Playwright synthesize the browser event with the
-    // literal key name it was given, `key: 'A'`, uppercase and shiftless both.
+    // literal key name it was given, `key: 'A'`, capital and shiftless both.
     const lowerKey = e.browserEvent.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       if (!e.shiftKey && lowerKey === 'a') {

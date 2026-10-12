@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { ImportFile } from '@shared/domain/memoryImport';
 import { rowVariants } from '@theme/components/rowVariants';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
@@ -39,12 +39,7 @@ const variant = computed(() => {
       class="flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 border-0 bg-transparent pl-3 text-left"
       @click="emit('select')"
     >
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <span class="min-w-0 flex-1 truncate">{{ file.relPath }}</span>
-        </TooltipTrigger>
-        <TooltipContent>{{ file.relPath }}</TooltipContent>
-      </Tooltip>
+      <span class="min-w-0 flex-1"><TruncatedText :text="file.relPath" /></span>
       <span v-if="file.state === 'done'" class="shrink-0 text-kira-sm text-muted-foreground">
         +{{ file.added }}
         ~{{ file.updated }}

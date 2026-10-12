@@ -21,7 +21,7 @@ const switchId = useId();
 
 function onSendTest(): void {
   // A failed test notification has no UI; the permission state shows the cause.
-  fireAndForget(props.sendTest(), 'notify-prompts');
+  fireAndForget(props.sendTest(), 'notifyPrompts');
 }
 </script>
 

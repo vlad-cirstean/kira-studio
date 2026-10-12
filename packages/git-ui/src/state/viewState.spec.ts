@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { compareNatural } from '@workbench/behaviour/match';
 import {
   DEFAULT_COLUMN_WIDTHS,
   InMemoryViewStateStore,
@@ -199,6 +200,10 @@ describe('parsePersistedViewState — P93 §4.4 version 7 -> 8', () => {
 
 describe('DEFAULT_COLUMN_WIDTHS — P92 item 1', () => {
   test('has a graph field, no sha field', () => {
-    expect(Object.keys(DEFAULT_COLUMN_WIDTHS).sort()).toEqual(['author', 'date', 'graph']);
+    expect(Object.keys(DEFAULT_COLUMN_WIDTHS).sort(compareNatural)).toEqual([
+      'author',
+      'date',
+      'graph',
+    ]);
   });
 });

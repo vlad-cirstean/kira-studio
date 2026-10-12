@@ -247,7 +247,7 @@ export function initApiDataSync(): void {
   unsubscribeApiDataChanged?.();
   unsubscribeApiDataChanged = control.onApiDataChanged((event) => {
     // A broadcast has no user action to attach an error strip to: log only.
-    fireAndForget(Promise.all(event.changes.map(handleApiDataChange)), 'api data changed');
+    fireAndForget(Promise.all(event.changes.map(handleApiDataChange)), 'apiDataChanged');
   });
 }
 

@@ -15,12 +15,12 @@ const props = defineProps<{
   advanced: Record<K, LogLevel>;
   leaf: K;
   label: string;
-  selectTestId: string;
+  selectTestid: string;
   isAtDefault: (section: 'advanced', key: K) => boolean;
   resetLeaf: (section: 'advanced', key: K) => void;
 }>();
 
-const resetTestId = computed(() => `settings-reset-advanced-${props.leaf}`);
+const resetTestid = computed(() => `settings-reset-advanced-${props.leaf}`);
 
 function onLogLevelChange(value: unknown): void {
   props.advanced[props.leaf] = String(value) as LogLevel;
@@ -39,7 +39,7 @@ const fieldId = useId();
       <TooltipIconButton
         icon="discard"
         :label="t('common.action.resetToDefault.label')"
-        :data-testid="resetTestId"
+        :data-testid="resetTestid"
         :disabled-trigger="isAtDefault('advanced', leaf)"
         :disabled="isAtDefault('advanced', leaf)"
         @click="resetLeaf('advanced', leaf)"
@@ -49,7 +49,7 @@ const fieldId = useId();
       :id="fieldId"
       variant="bordered"
       size="kira-lg"
-      :data-testid="selectTestId"
+      :data-testid="selectTestid"
       :model-value="advanced[leaf]"
       @update:model-value="onLogLevelChange"
     >

@@ -72,7 +72,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       if (installing.value) return;
       if (isAvailable && latest !== dismissed) {
         // Best effort: the status-bar item still opens the dialog.
-        fireAndForget(control.promptsRaiseUpdate(latest), 'app-update');
+        fireAndForget(control.promptsRaiseUpdate(latest), 'appUpdate');
       } else if (dismissed === latest) {
         dialogOpen.value = false;
       }
@@ -92,7 +92,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       dismissedVersion.value = latestVersion.value;
       dialogOpen.value = false;
       // The popup is already hidden here; a stale one in another window closes with its own Later.
-      fireAndForget(control.promptsDismiss(`update:${latestVersion.value}`), 'app-update');
+      fireAndForget(control.promptsDismiss(`update:${latestVersion.value}`), 'appUpdate');
     }
 
     async function install(): Promise<void> {

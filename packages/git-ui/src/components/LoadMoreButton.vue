@@ -61,7 +61,7 @@ function handleCancel(): void {
   >
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira" :disabled="isLoading" @click="handlePress">
+        <Button variant="toolbar" size="kira" :pending="isLoading" @click="handlePress">
           {{ buttonLabel }}
         </Button>
       </TooltipTrigger>

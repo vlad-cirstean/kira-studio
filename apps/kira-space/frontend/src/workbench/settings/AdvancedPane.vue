@@ -30,7 +30,7 @@ function setSources(ignore: boolean): void {
       :advanced="draft.advanced"
       leaf="gitLogLevel"
       :label="t('space.settings.advanced.gitLogLevel.label')"
-      select-test-id="settings-git-log-level"
+      select-testid="settings-git-log-level"
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
     >

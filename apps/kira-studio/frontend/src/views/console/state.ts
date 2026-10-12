@@ -318,8 +318,8 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
       // (or auto-explain's EXPLAIN batch) fires server-side after the tab is already gone. Cancel
       // both possible in-flight ops and flip status so every such guard sees the close.
       if (rt.status === 'running') {
-        if (rt.explainOpId) fireAndForget(control.opsCancel(rt.explainOpId), 'cancel explain');
-        if (rt.opId) fireAndForget(control.opsCancel(rt.opId), 'cancel query');
+        if (rt.explainOpId) fireAndForget(control.opsCancel(rt.explainOpId), 'cancelExplain');
+        if (rt.opId) fireAndForget(control.opsCancel(rt.opId), 'cancelQuery');
         rt.status = 'cancelled';
       }
     }
@@ -541,7 +541,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     if (rt?.status === 'running') rt.status = 'cancelled';
     // The auto-explain batch's own op id — the real run's opId isn't registered on the backend yet
     // while this batch is in flight, so cancelling only opId (below) would be a no-op (finding #5).
-    if (rt?.explainOpId) fireAndForget(control.opsCancel(rt.explainOpId), 'cancel explain');
+    if (rt?.explainOpId) fireAndForget(control.opsCancel(rt.explainOpId), 'cancelExplain');
     stopOp(rt);
   }
 

@@ -94,7 +94,7 @@ if [ -z "$TC_COLLECT" ]; then
     fi
     grep -rnP --include='*.vue' -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" 2>/dev/null |
       grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-      grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
+      grep -P "(?::?class)=\"[^\"]*(?<![-\\w])(?:${alt})(?![-\\w])" || true
     grep -rnP --include='*.ts' "" "$GIT_UI_SRC" 2>/dev/null |
         grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
       grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
@@ -164,7 +164,7 @@ check_no_kui_class() {
   hits=$(grep -rnP --include='*.vue' --include='*.ts' \
     -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-    grep -P '(?<![-\w])kui-[a-z-]+(?![-\w])' || true)
+    grep -P '(?::?class)="[^"]*(?<![-\w])kui-[a-z-]+(?![-\w])' || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: retired kui-* class still used -- replace with a shadcn-vue component from @theme/components/ui:" >&2
     echo "$hits" >&2
@@ -185,7 +185,7 @@ _gu_ku_hits() {
   vue_hits=$(grep -rnP --include='*.vue' \
     -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-    grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
+    grep -P "(?::?class)=\"[^\"]*(?<![-\\w])${name}(?![-\\w])" || true)
   ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
@@ -673,6 +673,8 @@ check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-md!?" 'the rounded-kira-sm equiv
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-lg!?" 'the rounded-kira equivalent (e.g. rounded-lg -> rounded-kira)'
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-xl!?" 'the rounded-kira-pill equivalent (e.g. rounded-xl -> rounded-kira-pill)'
 check_alias 'var\(--radius(-sm|-md|-lg|-xl)?\)' 'var(--kira-radius) (or the matching --kira-radius-* step) -- shadcn-bridge.css no longer defines --radius'
+# P267: popovers and menus take shadow-kira, dialogs shadow-kira-dialog; no stock Tailwind shadow step.
+check_alias 'shadow-(?:sm|md|lg|xl|2xl)' 'shadow-kira (popover, menu) or shadow-kira-dialog'
 
 # P122: the one focus ring is 1px solid --kira-focus, inset (base.css's `focus-ring` utility) --
 # no component may bypass it with its own halo or a wider/coloured outline.

@@ -85,7 +85,7 @@ onUnmounted(() => {
   // has already finished.
   if (signal.opId && state.value.status === 'loading') {
     signal.cancelled = true;
-    fireAndForget(control.opsCancel(signal.opId), 'cancel fk preview');
+    fireAndForget(control.opsCancel(signal.opId), 'cancelFkPreview');
   }
 });
 </script>

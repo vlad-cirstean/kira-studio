@@ -229,6 +229,6 @@ export function closeVariableSetTabsForOwner(scope: VariableScope, ownerId: stri
     if (tab.kind !== 'variable-set') continue;
     const vt = tab as VariableSetTabRecord;
     if (vt.state.scope === scope && vt.state.ownerId === ownerId)
-      fireAndForget(tabsStore.closeTab(tab.id), 'close variable-set tab');
+      fireAndForget(tabsStore.closeTab(tab.id), 'closeVariableSetTab');
   }
 }

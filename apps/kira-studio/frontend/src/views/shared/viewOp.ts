@@ -38,7 +38,7 @@ export function classifyLoadError(err: unknown): LoadFailure {
 
 /** `control.opsCancel(rt.opId)` when there is one — the body all five `stop()` functions share. */
 export function stopOp(rt: { opId: string | null } | undefined): void {
-  if (rt?.opId) fireAndForget(control.opsCancel(rt.opId), 'cancel op');
+  if (rt?.opId) fireAndForget(control.opsCancel(rt.opId), 'cancelOp');
 }
 
 /** The per-tab runtime record every view state module keeps, plus the one accessor that creates

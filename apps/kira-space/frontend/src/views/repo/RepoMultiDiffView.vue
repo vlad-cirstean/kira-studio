@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -146,14 +147,9 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>{{ section.path }}</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <span class="path-dir flex-auto min-w-0 truncate text-kira-md text-subtle">{{
-              section.path
-            }}</span>
-          </TooltipTrigger>
-          <TooltipContent>{{ section.path }}</TooltipContent>
-        </Tooltip>
+        <span class="path-dir flex-auto min-w-0 text-kira-md text-subtle"
+          ><TruncatedText :text="section.path" /></span
+        >
         <Button
           v-if="section.expanded && sectionState[section.path] === 'found'"
           variant="toolbar"

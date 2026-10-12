@@ -125,7 +125,7 @@ const expensiveQueryRowsId = useId();
       :advanced="draft.advanced"
       leaf="logLevel"
       :label="t('studio.settings.advanced.logLevel.label')"
-      select-test-id="settings-log-level"
+      select-testid="settings-log-level"
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
     >

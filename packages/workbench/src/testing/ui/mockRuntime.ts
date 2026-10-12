@@ -108,7 +108,9 @@ export interface CanonicalOptions {
 export function canonical(value: unknown, options: CanonicalOptions): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    for (const key of Object.keys(value as Record<string, unknown>).sort((a, b) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    )) {
       if (options.excludeKeys.includes(key)) continue;
       const v = (value as Record<string, unknown>)[key];
       if (v === undefined) continue;

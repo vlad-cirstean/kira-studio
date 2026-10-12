@@ -6,6 +6,7 @@ import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import Spinner from '@theme/components/Spinner.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Button } from '@theme/components/ui/button';
 import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -263,22 +264,16 @@ function durationText(ms: number | null): string | null {
                   displayValue(durationText(listItems[vi.index].record.durationMs))
                 }}</span>
                 <template v-else-if="column.id === 'command'">
-                  <Tooltip v-if="listItems[vi.index].record.status === 'error'">
-                    <TooltipTrigger as-child>
-                      <span class="font-data truncate min-w-0 text-error block">{{
-                        listItems[vi.index].record.error
-                      }}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ listItems[vi.index].record.error ?? '' }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip v-else>
-                    <TooltipTrigger as-child>
-                      <span class="font-data truncate min-w-0 block">{{
-                        displayValue(listItems[vi.index].record.command)
-                      }}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ listItems[vi.index].record.command ?? '' }}</TooltipContent>
-                  </Tooltip>
+                  <span
+                    v-if="listItems[vi.index].record.status === 'error'"
+                    class="block min-w-0 font-data text-error"
+                    ><TruncatedText :text="listItems[vi.index].record.error ?? ''" /></span
+                  >
+                  <span v-else class="block min-w-0 font-data"
+                    ><TruncatedText
+                      :text="displayValue(listItems[vi.index].record.command)"
+                    /></span
+                  >
                 </template>
                 <slot v-else name="cell" :column="column" :record="listItems[vi.index].record" />
               </template>

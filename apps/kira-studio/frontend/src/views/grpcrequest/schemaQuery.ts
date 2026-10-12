@@ -106,7 +106,7 @@ async function describeSchema(
   const opId = crypto.randomUUID();
   signal?.addEventListener(
     'abort',
-    () => fireAndForget(control.opsCancel(opId), 'cancel schema query'),
+    () => fireAndForget(control.opsCancel(opId), 'cancelSchemaQuery'),
     { once: true },
   );
   return control.grpcDescribe({
