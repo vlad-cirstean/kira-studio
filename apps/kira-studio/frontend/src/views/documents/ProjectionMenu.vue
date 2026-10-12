@@ -2,12 +2,12 @@
 import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { Separator } from '@theme/components/ui/separator';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { onUnmounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { fieldNamesOnPage } from './page';

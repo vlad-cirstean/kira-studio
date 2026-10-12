@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
+import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';

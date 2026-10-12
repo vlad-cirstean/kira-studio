@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { paneFrame } from '@theme/lib/frames';
 import { cn } from '@theme/lib/utils';
 import { useElementSize, useScroll } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';

@@ -4,6 +4,7 @@ import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
 import { adeBoard, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -12,10 +13,6 @@ import type { ControlSnapshot } from './support/types';
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const card = (id: string) => `[data-testid="ade-card"][data-task-id="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 function script(id: string, name: string, kind: 'script' | 'smart', command: string) {
   return {

@@ -17,11 +17,11 @@
 import type { StackBranch } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { prBadgeClass, refBadgeClass } from '../lib/badgeClass.ts';
 import type { PickerList, PickerStackGroup } from '../lib/pickerModel.ts';
 import {

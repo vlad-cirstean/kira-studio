@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { type RepoSummary, repoSummarySchema } from '@shared/domain/repo';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -31,10 +32,6 @@ function listRepos(...records: ReturnType<typeof record>[]): ControlSnapshot {
 }
 
 const repoRow = (page: Page, id: string) => page.locator(`${t('repo-row')}[data-repo-id="${id}"]`);
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 test('a hidden repo is absent until Show hidden reveals it, marked', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [listRepos(SHOWN, HIDDEN)] });

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -8,6 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
+import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { refDebounced } from '@vueuse/core';
 import PanelBar from '@workbench/components/PanelBar.vue';

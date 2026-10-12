@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowActions } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
+import { rowActions } from '@theme/lib/rowVariants';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../behaviour/clipboard';
 import { revealElement } from '../behaviour/focus';

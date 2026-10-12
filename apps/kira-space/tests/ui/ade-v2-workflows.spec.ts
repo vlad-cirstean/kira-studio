@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeFixture, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -22,10 +23,6 @@ async function openWorkflows(
   await app.window.locator(t('ade-tab-workflows')).click();
   await app.window.locator(t('ade-workflows')).waitFor();
   return app;
-}
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
 }
 
 interface SavedWorkflow {

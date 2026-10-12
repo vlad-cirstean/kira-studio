@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { DefinitionSection } from '@shared/domain/definition';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 
 // P23 D6/D5/D9: one `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
 // consumer group's Group/Members/Committed offsets, an SQS queue's Attributes. Same section chrome

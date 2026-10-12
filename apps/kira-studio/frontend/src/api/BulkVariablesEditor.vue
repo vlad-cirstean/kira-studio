@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-core';
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
-import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import { paneFrame } from '@theme/lib/frames';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';

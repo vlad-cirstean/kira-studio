@@ -3,7 +3,6 @@ import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/responseHistory';
 import Disclosure from '@theme/components/Disclosure.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -26,6 +25,7 @@ import {
 } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import {
   displayValue,

@@ -1,15 +1,12 @@
 import { expect, test } from './fixtures';
 import { adeBoard, emitAgentEvent, emitAgentSessions, openPlan } from './support/adeV2';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // The Needs you page: its list, the action behind each kind, the footer and All sessions.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const item = (kind: string) => `${t('ade-needs-item')}[data-kind="${kind}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 test('lists the items most urgent first, with the badge and the footer', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);

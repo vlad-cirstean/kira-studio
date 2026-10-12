@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
-import { paneFrame } from '@theme/components/frames';
 import InlineState from '@theme/components/InlineState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { FieldDescription } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
+import { paneFrame } from '@theme/lib/frames';
 import { cn } from '@theme/lib/utils';
 import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';

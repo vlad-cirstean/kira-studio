@@ -4,12 +4,12 @@ import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { useEventListener } from '@vueuse/core';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';

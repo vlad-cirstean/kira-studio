@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
+import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';

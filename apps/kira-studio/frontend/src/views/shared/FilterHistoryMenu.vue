@@ -2,11 +2,11 @@
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Separator } from '@theme/components/ui/separator';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';

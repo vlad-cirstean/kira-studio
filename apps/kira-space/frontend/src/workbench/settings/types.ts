@@ -1,4 +1,4 @@
-import type { SettingsPaneProps as GenericSettingsPaneProps } from '@workbench/components/settingsPaneProps';
+import type { SettingsPaneProps as GenericSettingsPaneProps } from '@workbench/lib/settingsPaneProps';
 import type { Settings } from '../../state/settingsDomain';
 
 // P103 Part 2 (§5.5): the one prop contract every one of this app's four settings panes takes,

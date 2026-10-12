@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import { t } from '@theme/i18n';
+import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import QueryState from '@workbench/components/QueryState.vue';

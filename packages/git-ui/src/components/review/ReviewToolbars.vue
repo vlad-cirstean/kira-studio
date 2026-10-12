@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { type MessageKey, t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, useTemplateRef, watch } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';

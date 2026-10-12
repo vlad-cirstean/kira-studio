@@ -6,6 +6,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
+import { dragTab, tabLocator } from './support/tabs';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/tabs.spec.ts (P57 D16). Its "session restore" section (roughly the back
@@ -87,10 +88,6 @@ async function menuItemIds(page: import('@playwright/test').Page): Promise<strin
           : (el.getAttribute('data-testid') ?? '').replace('menu-item-', ''),
       ),
     );
-}
-
-function tabLocator(page: import('@playwright/test').Page, tabId: string) {
-  return page.locator(`[data-testid="tab"][data-tab-id="${tabId}"]`);
 }
 
 async function createAndConnect(page: import('@playwright/test').Page): Promise<void> {
@@ -300,29 +297,6 @@ test('the tab strip scrolls once tabs overflow it (P31 D6/D7)', async ({ relaunc
     })
     .toBe(true);
 });
-
-async function dragTab(
-  page: import('@playwright/test').Page,
-  source: import('@playwright/test').Locator,
-  target: import('@playwright/test').Locator,
-): Promise<void> {
-  const from = await source.boundingBox();
-  const to = await target.boundingBox();
-  if (!from || !to) throw new Error('dragTab: chip has no box');
-  const fx = from.x + from.width / 2;
-  const fy = from.y + from.height / 2;
-  // Aim past the target's midpoint in the drag direction so Sortable's swap threshold is met.
-  const tx = to.x + to.width * (to.x < from.x ? 0.25 : 0.75);
-  const ty = to.y + to.height / 2;
-  await page.mouse.move(fx, fy);
-  await page.mouse.down();
-  await page.mouse.move(fx + 10, fy, { steps: 5 });
-  await page.mouse.move(tx, ty, { steps: 15 });
-  await page.mouse.move(tx, ty, { steps: 2 });
-  // Sortable's fallback mode emulates dragover on a 50ms interval, one swap per tick.
-  await page.waitForTimeout(300);
-  await page.mouse.up();
-}
 
 test('tab strip: drag reorders tabs; click, middle-click and close still work (P137)', async ({
   relaunch,

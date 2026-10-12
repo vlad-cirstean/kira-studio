@@ -2,10 +2,10 @@
 import { useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
-import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { type MessageKey, t } from '@theme/i18n';
+import { rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed, ref } from 'vue';

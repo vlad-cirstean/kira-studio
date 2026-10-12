@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import InlineState from '@theme/components/InlineState.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
+import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import { buildRefListSections } from '../../lib/refListModel.ts';

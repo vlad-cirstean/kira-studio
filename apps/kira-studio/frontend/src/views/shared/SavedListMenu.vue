@@ -1,13 +1,13 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { ref } from 'vue';
 

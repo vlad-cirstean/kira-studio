@@ -1,5 +1,4 @@
 <script setup lang="ts" generic="T extends Record<string, Record<string, unknown>>">
-import { rowVariants } from '@theme/components/rowVariants';
 import {
   Dialog,
   DialogBody,
@@ -9,6 +8,7 @@ import {
   DialogFooter as UiDialogFooter,
 } from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, reactive, ref } from 'vue';
 import { errorText } from '../bridge/codedError';

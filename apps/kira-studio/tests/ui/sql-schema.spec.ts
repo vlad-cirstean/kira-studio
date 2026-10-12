@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { openConsoleFromMenu } from './support/connect';
+import { postgresCreateArgs } from './support/connectionArgs';
 import { hoverWord, typeInto } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -19,27 +20,6 @@ import { connectionRow, expandRow, openRowMenu } from './support/tree';
 // service it feeds — completion, diagnostics, hovers — behaves exactly as today's console with no
 // DDL document (D5) and picks up real schema-aware behaviour once one is saved. §7.1's own
 // scenarios, ported to this file's postgres fixture.
-
-function postgresCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
 
 // P4: no expandRow calls at all — the honest-degradation case a root console gets when the
 // connection was never expanded in the tree first (right-click a still-collapsed connection row

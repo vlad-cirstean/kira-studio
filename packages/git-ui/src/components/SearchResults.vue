@@ -21,11 +21,11 @@
 import { shortSha } from '@kira/git-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
 import Identifier from '@workbench/components/Identifier.vue';

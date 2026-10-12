@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { type MessageKey, t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { displayValue, formatBytes, formatDateTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from '../ui/fixtures';
+import { postgresCreateArgs } from '../ui/support/connectionArgs';
 import { IPC } from '../ui/support/ipcChannels';
 import { orderItemsFixture, postgresConnectionSummary } from '../ui/support/postgresFixture';
 import { connectionRow, openRowMenu } from '../ui/support/tree';
@@ -13,27 +14,6 @@ import { settleFonts } from './support/settle';
 
 const CONNECTION_ID = 'conn-visual-schema-dialog';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Visual Schema', 'green');
-
-function postgresCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
 
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },

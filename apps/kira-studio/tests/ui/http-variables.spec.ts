@@ -1,7 +1,8 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { modeTab } from './support/apiMode';
+import { openHttpMode } from './support/apiMode';
+import { collectionRow, variableRow } from './support/apiRows';
 import { contract } from './support/contract';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
@@ -11,16 +12,6 @@ import { IPC } from './support/ipcChannels';
 // rather than driving a real LocalAuthentication prompt this tier cannot reach at all.
 
 const NOW = '2026-01-01T00:00:00.000Z';
-
-async function openHttpMode(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-}
-function collectionRow(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
-}
-function variableRow(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="variable-row"][data-id="${id}"]`);
-}
 
 // One collection, one request item directly under its root (no folder — one twisty click reaches
 // it), reused by every test below.

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowActions, rowMeta } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { t } from '@theme/i18n';
+import { rowActions, rowMeta } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { wheelToHorizontal } from '@workbench/lib/wheelScroll';

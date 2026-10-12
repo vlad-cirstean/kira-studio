@@ -13,11 +13,11 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  */
 import InlineState from '@theme/components/InlineState.vue';
 import PickerTrigger from '@theme/components/PickerTrigger.vue';
-import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
+import { rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
 import { buildRefListSections } from '../../lib/refListModel.ts';

@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures';
 import { installGitStreamMock } from './support/gitStreamMock';
 import { IPC } from './support/ipcChannels';
+import { repoRowById, repoTab, treeRow } from './support/repoRows';
 import type { ControlSnapshot } from './support/types';
 
 // P67b §2/§3/§9: the two reported bugs, as regressions. Both need the real @kira/git-ui mount
@@ -37,21 +38,8 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-function repoRow(page: import('@playwright/test').Page) {
-  return page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`);
-}
-
-function treeRow(page: import('@playwright/test').Page, path: string) {
-  return page.locator(`[data-testid="repo-tree-row"][data-path="${path}"]`);
-}
-
 // P72 §7: the pinned graph tab now renders in `tab-strip-pinned`, a sibling of `tab-strip-row`
 // rather than a descendant of it — `tab-strip-wrapper` is the common ancestor of both.
-function tab(page: import('@playwright/test').Page, kind?: string) {
-  return kind
-    ? page.locator(`[data-testid="tab-strip-wrapper"] [data-testid="tab"][data-tab-kind="${kind}"]`)
-    : page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');
-}
 
 // `repo-graph-host`/`repo-review-host` are this app's OWN mount-point <div>s (RepoGraphView.vue/
 // RepoReviewView.vue) — always present the instant the tab/segment renders, regardless of whether
@@ -79,7 +67,7 @@ test('bug 2 regression: a cold repo open reaches the graph with no boot-retry cl
   // RepoGraphView.vue's own mount, which the repo-row click below causes.
   await installGitStreamMock(page, REPO.repoId);
 
-  await repoRow(page).click();
+  await repoRowById(page, REPO.id).click();
 
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
@@ -101,7 +89,7 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   const { window: page } = await relaunch({ control: CONTROL });
   await installGitStreamMock(page, REPO.repoId);
 
-  await repoRow(page).click();
+  await repoRowById(page, REPO.id).click();
   await page.locator('[data-testid="git-panel-tab-files"]').click();
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
@@ -121,7 +109,7 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   // connection-state never reaches 'connected' and no boot error fires either — the container div
   // alone (repo-graph-host) is visible either way, which is why the real assertion is the
   // connection state reaching 'connected', not merely the host existing.
-  await tab(page, 'repo-graph').click();
+  await repoTab(page, 'repo-graph').click();
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
   await expect(page.locator('[data-testid="boot-error"]')).toHaveCount(0);

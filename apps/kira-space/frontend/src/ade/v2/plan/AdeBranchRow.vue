@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowActions } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
+import { rowActions } from '@theme/lib/rowVariants';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, useTemplateRef } from 'vue';

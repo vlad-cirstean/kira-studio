@@ -9,11 +9,8 @@ import {
   postgresConnectionSummary,
   SERVER_VERSION,
 } from './support/postgresFixture';
+import { tabLocator } from './support/tabs';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
-
-function tabLocator(page: import('@playwright/test').Page, tabId: string) {
-  return page.locator(`[data-testid="tab"][data-tab-id="${tabId}"]`);
-}
 
 // M5 §8's own UI spec: mark a column PII from the grid header menu, verify the preview masks it
 // and locks editing everywhere a write could otherwise happen, then turn it off and verify the

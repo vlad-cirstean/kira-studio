@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
-import { paneFrame } from '@theme/components/frames';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { t } from '@theme/i18n';
+import { paneFrame } from '@theme/lib/frames';
 import { cn } from '@theme/lib/utils';
 import { useElementSize, useParentElement } from '@vueuse/core';
 import { computed } from 'vue';

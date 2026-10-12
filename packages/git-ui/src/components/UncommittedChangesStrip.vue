@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 /**
  * G-UX (item 4): "current changes on a branch aren't visible in the git graph at all" — a small,
  * pinned strip above the graph, not a synthetic row inside it. The literal ask (a GitLens-style
@@ -30,9 +32,7 @@
  * `select`, which `App.vue` routes to `WorkingDetailState.select(true)` — the IPC method the
  * original v1 note said this needed, `working.detail`, now exists.
  */
-import { rowVariants } from '@theme/components/rowVariants';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { GEOMETRY } from '../graph/geometry.ts';

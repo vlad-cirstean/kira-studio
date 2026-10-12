@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import PanelBar from '@workbench/components/PanelBar.vue';

@@ -74,3 +74,12 @@ export function httpResponse(
 ): Record<string, unknown> {
   return { ...base, ...overrides };
 }
+
+export async function openHttpMode(page: Page): Promise<void> {
+  await modeTab(page, 'api').click();
+}
+
+export async function openHttpRequestView(page: Page): Promise<void> {
+  await openHttpMode(page);
+  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
+}

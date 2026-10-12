@@ -3,6 +3,7 @@ import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { connectMongo, connectRedis, openConsoleFromMenu } from './support/connect';
+import { mongoCreateArgs, postgresCreateArgs, redisCreateArgs } from './support/connectionArgs';
 import { typeInto } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -26,69 +27,6 @@ import { connectionRow, expandRow, openRowMenu } from './support/tree';
 // P13 §6.1: no scenario here runs a statement, so no execute() port snapshot is needed at all —
 // Format is pure renderer work, and the boot/connect control snapshots each fixture already
 // exports are the whole setup.
-
-function postgresCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
-
-function mongoCreateArgs(name: string) {
-  return {
-    name,
-    kind: 'mongodb',
-    color: 'green',
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 27017,
-    database: 'kira_test',
-    username: 'kira',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
-
-function redisCreateArgs(name: string) {
-  return {
-    name,
-    kind: 'redis',
-    color: 'red',
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 6379,
-    database: '0',
-    username: null,
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
 
 async function connectAndExpandPostgres(page: Page, name: string, color: string): Promise<void> {
   await page.click('[data-testid="add-connection"]');

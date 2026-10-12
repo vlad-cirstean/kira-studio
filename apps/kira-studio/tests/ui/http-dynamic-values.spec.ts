@@ -1,7 +1,6 @@
-import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { modeTab, openHttpModeAndNewRequest as openHttpMode } from './support/apiMode';
+import { modeTab, openHttpRequestView } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
 // P6 §6.3: `tests/ui` drives the real built bundle in real WebKit with both wire planes mocked, so
@@ -15,11 +14,6 @@ import { IPC } from './support/ipcChannels';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await openHttpMode(page);
-  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
-}
 
 const RESPONSE = {
   status: 200,
@@ -41,7 +35,7 @@ test('a dynamic reference is generated, and reaches the wire', async ({ relaunch
   const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: RESPONSE }];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill(
     '[data-testid="http-url"]',
     'https://api.example.com/orders/{{$guid}}?t={{$timestamp}}',
@@ -66,7 +60,7 @@ test('per-occurrence freshness: two {{$guid}}s in one send differ, and a second 
   const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: RESPONSE }];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/echo');
   await page.click('[data-testid="http-request-pane-body"]');
   await page.click('[data-testid="http-body-mode-raw"]');
@@ -103,7 +97,7 @@ test('the preview never generates: a catalogued name is not a warning and stays 
   const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: RESPONSE }];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill('[data-testid="http-url"]', '{{$guid}}');
 
   // A catalogued $name is not shown as unresolved (D8) — it will resolve fine at send time.

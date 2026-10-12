@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowActions } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
 import { t } from '@theme/i18n';
+import { rowActions } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { displayValue, formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';

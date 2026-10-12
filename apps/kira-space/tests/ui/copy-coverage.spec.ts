@@ -1,6 +1,5 @@
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { Page } from '@playwright/test';
 import {
   expectCatalogText,
   setPseudoLocale,
@@ -51,13 +50,9 @@ function fixtureData(): RegExp[] {
   ];
 }
 
-async function pseudo(page: Page): Promise<void> {
-  await setPseudoLocale(page);
-}
-
 test('plan board, task card menu and day menu', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   await expectCatalogText(page.locator(t('ade-plan')), { allow });
   await page.locator('[data-testid="ade-card"][data-task-id="T_alerts"]').click({
@@ -75,7 +70,7 @@ test('plan board, task card menu and day menu', async ({ relaunch }) => {
 
 test('backlog and needs pages', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   await page.locator(t('ade-tab-backlog')).click();
   await expectCatalogText(page.locator(t('ade-backlog')), { allow });
@@ -85,7 +80,7 @@ test('backlog and needs pages', async ({ relaunch }) => {
 
 test('task panel, every tab', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   await page
     .locator('[data-testid="ade-card"][data-task-id="T_bill"] [data-testid="ade-card-head"]')
@@ -100,7 +95,7 @@ test('task panel, every tab', async ({ relaunch }) => {
 
 test('workflows page, editor and inspectors', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   await page.locator(t('ade-tab-workflows')).click();
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
@@ -132,7 +127,7 @@ test('run dialog', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: board },
   ]);
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   await page
     .locator(
@@ -179,7 +174,7 @@ reviewTest('review window', async ({ relaunch }) => {
     },
   });
   await page.locator(t('ade-review-window')).waitFor();
-  await pseudo(page);
+  await setPseudoLocale(page);
   await expectCatalogText(page.locator(t('ade-review-window')), {
     allow: [...fixtureData(), /^src\/pending\.ts$|^pending\.ts$/],
   });
@@ -191,7 +186,7 @@ test('repositories dialog', async ({ relaunch }) => {
   });
   await page.locator(t('manage-repos')).click();
   await page.locator(t('repos-dialog')).waitFor();
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   await expectCatalogText(page.locator(t('repos-dialog')), { allow });
   await page.locator(t('repos-dialog-repo')).nth(1).click();
@@ -207,7 +202,7 @@ test('settings dialog, every pane', async ({ relaunch }) => {
   });
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-dialog')).waitFor();
-  await pseudo(page);
+  await setPseudoLocale(page);
   const allow = fixtureData();
   for (const section of [
     'Appearance',
@@ -226,7 +221,7 @@ test('memory panel, add memory dialog and import view', async ({ relaunch }) => 
   const { window: page } = await relaunch();
   await page.locator('[data-testid="mode-tab"][data-mode="memory"]').click();
   await expect(page.locator(t('memory-panel'))).toBeVisible();
-  await pseudo(page);
+  await setPseudoLocale(page);
   await expectCatalogText(page.locator(t('memory-panel')));
   await page.locator(t('memory-add')).click();
   const dialog = page.locator(t('add-memory-dialog'));
@@ -239,6 +234,6 @@ test('memory panel, add memory dialog and import view', async ({ relaunch }) => 
 
 test('title bar', async ({ relaunch }) => {
   const { window: page } = await relaunch();
-  await pseudo(page);
+  await setPseudoLocale(page);
   await expectCatalogText(page.locator(t('toggle-project-panel')).locator('xpath=..'));
 });

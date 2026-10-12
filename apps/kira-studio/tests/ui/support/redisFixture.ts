@@ -1,6 +1,9 @@
+import type { Page } from '@playwright/test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ControlSnapshot } from '../../ipc/support/types';
+import { expect } from '../fixtures';
 import { IPC } from './ipcChannels';
+import { connectionRow, expandRow, findRow, openRowMenu } from './tree';
 
 // Real capture of a real Redis 7 container's connect() response — via
 // `bun scripts/capture-tree.ts redis --recipe-file ...` (scripts/capture-tree.ts), not
@@ -91,4 +94,22 @@ export function redisConnectionSummary(
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
+}
+
+export const REDIS_DB0 = 'database:db0';
+
+export async function openRedisBrowse(page: Page): Promise<void> {
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await (await findRow(page, REDIS_DB0)).dblclick();
+  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
+    'data-level',
+    REDIS_DB0,
+  );
 }

@@ -18,7 +18,6 @@ import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import PickerTrigger from '@theme/components/PickerTrigger.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import {
@@ -29,6 +28,7 @@ import {
 } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { useEventListener, useFocus } from '@vueuse/core';
 import { useCappedList } from '@workbench/behaviour/cappedList';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';

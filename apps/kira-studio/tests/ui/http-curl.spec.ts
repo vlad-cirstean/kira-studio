@@ -1,7 +1,6 @@
-import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { modeTab, openHttpModeAndNewRequest as openHttpMode } from './support/apiMode';
+import { modeTab, openHttpRequestView } from './support/apiMode';
 import { installFakeTimers } from './support/clock';
 import { contract } from './support/contract';
 import { editorText } from './support/editorText';
@@ -14,11 +13,6 @@ import { IPC } from './support/ipcChannels';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await openHttpMode(page);
-  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
-}
 
 // ---- 1. Import populates a new tab ----
 
@@ -197,7 +191,7 @@ test('copy as curl with no secrets never reveals or sends anything', async ({ re
   ];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill('[data-testid="http-url"]', 'https://{{host}}/v1/x');
   await page.click('[data-testid="http-copy-as-curl"]');
   await expect(page.locator('[data-testid="copy-as-curl-dialog"]')).toBeVisible();
@@ -251,7 +245,7 @@ test('copy as curl with a secret: masked by default, revealed by one gated actio
   ];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/x');
   await page.click('[data-testid="http-request-pane-headers"]');
   const firstHeaderRow = page.locator('[data-testid="http-header-row"]').first();
@@ -299,7 +293,7 @@ test('copy as curl with a secret: a cancelled reveal leaves the reference litera
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/x');
   await page.click('[data-testid="http-request-pane-headers"]');
   const firstHeaderRow = page.locator('[data-testid="http-header-row"]').first();
@@ -336,7 +330,7 @@ test('a dynamic value is frozen across the reveal, and stays distinct per occurr
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await openHttpModeAndNewRequest(page);
+  await openHttpRequestView(page);
   await page.fill(
     '[data-testid="http-url"]',
     'https://api.example.com/orders/{{$guid}}?trace={{$guid}}',

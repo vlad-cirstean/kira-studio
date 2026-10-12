@@ -3,7 +3,6 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -19,6 +18,7 @@ import {
 import { FieldDescription } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';

@@ -2,16 +2,13 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeBoard, emitOpenSession, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // The Sessions tab of a task and of a branch, Take over and the terminal pane.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const row = (id: string) => `[data-testid="ade-branch-row"][data-branch-id="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 async function openSessions(page: Page, taskId: string): Promise<void> {
   await page

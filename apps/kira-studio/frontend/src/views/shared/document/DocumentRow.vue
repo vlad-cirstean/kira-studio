@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';

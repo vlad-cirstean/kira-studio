@@ -1,11 +1,10 @@
 import type { Locator, Page } from '@playwright/test';
-import { DATA_OP } from '@shared/protocol/dataOps';
-import type { ColumnDescriptor } from '@shared/protocol/page';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
-import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
+import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from './support/connect';
+import { executeSnap, numberPage } from './support/consolePages';
 import { typeInto } from './support/editor';
 import { IPC } from './support/ipcChannels';
 import {
@@ -532,49 +531,6 @@ test('connection detail tabs: hover, 2px gap, and arrow-key roving focus (P121 T
   await page.keyboard.press('Enter');
   await expect(advanced).toHaveAttribute('data-state', 'on');
 });
-
-function intColumnPage(column: string, values: string[]): LogicalPage {
-  const columns: ColumnDescriptor[] = [
-    {
-      name: column,
-      dataType: 'int4',
-      typeClass: 'number',
-      nullable: true,
-      isPrimaryKey: false,
-      generated: false,
-    },
-  ];
-  return {
-    kind: 'tabular',
-    columns,
-    rows: values.map((v) => [v]),
-    position: {
-      offset: 0,
-      pageSize: values.length,
-      hasMore: false,
-      nextToken: null,
-      prevToken: null,
-      strategy: 'offset',
-    },
-    truncatedCells: 0,
-  };
-}
-
-function numberPage(column: string, value: string): LogicalPage {
-  return intColumnPage(column, [value]);
-}
-
-function executeSnap(
-  connectionId: string,
-  statements: string[],
-  pages: LogicalPage[],
-): PortSnapshot {
-  return {
-    op: DATA_OP.execute,
-    payload: { connectionId, path: ORDER_ITEMS_PATH, statements },
-    response: { kind: 'execute', pages },
-  };
-}
 
 // P121 §6.2: the console's own result chips ("Result 1", "Result 2") were the one tab-chip copy
 // off the shared scale (22px/10px, a 4px strip gap) -- now tab-strip size (T1's own 26px/12px/2px,

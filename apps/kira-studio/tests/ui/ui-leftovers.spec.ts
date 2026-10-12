@@ -7,6 +7,7 @@ import {
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { collectionRow } from './support/apiRows';
 import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
 import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from './support/connect';
 import { acceptConfirm, cancelConfirm } from './support/dialogs';
@@ -18,7 +19,8 @@ import {
   compositePkConnectAndOpen,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { openRedisBrowse, REDIS_DB0 } from './support/redisFixture';
+import { expandRow, findRow } from './support/tree';
 
 // P267 Stream A: UI leftover unification. Written, not run in the authoring session.
 
@@ -208,10 +210,6 @@ const HEALTH_REQUEST = {
   binaryFile: null,
 };
 
-function collectionRow(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
-}
-
 test('Ctrl/Cmd+S in an HTTP request tab calls the save mock', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [
@@ -274,26 +272,9 @@ test('Ctrl/Cmd+S in a document edit saves it', async ({ relaunch }) => {
 
 // --- redis browse / key-value -----------------------------------------------------------------
 
-const REDIS_DB0 = 'database:db0';
 const REDIS_USER_NS = `${REDIS_DB0}/namespace:user`;
 const REDIS_USER1_NS = `${REDIS_USER_NS}/namespace:1`;
 const REDIS_BIGHASH = `${REDIS_USER1_NS}/key:user%3A1%3Abighash`;
-
-async function openRedisBrowse(page: Page): Promise<void> {
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
-    'data-status',
-    'connected',
-    { timeout: 10_000 },
-  );
-  await expandRow(page, '');
-  await (await findRow(page, REDIS_DB0)).dblclick();
-  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
-    'data-level',
-    REDIS_DB0,
-  );
-}
 
 test('right-click on a KeyValue row selects it before the menu shows', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });

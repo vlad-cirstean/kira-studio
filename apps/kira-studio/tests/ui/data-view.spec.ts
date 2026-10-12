@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, LogicalPage } from '../ipc/support/types';
@@ -22,6 +21,7 @@ import {
   BIG_ROWS_COLUMNS,
   BIG_ROWS_PATH,
   bigRowsFixture,
+  bigRowsRows,
   NULLS_AND_UNICODE_PAGE,
   NULLS_META,
   NULLS_PATH,
@@ -112,12 +112,6 @@ const HISTORY_SMALL_IDS = {
 // so recomputing them at test time avoids a multi-thousand-row literal array for content nothing
 // here inspects past a handful of specific ids and the first/last gutter number. Every other page
 // below (10/100-row) is small enough to keep as the literal real capture.
-function bigRowsRow(id: number): [string, string] {
-  return [String(id), createHash('md5').update(String(id)).digest('hex')];
-}
-function bigRowsRows(count: number, startId: number): [string, string][] {
-  return Array.from({ length: count }, (_, i) => bigRowsRow(startId + i));
-}
 
 // The real nextToken FIXTURE's own initial pageSize-100 read (BIG_ROWS_FIRST_PAGE) came back
 // with — chaining a real opaque keyset token across requests the same way the renderer does

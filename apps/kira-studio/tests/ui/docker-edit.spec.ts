@@ -3,6 +3,7 @@ import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/u
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
+import { containerDetailBare } from './support/dockerFixture';
 
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
 const GB = 1024 ** 3;
@@ -54,27 +55,6 @@ function row(id: string, name: string, extra: Json = {}): Json {
     originName: '',
     networks: ['bridge'],
     ...extra,
-  };
-}
-
-function detail(c: Json): Json {
-  return {
-    container: c,
-    command: ['sh'],
-    entrypoint: [],
-    env: [],
-    workingDir: '/',
-    user: '',
-    restartPolicy: 'no',
-    health: '',
-    startedAt: '2026-01-01T00:00:00Z',
-    finishedAt: '0001-01-01T00:00:00Z',
-    exitCode: 0,
-    tty: false,
-    mounts: [],
-    labels: {},
-    networkAttachments: [],
-    raw: '{"Id":"x"}',
   };
 }
 
@@ -130,7 +110,9 @@ async function setup(
         })),
       InspectContainer: (a) => {
         const c = state.containers.find((x) => x.id === (a as { id: string }).id);
-        return c ? detail(c) : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
+        return c
+          ? containerDetailBare(c)
+          : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
       ContainerEditSpec: () => state.spec,
       ...opts.handlers,

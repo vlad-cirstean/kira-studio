@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import KeyValueList from '@theme/components/KeyValueList.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { displayValue, formatDateTime } from '@workbench/behaviour/format';

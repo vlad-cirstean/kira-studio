@@ -1,8 +1,7 @@
-import type { Page } from '@playwright/test';
 import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/ui/dockerMock';
 import { expect, test } from './fixtures';
-import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
+import { openContainer, openDocker } from './support/dockerFixture';
 
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
 const GB = 1024 ** 3;
@@ -95,17 +94,6 @@ async function setup(
     },
   });
   return { page, docker };
-}
-
-async function openDocker(page: Page): Promise<void> {
-  await modeTab(page, 'docker').click();
-  await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
-}
-
-async function openContainer(page: Page, name: string, tab?: string): Promise<void> {
-  await page.locator(`[data-testid="docker-row"][data-name="${name}"]`).click();
-  await expect(page.locator('[data-testid="docker-container-detail"]')).toBeVisible();
-  if (tab) await page.locator(`[data-testid="docker-tab-${tab}"]`).click();
 }
 
 test('contract: engine disk usage is measured only on demand and persists its last result', async ({

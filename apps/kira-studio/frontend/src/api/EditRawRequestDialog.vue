@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -13,6 +12,7 @@ import {
 import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import { paneFrame } from '@theme/lib/frames';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';

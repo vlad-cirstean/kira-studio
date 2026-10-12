@@ -2,7 +2,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
-import type { OpLogColumn } from '@workbench/components/opLog';
+import type { OpLogColumn } from '@workbench/lib/opLog';
 import { computed } from 'vue';
 import { useOpsStore } from '../state/ops';
 import type { SpaceOpRecord } from '../state/opsDomain';

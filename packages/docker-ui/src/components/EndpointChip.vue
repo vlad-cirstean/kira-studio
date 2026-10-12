@@ -2,7 +2,6 @@
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import PickerTrigger from '@theme/components/PickerTrigger.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import {
@@ -15,6 +14,7 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { computed } from 'vue';
 import { useDocker } from '../context';
 import { useDockerStatus } from '../queries';

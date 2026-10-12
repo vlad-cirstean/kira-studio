@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -15,6 +14,7 @@ import {
 } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import {
   displayValue,
   formatBytes,

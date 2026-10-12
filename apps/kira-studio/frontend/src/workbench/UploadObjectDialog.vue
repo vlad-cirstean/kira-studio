@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { contentTypeForFilename } from '@shared/domain/objectStore';
 import { decodePath } from '@shared/domain/tree';
-import { rowMeta } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -16,6 +15,7 @@ import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatBytes } from '@workbench/behaviour/format';
 import { computed, ref, watch } from 'vue';

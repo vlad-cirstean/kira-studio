@@ -1,7 +1,7 @@
-import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { modeTab } from './support/apiMode';
+import { openHttpMode } from './support/apiMode';
+import { collectionRow, variableRow } from './support/apiRows';
 import { IPC } from './support/ipcChannels';
 
 // Round-1 review finding 5: revealedValues (state/variables.ts) is shared between the Variables
@@ -19,16 +19,6 @@ import { IPC } from './support/ipcChannels';
 // never lets a *different*, later one skip a real reveal call.
 
 const NOW = '2026-01-01T00:00:00.000Z';
-
-function collectionRow(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
-}
-function variableRow(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="variable-row"][data-id="${id}"]`);
-}
-async function openHttpMode(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-}
 
 const TREE = {
   collections: [{ id: 'col-1', name: 'Orders API', sortOrder: 0, createdAt: NOW, updatedAt: NOW }],

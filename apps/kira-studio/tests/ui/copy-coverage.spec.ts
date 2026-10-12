@@ -58,15 +58,11 @@ const BACKEND_NOTE = /^Composed from catalog metadata:/;
 const ALLOW: RegExp[] = [...PG_ALLOW, NAMES, BYTES];
 const loc = (page: Page, testid: string) => page.locator(`[data-testid="${testid}"]`);
 
-async function pseudo(page: Page): Promise<void> {
-  await setPseudoLocale(page);
-}
-
 test('title bar, mode switcher and status bar', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [{ channel: IPC.connectionsList, response: [] }],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await expectCatalogText(page.locator('.h-titlebar'), { allow: ALLOW });
   await expectCatalogText(page.locator('[data-testid="mode-tab"]'), { allow: ALLOW });
   await expectCatalogText(loc(page, 'status-bar'), { allow: ALLOW });
@@ -76,13 +72,13 @@ test('project panel header and empty state', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [{ channel: IPC.connectionsList, response: [] }],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await expectCatalogText(loc(page, 'project-panel'), { allow: ALLOW });
 });
 
 test('connection row menu', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openRowMenu(page, '');
   await expectCatalogText(loc(page, 'context-menu'), { allow: ALLOW });
 });
@@ -91,7 +87,7 @@ test('connection dialog, every tab', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [{ channel: IPC.connectionsList, response: [] }],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await page.click('[data-testid="add-connection"]');
   const dialog = loc(page, 'connection-dialog');
   await expect(dialog).toBeVisible();
@@ -105,7 +101,7 @@ test('connection dialog, every tab', async ({ relaunch }) => {
 
 test('settings dialog, every pane', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openSettings(page);
   for (const section of ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced']) {
     await loc(page, `settings-section-${section}`).click();
@@ -115,7 +111,7 @@ test('settings dialog, every pane', async ({ relaunch }) => {
 
 test('data view toolbar, column menu, cell menu and cell editor dock', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openCompositeTable(page);
   await expectCatalogText(loc(page, 'data-toolbar'), { allow: ALLOW });
 
@@ -138,7 +134,7 @@ test('data view toolbar, column menu, cell menu and cell editor dock', async ({ 
 
 test('generate data dialog', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openCompositeTable(page);
   await page.click('[data-testid="toolbar-generate-data"]');
   const dialog = loc(page, 'generate-data-dialog');
@@ -148,7 +144,7 @@ test('generate data dialog', async ({ relaunch }) => {
 
 test('console toolbar', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await connectPostgres(page);
   await openRowMenu(page, COMPOSITE_PK_PATH);
   await page.click('[data-testid="menu-item-open-console"]');
@@ -158,7 +154,7 @@ test('console toolbar', async ({ relaunch }) => {
 
 test('command palette', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await emitWailsEvent(page, IPC.commandPalette, null);
   await expect(loc(page, 'command-palette-input')).toBeVisible();
   await expectCatalogText(page.locator('[data-slot="dialog-content"]'), { allow: ALLOW });
@@ -166,7 +162,7 @@ test('command palette', async ({ relaunch }) => {
 
 test('operations panel', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await page.click('[data-testid="toggle-operations-panel"]');
   await expect(loc(page, 'operations-panel')).toBeVisible();
   await expectCatalogText(loc(page, 'operations-panel'), { allow: ALLOW });
@@ -185,7 +181,7 @@ test('DB MCP approval dialog', async ({ relaunch }) => {
       },
     ],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
   const dialog = loc(page, 'db-mcp-approval-dialog');
   await expect(dialog).toBeVisible();
@@ -199,7 +195,7 @@ test('DB MCP approval dialog', async ({ relaunch }) => {
 
 test('HTTP request view, every tab, empty response', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openHttpModeAndNewRequest(page);
   await expectCatalogText(loc(page, 'http-request-view'), { allow: ALLOW });
   for (const pane of ['params', 'headers', 'body', 'settings', 'cookies']) {
@@ -212,7 +208,7 @@ test('collections panel empty state', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [{ channel: IPC.collectionsList, response: { collections: [], items: [] } }],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await modeTab(page, 'api').click();
   await expect(loc(page, 'collections-empty')).toBeVisible();
   await expectCatalogText(loc(page, 'project-panel'), { allow: ALLOW });
@@ -222,7 +218,7 @@ test('environments view', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [{ channel: IPC.collectionsList, response: { collections: [], items: [] } }],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await modeTab(page, 'api').click();
   await page.click('[data-testid="api-environments"]');
   await expect(loc(page, 'environments-dialog')).toBeVisible();
@@ -231,7 +227,7 @@ test('environments view', async ({ relaunch }) => {
 
 test('saved queries menu', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openItemsConsole(page);
   await page.click('[data-testid="console-saved-toggle"]');
   await expect(loc(page, 'console-saved-entry').first()).toBeVisible();
@@ -242,7 +238,7 @@ test('saved queries menu', async ({ relaunch }) => {
 
 test('explain result', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openItemsConsole(page);
   const view = loc(page, 'console-view');
   await typeInto(view, page, ITEMS_SQL);
@@ -254,7 +250,7 @@ test('explain result', async ({ relaunch }) => {
 
 test('definition view, structure and source', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await connectPostgres(page);
   await openRowMenu(page, `${APP_PATH}/table:order_items`);
   await page.click('[data-testid="menu-item-open-definition"]');
@@ -273,7 +269,7 @@ test('documents toolbar', async ({ relaunch }) => {
     control: [{ channel: IPC.connectionsList, response: [conn] }, ...fixture.control],
     stream: fixture.port,
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openRowMenu(page, '');
   await page.click('[data-testid="menu-item-connect"]');
   await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
@@ -292,7 +288,7 @@ test('documents toolbar', async ({ relaunch }) => {
 
 test('key-value view', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openRowMenu(page, '');
   await page.click('[data-testid="menu-item-connect"]');
   await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
@@ -320,7 +316,7 @@ test('key-value view', async ({ relaunch }) => {
 
 test('stream view', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: sqsControl, stream: sqsPorts });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await openRowMenu(page, '');
   await page.click('[data-testid="menu-item-connect"]');
   await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
@@ -349,7 +345,7 @@ test('gRPC request view, every tab', async ({ relaunch }) => {
       },
     ],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   const view = loc(page, 'grpc-request-view');
   await expect(view).toBeVisible();
   await expectCatalogText(view, { allow: ALLOW });
@@ -391,7 +387,7 @@ test('collections panel menu', async ({ relaunch }) => {
       },
     ],
   });
-  await pseudo(page);
+  await setPseudoLocale(page);
   await modeTab(page, 'api').click();
   const fixtureNames = [...ALLOW, /Orders API|Health check|api\.example\.com|GET/];
   await expectCatalogText(loc(page, 'project-panel'), { allow: fixtureNames });

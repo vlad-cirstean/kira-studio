@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import { InputGroup } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { autoClosePairsOnType, wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { loadMonaco, type MonacoModule } from '@workbench/editor/monaco';

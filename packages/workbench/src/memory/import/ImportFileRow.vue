@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { ImportFile } from '@shared/domain/memoryImport';
-import { rowVariants } from '@theme/components/rowVariants';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
 import { FILE_STATE_LABEL } from './importFormat';

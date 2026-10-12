@@ -3,6 +3,7 @@ import { type RepoSummary, repoSummarySchema } from '@shared/domain/repo';
 import { expect, test } from './fixtures';
 import { adeFixture, adeV2Control, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -21,10 +22,6 @@ interface FolderFx {
 }
 
 const t = (id: string) => `[data-testid="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 const chooseFolder = {
   channel: IPC.filesChooseFolder,

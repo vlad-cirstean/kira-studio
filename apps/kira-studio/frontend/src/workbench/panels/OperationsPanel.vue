@@ -7,7 +7,7 @@ import { ICON } from '@theme/icons';
 import { displayValue } from '@workbench/behaviour/format';
 import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
-import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
+import { type OpLogColumn, opLogMenuItems } from '@workbench/lib/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';

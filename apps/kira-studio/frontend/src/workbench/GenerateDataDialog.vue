@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -26,6 +25,7 @@ import {
 } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowMeta } from '@theme/lib/rowVariants';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { errorText } from '@workbench/bridge/codedError';

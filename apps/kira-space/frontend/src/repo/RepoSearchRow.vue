@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import HighlightedText from '@theme/components/HighlightedText.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';

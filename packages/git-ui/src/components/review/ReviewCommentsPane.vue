@@ -12,11 +12,11 @@ import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
  * re-sorting.
  */
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, useTemplateRef } from 'vue';
 import { shaLabel } from '../../lib/text.ts';

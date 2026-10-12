@@ -17,8 +17,8 @@ import { useCopy } from '../behaviour/clipboard';
 import { displayValue, formatClockTime, formatDuration } from '../behaviour/format';
 import { useListNavigation } from '../behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
+import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from '../lib/opLog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from './opLog';
 
 // P132 Part 1 (§2.3): hoisted from Kira Studio's own workbench/panels/OperationsPanel.vue —
 // store-agnostic (props/emits only, no Pinia import here), generic over each app's own record

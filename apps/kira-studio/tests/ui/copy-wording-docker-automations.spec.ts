@@ -4,6 +4,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
+import { containerDetailBare } from './support/dockerFixture';
 import { IPC } from './support/ipcChannels';
 
 // P265 Stream C: pins the unified wording of the Docker and Automations surfaces.
@@ -58,27 +59,6 @@ function row(id: string, name: string, state: string): Json {
   };
 }
 
-function detail(c: Json): Json {
-  return {
-    container: c,
-    command: ['sh'],
-    entrypoint: [],
-    env: [],
-    workingDir: '/',
-    user: '',
-    restartPolicy: 'no',
-    health: '',
-    startedAt: '2026-01-01T00:00:00Z',
-    finishedAt: '0001-01-01T00:00:00Z',
-    exitCode: 0,
-    tty: false,
-    mounts: [],
-    labels: {},
-    networkAttachments: [],
-    raw: '{"Id":"x"}',
-  };
-}
-
 async function setupDocker(
   relaunch: Parameters<Parameters<typeof test>[2]>[0]['relaunch'],
   containers: Json[],
@@ -95,7 +75,9 @@ async function setupDocker(
       Networks: () => [],
       InspectContainer: (a) => {
         const c = containers.find((x) => x.id === (a as { id: string }).id);
-        return c ? detail(c) : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
+        return c
+          ? containerDetailBare(c)
+          : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
       ContainerEditSpec: () => ({
         ...contract<Json>('docker-edit', 'DockerService.ContainerEditSpec'),

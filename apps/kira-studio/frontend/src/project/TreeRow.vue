@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import HighlightedText from '@theme/components/HighlightedText.vue';
-import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { splitMatches } from '@workbench/behaviour/match';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';

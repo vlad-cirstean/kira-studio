@@ -1,40 +1,18 @@
-import type { Page } from '@playwright/test';
-import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/ui/dockerMock';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
+import {
+  containerDetailWithSecret,
+  ENDPOINT,
+  IMAGES,
+  OK_STATUS,
+  openContainer,
+  openDocker,
+  seedContainers,
+  setupDocker,
+} from './support/dockerFixture';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-
-const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
-
-const ENDPOINT = {
-  context: 'default',
-  host: 'unix:///var/run/docker.sock',
-  source: 'default',
-  secure: true,
-  remote: false,
-};
-
-const OK_STATUS = {
-  state: 'ok',
-  endpoint: ENDPOINT,
-  engine: {
-    version: '29.0.0',
-    apiVersion: '1.52',
-    os: 'linux',
-    arch: 'amd64',
-    operatingSystem: 'Debian',
-    kernelVersion: '6.1',
-    cpus: 8,
-    memTotal: 16 * 1024 ** 3,
-    containers: 4,
-    running: 3,
-    paused: 0,
-    stopped: 1,
-    images: 2,
-  },
-};
 
 const DOWN_STATUS = {
   state: 'unavailable',
@@ -43,159 +21,13 @@ const DOWN_STATUS = {
   endpoint: ENDPOINT,
 };
 
-function container(id: string, name: string, state: string, extra: Record<string, unknown> = {}) {
-  return {
-    id,
-    name,
-    image: 'alpine:3.20',
-    imageId: 'sha256:img1',
-    state,
-    status: state === 'running' ? 'Up 2 minutes' : 'Exited (0) 1 hour ago',
-    created: 1_700_000_000,
-    ports: [],
-    composeProject: '',
-    composeService: '',
-    origin: '',
-    originName: '',
-    networks: ['bridge'],
-    ...extra,
-  };
-}
-
-function seedContainers() {
-  return [
-    container('c-web', 'shop-web-1', 'running', {
-      composeProject: 'shop',
-      composeService: 'web',
-      origin: 'compose',
-      originName: 'shop',
-    }),
-    container('c-db', 'shop-db-1', 'running', {
-      composeProject: 'shop',
-      composeService: 'db',
-      origin: 'compose',
-      originName: 'shop',
-    }),
-    container('c-solo', 'solo', 'running'),
-    container('c-old', 'old-job', 'exited'),
-  ];
-}
-
-const IMAGES = [
-  {
-    id: 'sha256:img1',
-    tags: ['alpine:3.20'],
-    size: 8_000_000,
-    created: 1_700_000_000,
-    containers: 2,
-    dangling: false,
-    registryUrl: 'https://hub.docker.com/_/alpine',
-  },
-  {
-    id: 'sha256:img2',
-    tags: ['local/app:dev'],
-    size: 1_000_000,
-    created: 1_700_000_000,
-    containers: 0,
-    dangling: false,
-    registryUrl: '',
-  },
-];
-const VOLUMES = [
-  {
-    name: 'pgdata',
-    driver: 'local',
-    mountpoint: '/var/lib/docker/volumes/pgdata',
-    scope: 'local',
-    created: '',
-    labels: {},
-    usedBy: ['c-db'],
-  },
-];
-const NETWORKS = [
-  {
-    id: 'net1',
-    name: 'shop_default',
-    driver: 'bridge',
-    scope: 'local',
-    internal: false,
-    subnets: ['172.18.0.0/16'],
-    containers: 2,
-    builtin: false,
-    usedBy: ['c-web', 'c-db'],
-  },
-];
-
-function detail(c: ReturnType<typeof container>) {
-  return {
-    container: c,
-    command: ['sh'],
-    entrypoint: [],
-    env: ['SECRET=hunter2'],
-    workingDir: '/',
-    user: '',
-    restartPolicy: 'no',
-    health: '',
-    startedAt: '2026-01-01T00:00:00Z',
-    finishedAt: '0001-01-01T00:00:00Z',
-    exitCode: 0,
-    tty: false,
-    mounts: [],
-    labels: {},
-    networkAttachments: [],
-    raw: '{"Id":"x"}',
-    registryUrl: c.image === 'alpine:3.20' ? 'https://hub.docker.com/_/alpine' : '',
-  };
-}
-
-async function setup(
-  relaunch: Parameters<Parameters<typeof test>[2]>[0]['relaunch'],
-  opts: { status?: unknown; handlers?: Record<string, (args: unknown) => unknown> } = {},
-) {
-  const { window: page, control } = await relaunch({ control: [] });
-  const state = { status: opts.status ?? OK_STATUS, containers: seedContainers() };
-  const docker = await installDockerMocks(page, {
-    bridgePkg: BRIDGE_PKG,
-    handlers: {
-      Status: () => state.status,
-      Containers: () => state.containers,
-      Images: () => IMAGES,
-      Volumes: () => VOLUMES,
-      Networks: () => NETWORKS,
-      InspectContainer: (a) => {
-        const c = state.containers.find((x) => x.id === (a as { id: string }).id);
-        return c ? detail(c) : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
-      },
-      Inspect: () => ({ raw: '{"Id":"x"}' }),
-      Stop: (a) => {
-        const c = state.containers.find((x) => x.id === (a as { id: string }).id);
-        if (c) c.state = 'exited';
-      },
-      ExecOpen: () => contract('docker-exec', 'DockerService.ExecOpen'),
-      ...opts.handlers,
-    },
-  });
-  return { page, docker, state, control };
-}
-
 const execOpenArgs = () =>
   contract<Record<string, unknown>>('docker-exec', 'args:DockerService.ExecOpen');
-
-async function openDocker(page: Page): Promise<void> {
-  await modeTab(page, 'docker').click();
-  await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
-}
-
-async function openContainer(page: Page, name: string, tab?: string): Promise<void> {
-  await page.locator(`[data-testid="docker-row"][data-name="${name}"]`).click();
-  await expect(page.locator('[data-testid="docker-container-detail"]')).toBeVisible();
-  if (tab) await page.locator(`[data-testid="docker-tab-${tab}"]`).click();
-}
 
 test('daemon down shows the unavailable state; Retry refetches and renders the lists', async ({
   relaunch,
 }) => {
-  const { page, docker, state } = await setup(relaunch, { status: DOWN_STATUS });
+  const { page, docker, state } = await setupDocker(relaunch, { status: DOWN_STATUS });
   await openDocker(page);
 
   await expect(page.locator('[data-testid="docker-unavailable"]')).toBeVisible();
@@ -213,7 +45,7 @@ test('daemon down shows the unavailable state; Retry refetches and renders the l
 test('containers group by Compose project; show-stopped and search filter the list', async ({
   relaunch,
 }) => {
-  const { page } = await setup(relaunch);
+  const { page } = await setupDocker(relaunch);
   await openDocker(page);
 
   const rows = page.locator('[data-testid="docker-row"]');
@@ -234,7 +66,7 @@ test('containers group by Compose project; show-stopped and search filter the li
 test('Stop calls the bound method and the row updates after a changed event', async ({
   relaunch,
 }) => {
-  const { page, docker } = await setup(relaunch);
+  const { page, docker } = await setupDocker(relaunch);
   await openDocker(page);
 
   const row = page.locator('[data-testid="docker-row"][data-name="solo"]');
@@ -252,7 +84,7 @@ test('Stop calls the bound method and the row updates after a changed event', as
 test('stats events reach the overview, not the side list; leaving the mode unsubscribes and unwatches', async ({
   relaunch,
 }) => {
-  const { page, docker } = await setup(relaunch);
+  const { page, docker } = await setupDocker(relaunch);
   await openDocker(page);
 
   await expect.poll(() => docker.calls('StatsSubscribe').length).toBeGreaterThan(0);
@@ -288,7 +120,7 @@ test('stats events reach the overview, not the side list; leaving the mode unsub
 test('logs: stream args, appended lines, filter, stderr styling, timestamps reopen', async ({
   relaunch,
 }) => {
-  const { page, docker } = await setup(relaunch);
+  const { page, docker } = await setupDocker(relaunch);
   await openDocker(page);
   await openContainer(page, 'solo', 'logs');
 
@@ -335,7 +167,7 @@ test('logs: stream args, appended lines, filter, stderr styling, timestamps reop
 test('contract: terminal: exec opens for the container, input is written, closing the chip closes it', async ({
   relaunch,
 }) => {
-  const { page, docker } = await setup(relaunch);
+  const { page, docker } = await setupDocker(relaunch);
   await openDocker(page);
   await openContainer(page, 'solo', 'terminal');
 
@@ -357,7 +189,7 @@ test('contract: terminal: exec opens for the container, input is written, closin
 test('contract: terminal: no session opens until New session is clicked; sessions survive tab switches', async ({
   relaunch,
 }) => {
-  const { page, docker } = await setup(relaunch);
+  const { page, docker } = await setupDocker(relaunch);
   await openDocker(page);
   await openContainer(page, 'solo', 'terminal');
 
@@ -390,7 +222,7 @@ test('contract: terminal: no session opens until New session is clicked; session
 });
 
 test('engine dropdown items do not overlap', async ({ relaunch }) => {
-  const { page } = await setup(relaunch, {
+  const { page } = await setupDocker(relaunch, {
     handlers: {
       Contexts: () => [
         { name: 'default', host: 'unix:///var/run/docker.sock', description: '', current: true },
@@ -428,7 +260,7 @@ test('engine dropdown items do not overlap', async ({ relaunch }) => {
 });
 
 test('images, volumes and networks list; "used by" selects the container', async ({ relaunch }) => {
-  const { page } = await setup(relaunch);
+  const { page } = await setupDocker(relaunch);
   await openDocker(page);
 
   await page.locator('[data-testid="docker-section-images"]').click();
@@ -448,7 +280,7 @@ test('images, volumes and networks list; "used by" selects the container', async
 });
 
 test('the tab strip is hidden in Docker mode and back elsewhere', async ({ relaunch }) => {
-  const { page } = await setup(relaunch);
+  const { page } = await setupDocker(relaunch);
   await expect(page.locator('[data-testid="tab-strip"]')).toBeVisible();
 
   await openDocker(page);
@@ -461,7 +293,7 @@ test('the tab strip is hidden in Docker mode and back elsewhere', async ({ relau
 test('engine overview tabulates containers with humanized stats; section tabs share one row', async ({
   relaunch,
 }) => {
-  const { page } = await setup(relaunch);
+  const { page } = await setupDocker(relaunch);
   await openDocker(page);
 
   const tabs = page.locator(
@@ -526,7 +358,7 @@ test('contract: image registry button opens the derived URL; local-only images g
     tags: r.tags,
     registryUrl: r.registryUrl,
   }));
-  const { page, control } = await setup(relaunch, { handlers: { Images: () => images } });
+  const { page, control } = await setupDocker(relaunch, { handlers: { Images: () => images } });
   await openDocker(page);
   await page.locator('[data-testid="docker-section-images"]').click();
 
@@ -553,12 +385,12 @@ test('contract: container detail shows the registry button next to the image', a
   relaunch,
 }) => {
   const rec = contract<RegistryRow>('docker-registry', 'DockerService.InspectContainer#registry');
-  const { page, control } = await setup(relaunch, {
+  const { page, control } = await setupDocker(relaunch, {
     handlers: {
       InspectContainer: (a) => {
         const c = seedContainers().find((x) => x.id === (a as { id: string }).id);
         return c
-          ? { ...detail(c), registryUrl: rec.registryUrl }
+          ? { ...containerDetailWithSecret(c), registryUrl: rec.registryUrl }
           : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
     },
@@ -576,7 +408,7 @@ test('contract: container detail shows the registry button next to the image', a
 });
 
 test('start is green, stop is red, and a selected row has no bar', async ({ relaunch }) => {
-  const { page } = await setup(relaunch);
+  const { page } = await setupDocker(relaunch);
   await openDocker(page);
 
   const stopped = page.locator('[data-testid="docker-row"][data-name="old-job"]');

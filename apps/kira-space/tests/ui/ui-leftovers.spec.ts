@@ -4,6 +4,7 @@ import { expect, test } from './fixtures';
 import { FIXED_NOW, openPlan } from './support/adeV2';
 import { gitStreamParams } from './support/gitStreamMock';
 import { BASE_RESULTS, PORT_CONTROL, PORT_REPO, SHA_A, SHA_B } from './support/gitUiPortFixtures';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -11,10 +12,6 @@ import type { ControlSnapshot } from './support/types';
 // P267 Stream B: unified primitives and behaviours in the ADE, the Repos panel and the status bar.
 
 const t = (id: string) => `[data-testid="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 test('All sessions filter is the shared segmented secondary tabs', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);

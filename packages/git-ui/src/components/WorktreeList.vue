@@ -19,7 +19,6 @@
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowMeta } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
@@ -35,6 +34,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import { rowMeta } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref } from 'vue';

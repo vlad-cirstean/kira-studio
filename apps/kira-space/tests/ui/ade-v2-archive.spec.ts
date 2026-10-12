@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { emitAgentEvent, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // Archiving a task: straight when nothing is at risk, else the Claude dialog; archived sessions.
@@ -13,10 +14,6 @@ async function openArchive(page: Page): Promise<void> {
     .locator('[data-testid="ade-card"][data-task-id="T_cart"] [data-testid="ade-card-head"]')
     .click();
   await page.locator(t('ade-panel-archive')).click();
-}
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
 }
 
 const branchRisk = (over: Record<string, unknown> = {}) => ({

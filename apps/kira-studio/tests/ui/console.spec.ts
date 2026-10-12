@@ -5,6 +5,8 @@ import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/
 import { expect, test } from './fixtures';
 import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
 import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from './support/connect';
+import { mongoCreateArgs } from './support/connectionArgs';
+import { executeSnap, intColumnPage, numberPage } from './support/consolePages';
 import { typeInto } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -42,49 +44,6 @@ const INVOICE_SEQ_PATH = `${APP_PATH}/sequence:invoice_number_seq`;
 const FULL_NAME_PATH = `${APP_PATH}/function:full_name`;
 const SEQUENCES_FOLDER_PATH = `${APP_PATH}#sequence`;
 const FUNCTIONS_FOLDER_PATH = `${APP_PATH}#function`;
-
-function executeSnap(
-  connectionId: string,
-  statements: string[],
-  pages: LogicalPage[],
-): PortSnapshot {
-  return {
-    op: DATA_OP.execute,
-    payload: { connectionId, path: ORDER_ITEMS_PATH, statements },
-    response: { kind: 'execute', pages },
-  };
-}
-
-function intColumnPage(column: string, values: string[]): LogicalPage {
-  const columns: ColumnDescriptor[] = [
-    {
-      name: column,
-      dataType: 'int4',
-      typeClass: 'number',
-      nullable: true,
-      isPrimaryKey: false,
-      generated: false,
-    },
-  ];
-  return {
-    kind: 'tabular',
-    columns,
-    rows: values.map((v) => [v]),
-    position: {
-      offset: 0,
-      pageSize: values.length,
-      hasMore: false,
-      nextToken: null,
-      prevToken: null,
-      strategy: 'offset',
-    },
-    truncatedCells: 0,
-  };
-}
-
-function numberPage(column: string, value: string): LogicalPage {
-  return intColumnPage(column, [value]);
-}
 
 test('Query console — open, run statement/all, errors, saved queries', async ({ relaunch }) => {
   const CONNECTION_ID = 'conn-console';
@@ -974,26 +933,6 @@ test('Query console — a tabular selection copies as TSV/CSV/JSON, rows/columns
 // P19 T8/D6/D11: a Mongo document result's own row menu — "Copy as JSON" (this row's canonical
 // EJSON body, re-indented) and "Copy all as JSON" (every row currently displayed — under an
 // active find-filter, the filtered subset).
-function mongoCreateArgs(name: string) {
-  return {
-    name,
-    kind: 'mongodb',
-    color: 'green',
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 27017,
-    database: 'kira_test',
-    username: 'kira',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
 
 async function clipboardJsonLength(page: Page): Promise<number> {
   try {

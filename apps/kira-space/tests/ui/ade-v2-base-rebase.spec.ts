@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { type AdeBoardFx, adeBoard, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // Task base branch, Change base and the headless rebase: one rule behind every control, the base
@@ -9,10 +10,6 @@ import { IPC } from './support/ipcChannels';
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const row = (id: string) => `[data-testid="ade-branch-row"][data-branch-id="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 type Edit = (b: AdeBoardFx) => void;
 const branch = (b: AdeBoardFx, id: string) =>

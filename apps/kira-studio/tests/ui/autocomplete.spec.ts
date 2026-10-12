@@ -4,6 +4,7 @@ import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
 import { connectMongo, connectRedis, openConsoleFromMenu } from './support/connect';
+import { mongoCreateArgs, redisCreateArgs } from './support/connectionArgs';
 import { hoverWord } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -77,48 +78,6 @@ function mariadbCreateArgs(name: string) {
     port: 3306,
     database: 'kira_test',
     username: 'kira',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
-
-function mongoCreateArgs(name: string) {
-  return {
-    name,
-    kind: 'mongodb',
-    color: 'green',
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 27017,
-    database: 'kira_test',
-    username: 'kira',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
-
-function redisCreateArgs(name: string) {
-  return {
-    name,
-    kind: 'redis',
-    color: 'red',
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 6379,
-    database: '0',
-    username: null,
     password: null,
     uri: null,
     options: {},

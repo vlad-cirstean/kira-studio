@@ -1,16 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeBoard, emitAgentEvent, emitAgentSessions, openPlan } from './support/adeV2';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // Rebase / queue after / merge: the Claude dialog, its blocks, delivery and what is recorded.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const row = (id: string) => `[data-testid="ade-branch-row"][data-branch-id="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 async function openCard(page: Page, taskId: string): Promise<void> {
   await page

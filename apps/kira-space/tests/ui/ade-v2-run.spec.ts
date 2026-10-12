@@ -9,6 +9,7 @@ import {
   openPlan,
 } from './support/adeV2';
 import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -21,10 +22,6 @@ const cellAction = (id: string, kind: string) =>
 
 function boardWith(edit: (b: AdeBoardFx) => void): ControlSnapshot[] {
   return [{ channel: IPC.adeTaskBoard, response: adeBoard(edit) }];
-}
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
 }
 
 async function open(page: Page, id: string): Promise<void> {

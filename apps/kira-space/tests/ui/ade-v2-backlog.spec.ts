@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures';
 import { adeFixture, openPlan } from './support/adeV2';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -14,10 +15,6 @@ interface Item {
 const items = () => adeFixture<{ items: Item[] }>('backlog').items;
 const rows = (page: import('@playwright/test').Page) =>
   page.locator('[data-testid="ade-backlog-row"]');
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 async function openBacklog(
   relaunch: Parameters<typeof openPlan>[0],

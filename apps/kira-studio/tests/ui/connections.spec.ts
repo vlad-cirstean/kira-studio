@@ -4,6 +4,7 @@ import { expect, test } from './fixtures';
 import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
+import { connectionRow } from './support/tree';
 
 // Ported from tests/e2e/connections.spec.ts (P57 D16, per P57-cutover.md §11's
 // connections/secrets finding). No real adapter needed — every scenario here only exercises
@@ -123,10 +124,6 @@ const DUPLICATE_OF_TEST_PG: ConnectionSummary = {
   createdAt: '2026-01-01T00:00:05.000Z',
   updatedAt: '2026-01-01T00:00:05.000Z',
 };
-
-function connectionRow(page: import('@playwright/test').Page, name: string) {
-  return page.locator('[data-testid="tree-row"][data-kind="connection"]').filter({ hasText: name });
-}
 
 const CONTROL: ControlSnapshot[] = [
   // Boot: the retired-colour row is the only pre-existing connection.

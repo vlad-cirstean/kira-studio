@@ -1,8 +1,8 @@
-import type { Locator, Page } from '@playwright/test';
 import { CHANNEL } from '@shared/protocol/events';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { modeTab } from './support/apiMode';
+import { openHttpMode } from './support/apiMode';
+import { collectionRow } from './support/apiRows';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
@@ -13,9 +13,6 @@ import { emitWailsEvent } from './support/mockRuntime';
 
 // Located by row id rather than by label: a `hasText` filter would make "Orders" match the
 // "Orders API" collection row too, and the id is what the row model actually keys on.
-function row(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
-}
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
@@ -75,10 +72,6 @@ const CREATE_ORDER_REQUEST = {
   binaryFile: null,
 };
 
-async function openHttpMode(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-}
-
 test('collections — the tree renders and a request opens into the existing tab kind', async ({
   relaunch,
 }) => {
@@ -91,37 +84,37 @@ test('collections — the tree renders and a request opens into the existing tab
 
   // A collection renders collapsed until it is opened — nothing auto-expands, so the shape the
   // user left the tree in is the shape it comes back as.
-  await expect(row(page, 'col-1')).toBeVisible();
-  await expect(row(page, 'col-1')).toHaveText('Orders API');
-  await expect(row(page, 'item-folder')).toHaveCount(0);
+  await expect(collectionRow(page, 'col-1')).toBeVisible();
+  await expect(collectionRow(page, 'col-1')).toHaveText('Orders API');
+  await expect(collectionRow(page, 'item-folder')).toHaveCount(0);
 
-  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
-  await expect(row(page, 'item-folder')).toBeVisible();
-  await expect(row(page, 'item-health')).toBeVisible();
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await expect(collectionRow(page, 'item-folder')).toBeVisible();
+  await expect(collectionRow(page, 'item-health')).toBeVisible();
   // The folder is collapsed in turn, so the request inside it is not rendered yet.
-  await expect(row(page, 'item-create')).toHaveCount(0);
+  await expect(collectionRow(page, 'item-create')).toHaveCount(0);
 
   // Depths come from the row model, not from DOM nesting — every row is a sibling in the virtual
   // list, indented by padding.
-  await expect(row(page, 'col-1')).toHaveAttribute('data-depth', '0');
-  await expect(row(page, 'item-health')).toHaveAttribute('data-depth', '1');
+  await expect(collectionRow(page, 'col-1')).toHaveAttribute('data-depth', '0');
+  await expect(collectionRow(page, 'item-health')).toHaveAttribute('data-depth', '1');
 
   // A request row carries its method chip; a folder and a collection do not.
-  await expect(row(page, 'item-health').locator('.method')).toHaveText('GET');
-  await expect(row(page, 'item-folder').locator('.method')).toHaveCount(0);
+  await expect(collectionRow(page, 'item-health').locator('.method')).toHaveText('GET');
+  await expect(collectionRow(page, 'item-folder').locator('.method')).toHaveCount(0);
 
   // Expanding the folder reveals the request at the next depth; collapsing hides it again.
-  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
-  await expect(row(page, 'item-create')).toBeVisible();
-  await expect(row(page, 'item-create')).toHaveAttribute('data-depth', '2');
-  await expect(row(page, 'item-create').locator('.method')).toHaveText('POST');
-  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
-  await expect(row(page, 'item-create')).toHaveCount(0);
+  await collectionRow(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
+  await expect(collectionRow(page, 'item-create')).toBeVisible();
+  await expect(collectionRow(page, 'item-create')).toHaveAttribute('data-depth', '2');
+  await expect(collectionRow(page, 'item-create').locator('.method')).toHaveText('POST');
+  await collectionRow(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
+  await expect(collectionRow(page, 'item-create')).toHaveCount(0);
 
   // Double-clicking a request opens the existing 'http-request' tab kind (D14), carrying the
   // **saved name** rather than the URL-derived title, and the saved body.
-  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
-  await row(page, 'item-create').dblclick();
+  await collectionRow(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
+  await collectionRow(page, 'item-create').dblclick();
   const view = page.locator('[data-testid="http-request-view"]');
   await expect(view).toBeVisible();
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
@@ -138,7 +131,7 @@ test('collections — the tree renders and a request opens into the existing tab
   );
 
   // Opening the same row again reuses the bound tab rather than making a second one (D14).
-  await row(page, 'item-create').dblclick();
+  await collectionRow(page, 'item-create').dblclick();
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
 });
 
@@ -165,9 +158,9 @@ test('contract: collections — a request moves to another collection from its c
   });
   const moveArgs = contract<Record<string, string>>('api-move', 'args:CollectionsService.MoveItem');
   await openHttpMode(page);
-  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
 
-  await row(page, 'item-health').click({ button: 'right' });
+  await collectionRow(page, 'item-health').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
   await expect(page.locator('[data-testid="menu-item-move-to-col-1"]')).toHaveAttribute(
     'data-disabled',
@@ -178,7 +171,7 @@ test('contract: collections — a request moves to another collection from its c
     .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItem)?.args)
     .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-2' });
 
-  await row(page, 'item-health').click({ button: 'right' });
+  await collectionRow(page, 'item-health').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
   await page.locator('[data-testid="menu-item-move-to-new"]').click();
   await expect
@@ -214,9 +207,9 @@ test('collections — editing marks the request dirty, and Save clears it', asyn
   const { window: page, control } = await relaunch({ control: CONTROL });
   await openHttpMode(page);
 
-  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
-  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
-  await row(page, 'item-create').dblclick();
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await collectionRow(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
+  await collectionRow(page, 'item-create').dblclick();
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 
   // A freshly opened saved request is clean, and Save is disabled because there is nothing to do.
@@ -354,32 +347,32 @@ test('collections — search filters the tree, keeps ancestors, and restores the
 
   // Expand the collection only — the folder stays collapsed, which is the state search must
   // restore afterwards.
-  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
-  await expect(row(page, 'item-folder')).toBeVisible();
-  await expect(row(page, 'item-create')).toHaveCount(0);
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await expect(collectionRow(page, 'item-folder')).toBeVisible();
+  await expect(collectionRow(page, 'item-create')).toHaveCount(0);
 
   await page.click('[data-testid="toggle-search"]');
   await page.fill('[data-testid="tree-search"]', 'Create');
 
   // Only the matching branch survives, and its ancestors render so the match is reachable.
-  await expect(row(page, 'item-create')).toBeVisible();
-  await expect(row(page, 'col-1')).toBeVisible();
-  await expect(row(page, 'item-folder')).toBeVisible();
-  await expect(row(page, 'item-health')).toHaveCount(0);
+  await expect(collectionRow(page, 'item-create')).toBeVisible();
+  await expect(collectionRow(page, 'col-1')).toBeVisible();
+  await expect(collectionRow(page, 'item-folder')).toBeVisible();
+  await expect(collectionRow(page, 'item-health')).toHaveCount(0);
   // The matched substring is highlighted, not the whole label.
-  await expect(row(page, 'item-create').locator('mark')).toHaveText('Create');
+  await expect(collectionRow(page, 'item-create').locator('mark')).toHaveText('Create');
 
   // A URL-only match still surfaces the row, since the URL is searched even though it is not shown.
   await page.fill('[data-testid="tree-search"]', 'healthz');
-  await expect(row(page, 'item-health')).toBeVisible();
-  await expect(row(page, 'item-create')).toHaveCount(0);
+  await expect(collectionRow(page, 'item-health')).toBeVisible();
+  await expect(collectionRow(page, 'item-create')).toHaveCount(0);
 
   // Clearing restores exactly the shape the user had: the collection expanded, the folder not —
   // D13's "renders expanded without mutating `expanded`".
   await page.fill('[data-testid="tree-search"]', '');
-  await expect(row(page, 'item-folder')).toBeVisible();
-  await expect(row(page, 'item-health')).toBeVisible();
-  await expect(row(page, 'item-create')).toHaveCount(0);
+  await expect(collectionRow(page, 'item-folder')).toBeVisible();
+  await expect(collectionRow(page, 'item-health')).toBeVisible();
+  await expect(collectionRow(page, 'item-create')).toHaveCount(0);
 });
 
 // P28 D16(d) removes P22b D8's Environments category from the collections panel — the user asked
@@ -402,7 +395,7 @@ test('collections — no environments category in the panel; the header action o
   const { window: page } = await relaunch({ control: CONTROL });
   await openHttpMode(page);
 
-  await expect(row(page, 'col-1')).toBeVisible();
+  await expect(collectionRow(page, 'col-1')).toBeVisible();
 
   // D16(d): gone outright — neither the category's toggle nor any of its rows exists any more.
   await expect(page.locator('[data-testid="environments-category-toggle"]')).toHaveCount(0);
@@ -528,7 +521,7 @@ test('collections — Postman import builds the contract tree and export asks fo
   expect(importCalls).toHaveLength(1);
   expect(importCalls[0].args).toEqual(importArgs);
 
-  const root = row(page, tree.collections[0].id);
+  const root = collectionRow(page, tree.collections[0].id);
   await expect(root).toContainText(tree.collections[0].name);
   await root.click({ button: 'right' });
   await page.click('[data-testid="menu-item-export"]');
@@ -557,7 +550,7 @@ test('collections — after a restart the tree and the active environment come b
   const { window: page } = await relaunch({ control: CONTROL });
   await openHttpMode(page);
 
-  await expect(row(page, tree.collections[0].id)).toBeVisible();
+  await expect(collectionRow(page, tree.collections[0].id)).toBeVisible();
   await page.click('[data-testid="api-environments"]');
   const active = envs.find((e) => e.isActive);
   expect(active).toBeDefined();

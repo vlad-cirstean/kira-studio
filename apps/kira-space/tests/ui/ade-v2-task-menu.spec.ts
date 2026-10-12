@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { openPlan } from './support/adeV2';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // The task context menu: right-click, Shift+F10 and the panel's More button.
@@ -8,10 +9,6 @@ import { IPC } from './support/ipcChannels';
 const t = (id: string) => `[data-testid="${id}"]`;
 const card = (id: string) => `[data-testid="ade-card"][data-task-id="${id}"]`;
 const item = (id: string) => t(`menu-item-${id}`);
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 async function menuIds(page: Page): Promise<string[]> {
   return page

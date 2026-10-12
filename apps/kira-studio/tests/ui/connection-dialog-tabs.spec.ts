@@ -2,13 +2,10 @@ import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { connectionRow } from './support/tree';
 
 // P28 §7's new spec: the connection dialog's step-2 tabs (General/Advanced/Pre-connect) and the
 // throttle field the Advanced tab gained.
-
-function connectionRow(page: import('@playwright/test').Page, name: string) {
-  return page.locator('[data-testid="tree-row"][data-kind="connection"]').filter({ hasText: name });
-}
 
 async function openNewPostgresDialog(page: import('@playwright/test').Page): Promise<void> {
   await page.click('[data-testid="add-connection"]');

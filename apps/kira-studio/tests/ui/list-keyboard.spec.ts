@@ -1,4 +1,3 @@
-import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/dataOps';
 import {
   controlSnapshots as redisControl,
@@ -23,6 +22,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
+import { openRedisBrowse, REDIS_DB0 } from './support/redisFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // P264: one key set for every list. The project tree is the Studio list bound through the shared
@@ -305,27 +305,10 @@ test('grpc history — arrows and Home/End move between calls', async ({ relaunc
 
 // --- redis Browse and KeyValue ----------------------------------------------------------------
 
-const REDIS_DB0 = 'database:db0';
 const REDIS_USER_NS = `${REDIS_DB0}/namespace:user`;
 const REDIS_USER1_NS = `${REDIS_USER_NS}/namespace:1`;
 const REDIS_BIGHASH = `${REDIS_USER1_NS}/key:user%3A1%3Abighash`;
 const MENU = '[data-testid="context-menu"]';
-
-async function openRedisBrowse(page: Page): Promise<void> {
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
-    'data-status',
-    'connected',
-    { timeout: 10_000 },
-  );
-  await expandRow(page, '');
-  await (await findRow(page, REDIS_DB0)).dblclick();
-  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
-    'data-level',
-    REDIS_DB0,
-  );
-}
 
 test('browse — arrows, Home/End, Space selects, Enter opens, Shift+F10 menu and focus return', async ({
   relaunch,

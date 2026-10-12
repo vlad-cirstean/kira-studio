@@ -17,10 +17,10 @@ import { TransportError } from '@kira/git-ipc';
  * row's `FileTree` renders no toolbar of its own (`show-toolbar="false"`).
  */
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatAgeCompact } from '@workbench/behaviour/format';

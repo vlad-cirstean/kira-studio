@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';

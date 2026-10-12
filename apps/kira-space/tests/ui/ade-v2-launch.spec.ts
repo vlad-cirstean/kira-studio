@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeBoard, adeFixture, openPlan } from './support/adeV2';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
 // Stage and start launches, the task's Take over and the `!` targets.
@@ -8,10 +9,6 @@ import { IPC } from './support/ipcChannels';
 const t = (id: string) => `[data-testid="${id}"]`;
 const row = (id: string) => `[data-testid="ade-branch-row"][data-branch-id="${id}"]`;
 const taskEl = (id: string) => `[data-testid="ade-task"][data-task-id="${id}"]`;
-
-function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
-  return control.log().filter((e) => e.channel === channel);
-}
 
 interface SessionFx {
   id: string;

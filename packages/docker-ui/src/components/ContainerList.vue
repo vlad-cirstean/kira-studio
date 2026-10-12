@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
-import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
+import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';

@@ -1,4 +1,9 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import {
+  center,
+  expectIdle,
+  openDock,
+} from '../../../../packages/workbench/src/testing/ui/panelResize';
 import { expect, test } from './fixtures';
 
 // P185: a panel resize must end on every release path. Reka's splitter ends a drag only on a
@@ -7,22 +12,6 @@ import { expect, test } from './fixtures';
 
 const PROJECT_HANDLE = '.workbench-shell [data-slot="resizable-handle"]';
 const DOCK_HANDLE = '.workbench-shell [role="separator"][aria-label="Resize operations panel"]';
-
-async function center(handle: Locator): Promise<{ x: number; y: number }> {
-  const box = await handle.boundingBox();
-  if (!box) throw new Error('handle has no box');
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-async function expectIdle(page: Page, handle: Locator): Promise<void> {
-  await expect(handle).not.toHaveAttribute('data-state', 'drag');
-  await expect(page.locator('[data-testid="main-panel"]')).not.toHaveCSS('pointer-events', 'none');
-}
-
-async function openDock(page: Page): Promise<void> {
-  await page.click('[data-testid="toggle-operations-panel"]');
-  await expect(page.locator('[data-testid="operations-panel"]')).toBeVisible();
-}
 
 const releases: {
   name: string;

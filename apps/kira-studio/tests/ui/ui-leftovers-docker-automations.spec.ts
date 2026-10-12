@@ -6,6 +6,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
+import { containerDetail } from './support/dockerFixture';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -60,28 +61,6 @@ function container(id: string, name: string) {
 
 const CONTAINERS = [container('c-a', 'alpha'), container('c-b', 'bravo')];
 
-function detail(c: ReturnType<typeof container>) {
-  return {
-    container: c,
-    command: ['sh'],
-    entrypoint: [],
-    env: [],
-    workingDir: '/',
-    user: '',
-    restartPolicy: 'no',
-    health: '',
-    startedAt: '2026-01-01T00:00:00Z',
-    finishedAt: '0001-01-01T00:00:00Z',
-    exitCode: 0,
-    tty: false,
-    mounts: [],
-    labels: {},
-    networkAttachments: [],
-    raw: '{"Id":"x"}',
-    registryUrl: '',
-  };
-}
-
 async function setupDocker(relaunch: Parameters<Parameters<typeof test>[2]>[0]['relaunch']) {
   const { window: page } = await relaunch({ control: [] });
   const docker = await installDockerMocks(page, {
@@ -94,7 +73,9 @@ async function setupDocker(relaunch: Parameters<Parameters<typeof test>[2]>[0]['
       Networks: () => [],
       InspectContainer: (a) => {
         const c = CONTAINERS.find((x) => x.id === (a as { id: string }).id);
-        return c ? detail(c) : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
+        return c
+          ? containerDetail(c)
+          : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
       Inspect: () => ({ raw: '{"Id":"x"}' }),
     },

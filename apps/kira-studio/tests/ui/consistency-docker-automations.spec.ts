@@ -1,8 +1,8 @@
-import type { Page } from '@playwright/test';
 import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/ui/dockerMock';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { container, containerDetail, openDocker } from './support/dockerFixture';
 import { IPC } from './support/ipcChannels';
 
 // P266 stream C. Backend half: internal/flows/{termflow,dockerflow}/errors_test.go return the
@@ -43,25 +43,6 @@ const DOWN_STATUS = {
   endpoint: ENDPOINT,
 };
 
-function container(id: string, name: string, state: string, extra: Record<string, unknown> = {}) {
-  return {
-    id,
-    name,
-    image: 'alpine:3.20',
-    imageId: 'sha256:img1',
-    state,
-    status: state === 'running' ? 'Up 2 minutes' : 'Exited (0) 1 hour ago',
-    created: 1_700_000_000,
-    ports: [],
-    composeProject: '',
-    composeService: '',
-    origin: '',
-    originName: '',
-    networks: ['bridge'],
-    ...extra,
-  };
-}
-
 const CONTAINERS = [
   container('c-web', 'shop-web-1', 'running', {
     composeProject: 'shop',
@@ -71,28 +52,6 @@ const CONTAINERS = [
   }),
   container('c-old', 'old-job', 'exited'),
 ];
-
-function detail(c: ReturnType<typeof container>) {
-  return {
-    container: c,
-    command: ['sh'],
-    entrypoint: [],
-    env: [],
-    workingDir: '/',
-    user: '',
-    restartPolicy: 'no',
-    health: '',
-    startedAt: '2026-01-01T00:00:00Z',
-    finishedAt: '0001-01-01T00:00:00Z',
-    exitCode: 0,
-    tty: false,
-    mounts: [],
-    labels: {},
-    networkAttachments: [],
-    raw: '{"Id":"x"}',
-    registryUrl: '',
-  };
-}
 
 async function setupDocker(
   relaunch: Parameters<Parameters<typeof test>[2]>[0]['relaunch'],
@@ -110,17 +69,14 @@ async function setupDocker(
       Networks: () => [],
       InspectContainer: (a) => {
         const c = CONTAINERS.find((x) => x.id === (a as { id: string }).id);
-        return c ? detail(c) : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
+        return c
+          ? containerDetail(c)
+          : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
       ...handlers,
     },
   });
   return page;
-}
-
-async function openDocker(page: Page): Promise<void> {
-  await modeTab(page, 'docker').click();
-  await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
 }
 
 const SCRIPT = {

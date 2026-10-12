@@ -2,10 +2,10 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import RunElapsed from './runs/RunElapsed.vue';
 import ScriptScheduleLine from './schedule/ScriptScheduleLine.vue';

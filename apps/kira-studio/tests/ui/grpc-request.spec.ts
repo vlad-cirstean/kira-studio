@@ -1,7 +1,8 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { grpcTab as buildGrpcTab, modeTab } from './support/apiMode';
+import { collectionRow } from './support/apiRows';
 import { installFakeTimers } from './support/clock';
 import { contract } from './support/contract';
 import { acceptConfirm } from './support/dialogs';
@@ -12,9 +13,6 @@ import { CHANNEL_TO_FQN, emitWailsEvent } from './support/mockRuntime';
 // Located by row id rather than by label — collections.spec.ts's own helper verbatim, over the
 // collections tree's own row (`[data-testid="collection-row"]`), a different tree from
 // tests/ui/support/tree.ts's `[data-testid="tree-row"]` (the Studio project tree).
-function row(page: Page, id: string): Locator {
-  return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
-}
 
 // P11 §6.4: seven tests, driving both wire planes mocked (D13's own reasoning, ported verbatim
 // from every other tests/ui spec) — the `Call` bound-call endpoint via installControlMocks'
@@ -637,10 +635,10 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
   // *New gRPC request* from the tree's own context menu (D12's sibling of *New request*) creates
   // the row directly — D13's inline rename is this tree's own "name it and it's saved" step, in
   // place of a Save-as dialog it does not need for a row that already exists.
-  await row(page, 'col-1').click({ button: 'right' });
+  await collectionRow(page, 'col-1').click({ button: 'right' });
   await page.click('[data-testid="menu-item-new-grpc-request"]');
 
-  const created = row(page, 'item-grpc-1');
+  const created = collectionRow(page, 'item-grpc-1');
   await expect(created).toBeVisible();
   // D12's own chip: `grpcMethodClass` gives every gRPC row the one neutral class (no per-row
   // streaming distinction — that lives in the method's own descriptor, unreachable from a
@@ -649,9 +647,9 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
 
   await page.locator('[data-testid="collection-rename-input"]').fill('List items');
   await page.keyboard.press('Enter');
-  await expect(row(page, 'item-grpc-1')).toContainText('List items');
+  await expect(collectionRow(page, 'item-grpc-1')).toContainText('List items');
 
-  await row(page, 'item-grpc-1').dblclick();
+  await collectionRow(page, 'item-grpc-1').dblclick();
   await expect(page.locator('[data-testid="grpc-request-view"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-request-view"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="grpc-method-chip"]')).toContainText(
