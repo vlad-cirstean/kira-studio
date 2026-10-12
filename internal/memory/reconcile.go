@@ -28,6 +28,9 @@ type work struct {
 	mergedVec  []float32
 }
 
+// within is the scope and project the fact may merge with: an update never crosses scopes.
+func (w *work) within() *scopeKey { return &scopeKey{scope: w.Scope, project: w.Project} }
+
 type decision struct {
 	Action string
 	Target string // real memory id; update/noop
@@ -41,6 +44,7 @@ type reconcileInputFact struct {
 	Index      int                  `json:"index"`
 	Fact       string               `json:"fact"`
 	Reason     string               `json:"reason"`
+	Origin     string               `json:"origin"`
 	Candidates []reconcileCandidate `json:"candidates"`
 }
 
@@ -48,6 +52,7 @@ type reconcileCandidate struct {
 	ID        string `json:"id"`
 	Fact      string `json:"fact"`
 	Reason    string `json:"reason"`
+	Origin    string `json:"origin"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -63,7 +68,7 @@ type reconcileDecision struct {
 // prepare resolves what needs no model: an exact duplicate is a noop, a fact with no candidates is
 // an add. It reports whether the fact still needs the reconcile call.
 func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err error) {
-	same, err := s.store.currentByHash(ctx, factHash(w.Fact), nil)
+	same, err := s.store.currentByHash(ctx, factHash(w.Fact), w.within())
 	if err != nil {
 		return false, err
 	}
@@ -92,12 +97,12 @@ func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err erro
 // memories whose embedding is within the spec's DocFloor of the new fact, keyword matches first.
 func (s *Service) candidates(ctx context.Context, w *work) ([]Memory, error) {
 	cands, err := s.store.searchFTS(ctx, SearchArgs{
-		Query: w.Fact + " " + strings.Join(w.Keywords, " "), Limit: reconcileCandidateLimit,
+		Query: w.Fact + " " + strings.Join(w.Keywords, " "), Limit: reconcileCandidateLimit, within: w.within(),
 	})
 	if err != nil || w.vec == nil {
 		return cands, err
 	}
-	top, err := s.store.vectorTopK(ctx, s.opts.Embedder.Spec().ID, w.vec, false, reconcileVectorCandidates)
+	top, err := s.store.vectorTopK(ctx, s.opts.Embedder.Spec().ID, w.vec, false, reconcileVectorCandidates, w.within())
 	if err != nil {
 		return nil, err
 	}
@@ -132,16 +137,16 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 	in := struct {
 		Facts []reconcileInputFact `json:"facts"`
 	}{}
-	tempIDs := make([]map[string]string, len(works))
+	tempIDs := make([]map[string]Memory, len(works))
 	next := 1
 	for i, w := range works {
-		f := reconcileInputFact{Index: i, Fact: w.Fact, Reason: w.Reason, Candidates: []reconcileCandidate{}}
-		tempIDs[i] = map[string]string{}
+		f := reconcileInputFact{Index: i, Fact: w.Fact, Reason: w.Reason, Origin: w.Origin, Candidates: []reconcileCandidate{}}
+		tempIDs[i] = map[string]Memory{}
 		for _, m := range w.cands {
 			id := "c" + strconv.Itoa(next)
 			next++
-			tempIDs[i][id] = m.ID
-			f.Candidates = append(f.Candidates, reconcileCandidate{ID: id, Fact: m.Fact, Reason: m.Reason, CreatedAt: m.CreatedAt})
+			tempIDs[i][id] = m
+			f.Candidates = append(f.Candidates, reconcileCandidate{ID: id, Fact: m.Fact, Reason: m.Reason, Origin: m.Origin, CreatedAt: m.CreatedAt})
 		}
 		in.Facts = append(in.Facts, f)
 	}
@@ -175,7 +180,10 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 	return nil
 }
 
-func checkDecision(d reconcileDecision, w *work, ids map[string]string) decision {
+// keptBesideWhy explains a grade-guard downgrade of update to add.
+const keptBesideWhy = "Kept beside a higher-graded fact."
+
+func checkDecision(d reconcileDecision, w *work, cands map[string]Memory) decision {
 	fail := func(format string, a ...any) decision {
 		return decision{Err: fmt.Errorf("%w: reconcile: %s", ErrClaudeOutput, fmt.Sprintf(format, a...))}
 	}
@@ -187,12 +195,17 @@ func checkDecision(d reconcileDecision, w *work, ids map[string]string) decision
 		}
 		return decision{Action: ActionAdd, Fact: w.Fact, Reason: w.Reason, Why: why}
 	case ActionNoop, ActionUpdate:
-		target, ok := ids[d.Target]
+		cand, ok := cands[d.Target]
 		if !ok {
 			return fail("target %q is not a candidate of this fact", d.Target)
 		}
+		target := cand.ID
 		if d.Action == ActionNoop {
 			return decision{Action: ActionNoop, Target: target, Why: why}
+		}
+		// A lower grade never replaces a higher one: user > external > agent.
+		if GradeOf(cand.Origin) > GradeOf(w.Origin) {
+			return decision{Action: ActionAdd, Fact: w.Fact, Reason: w.Reason, Why: keptBesideWhy}
 		}
 		fact, reason := strings.TrimSpace(d.Fact), strings.TrimSpace(d.Reason)
 		if fact == "" || len([]rune(fact)) > MaxFactLen || reason == "" || len([]rune(reason)) > MaxReasonLen {

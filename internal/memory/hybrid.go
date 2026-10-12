@@ -159,7 +159,7 @@ func (s *Service) semanticHits(ctx context.Context, a SearchArgs, limit int) ([]
 		slog.Debug("memory: query embedding failed; keyword results only", "scope", "memory", "err", err)
 		return nil, nil
 	}
-	top, err := s.store.vectorTopK(ctx, model, vecs[0], a.IncludeHistory, limit)
+	top, err := s.store.vectorTopK(ctx, model, vecs[0], a.IncludeHistory, limit, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -201,7 +201,9 @@ var MemoryGateSystem = define(Entry{
 
 {{template "memory.dataHygiene"}}
 
-Input: "items" (each a claimed fact with a reason), optional "clarifications" (question and answer pairs from the person who stated the items), and "relatedMemories" (facts already stored; context only, never edit them).
+Input: "items" (each a claimed fact with a reason, an origin, an optional sourceTag and a scope), optional "clarifications" (question and answer pairs from the person who stated the items), and "relatedMemories" (facts already stored; context only, never edit them).
+
+Origin, sourceTag and scope are metadata of the item. Never change them and never judge the item by them; every fact split from an item keeps them.
 
 For each item:
 1. Split it into atomic facts: one claim each. Rewrite a fact only to make it standalone. Resolve a pronoun or vague reference only when the item itself makes the referent certain. Otherwise keep the author's wording.
@@ -254,7 +256,9 @@ var MemoryReconcileSystem = define(Entry{
 
 {{template "memory.dataHygiene"}}
 
-Input: "facts", each with its "candidates": existing memories found by a loose, recall-first search. Most candidates are unrelated.
+Input: "facts", each with its "origin" and its "candidates": existing memories, each with its "origin", found by a loose, recall-first search. Most candidates are unrelated.
+
+Origins rank user, then external, then agent. Never choose "update" for a candidate whose origin ranks higher than the fact's origin; choose "add".
 
 For each fact choose exactly one action:
 - "noop" with "target": a candidate already states the same fact and its reason already covers the new one.
@@ -326,7 +330,7 @@ Work through the facts:
 1. The chunks were read independently, so facts overlap and repeat. Merge duplicates and near-duplicates into one fact.
 2. Resolve each fact marked unresolved using the other facts of this document, then rewrite it as a standalone fact. A fact that stays ambiguous is not stored: list it in "unresolved" with the open question.
 3. Drop a fact that is not durable (trivia, an example, time-bound, navigation): list it in "dropped" with why. Drop any secret (password, token, API key, private key) and never store it.
-4. Store the rest with the store_memory tool, at most {{.MaxItems}} items per call, with author "agent". Write each item's fact standalone. Write each item's reason exactly as: Stated in <document path>, <section>: "<evidence>" (at most {{.MaxReason}} characters).
+4. Store the rest with the store_memory tool, at most {{.MaxItems}} items per call, with origin "external", sourceTag "doc" and scope "personal". Write each item's fact standalone. Write each item's reason exactly as: Stated in <document path>, <section>: "<evidence>" (at most {{.MaxReason}} characters).
 5. store_memory can challenge items with questions; a challenged call stores nothing. Answer the questions through "clarifications" using only what this document's facts state, never assumption or general knowledge. When the document cannot answer, remove that item from the call, call again, and list the fact in "unresolved" with the questions the store asked.
 6. store_memory already reconciles new facts against stored ones. Use search_memories only when it helps you word a fact.
 7. Stop when every input fact is stored, merged into another, dropped or listed unresolved. Report only the facts you did not store.`,

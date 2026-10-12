@@ -33,15 +33,17 @@ func (h *minHeap) Pop() any {
 
 var warnedBadVector atomic.Bool
 
-// vectorTopK scans every stored vector of model and returns the k best by dot product with q,
+// vectorTopK scans every stored vector of model (within one scope and project when set) and returns the k best by dot product with q,
 // best first. A row whose length does not match q is skipped and logged once.
-func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, includeHistory bool, k int) ([]scored, error) {
+func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, includeHistory bool, k int, within *scopeKey) ([]scored, error) {
 	db, err := s.conn()
 	if err != nil {
 		return nil, err
 	}
+	scope, project := within.args()
 	rows, err := db.QueryContext(ctx, `SELECT e.seq, e.vec FROM memory_embeddings e JOIN memories m ON m.seq = e.seq
-		WHERE e.model = ?1 AND (?2 OR m.status = 'current')`, model, includeHistory)
+		WHERE e.model = ?1 AND (?2 OR m.status = 'current') AND (?3 IS NULL OR (m.scope = ?3 AND m.project IS ?4))`,
+		model, includeHistory, scope, project)
 	if err != nil {
 		return nil, fmt.Errorf("memory: vector scan: %w", err)
 	}

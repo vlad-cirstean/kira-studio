@@ -16,9 +16,12 @@ type gateInput struct {
 }
 
 type gateInputItem struct {
-	Index  int    `json:"index"`
-	Fact   string `json:"fact"`
-	Reason string `json:"reason"`
+	Index     int    `json:"index"`
+	Fact      string `json:"fact"`
+	Reason    string `json:"reason"`
+	Origin    string `json:"origin"`
+	SourceTag string `json:"sourceTag,omitempty"`
+	Scope     string `json:"scope"`
 }
 
 type gateClarify struct {
@@ -50,7 +53,7 @@ func (s *Service) runGate(ctx context.Context, req StoreRequest) ([]gateVerdict,
 	in := gateInput{Related: []gateRelated{}}
 	text := make([]string, 0, 2*len(req.Items))
 	for i, it := range req.Items {
-		in.Items = append(in.Items, gateInputItem{Index: i, Fact: it.Fact, Reason: it.Reason})
+		in.Items = append(in.Items, gateInputItem{Index: i, Fact: it.Fact, Reason: it.Reason, Origin: it.Origin, SourceTag: it.SourceTag, Scope: it.Scope})
 		text = append(text, it.Fact, it.Reason)
 	}
 	for _, c := range req.Clarifications {
