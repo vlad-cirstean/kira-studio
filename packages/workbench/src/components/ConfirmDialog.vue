@@ -33,7 +33,7 @@ watch(
     :message="confirmDialogStore.message"
     :confirm-label="confirmDialogStore.confirmLabel"
     :tone="confirmDialogStore.tone"
-    :busy="confirmDialogStore.busy"
+    :pending="confirmDialogStore.busy"
     :error="confirmDialogStore.error"
     @confirm="confirmDialogStore.acceptConfirm()"
     @cancel="confirmDialogStore.cancelConfirm()"

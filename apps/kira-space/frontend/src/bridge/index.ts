@@ -165,8 +165,7 @@ const spaceControl = {
   openExternal: createOpenExternal((url) => unwrap(LinkService.OpenExternal({ url }))),
   onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
-  // Space-only menu channel (appshell Review Code item); not in the shared CHANNEL table.
-  onReviewCode: (cb: () => void): (() => void) => on('kira:menu:reviewCode', cb),
+  onReviewCode: (cb: () => void): (() => void) => on(CHANNEL.reviewCode, cb),
 
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),

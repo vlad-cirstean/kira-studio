@@ -160,7 +160,7 @@ async function confirmTakeOver(): Promise<void> {
       :title="t('mobile.needs.takeOverConfirm.title')"
       :message="t('mobile.needs.takeOverConfirm.body', { what: takingOver?.what ?? '' })"
       :confirm-label="t('common.action.takeOver.label')"
-      :busy="writes.takeOver.isPending.value"
+      :pending="writes.takeOver.isPending.value"
       :error="takeOverError"
       :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"
       @cancel="takingOver = null"

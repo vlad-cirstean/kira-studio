@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {

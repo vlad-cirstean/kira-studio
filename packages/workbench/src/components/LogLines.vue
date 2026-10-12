@@ -34,7 +34,17 @@ const { virtualizer, virtualItems, totalSize, onScroll } = useVirtualRows({
   rowHeight: () => ESTIMATED_LINE_HEIGHT,
   scrollElement: scrollEl,
 });
-useFollowTail(scrollEl, () => props.lines.length);
+// An explicit `v-model:follow` toggles following; left unbound, scrolling up pauses it and scrolling
+// back to the bottom resumes it.
+const follow = defineModel<boolean | undefined>('follow', { default: undefined });
+const { atBottom, jumpToLatest } = useFollowTail(scrollEl, () => props.lines.length, { follow });
+
+/** Scroll a line into view (the virtual row may not be mounted yet). */
+function scrollToIndex(index: number): void {
+  virtualizer.value.scrollToIndex(index, { align: 'center' });
+}
+
+defineExpose({ atBottom, jumpToLatest, scrollToIndex });
 
 const style = computed(() => (props.maxHeight ? { maxHeight: props.maxHeight } : undefined));
 

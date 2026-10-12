@@ -13,10 +13,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// reviewCodeChord mirrors SHORTCUTS' `ade.reviewCode` row (packages/shared/domain/shortcuts.ts); it is
-// this app's own, so it lives here rather than in the shared shell.Shortcuts table.
-var reviewCodeChord = shell.Chord{Key: "R", CmdOrCtrl: true, Shift: true}
-
 // BuildTemplate is Kira Space's own menu — Kira Studio's own BuildTemplate
 // (apps/kira-studio/internal/appshell/menu.go) trimmed to this app's own commands: no connections/
 // requests/import items, no run/format (this app has none of those). P116 G1-G4 grew
@@ -39,7 +35,7 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 		{Kind: shell.ItemSeparator},
 		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.commandPalette.label", nil), Accelerator: shell.Shortcuts["view.commandPalette"].Accelerator(), Channel: bridge.ChannelCommandPalette},
 		{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.find.label", nil), Accelerator: shell.Shortcuts["view.find"].Accelerator(), Channel: bridge.ChannelViewFind},
-		{Kind: shell.ItemEmit, Label: i18n.T("backend.space.menu.reviewCode.label", nil), Accelerator: reviewCodeChord.Accelerator(), Channel: bridge.ChannelReviewCode},
+		{Kind: shell.ItemEmit, Label: i18n.T("backend.space.menu.reviewCode.label", nil), Accelerator: shell.Shortcuts["ade.reviewCode"].Accelerator(), Channel: bridge.ChannelReviewCode},
 	}
 	if isDev {
 		viewItems = append(viewItems,

@@ -167,7 +167,7 @@ const stopFirst = computed(() => props.card.moves.live);
       :title="actions.dialog.value.title"
       :message="actions.dialog.value.text"
       :confirm-label="actions.dialog.value.confirmLabel"
-      :busy="actions.busy.value"
+      :pending="actions.busy.value"
       :error="actions.error.value"
       :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"
       @cancel="actions.cancel"

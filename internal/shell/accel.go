@@ -34,7 +34,7 @@ func (c Chord) Accelerator() string {
 	return strings.Join(parts, "+")
 }
 
-// Shortcuts mirrors SHORTCUTS' `global: true` rows by id (packages/shared/domain/shortcuts.ts:25-37),
+// Shortcuts mirrors SHORTCUTS' `global: true` rows by id (packages/shared/domain/shortcuts.ts),
 // so the table can be diffed against the TS by name.
 var Shortcuts = map[string]Chord{
 	"app.settings":               {Key: ",", CmdOrCtrl: true},
@@ -52,4 +52,5 @@ var Shortcuts = map[string]Chord{
 	"tab.close":                  {Key: "W", CmdOrCtrl: true},
 	"window.new":                 {Key: "N", CmdOrCtrl: true, Shift: true},
 	"window.close":               {Key: "W", CmdOrCtrl: true, Shift: true},
+	"ade.reviewCode":             {Key: "R", CmdOrCtrl: true, Shift: true},
 }

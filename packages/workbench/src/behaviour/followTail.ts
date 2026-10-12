@@ -6,18 +6,19 @@ const TAIL_TOLERANCE = 8;
 
 /**
  * Keep a scroller pinned to its bottom while the reader is at the bottom. `trigger` changes when
- * content is appended. Without `follow`, the reader scrolling up stops the follow and scrolling back
- * down resumes it. With `follow` (an explicit toggle), `follow` decides, and scrolling up turns it off.
+ * content is appended. Without `follow` (or while it is `undefined`), the reader scrolling up stops
+ * the follow and scrolling back down resumes it. With a boolean `follow` (an explicit toggle),
+ * `follow` decides, and scrolling up turns it off.
  */
 export function useFollowTail(
   el: Ref<HTMLElement | null>,
   trigger: WatchSource,
-  opts: { follow?: Ref<boolean> } = {},
+  opts: { follow?: Ref<boolean | undefined> } = {},
 ) {
   const { arrivedState } = useScroll(el, {
     offset: { bottom: TAIL_TOLERANCE },
     onScroll: () => {
-      if (opts.follow && !arrivedState.bottom && opts.follow.value) opts.follow.value = false;
+      if (opts.follow?.value && !arrivedState.bottom) opts.follow.value = false;
     },
   });
 
@@ -27,14 +28,14 @@ export function useFollowTail(
 
   // Read before the DOM grows: after the append the reader no longer looks "at the bottom".
   watch(trigger, async () => {
-    const follow = opts.follow ? opts.follow.value : arrivedState.bottom;
+    const follow = opts.follow?.value ?? arrivedState.bottom;
     await nextTick();
     if (follow) stick();
   });
 
   /** Resume following and jump to the newest line. */
   function jumpToLatest(): void {
-    if (opts.follow) opts.follow.value = true;
+    if (opts.follow && opts.follow.value !== undefined) opts.follow.value = true;
     void nextTick(stick);
   }
 

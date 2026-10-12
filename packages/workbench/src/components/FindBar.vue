@@ -62,7 +62,8 @@ defineExpose({
 </script>
 
 <template>
-  <search class="contents" :aria-label="t('workbench.findBar.region.aria')">
+  <!-- biome-ignore lint/a11y/useSemanticElements: vue-tsc reports <search> as an unresolved component -->
+  <div role="search" class="contents" :aria-label="t('workbench.findBar.region.aria')">
     <ViewToolbar
       ref="rootEl"
       class="bg-elevated"
@@ -106,5 +107,5 @@ defineExpose({
         @click="emit('close')"
       />
     </ViewToolbar>
-  </search>
+  </div>
 </template>

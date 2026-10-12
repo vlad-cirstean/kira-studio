@@ -6,7 +6,6 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
 import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
-import { revealElement } from '@workbench/behaviour/focus';
 import { matchesQuery, splitMatches } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
@@ -21,8 +20,6 @@ import type { DockerLogLine } from '../wire';
 const props = defineProps<{ containerId: string }>();
 
 const MAX_LINES = 20_000;
-// Fixed: LogLines rows are one line tall unless wrapped.
-const LOG_ROW_PX = 18;
 const TAILS = [100, 1000, 5000, -1] as const;
 
 const tailLabel = (n: number): string =>
@@ -35,6 +32,7 @@ interface Line extends DockerLogLine {
 const { control } = useDocker();
 
 const lines = shallowRef<Line[]>([]);
+const follow = ref(true);
 const timestamps = ref(false);
 const wrap = ref(false);
 const tail = ref<number>(1000);
@@ -45,7 +43,11 @@ const current = ref(0);
 const ended = ref(false);
 const failure = ref('');
 const streamError = ref('');
-const logsEl = useTemplateRef<{ $el: HTMLElement }>('logsEl');
+const logsEl = useTemplateRef<{
+  scrollToIndex: (index: number) => void;
+  atBottom: () => boolean;
+  jumpToLatest: () => void;
+}>('logsEl');
 
 let streamId = '';
 let opening: Promise<unknown> = Promise.resolve();
@@ -89,18 +91,9 @@ function closeFind(): void {
 
 function revealCurrent(): void {
   const index = currentLine.value;
-  const scroller = logsEl.value?.$el;
-  if (index === undefined || !scroller) return;
-  const row = scroller.querySelector(`[data-index="${index}"]`);
-  if (row) {
-    revealElement(row, { block: 'center' });
-    return;
-  }
-  scroller.scrollTop = index * LOG_ROW_PX;
-  requestAnimationFrame(() => {
-    const placed = scroller.querySelector(`[data-index="${index}"]`);
-    if (placed) revealElement(placed, { block: 'center' });
-  });
+  if (index === undefined) return;
+  follow.value = false;
+  logsEl.value?.scrollToIndex(index);
 }
 
 watch(matchLines, (m) => {
@@ -175,14 +168,28 @@ function segmentStyle(seg: AnsiSegment): Record<string, string> | undefined {
   };
 }
 
+function jumpFollow(): void {
+  follow.value = true;
+  logsEl.value?.jumpToLatest();
+}
+
 function clear(): void {
   lines.value = [];
 }
 </script>
 
 <template>
-  <div class="flex h-full flex-col" data-testid="docker-logs">
+  <div class="relative flex h-full flex-col" data-testid="docker-logs">
     <ViewToolbar class="flex-wrap">
+      <Toggle
+        v-model="follow"
+        size="kira"
+        data-testid="docker-logs-follow"
+        :aria-label="t('docker.logs.follow.label')"
+        >{{
+          t('docker.logs.follow.label')
+        }}</Toggle
+      >
       <Toggle
         v-model="timestamps"
         size="kira"
@@ -236,6 +243,7 @@ function clear(): void {
       testid="docker-log"
       max-height="none"
       class="rounded-none border-0"
+      v-model:follow="follow"
       :lines="lines"
       :wrap="wrap"
       :error="errorMessage || undefined"
@@ -256,6 +264,16 @@ function clear(): void {
         >
       </template>
     </LogLines>
+    <Button
+      v-if="!follow && logsEl && !logsEl.atBottom()"
+      variant="toolbar"
+      size="kira"
+      class="absolute bottom-8 right-4"
+      data-testid="docker-logs-jump"
+      @click="jumpFollow"
+    >
+      {{ t('docker.logs.jumpToLatest.label') }}
+    </Button>
     <div
       v-if="ended && !errorMessage"
       class="shrink-0 border-t border-border bg-chrome px-2 py-0.5 text-kira-sm text-muted-foreground"

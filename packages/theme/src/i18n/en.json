@@ -2866,6 +2866,12 @@
       }
     },
     "logs": {
+      "follow": {
+        "label": "Follow"
+      },
+      "jumpToLatest": {
+        "label": "Jump to latest"
+      },
       "stopped": {
         "status": "Container stopped"
       },

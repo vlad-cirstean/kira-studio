@@ -21,7 +21,7 @@ const props = withDefaults(
     message: string;
     confirmLabel: string;
     tone: 'danger' | 'primary';
-    busy?: boolean;
+    pending?: boolean;
     error?: string;
     touch?: boolean;
     testids?: Partial<
@@ -29,7 +29,7 @@ const props = withDefaults(
     >;
   }>(),
   {
-    busy: false,
+    pending: false,
     error: '',
     touch: false,
     testids: () => ({}),
@@ -49,7 +49,7 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="(v) => !v && !busy && emit('cancel')">
+  <Dialog :open="open" @update:open="(v) => !v && !pending && emit('cancel')">
     <DialogContent size="sm" :destructive="tone === 'danger'" :data-testid="id('root')">
       <DialogHeader :close-testid="id('close')">
         <DialogTitle class="break-all">{{ title }}</DialogTitle>
@@ -71,7 +71,7 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
           data-dialog-dismiss
           :class="touch ? 'flex-1' : undefined"
           :data-testid="id('cancel')"
-          @click="!busy && emit('cancel')"
+          @click="!pending && emit('cancel')"
         >
           {{ t('common.action.cancel.label') }}
         </Button>
@@ -80,7 +80,7 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
           :variant="tone === 'danger' ? 'dialog-danger' : 'dialog-primary'"
           :size="touch ? 'touch' : 'kira-lg'"
           :class="touch ? 'flex-1' : undefined"
-          :pending="busy"
+          :pending="pending"
           :data-testid="id('confirm')"
           @click="emit('confirm')"
         >

@@ -14,6 +14,7 @@ const style = computed(() => ({ fontSize: `${props.size}px` }));
 
 <template>
   <i
+    data-slot="spinner"
     :class="`codicon codicon-${icon} shrink-0 animate-spin`"
     :style="style"
     :role="label ? 'status' : undefined"

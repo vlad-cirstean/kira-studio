@@ -2,6 +2,7 @@
 import type { CommitStore } from '@kira/git-core';
 import { shortSha } from '@kira/git-core';
 import EmptyState from '@theme/components/EmptyState.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { FieldError } from '@theme/components/ui/field';

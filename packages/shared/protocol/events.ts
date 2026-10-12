@@ -22,6 +22,8 @@ export const CHANNEL = {
   viewRun: 'kira:menu:viewRun',
   viewRunAll: 'kira:menu:viewRunAll',
   viewFormat: 'kira:menu:viewFormat',
+  // Space only: the Review Code menu item (ade.reviewCode).
+  reviewCode: 'kira:menu:reviewCode',
   appFlushBeforeClose: 'kira:app:flushBeforeClose',
   windowFlushBeforeClose: 'kira:window:flushBeforeClose',
   connectionState: 'kira:connection:state',

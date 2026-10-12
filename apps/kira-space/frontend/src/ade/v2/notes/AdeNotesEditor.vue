@@ -57,7 +57,7 @@ const editor = useEditor({
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null;
       const link = target?.closest('a');
-      if (link && isPrimaryModifier(event as MouseEvent & KeyboardEvent)) {
+      if (link && isPrimaryModifier(event)) {
         event.preventDefault();
         fireAndForget(control.openExternal(link.href), 'ade.notes');
         return true;

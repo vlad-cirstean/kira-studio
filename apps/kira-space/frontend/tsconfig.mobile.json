@@ -19,6 +19,7 @@
       "@workbench/*": ["../../../packages/workbench/src/*"]
     }
   },
+  "vueCompilerOptions": { "checkUnknownComponents": true },
   "include": [
     "mobile/**/*.ts",
     "mobile/**/*.vue",

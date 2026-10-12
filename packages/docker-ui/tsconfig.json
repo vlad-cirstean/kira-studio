@@ -19,5 +19,6 @@
       "/wails/runtime.js": ["../../node_modules/@wailsio/runtime/types/index.d.ts"]
     }
   },
+  "vueCompilerOptions": { "checkUnknownComponents": true },
   "include": ["src/**/*.ts", "src/**/*.vue", "../workbench/env.d.ts"]
 }
