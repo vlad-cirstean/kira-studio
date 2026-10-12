@@ -41,7 +41,7 @@ import { useFocus } from '@vueuse/core';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { useFormErrors } from '@workbench/behaviour/formErrors';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { shortcutKeydown } from '@workbench/shortcuts/useShortcut';
 import { type ComponentPublicInstance, computed, ref, toRaw, useTemplateRef } from 'vue';
 import { errorText } from '../bridge/codedError';
 import type { ScriptsSeam } from './module';
@@ -238,12 +238,13 @@ function onOpenAutoFocus(e: Event): void {
   e.preventDefault();
   nameFocused.value = true;
 }
-useShortcut(window, ['form.submit'], () => void save());
+const onSubmitKey = shortcutKeydown(['form.submit'], () => void save());
 </script>
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent
+      @keydown="onSubmitKey"
       size="lg"
       data-testid="script-dialog"
       :dirty="dirty"

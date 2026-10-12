@@ -19,7 +19,7 @@ import type { TextPart } from '@theme/varText';
 import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import QueryState from '@workbench/components/QueryState.vue';
-import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { shortcutKeydown } from '@workbench/shortcuts/useShortcut';
 import { computed, ref, watch } from 'vue';
 import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
@@ -118,12 +118,12 @@ function run(): void {
   accept.mutate();
 }
 
-useShortcut(window, ['form.submit'], run);
+const onSubmitKey = shortcutKeydown(['form.submit'], run);
 </script>
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="lg" :dirty="dirty" data-testid="schedule-confirm">
+    <DialogContent @keydown="onSubmitKey" size="lg" :dirty="dirty" data-testid="schedule-confirm">
       <DialogHeader close-testid="schedule-confirm-close">
         <DialogTitle>{{
           script
