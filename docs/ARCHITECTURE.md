@@ -2450,7 +2450,7 @@ All user-visible text lives in one catalog, `packages/theme/src/i18n/en.json`. v
 - Source guard `scripts/copy/check-copy.ts` (Babel and `@vue/compiler-sfc` ASTs), run by `bun run lint`: U64 template text; U65 static text attribute; U66 string literal in a template expression; U67 string in a text property or announce call; U68 `vue-i18n` use outside the i18n folder; U69 concatenated or composed translation, `copyAnnounced(x, 'word')`; U70 `t(` at module scope; U71 `t` call params differ from the message placeholders.
 - Exemptions: `scripts/copy/exemptions.ts`, one rule for one file with a reason. A stale exemption (no hit left) fails. Covers font names, protocol tokens, command syntax, EJSON syntax and CLI flag names only. `bun scripts/copy/check-copy.ts --all` prints every hit.
 
-**Go reader.** `packages/theme/src/i18n/catalog.go` embeds `en.json`. `i18n.T("backend.menu.quit.label", map[string]string{"appName": name})` replaces `{name}` placeholders and panics on an unknown key. `backend.*` holds native menu text, OS notification and prompt titles, native dialog titles, git undo labels, definition section titles and query plan roots; named placeholders only, no plural. Call sites must pass a literal key and `nil` or a map literal: `catalog_test.go` checks key existence and placeholders for every `i18n.T(` in the repo. Menu text duplicates `common.*` wording by design (Go reads `backend.*` only). Backend error messages stay Go literals (see Known open items).
+**Go reader.** `packages/theme/src/i18n/catalog.go` embeds `en.json`. `i18n.T("backend.menu.quit.label", map[string]string{"appName": name})` replaces `{name}` placeholders and panics on an unknown key. `backend.*` holds native menu text, OS notification and prompt titles, native dialog titles, git undo labels, definition section titles and query plan roots; named placeholders only, no plural. Call sites must pass a literal key and `nil` or a map literal: `catalog_test.go` checks key existence and placeholders for every `i18n.T(` in the repo. Menu text duplicates `common.*` wording by design (Go reads `backend.*` only).
 
 **Add a string.** Pick the key (namespace of the owning module, `common.*` if shared). Add it to `en.json`, sorted (`biome check --write` sorts and formats). Use `t('…')` in script or template, or `CatalogText` around elements. Run `bun run lint` and `bun run typecheck`. Specs keep literal expected strings: the wording is the contract.
 
@@ -2458,7 +2458,7 @@ All user-visible text lives in one catalog, `packages/theme/src/i18n/en.json`. v
 
 ### Consistency conventions (P266)
 
-One decision per cross-cutting concern. Guards: `scripts/check-ui-primitives.sh` (U72-U82), `scripts/check-conventions.ts` (N1-N7), `internal/conventiontest` (G1-G4), Biome `noConsole`, golangci `sloglint`. Pending migration hits sit in `scripts/consistency-allowlist/`; a stale line fails, so the lists only shrink.
+One decision per cross-cutting concern. Guards: `scripts/check-ui-primitives.sh` (U72-U82), `scripts/check-conventions.ts` (N1-N7), `internal/conventiontest` (G1-G4), Biome `noConsole`, golangci `sloglint`. Each guard keeps a named exemption list with a reason per entry; an entry that exempts nothing fails, so the lists only shrink. No pending lists remain.
 
 **Icons.** One UI glyph set: codicons, bare names (`trash`, not `codicon-trash`). `simple-icons` for third-party brand marks, seti for file types, `@lucide/vue` only inside vendored `packages/theme/src/components/ui/**` (U72). Concept table `packages/theme/src/icons.ts` `ICON`; a concept uses its row everywhere, a kind of thing (file, engine) uses its kind icon. Banned names: `gear`, `settings`, `kebab-vertical`; no `'codicon-…'` literals outside `CodiconIcon.vue`, `Spinner.vue`, theme (U73).
 
@@ -5322,20 +5322,8 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **Backend error messages stay Go literals (P265).** `ipcerr` and adapter messages are not in the
-  catalog. Owned by P266 item 2. Delete once they read from `backend.*`.
 - **Flow engine keyboard hints are English (P265).** `@vue-flow` hardcodes its `vue-flow__*` ARIA
   description text; `copyCoverage` skips that subtree. Delete if the library exposes a localisable hint.
-- **git-core compact ages and preflight messages are English (P265).** They mirror Go output (P266).
-- **`ui-timing` budgets fail on slow hosts (P264).** Console keystroke p50 (53 ms vs 50 bound) and
-  scroll frame p95 (81-134 ms vs 80) fail on a host about 2x slower than the budgets assume, and at
-  the pre-P263 base `d381439d6`. Not a regression. Delete once the project passes on the CI runner.
-- **Visual baselines were recorded in the sandbox, not CI (P264).** CI render drifted 0.6-1% on 13
-  specs before the re-record. Delete once the CI visual job is green on the recorded PNGs.
-- **`internal/docker` `TestEngine` fix is unconfirmed (P264).** The test container traps TERM and state
-  checks poll up to 15 s; no Docker in the sandbox to run it. Delete once a container-tests run passes.
-- **Space repo-graph specs are sensitive to host load (P264).** Refresh, paging, columns, badges and
-  workspace specs use 1 s-class budgets and fail intermittently under load; they pass on a quiet host.
 - **Claude Code usage limits show only what Kira-started sessions report (P239).** Claude Code sends
   `rate_limits` only for claude.ai Pro and Max plans and only after the first API response of a
   session, so the item reads `Usage: –` until then. A session in another terminal is invisible.
@@ -5561,7 +5549,7 @@ Performance:
 - **A pending insert row's cell is a single-line `<input>` (P176).** A staged value with a line break (pasted TSV/CSV) shows flattened, and typing in that input restages it without the break. Delete once insert cells move to the inline cell editor's textarea.
 
 - **`memory-mcp` as a macOS app-bundle executable is unverified (P201).** Verified with a `-tags server` Linux binary only. Spawning the bundle's executable as a CLI child of Claude Code on a Mac is unobserved. Delete once checked on a Mac.
-- **Memory has no delete (P201).** Stored memories are never deletable by design (updates keep a `historical` version). The Memory mode in Kira Space shows an empty tab strip.
+- **Memory has no delete (P201).** Stored memories are never deletable by design (updates keep a `historical` version).
 - **Re-importing a changed document never retracts facts (P211).** New facts add or update; facts the edit removed stay as current memories. Delete if memories gain a delete or retract path.
 - **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
@@ -5574,9 +5562,9 @@ Performance:
 - **Registry button links local images to Docker Hub when the containerd image store keeps a RepoDigest (P260).** `registryURL` (`internal/docker/registry.go`) treats any digest as pushed, so an unqualified local name (`myapp:dev`) gets a Hub link that may 404. Delete once the engine's store type or a pull-origin signal separates local builds.
 - **Semantic model download has no URL seam (P210).** The Hugging Face URLs are constants in `internal/memory/embed/spec.go`, so tests cannot point `Install` at a local server; the flow test covers cancel and not-installed only. Delete once the base URL is injectable.
 - **A missing `claude` shows the shell's raw text (P250).** Kira runs a bare `claude` through the user's shell (`ade/command.go`), so a missing CLI surfaces as the shell's own "command not found" in the tab, with no Kira message. Delete once launch checks the CLI first.
-- **`ui-timing` budgets are load-sensitive (P250).** `perf.spec.ts` and `budgets.spec.ts` fail under load average above ~9 (p95 84 vs 80, 76 vs 50 ms). Run `--project=ui-timing` on an idle machine; no quiet rerun is recorded yet. Delete once one passes quiet.
+- **`ui-timing` budgets fail on slow or loaded hosts (P250, P264, P266).** Console keystroke p50 (53 ms vs 50), scroll frame p95 (81-134 ms vs 80), cached tree expand p95 (53 vs 50) and `perf.spec.ts` scroll p95 (112 vs 80) fail on a host about 2x slower than the budgets assume or under load average above ~9, and at the pre-P263 base `d381439d6`. Not a regression. Run `--project=ui-timing` on an idle machine; delete once the project passes on the CI runner or a quiet host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
-- **Visual baselines are unchecked on the CI `ui` job image (P227, P229, P242, P245, P247).** All were recorded in the dev container: 13 Studio (P227, P242), 4 Space Settings, 3 git-module (P229, P245) and 1 ADE workflow graph (P247); the suites pass there. If the CI job disagrees, regenerate there and check each diff is the expected change only.
+- **Visual baselines are unchecked on the CI `ui` job image (P227, P229, P242, P245, P247, P264, P266).** All were recorded in the dev container: 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph; the suites pass there. CI render drifted 0.6-1% on 13 specs before the P264 re-record. If the CI job disagrees, regenerate there and check each diff is the expected change only. Delete once the CI visual job is green on the recorded PNGs.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
-- **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), `ade-v2-panel` handle-drag width, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestRebaseRun` (rebase `NoOp:true`, root cause not found) and `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked.
+- **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251, P264).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), Space repo-graph refresh, paging, columns, badges and workspace specs (1 s-class budgets), `ade-v2-panel` handle-drag width, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked.
 - **Unhiding one imported repo mid-folder-scan can be re-hidden (v2.2 code review R2).** Unhide right after the folder flag flips, while the scan runs: `ApplyFolderHidden` re-hides it. No timestamp separates the unhide from the scan's own import. Detail: `docs/v2.2/plans/CODE-REVIEW-R2-result.md`.

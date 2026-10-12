@@ -988,3 +988,43 @@ Leftovers: `stream-c.txt` empty; `go-stream-c.txt` 2 permanent G4 lines (flowtes
 Specs written, not run: `internal/flows/termflow/errors_test.go`; `internal/flows/dockerflow/errors_test.go` (needs Docker); `tests/ui/consistency-docker-automations.spec.ts`; Space `tests/ui/consistency-git.spec.ts`; updated `copy-wording-git.spec.ts` and `copy-coverage-git.spec.ts`. `RunLog` layout inside `LogLines` (flex-1, `max-height: none`) is unverified visually.
 
 Checks per stream: normal hook (lint, typecheck) green, `go build`, `lint:go`. No UI, e2e or Go test suites run.
+
+## P266 result
+
+Status: Done. Nothing pushed.
+
+Commits (base `36eb6b80d`): `d5375f58b` through `2124108e7` plus close-out docs. Groups:
+- Source fixes: panics answer `E_INTERNAL`; `toCodedError` idempotent; QueryState spinner delay starts at load; TabStrip Duplicate icon; command items render outside `CommandGroup` (palette was empty); LogLines inner list `shrink-0` (long logs scroll); mobile `@source` for workbench components (44px confirm buttons); palette command labels follow locale; `TestRebaseRun` flake (`waitBehind`).
+- Spec/fixture follow-ups: catalog wording, reachable surfaces, docker-edit contract fixture regenerated, kafka malformed page token expects `CodeContract`.
+- Close-out: legacy codes retired, `scripts/consistency-allowlist/` deleted, `console.*` converted to `logError`/`logWarn` and the `noConsole` override list removed.
+
+Suites (serial, low workers):
+- `go test ./...`: 121 packages ok. Kafka and terminal tests time out under load, pass alone.
+- `test:unit`: 1888 pass.
+- Studio ui: 505 pass. Space ui: 538 pass after 17 wording fixes.
+- Mobile ios+android: 65 pass, 1 skipped.
+- Visual: Space 13, Studio 13.
+- ipc-frontend: 7 specs pass after wording fixes.
+- lint, lint:dead, lint:go, typecheck: green.
+- ui-timing: 2 known load-sensitive failures, recorded, not loosened.
+
+Baselines re-recorded (6, each diff inspected; none from Vue formatting):
+- Space `git-row-menu-visual`: "New branch" gained ellipsis.
+- Space `settings-appearance-visual`: new Font family field.
+- Studio `connection-dialog`, `schema-dialog`, `workbench-shell`: EmptyState text 13px muted, ModuleStart stacks actions.
+- Studio `settings-appearance`: Font family field.
+
+Deviations:
+- `ipcerr.T(` in 48 files vs plan >=60.
+- `useCappedList(` in 1 git-ui file (`BranchPicker.vue`, 8 uses) vs >=5 files. Plan caps picker sections only.
+- dockerd started by hand for Docker-gated flow tests and `TestEngine` (passes, 4.9s).
+- ui-timing failures left open.
+
+## Close-out result
+
+- Exemptions kept: 9 `G4` in `conventions_test.go` (harness and fixture writers, reasons inline); `U82` for `useAdeWrites.ts` (UUID slicing); U-PERMANENT block unchanged. No pending lists remain in any guard.
+- Error codes 46 to 39: `Legacy` map and `LEGACY_ERROR_CODES` removed; N6 fails if either returns.
+- SecondaryTabs: 33 files. EmptyState: 49 files. ModuleStart: 6 files. Raw `Empty`: 0.
+- `console.*` outside logger: 0.
+- ARCHITECTURE: "Consistency conventions (P266)" final; resolved `TestEngine` open item deleted.
+- Parked: none.
