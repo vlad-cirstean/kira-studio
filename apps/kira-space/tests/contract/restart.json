@@ -1,11 +1,10 @@
 {
   "MemoryService.Recent#after-restart": [
     {
-      "author": "user",
       "createdAt": "<masked>",
       "fact": "Deploys to staging run every weekday at 09:00 UTC.",
       "historical": false,
-      "id": "<id:1>",
+      "id": "<id:1>.1",
       "keywords": [
         "deploy",
         "staging",
@@ -14,7 +13,12 @@
         "weekday"
       ],
       "lineageId": "<id:1>",
+      "origin": "user",
+      "project": null,
       "reason": "The release calendar says so.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
       "status": "current",
       "supersededAt": null,
       "supersededById": null,
@@ -23,11 +27,10 @@
       "versions": 1
     },
     {
-      "author": "user",
       "createdAt": "<masked>",
       "fact": "The billing service uses PostgreSQL 16.",
       "historical": false,
-      "id": "<id:2>",
+      "id": "<id:2>.1",
       "keywords": [
         "billing",
         "postgres",
@@ -36,7 +39,12 @@
         "db"
       ],
       "lineageId": "<id:2>",
+      "origin": "user",
+      "project": null,
       "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
       "status": "current",
       "supersededAt": null,
       "supersededById": null,
