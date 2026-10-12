@@ -27,6 +27,8 @@ const tailLabel = (n: number): string =>
 
 interface Line extends DockerLogLine {
   id: number;
+  /** ANSI-stripped text, filled on first find scan so later batches parse only new lines. */
+  plain?: string;
 }
 
 const { control } = useDocker();
@@ -59,7 +61,8 @@ const matchLines = computed<number[]>(() => {
   if (q === '') return [];
   const out: number[] = [];
   lines.value.forEach((l, i) => {
-    if (matchesQuery(plain(l.text), q)) out.push(i);
+    l.plain ??= plain(l.text);
+    if (matchesQuery(l.plain, q)) out.push(i);
   });
   return out;
 });
