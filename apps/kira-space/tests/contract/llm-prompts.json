@@ -1,0 +1,142 @@
+{
+  "LlmPromptsService.List#entry": {
+    "applies": "nextCall",
+    "defaultChanged": false,
+    "field": "",
+    "fragments": [],
+    "hash": "fedb30e018380ab348a3298e9d024b9f27af0ea0784ba3edd3c5d26e0382eac7",
+    "id": "ade.sendBack.line",
+    "invalid": "",
+    "kind": "message",
+    "name": "",
+    "overridden": false,
+    "parent": "",
+    "purposeKey": "llmPrompts.entry.adeSendBackLine.description",
+    "schema": "",
+    "titleKey": "llmPrompts.entry.adeSendBackLine.title",
+    "updatedAt": 0,
+    "usedByKey": "llmPrompts.entry.adeSendBackLine.usedBy.body",
+    "vars": [
+      {
+        "example": "Verify",
+        "name": "From",
+        "required": false
+      },
+      {
+        "example": "feat/login",
+        "name": "Branch",
+        "required": false
+      },
+      {
+        "example": "tests red",
+        "name": "Reason",
+        "required": true
+      }
+    ]
+  },
+  "LlmPromptsService.Preview#errors": {
+    "errors": [
+      {
+        "col": 0,
+        "id": "headless.tool.finish_step.arg.status",
+        "line": 0,
+        "message": "The prompt must use the variable .Results."
+      },
+      {
+        "col": 2,
+        "id": "headless.tool.finish_step.arg.status",
+        "line": 1,
+        "message": "The template can’t be rendered: executing \"headless.tool.finish_step.arg.status\" at <.Nope>: can't evaluate field Nope in type llmprompts.StatusVars."
+      }
+    ],
+    "parts": []
+  },
+  "LlmPromptsService.Preview#parts": {
+    "errors": [],
+    "parts": [
+      {
+        "text": "",
+        "value": "Verify",
+        "var": "From"
+      },
+      {
+        "text": " failed on ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "feat/login",
+        "var": "Branch"
+      },
+      {
+        "text": ": ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "tests red",
+        "var": "Reason"
+      },
+      {
+        "text": ". Redo it.",
+        "value": "",
+        "var": ""
+      }
+    ]
+  },
+  "LlmPromptsService.Save#entry": {
+    "applies": "nextCall",
+    "defaultChanged": false,
+    "field": "",
+    "fragments": [],
+    "hash": "d0a8f98a845e2b79990ec67e17dac6261089c8ec6c75030787599a49aff2f08b",
+    "id": "ade.sendBack.line",
+    "invalid": "",
+    "kind": "message",
+    "name": "",
+    "overridden": true,
+    "parent": "",
+    "purposeKey": "llmPrompts.entry.adeSendBackLine.description",
+    "schema": "",
+    "text": "{{.From}} failed on {{.Branch}}: {{.Reason}}. Redo it.",
+    "titleKey": "llmPrompts.entry.adeSendBackLine.title",
+    "updatedAt": 0,
+    "usedByKey": "llmPrompts.entry.adeSendBackLine.usedBy.body",
+    "vars": [
+      {
+        "example": "Verify",
+        "name": "From",
+        "required": false
+      },
+      {
+        "example": "feat/login",
+        "name": "Branch",
+        "required": false
+      },
+      {
+        "example": "tests red",
+        "name": "Reason",
+        "required": true
+      }
+    ]
+  },
+  "LlmPromptsService.Save#invalid": {
+    "code": "E_BAD_REQUEST",
+    "details": {
+      "problems": [
+        {
+          "col": 20,
+          "id": "headless.tool.finish_step.arg.status",
+          "line": 1,
+          "message": "The template can’t be rendered: executing \"headless.tool.finish_step.arg.status\" at <.Nope>: can't evaluate field Nope in type llmprompts.ResultVar."
+        }
+      ]
+    },
+    "message": "Some prompts are invalid. Nothing was saved."
+  },
+  "event:kira:llmPrompts:changed": {
+    "revision": 1
+  }
+}

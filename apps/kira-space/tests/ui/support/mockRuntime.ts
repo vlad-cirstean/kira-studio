@@ -99,6 +99,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   promptsRaise: 'PromptsService.Raise',
   promptsDismiss: 'PromptsService.Dismiss',
   promptsSendTest: 'PromptsService.SendTest',
+  llmPromptsList: 'LlmPromptsService.List',
+  llmPromptsSave: 'LlmPromptsService.Save',
+  llmPromptsPreview: 'LlmPromptsService.Preview',
   scriptRunsGet: 'ScriptRunsService.Get',
   scriptRunsStop: 'ScriptRunsService.Stop',
   scriptRunsResolveDir: 'ScriptRunsService.ResolveDir',
@@ -242,6 +245,10 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.promptsRaise]: 'null',
   [IPC.promptsDismiss]: 'null',
   [IPC.promptsSendTest]: 'null',
+  // The prompt editor's calls; a spec answers List/Save from tests/contract/llm-prompts.json.
+  [IPC.llmPromptsList]: '{"prompts":[],"storeError":"","revision":0}',
+  [IPC.llmPromptsSave]: '{"prompts":[],"storeError":"","revision":0}',
+  [IPC.llmPromptsPreview]: '{"errors":[],"parts":[]}',
   [IPC.layoutSet]: JSON.stringify(defaultLayout),
   [IPC.settingsSet]: JSON.stringify(defaultSettings),
   // P132 Part 2: main.ts's bootstrap() hydrates the op log on every boot.
