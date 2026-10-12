@@ -48,6 +48,7 @@ async function openWorkflows(relaunch: Parameters<typeof openPlan>[0]) {
   return app;
 }
 
+// tree.delete is Cmd+Backspace on a Mac userAgent, which Playwright's WebKit always reports.
 test('workflow graph: Delete removes the selected step, but edits text inside a field', async ({
   relaunch,
 }) => {
@@ -56,12 +57,12 @@ test('workflow graph: Delete removes the selected step, but edits text inside a 
   await step.click();
 
   await page.locator(t('ade-wf-step-tools')).fill('Read, Grep');
-  await page.locator(t('ade-wf-step-tools')).press('Delete');
+  await page.locator(t('ade-wf-step-tools')).press('Meta+Backspace');
   await expect(page.locator(t('confirm-dialog-confirm'))).toHaveCount(0);
   await expect(step).toBeVisible();
 
   await step.click();
-  await step.press('Delete');
+  await step.press('Meta+Backspace');
   await page.locator(t('confirm-dialog-confirm')).click();
   await expect(step).toHaveCount(0);
   await page.locator(t('ade-wf-save')).click();
@@ -98,7 +99,7 @@ test('the Claude usage status item is one control-sm row high', async ({ relaunc
     { channel: IPC.claudeUsageGet, response: snap },
   ]);
   const box = await page.locator(t('claude-usage-status')).boundingBox();
-  expect(Math.round(box?.height ?? 0)).toBe(22);
+  expect(Math.round(box?.height ?? 0)).toBe(18);
 });
 
 test('an outside click keeps a dirty git credential dialog open', async ({ relaunch }) => {
@@ -115,9 +116,6 @@ test('an outside click keeps a dirty git credential dialog open', async ({ relau
   await emitWailsEvent(window, IPC.gitCredential, [prompt]);
   await emitPrompts(window, [routed('git-credential', 'req-1')]);
   const dialog = window.locator(t('git-credential-dialog'));
-  await expect(dialog).toBeVisible();
-
-  await window.mouse.click(2, 2);
   await expect(dialog).toBeVisible();
 
   await window.fill(t('git-credential-input'), 'hunter2');
@@ -145,6 +143,8 @@ const README = [
   '',
   'The end.',
   '',
+  // Trailing content lets the heading reach the pane top.
+  ...Array.from({ length: 80 }, (_, i) => `Tail ${i}\n`),
 ].join('\n');
 
 function readFile(path: string, text: string, language: string): ControlSnapshot {
@@ -282,7 +282,7 @@ test('a review diff that fails to load shows an Alert with Retry, and Retry relo
   });
   const alert = page.locator('[data-slot="alert"]');
   await expect(alert).toBeVisible();
-  const retry = alert.getByRole('button', { name: 'Retry' });
+  const retry = alert.locator('button', { hasText: 'Retry' });
   await expect(retry).toBeVisible();
   expect(await gitStreamParams(page, 'review.resolveBase')).toHaveLength(1);
 

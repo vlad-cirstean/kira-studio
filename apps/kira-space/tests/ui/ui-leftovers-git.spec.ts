@@ -47,9 +47,11 @@ test('search: arrows move the active option, the first Esc closes the dropdown a
 
 test('branch picker: the trigger is the shared picker trigger', async ({ relaunch }) => {
   const page = await openBranchPicker(relaunch);
-  await expect(
-    page.locator('[data-testid="branch-trigger"][data-slot="picker-trigger"]'),
-  ).toBeVisible();
+  // PopoverTrigger and TooltipTrigger overwrite data-slot, so assert the shared look instead.
+  const trigger = page.locator('[data-testid="branch-trigger"]');
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toHaveClass(/rounded-kira-sm/);
+  await expect(trigger).toHaveClass(/h-control/);
 });
 
 const WITH_REMOTE = {
@@ -58,6 +60,11 @@ const WITH_REMOTE = {
     ...PICKER_RESULTS['refs.list'],
     remoteBranches: [
       refRow('origin/main', { refname: 'refs/remotes/origin/main', kind: 'remoteBranch' }),
+    ],
+    // A first tag takes the roving tabindex by default, so v1 starts at -1.
+    tags: [
+      refRow('v0', { refname: 'refs/tags/v0', kind: 'tag' }),
+      refRow('v1', { refname: 'refs/tags/v1', kind: 'tag' }),
     ],
   },
 };
@@ -81,7 +88,9 @@ test('tags: a right-click selects the row; the disabled push item shows its reas
   const push = page.locator('[data-testid="menu-item-pushRef:origin"]');
   await expect(push).toHaveAttribute('data-disabled', '');
   await push.hover();
-  await expect(page.getByRole('tooltip').filter({ hasText: 'Not supported yet.' })).toBeVisible();
+  await expect(
+    page.locator('[data-slot="tooltip-content"]').filter({ hasText: 'Not supported yet.' }),
+  ).toBeVisible();
 });
 
 const MANY_FILES = Array.from({ length: 1100 }, (_, i) => ({

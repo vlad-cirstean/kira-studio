@@ -221,7 +221,7 @@ test('a result added in the inspector gets its own connector', async ({ relaunch
 test('Delete removes the selected step after asking', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   await node(page, 'ci').click();
-  await page.locator(t('ade-wf-graph')).press('Delete');
+  await page.locator(t('ade-wf-graph')).press('Meta+Backspace');
   await page.locator(t('confirm-dialog-confirm')).click();
   await expect(node(page, 'ci')).toHaveCount(0);
   const out = await saved(page, control, 1);

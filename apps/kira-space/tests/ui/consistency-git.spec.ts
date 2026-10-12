@@ -126,6 +126,11 @@ test('an empty tag name shows the catalog error', async ({ relaunch }) => {
   await firstRow(page).click({ button: 'right' });
   await tid(page, 'menu-item-createTagHere').click();
 
+  // Errors show after the first change, not on open.
+  const name = page.getByRole('dialog').getByRole('textbox').first();
+  await name.fill('v1');
+  await name.fill('');
+
   await expect(page.getByRole('dialog')).toContainText('Name can’t be empty.');
 });
 

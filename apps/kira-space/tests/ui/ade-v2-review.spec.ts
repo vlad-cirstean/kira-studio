@@ -135,7 +135,11 @@ reviewTest(
     await page.locator(t('ade-review-sync')).click();
     const popover = page.locator(t('ade-review-sync-popover'));
     await expect(popover.locator(t('ade-review-sync-rows'))).toContainText('src/a.ts');
-    await popover.locator(t('ade-review-sync-skipped')).evaluate((d) => d.setAttribute('open', ''));
+    await popover
+      .locator(t('ade-review-sync-skipped'))
+      .getByRole('button')
+      .first()
+      .dispatchEvent('click');
     await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText(
       'Changed since review',
     );
