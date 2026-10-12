@@ -1,6 +1,9 @@
 import { computed, type Ref, shallowRef, watch } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 
+/** The one drag-ghost class; Sortable toggles a single class name. */
+export const SORTABLE_GHOST_CLASS = 'opacity-50';
+
 /** Moves fromId to toId's pre-splice index — createTabsStore.moveTab's own rule, so a drop onto a
  *  later item lands after it and onto an earlier one lands before it. */
 export function moveId(ids: readonly string[], fromId: string, toId: string): string[] {
@@ -59,8 +62,7 @@ export function useSortableReorder(
       forceFallback: true,
       fallbackOnBody: options.fallbackOnBody ?? true,
       fallbackTolerance: 4,
-      // Sortable toggles one class name on the ghost, so a single utility.
-      ghostClass: 'opacity-50',
+      ghostClass: SORTABLE_GHOST_CLASS,
       onStart: () => {
         dragging.value = true;
       },

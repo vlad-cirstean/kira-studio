@@ -1,3 +1,5 @@
+import { t } from '@theme/i18n';
+
 // 'none' is a real, storable ConnectionColor (D18's default) — not merely a falsy value — so
 // every call site that decides whether to paint a mark must exclude it explicitly rather
 // than just checking truthiness. Marks go through `colorMarkClass`; this stays for the few
@@ -66,4 +68,11 @@ export function colorMarkClass(mark: ColorMark, color: string | null | undefined
   const paint = connBgClass(color);
   if (paint) return `${MARK_SHAPE[mark]} ${paint}`;
   return mark === 'dot' ? `${MARK_SHAPE.dot} bg-none border border-disabled` : MARK_SHAPE[mark];
+}
+
+type OfferedColour = 'red' | 'amber' | 'green' | 'cyan' | 'blue' | 'magenta' | 'grey';
+
+/** The picker's name for a palette colour ('Blue'); `none` reads as "No colour". */
+export function colourLabel(color: OfferedColour | 'none'): string {
+  return color === 'none' ? t('common.field.noColour.label') : t(`common.colour.${color}.label`);
 }

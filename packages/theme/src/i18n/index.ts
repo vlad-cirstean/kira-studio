@@ -1,5 +1,6 @@
 import { createI18n } from 'vue-i18n';
 import en from './en.json';
+import { formatCount } from './number';
 import { pseudoMessages } from './pseudo';
 import type { CopyLocale, MessageKey, MessageParams } from './types';
 
@@ -20,7 +21,7 @@ export function t(key: MessageKey, params?: MessageParams): string {
   const g = i18n.global;
   if (params && typeof params.count === 'number') {
     const { count, ...rest } = params;
-    return g.t(key, { ...rest, count: g.n(count) }, count);
+    return g.t(key, { ...rest, count: formatCount(count) }, count);
   }
   return params ? g.t(key, params) : g.t(key);
 }

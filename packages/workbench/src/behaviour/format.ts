@@ -26,12 +26,7 @@ export function formatPercent(n: number): string {
   return n >= 100 ? `${Math.round(n)}%` : `${n.toFixed(1)}%`;
 }
 
-const COUNT_FORMAT = new Intl.NumberFormat();
-
-/** A count with the locale's digit grouping: '12,345'. */
-export function formatCount(n: number): string {
-  return COUNT_FORMAT.format(n);
-}
+export { formatCount } from '@theme/i18n/number';
 
 /** A finished duration: '240 ms' / '3.4 s' / '2m 5s' / '1h 2m'. */
 export function formatDuration(ms: number): string {
@@ -93,6 +88,58 @@ const WEEKDAY_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
 /** A date without a time, with its weekday: 'Tue, 14 Oct' in the user's locale. */
 export function formatWeekdayDate(at: Instant): string {
   return WEEKDAY_DATE_FORMAT.format(toMillis(at));
+}
+
+const AGE_MINUTE = 60;
+const AGE_HOUR = 60 * AGE_MINUTE;
+const AGE_DAY = 24 * AGE_HOUR;
+const AGE_MONTH = 30 * AGE_DAY;
+const AGE_YEAR = 365 * AGE_DAY;
+
+/** A terse age sized for a narrow column: '<1m' / '5m' / '2h' / '3d' / '4mo' / '1y'. A timestamp
+ *  in the future (clock skew) clamps to '<1m'. */
+export function formatAgeCompact(timestampSeconds: number, nowMs: number = Date.now()): string {
+  const delta = Math.max(0, Math.floor(nowMs / 1000) - timestampSeconds);
+  if (delta < AGE_MINUTE) return t('format.age.now');
+  if (delta < AGE_HOUR)
+    return t('format.relative.unitMinute', { count: Math.floor(delta / AGE_MINUTE) });
+  if (delta < AGE_DAY)
+    return t('format.relative.unitHour', { count: Math.floor(delta / AGE_HOUR) });
+  if (delta < AGE_MONTH)
+    return t('format.relative.unitDay', { count: Math.floor(delta / AGE_DAY) });
+  if (delta < AGE_YEAR) return t('format.age.months', { count: Math.floor(delta / AGE_MONTH) });
+  return t('format.age.years', { count: Math.floor(delta / AGE_YEAR) });
+}
+
+// UTC and a fixed locale on purpose: the same commit reads the same for everyone on a team.
+const ABSOLUTE_UTC_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'UTC',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+/** '2024-03-14 09:41' in UTC; always 16 characters. */
+export function formatAbsoluteUtc(timestampSeconds: number): string {
+  const parts = ABSOLUTE_UTC_FORMAT.formatToParts(new Date(timestampSeconds * 1000));
+  const get = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+}
+
+/** Weekday names in the user's locale, Sunday first. */
+export function weekdayNames(style: 'long' | 'short' | 'narrow' = 'short'): string[] {
+  const f = new Intl.DateTimeFormat(undefined, { weekday: style, timeZone: 'UTC' });
+  return Array.from({ length: 7 }, (_, i) => f.format(Date.UTC(2023, 0, 1 + i)));
+}
+
+/** Month names in the user's locale, January first. */
+export function monthNames(style: 'long' | 'short' = 'long'): string[] {
+  const f = new Intl.DateTimeFormat(undefined, { month: style, timeZone: 'UTC' });
+  return Array.from({ length: 12 }, (_, i) => f.format(Date.UTC(2023, i, 1)));
 }
 
 /** '04:29:57.123' in local time. */

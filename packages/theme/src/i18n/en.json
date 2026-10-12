@@ -1026,8 +1026,26 @@
       "label": "Collection"
     },
     "colour": {
+      "amber": {
+        "label": "Amber"
+      },
       "blue": {
         "label": "Blue"
+      },
+      "cyan": {
+        "label": "Cyan"
+      },
+      "green": {
+        "label": "Green"
+      },
+      "grey": {
+        "label": "Grey"
+      },
+      "magenta": {
+        "label": "Magenta"
+      },
+      "red": {
+        "label": "Red"
       }
     },
     "command": {
@@ -2255,7 +2273,9 @@
   },
   "format": {
     "age": {
-      "now": "Moments ago"
+      "months": "{count}mo",
+      "now": "<1m",
+      "years": "{count}y"
     },
     "duration": {
       "hoursMinutes": "{hours}h {minutes}m",
@@ -10929,6 +10949,31 @@
     "commandDialog": {
       "description": "Search for a command to run.",
       "title": "Command palette"
+    },
+    "fontFamily": {
+      "current": {
+        "label": "Current font"
+      },
+      "description": "Used by grids, editors, diffs and logs.",
+      "installed": {
+        "label": "Installed fonts"
+      },
+      "label": "Font family",
+      "notInstalled": {
+        "label": "Unavailable fonts"
+      },
+      "preview": {
+        "label": "Sphinx of black quartz, judge my vow. 0123456789"
+      },
+      "system": {
+        "label": "System monospace font"
+      },
+      "unavailable": {
+        "error": "Font not installed. Text falls back to the browser’s default.",
+        "fallback": {
+          "error": "Font not installed. Text falls back to the browser’s {fallback} default."
+        }
+      }
     },
     "numberStepper": {
       "decrease": {

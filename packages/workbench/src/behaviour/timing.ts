@@ -21,6 +21,12 @@ export const TIMING = {
   hoverInfo: 400,
   pollFast: 5000,
   pollSlow: 60000,
+  /** QueryState shows its loading state only after this wait, so fast loads do not flash. */
+  spinnerDelay: 300,
+  /** Scroll-position persistence. */
+  scrollPersist: 300,
+  /** How long an agent paste waits for the terminal to settle. */
+  agentPasteWait: 10000,
   clockTick: 1000,
   clockTickSlow: 30000,
 } as const;
