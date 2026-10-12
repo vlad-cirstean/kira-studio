@@ -5129,6 +5129,39 @@
     }
   },
   "llmPrompts": {
+    "applies": {
+      "newSession": {
+        "hint": "A change applies to new Claude sessions. Running sessions keep the old text."
+      },
+      "nextCall": {
+        "hint": "A change applies to the next call."
+      }
+    },
+    "area": {
+      "agentRuns": {
+        "label": "Agent runs"
+      },
+      "rebaseReview": {
+        "label": "Rebase and review"
+      }
+    },
+    "args": {
+      "hint": "Arguments. Each description is read by the agent next to the argument name."
+    },
+    "badge": {
+      "defaultChanged": {
+        "label": "Default changed"
+      },
+      "edited": {
+        "label": "Edited"
+      },
+      "invalid": {
+        "label": "Invalid"
+      }
+    },
+    "defaultChanged": {
+      "body": "The default text changed after this edit was saved. Review the diff."
+    },
     "entry": {
       "adeJiraLine": {
         "description": "The Jira key and link line of a launch message.",
@@ -5313,6 +5346,12 @@
         }
       }
     },
+    "fragments": {
+      "hint": "Must include these shared paragraphs. Click one to insert it."
+    },
+    "invalid": {
+      "body": "This saved edit is invalid ({cause}), so the default is in use."
+    },
     "kind": {
       "argument": {
         "description": "The description an agent reads for this tool argument."
@@ -5337,6 +5376,21 @@
       },
       "toolResult": {
         "description": "Text a tool returns to the agent to steer its next step."
+      }
+    },
+    "list": {
+      "empty": "No prompts"
+    },
+    "resize": {
+      "label": "Resize prompt list"
+    },
+    "schema": {
+      "hint": "Fixed. The reply must match this schema, and an edit can’t change it.",
+      "label": "Output schema"
+    },
+    "tab": {
+      "preview": {
+        "label": "Preview"
       }
     },
     "var": {
@@ -5466,6 +5520,9 @@
       "worktree": {
         "description": "The worktree path."
       }
+    },
+    "vars": {
+      "hint": "Variables. Click one to insert it at the caret."
     }
   },
   "memory": {
