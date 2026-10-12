@@ -74,6 +74,7 @@ test('Cancel and Escape both discard the draft', async ({ relaunch }) => {
   await openSettings(page);
   await densityButton(page, 'compact').click();
   await page.keyboard.press('Escape');
+  await page.click('[data-testid="confirm-dialog-confirm"]');
   await expect(dialog(page)).toHaveCount(0);
   expect(settingsSetCalls(control)).toHaveLength(0);
   expect(await rowHeightVar(page)).toBe('28px');

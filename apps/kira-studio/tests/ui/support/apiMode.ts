@@ -80,6 +80,6 @@ export async function openHttpMode(page: Page): Promise<void> {
 }
 
 export async function openHttpRequestView(page: Page): Promise<void> {
-  await openHttpMode(page);
+  await openHttpModeAndNewRequest(page);
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 }

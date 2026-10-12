@@ -112,7 +112,8 @@ test('QueryState: the loading spinner stays hidden at 100 ms and shows within 1 
     })
     .toBeGreaterThan(0);
   expect(elapsed).toBeLessThan(100);
-  expect(await loading.count()).toBe(0);
+  // The placeholder mounts invisible and shows after SPINNER_DELAY (300 ms).
+  await expect(loading).toBeHidden();
   await page.clock.runFor(1000);
   await expect(loading).toBeVisible();
 });

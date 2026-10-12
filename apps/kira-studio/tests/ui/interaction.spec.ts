@@ -4,6 +4,7 @@ import type { ObjectMeta } from '@shared/domain/tree';
 import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { primaryChord } from './support/chord';
 import { installClipboardShim } from './support/clipboard';
 import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import {
@@ -1361,13 +1362,12 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   // =============================================================================================
   // D1/D13: local grid copy/paste via Ctrl+C/Ctrl+V — anchor-and-fill, rows beyond the loaded
-  // page become new pending inserts. DataGrid.vue's own inline check accepts either Ctrl or Cmd
-  // regardless of platform, so a literal 'Control+v' is used unconditionally here.
+  // page become new pending inserts. The grid binds the platform primary modifier (grid.paste).
   // =============================================================================================
   await page.evaluate(() => navigator.clipboard.writeText('typed via paste'));
   await gridCell(page, 0, 'name').click();
   await grid.focus();
-  await page.keyboard.press('Control+v');
+  await page.keyboard.press(await primaryChord(page, 'v'));
   await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'name')).toBe('typed via paste');
   await discardChanges(page);
@@ -1379,7 +1379,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   );
   await gridCell(page, 2, 'tenant_id').click();
   await grid.focus();
-  await page.keyboard.press('Control+v');
+  await page.keyboard.press(await primaryChord(page, 'v'));
   await expect(gridCell(page, 2, 'name')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 2, 'name')).toBe('edited last row');
   const pastedInsertRow = page.locator('[data-testid="grid-row-insert"]');
@@ -1401,7 +1401,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await page.evaluate(() => navigator.clipboard.writeText('3\t3\tupdated brand new row'));
   await gutterCell(page, pastedRow).click();
   await grid.focus();
-  await page.keyboard.press('Control+v');
+  await page.keyboard.press(await primaryChord(page, 'v'));
   await expect(pastedInsertRow).toHaveCount(1);
   await expect(pastedInsertInputs.nth(0)).toHaveValue('3');
   await expect(pastedInsertInputs.nth(1)).toHaveValue('3');
@@ -1648,7 +1648,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await cellEditorPanel.locator('.view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"Deluxe Widget"');
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press(await primaryChord(page, 'Enter'));
   await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'name')).toBe('"Deluxe Widget"');
 

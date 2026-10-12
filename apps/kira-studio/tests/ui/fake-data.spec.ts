@@ -298,6 +298,7 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   await expect(dialog).toBeVisible(); // stays open — the run did not succeed
 
   await page.click('[data-testid="generate-data-close"]');
+  await page.click('[data-testid="confirm-dialog-confirm"]');
   await expect(dialog).toHaveCount(0);
 
   // --- scenario 1: the button's gate on a read-only connection ------------------------------

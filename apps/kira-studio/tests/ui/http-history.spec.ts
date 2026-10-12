@@ -103,11 +103,11 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   const rows = page.locator('[data-testid="http-history-row"]');
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toContainText('200');
-  await expect(rows.nth(0)).toContainText('60 ms');
+  await expect(rows.nth(0)).toContainText('60ms');
   await expect(rows.nth(1)).toContainText('404');
   await expect(rows.nth(1)).toContainText('Staging');
   await expect(rows.nth(2)).toContainText('200');
-  await expect(rows.nth(2)).toContainText('100 ms');
+  await expect(rows.nth(2)).toContainText('100ms');
 
   // P22b D1: a secondary status surface (the history list) now carries the code's meaning too —
   // not as a bare chip, since a dense list row has no room for a full sentence on its own line.
@@ -488,8 +488,8 @@ test('Http history — the list refreshes after a send made while another pane w
   await expect(rows).toHaveCount(2);
   // Newest first — the same order Record's own per-scope trim/List orders by (and the order this
   // test's own List answer above is already sorted in, matching every other test in this file).
-  await expect(rows.nth(0)).toContainText('5 ms');
-  await expect(rows.nth(1)).toContainText('50 ms');
+  await expect(rows.nth(0)).toContainText('5ms');
+  await expect(rows.nth(1)).toContainText('50ms');
 });
 
 test('Http history — sending while viewing a stored response shows the new one (P18 D3)', async ({

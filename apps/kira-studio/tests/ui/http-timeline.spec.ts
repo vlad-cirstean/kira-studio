@@ -158,13 +158,13 @@ test('Http timeline — a reused hop is shown as reused, not as zero', async ({ 
   const hop1 = page.locator('[data-testid="http-timeline-hop"]').nth(1);
   const dnsCell = hop1.locator('[data-testid="http-timeline-phase-dns"]');
   await expect(dnsCell).toContainText('DNS —');
-  await expect(dnsCell).not.toContainText('0 ms');
+  await expect(dnsCell).not.toContainText(/(^|\D)0ms/);
   const connectCell = hop1.locator('[data-testid="http-timeline-phase-connect"]');
   await expect(connectCell).toContainText('Connect —');
-  await expect(connectCell).not.toContainText('0 ms');
+  await expect(connectCell).not.toContainText(/(^|\D)0ms/);
   const tlsCell = hop1.locator('[data-testid="http-timeline-phase-tls"]');
   await expect(tlsCell).toContainText('TLS —');
-  await expect(tlsCell).not.toContainText('0 ms');
+  await expect(tlsCell).not.toContainText(/(^|\D)0ms/);
 
   const reuseNote = hop1.locator('[data-testid="http-timeline-reuse-note"]');
   await expect(reuseNote).toBeVisible();

@@ -8,6 +8,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { collectionRow } from './support/apiRows';
+import { deleteChord, primaryChord } from './support/chord';
 import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
 import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from './support/connect';
 import { acceptConfirm, cancelConfirm } from './support/dialogs';
@@ -228,7 +229,7 @@ test('Ctrl/Cmd+S in an HTTP request tab calls the save mock', async ({ relaunch 
 
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/healthz?x=1');
   await expect(page.locator('[data-testid="http-dirty"]')).toBeVisible();
-  await page.locator('[data-testid="http-url"]').press('ControlOrMeta+S');
+  await page.locator('[data-testid="http-url"]').press(await primaryChord(page, 'S'));
   await expect(page.locator('[data-testid="http-dirty"]')).toHaveCount(0);
   expect(control.log().filter((e) => e.channel === IPC.collectionsSaveRequest)).toHaveLength(1);
 });
@@ -264,7 +265,7 @@ test('Ctrl/Cmd+S in a document edit saves it', async ({ relaunch }) => {
   await page.locator('[data-testid="document-edit"]').first().click();
   await page.locator('.view-lines').first().click();
   await page.keyboard.type(' ');
-  await page.keyboard.press('ControlOrMeta+S');
+  await page.keyboard.press(await primaryChord(page, 'S'));
   await expect
     .poll(async () => (await stream.ops()).some((op) => op.op === DATA_OP.mutate))
     .toBe(true);
@@ -310,9 +311,7 @@ test('right-click on a KeyValue row selects it before the menu shows', async ({ 
   ).toBe('true');
 });
 
-test('Browse: the tree.copyName chord copies the name; tree.delete opens the confirm', async ({
-  relaunch,
-}) => {
+test('Browse: the tree.copyName chord copies the name', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
   await openRedisBrowse(page);
   const browse = page.locator('[data-testid="browse-view"]');
@@ -323,12 +322,21 @@ test('Browse: the tree.copyName chord copies the name; tree.delete opens the con
 
   await installClipboardSpy(page);
   await keyRow.focus();
-  await page.keyboard.press('ControlOrMeta+C');
+  await page.keyboard.press(await primaryChord(page, 'C'));
   await expect.poll(() => lastClipboardWrite(page)).toBe('user:1:bighash');
+});
 
-  await page.keyboard.press('Delete');
+test('collections tree: the tree.delete chord opens the delete confirm', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.collectionsList, response: COLLECTION_TREE }],
+  });
+  await modeTab(page, 'api').click();
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await collectionRow(page, 'item-health').focus();
+  await page.keyboard.press(await deleteChord(page));
   await expect(page.locator(CONFIRM)).toBeVisible();
   await cancelConfirm(page);
+  await expect(collectionRow(page, 'item-health')).toBeVisible();
 });
 
 // --- InlineState, find bar --------------------------------------------------------------------
@@ -485,7 +493,8 @@ test('environments: Alt+Down moves a row', async ({ relaunch }) => {
   const rows = await openEnvironments(page);
   await expect(rows.first().locator('[data-testid="environment-name"]')).toHaveValue('Alpha');
 
-  await rows.first().focus();
+  // The row itself is not focusable; its name input is where a keyboard user stands.
+  await rows.first().locator('[data-testid="environment-name"]').focus();
   await page.keyboard.press('Alt+ArrowDown');
   await expect(rows.nth(1).locator('[data-testid="environment-name"]')).toHaveValue('Alpha');
   await expect(rows.first().locator('[data-testid="environment-name"]')).toHaveValue('Bravo');
@@ -524,11 +533,14 @@ test('environments: Escape during a drag restores the order', async ({ relaunch 
 
 test('a tooltip layer sits above TextPromptDialog', async ({ relaunch }) => {
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.collectionsList, response: COLLECTION_TREE }],
+    control: [...GRID_CONTROL, { channel: IPC.queriesList, response: [] }],
+    stream: GRID_FIXTURE.port,
   });
-  await modeTab(page, 'api').click();
-  await collectionRow(page, 'col-1').click({ button: 'right' });
-  await page.click('[data-testid="menu-item-rename"]');
+  await connectAndExpand(page, 'Leftover DB', 'green');
+  await (await findRow(page, COMPOSITE_PK_PATH)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await page.click('[data-testid="filter-history-button"]');
+  await page.click('[data-testid="save-current-filter"]');
   const prompt = page.locator('[data-testid="text-prompt"]');
   await expect(prompt).toBeVisible();
 
@@ -558,9 +570,11 @@ test('tree rows and toolbar buttons use the default cursor; a link button uses p
     ],
   });
   const cursor = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).cursor);
+  await modeTab(page, 'studio').click();
   await expect.poll(() => cursor(page.locator('[data-testid="tree-row"]').first())).toBe('default');
   await expect.poll(() => cursor(page.locator('[data-testid="add-connection"]'))).toBe('default');
 
+  await modeTab(page, 'api').click();
   await page.click('[data-testid="http-request-pane-settings"]');
   await expect
     .poll(() => cursor(page.locator('[data-testid="http-settings-edit-global"]')))
@@ -599,7 +613,14 @@ test('filter history: pin toggles the row without reopening the menu', async ({ 
   await expect(pin).toHaveClass(/text-subtle/);
 
   await pin.click();
-  await expect(pin).toHaveClass(/text-warn/);
+  // The mocked list stays unpinned after the update, so the toggle shows as the call it makes.
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.queriesUpdate))
+    .toHaveLength(1);
+  expect(control.log().find((e) => e.channel === IPC.queriesUpdate)?.args).toEqual({
+    id: 'q-1',
+    name: null,
+    pinned: true,
+  });
   await expect(panel).toBeVisible();
-  expect(control.log().filter((e) => e.channel === IPC.queriesUpdate)).toHaveLength(1);
 });

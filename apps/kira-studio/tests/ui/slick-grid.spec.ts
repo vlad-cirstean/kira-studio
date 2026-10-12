@@ -2,6 +2,7 @@ import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { primaryChord } from './support/chord';
 import { CLIPBOARD_SHIM } from './support/clipboard';
 import {
   cellNavButton,
@@ -1236,7 +1237,7 @@ test('P22 Pass B follow-up — select-all under an active row filter copies only
   await page.evaluate(() =>
     (document.querySelector('.grid-canvas') as HTMLElement | null)?.focus(),
   );
-  await page.keyboard.press('Control+c');
+  await page.keyboard.press(await primaryChord(page, 'c'));
   const tsv = await page.evaluate(() => navigator.clipboard.readText());
   const lines = tsv.split('\n');
   expect(lines).toHaveLength(3); // not the ~100 (page rowCount) the pre-fix range spanned
@@ -2039,7 +2040,7 @@ test('P22 Pass B follow-up — a range selection under an active filter only cop
   await page.evaluate(() =>
     (document.querySelector('.grid-canvas') as HTMLElement | null)?.focus(),
   );
-  await page.keyboard.press('Control+c');
+  await page.keyboard.press(await primaryChord(page, 'c'));
   const tsv = await page.evaluate(() => navigator.clipboard.readText());
   expect(tsv.split('\n')).toEqual(['1', '2', '3', '90']);
 

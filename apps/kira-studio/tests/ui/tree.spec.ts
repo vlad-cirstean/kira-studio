@@ -697,7 +697,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(page.locator('[data-testid="filters-preview"]')).toBeVisible();
   await expect(page.locator('.cached-note')).toContainText('Only cached nodes are listed');
   // Expand one level deeper inside the dialog and untick a box — still zero queries while open.
-  await filterObjectRow(APP_PATH).locator('.twisty-btn').click();
+  await filterObjectRow(APP_PATH).locator('[data-testid="tree-twisty"]').click();
   await expect(filterObjectRow(WIDE_TABLE_PATH)).toBeVisible();
   await filterObjectCheckbox(APP_PATH).click();
   await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'off');
@@ -732,7 +732,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await openFilters(APP_PATH);
   await filterKindCheckbox('sequence').click();
   await expect(filterKindRow('sequence')).toHaveAttribute('data-state', 'off');
-  await filterObjectRow(APP_PATH).locator('.twisty-btn').click();
+  await filterObjectRow(APP_PATH).locator('[data-testid="tree-twisty"]').click();
   await expect(filterObjectCheckbox(SEQUENCE_PATH)).toBeDisabled();
   await expect(filterObjectRow(SEQUENCE_PATH)).toHaveAttribute('data-state', 'off');
   // P104 §6.2: the disabled-row reason moved off data-kira-tip onto the real Tooltip system
@@ -781,7 +781,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // original (D11) is dropped per the header comment. -----------------------------------------
   const opsBeforeFilter = opsCount(control.log());
   await openFilters('');
-  await filterObjectRow(DB_PATH).locator('.twisty-btn').click();
+  await filterObjectRow(DB_PATH).locator('[data-testid="tree-twisty"]').click();
   await filterObjectCheckbox(ANALYTICS_PATH).click();
   await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'on');
   await saveFilters();

@@ -638,7 +638,9 @@ test('http-method-select and http-url report the same height (D6)', async ({ rel
   expect(urlBoxHeight).toBe(methodHeight);
 });
 
-test('a placeholder is muted text, and .dim text is subtle text (D8/D9)', async ({ relaunch }) => {
+test('a placeholder is muted text, and the elapsed caption is secondary (muted) text, never disabled (D8/D9)', async ({
+  relaunch,
+}) => {
   const RESPONSE = {
     status: 200,
     statusText: 'OK',
@@ -680,22 +682,22 @@ test('a placeholder is muted text, and .dim text is subtle text (D8/D9)', async 
   }, mutedToken);
   expect(placeholderColor).toBe(mutedRgb);
 
-  // D9: a `.dim` element (the elapsed-time caption in the response status row, shown once a
-  // response has landed) now reads --kira-fg-subtle, not --kira-fg-disabled.
+  // D9: the elapsed-time caption in the response status row (shown once a response has landed)
+  // is secondary content (P267 §2.3): --kira-fg-muted, not --kira-fg-disabled.
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-elapsed"]')).toBeVisible();
-  const [dimColor, subtleRgb] = await page.evaluate(() => {
+  const [dimColor, mutedElapsedRgb] = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="http-elapsed"]') as HTMLElement;
     const probe = document.createElement('span');
     probe.style.color = getComputedStyle(document.documentElement)
-      .getPropertyValue('--kira-fg-subtle')
+      .getPropertyValue('--kira-fg-muted')
       .trim();
     document.body.appendChild(probe);
     const rgb = getComputedStyle(probe).color;
     probe.remove();
     return [getComputedStyle(el).color, rgb];
   });
-  expect(dimColor).toBe(subtleRgb);
+  expect(dimColor).toBe(mutedElapsedRgb);
 });
 
 test('the response find bar counts and steps through matches, and Escape clears them (D11)', async ({

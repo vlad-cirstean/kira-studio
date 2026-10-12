@@ -1103,25 +1103,21 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   ).toBeLessThanOrEqual(16);
   expect(runStateBox.x).toBeGreaterThan(searchToggleBox.x);
 
-  // --- P16 D2: the run-state label reserves its own width — the LAW-12 assertion, and the only
-  // one that can catch the toolbar-reflow regression this phase's own D2 fixes. -----------------
+  // --- P16 D2 (LAW-12): the run-state label is the toolbar's right-most item, so its text
+  // changing between loads can never move a control that sits left of it. ----------------------
   const runStateLabel = page.locator('[data-testid="run-state-label"]').first();
   await expect(runStateLabel).toBeVisible();
-  const { offsetWidth: widthAfterFirstLoad, minWidth } = await runStateLabel.evaluate((el) => {
-    const e = el as HTMLElement;
-    return {
-      offsetWidth: e.offsetWidth,
-      minWidth: Number.parseFloat(getComputedStyle(e).minWidth),
-    };
-  });
-  expect(minWidth).toBeGreaterThan(0);
-  expect(widthAfterFirstLoad).toBeGreaterThanOrEqual(Math.floor(minWidth));
-  // A second, independently-timed load produces its own elapsed-time text — LAW 12's own promise
-  // is that the reserved gutter's outer width can never move regardless of what that text is.
+  const leftEdges = () =>
+    page.evaluate(() =>
+      ['pager', 'page-size-picker', 'toolbar-search'].map(
+        (id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().x ?? -1,
+      ),
+    );
+  const edgesAfterFirstLoad = await leftEdges();
+  expect(edgesAfterFirstLoad.every((x) => x >= 0)).toBe(true);
+  // A second, independently-timed load produces its own elapsed-time text.
   await page.click('[data-testid="toolbar-refresh"]');
-  await expect
-    .poll(() => runStateLabel.evaluate((el) => (el as HTMLElement).offsetWidth))
-    .toBe(widthAfterFirstLoad);
+  await expect.poll(leftEdges).toEqual(edgesAfterFirstLoad);
 
   // --- pagination: next/prev/first, page sizes ---------------------------------------------
   await page.click('[data-testid="pager-next"]');
@@ -1152,7 +1148,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await countButton.click();
   await hoverCount();
   await expect(countTip).toContainText(/1,000,000/, { timeout: 15_000 });
-  await expect(page.locator('[data-testid="pager"]')).toContainText('of 100000');
+  await expect(page.locator('[data-testid="pager"]')).toContainText('of 100,000');
 
   await page.click('[data-testid="pager-next"]');
   await hoverCount();

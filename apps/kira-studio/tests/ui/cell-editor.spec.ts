@@ -17,6 +17,7 @@ import {
   WIDE_TABLE_COLUMNS,
   WIDE_TABLE_ROWS,
 } from './support/cellEditorCaptures';
+import { primaryChord } from './support/chord';
 import { connectionCreateArgs } from './support/connect';
 import { editorText as sharedEditorText } from './support/editorText';
 import { gridCell, gridCellSelector, gridScroller } from './support/grid';
@@ -703,7 +704,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.locator('[data-testid="cell-editor-panel"] .view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited via ctrl-enter"');
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press(await primaryChord(page, 'Enter'));
   await expect(gridCell(page, 0, 'sample')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'sample')).toBe('"edited via ctrl-enter"');
   await page.click('[data-testid="toolbar-discard-changes"]');

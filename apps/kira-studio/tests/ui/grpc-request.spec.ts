@@ -400,7 +400,7 @@ test('gRPC request — a server-streaming call appends messages as they arrive',
     done: false,
   });
   await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(2);
-  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('At 4 ms');
+  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('At 4ms');
 
   await emitWailsEvent(page, IPC.grpcCall, {
     callId,
@@ -474,10 +474,10 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
   await emitWailsEvent(page, IPC.grpcCall, { callId, seq: 0, messages: batch, done: false });
 
   await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
-    `Showing the most recent 10000 of ${total} messages.`,
+    `Showing the most recent 10,000 of ${total.toLocaleString('en-US')} messages.`,
   );
   // The oldest 37 messages were dropped, not the newest — the ones a live user is watching arrive.
-  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('At 37 ms');
+  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('At 37ms');
 
   await emitWailsEvent(page, IPC.grpcCall, {
     callId,
@@ -506,7 +506,7 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
   );
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('98.0 KB');
   await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
-    `Showing the most recent 10000 of ${total} messages.`,
+    `Showing the most recent 10,000 of ${total.toLocaleString('en-US')} messages.`,
   );
 });
 
