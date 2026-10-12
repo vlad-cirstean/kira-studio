@@ -109,7 +109,7 @@ const emit = defineEmits<{
 }>();
 
 // P131 Part 2 §5.6: KuiSegmentedOption goes with KuiSegmented -- this is the same shape, inlined
-// as a local type instead of importing one from kira-ui.
+// as a local type instead of importing one.
 interface ListModeOption {
   readonly id: FileListMode;
   readonly icon: string;

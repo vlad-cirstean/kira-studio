@@ -527,6 +527,44 @@ primitives, `TooltipIconButton`); `HighlightedText` takes parts (no `splitMatche
    rule. Edit "Element families" grey roles.
 8. Plan "Foundation result" section. Background push.
 
+### 4.4 Foundation result
+
+F0-F3 landed on `v2.0`, not pushed. F2 branch `p267-f` rebased onto `v2.0`, ff-merged, worktree removed.
+F3 commits: `741b2ceeb` (format, spinner delay, QueryState, discard provider, dragging cursor,
+`TruncatedText split`, `MenuItems` swatch), `38cb6cdd6` (`packages/kira-ui` deleted), `926984a45`
+(copy guard cva skip, compiler-core types, G4 path rule). Docs and this section in the commit after.
+
+Deviations from §4.3:
+
+- `bootstrapShell` has no app instance (each `main.ts` builds its own `createApp`). It exports
+  `provideShellServices(app)`, called by both `main.ts` after `app.use(pinia)`; the provider calls
+  `useConfirmDialogStore().confirm` with `tone: 'danger'`.
+- `T/format.ts` already held every formatter (F1); `W/behaviour/format.ts` re-exports by name
+  (Biome `noReExportAll`) and keeps `useRelativeTime`. `packages/theme/tsconfig.json` added so
+  `bun test` resolves `@theme/*` from `T/` specs.
+- `QueryState` loading: `EmptyState fill loading` / `InlineState kind="loading"`; both delay
+  themselves, so the `useTimeout` wiring is gone. A caller's `#loading` slot still shows at once.
+- `allowImportingTsExtensions` stays in `apps/kira-studio/frontend/tsconfig.json` (theme and
+  workbench import `.ts` specifiers); only the kira-ui rationale went.
+- `@vue/compiler-core` 3.5.42 added to root devDependencies (types for the two guard scripts);
+  `bun.lock` also re-hoisted `entities` 8.1.0 to 7.0.1 as a side effect.
+- Remaining `theme.identifier.copy.label` seed deleted (duplicate of `workbench.identifier.copy.label`);
+  `SEEDS` and its filter in `scripts/copy/check-catalog.ts` removed. Other `seed` keys in `en.json`
+  (`core/space/studio seed placeholder`, `Seed`) are not P267 seeds; untouched.
+- PERMANENT: U31 `WorkbenchShell` removed. AutocompleteField U36/U41/U47/U58 and `ContextMenu` U27
+  lines were already gone from F2.
+
+Handoffs for streams and R:
+
+- `scripts/check-theme-classes.sh` keeps the `RepoFileView.vue` font-scale anchor: its `.md-reading`
+  block still holds `text-[1.6em]` etc. Stream B drops the anchor when `RepoFileView` moves to
+  `.kira-prose`. The `base.css` anchor stays (F1's `kira-prose` em scale).
+- `anser` dep and `D/lib/ansi.ts` stay: `D/components/LogsView.vue` still imports `parseAnsi`,
+  `splitMatches`. Stream C (C4) removes both with `LogsView` -> `LogLines`.
+- Go `s3.formatBytes` (`ks/adapters/s3/read.go`) belongs to Stream A (A4); untouched.
+- `TIMING.spinnerDelay` has no caller now (placeholders read `SPINNER_DELAY` directly); kept per §2.1.
+- `Identifier split="path"` ignores `short` (tooltip and display come from `value`).
+
 ## 5. Streams
 
 Three worktrees off the **F3 tip**: `/home/user/kira-p267-a` (branch `p267-a`), `-b`, `-c`. One

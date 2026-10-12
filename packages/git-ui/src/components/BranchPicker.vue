@@ -291,7 +291,7 @@ function onFilterDown(event: KeyboardEvent): void {
 }
 
 // P131 Part 2 §5.2: KuiSegmentedOption goes with KuiSegmented -- this is the same shape, inlined
-// as a local type instead of importing one from kira-ui.
+// as a local type instead of importing one.
 interface PickerTabOption {
   readonly id: PickerTab;
   readonly icon: string;
