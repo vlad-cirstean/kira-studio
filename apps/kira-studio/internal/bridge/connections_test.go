@@ -42,7 +42,7 @@ func TestConnectionsServiceRejectsBareID(t *testing.T) {
 		assertBadRequest(t, err)
 	})
 	t.Run("Remove", func(t *testing.T) {
-		assertBadRequest(t, svc.Remove(bridge.ConnectionsIDArgs{ID: ""}))
+		assertBadRequest(t, svc.Delete(bridge.ConnectionsIDArgs{ID: ""}))
 	})
 	t.Run("Connect", func(t *testing.T) {
 		_, err := svc.Connect(bridge.ConnectionsIDArgs{ID: ""})

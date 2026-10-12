@@ -36,8 +36,7 @@ const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/
 
 // One line per request/response channel — the FQN half of each pair, read off the generated
 // bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"' apps/kira-studio/frontend/bindings/.../bridge/*.ts`),
-// not retyped from memory. `connectionsDelete`'s Go-side name is `Remove`, not `Delete` (P57
-// §1.9) — the one place key and value genuinely disagree.
+// not retyped from memory.
 const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   appInfo: 'AppService.Info',
   settingsGetAll: 'SettingsService.GetAll',
@@ -55,7 +54,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   connectionsCreate: 'ConnectionsService.Create',
   connectionsUpdate: 'ConnectionsService.Update',
   connectionsDuplicate: 'ConnectionsService.Duplicate',
-  connectionsDelete: 'ConnectionsService.Remove',
+  connectionsDelete: 'ConnectionsService.Delete',
   connectionsReorder: 'ConnectionsService.Reorder',
   connectionsReveal: 'ConnectionsService.Reveal',
   connectionsSecretsStatus: 'ConnectionsService.SecretsStatus',
@@ -65,7 +64,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   connectionsStates: 'ConnectionsService.States',
   maskRulesList: 'MaskRulesService.List',
   maskRulesUpsert: 'MaskRulesService.Upsert',
-  maskRulesRemove: 'MaskRulesService.Remove',
+  maskRulesDelete: 'MaskRulesService.Delete',
   maskRulesRegenerateKey: 'MaskRulesService.RegenerateKey',
   maskRulesCounts: 'MaskRulesService.Counts',
   maskRulesCorrelationKey: 'MaskRulesService.CorrelationKey',
@@ -163,7 +162,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   customScriptsList: 'CustomScriptsService.List',
   customScriptsCreate: 'CustomScriptsService.Create',
   customScriptsUpdate: 'CustomScriptsService.Update',
-  customScriptsRemove: 'CustomScriptsService.Remove',
+  customScriptsDelete: 'CustomScriptsService.Delete',
   customScriptsCreateCollection: 'CustomScriptsService.CreateCollection',
   customScriptsRenameCollection: 'CustomScriptsService.RenameCollection',
   customScriptsDeleteCollection: 'CustomScriptsService.DeleteCollection',

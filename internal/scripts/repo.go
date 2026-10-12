@@ -205,19 +205,19 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 	return *rec, nil
 }
 
-// Remove deletes one row by id. Returns a wrapped sql.ErrNoRows for an unknown id, the same rule
+// Delete deletes one row by id. Returns a wrapped sql.ErrNoRows for an unknown id, the same rule
 // Update above follows.
-func (r *Repo) Remove(id string) error {
+func (r *Repo) Delete(id string) error {
 	res, err := r.DB.Exec(`DELETE FROM custom_scripts WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("scripts: remove %s: %w", id, err)
+		return fmt.Errorf("scripts: delete %s: %w", id, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("scripts: remove %s: rows affected: %w", id, err)
+		return fmt.Errorf("scripts: delete %s: rows affected: %w", id, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("scripts: remove %s: %w", id, sql.ErrNoRows)
+		return fmt.Errorf("scripts: delete %s: %w", id, sql.ErrNoRows)
 	}
 	return nil
 }

@@ -17,7 +17,7 @@ type CustomScriptsService struct {
 type (
 	CustomScriptsCreateArgs           = scripts.CreateArgs
 	CustomScriptsUpdateArgs           = scripts.UpdateArgs
-	CustomScriptsRemoveArgs           = scripts.RemoveArgs
+	CustomScriptsDeleteArgs           = scripts.DeleteArgs
 	CustomScriptsCreateCollectionArgs = scripts.CreateCollectionArgs
 	CustomScriptsRenameCollectionArgs = scripts.RenameCollectionArgs
 	CustomScriptsDeleteCollectionArgs = scripts.DeleteCollectionArgs
@@ -46,8 +46,8 @@ func (s *CustomScriptsService) Update(args CustomScriptsUpdateArgs) (scripts.Cus
 	return s.shared().Update(args)
 }
 
-func (s *CustomScriptsService) Remove(args CustomScriptsRemoveArgs) error {
-	return s.shared().Remove(args)
+func (s *CustomScriptsService) Delete(args CustomScriptsDeleteArgs) error {
+	return s.shared().Delete(args)
 }
 
 func (s *CustomScriptsService) CreateCollection(args CustomScriptsCreateCollectionArgs) (scripts.Collection, error) {

@@ -200,7 +200,7 @@ func TestCustomScriptUpdateRemove(t *testing.T) {
 	}
 
 	mark = app.Events.Mark()
-	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: rec.ID}); err != nil {
+	if err := cs.Delete(bridge.CustomScriptsDeleteArgs{ID: rec.ID}); err != nil {
 		t.Fatal(err)
 	}
 	var snap scripts.Snapshot
@@ -208,7 +208,7 @@ func TestCustomScriptUpdateRemove(t *testing.T) {
 	if len(snap.Scripts) != 1 || snap.Scripts[0].ID != keep.ID {
 		t.Fatalf("snapshot after Remove = %+v, want only %q", snap, keep.Name)
 	}
-	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: rec.ID}); err == nil {
+	if err := cs.Delete(bridge.CustomScriptsDeleteArgs{ID: rec.ID}); err == nil {
 		t.Fatal("removing an already removed command succeeded")
 	}
 

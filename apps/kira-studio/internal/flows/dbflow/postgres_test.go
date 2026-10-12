@@ -55,7 +55,7 @@ func TestPostgresJourney(t *testing.T) {
 		"create table users (id serial primary key, name text not null, email text)",
 		"insert into users (name, email) values ('ada', 'ada@example.com'), ('bob', 'bob@example.com'), ('cy', null)",
 		"create view named_users as select id, name from users")
-	if err := app.W.Connections.Remove(bridge.ConnectionsIDArgs{ID: seed.ID}); err != nil {
+	if err := app.W.Connections.Delete(bridge.ConnectionsIDArgs{ID: seed.ID}); err != nil {
 		t.Fatal(err)
 	}
 	bad := in

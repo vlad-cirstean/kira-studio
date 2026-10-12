@@ -15,7 +15,10 @@ func (s *ConnectionsService) List() ([]model.ConnectionSummary, error) {
 	return s.Deps.Connections.List()
 }
 
-func (s *ConnectionsService) Create(input connections.Input) (model.ConnectionSummary, error) {
+// ConnectionsCreateArgs is the connection form itself; the alias keeps the wire JSON flat.
+type ConnectionsCreateArgs = connections.Input
+
+func (s *ConnectionsService) Create(input ConnectionsCreateArgs) (model.ConnectionSummary, error) {
 	return s.Deps.Connections.Create(input)
 }
 
@@ -43,7 +46,7 @@ func (s *ConnectionsService) Duplicate(args ConnectionsIDArgs) (model.Connection
 	return s.Deps.Connections.Duplicate(args.ID)
 }
 
-func (s *ConnectionsService) Remove(args ConnectionsIDArgs) error {
+func (s *ConnectionsService) Delete(args ConnectionsIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}

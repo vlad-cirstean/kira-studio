@@ -59,7 +59,7 @@ export async function upsertMaskRule(
 }
 
 export async function removeMaskRule(connectionId: string, id: string): Promise<void> {
-  await control.maskRulesRemove(id);
+  await control.maskRulesDelete(id);
   await loadMaskRules(connectionId);
 }
 

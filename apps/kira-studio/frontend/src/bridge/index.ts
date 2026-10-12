@@ -108,7 +108,7 @@ const studioControl = {
   connectionsDuplicate: (id: string): Promise<ConnectionSummary> =>
     unwrap(ConnectionsService.Duplicate({ id })).then((r) => trust<ConnectionSummary>(r)),
   // Go-side name is Remove, not Delete (P57 §1.9) — read the .go file, do not assume lowerCamel.
-  connectionsDelete: (id: string): Promise<void> => unwrap(ConnectionsService.Remove({ id })),
+  connectionsDelete: (id: string): Promise<void> => unwrap(ConnectionsService.Delete({ id })),
   connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
     unwrap(ConnectionsService.Reorder({ ids })).then((r) => trust<ConnectionSummary[]>(r ?? [])),
   // P14 D6: outcome is one of revealed | cancelled | confirmation-required | error — confirmed is
@@ -169,7 +169,7 @@ const studioControl = {
         fields,
       } as unknown as Parameters<typeof MaskRulesService.Upsert>[0]),
     ).then((r) => trust<MaskRule>(r)),
-  maskRulesRemove: (id: string): Promise<void> => unwrap(MaskRulesService.Remove({ id })),
+  maskRulesDelete: (id: string): Promise<void> => unwrap(MaskRulesService.Delete({ id })),
   maskRulesRegenerateKey: (connectionId: string): Promise<void> =>
     unwrap(MaskRulesService.RegenerateKey({ connectionId })),
   maskRulesCounts: (): Promise<Record<string, number>> =>
@@ -369,7 +369,7 @@ const studioControl = {
     unwrap(CustomScriptsService.Create({ fields })).then((r) => trust<CustomScript>(r)),
   customScriptsUpdate: (id: string, fields: CustomScriptFields): Promise<CustomScript> =>
     unwrap(CustomScriptsService.Update({ id, fields })).then((r) => trust<CustomScript>(r)),
-  customScriptsRemove: (id: string): Promise<void> => unwrap(CustomScriptsService.Remove({ id })),
+  customScriptsDelete: (id: string): Promise<void> => unwrap(CustomScriptsService.Delete({ id })),
   customScriptsCreateCollection: (name: string): Promise<ScriptCollection> =>
     unwrap(CustomScriptsService.CreateCollection({ name })).then((r) => trust<ScriptCollection>(r)),
   customScriptsRenameCollection: (id: string, name: string): Promise<void> =>

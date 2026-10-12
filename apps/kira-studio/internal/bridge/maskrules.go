@@ -84,11 +84,11 @@ func (s *MaskRulesService) Upsert(args MaskRulesUpsertArgs) (model.MaskRule, err
 	return rec, nil
 }
 
-type MaskRulesRemoveArgs struct {
+type MaskRulesDeleteArgs struct {
 	ID string `json:"id"`
 }
 
-func (s *MaskRulesService) Remove(args MaskRulesRemoveArgs) error {
+func (s *MaskRulesService) Delete(args MaskRulesDeleteArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}

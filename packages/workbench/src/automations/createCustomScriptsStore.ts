@@ -15,7 +15,7 @@ export interface CustomScriptsControl {
   customScriptsList(): Promise<ScriptsSnapshot>;
   customScriptsCreate(fields: CustomScriptFields): Promise<CustomScript>;
   customScriptsUpdate(id: string, fields: CustomScriptFields): Promise<CustomScript>;
-  customScriptsRemove(id: string): Promise<void>;
+  customScriptsDelete(id: string): Promise<void>;
   customScriptsCreateCollection(name: string): Promise<ScriptCollection>;
   customScriptsRenameCollection(id: string, name: string): Promise<void>;
   customScriptsDeleteCollection(id: string): Promise<void>;
@@ -60,7 +60,7 @@ export function createCustomScriptsStore(control: CustomScriptsControl) {
     }
 
     async function removeCustomScript(id: string): Promise<void> {
-      await control.customScriptsRemove(id);
+      await control.customScriptsDelete(id);
     }
 
     function createCollection(name: string): Promise<ScriptCollection> {

@@ -78,15 +78,15 @@ func (s *Service) Update(args UpdateArgs) (CustomScript, error) {
 	return rec, nil
 }
 
-type RemoveArgs struct {
+type DeleteArgs struct {
 	ID string `json:"id"`
 }
 
-func (s *Service) Remove(args RemoveArgs) error {
+func (s *Service) Delete(args DeleteArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Repo.Remove(args.ID); err != nil {
+	if err := s.Repo.Delete(args.ID); err != nil {
 		return fail(err)
 	}
 	if s.Home != "" {

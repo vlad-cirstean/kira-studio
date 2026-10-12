@@ -38,7 +38,7 @@ export const IPC = {
   customScriptsList: 'kira:customScripts:list',
   customScriptsCreate: 'kira:customScripts:create',
   customScriptsUpdate: 'kira:customScripts:update',
-  customScriptsRemove: 'kira:customScripts:remove',
+  customScriptsDelete: 'kira:customScripts:delete',
   customScriptsCreateCollection: 'kira:customScripts:createCollection',
   customScriptsRenameCollection: 'kira:customScripts:renameCollection',
   customScriptsDeleteCollection: 'kira:customScripts:deleteCollection',

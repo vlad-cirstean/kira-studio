@@ -231,8 +231,8 @@ func (j *journey) filtersAndMasks(connID string) {
 	if next, err := app.W.MaskRules.CorrelationKey(bridge.MaskRulesListArgs{ConnectionID: connID}); err != nil || next == key {
 		t.Fatalf("key after regenerate = %q (%v), want a new one", next, err)
 	}
-	if err := app.W.MaskRules.Remove(bridge.MaskRulesRemoveArgs{ID: rule.ID}); err != nil {
-		t.Fatalf("MaskRules.Remove: %v", err)
+	if err := app.W.MaskRules.Delete(bridge.MaskRulesDeleteArgs{ID: rule.ID}); err != nil {
+		t.Fatalf("MaskRules.Delete: %v", err)
 	}
 	if counts, _ := app.W.MaskRules.Counts(); counts[connID] != 0 {
 		t.Fatalf("Counts after Remove = %v, want none", counts)
@@ -257,7 +257,7 @@ func (j *journey) manage(conn model.ConnectionSummary) {
 	if err != nil || updated.Name != upd.Name || updated.Color != "green" {
 		t.Fatalf("Update = %+v (%v)", updated, err)
 	}
-	if err := app.W.Connections.Remove(bridge.ConnectionsIDArgs{ID: dup.ID}); err != nil {
+	if err := app.W.Connections.Delete(bridge.ConnectionsIDArgs{ID: dup.ID}); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
 

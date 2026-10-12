@@ -304,7 +304,7 @@ func TestScriptRunRetentionAndRemove(t *testing.T) {
 	if _, err := os.Stat(folder); err != nil {
 		t.Fatalf("automations folder missing before Remove: %v", err)
 	}
-	if err := app.W.CustomScripts.Remove(bridge.CustomScriptsRemoveArgs{ID: rec.ID}); err != nil {
+	if err := app.W.CustomScripts.Delete(bridge.CustomScriptsDeleteArgs{ID: rec.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(folder); !os.IsNotExist(err) {

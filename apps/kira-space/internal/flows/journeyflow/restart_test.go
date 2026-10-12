@@ -112,7 +112,7 @@ func TestRestartKeepsUserData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: extra.ID}); err != nil {
+	if err := cs.Delete(bridge.CustomScriptsDeleteArgs{ID: extra.ID}); err != nil {
 		t.Fatal(err)
 	}
 
