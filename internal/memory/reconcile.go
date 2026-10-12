@@ -16,8 +16,10 @@ const reconcileCandidateLimit = 10
 type work struct {
 	Fact, Reason string
 	Keywords     []string
-	cands        []Memory
-	dec          decision
+	// Provenance of the item the fact came from.
+	Origin, SourceTag, Scope, Project string
+	cands                             []Memory
+	dec                               decision
 
 	// vec is Fact's embedding (nil when none could be made); mergedFact/mergedVec cache an
 	// update's rewritten fact across commit retries.
@@ -61,7 +63,7 @@ type reconcileDecision struct {
 // prepare resolves what needs no model: an exact duplicate is a noop, a fact with no candidates is
 // an add. It reports whether the fact still needs the reconcile call.
 func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err error) {
-	same, err := s.store.currentByHash(ctx, factHash(w.Fact))
+	same, err := s.store.currentByHash(ctx, factHash(w.Fact), nil)
 	if err != nil {
 		return false, err
 	}

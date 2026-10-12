@@ -153,7 +153,7 @@ func TestImportLifecycle(t *testing.T) {
 	app.Contract(t, "memory-import", "MemoryImportService.Job#done", done, importMask)
 
 	hits, err := app.W.Memory.Search(ctx, bridge.MemorySearchArgs{Query: "invoices"})
-	if err != nil || len(hits) == 0 || hits[0].Author != memory.AuthorAgent {
+	if err != nil || len(hits) == 0 || hits[0].Origin != memory.OriginExternal {
 		t.Fatalf("Search invoices = %+v, %v, want an agent memory", hits, err)
 	}
 	hist, err := app.W.Memory.History(ctx, bridge.MemoryIDArgs{ID: hits[0].ID})

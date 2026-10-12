@@ -104,9 +104,10 @@ func (a *fakeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOut
 	}
 	var items []memory.Item
 	for _, f := range in.Facts {
-		items = append(items, memory.Item{Fact: f.Fact.Fact, Reason: "Stated in " + in.Path})
+		items = append(items, memory.Item{Fact: f.Fact.Fact, Reason: "Stated in " + in.Path,
+			Origin: memory.OriginExternal, SourceTag: "doc", Scope: memory.ScopePersonal})
 	}
-	_, err := a.svc.Store(ctx, memory.StoreRequest{Items: items, Author: memory.AuthorAgent, Source: memory.SourceImport, SourceRef: in.FileID})
+	_, err := a.svc.Store(ctx, memory.StoreRequest{Items: items, Source: memory.SourceImport, SourceRef: in.FileID})
 	return FinalizeOutput{CostUSD: 0.02}, err
 }
 

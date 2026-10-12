@@ -83,7 +83,7 @@ func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	}
 	var found struct{ Memories []memory.Memory }
 	call("search_memories", map[string]any{"query": "cach"}, &found)
-	if len(found.Memories) != 1 || found.Memories[0].Historical || found.Memories[0].Author != "agent" {
+	if len(found.Memories) != 1 || found.Memories[0].Historical || found.Memories[0].Origin != "agent" {
 		t.Fatalf("found = %+v", found)
 	}
 	var hist memory.History
@@ -101,7 +101,7 @@ func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	}
 	var ih memory.History
 	call("memory_history", map[string]any{"id": imported.Outcomes[0].ID}, &ih)
-	if ev := ih.Events[0]; ev.Source != memory.SourceImport || ev.Author != memory.AuthorAgent || ev.SourceRef == nil || *ev.SourceRef != "file-1" {
+	if ev := ih.Events[0]; ev.Source != memory.SourceImport || ev.Origin != memory.OriginExternal || ev.SourceRef == nil || *ev.SourceRef != "file-1" {
 		t.Fatalf("import event = %+v", ev)
 	}
 

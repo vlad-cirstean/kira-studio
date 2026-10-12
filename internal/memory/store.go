@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
-
-	"github.com/google/uuid"
+	"time"
 
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/memory/migrations"
@@ -91,10 +91,27 @@ type SearchArgs struct {
 	Query          string
 	IncludeHistory bool
 	Limit          int // clamped to [1, 100]; 0 means 25
+
+	// within limits matches to one scope and project. Reconcile only; not on the MCP surface.
+	within *scopeKey
 }
 
-const memoryColumns = `m.id, m.lineage_id, m.version, m.fact, m.reason, m.keywords, m.author, m.status,
-	m.supersedes_id, m.superseded_by_id, m.created_at, m.superseded_at,
+// scopeKey is a scope plus its project (empty for company and personal).
+type scopeKey struct{ scope, project string }
+
+// args are the nullable SQL parameters of the scope filter; a nil key matches everything.
+func (k *scopeKey) args() (scope, project any) {
+	if k == nil {
+		return nil, nil
+	}
+	if k.project == "" {
+		return k.scope, nil
+	}
+	return k.scope, k.project
+}
+
+const memoryColumns = `m.id, m.lineage_id, m.version, m.fact, m.reason, m.keywords, m.origin, m.source_tag, m.scope,
+	m.project, m.session_id, m.status, m.supersedes_id, m.superseded_by_id, m.created_at, m.superseded_at,
 	(SELECT count(*) FROM memories x WHERE x.lineage_id = m.lineage_id) AS versions, m.seq`
 
 type rowScanner interface{ Scan(dest ...any) error }
@@ -102,8 +119,8 @@ type rowScanner interface{ Scan(dest ...any) error }
 func scanMemory(r rowScanner, extra ...any) (Memory, error) {
 	var m Memory
 	var kw string
-	dest := append([]any{&m.ID, &m.LineageID, &m.Version, &m.Fact, &m.Reason, &kw, &m.Author, &m.Status,
-		&m.SupersedesID, &m.SupersededBy, &m.CreatedAt, &m.SupersededAt, &m.Versions, &m.seq}, extra...)
+	dest := append([]any{&m.ID, &m.LineageID, &m.Version, &m.Fact, &m.Reason, &kw, &m.Origin, &m.SourceTag, &m.Scope,
+		&m.Project, &m.SessionID, &m.Status, &m.SupersedesID, &m.SupersededBy, &m.CreatedAt, &m.SupersededAt, &m.Versions, &m.seq}, extra...)
 	if err := r.Scan(dest...); err != nil {
 		return Memory{}, err
 	}
@@ -153,11 +170,13 @@ func (s *Store) searchFTS(ctx context.Context, a SearchArgs) ([]Memory, error) {
 	if err != nil {
 		return nil, err
 	}
+	scope, project := a.within.args()
 	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+`, bm25(memories_fts, 10.0, 2.0, 4.0) AS rank
 		FROM memories_fts JOIN memories m ON m.seq = memories_fts.rowid
 		WHERE memories_fts MATCH ?1 AND (?2 OR m.status = 'current')
+		AND (?4 IS NULL OR (m.scope = ?4 AND m.project IS ?5))
 		ORDER BY rank, m.seq DESC
-		LIMIT ?3`, match, a.IncludeHistory, clampLimit(a.Limit))
+		LIMIT ?3`, match, a.IncludeHistory, clampLimit(a.Limit), scope, project)
 	if err != nil {
 		return nil, fmt.Errorf("memory: search: %w", err)
 	}
@@ -178,14 +197,34 @@ func (s *Store) Recent(ctx context.Context, limit int) ([]Memory, error) {
 	return collect(rows, false)
 }
 
-// Lineage returns every version of id's lineage (id may be any version) plus its events.
+// lineageOf resolves a fact id, a version id or a legacy uuid to its fact id.
+func lineageOf(ctx context.Context, q queryer, id string) (string, error) {
+	var lineage string
+	err := q.QueryRowContext(ctx, `SELECT lineage_id FROM memories
+		WHERE lineage_id = ?1 OR id = ?1 OR id = (SELECT memory_id FROM memory_legacy_ids WHERE legacy_id = ?1)
+		LIMIT 1`, id).Scan(&lineage)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("memory: resolve id: %w", err)
+	}
+	return lineage, nil
+}
+
+// Lineage returns every version of a fact plus its events. id is the fact id, any version id or a
+// legacy uuid.
 func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 	db, err := s.conn()
 	if err != nil {
 		return History{}, err
 	}
+	lineage, err := lineageOf(ctx, db, id)
+	if err != nil {
+		return History{}, err
+	}
 	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+` FROM memories m
-		WHERE m.lineage_id = (SELECT lineage_id FROM memories WHERE id = ?) ORDER BY m.version`, id)
+		WHERE m.lineage_id = ? ORDER BY m.version`, lineage)
 	if err != nil {
 		return History{}, fmt.Errorf("memory: lineage: %w", err)
 	}
@@ -197,9 +236,9 @@ func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 		return History{}, ErrNotFound
 	}
 	erows, err := db.QueryContext(ctx, `SELECT e.seq, e.request_id, e.source, e.source_ref, COALESCE(f.rel_path, ''),
-		e.action, e.lineage_id, e.memory_id, e.previous_id, e.author, e.rationale, e.created_at
+		e.action, e.lineage_id, e.memory_id, e.previous_id, e.origin, e.source_tag, e.session_id, e.rationale, e.created_at
 		FROM memory_events e LEFT JOIN import_files f ON e.source = 'import' AND f.id = e.source_ref
-		WHERE e.lineage_id = ? ORDER BY e.seq`, mems[0].LineageID)
+		WHERE e.lineage_id = ? ORDER BY e.seq`, lineage)
 	if err != nil {
 		return History{}, fmt.Errorf("memory: events: %w", err)
 	}
@@ -208,7 +247,7 @@ func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 	for erows.Next() {
 		var e Event
 		if err := erows.Scan(&e.Seq, &e.RequestID, &e.Source, &e.SourceRef, &e.SourceLabel, &e.Action, &e.LineageID, &e.MemoryID,
-			&e.PreviousID, &e.Author, &e.Rationale, &e.CreatedAt); err != nil {
+			&e.PreviousID, &e.Origin, &e.SourceTag, &e.SessionID, &e.Rationale, &e.CreatedAt); err != nil {
 			return History{}, err
 		}
 		h.Events = append(h.Events, e)
@@ -216,17 +255,117 @@ func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 	return h, erows.Err()
 }
 
-// ErrNotFound is returned when an id names no memory.
-var ErrNotFound = errors.New("memory not found")
+// Context returns the current version of a fact with, per group the fact belongs to (newest group
+// first), the other current facts of that group, newest first, at most limit each.
+func (s *Store) Context(ctx context.Context, id string, limit int) (Context, error) {
+	db, err := s.conn()
+	if err != nil {
+		return Context{}, err
+	}
+	lineage, err := lineageOf(ctx, db, id)
+	if err != nil {
+		return Context{}, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+` FROM memories m
+		WHERE m.lineage_id = ? AND m.status = 'current'`, lineage)
+	if err != nil {
+		return Context{}, fmt.Errorf("memory: context: %w", err)
+	}
+	cur, err := collect(rows, false)
+	if err != nil {
+		return Context{}, err
+	}
+	if len(cur) == 0 {
+		return Context{}, ErrNotFound
+	}
+	out := Context{Memory: cur[0], Groups: []GroupContext{}}
+	grows, err := db.QueryContext(ctx, `SELECT g.id, g.kind, g.key, g.title,
+		(SELECT count(*) FROM memory_group_members x WHERE x.group_id = g.id AND x.lineage_id <> ?1)
+		FROM memory_group_members gm JOIN memory_groups g ON g.id = gm.group_id
+		WHERE gm.lineage_id = ?1 ORDER BY gm.added_at DESC, g.rowid DESC`, lineage)
+	if err != nil {
+		return Context{}, fmt.Errorf("memory: context groups: %w", err)
+	}
+	for grows.Next() {
+		var g GroupContext
+		if err := grows.Scan(&g.ID, &g.Kind, &g.Key, &g.Title, &g.Total); err != nil {
+			_ = grows.Close()
+			return Context{}, err
+		}
+		out.Groups = append(out.Groups, g)
+	}
+	if err := grows.Err(); err != nil {
+		_ = grows.Close()
+		return Context{}, err
+	}
+	_ = grows.Close()
+	for i := range out.Groups {
+		frows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+` FROM memory_group_members gm
+			JOIN memories m ON m.lineage_id = gm.lineage_id AND m.status = 'current'
+			WHERE gm.group_id = ? AND gm.lineage_id <> ?
+			ORDER BY m.created_at DESC, m.seq DESC LIMIT ?`, out.Groups[i].ID, lineage, limit)
+		if err != nil {
+			return Context{}, fmt.Errorf("memory: context facts: %w", err)
+		}
+		if out.Groups[i].Facts, err = collect(frows, false); err != nil {
+			return Context{}, err
+		}
+	}
+	return out, nil
+}
 
-// currentByHash lists current memories whose normalized fact hashes to h.
-func (s *Store) currentByHash(ctx context.Context, h string) ([]Memory, error) {
+// Projects lists the distinct project keys of current facts, sorted.
+func (s *Store) Projects(ctx context.Context) ([]string, error) {
 	db, err := s.conn()
 	if err != nil {
 		return nil, err
 	}
+	rows, err := db.QueryContext(ctx, `SELECT DISTINCT project FROM memories
+		WHERE status = 'current' AND project IS NOT NULL ORDER BY project`)
+	if err != nil {
+		return nil, fmt.Errorf("memory: projects: %w", err)
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// ImportDocument names the import file ref points at: its absolute path and its path relative to the
+// import root. ErrNotFound when the file row is gone.
+func (s *Store) ImportDocument(ctx context.Context, ref string) (path, relPath string, err error) {
+	db, err := s.conn()
+	if err != nil {
+		return "", "", err
+	}
+	err = db.QueryRowContext(ctx, `SELECT path, rel_path FROM import_files WHERE id = ?`, ref).Scan(&path, &relPath)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("memory: import document: %w", err)
+	}
+	return path, relPath, nil
+}
+
+// ErrNotFound is returned when an id names no memory.
+var ErrNotFound = errors.New("memory not found")
+
+// currentByHash lists current memories whose normalized fact hashes to h, within one scope and project.
+func (s *Store) currentByHash(ctx context.Context, h string, within *scopeKey) ([]Memory, error) {
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	scope, project := within.args()
 	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+` FROM memories m
-		WHERE m.status = 'current' AND m.fact_hash = ?`, h)
+		WHERE m.status = 'current' AND m.fact_hash = ?1 AND (?2 IS NULL OR (m.scope = ?2 AND m.project IS ?3))`, h, scope, project)
 	if err != nil {
 		return nil, fmt.Errorf("memory: hash lookup: %w", err)
 	}
@@ -270,15 +409,21 @@ func (s *Store) DataVersion(ctx context.Context) (int64, error) {
 type commitInput struct {
 	Revision  int64
 	Action    string
-	TargetID  string // update/noop
+	TargetID  string // update/noop: version id of the current version
 	Fact      string
 	Reason    string
 	Keywords  []string
-	Author    string
+	Origin    string
+	SourceTag string // external only
+	Scope     string
+	Project   string // scope project only
+	SessionID string // empty stores NULL
 	Source    string
 	SourceRef string // import file id; empty stores NULL
 	RequestID string
 	Why       string
+	// Groups the fact joins, whatever the action. Group rows are created on first use.
+	Groups []GroupRef
 	// Vec, when set, is the L2-normalised embedding of the inserted fact, stored in the same
 	// transaction under Model. Noop ignores it.
 	Vec   []byte
@@ -292,6 +437,18 @@ type commitResult struct {
 	// Revision is the store revision after this commit, so a request's next fact can proceed
 	// without mistaking its own insert for a concurrent writer.
 	Revision int64
+}
+
+// nullable maps "" to SQL NULL.
+func nullable(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func isUnique(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // commitFact applies one decision in one write transaction. errStale means the store changed
@@ -318,41 +475,16 @@ func (s *Store) commitFact(ctx context.Context, in commitInput) (commitResult, e
 	var res commitResult
 	switch in.Action {
 	case ActionAdd:
-		res.ID = uuid.NewString()
-		res.LineageID, res.Version = res.ID, 1
-		if err := insertMemory(ctx, tx, res, in, "", now); err != nil {
-			return commitResult{}, err
-		}
+		res, err = commitAdd(ctx, tx, in, now)
 	case ActionUpdate:
-		var lineage, status string
-		var version int
-		err := tx.QueryRowContext(ctx, `SELECT lineage_id, version, status FROM memories WHERE id = ?`, in.TargetID).
-			Scan(&lineage, &version, &status)
-		if err != nil || status != StatusCurrent {
-			return commitResult{}, errStale
-		}
-		res = commitResult{ID: uuid.NewString(), LineageID: lineage, Version: version + 1, PreviousID: in.TargetID}
-		if _, err := tx.ExecContext(ctx, `UPDATE memories SET status = 'superseded', superseded_at = ? WHERE id = ?`,
-			now, in.TargetID); err != nil {
-			return commitResult{}, fmt.Errorf("memory: supersede: %w", err)
-		}
-		if err := insertMemory(ctx, tx, res, in, in.TargetID, now); err != nil {
-			return commitResult{}, err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE memories SET superseded_by_id = ? WHERE id = ?`,
-			res.ID, in.TargetID); err != nil {
-			return commitResult{}, fmt.Errorf("memory: link superseded: %w", err)
-		}
+		res, err = commitUpdate(ctx, tx, in, now)
 	case ActionNoop:
-		var lineage string
-		var version int
-		if err := tx.QueryRowContext(ctx, `SELECT lineage_id, version FROM memories WHERE id = ?`, in.TargetID).
-			Scan(&lineage, &version); err != nil {
-			return commitResult{}, errStale
-		}
-		res = commitResult{ID: in.TargetID, LineageID: lineage, Version: version}
+		res, err = commitNoop(ctx, tx, in)
 	default:
-		return commitResult{}, fmt.Errorf("memory: unknown action %q", in.Action)
+		err = fmt.Errorf("memory: unknown action %q", in.Action)
+	}
+	if err != nil {
+		return commitResult{}, err
 	}
 
 	var prev, ref any
@@ -363,10 +495,16 @@ func (s *Store) commitFact(ctx context.Context, in commitInput) (commitResult, e
 		ref = in.SourceRef
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO memory_events
-		(request_id, source, source_ref, action, lineage_id, memory_id, previous_id, author, rationale, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		in.RequestID, in.Source, ref, in.Action, res.LineageID, res.ID, prev, in.Author, in.Why, now); err != nil {
+		(request_id, source, source_ref, action, lineage_id, memory_id, previous_id, origin, source_tag, session_id, rationale, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.RequestID, in.Source, ref, in.Action, res.LineageID, res.ID, prev, in.Origin, nullable(in.SourceTag),
+		nullable(in.SessionID), in.Why, now); err != nil {
 		return commitResult{}, fmt.Errorf("memory: event: %w", err)
+	}
+	for _, g := range in.Groups {
+		if err := joinGroup(ctx, tx, g, res.LineageID, time.Now().UnixMilli()); err != nil {
+			return commitResult{}, err
+		}
 	}
 	if res.Revision, err = readRevision(ctx, tx); err != nil {
 		return commitResult{}, err
@@ -377,16 +515,89 @@ func (s *Store) commitFact(ctx context.Context, in commitInput) (commitResult, e
 	return res, nil
 }
 
-func insertMemory(ctx context.Context, tx *sql.Tx, r commitResult, in commitInput, supersedes, now string) error {
-	var sup any
-	if supersedes != "" {
-		sup = supersedes
+// commitAdd inserts version 1 of a new fact. One retry on a fact id collision: 60 bits make a
+// second one implausible.
+func commitAdd(ctx context.Context, tx *sql.Tx, in commitInput, now string) (commitResult, error) {
+	for attempt := 0; ; attempt++ {
+		id, err := newFactID()
+		if err != nil {
+			return commitResult{}, fmt.Errorf("memory: new id: %w", err)
+		}
+		res := commitResult{ID: versionID(id, 1), LineageID: id, Version: 1}
+		err = insertMemory(ctx, tx, res, in, "", now)
+		if err == nil {
+			return res, nil
+		}
+		if !isUnique(err) || attempt == 1 {
+			return commitResult{}, err
+		}
 	}
+}
+
+// commitUpdate supersedes the current version of in.TargetID's fact with a new one.
+func commitUpdate(ctx context.Context, tx *sql.Tx, in commitInput, now string) (commitResult, error) {
+	var lineage, status string
+	var version int
+	err := tx.QueryRowContext(ctx, `SELECT lineage_id, version, status FROM memories WHERE id = ?`, in.TargetID).
+		Scan(&lineage, &version, &status)
+	if err != nil || status != StatusCurrent {
+		return commitResult{}, errStale
+	}
+	res := commitResult{ID: versionID(lineage, version+1), LineageID: lineage, Version: version + 1, PreviousID: in.TargetID}
+	if _, err := tx.ExecContext(ctx, `UPDATE memories SET status = 'superseded', superseded_at = ? WHERE id = ?`,
+		now, in.TargetID); err != nil {
+		return commitResult{}, fmt.Errorf("memory: supersede: %w", err)
+	}
+	if err := insertMemory(ctx, tx, res, in, in.TargetID, now); err != nil {
+		return commitResult{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE memories SET superseded_by_id = ? WHERE id = ?`,
+		res.ID, in.TargetID); err != nil {
+		return commitResult{}, fmt.Errorf("memory: link superseded: %w", err)
+	}
+	return res, nil
+}
+
+// commitNoop reports the existing version; the caller still records the event and group joins.
+func commitNoop(ctx context.Context, tx *sql.Tx, in commitInput) (commitResult, error) {
+	var lineage string
+	var version int
+	if err := tx.QueryRowContext(ctx, `SELECT lineage_id, version FROM memories WHERE id = ?`, in.TargetID).
+		Scan(&lineage, &version); err != nil {
+		return commitResult{}, errStale
+	}
+	return commitResult{ID: in.TargetID, LineageID: lineage, Version: version}, nil
+}
+
+// joinGroup adds a fact to a group, creating the group on first use. Membership is by fact id, so it
+// survives new versions. An existing group keeps its first title.
+func joinGroup(ctx context.Context, tx *sql.Tx, g GroupRef, lineage string, ms int64) error {
+	var id string
+	err := tx.QueryRowContext(ctx, `SELECT id FROM memory_groups WHERE kind = ? AND key = ?`, g.Kind, g.Key).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		if id, err = newGroupID(); err != nil {
+			return fmt.Errorf("memory: new group id: %w", err)
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO memory_groups (id, kind, key, title, created_at) VALUES (?, ?, ?, ?, ?)`,
+			id, g.Kind, g.Key, g.Title, ms)
+	}
+	if err != nil {
+		return fmt.Errorf("memory: group: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_group_members (group_id, lineage_id, added_at) VALUES (?, ?, ?)`,
+		id, lineage, ms); err != nil {
+		return fmt.Errorf("memory: group member: %w", err)
+	}
+	return nil
+}
+
+func insertMemory(ctx context.Context, tx *sql.Tx, r commitResult, in commitInput, supersedes, now string) error {
 	res, err := tx.ExecContext(ctx, `INSERT INTO memories
-		(id, lineage_id, version, fact, reason, keywords, author, status, supersedes_id, fact_hash, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'current', ?, ?, ?)`,
-		r.ID, r.LineageID, r.Version, in.Fact, in.Reason, joinKeywords(in.Keywords), in.Author, sup,
-		factHash(in.Fact), now)
+		(id, lineage_id, version, fact, reason, keywords, origin, source_tag, scope, project, session_id, status,
+		 supersedes_id, fact_hash, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'current', ?, ?, ?)`,
+		r.ID, r.LineageID, r.Version, in.Fact, in.Reason, joinKeywords(in.Keywords), in.Origin, nullable(in.SourceTag),
+		in.Scope, nullable(in.Project), nullable(in.SessionID), nullable(supersedes), factHash(in.Fact), now)
 	if err != nil {
 		return fmt.Errorf("memory: insert: %w", err)
 	}

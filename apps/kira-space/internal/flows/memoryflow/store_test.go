@@ -61,7 +61,7 @@ func TestStoreThroughGate(t *testing.T) {
 	}
 	app.Contract(t, "memory", "MemoryService.Recent#gated", recent, flowharness.Mask("createdAt"))
 	for _, m := range recent {
-		if m.Author != memory.AuthorUser || m.Version != 1 || len(m.Keywords) < 3 {
+		if m.Origin != memory.OriginUser || m.Version != 1 || len(m.Keywords) < 3 {
 			t.Fatalf("stored memory = %+v, want a user-authored v1 with the gate's keywords", m)
 		}
 	}
@@ -74,7 +74,7 @@ func TestStoreThroughGate(t *testing.T) {
 	if err != nil || len(hist.Memories) != 1 || len(hist.Events) != 1 {
 		t.Fatalf("History = %+v, %v, want one version and its store event", hist, err)
 	}
-	if ev := hist.Events[0]; ev.Action != "add" || ev.Source != memory.SourceUI || ev.Author != memory.AuthorUser || ev.MemoryID != hits[0].ID {
+	if ev := hist.Events[0]; ev.Action != "add" || ev.Source != memory.SourceUI || ev.Origin != memory.OriginUser || ev.MemoryID != hits[0].ID {
 		t.Fatalf("store event = %+v", ev)
 	}
 }

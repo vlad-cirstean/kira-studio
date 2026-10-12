@@ -65,7 +65,8 @@ const MIGRATION_SETS: ReadonlyArray<{ dir: string; baseline: number }> = [
   { dir: 'apps/kira-space/internal/gitreview/migrations', baseline: 3 },
   { dir: 'apps/kira-space/internal/storage/migrations', baseline: 32 },
   { dir: 'apps/kira-studio/internal/storage/migrations', baseline: 37 },
-  { dir: 'internal/memory/migrations', baseline: 3 },
+  // 0004 rebuilds memories and memory_events with their legacy TEXT ISO created_at/superseded_at unchanged.
+  { dir: 'internal/memory/migrations', baseline: 4 },
 ];
 const MIGRATION_NAME = /^(\d{4})_[a-z]\d+[a-z]?_[a-z0-9]+(?:_[a-z0-9]+)*\.sql$/;
 const BAD_FOLDERS = new Set(['util', 'utils', 'helpers']);

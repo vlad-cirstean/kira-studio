@@ -3,8 +3,21 @@ package memory
 import "strings"
 
 const (
-	AuthorUser  = "user"
-	AuthorAgent = "agent"
+	// Origin: who decided a fact. Grade order: user > external > agent.
+	OriginUser     = "user"
+	OriginAgent    = "agent"
+	OriginExternal = "external"
+
+	ScopeCompany  = "company"
+	ScopeProject  = "project"
+	ScopePersonal = "personal"
+
+	// Group kinds. session, request and document are set by the server; the rest by the caller.
+	GroupSession  = "session"
+	GroupRequest  = "request"
+	GroupTask     = "task"
+	GroupDocument = "document"
+	GroupThread   = "thread"
 
 	SourceMCP    = "mcp"
 	SourceUI     = "ui"
@@ -23,7 +36,21 @@ const (
 	MaxKeywords  = 10
 )
 
+// GradeOf ranks an origin: user 3, external 2, agent 1. Unknown origins rank 0.
+func GradeOf(origin string) int {
+	switch origin {
+	case OriginUser:
+		return 3
+	case OriginExternal:
+		return 2
+	case OriginAgent:
+		return 1
+	}
+	return 0
+}
+
 // Memory is one immutable version of a fact. Superseded versions stay queryable, flagged Historical.
+// LineageID is the fact id, shared by every version; ID is the version id "<fact id>.<version>".
 type Memory struct {
 	ID           string   `json:"id"`
 	LineageID    string   `json:"lineageId"`
@@ -31,7 +58,11 @@ type Memory struct {
 	Fact         string   `json:"fact"`
 	Reason       string   `json:"reason"`
 	Keywords     []string `json:"keywords"`
-	Author       string   `json:"author"`
+	Origin       string   `json:"origin"`
+	SourceTag    *string  `json:"sourceTag"`
+	Scope        string   `json:"scope"`
+	Project      *string  `json:"project"`
+	SessionID    *string  `json:"sessionId"`
 	Status       string   `json:"status"`
 	Historical   bool     `json:"historical"`
 	SupersedesID *string  `json:"supersedesId"`
@@ -57,7 +88,9 @@ type Event struct {
 	LineageID   string  `json:"lineageId"`
 	MemoryID    string  `json:"memoryId"`
 	PreviousID  *string `json:"previousId"`
-	Author      string  `json:"author"`
+	Origin      string  `json:"origin"`
+	SourceTag   *string `json:"sourceTag"`
+	SessionID   *string `json:"sessionId"`
 	Rationale   string  `json:"rationale"`
 	CreatedAt   string  `json:"createdAt"`
 }
@@ -66,6 +99,30 @@ type Event struct {
 type History struct {
 	Memories []Memory `json:"memories"`
 	Events   []Event  `json:"events"`
+}
+
+// GroupRef names a group a fact joins. Kind, Key and Title come from the caller or the server.
+type GroupRef struct {
+	Kind  string `json:"kind"`
+	Key   string `json:"key"`
+	Title string `json:"title,omitempty"`
+}
+
+// GroupContext is one group of a fact with its other current facts, newest first. Total counts every
+// other fact in the group; Facts holds at most the requested limit.
+type GroupContext struct {
+	ID    string   `json:"id"`
+	Kind  string   `json:"kind"`
+	Key   string   `json:"key"`
+	Title string   `json:"title"`
+	Total int      `json:"total"`
+	Facts []Memory `json:"facts"`
+}
+
+// Context is a fact's immediate context: the other facts stored with it, per group.
+type Context struct {
+	Memory Memory         `json:"memory"`
+	Groups []GroupContext `json:"groups"`
 }
 
 func joinKeywords(k []string) string { return strings.Join(k, "\n") }

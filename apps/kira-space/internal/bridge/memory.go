@@ -226,9 +226,12 @@ func (s *MemoryService) History(ctx context.Context, args MemoryIDArgs) (memory.
 
 // Store runs the gate-reconcile-commit pipeline as the user.
 func (s *MemoryService) Store(ctx context.Context, args MemoryStoreArgs) (memory.StoreResult, error) {
-	res, err := s.service().Store(ctx, memory.StoreRequest{
-		Items: args.Items, Clarifications: args.Clarifications, Author: memory.AuthorUser, Source: memory.SourceUI,
-	})
+	items := make([]memory.Item, len(args.Items))
+	for i, it := range args.Items {
+		it.Origin, it.Scope = memory.OriginUser, memory.ScopePersonal
+		items[i] = it
+	}
+	res, err := s.service().Store(ctx, memory.StoreRequest{Items: items, Clarifications: args.Clarifications, Source: memory.SourceUI})
 	return res, memoryErr(err)
 }
 

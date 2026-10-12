@@ -49,16 +49,21 @@ func (f *fakeRunner) count(kind string) int {
 // acceptAll echoes each item as one fact.
 func acceptAll(in gateInput) string {
 	var items []map[string]any
-	for _, it := range in.Items {
-		items = append(items, map[string]any{"index": it.Index, "verdict": "accept", "questions": []string{},
-			"facts": []map[string]any{{"fact": it.Fact, "reason": it.Reason, "keywords": []string{"kw"}}}})
+	for _, gi := range in.Items {
+		items = append(items, map[string]any{"index": gi.Index, "verdict": "accept", "questions": []string{},
+			"facts": []map[string]any{{"fact": gi.Fact, "reason": gi.Reason, "keywords": []string{"kw"}}}})
 	}
 	b, _ := json.Marshal(map[string]any{"items": items})
 	return string(b)
 }
 
+// it is a personal fact stated by the user.
+func it(fact, reason string) Item {
+	return Item{Fact: fact, Reason: reason, Origin: OriginUser, Scope: ScopePersonal}
+}
+
 func req(items ...Item) StoreRequest {
-	return StoreRequest{Items: items, Author: AuthorUser, Source: SourceUI}
+	return StoreRequest{Items: items, Source: SourceUI}
 }
 
 func newService(t *testing.T, r Runner) (*Service, *Store) {
@@ -72,7 +77,7 @@ func TestChallengeStoresNothing(t *testing.T) {
 			{"index":1,"verdict":"challenge","questions":["Which project?"],"facts":[]}]}`
 	}}
 	svc, st := newService(t, fr)
-	res, err := svc.Store(context.Background(), req(Item{"a clear fact", "r"}, Item{"it uses 8080", "because"}))
+	res, err := svc.Store(context.Background(), req(it("a clear fact", "r"), it("it uses 8080", "because")))
 	if err != nil || res.Status != "challenged" || len(res.Challenges) != 1 || res.Challenges[0].Index != 1 {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
@@ -88,7 +93,7 @@ func TestSplitAndNoCandidatesSkipsReconcile(t *testing.T) {
 			{"fact":"zebra cluster is in eu-west","reason":"infra doc","keywords":["region"]}]}]}`
 	}}
 	svc, st := newService(t, fr)
-	res, err := svc.Store(context.Background(), req(Item{"alpha owns billing and zebra is in eu-west", "docs"}))
+	res, err := svc.Store(context.Background(), req(it("alpha owns billing and zebra is in eu-west", "docs")))
 	if err != nil || len(res.Outcomes) != 2 {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
@@ -103,10 +108,10 @@ func TestSplitAndNoCandidatesSkipsReconcile(t *testing.T) {
 func TestHashShortCircuit(t *testing.T) {
 	fr := &fakeRunner{gate: acceptAll}
 	svc, _ := newService(t, fr)
-	if _, err := svc.Store(context.Background(), req(Item{"Port is 8080", "ops"})); err != nil {
+	if _, err := svc.Store(context.Background(), req(it("Port is 8080", "ops"))); err != nil {
 		t.Fatal(err)
 	}
-	res, err := svc.Store(context.Background(), req(Item{"port is  8080", "OPS"}))
+	res, err := svc.Store(context.Background(), req(it("port is  8080", "OPS")))
 	if err != nil || res.Outcomes[0].Action != ActionNoop {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
@@ -132,10 +137,10 @@ func TestUpdateSupersedesAndKeepsHistory(t *testing.T) {
 	fr := &fakeRunner{gate: acceptAll, rec: updateAll}
 	svc, _ := newService(t, fr)
 	ctx := context.Background()
-	if _, err := svc.Store(ctx, req(Item{"api port is 8080", "initial"})); err != nil {
+	if _, err := svc.Store(ctx, req(it("api port is 8080", "initial"))); err != nil {
 		t.Fatal(err)
 	}
-	res, err := svc.Store(ctx, req(Item{"api port is 9090", "moved"}))
+	res, err := svc.Store(ctx, req(it("api port is 9090", "moved")))
 	if err != nil || res.Outcomes[0].Action != ActionUpdate || res.Outcomes[0].Version != 2 {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
@@ -167,7 +172,7 @@ func TestForeignTargetFailsOnlyThatFact(t *testing.T) {
 	svc, st := newService(t, fr)
 	add(t, st, "redis cache size is 1gb", "old")
 	add(t, st, "postgres cache size is 3gb", "old")
-	res, err := svc.Store(context.Background(), req(Item{"cache sizes", "r"}))
+	res, err := svc.Store(context.Background(), req(it("cache sizes", "r")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +192,7 @@ func TestConcurrentWriterRetriesThenFails(t *testing.T) {
 			add(t, st, "unrelated filler "+strings.Repeat("x", n), "bump")
 		}
 	}
-	res, err := svc.Store(context.Background(), req(Item{"deploy target is production", "r"}))
+	res, err := svc.Store(context.Background(), req(it("deploy target is production", "r")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +222,7 @@ func TestStaleRedecidesLaterFacts(t *testing.T) {
 			add(t, st, "zebra cluster is in eu-west region", "foreign")
 		}
 	}
-	res, err := svc.Store(context.Background(), req(Item{"deploy and zebra", "r"}))
+	res, err := svc.Store(context.Background(), req(it("deploy and zebra", "r")))
 	if err != nil || len(res.Outcomes) != 2 {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
@@ -229,7 +234,7 @@ func TestStaleRedecidesLaterFacts(t *testing.T) {
 func TestGateMissingIndexIsOutputError(t *testing.T) {
 	fr := &fakeRunner{gate: func(gateInput) string { return `{"items":[]}` }}
 	svc, st := newService(t, fr)
-	_, err := svc.Store(context.Background(), req(Item{"some fact", "r"}))
+	_, err := svc.Store(context.Background(), req(it("some fact", "r")))
 	if !errors.Is(err, ErrClaudeOutput) {
 		t.Fatalf("err = %v", err)
 	}

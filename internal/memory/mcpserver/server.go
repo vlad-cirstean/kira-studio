@@ -18,8 +18,14 @@ import (
 
 const serverVersion = "1"
 
+// legacyItem is the transitional item shape: origin and scope arrive with the new item fields.
+type legacyItem struct {
+	Fact   string `json:"fact"`
+	Reason string `json:"reason"`
+}
+
 type storeInput struct {
-	Items          []memory.Item          `json:"items"`
+	Items          []legacyItem           `json:"items"`
 	Author         string                 `json:"author"`
 	Clarifications []memory.Clarification `json:"clarifications,omitempty"`
 }
@@ -125,9 +131,17 @@ func rememberText(src llmprompts.Source, text string) string {
 }
 
 func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
-	sr := memory.StoreRequest{Items: in.Items, Clarifications: in.Clarifications, Author: in.Author, Source: memory.SourceMCP}
+	// Transitional: the author argument still sets each item's origin until the item fields land.
+	items := make([]memory.Item, len(in.Items))
+	for i, it := range in.Items {
+		items[i] = memory.Item{Fact: it.Fact, Reason: it.Reason, Origin: in.Author, Scope: memory.ScopePersonal}
+	}
+	sr := memory.StoreRequest{Items: items, Clarifications: in.Clarifications, Source: memory.SourceMCP}
 	if opts.ImportRef != "" {
-		sr.Author, sr.Source, sr.SourceRef = memory.AuthorAgent, memory.SourceImport, opts.ImportRef
+		sr.Source, sr.SourceRef = memory.SourceImport, opts.ImportRef
+		for i := range sr.Items {
+			sr.Items[i].Origin, sr.Items[i].SourceTag = memory.OriginExternal, "doc"
+		}
 	}
 	if token := req.Params.GetProgressToken(); token != nil && req.Session != nil {
 		step := 0.0
@@ -186,7 +200,7 @@ func renderMemories(ms []memory.Memory) string {
 		if m.Match == "semantic" {
 			flag += " [semantic]"
 		}
-		fmt.Fprintf(&b, "- %s%s (v%d, %s, id %s)\n  reason: %s\n", m.Fact, flag, m.Version, m.Author, m.ID, m.Reason)
+		fmt.Fprintf(&b, "- %s%s (v%d, %s, id %s)\n  reason: %s\n", m.Fact, flag, m.Version, m.Origin, m.ID, m.Reason)
 	}
 	return b.String()
 }
