@@ -1,6 +1,7 @@
 import type { CodeSearchEvent, FileMatches, SearchStats } from '@shared/domain/repo';
 import { useLocalStorage } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
@@ -227,7 +228,7 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
   /** Stops repoId's own in-flight search, if any — the panel's own Stop button. Fire-and-forget:
    *  the terminal event this run still owes (D7/D8) is what actually clears `running`. */
   function cancelRepoSearch(repoId: string): void {
-    void control.codeWorkspaceCancelSearch(repoId);
+    fireAndForget(control.codeWorkspaceCancelSearch(repoId), 'search');
   }
 
   function toggleRepoSearchCollapse(repoId: string, path: string): void {

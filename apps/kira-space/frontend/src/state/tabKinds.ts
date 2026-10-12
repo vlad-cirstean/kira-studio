@@ -1,3 +1,4 @@
+import { shortSha } from '@kira/git-core';
 import type { PaletteColor } from '@shared/domain/color';
 import { t } from '@theme/i18n';
 import { scriptRunState } from '@workbench/automations/runs/runStates';
@@ -60,7 +61,7 @@ function repoFileTitle(tab: TabRecord): string {
   const idx = tab.path.lastIndexOf('/');
   const base = idx < 0 ? tab.path : tab.path.slice(idx + 1);
   const rev = asRepoFileTab(tab)?.state.rev;
-  return rev == null ? base : `${base} (${rev.slice(0, 7)})`;
+  return rev == null ? base : `${base} (${shortSha(rev)})`;
 }
 
 // Same basename-only reasoning as repoFileTitle, plus a suffix distinguishing a diff tab from a
@@ -69,8 +70,8 @@ function repoFileTitle(tab: TabRecord): string {
 function repoDiffTitle(tab: TabRecord): string {
   const diff = tab as RepoDiffTabRecord;
   if (diff.state.left !== null && diff.state.right !== null) {
-    const left = diff.state.leftLabel ?? diff.state.left.slice(0, 7);
-    const right = diff.state.rightLabel ?? diff.state.right.slice(0, 7);
+    const left = diff.state.leftLabel ?? shortSha(diff.state.left);
+    const right = diff.state.rightLabel ?? shortSha(diff.state.right);
     return `${repoFileTitle(tab)} (${left} ↔ ${right})`;
   }
   return `${repoFileTitle(tab)} (Working Tree)`;

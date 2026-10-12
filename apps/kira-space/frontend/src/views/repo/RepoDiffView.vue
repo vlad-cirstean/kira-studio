@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -140,21 +140,9 @@ onUnmounted(() => {
       class="monaco-host flex-auto min-h-0 w-full"
       data-testid="repo-diff-editor"
     />
-    <Empty v-else-if="state === 'binary'" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.binaryCompare.empty') }}</EmptyTitle>
-    </Empty>
-    <Empty v-else-if="state === 'tooLarge'" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.tooLargeCompare.empty') }}</EmptyTitle>
-    </Empty>
-    <Empty v-else-if="state === 'bothMissing'" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.missing.empty') }}</EmptyTitle>
-    </Empty>
-    <Empty v-else class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ errorMessage || t('space.repo.view.openDiffFailed.error') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-else-if="state === 'binary'" class="flex-1 min-h-0" icon="file-binary" :title="t('space.repo.view.binaryCompare.empty')" />
+    <EmptyState v-else-if="state === 'tooLarge'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.tooLargeCompare.empty')" />
+    <EmptyState v-else-if="state === 'bothMissing'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.missing.empty')" />
+    <EmptyState v-else class="flex-1 min-h-0" icon="warning" :title="errorMessage || t('space.repo.view.openDiffFailed.error')" />
   </div>
 </template>

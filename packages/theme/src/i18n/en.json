@@ -7340,7 +7340,7 @@
       },
       "panel": {
         "allHidden": {
-          "description": "They stay imported and usable.",
+          "description": "They stay imported and usable. Use the eye button in the header to show them.",
           "title": "All repositories are hidden"
         },
         "configure": {
@@ -7362,7 +7362,6 @@
           "title": "Rename repository"
         },
         "showHidden": {
-          "label": "Show hidden",
           "tooltip": "Show hidden repositories"
         },
         "terminalOpen": {

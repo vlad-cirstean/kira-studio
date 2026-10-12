@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -123,10 +123,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!repoId" class="h-full overflow-y-auto flex flex-col">
-    <Empty class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ noRepositoryMessage() }}</EmptyTitle>
-    </Empty>
+    <EmptyState class="flex-1 min-h-0" icon="warning" :title="noRepositoryMessage()" />
   </div>
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
     <div v-for="section in sections" :key="section.path" class="flex flex-none flex-col border-b border-border">
@@ -167,27 +164,12 @@ onUnmounted(() => {
           class="monaco-host flex-none h-[60vh] w-full"
           data-testid="repo-multi-diff-editor"
         />
-        <Empty v-else-if="sectionState[section.path] === 'binary'" class="p-4">
-      <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.binaryCompare.empty') }}</EmptyTitle>
-    </Empty>
-        <Empty v-else-if="sectionState[section.path] === 'tooLarge'" class="p-4">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.tooLargeCompare.empty') }}</EmptyTitle>
-    </Empty>
-        <Empty v-else-if="sectionState[section.path] === 'bothMissing'" class="p-4">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.missing.empty') }}</EmptyTitle>
-    </Empty>
-        <Empty v-else class="p-4">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ sectionError[section.path] || t('space.repo.view.openDiffFailed.error') }}</EmptyTitle>
-    </Empty>
+        <EmptyState v-else-if="sectionState[section.path] === 'binary'" class="p-4" icon="file-binary" :title="t('space.repo.view.binaryCompare.empty')" />
+        <EmptyState v-else-if="sectionState[section.path] === 'tooLarge'" class="p-4" icon="warning" :title="t('space.repo.view.tooLargeCompare.empty')" />
+        <EmptyState v-else-if="sectionState[section.path] === 'bothMissing'" class="p-4" icon="warning" :title="t('space.repo.view.missing.empty')" />
+        <EmptyState v-else class="p-4" icon="warning" :title="sectionError[section.path] || t('space.repo.view.openDiffFailed.error')" />
       </template>
     </div>
-    <Empty v-if="sections.length === 0" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="git-compare" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.noChanges.empty') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-if="sections.length === 0" class="flex-1 min-h-0" icon="git-compare" :title="t('space.repo.view.noChanges.empty')" />
   </div>
 </template>

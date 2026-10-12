@@ -130,11 +130,14 @@ test('RepoHeads never asks for a hidden repo while Show hidden is off', async ({
   await expect.poll(asked).toContain(HIDDEN.id);
 });
 
-test('all repos hidden shows the empty state with a Show hidden button', async ({ relaunch }) => {
+test('all repos hidden shows the empty state without a button; the header toggle shows them', async ({
+  relaunch,
+}) => {
   const { window: page, control } = await relaunch({ control: [listRepos(HIDDEN)] });
   await expect(page.locator(t('repos-all-hidden'))).toContainText('All repositories are hidden');
   await expect(page.locator(t('repo-row'))).toHaveCount(0);
   expect(calls(control, IPC.codeWorkspaceRepoHeads)).toHaveLength(0);
-  await page.locator(t('repos-show-hidden-empty')).click();
+  await expect(page.locator(t('repos-all-hidden')).locator('button')).toHaveCount(0);
+  await page.locator(t('repos-show-hidden')).click();
   await expect(repoRow(page, HIDDEN.id)).toBeVisible();
 });

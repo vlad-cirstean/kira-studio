@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 // C11 §7.4 (S10) — one review thread's body over Monaco, mounted into an IViewZone by
 // reviewDecorations.ts (S9) via createApp/unmount, never routed through the workbench's own tab
 // system (this is editor-surface furniture, not a view). Two modes: 'view' renders an existing
@@ -36,12 +37,12 @@ const emit = defineEmits<{
 const anchorLabel = computed<string | undefined>(() => {
   const comment = props.comment;
   if (!comment) return undefined;
-  const sha8 = comment.anchorSha.slice(0, 8);
+  const sha = shortSha(comment.anchorSha);
   switch (comment.anchor) {
     case 'removed':
-      return t('space.repo.view.anchorRemoved.status', { branch: props.branch, sha: sha8 });
+      return t('space.repo.view.anchorRemoved.status', { branch: props.branch, sha });
     case 'stale':
-      return t('space.repo.view.anchorStale.status', { branch: props.branch, sha: sha8 });
+      return t('space.repo.view.anchorStale.status', { branch: props.branch, sha });
     case 'exact':
     case 'projected':
       return undefined;

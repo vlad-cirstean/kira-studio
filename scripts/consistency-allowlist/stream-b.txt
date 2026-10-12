@@ -1,18 +1,9 @@
 U74 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue
 U74 apps/kira-space/frontend/mobile/screens/NeedsScreen.vue
 U74 apps/kira-space/frontend/mobile/screens/PlanScreen.vue
-U74 apps/kira-space/frontend/src/repo/GitPanel.vue
-U74 apps/kira-space/frontend/src/repo/GitStart.vue
-U74 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue
-U74 apps/kira-space/frontend/src/views/repo/RepoFileView.vue
-U74 apps/kira-space/frontend/src/views/repo/RepoGraphView.vue
-U74 apps/kira-space/frontend/src/views/repo/RepoMultiDiffView.vue
 U74 packages/workbench/src/memory/MemoryPanel.vue
 U74 packages/workbench/src/memory/MemoryStart.vue
 U74 packages/workbench/src/memory/import/ImportView.vue
-U77 apps/kira-space/frontend/src/repo/state/search.ts
-U77 apps/kira-space/frontend/src/state/agentNotify.ts
-U77 apps/kira-space/frontend/src/state/workspace.ts
 U82 apps/kira-space/frontend/mobile/AppShell.vue
 U82 apps/kira-space/frontend/mobile/components/ReplySheet.vue
 U82 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue
@@ -21,9 +12,5 @@ U82 apps/kira-space/frontend/mobile/screens/PlanTaskCard.vue
 U82 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts
 U82 apps/kira-space/frontend/mobile/terminal/KeyBar.vue
-U82 apps/kira-space/frontend/src/repo/git/hostHandlers.ts
-U82 apps/kira-space/frontend/src/repo/state/repoHeads.ts
-U82 apps/kira-space/frontend/src/state/tabKinds.ts
-U82 apps/kira-space/frontend/src/views/repo/ReviewThread.vue
 # PERMANENT U79 bridge/index.ts: the one LinkService.OpenExternal call, wrapped by createOpenExternal; the guard exempt path in check-ui-primitives.sh never matches it.
 U79 apps/kira-space/frontend/src/bridge/index.ts

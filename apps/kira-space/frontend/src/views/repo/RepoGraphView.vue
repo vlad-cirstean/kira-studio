@@ -10,8 +10,7 @@
 // A tab switch away unmounts this view; the transport outlives it and view state restores
 // through TabViewStateStore.
 import type { MountHandle } from '@kira/git-ui';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
@@ -84,8 +83,5 @@ onUnmounted(() => {
     class="h-full w-full"
     data-testid="repo-graph-host"
   />
-  <Empty v-else class="h-full">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ errorMessage }}</EmptyTitle>
-    </Empty>
+  <EmptyState v-else class="h-full" icon="warning" :title="errorMessage" />
 </template>

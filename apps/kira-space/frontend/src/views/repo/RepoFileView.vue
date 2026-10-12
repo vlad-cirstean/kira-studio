@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -298,22 +297,10 @@ onUnmounted(() => {
     </div>
     <div v-else ref="container" class="monaco-host h-full w-full" data-testid="repo-file-editor" />
   </template>
-  <Empty v-else-if="state === 'binary'" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.binaryPreview.empty') }}</EmptyTitle>
-    </Empty>
-  <Empty v-else-if="state === 'tooLarge'" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.tooLargePreview.empty') }}</EmptyTitle>
-    </Empty>
-  <Empty v-else-if="state === 'missing'" class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('space.repo.view.missing.empty') }}</EmptyTitle>
-    </Empty>
-  <Empty v-else class="flex-1 min-h-0">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ errorMessage || t('space.repo.view.openFileFailed.error') }}</EmptyTitle>
-    </Empty>
+  <EmptyState v-else-if="state === 'binary'" class="flex-1 min-h-0" icon="file-binary" :title="t('space.repo.view.binaryPreview.empty')" />
+  <EmptyState v-else-if="state === 'tooLarge'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.tooLargePreview.empty')" />
+  <EmptyState v-else-if="state === 'missing'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.missing.empty')" />
+  <EmptyState v-else class="flex-1 min-h-0" icon="warning" :title="errorMessage || t('space.repo.view.openFileFailed.error')" />
 </template>
 
 <style scoped>

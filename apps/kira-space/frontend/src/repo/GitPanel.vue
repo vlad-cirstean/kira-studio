@@ -3,14 +3,13 @@ import type { WorktreeEntry } from '@kira/git-ipc';
 import { PALETTE_COLOR_CHOICES } from '@shared/domain/color';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, colourLabel } from '@theme/connColor';
 import { t } from '@theme/i18n';
@@ -513,18 +512,14 @@ onUnmounted(() => {
       <div class="min-h-0 flex-1">
         <div class="h-full flex flex-col min-h-0">
         <section v-if="tab === 'repos'" class="flex-1 min-h-0 overflow-y-auto" data-testid="repo-section">
-          <Empty v-if="allHidden" class="h-full" data-testid="repos-all-hidden">
-            <EmptyHeader>
-              <EmptyMedia><CodiconIcon name="eye-closed" :size="24" /></EmptyMedia>
-              <EmptyTitle>{{ t('space.repo.panel.allHidden.title') }}</EmptyTitle>
-              <EmptyDescription>{{ t('space.repo.panel.allHidden.description') }}</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button variant="dialog" size="kira-lg" data-testid="repos-show-hidden-empty" @click="visibility.showHidden = true">
-                {{ t('space.repo.panel.showHidden.label') }}
-              </Button>
-            </EmptyContent>
-          </Empty>
+          <EmptyState
+            v-if="allHidden"
+            class="h-full"
+            icon="eye-closed"
+            :title="t('space.repo.panel.allHidden.title')"
+            :description="t('space.repo.panel.allHidden.description')"
+            data-testid="repos-all-hidden"
+          />
           <div v-else ref="listEl" class="flex flex-col" role="listbox" :aria-label="t('common.module.repositories.label')">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
@@ -743,22 +738,12 @@ onUnmounted(() => {
               :repo-id="repoId"
             />
           </template>
-          <Empty v-else class="h-full">
-            <EmptyHeader>
-              <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
-              <EmptyTitle>{{ t('space.repo.noRepoOpen.empty') }}</EmptyTitle>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState v-else class="h-full" icon="source-control" :title="t('space.repo.noRepoOpen.empty')" />
         </template>
       </div>
       </div>
     </template>
-    <Empty v-else class="h-full">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('space.repo.panel.importPrompt.emptyHint') }}</EmptyTitle>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState v-else class="h-full" icon="source-control" :title="t('space.repo.panel.importPrompt.emptyHint')" />
   </div>
 
   <TextPromptDialog

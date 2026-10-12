@@ -12,7 +12,11 @@
  * miss rather than guessing, exact rather than heuristic because `RepoSummary.repoId` is already
  * stored from the same `gitclient.Identify` call `repo.open` itself runs (C5's import).
  */
-import { findChangeInDetail as lookupChangeInDetail, mapLineAcrossDiff } from '@kira/git-core';
+import {
+  findChangeInDetail as lookupChangeInDetail,
+  mapLineAcrossDiff,
+  shortSha,
+} from '@kira/git-core';
 import type {
   EventKey,
   EventPayload,
@@ -222,8 +226,8 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
         );
       }
       const leftRev = found.baseSha ?? EMPTY_TREE_SHA;
-      const leftLabel = found.baseSha ? found.baseSha.slice(0, 7) : 'empty tree';
-      const rightLabel = effectiveSha.slice(0, 7);
+      const leftLabel = found.baseSha ? shortSha(found.baseSha) : 'empty tree';
+      const rightLabel = shortSha(effectiveSha);
       // C5's preview/permanent split (§6.1): pinned:false is C5's own default preview slot;
       // only an explicit true pins.
       openRepoCommitDiffTab(
@@ -255,8 +259,8 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       );
       const baseSha = detail.parents[detail.parentIndex] ?? null;
       const leftRev = baseSha ?? EMPTY_TREE_SHA;
-      const leftLabel = baseSha ? baseSha.slice(0, 7) : 'empty tree';
-      const rightLabel = sha.slice(0, 7);
+      const leftLabel = baseSha ? shortSha(baseSha) : 'empty tree';
+      const rightLabel = shortSha(sha);
       openRepoMultiDiffTab(
         codeRepoId,
         detail.files.map((change) => change.path),

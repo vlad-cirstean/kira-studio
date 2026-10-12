@@ -20,9 +20,12 @@ import { Switch } from '@theme/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { cn } from '@theme/lib/utils';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
@@ -65,6 +68,21 @@ watch(
   { immediate: true },
 );
 // The selection follows the arrows (master-detail): each stop shows that repo's settings.
+const rowHeight = useRowHeight();
+const { virtualizer, virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
+  count: () => codeRepos.records.length,
+  rowHeight: () => rowHeight.single.value + 2,
+  scrollElement: listEl,
+});
+const windowRows = computed(() =>
+  virtualItems.value.flatMap((item) => {
+    const r = codeRepos.records[item.index];
+    return r ? [{ item, r }] : [];
+  }),
+);
+function measure(el: unknown): void {
+  if (el instanceof Element) virtualizer.value.measureElement(el);
+}
 const nav = useListNavigation({
   container: listEl,
   items: () => codeRepos.records,
@@ -72,6 +90,8 @@ const nav = useListNavigation({
   activeKey: activeRepoKey,
   selectOnMove: true,
   onSelect: (r) => pickRepo(r.id),
+  scrollToIndex: (index) => scrollToIndex(index),
+  rendered: () => virtualItems.value,
 });
 const showRepos = computed(() => dialog.tab === 'repos');
 const error = ref('');
@@ -141,29 +161,40 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
 
       <DialogBody flush class="flex-row overflow-hidden">
         <nav class="flex w-44 shrink-0 flex-col border-r border-border">
-          <div ref="listEl" class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" :aria-label="t('common.module.repositories.label')" data-testid="repos-dialog-repos">
+          <div ref="listEl" class="min-h-0 flex-1 overflow-y-auto px-1 py-1.5" role="listbox" :aria-label="t('common.module.repositories.label')" data-testid="repos-dialog-repos" @scroll.passive="onScroll">
             <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">{{ t('space.repo.dialog.empty.empty') }}</p>
-            <Tooltip v-for="r in codeRepos.records" :key="r.id">
-              <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  role="option"
-                  v-bind="nav.rowProps(r.id)"
-                  class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
-                  :class="repoRowClass(r)"
-                  :aria-selected="showRepos && selected?.id === r.id"
-                  data-testid="repos-dialog-repo"
-                  :data-repo-id="r.id"
-                  :data-hidden="r.hidden"
-                  @click="pickRepo(r.id)"
-                >
-                  <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
-                  <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
-                  <CodiconIcon v-if="r.hidden" name="eye-closed" :size="13" class="shrink-0" data-testid="repos-dialog-repo-hidden-mark" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ r.root }}</TooltipContent>
-            </Tooltip>
+            <div v-else class="relative w-full" :style="{ height: `${totalSize}px` }">
+              <div
+                v-for="{ item, r } in windowRows"
+                :key="r.id"
+                :ref="measure"
+                :data-index="item.index"
+                :class="cn(VIRTUAL_ROW_CLASS, 'pb-px')"
+                :style="{ transform: `translateY(${item.start}px)` }"
+              >
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      type="button"
+                      role="option"
+                      v-bind="nav.rowProps(r.id)"
+                      class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
+                      :class="repoRowClass(r)"
+                      :aria-selected="showRepos && selected?.id === r.id"
+                      data-testid="repos-dialog-repo"
+                      :data-repo-id="r.id"
+                      :data-hidden="r.hidden"
+                      @click="pickRepo(r.id)"
+                    >
+                      <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
+                      <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
+                      <CodiconIcon v-if="r.hidden" name="eye-closed" :size="13" class="shrink-0" data-testid="repos-dialog-repo-hidden-mark" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ r.root }}</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
           </div>
           <div class="flex flex-col gap-px border-t border-border px-1 py-1.5">
             <button

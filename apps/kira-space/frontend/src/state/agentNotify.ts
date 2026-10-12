@@ -1,5 +1,6 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { useDocumentVisibility, useWindowFocus, watchDebounced } from '@vueuse/core';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed } from 'vue';
 import { useAdeBoardUiStore } from '../ade/v2/state/adeBoardUi';
@@ -40,9 +41,7 @@ export function installAgentNotifyFocus(): void {
       activeScriptRunId: activeScriptRunId.value,
     }),
     (state) => {
-      void control.agentNotifyReportFocus(state).catch((err: unknown) => {
-        console.error('agent notify: report focus failed', err);
-      });
+      fireAndForget(control.agentNotifyReportFocus(state), 'agentNotify');
     },
     { debounce: 150, immediate: true, deep: true },
   );
