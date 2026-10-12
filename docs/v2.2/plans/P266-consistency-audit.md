@@ -897,3 +897,42 @@ scripts/prepare-worktree.sh`, then `sh scripts/codegraph-setup.sh`); never symli
 - Known open items: no "Backend error messages stay Go literals", no "git-core compact ages"; one
   entry each for `ui-timing`, visual baselines, load-sensitive specs.
 - Every suite of §6.3 step 3 green; every changed baseline listed in "Test and fix result".
+
+## Foundation result (F4)
+
+Base `c59036a40` (F0-F3 landed). F4 commits, in order:
+
+1. `7d0d21d20` QueryState on `EmptyState` (new `media` slot), `isRetryable` gating, `TIMING.spinnerDelay` via VueUse `useTimeout`.
+2. `5636f481f` 22 event renames (Go, TS, both `ipcChannels.ts`, contract fixture, specs, ARCHITECTURE).
+3. `21e0edd15` `Remove` to `Delete` (Connections, MaskRules, CustomScripts both apps, `internal/scripts`); `ConnectionsCreateArgs`; bindings regenerated.
+4. `5074f76c8` 46 `.test.ts` to `.spec.ts`; knip, Biome, mutation globs.
+5. `4f7927926` 10 `packages/shared` kebab files to camelCase, importers.
+6. `9ad249a01` `util` to `lib` in workbench and git-core.
+7. `76f5de886` Pinia ids (6 fixed).
+8. `1afda2ef0` `prompts.ts` to `packages/workbench/src/testing/ui/`.
+9. `c6ca22a68` Studio adopts shared palette and `FontFamilyField`; `shortcuts/state.ts` becomes `studioCommands.ts` (command list only); `CommandPalette.vue` and `fonts.ts` deleted.
+10. `df5309d72` N6 (Go/TS code parity, with spec).
+11. `ee1b4beb0` allowlists split by stream.
+12. `94bc5b136` ARCHITECTURE "Consistency conventions (P266)", Module order text (Memory `tabStrip: false`).
+
+Deviations:
+
+- Pinia: 6 ids fixed, not 5 (`createOpLogStore` `ops` to `opLog` was a sixth N4 hit). `mobileAuth` to `auth`, `dbmcp` to `dbMcp`, `coderepos` to `codeRepos`, `memoryImportUi` to `importUi`, `memoryModelDownloads` to `modelDownloads`.
+- N1 rule: role suffixes `.worker`/`.check` allowed and `generated` skipped (`parse.worker.ts`, `layout.worker.ts`, `types.check.ts`, gitwire flatc output are not violations). 4 kebab workbench specs renamed: `shortcutsConflicts`, `agentActivityReducer`, `oplogHydrateRace`, `oplogMarkRaw`.
+- `contract.ts` stays per app: it only binds the app's fixture directory to the shared `createContract`; `prompts.ts` moved. Shared helper uses `CHANNEL.promptsChanged`.
+- Studio font catalog keys (`studio.settings.appearance.{dataFont,font*}`) deleted; Studio Appearance now shows the shared `theme.fontFamily.*` wording (label "Font family", not "Data font"). No spec asserted the old text.
+- Copy exemption for `apps/kira-studio/frontend/src/fonts.ts` removed (file gone; new `fonts.ts` uses `family`, no hit). 8 exemptions remain. U3 exemption for the old Studio `CommandPalette.vue` removed (shared palette needs none).
+- 2 foundation-owned hits fixed: `ipcerr/errors.go` G2 (constants), `testing/unit/wailsRuntime.ts` U77 (comment wording).
+- Catalog key is `common.error.contract.body` ("Something went wrong inside Kira ({detail})."), not the plan's `.message`/colon wording. Stream A's spec asserts the catalog text.
+- Biome `noConsole` override for the console files unchanged (F4 touched none).
+- Memory `tabStrip: false` code lands in B3; ARCHITECTURE already states it.
+
+Pending counts (`<ID> <path>`, files in `scripts/consistency-allowlist/`):
+
+| Stream | TS file | TS lines | Go file | Go lines |
+|---|---|---|---|---|
+| A | `stream-a.txt` | 32 (U74 23, U77 7, U79 1, U81 1) | `go-stream-a.txt` | 68 (G1 58, G2 5, G3 1, G4 4) |
+| B | `stream-b.txt` | 43 (U73 1, U74 13, U76 1, U77 7, U79 6, U82 15) | `go-stream-b.txt` | 68 (G1 28, G2 20, G3 15, G4 5) |
+| C | `stream-c.txt` | 64 (U67 6, U72 2, U73 8, U74 16, U75 1, U77 5, U80 5, U82 21) | `go-stream-c.txt` | 56 (G1 26, G2 23, G3 1, G4 6) |
+
+Checks at the tip: `bun run lint`, `typecheck`, `lint:go` (0 issues), `lint:dead`, `test:unit` (1899 pass), `go test ./internal/...` plus bridge/dbflow/connections packages, `build:test:studio`, `build:test:space`, `build:space-mobile` all green. No UI suites run.
