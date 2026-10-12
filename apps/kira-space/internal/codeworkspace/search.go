@@ -185,7 +185,7 @@ func newMatcher(req SearchRequest) (matcher, error) {
 }
 
 // ValidatePattern compiles req's own pattern without running any search — StartSearch's own
-// "compile before returning" step (§5), so a bad regex is E_INVALID on the bound call itself,
+// "compile before returning" step (§5), so a bad regex is E_BAD_REQUEST on the bound call itself,
 // never a stream error the panel would have to render a second way.
 func ValidatePattern(req SearchRequest) error {
 	_, err := newMatcher(req)

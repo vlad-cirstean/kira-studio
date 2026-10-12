@@ -731,7 +731,7 @@ export interface ReadLogArgs {
 }
 export interface TakeOverArgs {
   sessionId: string;
-  stopIfRunning: boolean /* false on a running run = E_INVALID, D3 */;
+  stopIfRunning: boolean /* false on a running run = E_BAD_REQUEST, D3 */;
 }
 export interface LaunchStageArgs {
   taskId: string;

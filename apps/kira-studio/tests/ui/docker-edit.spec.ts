@@ -438,7 +438,7 @@ test('contract: an auto-remove container is never recreated', async ({ relaunch 
     'docker-edit',
     'DockerService.RecreateContainer#auto-remove',
   );
-  expect(refusal.code).toBe('E_INVALID');
+  expect(refusal.code).toBe('E_BAD_REQUEST');
   const { page, docker } = await setup(relaunch, { spec, name: 'kira-flow-auto' });
   await openEdit(page, 'kira-flow-auto');
 

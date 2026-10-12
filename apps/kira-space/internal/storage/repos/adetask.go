@@ -12,7 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-// Sentinels AdeTaskRepo/AdeBacklogRepo return; bridge maps them to E_INVALID/E_NOT_FOUND.
+// Sentinels AdeTaskRepo/AdeBacklogRepo return; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
 var (
 	ErrTaskNotFound  = errors.New("repos: task not found")
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")

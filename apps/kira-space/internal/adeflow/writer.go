@@ -19,7 +19,7 @@ import (
 )
 
 // ErrInvalid marks a caller mistake: a bad file name, an invalid workflow, a YAML syntax error in
-// the file being edited. The ade engine maps it to E_INVALID.
+// the file being edited. The ade engine maps it to E_BAD_REQUEST.
 var ErrInvalid = errors.New("adeflow: invalid")
 
 // ErrConflict marks a save built on a file text that has since changed. The ade engine maps it to

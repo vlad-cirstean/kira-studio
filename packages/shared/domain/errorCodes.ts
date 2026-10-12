@@ -45,27 +45,7 @@ export const ERROR_CODES = [
 /** Raised in TS only, never sent by Go. */
 export const CLIENT_ERROR_CODES = ['E_NETWORK', 'E_FIXTURE_MISS'] as const;
 
-/** Retired codes still present in the tree; mirrors `Legacy` in codes.go. */
-export const LEGACY_ERROR_CODES = [
-  'E_INVALID',
-  'E_STALE',
-  'E_TERMINAL_BUSY',
-  'E_IN_FLIGHT',
-  'E_WORKSPACE_CLOSED',
-  'E_GRPC_CANCELLED',
-  'E_GRPC_BAD_REQUEST',
-  'E_HTTP_TRANSPORT',
-  'E_GRPC_TRANSPORT',
-  'E_DOCKER_UNAVAILABLE',
-  'E_NO_WINDOW',
-  'E_LAUNCH_TIMEOUT',
-  'E_GRPC_SCHEMA',
-] as const;
-
-export type ErrorCode =
-  | (typeof ERROR_CODES)[number]
-  | (typeof CLIENT_ERROR_CODES)[number]
-  | (typeof LEGACY_ERROR_CODES)[number];
+export type ErrorCode = (typeof ERROR_CODES)[number] | (typeof CLIENT_ERROR_CODES)[number];
 
 const NOT_RETRYABLE: ReadonlySet<string> = new Set([
   'E_NOT_FOUND',

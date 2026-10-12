@@ -280,7 +280,7 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 }
 
 // ImportRepo identifies path via gitclient.Identify and stores it as a code_repos row — a plain
-// E_INVALID for a bare repository (no worktree to browse) or a path that isn't a git repository at
+// E_BAD_REQUEST for a bare repository (no worktree to browse) or a path that isn't a git repository at
 // all, per §3.3's own contract; a friendlier E_ALREADY_IMPORTED than the UNIQUE index's own
 // constraint-violation text when repo_id is already stored.
 func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspaceImportArgs) (model.CodeRepo, error) {
@@ -572,7 +572,7 @@ type CodeWorkspaceSearchHandle struct {
 }
 
 // StartSearch validates args, compiles the pattern before returning (codeworkspace.ValidatePattern
-// — a bad regex is E_INVALID on this call, never a stream error the panel has to render twice),
+// — a bad regex is E_BAD_REQUEST on this call, never a stream error the panel has to render twice),
 // mints a search id, and starts one goroutine running codeworkspace.Search followed by the
 // coalescer's terminal flush. It returns the handle immediately — a full-worktree scan takes far
 // longer than an IPC call may (OpenWorkspace's own posture).

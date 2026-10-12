@@ -325,7 +325,7 @@
     "warnings": []
   },
   "DockerService.RecreateContainer#auto-remove": {
-    "code": "E_INVALID",
+    "code": "E_BAD_REQUEST",
     "message": "<masked>"
   },
   "DockerService.RecreateContainer#rollback": {

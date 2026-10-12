@@ -928,7 +928,7 @@ func (s *AdeTaskService) ReviewAgent(_ context.Context, args adewire.TaskArgs) (
 	return out, nil
 }
 
-// LaunchReviewAgent starts or resumes the task's review agent. E_INVALID when one already runs.
+// LaunchReviewAgent starts or resumes the task's review agent. E_CONFLICT when one already runs.
 func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.TaskArgs) (adewire.ReviewAgentLaunch, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.ReviewAgentLaunch{}, err

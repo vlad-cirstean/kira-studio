@@ -49,25 +49,3 @@ const (
 	CodeIdempotencyMismatch Code = "E_IDEMPOTENCY_MISMATCH"
 	CodeFrameTooLarge       Code = "E_FRAME_TOO_LARGE"
 )
-
-// Legacy lists retired codes still present in the tree. Streams empty it; close-out deletes it.
-// Retired mapping: E_INVALID to E_BAD_REQUEST, E_CONFLICT or E_CONTRACT per site; E_STALE,
-// E_TERMINAL_BUSY, E_IN_FLIGHT, E_WORKSPACE_CLOSED to E_CONFLICT; E_GRPC_CANCELLED to
-// E_CANCELLED; E_GRPC_BAD_REQUEST and E_GRPC_SCHEMA to E_BAD_REQUEST; E_HTTP_TRANSPORT and
-// E_GRPC_TRANSPORT to E_TRANSPORT; E_DOCKER_UNAVAILABLE and E_NO_WINDOW to E_UNAVAILABLE;
-// E_LAUNCH_TIMEOUT to E_TIMEOUT.
-var Legacy = map[Code]Code{
-	"E_INVALID":            CodeBadRequest,
-	"E_STALE":              CodeConflict,
-	"E_TERMINAL_BUSY":      CodeConflict,
-	"E_IN_FLIGHT":          CodeConflict,
-	"E_WORKSPACE_CLOSED":   CodeConflict,
-	"E_GRPC_CANCELLED":     CodeCancelled,
-	"E_GRPC_BAD_REQUEST":   CodeBadRequest,
-	"E_HTTP_TRANSPORT":     CodeTransport,
-	"E_GRPC_TRANSPORT":     CodeTransport,
-	"E_DOCKER_UNAVAILABLE": CodeUnavailable,
-	"E_NO_WINDOW":          CodeUnavailable,
-	"E_LAUNCH_TIMEOUT":     CodeTimeout,
-	"E_GRPC_SCHEMA":        CodeBadRequest,
-}

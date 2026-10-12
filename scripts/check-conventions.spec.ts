@@ -1,12 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  applyPending,
   codeParityHits,
   eventHits,
   fileNameHit,
   folderHits,
   migrationHits,
-  parsePending,
   piniaHits,
   testSuffixHit,
 } from './check-conventions';
@@ -39,25 +37,26 @@ describe('N2/N3', () => {
 });
 
 describe('N6 error-code parity', () => {
-  const go = (codes: string[], legacy: string[]) =>
-    `${codes.map((c) => `CodeX Code = "${c}"`).join('\n')}\nvar Legacy = map[Code]Code{\n${legacy
-      .map((c) => `"${c}": CodeX,`)
-      .join('\n')}\n}`;
-  const ts = (codes: string[], legacy: string[]) =>
+  const go = (codes: string[], extra = '') =>
+    `${codes.map((c) => `CodeX Code = "${c}"`).join('\n')}\n${extra}`;
+  const ts = (codes: string[], extra = '') =>
     `export const ERROR_CODES = [${codes.map((c) => `'${c}'`).join(', ')}] as const;\n` +
-    `export const CLIENT_ERROR_CODES = ['E_NETWORK'] as const;\n` +
-    `export const LEGACY_ERROR_CODES = [${legacy.map((c) => `'${c}'`).join(', ')}] as const;`;
+    `export const CLIENT_ERROR_CODES = ['E_NETWORK'] as const;\n${extra}`;
   test('same sets pass, client-only codes are ignored', () => {
-    expect(codeParityHits(go(['E_A', 'E_B'], ['E_OLD']), ts(['E_B', 'E_A'], ['E_OLD']))).toEqual(
-      [],
-    );
+    expect(codeParityHits(go(['E_A', 'E_B']), ts(['E_B', 'E_A']))).toEqual([]);
   });
   test('a code on one side only fails and names the side', () => {
-    const hits = codeParityHits(go(['E_A', 'E_B'], []), ts(['E_A', 'E_C'], ['E_OLD']));
-    expect(hits).toHaveLength(2);
+    const hits = codeParityHits(go(['E_A', 'E_B']), ts(['E_A', 'E_C']));
+    expect(hits).toHaveLength(1);
     expect(hits[0]?.message).toContain('only in Go: E_B');
     expect(hits[0]?.message).toContain('only in TS: E_C');
-    expect(hits[1]?.message).toContain('only in TS: E_OLD');
+  });
+  test('a retired-code registry on either side fails', () => {
+    const goLegacy = go(['E_A'], 'var Legacy = map[Code]Code{}');
+    const tsLegacy = ts(['E_A'], 'export const LEGACY_ERROR_CODES = [] as const;');
+    expect(codeParityHits(goLegacy, ts(['E_A']))).toHaveLength(1);
+    expect(codeParityHits(go(['E_A']), tsLegacy)).toHaveLength(1);
+    expect(codeParityHits(go(['E_A']), ts(['E_A']))).toEqual([]);
   });
 });
 
@@ -95,18 +94,5 @@ describe('N7 migrations', () => {
   test('only files above the baseline are checked', () => {
     const hits = migrationHits('d', 3, files);
     expect(hits.map((h) => h.path)).toEqual(['d/0005_p266_text.sql', 'd/0006_badname.sql']);
-  });
-});
-
-describe('pending list', () => {
-  test('exempts a listed hit, reports an unused line as stale, ignores other ids', () => {
-    const pending = parsePending(['N1 a.ts # why', 'N2 gone.spec.ts', 'U72 x.vue', 'G1 y.go', '']);
-    const hits = [
-      { rule: 'N1' as const, path: 'a.ts', message: '' },
-      { rule: 'N1' as const, path: 'b.ts', message: '' },
-    ];
-    const { remaining, stale } = applyPending(hits, pending);
-    expect(remaining.map((h) => h.path)).toEqual(['b.ts']);
-    expect(stale).toEqual(['N2 gone.spec.ts']);
   });
 });

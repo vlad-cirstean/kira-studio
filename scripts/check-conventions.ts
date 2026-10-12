@@ -9,8 +9,8 @@
  * TEXT `*_at` column, N6 the Go (`internal/ipcerr/codes.go`) and TS
  * (`packages/shared/domain/errorCodes.ts`) error-code registries list the same codes.
  *
- * A hit listed as `N<n> path` in scripts/consistency-allowlist/*.txt is pending migration; a line
- * that matches no hit is stale and fails, so the lists only shrink.
+ * No pending list: every hit fails. N6 also fails on any retired-code registry (`Legacy` in Go,
+ * `LEGACY_ERROR_CODES` in TS).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,7 +23,6 @@ export interface Hit {
 }
 
 const REPO_ROOT = join(import.meta.dir, '..');
-const ALLOW_DIR = join(REPO_ROOT, 'scripts/consistency-allowlist');
 const SOURCE_ROOTS = ['apps/kira-studio/frontend', 'apps/kira-space/frontend', 'packages'];
 const SKIP_DIR = new Set([
   'node_modules',
@@ -120,32 +119,36 @@ function codesOf(text: string): Set<string> {
   return new Set([...text.matchAll(/"?'?(E_[A-Z_]+)"?'?/g)].map((m) => m[1] ?? ''));
 }
 
-/** Go constants == TS `ERROR_CODES`; Go `Legacy` keys == TS `LEGACY_ERROR_CODES`. */
+/** Go constants == TS `ERROR_CODES`; no retired-code registry on either side. */
 export function codeParityHits(goSource: string, tsSource: string): Hit[] {
   const goActive = new Set(
     [...goSource.matchAll(/\bCode\s*=\s*"(E_[A-Z_]+)"/g)].map((m) => m[1] ?? ''),
   );
-  const legacyBlock = goSource.match(/var Legacy = map\[Code\]Code\{([\s\S]*?)\n\}/)?.[1] ?? '';
-  const goLegacy = new Set([...legacyBlock.matchAll(/"(E_[A-Z_]+)":/g)].map((m) => m[1] ?? ''));
-  const tsArray = (name: string): Set<string> =>
-    codesOf(
-      tsSource.match(new RegExp(`export const ${name} = \\[([\\s\\S]*?)\\] as const`))?.[1] ?? '',
-    );
-  const diff = (label: string, go: Set<string>, ts: Set<string>): Hit[] => {
-    const onlyGo = [...go].filter((c) => !ts.has(c)).sort();
-    const onlyTs = [...ts].filter((c) => !go.has(c)).sort();
-    const parts = [
-      onlyGo.length > 0 ? `only in Go: ${onlyGo.join(', ')}` : '',
-      onlyTs.length > 0 ? `only in TS: ${onlyTs.join(', ')}` : '',
-    ].filter(Boolean);
-    return parts.length === 0
-      ? []
-      : [{ rule: 'N6', path: TS_CODES_PATH, message: `${label} differ (${parts.join('; ')})` }];
-  };
-  return [
-    ...diff('error codes', goActive, tsArray('ERROR_CODES')),
-    ...diff('legacy error codes', goLegacy, tsArray('LEGACY_ERROR_CODES')),
-  ];
+  const tsActive = codesOf(
+    tsSource.match(/export const ERROR_CODES = \[([\s\S]*?)\] as const/)?.[1] ?? '',
+  );
+  const onlyGo = [...goActive].filter((c) => !tsActive.has(c)).sort();
+  const onlyTs = [...tsActive].filter((c) => !goActive.has(c)).sort();
+  const parts = [
+    onlyGo.length > 0 ? `only in Go: ${onlyGo.join(', ')}` : '',
+    onlyTs.length > 0 ? `only in TS: ${onlyTs.join(', ')}` : '',
+  ].filter(Boolean);
+  const hits: Hit[] = [];
+  if (parts.length > 0) {
+    hits.push({
+      rule: 'N6',
+      path: TS_CODES_PATH,
+      message: `error codes differ (${parts.join('; ')})`,
+    });
+  }
+  if (/\bvar Legacy\b/.test(goSource) || /\bLEGACY_ERROR_CODES\b/.test(tsSource)) {
+    hits.push({
+      rule: 'N6',
+      path: TS_CODES_PATH,
+      message: 'retired-code registry (Go `Legacy` or TS `LEGACY_ERROR_CODES`); delete it',
+    });
+  }
+  return hits;
 }
 
 export function migrationHits(
@@ -174,27 +177,6 @@ export function migrationHits(
     }
   }
   return hits;
-}
-
-/** Splits pending lines of the given rule ids into a set of `rule path` keys. */
-export function parsePending(lines: readonly string[]): Set<string> {
-  const keys = new Set<string>();
-  for (const raw of lines) {
-    const entry = raw.replace(/\s*#.*$/, '').trim();
-    if (/^N[1-9] \S/.test(entry)) keys.add(entry);
-  }
-  return keys;
-}
-
-export function applyPending(
-  hits: readonly Hit[],
-  pending: ReadonlySet<string>,
-): { remaining: Hit[]; stale: string[] } {
-  const keys = new Set(hits.map((h) => `${h.rule} ${h.path}`));
-  return {
-    remaining: hits.filter((h) => !pending.has(`${h.rule} ${h.path}`)),
-    stale: [...pending].filter((k) => !keys.has(k)).sort(),
-  };
 }
 
 function walk(root: string): string[] {
@@ -245,19 +227,11 @@ function collectHits(): Hit[] {
 }
 
 function main(): number {
-  const lines: string[] = [];
-  if (existsSync(ALLOW_DIR)) {
-    for (const f of readdirSync(ALLOW_DIR).filter((n) => n.endsWith('.txt'))) {
-      lines.push(...readFileSync(join(ALLOW_DIR, f), 'utf8').split('\n'));
-    }
-  }
-  const { remaining, stale } = applyPending(collectHits(), parsePending(lines));
-  for (const h of remaining) console.error(`check-conventions: ${h.path}: ${h.rule} ${h.message}`);
-  for (const k of stale)
-    console.error(`check-conventions: stale pending entry (no hit left): ${k}`);
-  if (remaining.length > 0 || stale.length > 0) {
+  const hits = collectHits();
+  for (const h of hits) console.error(`check-conventions: ${h.path}: ${h.rule} ${h.message}`);
+  if (hits.length > 0) {
     console.error(
-      `check-conventions: ${remaining.length} hit(s), ${stale.length} stale entr(y/ies); see docs/v2.2/plans/P266-consistency-audit.md section 2.10`,
+      `check-conventions: ${hits.length} hit(s); see docs/v2.2/plans/P266-consistency-audit.md section 2.10`,
     );
     return 1;
   }

@@ -89,7 +89,7 @@ test.describe('with write access', () => {
   test('a stale move shows the server message and keeps the card', async ({ page, server }) => {
     server.state.failNext.set('/api/ade/tasks/stage', {
       status: 409,
-      code: 'E_STALE',
+      code: 'E_CONFLICT',
       message: 'The task moved on the computer. Refresh and try again.',
     });
     await page.locator(t('tab-plan')).click();

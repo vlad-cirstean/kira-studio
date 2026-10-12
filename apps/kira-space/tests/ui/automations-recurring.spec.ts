@@ -172,7 +172,10 @@ test('an invalid cron shows the error and holds Save', async ({ relaunch }) => {
       ...BASE.filter((s) => s.channel !== IPC.scriptRunsNextFires),
       {
         channel: IPC.scriptRunsNextFires,
-        error: { code: 'E_INVALID', message: 'cron needs 5 fields: minute hour day month weekday' },
+        error: {
+          code: 'E_BAD_REQUEST',
+          message: 'cron needs 5 fields: minute hour day month weekday',
+        },
       },
     ],
   });

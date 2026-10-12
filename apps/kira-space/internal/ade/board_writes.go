@@ -19,11 +19,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
 
-// ErrInvalidInput marks a caller mistake (bad id, bad value); the bridge maps it to E_INVALID.
+// ErrInvalidInput marks a caller mistake (bad id, bad value); the bridge maps it to E_BAD_REQUEST.
 var ErrInvalidInput = errors.New("ade: invalid input")
 
 // ErrStale marks a write built from a board the caller saw before the task moved on; the bridge
-// maps it to E_STALE.
+// maps it to E_CONFLICT.
 var ErrStale = errors.New("ade: task moved on")
 
 // staleStage refuses when the caller named the stage it saw and the task is elsewhere now. Called
