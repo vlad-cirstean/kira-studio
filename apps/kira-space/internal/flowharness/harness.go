@@ -49,6 +49,7 @@ type options struct {
 	trackerGrace    time.Duration
 	rebaseTimeout   time.Duration
 	mobilePoll      time.Duration
+	seed            func(*App)
 }
 
 // Opt tweaks New.
@@ -78,6 +79,10 @@ func WithMobilePoll(d time.Duration) Opt { return func(o *options) { o.mobilePol
 
 // WithRebaseTimeout bounds an ADE rebase run (20 minutes by default).
 func WithRebaseTimeout(d time.Duration) Opt { return func(o *options) { o.rebaseTimeout = d } }
+
+// WithSeed runs seed on the isolated homes before the first boot. Startup work that runs in the
+// background (sweeps) would race a seed written after New.
+func WithSeed(seed func(*App)) Opt { return func(o *options) { o.seed = seed } }
 
 // noGhLocator finds no gh anywhere, system installs included.
 type noGhLocator struct{}
@@ -148,6 +153,9 @@ func New(t *testing.T, opts ...Opt) *App {
 	t.Setenv("TZ", "UTC")
 	t.Setenv(fakeagent.EnvDir, a.FakeDir)
 	t.Setenv(fakeagent.EnvScenario, a.scenario.Encode())
+	if o.seed != nil {
+		o.seed(a)
+	}
 	a.build()
 	t.Cleanup(a.stop)
 	return a
