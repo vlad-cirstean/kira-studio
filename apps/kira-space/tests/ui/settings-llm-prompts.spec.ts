@@ -1,5 +1,13 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ContractJson } from '@workbench/testing/ui/contract';
+import {
+  previewAnswer,
+  promptBadges,
+  promptEditor,
+  promptEditorText,
+  promptRow,
+  typeDraft,
+} from '@workbench/testing/ui/llmPrompts';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
@@ -81,38 +89,14 @@ const afterSave = promptList(gate, sendBackEdited, finishStep, status);
 const afterReset = fresh;
 
 const noFindings = { errors: [], parts: [] };
-const row = (page: Page, id: string) =>
-  page.locator(`[data-testid="llm-prompt-row"][data-id="${id}"]`);
-const badges = (page: Page, id: string) =>
-  row(page, id).locator('[data-testid="llm-prompt-badge"]');
-const editor = (page: Page) => page.locator('[data-testid="llm-prompt-editor"]');
 
 async function openPrompts(page: Page): Promise<void> {
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator('[data-testid="settings-section-Prompts"]').click();
 }
 
-// Monaco virtualises its lines: the full text is read from the debug attribute on the host.
-async function editorText(host: Locator): Promise<string> {
-  const root = host.locator('.monaco-host');
-  await expect(root).toHaveAttribute('data-kira-editor-text', /^[\s\S]*$/);
-  return (await root.getAttribute('data-kira-editor-text')) ?? '';
-}
-
-async function typeDraft(page: Page, text: string): Promise<void> {
-  const host = editor(page);
-  await host.locator('.view-lines').click();
-  // The UI test pages report macOS, so Select All is Cmd+A.
-  await page.keyboard.press('Meta+a');
-  await page.keyboard.insertText(text);
-  await expect.poll(() => editorText(host)).toBe(text);
-}
-
-const previewOf = (id: string, text: string | undefined, response: unknown) => ({
-  channel: IPC.llmPromptsPreview,
-  args: text === undefined ? { id } : { id, text },
-  response,
-});
+const previewOf = (id: string, text: string | undefined, response: unknown) =>
+  previewAnswer(IPC.llmPromptsPreview, id, text, response);
 
 test('lists this app’s prompts; an unedited prompt has no badge', async ({ relaunch }) => {
   const { window } = await relaunch({
@@ -121,10 +105,10 @@ test('lists this app’s prompts; an unedited prompt has no badge', async ({ rel
   await openPrompts(window);
 
   await expect(window.locator('[data-testid="llm-prompt-row"]')).toHaveCount(3);
-  await expect(row(window, gate.id)).toContainText('Memory gate');
-  await expect(row(window, editID)).toContainText('Send back message');
-  await expect(row(window, finishStep.id)).toContainText('finish_step');
-  await expect(badges(window, gate.id)).toHaveCount(0);
+  await expect(promptRow(window, gate.id)).toContainText('Memory gate');
+  await expect(promptRow(window, editID)).toContainText('Send back message');
+  await expect(promptRow(window, finishStep.id)).toContainText('finish_step');
+  await expect(promptBadges(window, gate.id)).toHaveCount(0);
   await expect(
     window.locator(`[data-testid="llm-prompt-detail"][data-id="${gate.id}"]`),
   ).toBeVisible();
@@ -139,7 +123,7 @@ test('a broken draft shows the findings and blocks Save', async ({ relaunch }) =
     ],
   });
   await openPrompts(window);
-  await row(window, editID).click();
+  await promptRow(window, editID).click();
   await expect(window.locator('[data-testid="llm-prompt-error"]')).toHaveCount(0);
 
   await typeDraft(window, BROKEN_DRAFT);
@@ -165,9 +149,9 @@ test('a valid draft previews with variable chips and saves the contract payload'
     ],
   });
   await openPrompts(window);
-  await row(window, editID).click();
+  await promptRow(window, editID).click();
   await typeDraft(window, editText);
-  await expect(badges(window, editID)).toHaveText('Edited');
+  await expect(promptBadges(window, editID)).toHaveText('Edited');
 
   await window.locator('[data-testid="llm-prompt-tab-preview"]').click();
   const preview = window.locator('[data-testid="llm-prompt-preview"]');
@@ -188,7 +172,7 @@ test('a valid draft previews with variable chips and saves the contract payload'
   expect(save.args).toEqual({ changes: [{ id: editID, text: editText, baseHash: listed.hash }] });
 
   await openPrompts(window);
-  await expect(badges(window, editID)).toHaveText('Edited');
+  await expect(promptBadges(window, editID)).toHaveText('Edited');
 });
 
 test('a refused save shows the failure, keeps the dialog and the draft', async ({ relaunch }) => {
@@ -202,7 +186,7 @@ test('a refused save shows the failure, keeps the dialog and the draft', async (
     ],
   });
   await openPrompts(window);
-  await row(window, finishStep.id).click();
+  await promptRow(window, finishStep.id).click();
   const field = window.locator(`[data-testid="llm-prompt-arg"][data-id="${statusID}"] textarea`);
   await field.fill(BROKEN_STATUS);
 
@@ -226,14 +210,14 @@ test('reset restores the default; saving it clears the badge', async ({ relaunch
     ],
   });
   await openPrompts(window);
-  await row(window, editID).click();
-  await expect(badges(window, editID)).toHaveText('Edited');
-  await expect.poll(() => editorText(editor(window))).toBe(editText);
+  await promptRow(window, editID).click();
+  await expect(promptBadges(window, editID)).toHaveText('Edited');
+  await expect.poll(() => promptEditorText(promptEditor(window))).toBe(editText);
 
   await window.locator('[data-testid="llm-prompt-reset"]').click();
 
-  await expect.poll(() => editorText(editor(window))).toBe(DEFAULT_TEXT);
-  await expect(badges(window, editID)).toHaveCount(0);
+  await expect.poll(() => promptEditorText(promptEditor(window))).toBe(DEFAULT_TEXT);
+  await expect(promptBadges(window, editID)).toHaveCount(0);
   await window.locator('[data-testid="settings-save"]').click();
   await expect(window.locator('[data-testid="settings-dialog"]')).toHaveCount(0);
   const [save] = calls(control, IPC.llmPromptsSave);
@@ -242,7 +226,7 @@ test('reset restores the default; saving it clears the badge', async ({ relaunch
   });
 
   await openPrompts(window);
-  await expect(badges(window, editID)).toHaveCount(0);
+  await expect(promptBadges(window, editID)).toHaveCount(0);
 });
 
 test('a conflict shows the error and keeps the draft', async ({ relaunch }) => {
@@ -253,12 +237,12 @@ test('a conflict shows the error and keeps the draft', async ({ relaunch }) => {
     ],
   });
   await openPrompts(window);
-  await row(window, editID).click();
+  await promptRow(window, editID).click();
   await typeDraft(window, editText);
 
   await window.locator('[data-testid="settings-save"]').click();
 
   await expect(window.locator('[data-testid="settings-save-error"]')).toHaveText(CONFLICT.message);
   await expect(window.locator('[data-testid="settings-dialog"]')).toBeVisible();
-  await expect.poll(() => editorText(editor(window))).toBe(editText);
+  await expect.poll(() => promptEditorText(promptEditor(window))).toBe(editText);
 });
