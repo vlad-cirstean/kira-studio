@@ -94,7 +94,7 @@ export function openItems(
 }
 
 // D5: offered only when the connection's caps say so — never a permanently disabled row.
-export function definitionItem(row: MenuRowLike): MenuItem[] {
+function definitionItem(row: MenuRowLike): MenuItem[] {
   if (useConnectionsStore().states[row.connectionId]?.caps?.definition !== true) return [];
   return [
     {
@@ -138,7 +138,7 @@ export function copyNameItems(row: MenuRowLike, qualified = false): MenuItem[] {
 
 // Only relationMenu/collectionMenu share this exact refreshObject call — every other menu's own
 // Refresh row reaches a different store method and stays where it is.
-export function refreshItem(row: MenuRowLike): MenuItem {
+function refreshItem(row: MenuRowLike): MenuItem {
   return {
     type: 'item',
     id: 'refresh',
@@ -150,7 +150,7 @@ export function refreshItem(row: MenuRowLike): MenuItem {
 
 // Opens (or reuses) the row's own tab and runs Σ on it — never a bare count with nowhere to show
 // the answer.
-export function countItem(
+function countItem(
   row: MenuRowLike,
   opts: {
     id: string;

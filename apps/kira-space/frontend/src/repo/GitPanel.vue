@@ -14,6 +14,7 @@ import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
 import { repoIdOfWorkspace, useWorkspaceStore } from '../state/workspace';
 import RepoFileTree from './RepoFileTree.vue';
+import RepoList from './RepoList.vue';
 import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
 import ReposDialog from './ReposDialog.vue';
