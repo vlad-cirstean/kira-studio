@@ -82,6 +82,17 @@ test('the push menu offers Force push…', async ({ relaunch }) => {
             isHead: false,
           }),
         ],
+        head: { kind: 'branch', name: 'main' },
+      },
+      'status.get': {
+        head: { kind: 'branch', name: 'main' },
+        upstream: { name: 'origin/main', ahead: 0, behind: 0 },
+        counts: { staged: 0, unstaged: 0, untracked: 0, unmerged: 0 },
+        isClean: true,
+        dirtyPaths: [],
+        dirtyTruncated: false,
+        inProgress: null,
+        autoFetch: null,
       },
     },
   });
@@ -103,7 +114,8 @@ test('the graph date column shows a compact age from the format catalog', async 
     { exhausted: true, remaining: 0 },
   );
   const page = await openPortGraph(relaunch, { chunks: [chunk], results: PICKER_RESULTS });
-  await expect(firstRow(page).locator('.kira-cell-date').first()).toHaveText('5m');
+  // The date cell is dropped at this width; the row label carries the same compact age.
+  await expect(firstRow(page)).toHaveAttribute('aria-label', 'A commit, Fake Author, 5m');
 });
 
 test('an empty tag name shows the catalog error', async ({ relaunch }) => {

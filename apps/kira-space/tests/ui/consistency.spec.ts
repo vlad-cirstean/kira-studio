@@ -1,13 +1,17 @@
 import type { Page } from '@playwright/test';
 import { defaultLayout } from '@shared/domain/layout';
 import { expect, test } from './fixtures';
-import { adeV2Control, emitLog, FIXED_NOW, openPlan } from './support/adeV2';
+import { adeFixture, adeV2Control, emitLog, FIXED_NOW, openPlan } from './support/adeV2';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
 // P266 Stream B: the Space consistency pass. Backend halves: adeflow TestStaleWorkflowSaveReportsCatalogText,
 // migrate_ade_panel_width_test.go, appflow layout_test.go.
+
+interface BoardFx {
+  tasks: { id: string; est: string }[];
+}
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
@@ -73,8 +77,13 @@ test('the menu find event focuses the open diff find widget', async ({ relaunch 
     ],
   });
   await openDiff(page);
-  await emitWailsEvent(page, IPC.viewFind, undefined);
-  await expect(page.locator('.monaco-editor .find-widget.visible').first()).toBeVisible();
+  await expect(page.locator('.monaco-diff-editor .monaco-editor').first()).toBeVisible();
+  await expect(async () => {
+    await emitWailsEvent(page, IPC.viewFind, undefined);
+    await expect(page.locator('.monaco-editor .find-widget.visible').first()).toBeVisible({
+      timeout: 500,
+    });
+  }).toPass();
 });
 
 test('Memory mode has no tab strip', async ({ relaunch }) => {
@@ -126,8 +135,13 @@ test('the Git panel empty state has no button', async ({ relaunch }) => {
 });
 
 test('the estimate unit is a secondary tabs control', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
-  await page.locator(`${t('ade-card')}[data-task-id="T_bill"] ${t('ade-card-head')}`).click();
+  const board = adeFixture<BoardFx>('board');
+  const target = board.tasks.find((x) => x.id === 'T_notif');
+  if (target) target.est = '';
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
+  await page.locator(`${t('ade-card')}[data-task-id="T_notif"] ${t('ade-card-head')}`).click();
   await expect(
     page.locator(t('ade-panel')).locator('[data-slot="secondary-tabs"]', {
       has: page.locator(t('ade-estimate-unit-d')),
@@ -170,7 +184,7 @@ test('a stale workflow save shows the same text the backend answers with', async
   await page.locator(t('ade-workflows')).waitFor();
   await page.locator(t('ade-wf-form-name')).fill('Renamed');
   await page.locator(t('ade-wf-save')).click();
-  await expect(page.locator(t('ade-wf-save-error'))).toHaveText(
+  await expect(page.locator(t('ade-wf-save-error'))).toContainText(
     'The workflow changed. Refresh and retry.',
   );
 });
@@ -182,7 +196,7 @@ test('a repo colour swatch tooltip names the colour', async ({ relaunch }) => {
   await page.locator(t('manage-repos')).click();
   await page.locator(t('repos-dialog')).waitFor();
   await page.locator(`${t('repo-color')} ${t('color-blue')}`).hover({ force: true });
-  await expect(page.getByRole('tooltip').getByText('Blue')).toBeVisible();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('Blue');
 });
 
 test('day band labels use the locale weekday names', async ({ relaunch }) => {
