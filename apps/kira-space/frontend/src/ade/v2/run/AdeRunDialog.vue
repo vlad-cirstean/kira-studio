@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { FieldError } from '@theme/components/ui/field';
+import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -86,6 +86,9 @@ const names = ref<Record<string, string>>({});
 // Snapshot at open: a board push that renames the task must not make an untouched message read as edited.
 const opening = ref('');
 const edited = computed(() => message.value !== opening.value);
+const dirty = computed(
+  () => edited.value || Object.values(names.value).some((n) => n.trim() !== ''),
+);
 
 watch(open, (o) => {
   if (!o) return;
@@ -112,7 +115,7 @@ const send = sending.run;
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && close()">
-    <DialogContent size="lg" data-testid="ade-run-dialog">
+    <DialogContent size="lg" :dirty="dirty" data-testid="ade-run-dialog">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <svg
@@ -134,7 +137,7 @@ const send = sending.run;
       </DialogHeader>
       <DialogBody class="flex flex-col gap-3 text-kira-md">
         <div v-if="named.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
-          <div v-for="r in named" :key="r.id" class="flex items-center gap-2.5">
+          <div v-for="r in named" :key="r.id" class="flex items-center gap-3">
             <AdeRepoTag :code-repo-id="r.branch.codeRepoId" :label="r.repo" />
             <Label
               :for="`ade-run-branch-${r.id}`"
@@ -174,7 +177,7 @@ const send = sending.run;
           <FieldError v-else data-testid="ade-run-smart-missing">{{
             t('space.ade.runDialog.smartMissing.error')
           }}</FieldError>
-          <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ suffix }}</p>
+          <FieldDescription data-testid="ade-run-suffix">{{ suffix }}</FieldDescription>
         </div>
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
@@ -198,9 +201,9 @@ const send = sending.run;
               class="max-h-90 resize-y"
               data-testid="ade-run-message"
             />
-            <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">
+            <FieldDescription data-testid="ade-run-suffix">
               {{ suffix }}
-            </p>
+            </FieldDescription>
           </div>
         </div>
         <Alert v-if="error" variant="error" data-testid="ade-run-error">
@@ -215,7 +218,7 @@ const send = sending.run;
           variant="dialog-primary"
           size="kira-lg"
           :class="ACTION_CLASS.claude"
-          :disabled="busy"
+          :pending="busy"
           data-testid="ade-run-send"
           @click="send"
         >

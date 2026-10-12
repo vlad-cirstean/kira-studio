@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -42,12 +43,12 @@ const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
         <AdeReviewSync :target="target" />
       </div>
     </div>
-    <p
+    <FieldDescription
       v-if="dirtyCount > 0"
-      class="m-0 border-t border-border px-3 py-1 text-kira-sm text-muted-foreground"
+      class="border-t border-border px-3 py-1"
       data-testid="ade-review-uncommitted"
     >
       {{ t('space.ade.review.header.uncommitted.hint', { count: dirtyCount }) }}
-    </p>
+    </FieldDescription>
   </header>
 </template>

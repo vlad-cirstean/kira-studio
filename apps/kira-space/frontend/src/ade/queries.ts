@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/vue-query';
 import { watch } from 'vue';
 import { control } from '../bridge/control';
 import { reposKey } from '../repo/state/reposQueries';
-import type { useAgentSessionsStore } from './state/agentSessions';
+import type { useAgentSessionsStore } from './state';
 import { installMobileLaunch } from './v2/dialog/mobileLaunch';
 import { adeTurns } from './v2/dialog/turnWatch';
 import { workflowYamlKey } from './v2/queries';

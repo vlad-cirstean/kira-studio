@@ -2,6 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { useRelativeTime } from '@workbench/behaviour/format';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { activityLabel, shortId } from '../activity';
@@ -45,7 +46,7 @@ function open(): void {
   <div
     role="button"
     tabindex="0"
-    class="flex cursor-pointer items-center gap-3 rounded-kira px-3 py-1.5"
+    class="flex items-center gap-3 rounded-kira px-3 py-1.5"
     :class="input && 'bg-tone-amber-solid/7'"
     data-testid="ade-all-session"
     :data-session-id="view.session.id"
@@ -66,19 +67,21 @@ function open(): void {
     <Button
       v-if="!archived"
       size="kira-lg"
-      :variant="opens ? 'dialog' : undefined"
+      variant="dialog"
       class="w-23 shrink-0 "
       :class="opens ? undefined : ACTION_CLASS.claude"
-      :disabled="takeOver.pending.has(view.session.id)"
+      :pending="takeOver.pending.has(view.session.id)"
       data-testid="ade-all-action"
       @click.stop="opens ? open() : takeOver.request(view.session.id)"
     >
       {{ opens ? t('common.action.open.label') : t('common.action.takeOver.label') }}
     </Button>
     <span v-else class="w-23 shrink-0" />
-    <span class="w-22.5 shrink-0 font-data text-kira-sm text-muted-foreground">{{
-      t('space.common.claudeSession.label', { id: shortId(view.session.id) })
-    }}</span>
+    <Identifier
+      :value="view.session.id"
+      :short="shortId"
+      class="w-22.5 shrink-0 text-kira-sm text-muted-foreground"
+    />
     <span class="w-16 shrink-0 truncate text-kira-sm text-subtle">{{
       view.repo || t('space.ade.needs.scope.spec.label')
     }}</span>

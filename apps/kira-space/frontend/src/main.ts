@@ -7,7 +7,7 @@ import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { installAdeSignals } from './ade/queries';
-import { useAgentSessionsStore } from './ade/state/agentSessions';
+import { useAgentSessionsStore } from './ade/state';
 import { reviewTargetKey } from './ade/v2/queries';
 import { adeReaderKey } from './ade/v2/reader';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';

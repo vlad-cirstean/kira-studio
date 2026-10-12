@@ -8,6 +8,7 @@ import { EditorContent, useEditor } from '@tiptap/vue-3';
 import { useDebounceFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
+import { isPrimaryModifier } from '@workbench/shortcuts/keys';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { control } from '../../../bridge/control';
 import { notesExtensions } from './notesExtensions';
@@ -38,16 +39,12 @@ function flush(): void {
 const debouncedFlush = useDebounceFn(flush, TIMING.autosave);
 
 const PROSE = [
-  'ade-notes-prose min-h-full px-3 py-2.5 outline-none',
-  '[&_p]:mb-[0.6em] [&_p:last-child]:mb-0',
-  '[&_h1]:my-[0.4em] [&_h1]:font-medium [&_h2]:my-[0.4em] [&_h2]:font-medium [&_h3]:my-[0.4em] [&_h3]:font-medium',
-  '[&_ul]:mb-[0.6em] [&_ul]:list-disc [&_ul]:pl-[1.4em] [&_ol]:mb-[0.6em] [&_ol]:list-decimal [&_ol]:pl-[1.4em]',
+  'ade-notes-prose kira-prose min-h-full px-3 py-2 outline-none',
+  '[&_p:last-child]:mb-0',
   "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-[0.2em]",
   "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-[0.4em]",
-  "[&_input[type='checkbox']]:cursor-pointer [&_input[type='checkbox']]:accent-ok",
+  "[&_input[type='checkbox']]:accent-ok",
   "[&_li[data-checked='true']>div]:text-subtle [&_li[data-checked='true']>div]:line-through",
-  '[&_code]:rounded-kira-xs [&_code]:bg-field [&_code]:px-[0.3em] [&_code]:py-[0.1em] [&_code]:font-data [&_code]:text-kira-sm',
-  '[&_a]:text-info',
   '[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-subtle [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]',
 ].join(' ');
 
@@ -60,7 +57,7 @@ const editor = useEditor({
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null;
       const link = target?.closest('a');
-      if (link && (event.metaKey || event.ctrlKey)) {
+      if (link && isPrimaryModifier(event as MouseEvent & KeyboardEvent)) {
         event.preventDefault();
         fireAndForget(control.openExternal(link.href), 'ade.notes');
         return true;
@@ -227,7 +224,7 @@ function keepFocus(e: MouseEvent): void {
       <Button
         v-for="btn in toolbar"
         :key="btn.label"
-        :variant="btn.active ? 'dialog' : 'toolbar'"
+        variant="toolbar"
         size="kira-icon"
         class="text-kira-sm"
         :aria-label="btn.label"

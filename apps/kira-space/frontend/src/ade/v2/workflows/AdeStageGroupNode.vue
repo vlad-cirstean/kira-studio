@@ -36,7 +36,7 @@ const detail = computed(() => {
     :class="[
       data.selected ? 'border-info' : 'border-muted-foreground/50',
       agent ? 'border-dashed' : 'border-solid',
-      stage.skip ? 'opacity-60' : '',
+      stage.skip ? 'text-muted-foreground' : '',
     ]"
     :style="{ width: `${data.w}px`, height: `${data.h}px` }"
     data-testid="ade-wf-stage-node"

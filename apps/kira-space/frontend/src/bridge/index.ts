@@ -165,6 +165,8 @@ const spaceControl = {
   openExternal: createOpenExternal((url) => unwrap(LinkService.OpenExternal({ url }))),
   onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
+  // Space-only menu channel (appshell Review Code item); not in the shared CHANNEL table.
+  onReviewCode: (cb: () => void): (() => void) => on('kira:menu:reviewCode', cb),
 
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),
@@ -275,7 +277,7 @@ const spaceControl = {
 
   // Agent-monitor surface: `terminalAgentSessions`/
   // `onAgentSessions`/`onAgentEvent` satisfy `AgentSessionsControl` structurally (P127's shared
-  // store factory, `ade/state/agentSessions.ts`'s own call), the same "no adapter" shape
+  // store factory, `ade/state.ts`'s own call), the same "no adapter" shape
   // `createAgentSessionsStore`'s own doc comment states.
   terminalAgentSessions: (): Promise<AgentSessionsEvent> =>
     unwrap(TerminalService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),

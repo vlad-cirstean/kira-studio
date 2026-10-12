@@ -55,8 +55,8 @@ test('tabs are named after the stage; the pane shows the full Claude session id 
       w.__clipboard.push(text);
     };
   });
-  await expect(page.locator(t('ade-session-id-text'))).toHaveText('claude-tk01');
-  await page.locator(t('ade-session-id-copy')).click();
+  await expect(page.locator(t('ade-session-id'))).toContainText('claude-tk01');
+  await page.locator(t('ade-session-id')).getByRole('button').click();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard))
     .toEqual(['claude-tk01']);

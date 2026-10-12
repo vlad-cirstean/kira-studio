@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { computed } from 'vue';
 
 // Save and Discard for the open workflow editor; both are off while nothing is edited.
-defineProps<{ dirty: boolean; saving: boolean }>();
+const props = defineProps<{ dirty: boolean; saving: boolean }>();
+const actionable = computed(() => props.dirty && !props.saving);
 const emit = defineEmits<{ save: []; discard: [] }>();
 </script>
 
@@ -15,7 +17,7 @@ const emit = defineEmits<{ save: []; discard: [] }>();
     <Button
       variant="dialog"
       size="kira-lg"
-      :disabled="!dirty || saving"
+      :disabled="!actionable"
       data-testid="ade-wf-discard"
       @click="emit('discard')"
     >
@@ -24,7 +26,8 @@ const emit = defineEmits<{ save: []; discard: [] }>();
     <Button
       variant="dialog-primary"
       size="kira-lg"
-      :disabled="!dirty || saving"
+      :disabled="!dirty"
+      :pending="saving"
       data-testid="ade-wf-save"
       @click="emit('save')"
     >

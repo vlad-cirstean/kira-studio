@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { FieldError } from '@theme/components/ui/field';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -11,7 +14,7 @@ import { Input } from '@theme/components/ui/input';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue-flow/core';
-import { onKeyStroke, useElementSize } from '@vueuse/core';
+import { useElementSize } from '@vueuse/core';
 import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -235,30 +238,27 @@ const viewport = computed(() => ({
 const contentH = computed(() => (layout.value.height + PAD * 2) * zoom.value);
 watch(viewport, (v) => void setViewport(v), { immediate: true });
 
-const IN_FIELD = 'input, textarea, select, [contenteditable]';
-onKeyStroke(
-  'Delete',
-  async (ev) => {
-    if (ev.target instanceof Element && ev.target.closest(IN_FIELD)) return;
-    const edge: GraphEdge | undefined = layout.value.edges.find((x) => x.id === edgeSel.value);
-    const sel = draft.selection;
-    if (edge?.stepId) {
-      draft.clear(edge.stageId, edge.stepId, edge.results);
-      edgeSel.value = '';
-    } else if (sel?.kind === 'step') {
-      const ok = await confirm.confirm({
-        title: t('space.ade.workflows.graph.removeStepConfirm.title'),
-        message: t('space.ade.workflows.graph.removeStepConfirm.body', {
-          name: draft.step?.name ?? '',
-        }),
-        confirmLabel: t('common.action.remove.label'),
-        tone: 'danger',
-      });
-      if (ok) draft.deleteStep(sel.stageId, sel.stepId);
-    }
-  },
-  { target: root },
-);
+async function deleteSelection(): Promise<void> {
+  const edge: GraphEdge | undefined = layout.value.edges.find((x) => x.id === edgeSel.value);
+  const sel = draft.selection;
+  if (edge?.stepId) {
+    draft.clear(edge.stageId, edge.stepId, edge.results);
+    edgeSel.value = '';
+  } else if (sel?.kind === 'step') {
+    const ok = await confirm.confirm({
+      title: t('space.ade.workflows.graph.removeStepConfirm.title'),
+      message: t('space.ade.workflows.graph.removeStepConfirm.body', {
+        name: draft.step?.name ?? '',
+      }),
+      confirmLabel: t('common.action.remove.label'),
+      tone: 'danger',
+    });
+    if (ok) draft.deleteStep(sel.stageId, sel.stepId);
+  }
+}
+useShortcut(root, ['tree.delete'], () => fireAndForget(deleteSelection(), 'adeWorkflows'), {
+  ignoreTextFields: true,
+});
 
 const stripEl = useTemplateRef<HTMLElement>('stripEl');
 useSortableReorder(
@@ -268,7 +268,7 @@ useSortableReorder(
     const ids = strip.value.map((s) => s.id);
     draft.reorderStages(ids.indexOf(from), ids.indexOf(to));
   },
-  { draggable: '[data-testid="ade-wf-strip-chip"]', direction: 'horizontal' },
+  { draggable: '[data-testid="ade-wf-strip-chip"]', direction: 'horizontal', keyboard: true },
 );
 
 onBeforeUnmount(() => {
@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
           class="cursor-grab gap-1.5 px-2 text-kira-sm"
           :class="[
             draft.selection?.stageId === s.id ? 'border-info' : '',
-            s.skip ? 'opacity-60' : '',
+            s.skip ? 'text-muted-foreground' : '',
           ]"
           data-testid="ade-wf-strip-chip"
           :data-stage-id="s.id"
@@ -439,57 +439,45 @@ onBeforeUnmount(() => {
             :stage="draft.stage"
             :scopes="scopes"
           />
-          <p v-else class="m-0 text-kira-sm text-subtle" data-testid="ade-wf-inspector-empty">
+          <FieldDescription v-else data-testid="ade-wf-inspector-empty">
             <CatalogText k="space.ade.workflows.graph.inspectorEmpty.emptyHint">
               <template #tokens><span class="font-data">{{ PLACEHOLDER_TOKENS }}</span></template>
             </CatalogText>
-          </p>
+          </FieldDescription>
         </div>
       </div>
     </div>
-    <FieldError v-if="draft.error" data-testid="ade-wf-save-error">
-      {{ draft.error }}
-      <template v-if="draft.conflict">
+    <Alert v-if="draft.error" variant="error" data-testid="ade-wf-save-error">
+      <AlertDescription>{{ draft.error }}</AlertDescription>
+      <AlertAction>
+        <template v-if="draft.conflict">
+          <Button variant="link" size="inline" data-testid="ade-wf-reload" @click="discard">
+            {{ t('common.action.refresh.label') }}
+          </Button>
+          <Button variant="link" size="inline" data-testid="ade-wf-overwrite" @click="overwrite">
+            {{ t('space.ade.workflows.conflict.overwrite.label') }}
+          </Button>
+        </template>
         <Button
+          v-else
           variant="link"
-          size="kira"
-          class="px-1 text-kira-sm text-info"
-          data-testid="ade-wf-reload"
-          @click="discard"
+          size="inline"
+          data-testid="ade-wf-switch-yaml"
+          @click="wfUi.workflowMode = 'yaml'"
         >
-          {{ t('common.action.refresh.label') }}
+          {{ t('space.ade.workflows.graph.switchYaml.label') }}
         </Button>
-        <Button
-          variant="link"
-          size="kira"
-          class="px-1 text-kira-sm text-info"
-          data-testid="ade-wf-overwrite"
-          @click="overwrite"
-        >
-          {{ t('space.ade.workflows.conflict.overwrite.label') }}
-        </Button>
-      </template>
-      <Button
-        v-else
-        variant="link"
-        size="kira"
-        class="px-1 text-kira-sm text-info"
-        data-testid="ade-wf-switch-yaml"
-        @click="wfUi.workflowMode = 'yaml'"
-      >
-        {{ t('space.ade.workflows.graph.switchYaml.label') }}
-      </Button>
-    </FieldError>
+      </AlertAction>
+    </Alert>
   </div>
-  <p v-else class="m-0 text-kira-md text-muted-foreground" data-testid="ade-wf-no-valid">
-    {{ t('space.ade.workflows.graph.noValid.body') }}
-    <Button
-      variant="link"
-      size="kira"
-      class="px-1 text-kira-md text-info"
-      @click="wfUi.workflowMode = 'yaml'"
-    >
+  <EmptyState
+    v-else
+    fill
+    :title="t('space.ade.workflows.graph.noValid.body')"
+    data-testid="ade-wf-no-valid"
+  >
+    <Button variant="link" size="inline" @click="wfUi.workflowMode = 'yaml'">
       {{ t('space.ade.workflows.graph.fixInYaml.label') }}
     </Button>
-  </p>
+  </EmptyState>
 </template>

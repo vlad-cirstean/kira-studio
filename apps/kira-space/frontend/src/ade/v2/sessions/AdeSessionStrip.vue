@@ -10,7 +10,7 @@ import type { SessionView } from './sessionView';
 // Tab strip of the running sessions in scope (mockup `termTabs`): activity glyph, TUI / claude -p
 // badge, name.
 defineProps<{ views: SessionView[]; selectedId: string | null }>();
-const emit = defineEmits<{ pick: [id: string] }>();
+const emit = defineEmits<{ select: [id: string] }>();
 const phones = useMobileTerminalsStore();
 </script>
 
@@ -29,7 +29,7 @@ const phones = useMobileTerminalsStore();
       :data-testid="`ade-session-tab-${v.session.id}`"
       :data-selected="v.session.id === selectedId || undefined"
       :data-mode="v.session.mode"
-      @click="emit('pick', v.session.id)"
+      @click="emit('select', v.session.id)"
     >
       <AdeActivityIcon :kind="v.kind" />
       <span

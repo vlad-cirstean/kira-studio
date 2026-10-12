@@ -8,11 +8,10 @@ import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref } from 'vue';
 import { useMobileTerminalsStore } from '../../../state/mobileTerminals';
 import { useTerminalsStore } from '../../../state/terminals';
-import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { activityLabel } from '../activity';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import AdeSessionId from './AdeSessionId.vue';
+import AdeSessionBar from './AdeSessionBar.vue';
 import type { SessionView } from './sessionView';
 
 // An interactive session: the terminal when this window holds it, else a Show button that raises
@@ -53,16 +52,11 @@ async function show(): Promise<void> {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-tui-pane">
-    <div
-      class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-kira-md"
-      :class="needsYou ? 'bg-tone-amber-solid/8 text-tone-amber' : 'text-muted-foreground'"
-    >
-      <AdeActivityIcon :kind="view.kind" :size="14" />
+    <AdeSessionBar :view="view" :needs-you="needsYou">
       <span class="truncate" data-testid="ade-tui-label">{{
         t('space.ade.tui.status.label', { activity: activityLabel(view.kind), ago })
       }}</span>
-      <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
-    </div>
+    </AdeSessionBar>
     <div v-if="held" class="relative flex min-h-0 flex-1 flex-col">
       <TerminalHostView
         :key="view.session.terminalId"
@@ -86,7 +80,7 @@ async function show(): Promise<void> {
         <Button
           variant="dialog"
           size="kira"
-          class="px-2.5"
+          class="px-2"
           data-testid="ade-tui-reconnect"
           @click="phones.reclaim(view.session.terminalId)"
         >
@@ -99,7 +93,7 @@ async function show(): Promise<void> {
       class="flex flex-col items-start gap-2 p-3 text-kira-md"
       data-testid="ade-tui-elsewhere"
     >
-      <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-show" @click="show">
+      <Button variant="dialog" size="kira" class="px-2" data-testid="ade-tui-show" @click="show">
         {{ t('common.action.show.label') }}
       </Button>
       <p v-if="missing" class="m-0 text-muted-foreground" data-testid="ade-tui-missing">

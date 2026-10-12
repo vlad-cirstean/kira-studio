@@ -115,8 +115,6 @@ U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading 
 U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
 U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
 U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
-U40 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue # plain Delete must reach text fields; useShortcut preventDefaults every match
-U41 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # Cmd/Ctrl-click link open reads a mouse event modifier, not a key chord
 U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha
 # C (rest)

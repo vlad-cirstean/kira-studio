@@ -2,9 +2,8 @@
 import { Badge } from '@theme/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { t } from '@theme/i18n';
-import { useEventListener } from '@vueuse/core';
-import { shortcutFor } from '@workbench/shortcuts/keys';
-import { computed, useTemplateRef } from 'vue';
+import { computed, onMounted, onScopeDispose } from 'vue';
+import { control } from '../../../bridge/control';
 import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
@@ -37,9 +36,9 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
 
 // Review code on the focused branch or card, else the selected one.
 const reviewCode = useReviewCode();
-const planRef = useTemplateRef<HTMLElement>('planEl');
-function reviewTarget(e: KeyboardEvent): { taskId?: string; branchId?: string; el?: HTMLElement } {
-  const t = e.target instanceof Element ? e.target : null;
+function reviewTarget(): { taskId?: string; branchId?: string; el?: HTMLElement } {
+  const active = document.activeElement;
+  const t = active instanceof Element ? active : null;
   const rowEl = t?.closest<HTMLElement>('[data-testid="ade-branch-row"][data-branch-id]');
   if (rowEl) return { branchId: rowEl.dataset.branchId, el: rowEl };
   const cardEl = t?.closest<HTMLElement>('[data-testid="ade-card"][data-task-id]');
@@ -51,12 +50,11 @@ function reviewTarget(e: KeyboardEvent): { taskId?: string; branchId?: string; e
   if (ui.selectedBranchId) return { branchId: ui.selectedBranchId };
   return { taskId: ui.selectedTaskId ?? undefined };
 }
-useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
-  if (ui.view !== 'plan' || e.defaultPrevented || !shortcutFor(e, ['ade.reviewCode'])) return;
-  e.preventDefault();
+function onReviewCode(): void {
+  if (ui.view !== 'plan') return;
   const m = model.value;
   if (!m) return;
-  const target = reviewTarget(e);
+  const target = reviewTarget();
   if (target.branchId) {
     const branch = m.board.branches.find((b) => b.id === target.branchId);
     const card = branch ? m.cardFor(branch.taskId) : null;
@@ -78,7 +76,12 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
       `[data-testid="ade-card"][data-task-id="${card.task.id}"] [data-testid="ade-card-head"]`,
     );
   reviewCode.openTask(card, head);
+}
+let offReviewCode: (() => void) | undefined;
+onMounted(() => {
+  offReviewCode = control.onReviewCode(onReviewCode);
 });
+onScopeDispose(() => offReviewCode?.());
 </script>
 
 <template>
@@ -137,7 +140,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
         </TabsTrigger>
       </TabsList>
     </nav>
-    <div ref="planEl" class="flex min-h-0 flex-1 gap-0.5">
+    <div class="flex min-h-0 flex-1 gap-0.5">
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />

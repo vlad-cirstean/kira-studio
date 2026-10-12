@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { useAutomationsModule } from '@workbench/automations/module';
@@ -33,9 +34,7 @@ function toggle(id: string): void {
     class="flex max-h-48 flex-col gap-1 overflow-y-auto"
     data-testid="ade-automations"
   >
-    <h4 class="m-0 text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{
-      t('common.module.automations.label')
-    }}</h4>
+    <SectionHeading :label="t('common.module.automations.label')" />
     <div
       v-for="run in rows"
       :key="run.id"

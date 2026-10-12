@@ -34,7 +34,7 @@ async function setMode(v: unknown): Promise<void> {
     :class="wfUi.workflowMode === 'yaml' ? 'max-w-4xl' : 'h-full min-h-0'"
     data-testid="ade-wf-editor"
   >
-    <div class="flex flex-wrap items-center gap-2.5">
+    <div class="flex flex-wrap items-center gap-3">
       <SecondaryTabs
         variant="segmented"
         size="kira-lg"

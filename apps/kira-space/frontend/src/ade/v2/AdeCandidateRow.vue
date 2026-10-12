@@ -7,7 +7,7 @@ import { repoText } from '../../state/coderepos';
 import type { CandidateBranch } from './wire';
 
 const props = defineProps<{ branch: CandidateBranch; repo: string }>();
-const emit = defineEmits<{ pick: [] }>();
+const emit = defineEmits<{ select: [] }>();
 
 const ago = useRelativeTime(() => props.branch.lastCommitAt);
 const repoLinks = useRepoLinksStore();
@@ -17,10 +17,10 @@ const repoLabel = computed(() => repoText(repoLinks.repoColorOf(props.branch.cod
 <template>
   <Button
     size="kira"
-    variant="ghost"
+    variant="toolbar"
     class="box-border h-row w-full justify-start gap-2 px-2 text-left text-fg"
     data-testid="ade-candidate"
-    @click="emit('pick')"
+    @click="emit('select')"
   >
     <span class="w-13 shrink-0 text-kira-sm text-muted-foreground">{{ ago }}</span>
     <span

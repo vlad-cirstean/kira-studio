@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
@@ -140,35 +141,27 @@ onBeforeUnmount(() => {
       :model-value="draft"
       spellcheck="false"
       class="resize-y font-data leading-relaxed [tab-size:2]"
+      :aria-invalid="error ? true : undefined"
+      :aria-describedby="error ? 'ade-wf-yaml-msg-text' : undefined"
       data-testid="ade-wf-yaml"
       @update:model-value="onInput"
     />
     <div v-if="!error" class="text-kira-sm text-ok" data-testid="ade-wf-yaml-msg">
       {{ t('space.ade.workflows.yaml.valid.status') }}
     </div>
-    <FieldError v-else class="font-data" data-testid="ade-wf-yaml-msg">{{ message }}</FieldError>
-    <FieldError v-if="saveError" data-testid="ade-wf-save-error">
-      {{ saveError }}
-      <template v-if="conflict">
-        <Button
-          variant="link"
-          size="kira"
-          class="px-1 text-kira-sm text-info"
-          data-testid="ade-wf-reload"
-          @click="reload"
-        >
+    <FieldError v-else id="ade-wf-yaml-msg-text" class="font-data" data-testid="ade-wf-yaml-msg">{{
+      message
+    }}</FieldError>
+    <Alert v-if="saveError" variant="error" data-testid="ade-wf-save-error">
+      <AlertDescription>{{ saveError }}</AlertDescription>
+      <AlertAction v-if="conflict">
+        <Button variant="link" size="inline" data-testid="ade-wf-reload" @click="reload">
           {{ t('common.action.refresh.label') }}
         </Button>
-        <Button
-          variant="link"
-          size="kira"
-          class="px-1 text-kira-sm text-info"
-          data-testid="ade-wf-overwrite"
-          @click="overwrite"
-        >
+        <Button variant="link" size="inline" data-testid="ade-wf-overwrite" @click="overwrite">
           {{ t('space.ade.workflows.conflict.overwrite.label') }}
         </Button>
-      </template>
-    </FieldError>
+      </AlertAction>
+    </Alert>
   </div>
 </template>

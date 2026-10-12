@@ -28,6 +28,7 @@ export const IPC = {
   openSettings: 'kira:menu:openSettings',
   commandPalette: 'kira:menu:commandPalette',
   viewFind: 'kira:menu:viewFind',
+  reviewCode: 'kira:menu:reviewCode',
   toggleProjectPanel: 'kira:menu:toggleProjectPanel',
   tabNext: 'kira:menu:tabNext',
   tabPrev: 'kira:menu:tabPrev',

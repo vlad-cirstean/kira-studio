@@ -16,9 +16,9 @@ const { action, perform, busy } = useTaskAction(() => props.card);
     <Button
       variant="dialog"
       size="kira-lg"
-      class="shrink-0 "
+      class="shrink-0"
       :class="ACTION_CLASS[action.tone]"
-      :disabled="busy"
+      :pending="busy"
       :data-testid="`ade-task-action-${action.kind}`"
       @click.stop="perform"
     >

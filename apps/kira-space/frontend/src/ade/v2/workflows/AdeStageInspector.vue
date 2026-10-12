@@ -37,7 +37,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
 
 <template>
   <div
-    class="flex flex-col gap-2.5"
+    class="flex flex-col gap-3"
     data-testid="ade-wf-stage"
     :data-stage-id="stage.id"
     :data-skipped="stage.skip"
@@ -113,7 +113,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
     </div>
 
     <template v-if="stage.kind === 'user'">
-      <div class="flex items-center gap-2.5 text-kira-md">
+      <div class="flex items-center gap-3 text-kira-md">
         <Checkbox
           :id="n('session')"
           :model-value="stage.session"

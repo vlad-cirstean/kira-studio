@@ -83,6 +83,9 @@ const (
 	ChannelAppMetrics         = appevent.ChannelAppMetrics
 	ChannelCommandPalette     = "kira:menu:commandPalette"
 	ChannelViewFind           = "kira:menu:viewFind"
+	// ChannelReviewCode is the Review Code menu item (ade.reviewCode): opens the review for the
+	// focused task or branch on the Plan board.
+	ChannelReviewCode = "kira:menu:reviewCode"
 )
 
 // P132 Part 2's op log channels, hoisted to internal/appevent (shared with Kira Studio's own

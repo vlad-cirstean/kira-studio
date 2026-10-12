@@ -49,7 +49,7 @@ function taskOf(taskId: string): { title: string; color: string } {
           {{ t('space.ade.needsPage.empty.emptyHint') }}
         </div>
         <div
-          class="flex items-center gap-2.5 border-b border-border px-3 py-2 text-kira-md text-muted-foreground"
+          class="flex items-center gap-3 border-b border-border px-3 py-2 text-kira-md text-muted-foreground"
         >
           <span class="flex-1" data-testid="ade-needs-footer">{{ needs.footer }}</span>
           <Button

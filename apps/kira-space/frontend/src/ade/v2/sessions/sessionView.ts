@@ -1,4 +1,5 @@
 import { t } from '@theme/i18n';
+import { compareNatural } from '@workbench/behaviour/match';
 import { type ActivityKind, activityKind, shortId } from '../activity';
 import type { Branch, Run, Session, Task, Workflow } from '../wire';
 
@@ -104,9 +105,9 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
 /** Running sessions: interactive first, then the most recently active. */
 export function byRunningOrder(a: Session, b: Session): number {
   const mode = Number(a.mode === 'headless') - Number(b.mode === 'headless');
-  return mode || b.lastActiveAt - a.lastActiveAt;
+  return mode || b.lastActiveAt - a.lastActiveAt || compareNatural(a.id, b.id);
 }
 
 export function byRecent(a: Session, b: Session): number {
-  return b.lastActiveAt - a.lastActiveAt;
+  return b.lastActiveAt - a.lastActiveAt || compareNatural(a.id, b.id);
 }

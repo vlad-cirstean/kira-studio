@@ -1145,6 +1145,11 @@
           "body": "Memory is closed. Reopen it and retry."
         }
       },
+      "menu": {
+        "reviewCode": {
+          "label": "Review code"
+        }
+      },
       "mobileLaunch": {
         "noWindow": {
           "body": "Open Kira Space on the computer first, then retry."

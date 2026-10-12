@@ -27,7 +27,7 @@ const open = ref(false);
       variant="dialog"
       size="kira"
       class="shrink-0"
-      :disabled="takeOver.pending.has(view.session.id)"
+      :pending="takeOver.pending.has(view.session.id)"
       data-testid="ade-stopped-takeover"
       @click="takeOver.request(view.session.id)"
     >
@@ -35,9 +35,9 @@ const open = ref(false);
     </Button>
     <Button
       v-if="view.headless && view.session.runId"
-      variant="ghost"
-      size="kira"
-      class="min-w-0 justify-start truncate px-1 text-kira-sm text-fg underline decoration-dotted"
+      variant="link"
+      size="inline"
+      class="min-w-0 justify-start truncate text-kira-sm text-fg"
       data-testid="ade-stopped-log-toggle"
       @click="open = !open"
     >

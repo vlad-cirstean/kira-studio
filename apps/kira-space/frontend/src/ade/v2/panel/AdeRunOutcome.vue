@@ -156,13 +156,9 @@ function copy(): void {
         outcome.report.lastGitError
       }}</CodeBlock
     >
-    <p
-      v-if="outcome?.report?.tried"
-      class="m-0 text-kira-sm text-muted-foreground"
-      data-testid="ade-outcome-tried"
-    >
+    <FieldDescription v-if="outcome?.report?.tried" data-testid="ade-outcome-tried">
       {{ t('space.ade.outcome.tried.label', { tried: outcome.report.tried }) }}
-    </p>
+    </FieldDescription>
     <div
       v-for="b in rebase?.branches ?? []"
       :key="b.branchId"

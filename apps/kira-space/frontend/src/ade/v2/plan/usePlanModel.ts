@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
-import { useAgentSessionsStore } from '../../state/agentSessions';
+import { useAgentSessionsStore } from '../../state';
 import { withTuiActivity } from '../activity';
 import { type BranchTag, branchTag, type TaskAction, taskCell } from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';

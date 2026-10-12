@@ -76,7 +76,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
 </script>
 
 <template>
-  <div class="flex flex-col gap-2.5" data-testid="ade-wf-step" :data-step-id="step.id">
+  <div class="flex flex-col gap-3" data-testid="ade-wf-step" :data-step-id="step.id">
     <div class="flex items-center gap-2">
       <Label :for="id('name')" class="sr-only">{{
         t('space.ade.workflows.stepInspector.name.aria')

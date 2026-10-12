@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Button } from '@theme/components/ui/button';
+import InlineState from '@theme/components/InlineState.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { type MessageKey, t } from '@theme/i18n';
+import { compareNatural } from '@workbench/behaviour/match';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { ACTIVITY_RANK, type ActivityKind } from '../activity';
@@ -22,6 +24,18 @@ const SUMMARY = {
 const filter = ref<'running' | 'stopped'>('running');
 const running = computed(() => sessions.value.filter((s) => s.state === 'running').length);
 const stopped = computed(() => sessions.value.length - running.value);
+const filterItems = computed(() => [
+  {
+    value: 'running',
+    label: t('space.ade.allSessions.running.label', { count: running.value }),
+    testid: 'ade-all-running',
+  },
+  {
+    value: 'stopped',
+    label: t('space.ade.allSessions.stopped.label', { count: stopped.value }),
+    testid: 'ade-all-stopped',
+  },
+]);
 
 interface Group {
   taskId: string;
@@ -53,9 +67,18 @@ const groups = computed((): Group[] => {
     .map(([taskId, rows]) => ({
       taskId,
       ...describe(taskId),
-      rows: rows.sort((a, b) => ACTIVITY_RANK[a.kind] - ACTIVITY_RANK[b.kind]),
+      rows: rows.sort(
+        (a, b) =>
+          ACTIVITY_RANK[a.kind] - ACTIVITY_RANK[b.kind] ||
+          compareNatural(a.session.id, b.session.id),
+      ),
     }))
-    .sort((a, b) => rank(a.rows) - rank(b.rows));
+    .sort(
+      (a, b) =>
+        rank(a.rows) - rank(b.rows) ||
+        compareNatural(a.title, b.title) ||
+        compareNatural(a.taskId, b.taskId),
+    );
 });
 
 const summary = computed(() => {
@@ -74,30 +97,19 @@ const summary = computed(() => {
 
 <template>
   <div class="flex flex-col gap-4 p-3" data-testid="ade-all-sessions">
-    <div class="flex items-center gap-3.5">
-      <div class="flex gap-1">
-        <Button
-          :variant="filter === 'running' ? 'dialog' : 'ghost'"
-          size="kira-lg"
-          data-testid="ade-all-running"
-          @click="filter = 'running'"
-        >
-          {{ t('space.ade.allSessions.running.label', { count: running }) }}
-        </Button>
-        <Button
-          :variant="filter === 'stopped' ? 'dialog' : 'ghost'"
-          size="kira-lg"
-          data-testid="ade-all-stopped"
-          @click="filter = 'stopped'"
-        >
-          {{ t('space.ade.allSessions.stopped.label', { count: stopped }) }}
-        </Button>
-      </div>
+    <div class="flex items-center gap-3">
+      <SecondaryTabs
+        variant="segmented"
+        size="kira-lg"
+        :model-value="filter"
+        :items="filterItems"
+        @update:model-value="(v) => (filter = v as 'running' | 'stopped')"
+      />
       <div class="flex gap-3">
         <span
           v-for="a in summary"
           :key="a.kind"
-          class="inline-flex items-center gap-1.25 text-kira-md"
+          class="inline-flex items-center gap-1 text-kira-md"
         >
           <AdeActivityIcon :kind="a.kind" />{{ a.text }}
         </span>
@@ -115,13 +127,8 @@ const summary = computed(() => {
       </div>
       <AdeAllSessionRow v-for="r in g.rows" :key="r.session.id" :view="r" :archived="g.archived" />
     </section>
-    <div
-      v-if="groups.length === 0"
-      class="p-3 text-kira-lg text-muted-foreground"
-      data-testid="ade-all-empty"
-      >{{
-        t('space.ade.allSessions.empty.empty')
-      }}</div
-    >
+    <InlineState v-if="groups.length === 0" kind="empty" data-testid="ade-all-empty">{{
+      t('space.ade.allSessions.empty.empty')
+    }}</InlineState>
   </div>
 </template>

@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { FieldLabel } from '@theme/components/ui/field';
+import { FieldDescription, FieldLabel } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
@@ -117,7 +117,7 @@ async function discard(): Promise<void> {
 
 <template>
   <Dialog v-if="view" :open="true" @update:open="(v) => !v && dialogs.close()">
-    <DialogContent size="lg" data-testid="ade-dialog">
+    <DialogContent size="lg" :dirty="view.edited" data-testid="ade-dialog">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <svg
@@ -146,7 +146,7 @@ async function discard(): Promise<void> {
         </Alert>
         <Alert v-else-if="view.busyShown" variant="error" data-testid="ade-dialog-busy">
           <AlertDescription>
-            <div class="flex items-start gap-2.5">
+            <div class="flex items-start gap-3">
               <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <span class="font-medium">{{ view.busyTitle }}</span>
                 <div
@@ -209,13 +209,9 @@ async function discard(): Promise<void> {
           />
           <span>{{ t('space.ade.claudeDialog.autostash.label') }}</span>
         </Label>
-        <p
-          v-if="view.noOp"
-          class="m-0 text-kira-sm text-muted-foreground"
-          data-testid="ade-dialog-noop"
-        >
+        <FieldDescription v-if="view.noOp" data-testid="ade-dialog-noop">
           {{ t('space.ade.claudeDialog.noOp.hint') }}
-        </p>
+        </FieldDescription>
 
         <div
           v-if="view.isArchive"
@@ -312,7 +308,7 @@ async function discard(): Promise<void> {
             variant="dialog"
             size="kira-lg"
             class="border-tone-red-solid bg-transparent text-tone-red"
-            :disabled="sending"
+            :pending="sending"
             data-testid="ade-dialog-delete"
             @click="discard"
           >
@@ -323,7 +319,8 @@ async function discard(): Promise<void> {
           variant="dialog-primary"
           size="kira-lg"
           :class="ACTION_CLASS[view.overridden ? 'red' : 'claude']"
-          :disabled="view.blocked || view.sendDisabled || sending || dialogs.waitingSetup"
+          :pending="sending"
+          :disabled="view.blocked || view.sendDisabled || dialogs.waitingSetup"
           data-testid="ade-dialog-send"
           @click="send"
         >

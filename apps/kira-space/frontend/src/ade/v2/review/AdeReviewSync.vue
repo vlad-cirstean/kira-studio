@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { shortSha } from '@kira/git-core';
+import Disclosure from '@theme/components/Disclosure.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import VarText from '@theme/components/VarText.vue';
 import { type MessageKey, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref } from 'vue';
 import { remoteErrorText } from '../board/panelFacts';
 import { useGhSyncPlan, useGitHubSyncApply, useRefresh } from '../queries';
 import type { GhSyncResult, ReviewWindowTarget } from '../wire';
+import { headDiffersParts } from './syncParts';
 
 // Marks this branch's fully reviewed files as viewed on its pull request, one way: nothing read from
 // GitHub changes the app's review state. The plan reloads on window focus, mark, and popover open, never on
@@ -135,22 +140,12 @@ function onOpenChange(next: boolean): void {
     </Tooltip>
     <PopoverContent class="w-96 text-kira-md" align="end" data-testid="ade-review-sync-popover">
       <div class="flex flex-col gap-2">
-        <p
-          v-if="data?.account"
-          class="m-0 text-kira-sm text-muted-foreground"
-          data-testid="ade-review-sync-account"
-        >
+        <FieldDescription v-if="data?.account" data-testid="ade-review-sync-account">
           {{ t('space.ade.review.sync.account.label', { account: data.account }) }}
-        </p>
-        <p
-          v-if="headDiffers && data"
-          class="m-0 text-kira-sm text-muted-foreground"
-          data-testid="ade-review-sync-head"
-        >
-          {{
-            t('space.ade.review.sync.headDiffers.label', { head: shortSha(data.headSha), local: shortSha(data.localTip) })
-          }}
-        </p>
+        </FieldDescription>
+        <FieldDescription v-if="headDiffers && data" data-testid="ade-review-sync-head">
+          <VarText :parts="headDiffersParts(data.headSha, data.localTip)" />
+        </FieldDescription>
 
         <template v-if="result">
           <p class="m-0" data-testid="ade-review-sync-result">
@@ -160,15 +155,13 @@ function onOpenChange(next: boolean): void {
                 : t('space.ade.review.sync.synced.status', { count: result.marked.length + result.unmarked.length })
             }}
           </p>
-          <FieldError v-if="result.status !== 'ok'">{{ result.message }}</FieldError>
+          <Alert v-if="result.status !== 'ok'" variant="error"
+            ><AlertDescription>{{ result.message }}</AlertDescription></Alert
+          >
           <ul v-if="result.failed.length" class="m-0 list-none p-0 text-kira-sm text-error">
-            <li v-for="f in result.failed" :key="f.path" class="truncate">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <span>{{ t('common.dashPair.label', { first: f.path, second: f.error }) }}</span>
-                </TooltipTrigger>
-                <TooltipContent>{{ f.error }}</TooltipContent>
-              </Tooltip>
+            <li v-for="f in result.failed" :key="f.path" class="flex gap-2">
+              <Identifier :value="f.path" split="path" />
+              <TruncatedText :text="f.error" />
             </li>
           </ul>
         </template>
@@ -178,7 +171,7 @@ function onOpenChange(next: boolean): void {
           <Button
             variant="dialog"
             size="kira"
-            :disabled="refresh.isPending.value"
+            :pending="refresh.isPending.value"
             data-testid="ade-review-sync-refresh"
             @click="refreshRepo"
           >
@@ -197,44 +190,38 @@ function onOpenChange(next: boolean): void {
           >
             <li v-for="f in [...marks, ...unmarks]" :key="f.path" class="flex gap-2">
               <span class="shrink-0 text-muted-foreground">{{ actionText(f.action) }}</span>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <span class="truncate font-data">{{ f.path }}</span>
-                </TooltipTrigger>
-                <TooltipContent>{{ f.path }}</TooltipContent>
-              </Tooltip>
+              <Identifier :value="f.path" split="path" />
             </li>
           </ul>
-          <details v-if="skipped.length" data-testid="ade-review-sync-skipped">
-            <summary class="cursor-pointer text-kira-sm text-muted-foreground">{{
-              t('memory.import.totals.skipped.label', { count: skipped.length })
-            }}</summary>
+          <Disclosure
+            v-if="skipped.length"
+            :label="t('memory.import.totals.skipped.label', { count: skipped.length })"
+            trigger-class="text-kira-sm text-muted-foreground"
+            data-testid="ade-review-sync-skipped"
+          >
             <ul
               class="m-0 mt-1 flex max-h-32 list-none flex-col gap-0.5 overflow-auto p-0 text-kira-sm"
             >
               <li v-for="f in skipped" :key="f.path" class="flex gap-2">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <span class="truncate font-data">{{ f.path }}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ f.path }}</TooltipContent>
-                </Tooltip>
+                <Identifier :value="f.path" split="path" />
                 <span class="shrink-0 text-muted-foreground">{{ reasonText(f.reason) }}</span>
               </li>
             </ul>
-          </details>
+          </Disclosure>
           <Button
             v-if="count > 0"
             variant="dialog"
             size="kira"
-            :disabled="apply.isPending.value"
+            :pending="apply.isPending.value"
             data-testid="ade-review-sync-confirm"
             @click="confirm"
           >
             {{ confirmLabel }}
           </Button>
         </template>
-        <FieldError v-if="error" data-testid="ade-review-sync-error">{{ error }}</FieldError>
+        <Alert v-if="error" variant="error" data-testid="ade-review-sync-error"
+          ><AlertDescription>{{ error }}</AlertDescription></Alert
+        >
       </div>
     </PopoverContent>
   </Popover>

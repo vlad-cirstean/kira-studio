@@ -51,7 +51,7 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
       :position="Position.Top"
       class="!size-2 !border-0 !bg-muted-foreground !left-5"
     />
-    <div class="flex items-center gap-1.5 px-2.5 pt-2">
+    <div class="flex items-center gap-1.5 px-2 pt-2">
       <AdeTip v-if="data.start" :text="t('common.action.start.label')"
         ><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip
       >
@@ -74,9 +74,9 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
         t('space.ade.workflows.stepNode.smart.label')
       }}</span>
     </div>
-    <div class="truncate px-2.5 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
+    <div class="truncate px-2 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
     <div
-      class="truncate px-2.5 text-muted-foreground [&>span]:whitespace-nowrap"
+      class="truncate px-2 text-muted-foreground [&>span]:whitespace-nowrap"
       data-testid="ade-wf-node-prompt"
     >
       <VarText :parts="parts" />

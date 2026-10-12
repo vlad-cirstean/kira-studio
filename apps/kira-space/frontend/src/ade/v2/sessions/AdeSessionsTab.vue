@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import InlineState from '@theme/components/InlineState.vue';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -45,7 +46,7 @@ const current = computed(
       v-if="running.length"
       :views="running"
       :selected-id="current?.session.id ?? null"
-      @pick="(id) => (ui.sessionId = id)"
+      @select="(id) => (ui.sessionId = id)"
     />
     <template v-if="current">
       <AdeHeadlessPane
@@ -56,14 +57,9 @@ const current = computed(
       />
       <AdeTuiPane v-else :key="current.session.id" :view="current" />
     </template>
-    <div
-      v-else
-      class="flex-1 p-3.5 text-kira-md text-muted-foreground"
-      data-testid="ade-sessions-empty"
-      >{{
-        t('space.ade.sessionList.empty.empty')
-      }}</div
-    >
+    <InlineState v-else kind="empty" class="flex-1 p-3" data-testid="ade-sessions-empty">{{
+      t('space.ade.sessionList.empty.empty')
+    }}</InlineState>
     <AdeStoppedList :views="stopped" :archived="archived" />
   </div>
 </template>

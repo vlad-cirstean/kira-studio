@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
-import { useAgentSessionsStore } from '../../state/agentSessions';
+import { useAgentSessionsStore } from '../../state';
 import { withTuiActivity } from '../activity';
 import { blockingSetups } from '../board/setupGate';
 import { useLaunchOpener } from '../dialog/useLaunchOpener';
@@ -104,9 +104,9 @@ async function focus(): Promise<void> {
         <Button variant="dialog" size="kira" data-testid="ade-review-focus" @click="focus">{{
           t('space.ade.review.agent.focus.label')
         }}</Button>
-        <p v-if="missing" class="m-0 text-muted-foreground">{{
+        <FieldDescription v-if="missing">{{
           t('space.ade.review.agent.gone.hint')
-        }}</p>
+        }}</FieldDescription>
       </div>
       <AdeReviewCompose :target="target" :repo-label="repoLabel" :session="session" />
     </template>
@@ -115,7 +115,7 @@ async function focus(): Promise<void> {
       class="flex flex-col items-start gap-2 p-3 text-kira-md"
       data-testid="ade-review-start-box"
     >
-      <p class="m-0 text-muted-foreground">{{ t('space.ade.review.agent.intro.hint') }}</p>
+      <FieldDescription>{{ t('space.ade.review.agent.intro.hint') }}</FieldDescription>
       <AdeSetupProgress
         v-for="b in setups"
         :key="b.id"
@@ -127,7 +127,8 @@ async function focus(): Promise<void> {
       <Button
         variant="dialog"
         size="kira"
-        :disabled="launchM.isPending.value || waitingSetup"
+        :pending="launchM.isPending.value"
+        :disabled="waitingSetup"
         data-testid="ade-review-start"
         @click="start"
       >
@@ -136,8 +137,10 @@ async function focus(): Promise<void> {
         }}
       </Button>
     </div>
-    <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-review-start-error">{{
-      error
-    }}</FieldError>
+    <div v-if="error" class="px-3 pb-2">
+      <Alert variant="error" data-testid="ade-review-start-error"
+        ><AlertDescription>{{ error }}</AlertDescription></Alert
+      >
+    </div>
   </div>
 </template>

@@ -3,7 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
+import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
@@ -218,7 +218,7 @@ async function pick(b: CandidateBranch): Promise<void> {
           data-testid="ade-nw-notes"
         />
         <span />
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-3">
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -232,9 +232,9 @@ async function pick(b: CandidateBranch): Promise<void> {
         </div>
       </div>
       <div v-else>
-        <p
+        <FieldDescription
           v-if="attachTo"
-          class="truncate border-b border-border px-3 py-1.5 text-kira-sm text-muted-foreground"
+          class="truncate border-b border-border px-3 py-1.5"
           data-testid="ade-add-attach"
         >
           <CatalogText k="space.ade.add.attach.label">
@@ -242,7 +242,7 @@ async function pick(b: CandidateBranch): Promise<void> {
               ><span class="font-medium text-fg">{{ attachTo.title }}</span></template
             >
           </CatalogText>
-        </p>
+        </FieldDescription>
         <div class="border-b border-border p-1">
           <SearchField
             v-model="q"
@@ -258,9 +258,9 @@ async function pick(b: CandidateBranch): Promise<void> {
             :key="`${b.codeRepoId}/${b.name}`"
             :branch="b"
             :repo="repoLabel(b.codeRepoId)"
-            @pick="pick(b)"
+            @select="pick(b)"
           />
-          <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">{{
+          <div v-if="shown.length === 0" class="p-2 text-kira-md text-muted-foreground">{{
             t('space.common.noBranches.empty')
           }}</div>
         </div>

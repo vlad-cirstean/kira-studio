@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { paneFrame } from '@theme/components/frames';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
@@ -26,7 +28,7 @@ const newWf = useNewWorkflow();
 function rowClass(selected: boolean): string {
   return cn(
     rowVariants({ layout: 'double', selected }),
-    'box-border w-full cursor-pointer flex-col items-stretch gap-0.5 whitespace-normal rounded-kira border-0 border-l-3 border-solid px-2.5 py-2 text-left',
+    'box-border w-full flex-col items-stretch gap-0.5 whitespace-normal rounded-kira border-0 border-l-3 border-solid px-2 py-2 text-left',
     selected ? 'border-l-tone-amber-solid' : 'border-l-transparent',
   );
 }
@@ -89,10 +91,7 @@ async function createNew(): Promise<void> {
 
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-workflows">
-    <div
-      class="flex w-75 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg"
-      data-testid="ade-wf-list"
-    >
+    <div :class="cn(paneFrame, 'flex w-75 shrink-0 flex-col')" data-testid="ade-wf-list">
       <PanelHeader>
         {{ t('space.common.workflows.label') }}
         <template #actions>
@@ -127,7 +126,7 @@ async function createNew(): Promise<void> {
             <Button
               variant="dialog"
               size="kira-lg"
-              :disabled="importWf.isPending.value"
+              :pending="importWf.isPending.value"
               data-testid="ade-wf-import-go"
               @click="runImport"
             >
@@ -135,16 +134,16 @@ async function createNew(): Promise<void> {
             </Button>
           </div>
         </div>
-        <FieldError v-if="listError" class="px-1 pb-1" data-testid="ade-wf-error">{{
-          listError
-        }}</FieldError>
-        <p
+        <Alert v-if="listError" variant="error" data-testid="ade-wf-error"
+          ><AlertDescription>{{ listError }}</AlertDescription></Alert
+        >
+        <InlineState
           v-if="workflows.isSuccess.value && entries.length === 0"
-          class="m-0 px-1 py-2 text-kira-sm text-subtle"
+          kind="empty"
           data-testid="ade-wf-empty"
         >
           {{ t('space.ade.workflows.page.empty.emptyHint', { dir }) }}
-        </p>
+        </InlineState>
         <button
           v-for="e in entries"
           :key="e.fileName"
@@ -188,9 +187,7 @@ async function createNew(): Promise<void> {
         </div>
       </div>
     </div>
-    <div
-      class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg"
-    >
+    <div :class="cn(paneFrame, 'flex flex-1 flex-col')">
       <PanelHeader>{{
         current?.workflow?.name ?? current?.fileName ?? t('space.common.workflow.label')
       }}</PanelHeader>

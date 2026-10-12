@@ -42,7 +42,7 @@ const ROW_BG_CLASS: Record<Tone, string> = {
     :data-kind="item.kind"
     :data-item-id="item.id"
   >
-    <div class="flex items-center gap-3 px-3 py-2" :class="ROW_BG_CLASS[item.tone]">
+    <div class="flex items-center gap-3 px-2 py-2" :class="ROW_BG_CLASS[item.tone]">
       <span
         class="w-23 shrink-0 whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm"
         :class="TONE_TAG_CLASS[item.tone]"
@@ -59,7 +59,7 @@ const ROW_BG_CLASS: Record<Tone, string> = {
         size="kira-lg"
         class="w-23 shrink-0 "
         :class="buttonClass"
-        :disabled="busy"
+        :pending="busy"
         data-testid="ade-needs-action"
         @click="perform(item)"
       >
@@ -79,9 +79,9 @@ const ROW_BG_CLASS: Record<Tone, string> = {
           }}</span>
           <Button
             v-if="hasLog"
-            variant="ghost"
-            size="kira"
-            class="shrink-0 text-kira-sm text-muted-foreground underline"
+            variant="link"
+            size="inline"
+            class="shrink-0 text-kira-sm text-muted-foreground"
             data-testid="ade-needs-log"
             @click="logOpen = !logOpen"
           >
