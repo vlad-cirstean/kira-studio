@@ -3125,6 +3125,7 @@
       "years": "{count}y"
     },
     "duration": {
+      "daysHours": "{days}d {hours}h",
       "hoursMinutes": "{hours}h {minutes}m",
       "minutesSeconds": "{minutes}m {seconds}s",
       "ms": "{value}ms",

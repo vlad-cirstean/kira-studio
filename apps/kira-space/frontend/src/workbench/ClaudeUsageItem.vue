@@ -4,7 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { useIntervalFn, useNow } from '@vueuse/core';
-import { formatDateTime, formatDuration, formatRelative } from '@workbench/behaviour/format';
+import { formatCompactDuration, formatDateTime, formatRelative } from '@workbench/behaviour/format';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed } from 'vue';
 import type { ClaudeUsageWindow } from '../bridge/index';
@@ -60,7 +60,7 @@ const tone = computed(() => {
 const lines = computed(() =>
   windows.value.map((w) => {
     const when = formatDateTime(w.window.resetsAt);
-    const left = formatDuration(
+    const left = formatCompactDuration(
       Math.max(0, Math.round((w.window.resetsAt - now.value.getTime()) / 60_000)) * 60_000,
     );
     return t('space.settings.claudeUsage.line.status', {

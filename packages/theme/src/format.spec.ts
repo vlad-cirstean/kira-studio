@@ -58,6 +58,12 @@ describe('formatCompactDuration', () => {
     expect(formatCompactDuration(3_725_000)).toBe('1h 2m');
   });
 
+  test('days from 24h, minutes dropped', () => {
+    expect(formatCompactDuration(86_399_000)).toBe('23h 59m');
+    expect(formatCompactDuration(86_400_000)).toBe('1d');
+    expect(formatCompactDuration(167 * 3_600_000 + 12 * 60_000)).toBe('6d 23h');
+  });
+
   test('ceil rounds a partial second up so a countdown never shows 0s early', () => {
     expect(formatCompactDuration(100)).toBe('0s');
     expect(formatCompactDuration(100, { ceil: true })).toBe('1s');

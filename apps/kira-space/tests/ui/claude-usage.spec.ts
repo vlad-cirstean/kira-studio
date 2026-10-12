@@ -64,7 +64,7 @@ test('shows both windows, and the tooltip lists the reset times and the source',
   await item(page).hover();
   const tip = page.locator('[data-testid="claude-usage-tooltip"]');
   await expect(tip).toContainText('Five-hour: 23% used');
-  await expect(tip).toContainText('in 2h 0m');
+  await expect(tip).toContainText('in 2h');
   await expect(tip).toContainText('Weekly: 41% used');
   await expect(tip).toContainText('From a Claude Code session, 5m ago');
 });

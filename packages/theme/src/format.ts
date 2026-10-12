@@ -45,7 +45,7 @@ export function formatDuration(ms: number): string {
   });
 }
 
-/** A whole-unit duration for timers and TTLs: '5s' / '2m' / '2m 5s' / '1h 2m'. `ceil` rounds a
+/** A whole-unit duration for timers and TTLs: '5s' / '2m' / '2m 5s' / '1h 2m' / '6d 23h'. `ceil` rounds a
  *  partial second up (a countdown never shows 0s early); the default floors (an elapsed clock). */
 export function formatCompactDuration(ms: number, options: { ceil?: boolean } = {}): string {
   const seconds = Math.max(0, options.ceil ? Math.ceil(ms / 1000) : Math.floor(ms / 1000));
@@ -58,6 +58,13 @@ export function formatCompactDuration(ms: number, options: { ceil?: boolean } = 
       : t('format.duration.minutesSeconds', { minutes, seconds: rest });
   }
   const hours = Math.floor(minutes / 60);
+  if (hours >= 24) {
+    const restHours = hours % 24;
+    const days = Math.floor(hours / 24);
+    return restHours === 0
+      ? t('format.relative.unitDay', { count: days })
+      : t('format.duration.daysHours', { days, hours: restHours });
+  }
   const restMinutes = minutes % 60;
   return restMinutes === 0
     ? t('format.relative.unitHour', { count: hours })
