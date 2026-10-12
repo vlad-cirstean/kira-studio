@@ -6,6 +6,7 @@ import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { errorText } from '../bridge/codedError';
 import { fireAndForget } from '../bridge/fireAndForget';
+import { logError } from '../bridge/log';
 import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
 import { createOrderedWriter } from './orderedWrites';
 
@@ -162,7 +163,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
           writeTerminal,
         });
       } catch (err) {
-        console.error(`terminal ${tabId}: renderer load failed`, err);
+        logError('terminals', `${tabId}: renderer load failed`, err);
       }
     }
 
@@ -222,7 +223,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
     // Concurrent bound calls arrive in any order, so keystrokes go one write at a time per tab.
     const writer = createOrderedWriter(
       (tabId, bytes) => control.terminalWrite(tabId, bytesToBase64(bytes)),
-      (tabId, err) => console.error(`terminal ${tabId}: write failed`, err),
+      (tabId, err) => logError('terminals', `${tabId}: write failed`, err),
     );
 
     /** A pass-through, not an encoding decision: bytes is already the exact byte sequence to send —

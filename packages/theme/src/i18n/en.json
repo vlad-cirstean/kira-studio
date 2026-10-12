@@ -11261,6 +11261,82 @@
     }
   },
   "workbench": {
+    "apiImport": {
+      "chunkedKept": {
+        "body": "‘{line}’ was kept, but Kira never sends a chunked body. It always computes an exact {header} instead."
+      },
+      "codeLanguage": {
+        "html": {
+          "label": "HTML"
+        },
+        "javascript": {
+          "label": "JavaScript"
+        },
+        "xml": {
+          "label": "XML"
+        }
+      },
+      "contentLengthDropped": {
+        "body": "‘{line}’ was dropped. Go computes the real {header} at send time, and a stale hand-typed value would be silently overridden."
+      },
+      "cookieJar": {
+        "body": "{flag} ‘{value}’ names a cookie-jar file. Kira does not read files from disk here."
+      },
+      "credential": {
+        "body": "{flag} stores this credential in the tab’s state in plain text. The place for a credential is a secret variable."
+      },
+      "dotenvNoEquals": {
+        "error": "Line {line} needs a key and a value, as in {example}."
+      },
+      "dotenvNoKey": {
+        "error": "Line {line} has no key before the {sign} sign."
+      },
+      "fileInline": {
+        "body": "{flag} ‘{value}’ would inline a local file’s contents. Kira can’t read files here, so it was dropped."
+      },
+      "fileInlineStripped": {
+        "body": "{flag} ‘{value}’ would inline a local file’s contents with newlines stripped. Kira can’t read files here, so it was dropped."
+      },
+      "fileRef": {
+        "body": "{flag} ‘{value}’ names a local file. Kira can’t read files here, so choose it again before sending."
+      },
+      "formFileContent": {
+        "body": "-F ‘{raw}’ takes its value from a local file’s contents. Kira can’t read files here, so the field was dropped."
+      },
+      "formFilename": {
+        "body": "-F ‘{raw}’ sets a per-part filename override. Kira has no field for it, so the row keeps its own default."
+      },
+      "headerNoColon": {
+        "body": "‘-H {raw}’ has no colon and no trailing semicolon. It was dropped."
+      },
+      "headerNoName": {
+        "body": "‘-H {raw}’ has no header name. It was dropped."
+      },
+      "impliedContentType": {
+        "body": "curl would have sent this body as {type}, its default for -d with no {header} header. An explicit header was added so Kira sends the same thing."
+      },
+      "methodCoerced": {
+        "body": "-X ‘{method}’ is not one of the seven supported methods. It was coerced to {fallback}."
+      },
+      "multipleUrls": {
+        "body": "{count} extra URL argument was dropped. A request tab is one request. | {count} extra URL arguments were dropped. A request tab is one request."
+      },
+      "noUrl": {
+        "body": "No URL was found in the command."
+      },
+      "shellOperator": {
+        "body": "Stopped at ‘{token}’. Kira never runs a shell, so nothing after it was parsed."
+      },
+      "unknownFlag": {
+        "body": "{raw} is not a recognised curl flag. It was ignored and assumed to take no value."
+      },
+      "unsupportedFlag": {
+        "body": "{raw} changes how the request behaves and has no equivalent here. The generated request will not behave identically."
+      },
+      "userVariable": {
+        "body": "{flag} ‘{value}’ contains a {reference} reference. Base64-encoding it here would destroy the reference, so the header was left unencoded. Base64-encode “{example}” before sending, or reference a secret variable through its own {pipe} pipe."
+      }
+    },
     "bootFailure": {
       "title": "{product} couldn’t start"
     },

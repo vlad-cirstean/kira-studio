@@ -71,9 +71,8 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
     watch([available, latestVersion, dismissedVersion], ([isAvailable, latest, dismissed]) => {
       if (installing.value) return;
       if (isAvailable && latest !== dismissed) {
-        control.promptsRaiseUpdate(latest).catch(() => {
-          // Routing the popup is best effort; the status-bar item still opens the dialog.
-        });
+        // Best effort: the status-bar item still opens the dialog.
+        fireAndForget(control.promptsRaiseUpdate(latest), 'app-update');
       } else if (dismissed === latest) {
         dialogOpen.value = false;
       }
@@ -92,9 +91,8 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       if (installing.value) return;
       dismissedVersion.value = latestVersion.value;
       dialogOpen.value = false;
-      control.promptsDismiss(`update:${latestVersion.value}`).catch(() => {
-        // The popup is already hidden here; a stale one in another window closes with its own Later.
-      });
+      // The popup is already hidden here; a stale one in another window closes with its own Later.
+      fireAndForget(control.promptsDismiss(`update:${latestVersion.value}`), 'app-update');
     }
 
     async function install(): Promise<void> {

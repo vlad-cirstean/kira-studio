@@ -175,7 +175,7 @@ function onCancel(): void {
     </div>
 
     <Alert v-if="parseError" variant="error" data-testid="variables-bulk-error">
-      <AlertDescription>{{ parseError.message }}</AlertDescription>
+      <AlertDescription>{{ t(parseError.message.key, parseError.message.params) }}</AlertDescription>
     </Alert>
     <template v-else-if="diff">
       <div class="text-subtle text-kira-sm" data-testid="variables-bulk-summary">{{ summary }}</div>

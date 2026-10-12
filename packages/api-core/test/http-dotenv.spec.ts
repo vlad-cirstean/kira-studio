@@ -90,7 +90,13 @@ describe('parseEnv', () => {
 
   test('a malformed line (no =) reports its own 1-based line number', () => {
     const { entries, error } = parseEnv('GOOD=1\nnot a valid line\nALSO_GOOD=2');
-    expect(error).toEqual({ line: 2, message: 'line 2: expected KEY=VALUE' });
+    expect(error).toEqual({
+      line: 2,
+      message: {
+        key: 'workbench.apiImport.dotenvNoEquals.error',
+        params: { line: 2, example: 'KEY=VALUE' },
+      },
+    });
     // Entries collected before the bad line are still returned — the caller decides what to do
     // with a partial result (in practice: disable Apply and show the message).
     expect(entries).toEqual([{ name: 'GOOD', value: '1', hasValue: true, description: '' }]);
@@ -120,7 +126,10 @@ describe('parseEnv', () => {
 
   test('a missing key before = is a parse error', () => {
     const { error } = parseEnv('=value');
-    expect(error).toEqual({ line: 1, message: "line 1: missing a key before '='" });
+    expect(error).toEqual({
+      line: 1,
+      message: { key: 'workbench.apiImport.dotenvNoKey.error', params: { line: 1, sign: '=' } },
+    });
   });
 });
 

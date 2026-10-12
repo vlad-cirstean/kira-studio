@@ -1,6 +1,7 @@
 import type { OpLogRecord } from '@shared/domain/ops';
 import { defineStore } from 'pinia';
 import { computed, markRaw, reactive, toRefs } from 'vue';
+import { logError } from '../bridge/log';
 
 const MAX_RECORDS = 500;
 const HYDRATE_LIMIT = 200;
@@ -108,7 +109,7 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       try {
         await control.cancel(id);
       } catch (err) {
-        console.error('cancel op', err);
+        logError('op-log', 'cancel failed', err);
       }
     }
 

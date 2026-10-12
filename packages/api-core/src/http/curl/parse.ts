@@ -159,7 +159,7 @@ function handleHeaderFlag(acc: CurlAccumulator, raw: string): void {
     if (name === '') {
       acc.warnings.push({
         kind: 'header-malformed',
-        detail: `'-H ${raw}' has no header name — dropped.`,
+        detail: { key: 'workbench.apiImport.headerNoName.body', params: { raw } },
       });
     } else {
       pushHeader(acc, name, value);
@@ -173,7 +173,7 @@ function handleHeaderFlag(acc: CurlAccumulator, raw: string): void {
   }
   acc.warnings.push({
     kind: 'header-malformed',
-    detail: `'-H ${raw}' has no ':' and no trailing ';' — dropped.`,
+    detail: { key: 'workbench.apiImport.headerNoColon.body', params: { raw } },
   });
 }
 
@@ -236,7 +236,10 @@ function handleFormFlag(acc: CurlAccumulator, id: 'form' | 'form-string', raw: s
     const path = content.slice(1);
     acc.warnings.push({
       kind: 'unresolved-file',
-      detail: `-F '${name}=@${path}' names a local file — this app cannot read files here, so it must be re-chosen before sending.`,
+      detail: {
+        key: 'workbench.apiImport.fileRef.body',
+        params: { flag: '-F', value: `${name}=@${path}` },
+      },
     });
     acc.formFields.push({
       name,
@@ -252,7 +255,7 @@ function handleFormFlag(acc: CurlAccumulator, id: 'form' | 'form-string', raw: s
   } else if (content.startsWith('<')) {
     acc.warnings.push({
       kind: 'form-file-content',
-      detail: `-F '${raw}' takes its value from a local file's contents — this app cannot read files here, so the field was dropped.`,
+      detail: { key: 'workbench.apiImport.formFileContent.body', params: { raw } },
     });
     return;
   } else {
@@ -271,7 +274,7 @@ function handleFormFlag(acc: CurlAccumulator, id: 'form' | 'form-string', raw: s
   if (hasFilenameOverride) {
     acc.warnings.push({
       kind: 'form-filename',
-      detail: `-F '${raw}' sets a per-part filename override — this app has no field for it, so the row keeps its own default instead.`,
+      detail: { key: 'workbench.apiImport.formFilename.body', params: { raw } },
     });
   }
 }
@@ -286,7 +289,7 @@ function handle(
   if (spec.category === 'warned') {
     acc.warnings.push({
       kind: 'unsupported-flag',
-      detail: `${raw} changes how the request behaves and has no equivalent here — the generated request will not behave identically.`,
+      detail: { key: 'workbench.apiImport.unsupportedFlag.body', params: { raw } },
     });
     return;
   }
@@ -323,7 +326,10 @@ function handle(
       } else {
         acc.warnings.push({
           kind: 'unsupported-flag',
-          detail: `-b/--cookie '${v}' names a cookie-jar file — reading it would be a filesystem read this app does not do.`,
+          detail: {
+            key: 'workbench.apiImport.cookieJar.body',
+            params: { flag: '-b/--cookie', value: v },
+          },
         });
       }
       return;
@@ -336,23 +342,33 @@ function handle(
         pushHeader(acc, 'Authorization', `Basic ${v}`);
         acc.warnings.push({
           kind: 'credential-in-command',
-          detail: `-u/--user '${v}' contains a {{variable}} reference — base64-encoding it here would destroy the reference, so the header was left unencoded. Base64-encode "user:pass" before sending, or reference a secret variable through its own {{name | base64}} pipe.`,
+          detail: {
+            key: 'workbench.apiImport.userVariable.body',
+            params: {
+              flag: '-u/--user',
+              value: v,
+              reference: '{{variable}}',
+              example: 'user:pass',
+              pipe: '{{name | base64}}',
+            },
+          },
         });
         return;
       }
       pushHeader(acc, 'Authorization', `Basic ${utf8Base64(v)}`);
       acc.warnings.push({
         kind: 'credential-in-command',
-        detail:
-          '-u/--user stores this credential in the tab’s state in plain text — the app’s place for a credential is a secret variable.',
+        detail: { key: 'workbench.apiImport.credential.body', params: { flag: '-u/--user' } },
       });
       return;
     case 'oauth2-bearer':
       pushHeader(acc, 'Authorization', `Bearer ${v}`);
       acc.warnings.push({
         kind: 'credential-in-command',
-        detail:
-          '--oauth2-bearer stores this credential in the tab’s state in plain text — the app’s place for a credential is a secret variable.',
+        detail: {
+          key: 'workbench.apiImport.credential.body',
+          params: { flag: '--oauth2-bearer' },
+        },
       });
       return;
     case 'json':
@@ -409,7 +425,7 @@ function handleUnrecognizedToken(
   // eats the URL, F6's exact failure mode.
   acc.warnings.push({
     kind: 'unknown-flag',
-    detail: `${raw} is not a recognised curl flag — ignored, assumed to take no value.`,
+    detail: { key: 'workbench.apiImport.unknownFlag.body', params: { raw } },
   });
   return i + 1;
 }
@@ -459,7 +475,10 @@ function resolveMethod(acc: CurlAccumulator): string {
     if ((HTTP_METHODS as readonly string[]).includes(upper)) return upper;
     acc.warnings.push({
       kind: 'method-coerced',
-      detail: `'-X ${acc.requestFlagValue}' is not one of this app's seven supported methods — coerced to GET.`,
+      detail: {
+        key: 'workbench.apiImport.methodCoerced.body',
+        params: { method: acc.requestFlagValue, fallback: 'GET' },
+      },
     });
     return 'GET';
   }
@@ -482,11 +501,11 @@ function resolveUrl(acc: CurlAccumulator): string {
   if (extraCount > 0) {
     acc.warnings.push({
       kind: 'multiple-urls',
-      detail: `${extraCount} extra URL-shaped argument(s) were dropped — a request tab is one request.`,
+      detail: { key: 'workbench.apiImport.multipleUrls.body', params: { count: extraCount } },
     });
   }
   if (url === '') {
-    acc.warnings.push({ kind: 'no-url', detail: 'No URL was found in the command.' });
+    acc.warnings.push({ kind: 'no-url', detail: { key: 'workbench.apiImport.noUrl.body' } });
   }
 
   // F13: -G appends the -d-family data verbatim to the query string rather than sending it as a
@@ -527,21 +546,30 @@ function filterLiteralPieces(acc: CurlAccumulator): RawDataPiece[] {
     if (piece.id === 'data' && piece.text.startsWith('@')) {
       acc.warnings.push({
         kind: 'data-file-inline',
-        detail: `-d '${piece.text}' would inline a local file's contents (with newlines stripped) — this app cannot read files here, so it was dropped.`,
+        detail: {
+          key: 'workbench.apiImport.fileInlineStripped.body',
+          params: { flag: '-d', value: piece.text },
+        },
       });
       continue;
     }
     if (piece.id === 'data-binary' && piece.text.startsWith('@')) {
       acc.warnings.push({
         kind: 'data-file-inline',
-        detail: `--data-binary '${piece.text}' would inline a local file's contents — this app cannot read files here, so it was dropped.`,
+        detail: {
+          key: 'workbench.apiImport.fileInline.body',
+          params: { flag: '--data-binary', value: piece.text },
+        },
       });
       continue;
     }
     if (piece.id === 'data-urlencode' && dataUrlencodeIsFile(piece.text)) {
       acc.warnings.push({
         kind: 'data-file-inline',
-        detail: `--data-urlencode '${piece.text}' would inline a local file's contents — this app cannot read files here, so it was dropped.`,
+        detail: {
+          key: 'workbench.apiImport.fileInline.body',
+          params: { flag: '--data-urlencode', value: piece.text },
+        },
       });
       continue;
     }
@@ -582,8 +610,10 @@ function decideBodyFromPieces(acc: CurlAccumulator, literalPieces: RawDataPiece[
   pushHeader(acc, 'Content-Type', 'application/x-www-form-urlencoded');
   acc.warnings.push({
     kind: 'implied-content-type',
-    detail:
-      'curl would have sent this body as application/x-www-form-urlencoded (its own default for -d with no Content-Type header) — an explicit header was added so this app sends the same thing.',
+    detail: {
+      key: 'workbench.apiImport.impliedContentType.body',
+      params: { type: 'application/x-www-form-urlencoded', header: 'Content-Type' },
+    },
   });
   return { ...noBody(), bodyMode: 'raw', bodyRaw: joined() };
 }
@@ -614,7 +644,10 @@ function resolveBodyMode(acc: CurlAccumulator): BodyResolution {
     const path = acc.rawDataPieces[0].text.slice(1);
     acc.warnings.push({
       kind: 'unresolved-file',
-      detail: `--data-binary '@${path}' names a local file — this app cannot read files here, so it must be re-chosen before sending.`,
+      detail: {
+        key: 'workbench.apiImport.fileRef.body',
+        params: { flag: '--data-binary', value: `@${path}` },
+      },
     });
     return {
       ...noBody(),
@@ -630,7 +663,10 @@ function resolveBodyMode(acc: CurlAccumulator): BodyResolution {
     // comes from the pasted command text, not a file this app resolved itself.
     acc.warnings.push({
       kind: 'unresolved-file',
-      detail: `-T '${acc.uploadFilePath}' names a local file — this app cannot read files here, so it must be re-chosen before sending.`,
+      detail: {
+        key: 'workbench.apiImport.fileRef.body',
+        params: { flag: '-T', value: acc.uploadFilePath },
+      },
     });
     return {
       ...noBody(),

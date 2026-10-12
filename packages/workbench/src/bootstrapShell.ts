@@ -1,6 +1,7 @@
 import { i18n } from '@theme/i18n';
 import { createApp } from 'vue';
 import { errorText } from './bridge/codedError';
+import { logError } from './bridge/log';
 import BootFailure from './components/BootFailure.vue';
 
 // P113 F6: kira-space's and kira-studio's own main.ts each wrote this identical catch-and-retry
@@ -16,7 +17,7 @@ export async function bootstrapShell(
   try {
     await mountShell();
   } catch (err) {
-    console.error('bootstrap: failed to hydrate/mount the shell', err);
+    logError('bootstrap', 'failed to hydrate/mount the shell', err);
     const failureApp = createApp(BootFailure, {
       appName,
       message: errorText(err),

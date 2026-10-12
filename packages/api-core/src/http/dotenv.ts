@@ -3,6 +3,8 @@
 // (VariablesRepo.ApplyBulk), never `.env` text, so there is no second parser to drift. Pure and
 // DOM-free, the same reason substitute.ts/transforms.ts are: a plain, unit-testable import.
 
+import type { TextRef } from '../lib/textRef';
+
 /** One existing row, as the bulk editor's own reconcile needs it — the secret flag decides D22's
  *  rule 3 (an untouched empty line never touches secret_value), and `id` is what a matched update
  *  keeps (and therefore its history). */
@@ -26,7 +28,7 @@ export interface EnvEntry {
 export interface EnvParseError {
   /** 1-based, matching how an editor reports its own line numbers. */
   line: number;
-  message: string;
+  message: TextRef;
 }
 
 export interface EnvParseResult {
@@ -197,14 +199,29 @@ export function parseEnv(text: string): EnvParseResult {
     const content = trimmed.startsWith('export ') ? trimmed.slice('export '.length) : trimmed;
     const eq = content.indexOf('=');
     if (eq === -1) {
-      return { entries, error: { line: lineNo, message: `line ${lineNo}: expected KEY=VALUE` } };
+      return {
+        entries,
+        error: {
+          line: lineNo,
+          message: {
+            key: 'workbench.apiImport.dotenvNoEquals.error',
+            params: { line: lineNo, example: 'KEY=VALUE' },
+          },
+        },
+      };
     }
     const key = content.slice(0, eq).trim();
     const rawValue = content.slice(eq + 1);
     if (key === '') {
       return {
         entries,
-        error: { line: lineNo, message: `line ${lineNo}: missing a key before '='` },
+        error: {
+          line: lineNo,
+          message: {
+            key: 'workbench.apiImport.dotenvNoKey.error',
+            params: { line: lineNo, sign: '=' },
+          },
+        },
       };
     }
 

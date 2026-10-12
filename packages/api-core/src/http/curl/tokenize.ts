@@ -1,4 +1,5 @@
 import { split } from 'shlex';
+import type { TextRef } from '../../lib/textRef';
 import { isCurlCommandName } from './detect';
 
 // P7 D1/D3: the shell-quoting half of curl parsing is `shlex@3.0.0` (F8's measurement) — this
@@ -29,7 +30,7 @@ const CURL_WARNING_KINDS = [
 export type CurlWarningKind = (typeof CURL_WARNING_KINDS)[number];
 export interface CurlWarning {
   kind: CurlWarningKind;
-  detail: string;
+  detail: TextRef;
 }
 
 export type TokenizeResult =
@@ -79,7 +80,7 @@ export function tokenize(text: string): TokenizeResult {
     const dropped = argv.slice(stopIndex);
     warnings.push({
       kind: 'shell-operator',
-      detail: `Stopped at '${dropped[0]}' — this app never runs a shell, so nothing after it was parsed.`,
+      detail: { key: 'workbench.apiImport.shellOperator.body', params: { token: dropped[0] } },
     });
     argv = argv.slice(0, stopIndex);
   }

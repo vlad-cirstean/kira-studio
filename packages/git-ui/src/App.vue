@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { shortSha } from '@kira/git-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { t } from '@theme/i18n';

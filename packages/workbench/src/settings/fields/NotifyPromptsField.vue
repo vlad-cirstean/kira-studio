@@ -6,6 +6,7 @@ import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
 import { useId } from 'vue';
+import { fireAndForget } from '../../bridge/fireAndForget';
 
 // P246: `advanced.notifyPrompts`, identical in both apps: the switch, its reset, and a button that
 // posts a test notification through the saved setting.
@@ -19,9 +20,8 @@ const props = defineProps<{
 const switchId = useId();
 
 function onSendTest(): void {
-  props.sendTest().catch(() => {
-    // A failed test notification has no UI to report to; the permission state shows the cause.
-  });
+  // A failed test notification has no UI; the permission state shows the cause.
+  fireAndForget(props.sendTest(), 'notify-prompts');
 }
 </script>
 

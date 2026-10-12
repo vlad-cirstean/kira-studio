@@ -9,7 +9,6 @@ export { WELL_KNOWN_REQUEST_METADATA } from './grpc/metadata';
 export { fromSavedGrpcRequest, isGrpcDirty, toSavedGrpcRequest } from './grpc/saved';
 export {
   BODY_MODE_OPTIONS,
-  bodyBadgeLabel,
   CODE_LANGUAGE_OPTIONS,
   contentTypeCaption,
   defaultContentTypeFor,
@@ -93,3 +92,4 @@ export {
   type SplitUrl,
   splitUrl,
 } from './http/url';
+export type { TextRef } from './lib/textRef';

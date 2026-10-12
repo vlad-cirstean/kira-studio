@@ -6,6 +6,7 @@ import {
   type HttpHeaderState,
   type HttpRequestTabState,
 } from '@kira/shared/domain/http';
+import type { TextRef } from '../lib/textRef';
 
 // P15 D6: a UI-level body-mode selection — HTTP_BODY_MODES itself is unchanged (still six values,
 // no 'json'); this is only what the segmented control in RequestBodyPane.vue renders and reads,
@@ -33,10 +34,10 @@ export const BODY_MODE_OPTIONS: readonly {
 // The `code` mode's sub-selector, in the same order raw's own sub-selector used to list them
 // (minus Text, which is what plain `raw` now means, and minus JSON, which is its own top-level
 // segment now — P15 D6).
-export const CODE_LANGUAGE_OPTIONS: readonly { value: HttpCodeLanguage; label: string }[] = [
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'html', label: 'HTML' },
-  { value: 'xml', label: 'XML' },
+export const CODE_LANGUAGE_OPTIONS: readonly { value: HttpCodeLanguage; label: TextRef }[] = [
+  { value: 'javascript', label: { key: 'workbench.apiImport.codeLanguage.javascript.label' } },
+  { value: 'html', label: { key: 'workbench.apiImport.codeLanguage.html.label' } },
+  { value: 'xml', label: { key: 'workbench.apiImport.codeLanguage.xml.label' } },
 ];
 
 // Which CodeMirror grammar a code sub-language renders with — only json/xml have a real grammar
@@ -98,8 +99,7 @@ export function contentTypeCaption(
 }
 
 /** P15 D8: what counts as "this request has a body", per mode — the tab-strip badge's predicate
- *  (state/tabKinds.ts's `badge()`), sharing bodyBadgeLabel's own per-mode reading of state rather
- *  than re-deriving it. */
+ *  (state/tabKinds.ts's `badge()`). */
 export function hasRequestBody(state: HttpRequestTabState): boolean {
   switch (state.bodyMode) {
     case 'none':
@@ -114,28 +114,5 @@ export function hasRequestBody(state: HttpRequestTabState): boolean {
       return state.formData.some((f) => f.enabled && f.name.trim() !== '');
     case 'file':
       return state.binaryFile !== null;
-  }
-}
-
-/** D9: the Body segment's own count badge — mirrors REQUEST_PANE_OPTIONS's existing
- *  "bake the count into the label" technique for Params/Headers (HttpRequestView.vue). */
-export function bodyBadgeLabel(state: HttpRequestTabState): string {
-  switch (state.bodyMode) {
-    case 'none':
-      return 'Body';
-    case 'raw':
-      return 'Body (raw)';
-    case 'code':
-      return state.codeLanguage === 'json' ? 'Body (JSON)' : 'Body (code)';
-    case 'urlencoded': {
-      const n = state.urlEncoded.filter((f) => f.enabled && f.name.trim() !== '').length;
-      return n > 0 ? `Body (${n})` : 'Body';
-    }
-    case 'formdata': {
-      const n = state.formData.filter((f) => f.enabled && f.name.trim() !== '').length;
-      return n > 0 ? `Body (${n})` : 'Body';
-    }
-    case 'file':
-      return state.binaryFile ? 'Body (1 file)' : 'Body';
   }
 }

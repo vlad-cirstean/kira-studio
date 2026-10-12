@@ -72,7 +72,7 @@ useFocusOnMount(curlEl);
           <AlertDescription>
             <ul class="m-0 flex flex-col gap-0.5 pl-2">
               <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
-                {{ warning.detail }}
+                {{ t(warning.detail.key, warning.detail.params) }}
               </li>
             </ul>
           </AlertDescription>

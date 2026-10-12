@@ -2,6 +2,7 @@ import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { type Ref, reactive, toRefs } from 'vue';
 import { TIMING } from '../behaviour/timing';
+import { logError } from '../bridge/log';
 import { cleanupTabRuntime } from './tabRuntime';
 
 // P103 Part 2 (§5.2): the shared skeleton both apps' `state/tabs.ts` used to duplicate —
@@ -223,7 +224,7 @@ export function createTabsStore<
             lastSavedSnapshot = toSave;
           },
           (err) => {
-            console.error('tabs save failed', err);
+            logError('tabs', 'save failed', err);
             // Re-queue for the next saveIfChanged/flush; never loops on its own.
             nextSnapshot ??= toSave;
           },

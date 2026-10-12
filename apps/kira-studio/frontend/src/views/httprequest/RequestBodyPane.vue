@@ -210,7 +210,7 @@ const BODY_MODE_ITEMS = computed(() =>
         @update:model-value="onCodeLanguageChange"
       >
         <option v-for="opt in CODE_LANGUAGE_OPTIONS" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
+          {{ t(opt.label.key) }}
         </option>
       </NativeSelect>
       <span class="ml-auto" />

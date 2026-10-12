@@ -4,6 +4,7 @@ import {
   type HttpHeaderState,
   type HttpRequestTabState,
 } from '@kira/shared/domain/http';
+import type { TextRef } from '../../lib/textRef';
 import { explicitContentType } from '../headers';
 
 // P9 D11: the warning vocabulary — a closed union, mirroring http/curl/tokenize.ts's own
@@ -12,7 +13,7 @@ const RAW_WARNING_KINDS = ['chunked-transfer-encoding', 'content-length-dropped'
 type RawWarningKind = (typeof RAW_WARNING_KINDS)[number];
 export interface RawWarning {
   kind: RawWarningKind;
-  detail: string;
+  detail: TextRef;
 }
 
 export interface ParsedRawRequest {
@@ -132,7 +133,10 @@ export function parseRawRequest(
     if (name.trim().toLowerCase() === 'content-length') {
       warnings.push({
         kind: 'content-length-dropped',
-        detail: `'${line}' was dropped — Go computes the real Content-Length at send time, and a stale hand-typed value would be silently overridden.`,
+        detail: {
+          key: 'workbench.apiImport.contentLengthDropped.body',
+          params: { line, header: 'Content-Length' },
+        },
       });
       continue;
     }
@@ -142,7 +146,10 @@ export function parseRawRequest(
     ) {
       warnings.push({
         kind: 'chunked-transfer-encoding',
-        detail: `'${line}' was kept, but this app never sends a chunked body — it always computes an exact Content-Length instead.`,
+        detail: {
+          key: 'workbench.apiImport.chunkedKept.body',
+          params: { line, header: 'Content-Length' },
+        },
       });
     }
     headers.push({ name, value, enabled: true, description: '' });
