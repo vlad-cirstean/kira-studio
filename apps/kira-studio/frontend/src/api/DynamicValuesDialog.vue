@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
@@ -85,13 +85,7 @@ function close(): void {
       <Alert v-if="error" variant="error" data-testid="dynamic-values-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
-      <Empty
-        v-if="isFiltered && filteredEntries.length === 0"
-        data-testid="dynamic-values-filter-empty"
-      >
-        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
-      </Empty>
+      <EmptyState v-if="isFiltered && filteredEntries.length === 0" data-testid="dynamic-values-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
       <Tooltip v-for="entry in filteredEntries" :key="entry.name">
         <TooltipTrigger as-child>
           <Button

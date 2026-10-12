@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { tableCellClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { computed, ref } from 'vue';
@@ -102,20 +102,8 @@ function editEnvironmentVariables(): void {
       </Alert>
 
       <div class="flex flex-col gap-0.5 overflow-y-auto p-1">
-        <Empty
-          v-if="isFiltered && filteredRows.length === 0"
-          data-testid="variables-overview-empty"
-        >
-          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
-        </Empty>
-        <Empty
-          v-else-if="rows.length === 0"
-          data-testid="variables-overview-empty"
-        >
-          <EmptyMedia><CodiconIcon name="symbol-variable" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('studio.api.variablesOverview.empty') }}</EmptyTitle>
-        </Empty>
+        <EmptyState v-if="isFiltered && filteredRows.length === 0" data-testid="variables-overview-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
+        <EmptyState v-else-if="rows.length === 0" data-testid="variables-overview-empty" :icon="ICON.variables" :title="t('studio.api.variablesOverview.empty')" />
         <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
              has no use for (handle, secret toggle, history, remove) -- name, value, scope,
              description, in the DOM order below. `description` is the last column specifically

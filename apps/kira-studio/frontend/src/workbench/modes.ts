@@ -8,7 +8,7 @@ import ProjectPanel from './panels/ProjectPanel.vue';
 import StudioStart from './panels/StudioStart.vue';
 
 // P91 OQ-1: Terminal joins Studio/Api last, the plan's own stated default. Hoisted here from
-// TitleBar.vue at P128 §2.3: one file lists a module.
+// the old TitleBar.vue at P128 §2.3: one file lists a module.
 export const MODE_ORDER: AppMode[] = ['studio', 'api', 'automations', 'docker'];
 
 // P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own

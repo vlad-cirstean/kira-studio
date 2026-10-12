@@ -3,6 +3,7 @@ import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { displayValue } from '@workbench/behaviour/format';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
@@ -135,7 +136,7 @@ function menuFor(record: OpRecord): MenuItem[] {
       type: 'item',
       id: 're-run',
       label: t('studio.operations.menu.rerun.label'),
-      icon: 'play',
+      icon: ICON.run,
       // P23 D1(c): a truncated command is only a 64 KiB prefix of what actually ran — Copy
       // command stays enabled (copying a prefix is honest and useful), but Re-run must not.
       disabled: !record.command || !canSql || record.commandTruncated,

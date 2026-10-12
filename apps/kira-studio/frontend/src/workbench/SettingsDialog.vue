@@ -37,7 +37,7 @@ const sectionLabels = computed<Record<Section, string>>(() => ({
   Advanced: t('common.advanced.label'),
 }));
 
-// §10.1: a later plain open (TitleBar.vue's gear icon, the command palette) must not inherit a
+// §10.1: a later plain open (the title bar's gear icon, the command palette) must not inherit a
 // deep link this instance was opened with.
 useSettingsDeepLinkReset(settingsStore);
 

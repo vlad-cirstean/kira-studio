@@ -1,4 +1,5 @@
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { type CollectionChoice, moveToCollectionMenu } from '@workbench/lib/collectionMenu';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import type { CollectionRowVm } from './state/collections';
@@ -73,7 +74,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         type: 'item',
         id: 'rename',
         label: t('common.action.rename.label'),
-        icon: 'edit',
+        icon: ICON.rename,
         shortcut: 'tree.rename',
         run: () => actions.rename(row),
       },
@@ -81,7 +82,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         type: 'item',
         id: 'duplicate',
         label: t('common.action.duplicate.label'),
-        icon: 'copy',
+        icon: ICON.duplicate,
         shortcut: 'tree.duplicate',
         run: () => actions.duplicate(row),
       },
@@ -99,7 +100,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         type: 'item',
         id: 'delete',
         label: t('common.action.delete.label'),
-        icon: 'trash',
+        icon: ICON.delete,
         danger: true,
         shortcut: 'tree.delete',
         run: () => actions.remove(row),
@@ -112,7 +113,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       type: 'item',
       id: 'new-request',
       label: t('studio.api.common.newRequest.label'),
-      icon: 'add',
+      icon: ICON.add,
       run: () => actions.newRequest(row),
     },
     {
@@ -134,7 +135,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       type: 'item',
       id: 'rename',
       label: t('common.action.rename.label'),
-      icon: 'edit',
+      icon: ICON.rename,
       shortcut: 'tree.rename',
       run: () => actions.rename(row),
     },
@@ -148,7 +149,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       type: 'item',
       id: 'variables',
       label: t('common.module.variables.label'),
-      icon: 'symbol-variable',
+      icon: ICON.variables,
       run: () => actions.variables(row),
     });
     items.push({
@@ -163,7 +164,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       type: 'item',
       id: 'duplicate',
       label: t('common.action.duplicate.label'),
-      icon: 'copy',
+      icon: ICON.duplicate,
       shortcut: 'tree.duplicate',
       run: () => actions.duplicate(row),
     });
@@ -176,7 +177,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       type: 'item',
       id: 'delete',
       label: t('common.action.delete.label'),
-      icon: 'trash',
+      icon: ICON.delete,
       danger: true,
       shortcut: 'tree.delete',
       run: () => actions.remove(row),
@@ -191,7 +192,7 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       type: 'item',
       id: 'new-collection',
       label: t('common.newCollection.label'),
-      icon: 'add',
+      icon: ICON.newCollection,
       run: () => actions.newCollection(),
     },
     {
@@ -213,14 +214,14 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       type: 'item',
       id: 'environments',
       label: t('studio.api.common.environments.label'),
-      icon: 'settings-gear',
+      icon: ICON.environments,
       run: () => actions.environments(),
     },
     {
       type: 'item',
       id: 'dynamic-values',
       label: t('studio.api.dynamicValues.title'),
-      icon: 'symbol-variable',
+      icon: ICON.variables,
       run: () => actions.dynamicValues(),
     },
   ];

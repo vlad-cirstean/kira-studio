@@ -26,6 +26,7 @@ import type { ApiEnvironment, ApiVariable, VariableScope } from '@shared/domain/
 import type { ApiDataChange } from '@shared/protocol/events';
 import type { QueryKey } from '@tanstack/vue-query';
 import { useQuery } from '@tanstack/vue-query';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { toValue } from 'vue';
@@ -245,11 +246,8 @@ let unsubscribeApiDataChanged: (() => void) | null = null;
 export function initApiDataSync(): void {
   unsubscribeApiDataChanged?.();
   unsubscribeApiDataChanged = control.onApiDataChanged((event) => {
-    // A broadcast has no user action to attach an error strip to — state/collections.ts's own
-    // console.warn precedent for an unattributable async failure.
-    void Promise.all(event.changes.map(handleApiDataChange)).catch((err) => {
-      console.warn('applying an api-data-changed event failed', err);
-    });
+    // A broadcast has no user action to attach an error strip to: log only.
+    fireAndForget(Promise.all(event.changes.map(handleApiDataChange)), 'api data changed');
   });
 }
 

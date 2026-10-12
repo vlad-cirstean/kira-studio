@@ -8096,7 +8096,7 @@
           "body": "“{name}” and everything inside it will be deleted."
         },
         "empty": "No collections yet",
-        "emptyHint": "Create one from the {plus} above, or import a Postman collection.",
+        "emptyHint": "Create one from the + button above, or import a Postman collection.",
         "export": {
           "label": "Export collection…"
         },

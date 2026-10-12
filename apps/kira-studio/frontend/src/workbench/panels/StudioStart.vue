@@ -5,8 +5,10 @@ import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
 import { formatRelative } from '@workbench/behaviour/format';
+import ModuleStart from '@workbench/components/ModuleStart.vue';
 import { computed } from 'vue';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useDatagripImportStore } from '../../state/datagripImport';
@@ -59,71 +61,58 @@ function openRecent(entry: RecentTableEntry): void {
 
 <template>
   <!-- FirstRun.html — no connections at all: one button, no duplicate engine grid. -->
-  <div v-if="!hasConnections" class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="first-run">
-    <div class="w-96 flex flex-col items-center text-center gap-4">
-      <span class="start-mark text-subtle"><CodiconIcon name="database" :size="24" /></span>
-      <!-- P24 D31: no bold text anywhere in the app -- --kira-t-xl (text-kira-xl, the scale's
-           largest step) already carries the emphasis a first-run heading needs. -->
-      <div class="tracking-normal text-kira-xl text-fg">{{ t('studio.start.empty.title') }}</div>
-      <div class="mt-0 text-kira-md leading-normal text-muted-foreground">
-        {{ t('studio.start.empty.body') }}
-      </div>
-      <!-- P110 B26: --kira-s-2 (4px) -> gap-1 is a real, quantified mismatch against
-           dialog/kira-lg's own gap-1.5 (6px) -- kept as a class override rather than a new Button
-           size, since only these two call sites need it. Padding/height/border/background/colour
-           all already match dialog/dialog-primary + kira-lg exactly (both pre-existing tokens). -->
-      <span class="flex gap-1.5">
-        <Button
-          type="button"
-          variant="dialog-primary"
-          size="kira-lg"
-          class="gap-1"
-          @click="connectionDialogStore.openCreateDialog"
-        >
-          <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
-          {{ t('studio.project.connectionDialog.newConnection.title') }}
-        </Button>
-        <Button
-          type="button"
-          variant="dialog"
-          size="kira-lg"
-          class="gap-1"
-          data-testid="first-run-import-datagrip"
-          @click="datagripImportStore.pickAndScanDataGripProject"
-        >
-          <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="cloud-download" :size="13" /></span>
-          {{ t('studio.start.importDataGrip.label') }}
-        </Button>
-      </span>
-    </div>
-  </div>
+  <ModuleStart
+    v-if="!hasConnections"
+    icon="database"
+    :title="t('studio.start.empty.title')"
+    :description="t('studio.start.empty.body')"
+    data-testid="first-run"
+  >
+    <Button type="button" variant="dialog-primary" size="kira-lg" class="gap-1" @click="connectionDialogStore.openCreateDialog">
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon :name="ICON.add" :size="13" /></span>
+      {{ t('studio.project.connectionDialog.newConnection.title') }}
+    </Button>
+    <template #secondary>
+      <Button
+        type="button"
+        variant="dialog"
+        size="kira-lg"
+        class="gap-1"
+        data-testid="first-run-import-datagrip"
+        @click="datagripImportStore.pickAndScanDataGripProject"
+      >
+        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="cloud-download" :size="13" /></span>
+        {{ t('studio.start.importDataGrip.label') }}
+      </Button>
+    </template>
+  </ModuleStart>
 
   <!-- Empty.html — connections exist, nothing open: recent tables and nothing else. -->
-  <div v-else class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="no-tab-open">
-    <div class="w-140 max-w-full">
-      <div class="tracking-normal text-kira-xl text-fg">{{ t('common.product.kiraStudio.label') }}</div>
-      <div class="text-kira-md mt-1.5 text-muted-foreground">{{ t('studio.start.open.hint') }}</div>
-
-      <template v-if="recentEntries.length > 0">
-        <div class="uppercase tracking-wider text-kira-sm mb-1.5 mt-4 text-subtle">{{ t('studio.start.recent.label') }}</div>
-        <div class="flex flex-col">
-          <button
-            v-for="entry in recentEntries"
-            :key="`${entry.kind}:${entry.connectionId}:${entry.path}`"
-            type="button"
-            :class="cn(rowVariants(), 'w-full text-left')"
-            @click="openRecent(entry)"
-          >
-            <span :class="colorMarkClass('bar', connectionFor(entry)?.color)" />
-            <span class="size-4 flex items-center justify-center shrink-0" :class="iconColorClass(entry)">
-              <CodiconIcon :name="iconFor(entry)" :size="13" />
-            </span>
-            <span class="truncate min-w-0">{{ entry.path }}</span>
-            <span class="ml-auto text-kira-sm text-subtle">{{ connectionFor(entry)?.name }} · {{ formatRelative(entry.openedAt) }}</span>
-          </button>
-        </div>
-      </template>
-    </div>
-  </div>
+  <ModuleStart
+    v-else
+    icon="database"
+    :title="t('common.product.kiraStudio.label')"
+    :description="t('studio.start.open.hint')"
+    data-testid="no-tab-open"
+  >
+    <template v-if="recentEntries.length > 0" #below>
+      <div class="uppercase tracking-wider text-kira-sm mb-1.5 text-subtle">{{ t('studio.start.recent.label') }}</div>
+      <div class="flex flex-col">
+        <button
+          v-for="entry in recentEntries"
+          :key="`${entry.kind}:${entry.connectionId}:${entry.path}`"
+          type="button"
+          :class="cn(rowVariants(), 'w-full text-left')"
+          @click="openRecent(entry)"
+        >
+          <span :class="colorMarkClass('bar', connectionFor(entry)?.color)" />
+          <span class="size-4 flex items-center justify-center shrink-0" :class="iconColorClass(entry)">
+            <CodiconIcon :name="iconFor(entry)" :size="13" />
+          </span>
+          <span class="truncate min-w-0">{{ entry.path }}</span>
+          <span class="ml-auto text-kira-sm text-subtle">{{ connectionFor(entry)?.name }} · {{ formatRelative(entry.openedAt) }}</span>
+        </button>
+      </div>
+    </template>
+  </ModuleStart>
 </template>
-

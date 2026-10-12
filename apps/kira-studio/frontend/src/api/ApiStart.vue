@@ -2,6 +2,8 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
+import ModuleStart from '@workbench/components/ModuleStart.vue';
 import { useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { openApiRequestTab, openGrpcRequestTab } from './tabs';
@@ -28,36 +30,29 @@ function onImportCurl(): void {
 </script>
 
 <template>
-  <div
-    class="flex flex-1 min-h-0 items-center justify-center overflow-auto p-4"
+  <ModuleStart
+    icon="globe"
+    :title="t('studio.api.start.empty')"
+    :description="t('studio.api.start.emptyHint')"
     data-testid="api-start"
   >
-    <div class="flex w-105 max-w-full flex-col items-center gap-2 text-center">
-      <span class="text-subtle"><CodiconIcon name="globe" :size="24" /></span>
-      <div class="tracking-normal text-fg text-kira-xl">{{ t('studio.api.start.empty') }}</div>
-      <div class="text-muted-foreground text-kira-md leading-normal">
-        {{ t('studio.api.start.emptyHint') }}
-      </div>
-      <div class="flex flex-wrap items-center justify-center gap-1">
-        <Button variant="dialog-primary" size="kira-lg" data-testid="new-request-start" @click="openApiRequestTab">
-          <CodiconIcon name="add" :size="13" />
-          {{ t('studio.api.common.newRequest.label') }}
-        </Button>
-      </div>
-      <div class="flex flex-wrap items-center justify-center gap-1">
-        <Button variant="dialog" size="kira-lg" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
-          <CodiconIcon name="symbol-interface" :size="13" />
-          {{ t('shared.grpc.newRequest.title') }}
-        </Button>
-        <Button variant="dialog" size="kira-lg" data-testid="import-collection-start" @click="onImport">
-          <CodiconIcon name="cloud-download" :size="13" />
-          {{ t('studio.api.common.importCollection.label') }}
-        </Button>
-        <Button variant="dialog" size="kira-lg" data-testid="import-curl-start" @click="onImportCurl">
-          <CodiconIcon name="terminal" :size="13" />
-          {{ t('studio.api.common.importCurl.label') }}
-        </Button>
-      </div>
-    </div>
-  </div>
+    <Button variant="dialog-primary" size="kira-lg" data-testid="new-request-start" @click="openApiRequestTab">
+      <CodiconIcon :name="ICON.add" :size="13" />
+      {{ t('studio.api.common.newRequest.label') }}
+    </Button>
+    <template #secondary>
+      <Button variant="dialog" size="kira-lg" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
+        <CodiconIcon name="symbol-interface" :size="13" />
+        {{ t('shared.grpc.newRequest.title') }}
+      </Button>
+      <Button variant="dialog" size="kira-lg" data-testid="import-collection-start" @click="onImport">
+        <CodiconIcon name="cloud-download" :size="13" />
+        {{ t('studio.api.common.importCollection.label') }}
+      </Button>
+      <Button variant="dialog" size="kira-lg" data-testid="import-curl-start" @click="onImportCurl">
+        <CodiconIcon name="terminal" :size="13" />
+        {{ t('studio.api.common.importCurl.label') }}
+      </Button>
+    </template>
+  </ModuleStart>
 </template>

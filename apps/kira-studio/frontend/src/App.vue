@@ -5,10 +5,12 @@ import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { automationsModuleKey } from '@workbench/automations/module';
 import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import AppLiveRegion from '@workbench/components/AppLiveRegion.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
+import WorkbenchTitleBar from '@workbench/components/WorkbenchTitleBar.vue';
 import { workbenchHostKey } from '@workbench/host';
 import PromptHost from '@workbench/prompts/PromptHost.vue';
 import { promptsControlKey } from '@workbench/prompts/promptsQueries';
@@ -29,6 +31,7 @@ import { useAppUpdateStore } from './state/appUpdate';
 import { useConnectionDialogStore } from './state/connections';
 import { useDatagripImportStore } from './state/datagripImport';
 import { useFakeDataStore } from './state/fakeData';
+import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useObjectStoreStore } from './state/objectStore';
@@ -38,7 +41,8 @@ import { createAutomationsModule } from './workbench/automationsModule';
 import DbMcpApprovalDialog from './workbench/DbMcpApprovalDialog.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import { createWorkbenchHost } from './workbench/host';
-import TitleBar from './workbench/TitleBar.vue';
+import { MODE_ORDER, MODES } from './workbench/modes';
+import SettingsDialog from './workbench/SettingsDialog.vue';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 
@@ -69,8 +73,18 @@ const collectionsStore = useCollectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
+const keepAwakeStore = useKeepAwakeStore();
 
 let unsubscribe: Array<() => void> = [];
+
+// A rejection (e.g. a `-tags server` build) logs, no UI. The button shows only the manual source.
+function onNewWindow(): void {
+  fireAndForget(control.windowsOpenNew(), 'new window');
+}
+
+function onToggleKeepAwake(): void {
+  fireAndForget(keepAwakeStore.setKeepAwakeManual(!keepAwakeStore.status.manual), 'toggle keep-awake');
+}
 
 function closeActiveTab(): void {
   if (modeStore.activeTab) tabsStore.closeTab(modeStore.activeTab.id);
@@ -121,7 +135,25 @@ onUnmounted(() => {
     <!-- P1 C8: the frame TitleBar + WorkbenchShell now share — WorkbenchShell.vue's own root swapped
          `height: 100%` for `flex: 1; min-height: 0` to match. -->
     <div class="h-full flex flex-col">
-      <TitleBar />
+      <WorkbenchTitleBar
+        :order="MODE_ORDER"
+        :modes="MODES"
+        :active="modeStore.active"
+        :panel-label="t('common.module.connections.label')"
+        :project-visible="layoutStore.panel.project.visible"
+        :operations-visible="layoutStore.panel.operations.visible"
+        :keep-awake="keepAwakeStore.status"
+        @select="modeStore.setMode"
+        @toggle-project="layoutStore.toggleProjectPanel"
+        @toggle-operations="layoutStore.toggleOperationsPanel"
+        @open-settings="settingsStore.settingsOpen = true"
+        @toggle-keep-awake="onToggleKeepAwake"
+        @new-window="onNewWindow"
+      >
+        <template #settings>
+          <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
+        </template>
+      </WorkbenchTitleBar>
       <WorkbenchShell />
     </div>
     <ConnectionDialog v-if="connectionDialogStore.open" />

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { formatRelative } from '@workbench/behaviour/format';
 import { useVariableSetStore } from './state/variables';
 
@@ -35,13 +35,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
 <template>
   <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="variable-history">
     <div class="flex max-h-80 flex-col overflow-auto p-1">
-      <Empty
-        v-if="variableSetStore.entries.length === 0"
-        data-testid="variable-history-empty"
-      >
-        <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('studio.api.variableHistory.empty') }}</EmptyTitle>
-      </Empty>
+      <EmptyState v-if="variableSetStore.entries.length === 0" data-testid="variable-history-empty" :icon="ICON.history" :title="t('studio.api.variableHistory.empty')" />
       <div
         v-for="entry in variableSetStore.entries"
         :key="entry.id"

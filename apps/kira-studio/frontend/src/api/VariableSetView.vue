@@ -2,16 +2,17 @@
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { revealElement } from '@workbench/behaviour/focus';
@@ -499,7 +500,7 @@ function onBulkClose(): void {
         :class="colorMarkClass('dot', railColor)"
       />
       <span class="size-4 flex items-center justify-center shrink-0">
-        <CodiconIcon :name="scope === 'environment' ? 'server-environment' : 'symbol-variable'" :size="13" />
+        <CodiconIcon :name="scope === 'environment' ? ICON.environments : ICON.variables" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || t('common.module.variables.label') }}</span>
       <span class="ml-auto flex items-center gap-1" />
@@ -525,10 +526,7 @@ function onBulkClose(): void {
       </div>
     </ViewToolbar>
 
-    <Empty v-if="ownersLoaded && !ownerExists" data-testid="variable-set-orphan">
-      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ t('studio.api.variableSet.orphan.empty') }}</EmptyTitle>
-    </Empty>
+    <EmptyState v-if="ownersLoaded && !ownerExists" data-testid="variable-set-orphan" icon="warning" :title="t('studio.api.variableSet.orphan.empty')" />
     <BulkVariablesEditor
       v-else-if="bulkMode"
       :tab-id="tab.id"

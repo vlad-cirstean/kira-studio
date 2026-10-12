@@ -14,6 +14,7 @@ import { refDebounced } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
+import { logWarn } from '@workbench/bridge/log';
 import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRef, toRefs, watch } from 'vue';
@@ -148,7 +149,9 @@ export const useCollectionsStore = defineStore('collections', () => {
   /** P108 F10's successor for the read side: a failed initial/refetch List used to reject into a
    *  void'd promise with nothing shown — this surfaces it the same way state.error does for a
    *  mutation's own failure (rendered in ImportReportStrip.vue). */
-  const treeLoadError = computed(() => treeQuery.error.value?.message ?? null);
+  const treeLoadError = computed(() =>
+    treeQuery.error.value ? errorText(treeQuery.error.value) : null,
+  );
 
   /** Every tree mutation below refreshes this one key then reconciles — reconcileTree (F9's
    *  successor) drops any cached saved-request query whose item no longer exists and evicts any
@@ -629,7 +632,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         try {
           await control.grpcHistoryAdopt(tabId, item.id);
         } catch (err) {
-          console.warn('adopting grpc call history into the saved request failed', err);
+          logWarn('collections', 'adopting grpc call history into the saved request failed', err);
         }
         patchGrpcRequestTabState(tabId, { itemId: item.id, name });
         await afterTreeListChange();
@@ -656,7 +659,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       try {
         await control.historyAdopt(tabId, item.id);
       } catch (err) {
-        console.warn('adopting response history into the saved request failed', err);
+        logWarn('collections', 'adopting response history into the saved request failed', err);
       }
       // The tab is now bound to a real row, so its title becomes the saved name and Save stops
       // falling back to Save as…

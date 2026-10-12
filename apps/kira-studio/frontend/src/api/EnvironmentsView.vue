@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -235,7 +236,7 @@ useEventListener(listEl, 'keydown', (e) => {
         v-if="railColor !== undefined"
         :class="colorMarkClass('dot', railColor)"
       />
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="server-environment" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon :name="ICON.environments" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="environments-target">{{ t('studio.api.common.environments.label') }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
@@ -261,7 +262,7 @@ useEventListener(listEl, 'keydown', (e) => {
           data-testid="environments-error-dismiss"
           @click="variablesStore.dismissError"
         >
-          <CodiconIcon name="close" :size="13" />
+          <CodiconIcon :name="ICON.close" :size="13" />
         </Button>
       </AlertAction>
     </Alert>
@@ -333,29 +334,20 @@ useEventListener(listEl, 'keydown', (e) => {
             {{ t('studio.api.environments.editVariables.label') }}
           </Button>
           <TooltipIconButton
-            icon="copy"
+            :icon="ICON.duplicate"
             :label="t('common.action.duplicate.label')"
             data-testid="environment-duplicate"
             @click="onDuplicate(env.id)"
           />
           <TooltipIconButton
-            icon="trash"
+            :icon="ICON.delete"
             :label="t('common.action.delete.label')"
             data-testid="environment-remove"
             @click="onDelete(env.id, env.name)"
           />
         </div>
-        <Empty v-if="variablesStore.environments.length === 0" data-testid="environments-empty">
-          <EmptyMedia><CodiconIcon name="server-environment" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('common.noEnvironments.empty') }}</EmptyTitle>
-        </Empty>
-        <Empty
-          v-else-if="isFiltered && displayEnvironments.length === 0"
-          data-testid="environments-filter-empty"
-        >
-          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('common.state.noMatches.empty') }}</EmptyTitle>
-        </Empty>
+        <EmptyState v-if="variablesStore.environments.length === 0" data-testid="environments-empty" :icon="ICON.environments" :title="t('common.noEnvironments.empty')" />
+        <EmptyState v-else-if="isFiltered && displayEnvironments.length === 0" data-testid="environments-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
       </div>
     </RadioGroup>
   </div>

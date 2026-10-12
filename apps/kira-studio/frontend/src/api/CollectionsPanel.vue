@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
-import CatalogText from '@theme/i18n/CatalogText.vue';
+import { ICON } from '@theme/icons';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -132,7 +131,7 @@ onUnmounted(() => {
       {{ t('studio.api.collections.title') }}
       <template #actions>
       <TooltipIconButton
-        icon="search"
+        :icon="ICON.search"
         :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
         :aria-label="t('common.action.search.label')"
         :pressed="showSearch"
@@ -140,13 +139,13 @@ onUnmounted(() => {
         @click="toggleSearch"
       />
       <TooltipIconButton
-        icon="add"
+        :icon="ICON.add"
         :label="t('studio.api.common.newRequest.label')"
         data-testid="new-request"
         @click="openApiRequestTab"
       />
       <TooltipIconButton
-        icon="new-folder"
+        :icon="ICON.newCollection"
         :label="t('common.newCollection.label')"
         data-testid="new-collection"
         @click="onNewCollection"
@@ -158,7 +157,7 @@ onUnmounted(() => {
       <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
       <TooltipIconButton
-        icon="server-environment"
+        :icon="ICON.environments"
         :label="t('studio.api.common.environments.label')"
         data-testid="api-environments"
         @click="onEnvironments"
@@ -199,15 +198,13 @@ onUnmounted(() => {
     </template>
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <ImportReportStrip />
-      <Empty class="h-full" data-testid="collections-empty">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="folder-library" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('studio.api.collections.empty') }}</EmptyTitle>
-          <EmptyDescription>
-            <CatalogText k="studio.api.collections.emptyHint"><template #plus><b>+</b></template></CatalogText>
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState
+        class="h-full"
+        data-testid="collections-empty"
+        icon="folder-library"
+        :title="t('studio.api.collections.empty')"
+        :description="t('studio.api.collections.emptyHint')"
+      />
     </div>
   </div>
 </template>

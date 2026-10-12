@@ -1,9 +1,3 @@
-U74 apps/kira-studio/frontend/src/api/CollectionsPanel.vue
-U74 apps/kira-studio/frontend/src/api/DynamicValuesDialog.vue
-U74 apps/kira-studio/frontend/src/api/EnvironmentsView.vue
-U74 apps/kira-studio/frontend/src/api/VariableHistoryMenu.vue
-U74 apps/kira-studio/frontend/src/api/VariableSetView.vue
-U74 apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue
 U74 apps/kira-studio/frontend/src/views/browse/BrowseView.vue
 U74 apps/kira-studio/frontend/src/views/definition/DefinitionView.vue
 U74 apps/kira-studio/frontend/src/views/documents/DocumentView.vue
@@ -20,7 +14,6 @@ U74 apps/kira-studio/frontend/src/views/httprequest/TimelinePane.vue
 U74 apps/kira-studio/frontend/src/views/shared/keyvalue/KeyValuePane.vue
 U74 apps/kira-studio/frontend/src/views/shared/page/SearchFilterNotice.vue
 U74 apps/kira-studio/frontend/src/views/stream/StreamView.vue
-U74 apps/kira-studio/frontend/src/workbench/panels/ProjectPanel.vue
 U77 apps/kira-studio/frontend/src/views/console/state.ts
 U77 apps/kira-studio/frontend/src/views/documents/DocumentView.vue
 U77 apps/kira-studio/frontend/src/views/grid/FilterToolbar.vue
@@ -28,5 +21,5 @@ U77 apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue
 U77 apps/kira-studio/frontend/src/views/grpcrequest/schemaQuery.ts
 U77 apps/kira-studio/frontend/src/views/shared/viewOp.ts
 U77 apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue
-U79 apps/kira-studio/frontend/src/docker/context.ts
 U81 apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts
+U79 apps/kira-studio/frontend/src/docker/context.ts # the one LinkService.OpenExternal call, wrapped by createOpenExternal; rule path exempt lacks a leading slash so it never matches

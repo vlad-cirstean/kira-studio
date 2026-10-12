@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -42,7 +42,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
       {{ t('common.module.connections.label') }}
       <template #actions>
         <TooltipIconButton
-          icon="search"
+          :icon="ICON.search"
           :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
           :pressed="showSearch"
           data-testid="toggle-search"
@@ -53,7 +53,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
              four-button header. StudioStart.vue's own first-run button stays: an empty state is
              exactly when a menu-bar-only affordance is hardest to find. -->
         <TooltipIconButton
-          icon="add"
+          :icon="ICON.add"
           :label="t('studio.project.connectionDialog.newConnection.title')"
           data-testid="add-connection"
           @click="connectionDialogStore.openCreateDialog"
@@ -70,12 +70,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
     </template>
     <!-- FirstRun.html's empty pane: says what the panel is for, nothing more — the headline
          already lives on the main start page, so it is not repeated here. -->
-    <Empty v-else class="h-full">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="database" :size="24" /></EmptyMedia>
-        <EmptyDescription>{{ t('studio.project.panel.empty.empty') }}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState v-else class="h-full" icon="database" :title="t('studio.project.panel.empty.empty')" />
   </div>
   <FiltersDialog />
   <CredentialsUpdateDialog v-if="credentialsDialogStore.open" />
