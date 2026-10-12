@@ -239,9 +239,7 @@ async function save(): Promise<void> {
             </FieldError>
           </Field>
           <Field>
-            <FieldLabel :for="graphScopeId">{{
-              t('git.dialog.repoSettings.scope.label')
-            }}</FieldLabel>
+            <FieldLabel :for="graphScopeId">{{ t('common.field.scope.label') }}</FieldLabel>
             <NativeSelect
               :id="graphScopeId"
               :model-value="draft['kiraSpace.graph.scope']"

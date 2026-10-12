@@ -2105,6 +2105,9 @@
       "number": {
         "label": "Number"
       },
+      "scope": {
+        "label": "Scope"
+      },
       "source": {
         "label": "Source"
       },
@@ -3551,9 +3554,6 @@
         },
         "saveError": {
           "error": "Couldn’t save settings: {error}"
-        },
-        "scope": {
-          "label": "Scope"
         },
         "scopeAll": {
           "option": "All refs"
@@ -5536,6 +5536,9 @@
       "checking": {
         "loading": "Checking with Claude…"
       },
+      "findProject": {
+        "placeholder": "Find or enter a project key"
+      },
       "label": "Add memory",
       "outcome": {
         "failed": {
@@ -5548,12 +5551,18 @@
           "status": "Updated v{from} to v{to}"
         }
       },
+      "project": {
+        "placeholder": "Choose or type a project key"
+      },
       "resubmit": {
         "label": "Resubmit"
       },
       "text": {
         "label": "What to remember",
         "placeholder": "Facts in your own words; Claude splits and checks them"
+      },
+      "useProject": {
+        "label": "Use {project}"
       }
     },
     "common": {
@@ -5592,6 +5601,9 @@
       },
       "pause": {
         "label": "Pause"
+      },
+      "project": {
+        "label": "Project key"
       },
       "resume": {
         "label": "Resume"
@@ -5784,6 +5796,12 @@
       }
     },
     "start": {
+      "context": {
+        "label": "Stored together",
+        "more": {
+          "label": "{count} more not shown"
+        }
+      },
       "empty": "Search or add a memory",
       "emptyHint": "Select a result to see its reason and history.",
       "event": {
@@ -5798,6 +5816,9 @@
         },
         "plain": {
           "label": "{action} · {origin} · {source}"
+        },
+        "session": {
+          "label": "Session {session}"
         },
         "source": {
           "ui": {
@@ -5814,8 +5835,17 @@
           "label": "{action} · {origin} · {source} — {rationale}"
         }
       },
+      "id": {
+        "label": "Fact ID"
+      },
+      "noSession": {
+        "description": "Not stored from a Claude Code session."
+      },
       "reason": {
         "label": "Reason:"
+      },
+      "session": {
+        "label": "Session ID"
       },
       "versions": {
         "label": "Versions"
