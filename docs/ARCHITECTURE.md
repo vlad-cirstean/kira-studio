@@ -54,6 +54,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | MCP server (M1; repo-map server removed in v1.9 P97) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio, for `internal/dbmcp` | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect, never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source |
 | Local embeddings (P210, Kira Space memory) | ONNX Runtime 1.29.1 (MIT) via `github.com/yalue/onnxruntime_go` v1.36.0 (MIT), `github.com/gomlx/go-huggingface` v0.4.13 (Apache-2.0) `hftokenizer` + `hub` downloader, model Snowflake arctic-embed-s int8 (Apache-2.0) | Cgo `dlopen` of a bundled `libonnxruntime`; inference in a `memory-embed` worker subprocess, vectors as BLOBs in `memory.db`, search in Go. Declined: `knights-analytics/hugot` pure-Go backend (458 MB loaded, 1.05 GB peak, 40x slower) and its ORT backend (drags GoMLX and go-xla into `go.mod` for one pipeline); `sqlite-vec` (a native extension `modernc.org/sqlite` cannot load; its KNN is brute force anyway); llama.cpp (second native toolchain); EmbeddingGemma (Gemma terms), jina v3 (non-commercial). See "Memory MCP server and module" |
 | Memory bulk import (P211, Kira Space) | `github.com/yuin/goldmark` v1.7.16 (MIT) Markdown AST for chunk boundaries; `github.com/go-git/go-git/v5` v5.19.2 (Apache-2.0) `plumbing/format/gitignore` matcher only; `github.com/cenkalti/backoff/v4` (MIT) retry | Go modules. Declined: hand-rolled Markdown splitter and gitignore matcher; a tokenizer for chunk sizes (estimate is ceil(runes / 3), within the margin the 3000-token target leaves). go-git pulls go-billy and a few indirect deps for one subpackage. See "Memory MCP server and module" |
+| Memory fact ids (P272, Kira Space) | `github.com/matoous/go-nanoid/v2` v2.1.0 (MIT) | Go module, pure Go. `internal/memory/ids.go` `newID` (`gonanoid.Generate`, Crockford base32 lowercase, 12 chars) for fact `km_` and group `kg_` ids. Migration 4 mints legacy ids in SQL (`random() & 31`) because `sqlitex.Migrate` runs SQL only. See "Memory MCP server and module" |
 | Native file viewer + diff (C5/C6, Kira Space) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library; neither `packages/workbench`'s nor either app's own `frontend/package.json` redeclares it. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs, now Kira Space's, stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6. **81** basic languages Monaco ships get a registered Monarch grammar as of P67c (`packages/workbench/src/editor/monacoEntry.ts`'s own `register.all.js` import, up from 19 — the package's own bundle registers 81, not the 84 once recorded here); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5-C7, P67c)" and "Diff tabs (C6)" below |
 | Git graph, native workspace (C10, historical) | Moved to Kira Space as of v1.9 P100 — `apps/kira-studio/frontend/package.json` no longer depends on `@kira/git-ui`/`@kira/git-ipc`/`@kira/git-core`/`seti-icons`, and the bundle-size deltas this row used to record no longer apply to this binary. `@kira/kira-ui` was deleted in P267. See "Git graph in the native workspace (C10)" below, now describing Kira Space's own frontend |
 
@@ -4638,7 +4639,7 @@ replies and full terminal attach for Claude Code sessions.
 - Schema: `memories` (immutable versions, `current`/`superseded`; one current row per lineage by partial
   unique index; update and delete blocked by trigger except `current` to `superseded`), `memories_fts`
   (FTS5 external content, `porter unicode61 remove_diacritics 2`, prefix 2 3), `memory_revision`
-  (insert counter), `memory_events` (every add/update/noop with author, source, request id, rationale).
+  (insert counter), `memory_events` (every add/update/noop with origin, source tag, session, source, request id, rationale).
 - Search is recall-first: every term a quoted prefix term OR-ed, plus the whole phrase; stopwords
   dropped; gate-written keywords indexed; bm25 `(10, 2, 4)` orders only; no score cutoff. One builder
   (`memory.BuildMatch`) serves MCP, module and reconcile candidates. User input never reaches FTS5 as syntax.
@@ -4697,7 +4698,7 @@ replies and full terminal attach for Claude Code sessions.
 - MCP server: `<Kira Space executable> memory-mcp`, stdio, spawned per session by Claude Code, so it works
   with the app closed or open. `main.go` calls `appwire.RunArgvShim` (`internal/appwire/wire.go`) before `startupfail` and
   `acquireSingleInstance`. Tools `store_memory` (progress notifications `checking`,
-  `reconciling`, `saving`), `search_memories` (`includeHistory`), `memory_history`; prompt `remember`
+  `reconciling`, `saving`), `search_memories` (`includeHistory`), `memory_history`, `memory_context`; prompt `remember`
   (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
   from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
   script lives in Studio's `mcpauth`).
@@ -4714,7 +4715,38 @@ replies and full terminal attach for Claude Code sessions.
 - Memory UI adds `settings/SemanticModelSection.vue` (download button, progress, indexing, retry) and a `semantic`
   badge on rows found by meaning only.
 - Add memory is one free-text box (cap 1000 = `MaxFactLen`), sent as one item with a fixed manual
-  reason. Gate splits it into atomic facts. Author `user`, source `ui`.
+  reason. Gate splits it into atomic facts. Origin `user`, source `ui`, scope picker (default Personal) plus project combobox for Project.
+- Ids (P272): fact id = lineage id, `km_` + 12 Crockford base32 lowercase chars (`km_7h3kq9x2mfa4`; word-boundary
+  regex `memory.FactIDPattern`). Version id = `<fact id>.<version>`, so grepping a fact id finds every version.
+  Agents cite the fact id. Lookups (`memory_history`, `memory_context`, `Lineage`) accept fact id (current
+  version), version id or a legacy uuid. Migration 4 (`0004_p272_provenance.sql`) rebuilt `memories` and
+  `memory_events` with new ids, kept `seq` (FTS and embeddings key on it) and recorded old ids in
+  `memory_legacy_ids(legacy_id, memory_id)`. Same fact and reason in the same scope and project is a noop
+  (hash short-circuit).
+- Provenance (P272): each item names `origin` (required, no default). Grade: `user` = human-challenged,
+  correct; `external` (requires `sourceTag`, `[a-z0-9-]` 1 to 32 chars, open set) = correct, probably
+  incomplete; `agent` = reference only. Order user > external > agent. Reconcile may not `update` a candidate
+  of higher grade; Go turns it into `add` ("Kept beside a higher-graded fact."). CHECKs tie `source_tag` to
+  `external`. Migration backfill: origin from old `author`, `external`/`doc` for import-created versions.
+- Scope (P272): each item names `scope` (required): `company`, `project`, `personal`. Project key =
+  normalised `origin` remote, `host/path` lowercase, no scheme, credentials, port or `.git`
+  (`github.com/acme/billing`; `memory.NormalizeRemote`); no remote gives `local:<main worktree path>`
+  (`memory.DetectProject`). `memory-mcp` detects it once from its cwd; a `project` item without a key uses it.
+  Hash noop and reconcile candidates stay within the same scope and project, so an
+  update never crosses scopes. Backfill: every old row `personal`.
+- Session (P272): `memories.session_id` is the `session` tool argument, else `CLAUDE_CODE_SESSION_ID`
+  read by `memorycli.Run` at start (real `claude` passes it to stdio servers and it equals `--session-id`),
+  else NULL. UI, import and pre-existing rows are NULL. Shape: 1 to 128 chars of `[A-Za-z0-9._:-]`.
+- Groups (P272): `memory_groups(id kg_…, kind, key, title, UNIQUE(kind, key))` and
+  `memory_group_members(group_id, lineage_id)`, append-only by trigger; membership is per fact, so it
+  survives versions. Kinds: `session` (auto when a session is known), `request` (auto per store call),
+  `document` (auto in import mode); caller may also pass `task`, `document`, `thread` (at most 5 per call,
+  key 1 to 300). Every add, update and noop of a call joins every group. Backfill: one `request` group per old request id,
+  one `document` group per import file.
+- Context (P272): `memory_context(id, limit)` MCP tool, `Service.Context`: per group of the fact, newest
+  first, `total` and up to `limit` (default 20, max 100) other current facts. IPC: `MemoryService.Context`
+  and `MemoryService.Projects` (distinct project keys of current facts). UI: detail shows fact id, grade, scope,
+  session and a context section per group (`MemoryContext.vue`).
 - Failure modes: no `claude` on `PATH` or not logged in surfaces a typed message in the dialog and as an
   MCP tool error; the gate can over-challenge; model latency is 5 to 20 s per store.
 
@@ -4737,8 +4769,8 @@ replies and full terminal attach for Claude Code sessions.
   `mcp__kira-memory__*` tools, `--permission-prompts none`, `--setting-sources ""`. No `--safe-mode`:
   it disables MCP servers. User-level `CLAUDE.md` stays out through `--setting-sources ""` (canary
   checked), and a tool outside the list is denied.
-- Import mode: `memory-mcp --import-ref` forces author `agent`, source `import`, `source_ref` = file id
-  whatever the tool input says. `memory_events` (migration 3) holds `source_ref`, checked as
+- Import mode: `memory-mcp --import-ref` forces origin `external` with source tag `doc`, scope `personal`, no session, source `import`, `source_ref` = file id
+  whatever the tool input says, and joins the file's `document` group. `memory_events` (migration 3) holds `source_ref`, checked as
   `(source = 'import') = (source_ref IS NOT NULL)`; history shows "via import (<path>)" through a join
   on `import_files`. The gate and reconcile run on every imported fact like any store.
 - State: `import_jobs`, `import_files`, `import_chunks` in `memory.db`. Job: scanning, awaiting,
@@ -5391,6 +5423,8 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
+
+- **`adapters/clickhouse` tests fail at `-count>1` (P272).** Runs share one container state. `-count=1` passes. Owned by P277.
 
 - **Quit discards staged grid edits and dirty edit buffers (P267).** Tab close and dialogs guard unsaved edits; app quit does not. Accepted by the user (P266 decision).
 - **Space review window sync popover never positions under WebKit (P267).** `ade-v2-review` sync popover: reka popper keeps its initial `translate(0px, -200%)`, box at y=-274. Same at P267 base `795948768`. Spec clicks with `dispatchEvent`. Other popovers position fine. Root cause open; delete once found. P277 closes it.

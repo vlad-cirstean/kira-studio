@@ -425,3 +425,8 @@ arrived and equaled the run's `--session-id`. Session capture from env works; no
 - Real `claude` 2.1.296: `TestMemoryGate` 15 s, `TestMemoryImport` 55 s (0.140 USD; 20 added, 1 unresolved), `TestMemoryMcpThroughClaude` 24 s, `TestMemoryInstallRegisters` 2 s all pass. `claude -p` spend 0.0087 USD (import cost is its own line).
 - Flake, not P272: `adapters/clickhouse` failed once under load (`QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING`), passes alone x2 at `-count=1`. `-count>1` fails by design (shared container state).
 - §7 greps: 1-3, 5-7 clean (`uuid.NewString` only `requestID` and import ids; `gonanoid` in `ids.go` via `newFactID` in `commitFact`; scope dialog uses `SecondaryTabs`, built on `ToggleGroup`).
+
+### 9.3 Close-out
+
+`docs/ARCHITECTURE.md` memory section (ids, provenance, scope, session, groups, context), nanoid dependency row and
+Known open item (clickhouse `-count>1`, owned by P277, appended to the SPEC P277 row) landed. SPEC P272 Done.
