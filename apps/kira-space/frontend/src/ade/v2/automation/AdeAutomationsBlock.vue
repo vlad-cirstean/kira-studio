@@ -43,9 +43,10 @@ function toggle(id: string): void {
       :data-state="run.state"
     >
       <div class="flex items-center gap-1.5">
-        <button
-          type="button"
-          class="flex min-w-0 flex-1 items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit"
+        <Button
+          variant="toolbar"
+          size="inline"
+          class="min-w-0 flex-1 justify-start gap-1.5 font-normal text-fg"
           :aria-expanded="expanded === run.id"
           @click="toggle(run.id)"
         >
@@ -60,7 +61,7 @@ function toggle(id: string): void {
             }}</span
           >
           <RunElapsed :run="run" class="ml-auto shrink-0 text-kira-sm text-muted-foreground" />
-        </button>
+        </Button>
         <Button
           v-if="run.kind === 'smart'"
           variant="dialog"

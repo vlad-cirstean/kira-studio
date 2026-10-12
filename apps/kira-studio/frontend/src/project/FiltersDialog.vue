@@ -245,7 +245,7 @@ const connectionName = computed(
             >
               <Checkbox
                 :model-value="!row.hidden"
-                class="size-3.5"
+                class="size-3.5 after:inset-0"
                 @update:model-value="onToggleKind(row.kind)"
               >
                 <CodiconIcon name="check" :size="12" />
@@ -301,7 +301,7 @@ const connectionName = computed(
                     <Checkbox
                       :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
                       :disabled="row.disabled"
-                      class="size-3.5"
+                      class="size-3.5 after:inset-0"
                       @update:model-value="onToggleNode(row)"
                     >
                       <template #default="{ state }">

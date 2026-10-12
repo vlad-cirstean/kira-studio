@@ -471,8 +471,10 @@ const fieldAttrs = computed(
           :style="{ left: `${hoverAnchor.x}px`, top: `${hoverAnchor.y}px` }"
         />
       </PopoverAnchor>
+      <!-- Above the field: below it the popper wrapper (which has pointer events) covers the
+           pointer, the input gets mouseleave and the panel closes itself. -->
       <PopoverContent
-        side="bottom"
+        side="top"
         align="start"
         :side-offset="4"
         class="var-hover-panel pointer-events-none z-(--kira-z-autocomplete) w-auto max-w-96 gap-0 overflow-hidden px-1.5 py-1 font-data"

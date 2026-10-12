@@ -248,7 +248,7 @@ function onEditorKeydown(e: KeyboardEvent): void {
 
 const editorBodyEl = useTemplateRef<HTMLElement>('editorBodyEl');
 useEventListener(editorBodyEl, 'keydown', onEditorKeydown);
-useShortcut(editorBodyEl, ['form.save', 'form.submit'], saveEdit);
+useShortcut(editorBodyEl, ['form.save', 'form.submit'], saveEdit, { capture: true });
 useEventListener(editorBodyEl, 'focusout', onEditorBlur);
 
 function closePanel(): void {

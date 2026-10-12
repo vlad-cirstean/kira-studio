@@ -58,7 +58,15 @@ export function useFormErrors<F extends string>(
     const tab = rules[first].tab;
     if (tab !== undefined) opts.onTab?.(tab);
     await nextTick();
-    document.querySelector<HTMLElement>(`[aria-describedby="${errorId(first)}"]`)?.focus();
+    // A tab's content can mount a frame after the tab switch.
+    for (let frame = 0; frame < 5; frame++) {
+      const el = document.querySelector<HTMLElement>(`[aria-describedby="${errorId(first)}"]`);
+      if (el) {
+        el.focus();
+        break;
+      }
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
     return false;
   }
 

@@ -4,7 +4,8 @@ import { TIMING } from './timing';
 
 /** The find bar's keys and query debounce: Enter next, Shift+Enter previous, Escape close (all
  *  IME-safe), `onQuery` called once typing pauses for `TIMING.search`. `root` is the bar's element
- *  or component, where the key events are caught. */
+ *  or component, where the key events are caught in the capture phase: `SearchField` swallows Esc to clear
+ *  a non-empty field, but a find bar closes on the first Esc. */
 export function useFindBar(opts: {
   root: Ref<unknown>;
   query: Ref<string>;
@@ -28,5 +29,6 @@ export function useFindBar(opts: {
         else opts.next();
       }
     },
+    { capture: true },
   );
 }

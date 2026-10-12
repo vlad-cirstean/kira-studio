@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Translation } from 'vue-i18n';
-import { i18n } from './index';
+import { formatCount } from './number';
 import type { MessageKey, MessageParams } from './types';
 
 const props = withDefaults(defineProps<{ k: MessageKey; params?: MessageParams; tag?: string }>(), {
@@ -21,12 +21,7 @@ const textParams = computed(() =>
     .filter(([name]) => !(name in slots))
     .map(
       ([name, value]) =>
-        [
-          name,
-          name === 'count' && count.value !== undefined
-            ? i18n.global.n(count.value)
-            : String(value),
-        ] as const,
+        [name, typeof value === 'number' ? formatCount(value) : String(value)] as const,
     ),
 );
 const slotNames = computed(() => Object.keys(slots));
