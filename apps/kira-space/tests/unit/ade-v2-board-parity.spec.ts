@@ -353,10 +353,18 @@ describe('Needs you', () => {
   test('same items (kind, text, action, scope) as the mockup', () => {
     const key = (kind: string, what: string, action: string, scope: string) =>
       [kind, what, action, scope].join('|');
-    // The product words differ from the mockup's by the P265 style rules: curly quotes, a capitalised scope.
+    // The product words differ from the mockup's by the P265 style rules: curly quotes, a capitalised scope,
+    // and the catalog's "Each repository" for the mockup's "each repo".
     const curly = (s: string) => s.replace(/"([^"]*)"/g, '“$1”');
     const theirs = oracle.needs.items
-      .map((n: MockupComponent) => key(n.kind, curly(n.what), n.btn, (n.repo ?? '').toLowerCase()))
+      .map((n: MockupComponent) =>
+        key(
+          n.kind,
+          curly(n.what),
+          n.btn,
+          (n.repo ?? '').toLowerCase().replace(/^each repo$/, 'each repository'),
+        ),
+      )
       .sort();
     const mine = ours()
       .items.map((n) => key(n.kind, n.what, n.action, n.scope.toLowerCase()))
