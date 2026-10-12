@@ -172,12 +172,12 @@ const historyToggleId = useId();
                   }}</Badge
                 >
                 <Badge data-testid="memory-row-scope">{{ t(SCOPE_LABEL[memory.scope]) }}</Badge>
-                <TruncatedText
+                <span
                   v-if="memory.project"
-                  class="max-w-40 font-data text-kira-sm text-muted-foreground"
-                  :text="memory.project"
+                  class="min-w-0 max-w-40 font-data text-kira-sm text-muted-foreground"
                   data-testid="memory-row-project"
-                />
+                  ><TruncatedText :text="memory.project" /></span
+                >
                 <Badge v-if="memory.historical" variant="warn">{{
                   t('memory.common.historical.status')
                 }}</Badge>

@@ -92,11 +92,9 @@ function eventsFor(id: string) {
             <template v-if="selected.project">
               <dt class="text-muted-foreground">{{ t('memory.common.project.label') }}</dt>
               <dd class="m-0 min-w-0">
-                <TruncatedText
-                  class="font-data"
-                  :text="selected.project"
-                  data-testid="memory-detail-project"
-                />
+                <span class="font-data" data-testid="memory-detail-project"
+                  ><TruncatedText :text="selected.project" /></span
+                >
               </dd>
             </template>
             <dt class="text-muted-foreground">{{ t('memory.start.session.label') }}</dt>

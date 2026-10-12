@@ -9,6 +9,7 @@ import { IPC } from './support/ipcChannels';
 
 interface Mem {
   id: string;
+  createdAt: string;
   lineageId: string;
   fact: string;
   origin: string;
@@ -27,6 +28,9 @@ async function enterMemoryMode(page: Page): Promise<void> {
   await page.locator('[data-testid="mode-tab"][data-mode="memory"]').click();
   await expect(page.locator('[data-testid="memory-panel"]')).toBeVisible();
 }
+
+// Go masks createdAt; the detail pane formats it, so give each fact a real time.
+const timed = <T extends Mem>(m: T): T => ({ ...m, createdAt: '2026-03-01T10:00:00.000Z' });
 
 const row = (page: Page, id: string) => page.locator(`[data-testid="memory-row-${id}"]`);
 
@@ -73,10 +77,14 @@ test('contract: Add memory in Project scope sends the chosen project key', async
 test('contract: a stored fact lists the facts stored with it and opens one', async ({
   relaunch,
 }) => {
-  const ctx = contract<Ctx>('memory', 'MemoryService.Context#request');
-  const group = ctx.groups[0];
-  const sibling = group?.facts[0];
-  if (!group || !sibling) throw new Error('contract has no request group');
+  const raw = contract<Ctx>('memory', 'MemoryService.Context#request');
+  const first = raw.groups[0]?.facts[0];
+  if (!first) throw new Error('contract has no request group');
+  const sibling = timed(first);
+  const ctx: Ctx = {
+    memory: timed(raw.memory),
+    groups: raw.groups.map((g) => ({ ...g, facts: g.facts.map(timed) })),
+  };
   const { window: page } = await relaunch({
     control: [
       { channel: IPC.memoryRecent, response: [ctx.memory, sibling] },
@@ -116,8 +124,12 @@ test('contract: a stored fact lists the facts stored with it and opens one', asy
 test('contract: an agent-stored external fact shows its source, scope, session and groups', async ({
   relaunch,
 }) => {
-  const recent = contract<Mem[]>('memory', 'MemoryService.Recent#mcp');
-  const ctx = contract<Ctx>('memory', 'MemoryService.Context#mcp');
+  const recent = contract<Mem[]>('memory', 'MemoryService.Recent#mcp').map(timed);
+  const rawCtx = contract<Ctx>('memory', 'MemoryService.Context#mcp');
+  const ctx: Ctx = {
+    memory: timed(rawCtx.memory),
+    groups: rawCtx.groups.map((g) => ({ ...g, facts: g.facts.map(timed) })),
+  };
   const { window: page } = await relaunch({
     control: [
       { channel: IPC.memoryRecent, response: recent },
