@@ -136,3 +136,16 @@ fixed") both require it gone. The P269 fixer should delete it with this file onc
 - High: 0
 - Medium: 0
 - Low: 5 (P269-1, P269-2, P269-3, P269-4, P269-5)
+
+## Round 2 fix result
+
+All five findings real on re-trace; fixed. Base `44e429b1c`.
+
+- Process note: `111205442` `docs(p268): remove fixed round 1 findings`.
+- P269-1: `320225426` `formatCompactDuration` at both Preparing sites in `board/actions.ts` (floors, clamps at 0).
+- P269-2: `fe85f6f02` day step in `formatCompactDuration` (`6d 23h`, `1d`); `ClaudeUsageItem.vue` uses it; spec case added; `claude-usage.spec.ts` expects `in 2h`.
+- P269-3: `6a6dd3fc6` message, yaml, prepareScript and deployedShaScript limits return `E_BAD_REQUEST` with catalog keys `backend.space.ade.{messageTooLong,yamlTooLarge,scriptTooLarge}.body`. Ids, counts, enums, plan size and "required" stay `E_CONTRACT`. No new code, N6 untouched. No TS change needed.
+- P269-4: `bf92635a2` `ConfirmDialog` takes `touch`, forwarded to the view; mobile `App.vue` passes it.
+- P269-5: `ca25ed992` `String(p)` at the three partition sites.
+
+Verified: `bun test` format.spec, `go test ./apps/kira-space/...`, lint and typecheck via hooks, Playwright `claude-usage` and `ade-v2-launch` (ui), mobile-ios `agents`. Not run: studio stream UI specs (none cover partitions), full suites.
