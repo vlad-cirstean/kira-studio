@@ -4,7 +4,9 @@ import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
+import PromptsPane from '@workbench/llmPrompts/PromptsPane.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
+import { useLlmPromptsShellExtra } from '@workbench/state/llmPromptDrafts';
 import { computed } from 'vue';
 import { type Section, sections, useSettingsStore } from '../state/settings';
 import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
@@ -27,6 +29,7 @@ const SETTINGS_DB_PATH = '~/.kira-studio/kira.sqlite';
 const emit = defineEmits<{ close: [] }>();
 
 const settingsStore = useSettingsStore();
+const promptsExtra = useLlmPromptsShellExtra();
 
 const sectionLabels = computed<Record<Section, string>>(() => ({
   Appearance: t('common.appearance.label'),
@@ -34,6 +37,7 @@ const sectionLabels = computed<Record<Section, string>>(() => ({
   Cache: t('studio.settings.nav.cache.label'),
   Api: t('studio.mode.api.label'),
   'Database MCP': t('studio.settings.nav.databaseMcp.label'),
+  Prompts: t('llmPrompts.nav.label'),
   Advanced: t('common.advanced.label'),
 }));
 
@@ -66,6 +70,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       api: settingsStore.api,
     }"
     :save="save"
+    :extra="promptsExtra"
     @close="emit('close')"
   >
     <template #pane="s">
@@ -104,6 +109,7 @@ async function save(patch: SettingsPatch): Promise<void> {
         :reset-leaf="s.resetLeaf"
         :register-field-error="s.registerFieldError"
       />
+      <PromptsPane :active="s.activeSection === 'Prompts'" />
       <AdvancedPane
         :active="s.activeSection === 'Advanced'"
         :draft="s.draft"

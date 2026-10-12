@@ -3,7 +3,9 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
+import PromptsPane from '@workbench/llmPrompts/PromptsPane.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
+import { useLlmPromptsShellExtra } from '@workbench/state/llmPromptDrafts';
 import { computed } from 'vue';
 import { type Section, sections, useSettingsStore } from '../state/settings';
 import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
@@ -26,6 +28,7 @@ import MobileAccessPane from './settings/MobileAccessPane.vue';
 const emit = defineEmits<{ close: [] }>();
 
 const settingsStore = useSettingsStore();
+const promptsExtra = useLlmPromptsShellExtra();
 
 const sectionLabels = computed<Record<Section, string>>(() => ({
   Appearance: t('common.appearance.label'),
@@ -33,6 +36,7 @@ const sectionLabels = computed<Record<Section, string>>(() => ({
   'Mobile access': t('space.settings.nav.mobileAccess.label'),
   'Claude Code': t('common.product.claudeCode.label'),
   Memory: t('common.module.memory.label'),
+  Prompts: t('llmPrompts.nav.label'),
   Advanced: t('common.advanced.label'),
 }));
 
@@ -65,6 +69,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       ade: { headlessSettingSources: settingsStore.ade.headlessSettingSources },
     }"
     :save="save"
+    :extra="promptsExtra"
     @close="emit('close')"
   >
     <template #pane="s">
@@ -103,6 +108,7 @@ async function save(patch: SettingsPatch): Promise<void> {
         :reset-leaf="s.resetLeaf"
         :register-field-error="s.registerFieldError"
       />
+      <PromptsPane :active="s.activeSection === 'Prompts'" />
       <AdvancedPane
         :active="s.activeSection === 'Advanced'"
         :draft="s.draft"

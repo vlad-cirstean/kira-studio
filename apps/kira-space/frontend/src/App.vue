@@ -12,6 +12,7 @@ import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import WorkbenchTitleBar from '@workbench/components/WorkbenchTitleBar.vue';
 import { workbenchHostKey } from '@workbench/host';
+import { llmPromptsControlKey } from '@workbench/llmPrompts/queries';
 import { memoryModuleKey } from '@workbench/memory/module';
 import PromptHost from '@workbench/prompts/PromptHost.vue';
 import { promptsControlKey } from '@workbench/prompts/promptsQueries';
@@ -48,6 +49,7 @@ provide(workbenchHostKey, createWorkbenchHost());
 provide(automationsModuleKey, createAutomationsModule());
 provide(memoryModuleKey, createMemoryModule());
 provide(promptsControlKey, control);
+provide(llmPromptsControlKey, control);
 
 // Always-mounted root dialogs (ConfirmDialog, GitCredentialDialog: a credential prompt must be able
 // to appear with nothing else open) and the Go menu's channel subscriptions.

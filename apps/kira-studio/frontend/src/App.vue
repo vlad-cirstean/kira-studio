@@ -12,6 +12,7 @@ import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import WorkbenchTitleBar from '@workbench/components/WorkbenchTitleBar.vue';
 import { workbenchHostKey } from '@workbench/host';
+import { llmPromptsControlKey } from '@workbench/llmPrompts/queries';
 import PromptHost from '@workbench/prompts/PromptHost.vue';
 import { promptsControlKey } from '@workbench/prompts/promptsQueries';
 import UpdatePrompt from '@workbench/prompts/UpdatePrompt.vue';
@@ -53,6 +54,7 @@ provide(workbenchHostKey, createWorkbenchHost());
 // AutomationsNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
 provide(automationsModuleKey, createAutomationsModule());
 provide(promptsControlKey, control);
+provide(llmPromptsControlKey, control);
 
 const appUpdateStore = useAppUpdateStore();
 provide(appUpdateStoreKey, appUpdateStore);

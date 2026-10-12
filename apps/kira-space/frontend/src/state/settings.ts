@@ -13,6 +13,7 @@ export const sections = [
   'Mobile access',
   'Claude Code',
   'Memory',
+  'Prompts',
   'Advanced',
 ] as const;
 export type Section = (typeof sections)[number];

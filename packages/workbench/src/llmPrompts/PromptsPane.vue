@@ -54,7 +54,10 @@ const selected = computed(
   () => entries.value.find((p) => p.id === selectedId.value) ?? entries.value[0] ?? null,
 );
 
-const isEdited = (p: LlmPromptView): boolean => drafts.textOf(p) !== p.defaultText;
+const isEdited = (p: LlmPromptView): boolean => {
+  const draft = drafts.draftFor(p.id);
+  return draft === undefined ? p.overridden : draft !== p.defaultText;
+};
 const rowEdited = (p: LlmPromptView): boolean => isEdited(p) || argsOf(p.id).some(isEdited);
 
 const listWidth = ref(260);

@@ -8,7 +8,15 @@ import { defaultSettings, type Settings, type SettingsPatch } from './settingsDo
 // P133 §2.6: 'Scripts' is gone — custom scripts are configured only from the Automations module's own
 // ScriptDialog.vue now, `openSettingsAt` stays for the Api panes' own deep link
 // (CookiesPane.vue/RequestSettingsPane.vue's "Edit global defaults…").
-export const sections = ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced'] as const;
+export const sections = [
+  'Appearance',
+  'Data',
+  'Cache',
+  'Api',
+  'Database MCP',
+  'Prompts',
+  'Advanced',
+] as const;
 export type Section = (typeof sections)[number];
 
 // P103 Part 2 (§5.3): the shared skeleton now lives in

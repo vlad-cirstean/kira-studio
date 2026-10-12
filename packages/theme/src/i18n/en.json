@@ -5381,6 +5381,9 @@
     "list": {
       "empty": "No prompts"
     },
+    "nav": {
+      "label": "Prompts"
+    },
     "resize": {
       "label": "Resize prompt list"
     },
