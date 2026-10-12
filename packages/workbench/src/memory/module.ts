@@ -1,6 +1,7 @@
 import type {
   Memory,
   MemoryClarification,
+  MemoryCommentCheck,
   MemoryContext,
   MemoryHistory,
   MemoryInstallResult,
@@ -41,6 +42,7 @@ export interface MemoryControl {
     signal?: AbortSignal,
   ): Promise<MemoryStoreResult>;
   memoryMcpStatus(): Promise<MemoryMcpStatus>;
+  memoryCommentCheck(): Promise<MemoryCommentCheck>;
   memoryMcpInstall(): Promise<MemoryInstallResult>;
   onMemoryChanged(cb: () => void): () => void;
   memorySemanticStatus(): Promise<MemorySemanticStatus>;

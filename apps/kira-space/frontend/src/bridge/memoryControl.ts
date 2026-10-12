@@ -1,6 +1,7 @@
 import * as MemoryImportService from '@bindings/memoryimportservice.js';
 import * as MemoryService from '@bindings/memoryservice.js';
 import {
+  memoryCommentCheckSchema,
   memoryContextSchema,
   memoryHistorySchema,
   memoryInstallResultSchema,
@@ -52,6 +53,8 @@ export const memoryControl: MemoryControl = {
       .array()
       .parse((await unwrap(MemoryService.Projects())) ?? []),
   memoryMcpStatus: async () => memoryMcpStatusSchema.parse(await unwrap(MemoryService.McpStatus())),
+  memoryCommentCheck: async () =>
+    memoryCommentCheckSchema.parse(await unwrap(MemoryService.CommentCheck())),
   memoryMcpInstall: async () =>
     memoryInstallResultSchema.parse(await unwrap(MemoryService.InstallClaudeCode())),
   onMemoryChanged: (cb) => on(CHANNEL.memoryChanged, cb),

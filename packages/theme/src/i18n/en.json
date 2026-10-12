@@ -5572,6 +5572,16 @@
         "label": "Use {project}"
       }
     },
+    "commentCheck": {
+      "description": "Checks kira-memory comments and doc files in any git repository. The hook reads staged files only, ignores other comments, and skips itself when this app is missing.",
+      "hook": {
+        "hint": "Or add this line to a hook manager such as husky or lefthook."
+      },
+      "install": {
+        "hint": "Install the pre-commit hook by running this once in the repository root."
+      },
+      "title": "Check memory comments"
+    },
     "common": {
       "grade": {
         "agent": {

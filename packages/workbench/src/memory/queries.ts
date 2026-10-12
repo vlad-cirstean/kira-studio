@@ -99,6 +99,18 @@ export function useMemoryMcpStatus() {
   );
 }
 
+export function useMemoryCommentCheck() {
+  const { control } = useMemoryModule();
+  return useQuery(
+    {
+      queryKey: [...MEMORY_KEY, 'commentCheck'] as const,
+      queryFn: () => control.memoryCommentCheck(),
+      staleTime: 0,
+    },
+    queryClient,
+  );
+}
+
 export function useInstallMemoryMcp() {
   const { control } = useMemoryModule();
   return useMutation(

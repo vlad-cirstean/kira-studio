@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
+	"github.com/kirathecat/kira-studio/internal/memory/memcheck"
 )
 
 // ChannelMemoryChanged fires after any write to memory.db, this process's or the MCP subprocess's.
@@ -335,6 +336,14 @@ type MemoryMcpStatus struct {
 	Probed          []string `json:"probed"`
 }
 
+// MemoryCommentCheck is what Settings > Memory shows to install the kira-memory commit check in
+// another repository.
+type MemoryCommentCheck struct {
+	Executable     string `json:"executable"`
+	InstallCommand string `json:"installCommand"`
+	HookLine       string `json:"hookLine"`
+}
+
 // MemoryInstallResult is mcpinstall's outcome vocabulary on the wire.
 type MemoryInstallResult struct {
 	Outcome string   `json:"outcome"`
@@ -364,6 +373,15 @@ func (s *MemoryService) McpStatus() MemoryMcpStatus {
 		st.Command = mcpinstall.StdioCommand(memoryServerName, exe, []string{"memory-mcp"})
 	}
 	return st
+}
+
+// CommentCheck returns the commands that install the memory-check pre-commit hook for this binary.
+func (s *MemoryService) CommentCheck() MemoryCommentCheck {
+	exe, err := memoryExecutable()
+	if err != nil {
+		return MemoryCommentCheck{}
+	}
+	return MemoryCommentCheck{Executable: exe, InstallCommand: memcheck.InstallCommand(exe), HookLine: memcheck.HookLine(exe)}
 }
 
 // InstallClaudeCode registers the kira-memory stdio server with Claude Code. It never returns a
