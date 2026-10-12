@@ -49,8 +49,8 @@ test('empty Needs, Backlog and Plan screens render the shared empty state', asyn
   server.state.auth = 'ok';
   const board = JSON.parse(
     readFileSync(resolve(__dirname, '../fixtures/ade-v2/board.json'), 'utf8'),
-  ) as { tasks: unknown[] };
-  server.state.replies.board = { ...board, tasks: [] };
+  ) as { tasks: unknown[]; branches: unknown[] };
+  server.state.replies.board = { ...board, tasks: [], branches: [] };
   server.state.replies.backlog = { items: [] };
   await app();
   await expect(page.locator(`${t('needs-empty')}[data-slot="empty-state"]`)).toBeVisible();
