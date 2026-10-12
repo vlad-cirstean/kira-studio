@@ -936,3 +936,55 @@ Pending counts (`<ID> <path>`, files in `scripts/consistency-allowlist/`):
 | C | `stream-c.txt` | 64 (U67 6, U72 2, U73 8, U74 16, U75 1, U77 5, U80 5, U82 21) | `go-stream-c.txt` | 56 (G1 26, G2 23, G3 1, G4 6) |
 
 Checks at the tip: `bun run lint`, `typecheck`, `lint:go` (0 issues), `lint:dead`, `test:unit` (1899 pass), `go test ./internal/...` plus bridge/dbflow/connections packages, `build:test:studio`, `build:test:space`, `build:space-mobile` all green. No UI suites run.
+
+## Streams result
+
+Streams landed ff-only in order C, B, A onto `v2.0`. Hashes below are post-rebase. Conflicts: `git-core/src/index.ts` (B took C's `shortSha` and `TextRef` exports, dropped B's `dateFormat` export and `sha.ts` copy); duplicate catalog text `update.noNewerRelease` in A and B merged to `backend.core.appUpdate.noNewerRelease`. Landing fixes: U79 exempt matcher now accepts repo-relative paths, so both permanent U79 lines are gone; `ReviewThread.vue` already uses `shortSha`; `format.spec.ts` already covers every deleted `dateFormat.spec.ts` age case.
+
+### Stream A (Studio)
+
+Commits: `cb77a1140` A1, `92305b6f6` A2, `0be52e5fd` A3, `0714723b0` A4, `ab6062b1e` A5, `32cd88452` A6, `314b52620` A8. A7 (sweep) needed no commit.
+
+Deviations:
+- Saved-query not-found mapping (`ErrSavedQueryNotFound`, `backend.studio.query.notFound.body`) and `Required("windowKey")` on `Tabs.List` and `Tabs.Save` are new Studio behaviour, added so the specs have something to assert.
+- `Queries.Get` does not exist; `Queries.Update` on a deleted id stands in.
+- Deleted `workbench/TitleBar.vue`; `App.vue` uses `WorkbenchTitleBar`.
+
+Leftover: `go-stream-a.txt` 4 permanent G4 lines.
+
+Specs written, not run: `apps/kira-studio/internal/flows/appflow/errors_test.go` (4 Go flow tests); `apps/kira-studio/tests/ui/consistency.spec.ts`. The "Duplicate tab" icon, OpenExternal live-region and Color submenu selectors are unverified.
+
+### Stream B (Space)
+
+Commits: `0a6abbb53` B1 gitrpc, mobileweb, mobileterm catalog errors; `07f3b5ae2` B2 bridge, ADE, memory, renameio, log scopes; `56c042a65` B3 shell title bar and palette, ADE width in layout, settings catalog rename; `c6f29ed7b` B4 ADE views; `e857ea262` B5 repo panels; `d83c877a2` B6 mobile and memory; `6a4e8d78a` B7 specs.
+
+Deviations:
+- Shared Layout schema has no `panel.ade.width`; Space keeps it as a Space-only slice in `state/adeLayout.ts`. Move it into the shared schema if Studio needs it.
+- Window `view.find` shortcut dropped for the palette and View menu entry; `kira:menu:viewFind` still runs `view.find`.
+- `ReposDialog` virtual row height is `useRowHeight().single + 2` (the `pb-px` gap).
+- `MemoryStart` uses `ModuleStart`; side panels use `EmptyState`.
+
+Leftovers: `stream-b.txt` one permanent U82 line (`mobile/state/useAdeWrites.ts`, UUID slice); `go-stream-b.txt` 3 permanent G4 lines.
+
+Specs written, not run: Go `adeflow/errors_test.go` `TestStaleWorkflowSaveReportsCatalogText`, `mobileweb/respond_test.go` `TestWriteServiceErrorConflictKeepsCatalogText`, `migrate_ade_panel_width_test.go`, `appflow/layout_test.go`; UI `tests/ui/consistency.spec.ts`, `ade-v2-panel.spec.ts`, `git-panel-hidden.spec.ts` (updated); mobile `tests/mobile/consistency.spec.ts`. Selectors for the diff find widget (`.monaco-editor .find-widget.visible`), swatch tooltip (`getByRole('tooltip')`) and day-band label are unverified.
+
+### Stream C (shared packages, Docker, git)
+
+Commits: `70b513b50` C1 docker and scriptruns error codes; `c81f5535d` C2 internal Go files on `ipcerr.T`; `15c4db15d` C3 git-core `TextRef`, `shortSha`, `dateFormat` removal, git-ui dialogs; `de7e02cf2` C4+C5 icons, EmptyState, capped lists, `shortSha`, menu keys; `54431975d` and `c2ccaa7fe` C6 docker-ui and workbench EmptyState, `fireAndForget`, codicons, `RunLog` on `LogLines`, `createOpenExternal`; `816943c9c` C7 api-core catalog text, `logError`, `fireAndForget`; `f1d0dbae3` C8 specs.
+
+Deviations:
+- C4 and C5 landed as one commit (shared files). Pin floor dropped.
+- `worktreeLabel` stays in git-core (Space `worktrees.ts` consumes it); it uses `shortSha`.
+- `runoutcome` reasons not converted. `terminalWindowClosing` key lives under `backend.core.docker.edit`.
+- Added `docker-ui/src/components/ConnectionState.vue`: non-side-panel `EmptyState` with Retry, since U78 forbids a Button in a side-panel `EmptyState`.
+- api-core: parse warning `detail` and dotenv `message` are `TextRef` (keys `workbench.apiImport.*`). `error:` strings in curl/raw parse and `contentTypeCaption` stay English. `CODE_LANGUAGE_OPTIONS[].label` is a `TextRef`; `bodyBadgeLabel` deleted.
+- Not touched, no guard hit: `EditRows`, `ScriptDialog`, `ParamsEditor`, `TIMING` use in docker and automations. `columns.ts` English "commit/commits" count text left.
+- Outside C ownership: removed stale `U25 ... RunLog.vue` from `check-ui-primitives.sh`; Space `blameLine.ts` on `formatAgeCompact`; one-line `t(x.key, x.params)` in Studio `ImportCurlDialog.vue`, `EditRawRequestDialog.vue`, `BulkVariablesEditor.vue`, `RequestBodyPane.vue`.
+- Space spec asserts worktree trash and stack-remove close, not `codicon-close` on `ReposDialog` remove (it uses trash).
+- `ipcerr.T(code, key, params)` takes a non-literal key, so Go key checks cannot see keys passed through wrappers. Unchanged.
+
+Leftovers: `stream-c.txt` empty; `go-stream-c.txt` 2 permanent G4 lines (flowtest harness).
+
+Specs written, not run: `internal/flows/termflow/errors_test.go`; `internal/flows/dockerflow/errors_test.go` (needs Docker); `tests/ui/consistency-docker-automations.spec.ts`; Space `tests/ui/consistency-git.spec.ts`; updated `copy-wording-git.spec.ts` and `copy-coverage-git.spec.ts`. `RunLog` layout inside `LogLines` (flex-1, `max-height: none`) is unverified visually.
+
+Checks per stream: normal hook (lint, typecheck) green, `go build`, `lint:go`. No UI, e2e or Go test suites run.
