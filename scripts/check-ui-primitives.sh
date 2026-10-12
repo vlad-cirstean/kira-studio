@@ -89,13 +89,9 @@ PANELS
 # "U<n> path # reason": one guard exempt for one file.
 cat >"$TMP/perm" <<'PERMANENT'
 # foundation
-U27 packages/workbench/src/components/ContextMenu.vue # 10px colour swatch marks a Color submenu choice, it is not a status dot
+U11 packages/workbench/src/components/LogLines.vue # ANSI bold is log data
 U31 packages/workbench/src/components/WorkbenchShell.vue # ns-resize cursor held shell-wide while the dock drag runs, the pointer leaves the 2px handle
-U36 packages/workbench/src/components/AutocompleteField.vue # caret-anchored suggestion and hover popups, not cards
-U41 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup reads modifiers for its own accept keys
-U47 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
-U58 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
-U62 packages/workbench/src/components/AutocompleteField.vue # caret-anchored popup must never take focus from the input
+U62 packages/workbench/src/components/AutocompleteField.vue # accepting a suggestion restores focus and the caret on the real input
 # A (apps/kira-studio)
 U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
 U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box

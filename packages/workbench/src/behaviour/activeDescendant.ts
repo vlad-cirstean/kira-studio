@@ -1,5 +1,12 @@
 import { computed, type Ref, ref, watch } from 'vue';
 
+const KEYS = new Set(['ArrowUp', 'ArrowDown', 'Enter', 'Escape']);
+
+/** True for the keys `useActiveDescendant` handles, so a keyup listener can skip them. */
+export function isActiveDescendantKey(key: string): boolean {
+  return KEYS.has(key);
+}
+
 export interface ActiveDescendantOptions<T> {
   items: () => readonly T[];
   /** DOM id of one option; the listbox points `aria-activedescendant` at it. */
@@ -12,6 +19,10 @@ export interface ActiveDescendantOptions<T> {
   onActive?: (item: T, index: number) => void;
   /** Disabled for the key rules when false (list closed). Default: always on. */
   when?: () => boolean;
+  /** Index `reset()` returns to. Default -1 (nothing active until the first arrow key). */
+  initialIndex?: number;
+  /** Wrap past either end (default) or clamp. */
+  wrap?: boolean;
 }
 
 /**
@@ -21,11 +32,15 @@ export interface ActiveDescendantOptions<T> {
  */
 export function useActiveDescendant<T>(opts: ActiveDescendantOptions<T>): {
   activeIndex: Ref<number>;
+  /** True once an arrow key moved the active option; Enter selects only then. */
+  navigated: Ref<boolean>;
   activeId: Readonly<Ref<string | undefined>>;
   onKeydown: (e: KeyboardEvent) => boolean;
   reset: () => void;
 } {
-  const activeIndex = ref(-1);
+  const initial = opts.initialIndex ?? -1;
+  const activeIndex = ref(initial);
+  const navigated = ref(false);
   const activeId = computed(() => {
     const item = opts.items()[activeIndex.value];
     return item === undefined ? undefined : opts.optionId(item, activeIndex.value);
@@ -46,7 +61,12 @@ export function useActiveDescendant<T>(opts: ActiveDescendantOptions<T>): {
     const count = opts.items().length;
     if (count === 0) return;
     const from = activeIndex.value;
-    activeIndex.value = from < 0 ? (step === 1 ? 0 : count - 1) : (from + step + count) % count;
+    navigated.value = true;
+    if (opts.wrap === false) {
+      activeIndex.value = Math.min(count - 1, Math.max(0, from + step));
+    } else {
+      activeIndex.value = from < 0 ? (step === 1 ? 0 : count - 1) : (from + step + count) % count;
+    }
   }
 
   /** Returns `true` when the key was consumed (and `preventDefault`ed). */
@@ -60,7 +80,7 @@ export function useActiveDescendant<T>(opts: ActiveDescendantOptions<T>): {
     }
     if (e.key === 'Enter') {
       const item = opts.items()[activeIndex.value];
-      if (item === undefined) return false;
+      if (item === undefined || !navigated.value) return false;
       e.preventDefault();
       opts.onSelect(item, activeIndex.value);
       return true;
@@ -74,10 +94,12 @@ export function useActiveDescendant<T>(opts: ActiveDescendantOptions<T>): {
 
   return {
     activeIndex,
+    navigated,
     activeId,
     onKeydown,
     reset(): void {
-      activeIndex.value = -1;
+      activeIndex.value = initial;
+      navigated.value = false;
     },
   };
 }
