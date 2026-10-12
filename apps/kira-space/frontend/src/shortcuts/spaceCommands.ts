@@ -5,13 +5,13 @@ import { useLayoutStore } from '../state/layout';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 
-/** Space's palette commands; call once from App setup (the stores resolve there). */
-export function spacePaletteCommands(): PaletteCommand[] {
+/** Space's palette commands; call once from App setup (the stores resolve there). The getter re-reads labels when the locale changes. */
+export function spacePaletteCommands(): () => PaletteCommand[] {
   const layoutStore = useLayoutStore();
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
 
-  return [
+  return () => [
     {
       id: 'open-settings',
       label: t('common.action.openSettings.label'),

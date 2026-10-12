@@ -8,8 +8,8 @@ import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 
-/** Studio's palette commands; call once from App setup (the stores resolve there). */
-export function studioPaletteCommands(): PaletteCommand[] {
+/** Studio's palette commands; call once from App setup (the stores resolve there). The getter re-reads labels when the locale changes. */
+export function studioPaletteCommands(): () => PaletteCommand[] {
   const layoutStore = useLayoutStore();
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
@@ -18,7 +18,7 @@ export function studioPaletteCommands(): PaletteCommand[] {
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
   // worth a name in the palette. No fuzzy scoring, no "go to anything" navigation (§8.15 calls
   // for "minimal").
-  return [
+  return () => [
     {
       id: 'new-connection',
       label: t('studio.project.connectionDialog.newConnection.title'),
