@@ -1,9 +1,9 @@
 import type { RoutedPrompt } from '@shared/domain/prompts';
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-import { emitPrompts, routed } from './support/prompts';
 
 // P246: the window shows the popup the Go router targeted at it, one at a time. The Go half is
 // flows/promptflow; here the router's pushes are mocked.

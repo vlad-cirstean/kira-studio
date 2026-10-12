@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/ui/dockerMock';
 import {
   expectCatalogText,
@@ -9,7 +10,6 @@ import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
-import { emitPrompts, routed } from './support/prompts';
 
 // P265 Stream C: every chrome string on the Docker and Automations surfaces comes from the catalog.
 // The pseudo-locale wraps catalog messages; fixture data is allowed by pattern.

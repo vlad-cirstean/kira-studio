@@ -1,8 +1,8 @@
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-import { emitPrompts, routed } from './support/prompts';
 
 // P212: the Mobile access settings pane and the phone pairing prompt.
 

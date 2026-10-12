@@ -1,7 +1,7 @@
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-import { emitPrompts, routed } from './support/prompts';
 
 // P178: the ADE board's git credential prompt reaches Kira Space through
 // the Go relay; the native dialog shows it, answers it, and closes when the relay withdraws it.

@@ -2,11 +2,11 @@ import type { Page } from '@playwright/test';
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import { scriptRunSchema } from '@shared/domain/scriptRuns';
 import { customScriptSchema } from '@shared/domain/scripts';
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-import { emitPrompts, routed } from './support/prompts';
 import type { ControlSnapshot } from './support/types';
 
 // P242 Part 4: recurring scripts on the mocked bridge: the editor's schedule, rows, the confirm popup.

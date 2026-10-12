@@ -1,6 +1,6 @@
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
-import { emitPrompts, routed } from './support/prompts';
 
 // P119: the status-bar update-available item and the modal update dialog it opens — Kira Studio's
 // own tests/ui/update-dialog.spec.ts, trimmed to this app's own first three cases (the error state

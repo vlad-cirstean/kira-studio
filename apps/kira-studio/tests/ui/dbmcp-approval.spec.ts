@@ -1,7 +1,7 @@
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
-import { emitPrompts, routed } from './support/prompts';
 
 // Contract dbmcp. Backend half: dbmcpflow TestDbMcpApprovalFlow. A write from an AI client parks on
 // the approval dialog; Approve sends that request's id and the snapshot empties.

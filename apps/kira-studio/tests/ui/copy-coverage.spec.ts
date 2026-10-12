@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import {
   expectCatalogText,
   setPseudoLocale,
@@ -35,7 +36,6 @@ import {
   widgetsFixture,
 } from './support/mongoFixture';
 import { APP_PATH, COMPOSITE_PK_PATH } from './support/postgresFixture';
-import { emitPrompts, routed } from './support/prompts';
 import { openSettings } from './support/settings';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 

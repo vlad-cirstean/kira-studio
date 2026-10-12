@@ -1,6 +1,6 @@
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
-import { emitPrompts, routed } from './support/prompts';
 
 // P119: the status-bar update-available item and the modal update dialog it opens, replacing
 // P66's own update-banner (release-page-link) behavior. Default boot answers "no update"
