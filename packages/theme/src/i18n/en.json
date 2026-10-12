@@ -4683,9 +4683,6 @@
       "loading": {
         "loading": "Loading review…"
       },
-      "loadMore": {
-        "label": "Load more"
-      },
       "noBranch": {
         "emptyHint": "Choose a branch to compare its commits against a base you set or one Kira detects."
       },

@@ -14,18 +14,13 @@
  * context menu W14 builds, which is where the destructive actions live") — a kebab button (mouse
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
-import type { RefRow, StashEntry } from '@kira/git-ipc';
+import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
-import InlineState from '@theme/components/InlineState.vue';
 import PickerTrigger from '@theme/components/PickerTrigger.vue';
-import { rowMeta, rowVariants } from '@theme/components/rowVariants';
+import { rowMeta } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import SectionHeading from '@theme/components/SectionHeading.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Badge } from '@theme/components/ui/badge';
-import { Button } from '@theme/components/ui/button';
 import {
   Popover,
   PopoverAnchor,
@@ -34,16 +29,13 @@ import {
 } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
-import { cn } from '@theme/lib/utils';
 import { useEventListener, useFocus } from '@vueuse/core';
 import { useCappedList } from '@workbench/behaviour/cappedList';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
-import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
-import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, provide, ref, useTemplateRef, watch } from 'vue';
 import { PICKER_TAB_ICONS } from '../icons/index.ts';
-import { prBadgeClass } from '../lib/badgeClass.ts';
 import {
   filterPickerInput,
   orderTab,
@@ -53,27 +45,18 @@ import {
   pickerRowIds,
 } from '../lib/pickerModel.ts';
 import { PICKER_FOCUS_ROW } from '../lib/pickerNav.ts';
-import { prStateLabel } from '../lib/prStateLabel.ts';
-import {
-  formatTrack,
-  localNameForRemoteBranch,
-  REF_LIST_SECTION_CAP,
-  remoteCheckoutLabel,
-  remoteCheckoutTarget,
-} from '../lib/refListModel.ts';
-import { buildRefMenu, remoteNamesFrom } from '../lib/rowMenuModel.ts';
-import { childOf, parentOf } from '../lib/stackListModel.ts';
+import { REF_LIST_SECTION_CAP } from '../lib/refListModel.ts';
+import { remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import { shaLabel } from '../lib/text.ts';
 import { useFieldFocus } from '../lib/useFieldFocus.ts';
-import { useSectionMenu } from '../lib/useSectionMenu.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
+import BranchPickerBranches from './BranchPickerBranches.vue';
 import GlobalStashList from './GlobalStashList.vue';
-import RowActionsButton from './RowActionsButton.vue';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import TagList from './TagList.vue';
@@ -93,20 +76,6 @@ const props = defineProps<{
    *  here or in `StackList.vue`. */
   openPullRequest: (number: number) => void;
 }>();
-
-/** The one PR record known for a branch's own short name, or `undefined` — same "render nothing"
- *  rule every other G24 surface follows. */
-function prFor(
-  shortName: string,
-): { number: number; url: string; title: string; state: string } | undefined {
-  return props.pr?.byBranch.value.get(shortName);
-}
-
-function prTooltip(shortName: string): string {
-  const pr = prFor(shortName);
-  if (!pr) return '';
-  return t('common.dashPair.label', { first: pr.title, second: prStateLabel(pr.state) });
-}
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
  *  comment on why the branch-mode dialog itself is owned by `App.vue`, not here. */
@@ -286,10 +255,11 @@ useEventListener(rowsScrollEl, 'focusin', (event: FocusEvent) => {
 
 provide(PICKER_FOCUS_ROW, (rowId: string) => void nav.focusKey(rowId));
 
+const contextMenuStore = useContextMenuStore();
+
 /** Right-click: the row becomes the roving stop and takes focus (B1), then the menu opens. */
-function onRowContextMenu(event: MouseEvent, row: RefRow, rowId: string): void {
+function openRowContextMenu(event: MouseEvent, items: MenuItem[], rowId: string): void {
   const item = model.value.rowIds.find((r) => r.id === rowId);
-  const items = rowMenu.itemsFor(menuFor(row), (id) => onRefMenuSelect(row, id));
   if (item === undefined) contextMenuStore.openContextMenu(event, items);
   else nav.contextMenu(item, event, items);
 }
@@ -357,16 +327,10 @@ const knownRemotes = computed(() =>
   remoteNamesFrom(props.refs.remoteBranches.value.map((row) => row.shortName)),
 );
 
-// P131 Part 2 §5.2: reka's own PopoverContent Escape/outside-click dismissal replaces the
-// rootEl keydown listener and onClickOutside call this file used to own -- close()'s resets
-// (row menu, renaming, forceDeleteCandidate, filter, caps) now run from the Popover's own
-// @update:open(false), reached either way (trigger click, Escape, outside click, or this file's
-// own explicit close() calls below).
+// close()'s resets run from the Popover's own @update:open(false), reached by trigger click,
+// Escape, outside click or an explicit close() call.
 function close(): void {
   isOpen.value = false;
-  rowMenu.close();
-  renaming.value = undefined;
-  forceDeleteCandidate.value = undefined;
   filter.value = '';
   resetCaps();
 }
@@ -421,144 +385,6 @@ function closeForCheckout(): void {
   focusTrigger();
   suppressCloseAutoFocus = true;
   close();
-}
-
-async function checkoutBranch(row: RefRow): Promise<void> {
-  closeForCheckout();
-  await props.ops.runCheckout(row.shortName, 'switch');
-}
-
-async function checkoutRemote(row: RefRow): Promise<void> {
-  closeForCheckout();
-  await props.ops.runCheckout(remoteCheckoutTarget(row, props.refs.branches.value), 'switch');
-}
-
-// ---------------------------------------------------------------------------------------
-// The ref-scoped context menu (W14) — one instance, shared by every branch/remote row (TagList
-// opens its own for tag rows, since its rows are not in this file's own DOM).
-// ---------------------------------------------------------------------------------------
-const rowMenu = useSectionMenu();
-const contextMenuStore = useContextMenuStore();
-const renaming = ref<string | undefined>(undefined);
-const forceDeleteCandidate = ref<string | undefined>(undefined);
-
-function menuFor(row: RefRow) {
-  // G26 D-4.14: the stack section is present only for a local branch row — a tag/remoteBranch is
-  // never a stack member (buildRefMenu itself already returns before reading `stack` for those
-  // two kinds, but computing it only for `branch` here keeps `parentOf`/`childOf` from ever
-  // running against a row that could not possibly answer anything).
-  const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
-  return buildRefMenu({
-    kind: row.kind,
-    shortName: row.shortName,
-    isHead: row.isHead,
-    knownRemotes: row.kind === 'tag' ? knownRemotes.value : [],
-    inProgress: props.ops.statusSummary.value?.inProgress ?? null,
-    stack:
-      row.kind === 'branch'
-        ? {
-            hasParent: parentOf(stackResult, row.shortName) !== undefined,
-            hasChild: childOf(stackResult, row.shortName) !== undefined,
-          }
-        : undefined,
-  });
-}
-
-async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
-  if (id === 'checkoutRef') {
-    await (row.kind === 'remoteBranch' ? checkoutRemote(row) : checkoutBranch(row));
-    return;
-  }
-  if (id === 'renameRef') {
-    contextMenuStore.afterClose(() => {
-      renaming.value = row.shortName;
-    });
-    return;
-  }
-  if (id === 'reviewBranch') {
-    closeForCheckout();
-    await props.ops.openReview(row.shortName);
-    return;
-  }
-  if (id === 'deleteRef') {
-    if (row.kind === 'tag') {
-      await props.ops.tagDelete(row.shortName);
-      return;
-    }
-    const result = await props.ops.branchDelete(row.shortName, false);
-    if (!result.ok && result.error?.kind === 'NotFullyMerged') {
-      forceDeleteCandidate.value = row.shortName;
-    }
-    return;
-  }
-  if (id.startsWith('pushRef:')) {
-    await props.ops.tagPush(id.slice('pushRef:'.length), [row.shortName]);
-    return;
-  }
-  if (id.startsWith('deleteRemoteRef:')) {
-    await props.ops.tagDeleteRemote(id.slice('deleteRemoteRef:'.length), row.shortName);
-    return;
-  }
-  if (id === 'createWorktreeHere') {
-    // P76 §9.1: same derivation as `checkoutRemote`'s own DWIM — a remote-tracking branch's local
-    // name may not exist yet, so that arm creates it as a new branch rather than passing it as an
-    // already-existing one.
-    emit(
-      'createWorktree',
-      row.kind === 'remoteBranch'
-        ? {
-            mode: 'newBranch',
-            branch: localNameForRemoteBranch(row.shortName),
-            startPoint: row.shortName,
-          }
-        : { mode: 'existingBranch', branch: row.shortName },
-    );
-    return;
-  }
-  // G26 D-4.14: the stack section's own five items — 'stackSetParent'/'stackRestack' emit intents
-  // (BranchPicker owns no dialog of its own, mirroring 'createWorktree'); 'stackRemove' is a
-  // direct, undoable write (StackList.vue's own row action makes the identical call); the two
-  // navigation items resolve a target via stackListModel and call the existing checkout op,
-  // exactly the shape 'checkoutStackParent'/'checkoutStackChild' establish for the palette too.
-  const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
-  if (id === 'stackSetParent') {
-    emit('openSetStackParentDialog', row.shortName);
-    return;
-  }
-  if (id === 'stackRemove') {
-    await props.ops.runStackSet(row.shortName, undefined);
-    return;
-  }
-  if (id === 'stackRestack') {
-    emit('openRestackDialog', row.shortName);
-    return;
-  }
-  if (id === 'stackGoToParent') {
-    const parent = parentOf(stackResult, row.shortName);
-    if (parent !== undefined) {
-      closeForCheckout();
-      await props.ops.runCheckout(parent, 'switch');
-    }
-    return;
-  }
-  if (id === 'stackGoToChild') {
-    const child = childOf(stackResult, row.shortName);
-    if (child !== undefined) {
-      closeForCheckout();
-      await props.ops.runCheckout(child, 'switch');
-    }
-  }
-}
-
-async function confirmForceDelete(): Promise<void> {
-  const name = forceDeleteCandidate.value;
-  forceDeleteCandidate.value = undefined;
-  if (name !== undefined) await props.ops.branchDelete(name, true);
-}
-
-async function submitRename(from: string, to: string): Promise<void> {
-  renaming.value = undefined;
-  await props.ops.branchRename(from, to);
 }
 
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
@@ -648,132 +474,37 @@ watch(visibleBranchNames, (names) => {
             :aria-label="t(TAB_LABELS[activeTab])"
           >
             <AttributeTooltip :container="rowsScrollEl" />
-            <template v-if="activeTab === 'branches'">
-              <section :aria-label="t('common.module.branches.label')">
-                <SectionHeading :label="t('common.module.branches.label')" />
-                <div
-                  data-testid="branch-row"
-                  v-for="row in model.branchesLocal.visible"
-                  :key="row.refname"
-                  class="flex items-center gap-0.5 px-1"
-                  :data-row-id="`branch:${row.refname}`"
-                  :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
-                >
-                  <InlineEditInput
-                    v-if="renaming === row.shortName"
-                    data-testid="branch-rename-input"
-                    :aria-label="t('git.dialog.rename.title')"
-                    :name="row.shortName"
-                    @commit="(to) => submitRename(row.shortName, to)"
-                    @cancel="renaming = undefined"
-                  />
-                  <template v-else>
-                    <button
-                      data-testid="branch-row-main"
-                      type="button"
-                      :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
-                      @click="checkoutBranch(row)"
-                    >
-                      <span
-                        class="w-2.5 text-focus"
-                        :role="row.isHead ? 'img' : undefined"
-                        :aria-label="row.isHead ? t('git.common.currentBranch.tooltip') : undefined"
-                        :aria-hidden="!row.isHead"
-                        >{{
-                          row.isHead ? "●" : ""
-                        }}</span
-                      >
-                      <span class="truncate">{{ row.shortName }}</span>
-                      <Badge
-                        v-if="row.checkedOutIn"
-                        :data-kira-tip="t('git.picker.checkedOutIn.tooltip', { path: row.checkedOutIn })"
-                        >{{
-                          t('common.worktree.label')
-                        }}</Badge
-                      >
-                      <span v-if="formatTrack(row.track)" :class="rowMeta">{{
-                        formatTrack(row.track)
-                      }}</span>
-                    </button>
-                    <button
-                      v-if="prFor(row.shortName)"
-                      type="button"
-                      :class="prBadgeClass(prFor(row.shortName)!.state)"
-                      :data-kira-tip="prTooltip(row.shortName)"
-                      @click.stop="openPullRequest(prFor(row.shortName)!.number)"
-                      >#{{ prFor(row.shortName)!.number }}</button
-                    >
-                    <RowActionsButton
-                      @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-                      @contextmenu.prevent="onRowContextMenu($event, row, `branch:${row.refname}`)"
-                    />
-                  </template>
-                </div>
-                <Alert v-if="forceDeleteCandidate" variant="warn" strip>
-                  <AlertDescription>{{
-                    t('git.common.forceDelete.body', { name: forceDeleteCandidate })
-                  }}</AlertDescription>
-                  <div class="flex items-center gap-1">
-                    <Button variant="danger" size="kira" @click="confirmForceDelete">{{
-                      t('git.common.forceDelete.confirm')
-                    }}</Button>
-                    <Button
-                      variant="toolbar"
-                      size="kira"
-                      @click="forceDeleteCandidate = undefined"
-                      >{{
-                        t('common.action.cancel.label')
-                      }}</Button
-                    >
-                  </div>
-                </Alert>
+            <BranchPickerBranches
+              v-if="activeTab === 'branches'"
+              :refs="refs"
+              :ops="ops"
+              :stack="stack"
+              :pr="pr"
+              :open-pull-request="openPullRequest"
+              :local-section="model.branchesLocal"
+              :remote-section="model.branchesRemote"
+              :active-row-id="activeRowId"
+              :close-for-checkout="closeForCheckout"
+              :open-context-menu="openRowContextMenu"
+              @create-worktree="(seed) => emit('createWorktree', seed)"
+              @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
+              @open-set-stack-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
+            >
+              <template #local-more>
                 <ShowMoreButton
                   :step="REF_LIST_SECTION_CAP"
                   :hidden-count="model.branchesLocal.hiddenCount"
                   @click="caps.branchesLocal.showMore()"
                 />
-                <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">{{
-                  t('git.picker.branches.empty')
-                }}</InlineState>
-              </section>
-
-              <section :aria-label="t('git.picker.remoteBranches.label')">
-                <SectionHeading :label="t('git.picker.remoteBranches.label')" />
-                <div
-                  data-testid="branch-row"
-                  v-for="row in model.branchesRemote.visible"
-                  :key="row.refname"
-                  class="flex items-center gap-0.5 px-1"
-                  :data-row-id="`remote:${row.refname}`"
-                  :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
-                >
-                  <button
-                    data-testid="branch-row-main"
-                    type="button"
-                    :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
-                    @click="checkoutRemote(row)"
-                  >
-                    <CodiconIcon name="cloud" :size="13" />
-                    <span class="truncate">{{ row.shortName }}</span>
-                    <span :class="rowMeta">{{
-                      remoteCheckoutLabel(row, refs.branches.value)
-                    }}</span>
-                  </button>
-                  <RowActionsButton
-                    @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-                    @contextmenu.prevent="onRowContextMenu($event, row, `remote:${row.refname}`)"
-                  />
-                </div>
+              </template>
+              <template #remote-more>
                 <ShowMoreButton
                   :step="REF_LIST_SECTION_CAP"
                   :hidden-count="model.branchesRemote.hiddenCount"
                   @click="caps.branchesRemote.showMore()"
                 />
-                <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
-                  {{ t('git.picker.remoteBranches.empty') }}
-                </InlineState>
-              </section>
-            </template>
+              </template>
+            </BranchPickerBranches>
 
             <template v-else-if="activeTab === 'tags'">
               <TagList

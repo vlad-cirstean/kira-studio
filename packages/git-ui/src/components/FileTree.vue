@@ -21,12 +21,8 @@ import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
-import SearchField from '@theme/components/SearchField.vue';
-import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Label } from '@theme/components/ui/label';
-import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useCappedList } from '@workbench/behaviour/cappedList';
@@ -36,8 +32,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed, ref, useId, watch } from 'vue';
-import { ACTION_ICONS } from '../icons/index.ts';
+import { computed, ref, watch } from 'vue';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
 import {
   buildFileTree,
@@ -52,9 +47,9 @@ import {
 } from '../lib/fileTreeModel.ts';
 import { sectionsToMenuItems } from '../lib/menuModel.ts';
 import { buildFileRowMenu } from '../lib/rowMenuModel.ts';
-import { shaLabel } from '../lib/text.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
+import FileTreeToolbar from './FileTreeToolbar.vue';
 
 const props = defineProps<{
   files: readonly FileChange[];
@@ -107,27 +102,6 @@ const emit = defineEmits<{
    *  code by the time this phase deleted the file). Never emitted when reviewStates is absent. */
   (e: 'toggleReviewed', path: string): void;
 }>();
-
-// P131 Part 2 §5.6: KuiSegmentedOption goes with KuiSegmented -- this is the same shape, inlined
-// as a local type instead of importing one.
-interface ListModeOption {
-  readonly id: FileListMode;
-  readonly icon: string;
-  readonly label: string;
-}
-
-const listModeOptions = computed<readonly ListModeOption[]>(() => [
-  { id: 'tree', icon: ACTION_ICONS.listTree, label: t('git.fileTree.listTree.tooltip') },
-  { id: 'flat', icon: ACTION_ICONS.listFlat, label: t('git.fileTree.listFlat.tooltip') },
-]);
-const listModeItems = computed(() =>
-  listModeOptions.value.map((option) => ({
-    value: option.id,
-    label: option.label,
-    icon: option.icon,
-    tooltip: option.label,
-  })),
-);
 
 const filterInput = ref(props.filter);
 watch(
@@ -332,31 +306,6 @@ const nav = useListNavigation<FileTreeRow>({
   },
 });
 
-interface ParentOption {
-  readonly sha: string;
-  readonly label: string;
-}
-
-const parentOptions = computed<ParentOption[]>(() =>
-  props.parents.map((sha, index) => {
-    const row = props.store.rowOfSha(sha);
-    const subject = row !== -1 ? props.store.subjectAt(row) : undefined;
-    const sha7 = shaLabel(sha);
-    const label = subject
-      ? t('git.fileTree.parent.label', { number: index + 1, sha: sha7, subject })
-      : t('git.fileTree.parentNoSubject.label', { number: index + 1, sha: sha7 });
-    return { sha, label };
-  }),
-);
-
-const parentSelectOptions = computed(() =>
-  parentOptions.value.map((option, index) => ({ value: String(index), label: option.label })),
-);
-
-function onParentChange(value: string): void {
-  emit('update:parentIndex', Number(value));
-}
-
 function statusLetter(change: FileChange): string {
   return STATUS_LETTERS[change.kind];
 }
@@ -467,11 +416,6 @@ function reviewCheckboxState(path: string): boolean | 'indeterminate' {
   if (kind === 'partial') return 'indeterminate';
   return false;
 }
-
-// P131 Part 2 §5.6: biome's noLabelWithoutControl can't see through NativeSelect's
-// `inheritAttrs: false` to the native select element it renders -- an explicit for/id pair keeps the
-// same association (same fix as StackDialog.vue's own parent picker).
-const parentSelectId = useId();
 </script>
 
 <template>
@@ -486,160 +430,34 @@ const parentSelectId = useId();
     <!-- P131 Part 2 §5.6: one hoisted AttributeTooltip for every row's data-kira-tip span --
          treeEl always names whichever of the two row containers below is currently mounted. -->
     <AttributeTooltip :container="treeEl" />
-    <div v-if="parentOptions.length > 1" class="flex flex-col gap-0.5 px-3 pb-2 text-graph-md">
-      <Label :for="parentSelectId">{{ t('git.fileTree.diffAgainst.label') }}</Label>
-      <NativeSelect
-        :id="parentSelectId"
-        :model-value="String(parentIndex)"
-        variant="bordered"
-        size="kira"
-        @update:model-value="(value) => onParentChange(String(value))"
-      >
-        <option v-for="option in parentSelectOptions" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
-      </NativeSelect>
-    </div>
-
-    <div v-if="showToolbar !== false" class="flex gap-1 px-2 pb-1">
-      <div class="min-w-0 flex-1">
-        <SearchField
-          data-testid="file-filter"
-          :model-value="filterInput"
-          :placeholder="t('git.fileTree.filter.placeholder')"
-          :aria-label="t('git.fileTree.filter.placeholder')"
-          @update:model-value="onFilterInput"
-        />
-      </div>
-      <SecondaryTabs
-        variant="segmented"
-        :aria-label="t('git.fileTree.display.aria')"
-        :model-value="listMode"
-        :items="listModeItems"
-        @update:model-value="(v) => emit('update:listMode', v as FileListMode)"
-      >
-        <template #item="{ item }">
-          <CodiconIcon :name="item.icon ?? ''" :size="13" />
-          <span class="sr-only">{{ item.label }}</span>
-        </template>
-      </SecondaryTabs>
-    </div>
+    <FileTreeToolbar
+      :parents="parents"
+      :store="store"
+      :show-toolbar="showToolbar"
+      :parent-index="parentIndex"
+      :list-mode="listMode"
+      :filter="filterInput"
+      @update:parent-index="emit('update:parentIndex', $event)"
+      @update:list-mode="emit('update:listMode', $event)"
+      @update:filter="onFilterInput"
+    />
 
     <div
-      v-if="listMode === 'tree'"
       ref="treeEl"
       class="flex-1 min-h-0 overflow-auto group"
-      :aria-label="t('git.fileTree.tree.aria')"
-      role="tree"
+      :aria-label="listMode === 'tree' ? t('git.fileTree.tree.aria') : t('git.fileTree.list.aria')"
+      :role="listMode === 'tree' ? 'tree' : 'listbox'"
     >
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
-      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from nav.rowProps. -->
+      <!-- biome-ignore lint/a11y/noStaticElementInteractions: role is treeitem or option by listMode. -->
       <div
         v-for="(row, index) in visibleRows"
         :key="rowKey(row)"
         data-testid="file-tree-row"
         :class="rowClass(row)"
-        role="treeitem"
-        :aria-level="row.depth + 1"
-        :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
-        :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
-        v-bind="nav.rowProps(rowKey(row))"
-        :style="rowIndent(row.depth)"
-        @click="onRowClick(index)"
-        @dblclick="onRowDblClick(index)"
-        @contextmenu="onRowContextMenu($event, row, index)"
-      >
-        <template v-if="row.kind === 'directory'">
-          <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
-               rows' checkbox column aligned underneath it. -->
-          <span v-if="reviewStates" class="w-3.5 shrink-0" aria-hidden="true"></span>
-          <TreeTwisty
-            :expanded="row.expanded"
-            :has-children="true"
-            @toggle="toggleDir(row.node.path)"
-          />
-          <CodiconIcon
-            :name="row.expanded ? 'folder-opened' : 'folder'"
-            :size="13"
-            class="shrink-0 text-muted-foreground"
-          />
-          <span class="font-ui truncate">{{ row.node.name }}</span>
-          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
-            {{ t('common.fileCount.label', { count: row.node.fileCount }) }}
-          </span>
-        </template>
-        <template v-else>
-          <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
-               status column and crowded the pane's scrollbar. A real Checkbox (not a
-               toggle button) so the partial state gets a correct `aria-checked="mixed"` for free,
-               and `.stop` (not `.prevent` -- reka's own control has no native default to prevent)
-               because the server's answer is this control's only state (`ReviewFilesState.mark`
-               applies `result.review`, not an optimistic local toggle). -->
-          <Checkbox
-            v-if="reviewStates"
-            class="shrink-0"
-            :model-value="reviewCheckboxState(row.node.change.path)"
-            :aria-label="reviewToggleTitle(row.node.change.path)"
-            :data-kira-tip="reviewToggleTitle(row.node.change.path)"
-            @click.stop
-            @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
-          >
-            <CodiconIcon
-              :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'"
-              :size="13"
-            />
-          </Checkbox>
-          <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
-            <span
-              class="size-3.25 mask-contain mask-no-repeat mask-center"
-              :style="fileIconStyle(row.node.path)"
-            ></span>
-          </span>
-          <span class="overflow-hidden text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
-            <template v-if="renameDisplay(row.node.change)">
-              {{ renameDisplay(row.node.change)?.from }}
-              <CodiconIcon name="arrow-small-right" :size="13" />
-              {{ renameDisplay(row.node.change)?.to }}
-            </template>
-            <template v-else>{{ row.node.name }}</template>
-          </span>
-          <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
-               directory row already carries this path via its own ancestor rows). -->
-          <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span
-              data-testid="file-tree-status"
-              class="min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
-              :class="statusClass(row.node.change)"
-              :data-kira-tip="fileTitle(row.node.change)"
-              >{{
-                statusLetter(row.node.change)
-              }}</span
-            >
-          </span>
-          <StatusDot
-            v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            tone="warn"
-            :data-kira-tip="t('git.review.changedSince.hint')"
-            aria-hidden="true"
-          />
-        </template>
-      </div>
-    </div>
-    <div
-      v-else
-      ref="treeEl"
-      class="flex-1 min-h-0 overflow-auto group"
-      :aria-label="t('git.fileTree.list.aria')"
-      role="listbox"
-    >
-      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
-      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from nav.rowProps. -->
-      <div
-        v-for="(row, index) in visibleRows"
-        :key="rowKey(row)"
-        data-testid="file-tree-row"
-        :class="rowClass(row)"
-        role="option"
+        :role="listMode === 'tree' ? 'treeitem' : 'option'"
+        :aria-level="listMode === 'tree' ? row.depth + 1 : undefined"
+        :aria-expanded="listMode === 'tree' && row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         v-bind="nav.rowProps(rowKey(row))"
         :style="rowIndent(row.depth)"
@@ -702,7 +520,7 @@ const parentSelectId = useId();
             <template v-else>{{ row.node.name }}</template>
           </span>
           <span
-            v-if="dirOf(row.node.path)"
+            v-if="listMode === 'flat' && dirOf(row.node.path)"
             class="overflow-hidden text-ellipsis text-muted-foreground text-graph-sm"
             >{{
               dirOf(row.node.path)

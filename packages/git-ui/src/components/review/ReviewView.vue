@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import { SETTINGS } from '@kira/git-core';
 import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import InlineState from '@theme/components/InlineState.vue';
-import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
-import SearchField from '@theme/components/SearchField.vue';
-import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import SectionHeading from '@theme/components/SectionHeading.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 /**
  * `docs/plans/P7.md` W11 — the sidebar view's whole root, mounted by `main.ts` in place of
@@ -36,31 +28,14 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { cn } from '@theme/lib/utils';
-import { useEventListener } from '@vueuse/core';
-import { formatCount } from '@workbench/behaviour/format';
-import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useLiveRegion } from '@workbench/behaviour/liveRegion';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
-import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  shallowRef,
-  useTemplateRef,
-  watch,
-} from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
-import { ACTION_ICONS } from '../../icons/index.ts';
-import { buildRefListSections } from '../../lib/refListModel.ts';
-import { useFieldFocus } from '../../lib/useFieldFocus.ts';
+import { createReviewFilesActions } from '../../lib/reviewFilesActions.ts';
+import { useReviewAnnouncements } from '../../lib/useReviewAnnouncements.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
-import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
@@ -69,10 +44,11 @@ import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
-import BaseSelector from './BaseSelector.vue';
+import ReviewBranchPicker from './ReviewBranchPicker.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
-import ReviewCommitRow from './ReviewCommitRow.vue';
+import ReviewCommitList from './ReviewCommitList.vue';
 import ReviewFilesPane from './ReviewFilesPane.vue';
+import ReviewToolbars from './ReviewToolbars.vue';
 
 const props = defineProps<{
   transport: Transport;
@@ -286,25 +262,8 @@ async function goBackToSelection(): Promise<void> {
   if (id) await bridge.request('review.session.save', { repoId: id, session: null });
 }
 
-/** G19 D5 (item 5): the header's swap button. */
-function onSwapBaseAndBranch(): void {
-  void review.value?.swapBaseAndBranch();
-}
-
-// G19 D6 (item 6): the always-rendered filter input is now revealed by a search-icon button —
-// `filterVisible` gates rendering; the button itself carries an "active" state whenever a filter
-// is applied *or* revealed, so an applied-but-collapsed filter still visibly signals itself.
+// The file filter is revealed by the toolbar's search button; `filterVisible` gates it.
 const filterVisible = ref(false);
-// Focus is explicit: `autofocus` is a11y-linted outside modals and fires only on first render.
-const toolbarFilter = useTemplateRef<{ $el: Element }>('toolbarFilter');
-const focusToolbarFilter = useFieldFocus(toolbarFilter);
-watch(filterVisible, (visible) => {
-  if (!visible) return;
-  void nextTick(focusToolbarFilter);
-});
-function toggleFilterVisible(): void {
-  filterVisible.value = !filterVisible.value;
-}
 
 // Type to search: a printable key in the commit list reveals the file filter and starts it.
 const { showSearch } = usePanelHeaderSearch(rootEl, {
@@ -409,56 +368,7 @@ function onSelectComment(path: string): void {
 // below already uses for its own `DetailActions | undefined`.
 const rowActions = computed<DetailActions | undefined>(() => review.value?.rowActions.value);
 
-// The Files pane's own actions bundle — "Open in editor"/"Go to file" are wired for real (the
-// same bridge calls createDetailActions makes) but ReviewFilesPane.vue always disables both
-// capabilities for its own DiffView, since neither has an honest meaning against a branch-review
-// delta with no single commit sha; FileTree's own copy-path button is the one thing this bundle
-// really serves here.
-const filesActions = computed<DetailActions>(() => {
-  return {
-    copy(text, message) {
-      void copyToClipboard(bridge, text, message).then((outcome) => {
-        announce(outcome.message);
-      });
-    },
-    announce,
-    async openInEditor({ sha, path, originalPath, parentIndex, pinned }) {
-      const repo = repoId.value;
-      if (!repo) return;
-      await bridge.request('editor.openDiff', {
-        repoId: repo,
-        sha,
-        path,
-        ...(originalPath !== undefined ? { originalPath } : {}),
-        parentIndex,
-        pinned,
-      });
-    },
-    async openAllChanges({ sha, parentIndex }) {
-      const repo = repoId.value;
-      if (!repo) throw new Error('openAllChanges: no active repo');
-      return bridge.request('editor.openAllChanges', { repoId: repo, sha, parentIndex });
-    },
-    async goToFile({ rev, path, line }) {
-      const repo = repoId.value;
-      if (!repo) throw new Error('goToFile: no active repo');
-      return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
-    },
-    async openPullRequest({ number }) {
-      const repo = repoId.value;
-      if (!repo) throw new Error('openPullRequest: no active repo');
-      await bridge.request('pr.openExternal', { repoId: repo, number });
-    },
-    async openExternalLink(url) {
-      await bridge.request('link.openExternal', { url });
-    },
-    async revealInGraph({ sha }) {
-      const repo = repoId.value;
-      if (!repo) return { revealed: false };
-      return bridge.request('graph.revealCommit', { repoId: repo, sha });
-    },
-  };
-});
+const filesActions = createReviewFilesActions(bridge, () => repoId.value, announce);
 
 onMounted(() => {
   // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
@@ -513,289 +423,16 @@ watch(
   scheduleSessionSave,
 );
 
-// ---------------------------------------------------------------------------------------
-// The "no branch" state's own branch picker (§6.8 state 1) — `refListModel.ts`'s fold over
-// `refs.list`, tags excluded (a tag is a point, not a line of development — matches W14's own
-// rule on the row menu's "Review branch changes" entry).
-// ---------------------------------------------------------------------------------------
-const branchFilter = ref('');
-const branchFilterInputRef = useTemplateRef<{ $el: Element }>('branchFilter');
-const focusBranchFilter = useFieldFocus(branchFilterInputRef);
-const branchSections = computed(() =>
-  buildRefListSections(
-    {
-      branches: refsState.branches.value,
-      remoteBranches: refsState.remoteBranches.value,
-      tags: [],
-    },
-    branchFilter.value,
-  ),
-);
-
-// Focused once this "no branch" state actually renders (not merely once at this component's own
-// mount, which would fire long before the picker is ever shown).
-watch(
-  () => !bootError.value && !!review.value && !noActiveRepo.value && !review.value.branch.value,
-  (showingPicker) => {
-    if (showingPicker) void nextTick(focusBranchFilter);
-  },
-);
-
 function pickBranch(name: string): void {
   const id = repoId.value;
   if (!id) return;
   void applyTarget(id, name);
 }
 
-// ---------------------------------------------------------------------------------------
-// The commit list — `PackedStreamState`'s own `store`/`loadedRows`/`generation`: `generation` is
-// read (not merely as a dependency of `loadedRows`) so a reset that happens to land on the same
-// row count (a `setBase` override back to an equally-sized range) still recomputes this list
-// rather than reusing stale row identities (`packedStream.ts`'s own doc comment on why
-// `generation` exists at all).
-// ---------------------------------------------------------------------------------------
-const shas = computed<readonly string[]>(() => {
-  const r = review.value;
-  if (!r) return [];
-  void r.generation.value;
-  const out: string[] = [];
-  for (let i = 0; i < r.loadedRows.value; i++) out.push(r.store.shaAt(i));
-  return out;
-});
-
-// The list is virtualized (`useVirtualRows` below): only rows near the viewport mount, however many
-// are loaded.
-const commitCountLabel = computed(() => {
-  const resolution = review.value?.resolution.value;
-  if (resolution?.range.kind !== 'ready') return '';
-  const count = resolution.range.commitCount;
-  return t('git.review.commits.count.label', { count });
-});
-
-// G14 D8 row 3/4: bare counts for the comparison summary node and the pane-toggle badges — the
-// same underlying numbers `commitCountLabel` above already formats into a sentence, plus the
-// Files/Comments panes' own row counts. `0` (not `undefined`) whenever a count is not yet known,
-// so a badge renders "0" rather than blinking in once data arrives — every source here is already
-// on the wire (D8's own "no new data" fence).
-const commitsCount = computed(() => {
-  const resolution = review.value?.resolution.value;
-  return resolution?.range.kind === 'ready' ? resolution.range.commitCount : 0;
-});
 const filesChangedCount = computed(() => reviewFiles.value?.files.value.length ?? 0);
 const commentsCount = computed(() => reviewComments.value?.comments.value.length ?? 0);
 
-// P131 Part 3 §5.1: a local option shape for the ToggleGroup rows below — matches
-// BranchPicker.vue's own PickerTabOption precedent, not a shared package export.
-interface ReviewToggleOption {
-  readonly id: string;
-  readonly icon: string;
-  readonly label: MessageKey;
-  readonly ariaLabel?: string;
-  readonly badge?: number;
-}
-
-// G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged section nodes.
-const panelOptions = computed<readonly ReviewToggleOption[]>(() => [
-  {
-    id: 'commits',
-    icon: ACTION_ICONS.commits,
-    label: 'common.module.commits.label',
-    badge: commitsCount.value,
-  },
-  {
-    id: 'files',
-    icon: ACTION_ICONS.files,
-    label: 'common.module.files.label',
-    badge: filesChangedCount.value,
-  },
-  {
-    id: 'comments',
-    icon: ACTION_ICONS.comments,
-    label: 'git.review.pane.comments.label',
-    badge: commentsCount.value,
-  },
-]);
-
-const listModeOptions: readonly ReviewToggleOption[] = [
-  { id: 'tree', icon: ACTION_ICONS.listTree, label: 'git.fileTree.listTree.tooltip' },
-  { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'git.fileTree.listFlat.tooltip' },
-];
-
-const panelItems = computed(() =>
-  panelOptions.value.map((o) => ({
-    value: o.id,
-    label: t(o.label),
-    icon: o.icon,
-    count: o.badge,
-    tooltip: t(o.label),
-    testid: `review-pane-${o.id}`,
-  })),
-);
-const listModeItems = computed(() =>
-  listModeOptions.map((o) => ({
-    value: o.id,
-    label: t(o.label),
-    icon: o.icon,
-    tooltip: t(o.label),
-  })),
-);
-
-function onPaneChange(pane: string): void {
-  review.value?.setPane(pane as ReviewPane);
-}
-
-/** G14 D8 row 3: the comparison summary's own second line — "N commits · M files changed",
- *  always shown while the list itself is (never gated on which pane is active, unlike the old
- *  commit-count-only span this replaces). */
-const comparisonSummaryLabel = computed(() => {
-  const commits = commitCountLabel.value;
-  if (!commits) return '';
-  const files = filesChangedCount.value;
-  return t('common.dotPair.label', {
-    first: commits,
-    second: t('git.review.filesChanged.label', { count: files }),
-  });
-});
-
-const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
-
-function loadMoreLabel(): string {
-  const r = review.value;
-  if (!r) return t('git.review.loadMore.label');
-  if (r.isLoadingMore.value) return t('common.state.loading.loading');
-  const remaining = r.remaining.value;
-  return remaining < FALLBACK_PAGE_SIZE
-    ? t('git.loadMore.last.label', { count: remaining })
-    : t('git.loadMore.page.label', {
-        pageSize: formatCount(FALLBACK_PAGE_SIZE),
-        remaining: formatCount(remaining),
-      });
-}
-
-function handleLoadMore(): void {
-  if (review.value?.isLoadingMore.value) return;
-  void review.value?.loadMore();
-}
-
-// ---------------------------------------------------------------------------------------
-// Row expansion, the roving-tabindex cursor, and the diff overlay — one keydown handler at the
-// root (§6.8 step 3's Esc ordering: the diff first, then the row), rather than three components
-// each guessing whether it is the innermost.
-// ---------------------------------------------------------------------------------------
-const rowsEl = ref<HTMLDivElement | null>(null);
-const focusedSha = ref<string | null>(null);
-const focusedRow = computed(() => {
-  const index = focusedSha.value === null ? -1 : shas.value.indexOf(focusedSha.value);
-  return index === -1 ? 0 : index;
-});
-
-// Collapsed rows are two lines; an expanded row's real height is measured (`measureRow`). Rows
-// position with `top`, not `transform`: a row's context menu is `position: fixed` and a transformed
-// ancestor would re-anchor it.
-const COLLAPSED_ROW_ESTIMATE = 44;
-const { virtualizer, virtualItems, totalSize, onScroll } = useVirtualRows({
-  count: () => shas.value.length,
-  rowHeight: () => COLLAPSED_ROW_ESTIMATE,
-  scrollElement: rowsEl,
-  pinned: () => focusedRow.value,
-});
-
-const focusedRowMounted = computed(() =>
-  virtualItems.value.some((item) => item.index === focusedRow.value),
-);
-
-function measureRow(el: unknown): void {
-  if (el instanceof HTMLElement) virtualizer.value.measureElement(el);
-}
-
-const nav = useListNavigation<string>({
-  container: rowsEl,
-  items: () => shas.value,
-  key: (sha) => sha,
-  activeKey: focusedSha,
-  onOpen: toggleRow,
-  tree: {
-    depth: () => 0,
-    isExpanded: (sha) => review.value?.expandedShas.value.has(sha) ?? false,
-    hasChildren: () => true,
-    expand: (sha) => {
-      if (!review.value?.expandedShas.value.has(sha)) toggleRow(sha);
-    },
-    collapse: (sha) => {
-      if (review.value?.expandedShas.value.has(sha)) toggleRow(sha);
-    },
-  },
-  scrollToIndex: (index) => virtualizer.value.scrollToIndex(index),
-  rendered: () => virtualItems.value,
-});
-
-function toggleRow(sha: string): void {
-  review.value?.toggle(sha);
-}
-
-// G12 D12: the diff overlay (and W17's modal-focus wiring for it) is gone — every diff opens in
-// the host editor now, so there is nothing left in the webview for Escape's first stage to close. Only
-// the second stage (collapse the focused row) remains.
-//
-// P108 F12: Kira Space mounts this alongside one or more graph tabs in the same document (kept
-// alive with `v-show` rather than unmounted) — this `document`-level listener otherwise fired for
-// an Escape typed while focus was inside a graph tab's own DOM too, collapsing a review row the
-// user was never even looking at. Scoped to this instance's own root.
-function onDocumentKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Escape') return;
-  if (!rootEl.value || !(event.target instanceof Node) || !rootEl.value.contains(event.target)) {
-    return;
-  }
-  const sha = shas.value[focusedRow.value];
-  if (sha && review.value?.expandedShas.value.has(sha)) review.value.collapse(sha);
-}
-
-useEventListener(document, 'keydown', onDocumentKeydown);
-
-// ---------------------------------------------------------------------------------------
-// The one polite live region — the shared per-row announcement (copy/open-in-editor/go-to-file
-// outcomes, `ReviewSessionState.announcement`) and, additionally, an announcement each time the
-// four non-list states are *entered* (W17: "a screen-reader user learns 'nothing to review'
-// rather than meeting silence").
-// ---------------------------------------------------------------------------------------
-watch(
-  () => review.value?.announcement.value,
-  (text) => {
-    if (text !== undefined) announce(text);
-  },
-  { deep: true },
-);
-
-watch(
-  () => review.value?.phase.value,
-  (phase) => {
-    const r = review.value;
-    if (!r) return;
-    const branch = r.branch.value ?? '';
-    const base = r.resolution.value?.base ?? '';
-    switch (phase) {
-      case 'ask':
-        announce(t('git.review.phase.ask.announce', { branch }));
-        break;
-      case 'unrelated':
-        announce(t('git.review.phase.unrelated.announce', { branch, base }));
-        break;
-      case 'empty':
-        announce(t('git.review.phase.empty.announce', { branch, base }));
-        break;
-      case 'listing':
-        announce(
-          t('git.review.phase.listing.announce', { branch, base, summary: commitCountLabel.value }),
-        );
-        break;
-      case 'error':
-        announce(t('git.review.phase.error.error', { branch, error: r.resolveError.value ?? '' }));
-        break;
-      default:
-        break;
-    }
-  },
-);
+useReviewAnnouncements(review, announce);
 </script>
 
 <template>
@@ -814,7 +451,7 @@ watch(
 
     <template v-if="bootError">
       <div class="flex flex-col gap-2 p-3" data-testid="boot-error">
-        <p class=" text-muted-foreground">{{
+        <p class="text-muted-foreground">{{
           t('git.app.bootError.error', { error: bootError })
         }}</p>
         <Button
@@ -841,149 +478,23 @@ watch(
     </template>
 
     <template v-else-if="!review.branch.value">
-      <div class="flex flex-col gap-1 p-3 min-h-0 h-full" data-testid="review-no-branch">
-        <h2 class="text-kira-lg font-medium text-fg">{{ t('git.review.start.title') }}</h2>
-        <p class=" text-muted-foreground">
-          {{ t('git.review.noBranch.emptyHint') }}
-        </p>
-        <SearchField
-          ref="branchFilter"
-          v-model="branchFilter"
-          :placeholder="t('git.picker.filterBranches.placeholder')"
-          :aria-label="t('git.picker.filterBranches.placeholder')"
-        />
-        <div class="flex-1 min-h-0 overflow-auto">
-          <div>
-            <SectionHeading :label="t('common.module.branches.label')" />
-            <button
-              v-for="row in branchSections.branches.visible"
-              :key="row.refname"
-              type="button"
-              :class="cn(rowVariants({ layout: 'tree' }), 'w-full text-left')"
-              :style="rowIndent(0)"
-              @click="pickBranch(row.shortName)"
-            >
-              {{ row.shortName }}
-            </button>
-            <InlineState v-if="branchSections.branches.visible.length === 0" kind="empty">
-              {{ t('common.state.noMatches.empty') }}
-            </InlineState>
-          </div>
-          <div>
-            <SectionHeading :label="t('git.picker.remoteBranches.label')" />
-            <button
-              v-for="row in branchSections.remoteBranches.visible"
-              :key="row.refname"
-              type="button"
-              :class="cn(rowVariants({ layout: 'tree' }), 'w-full text-left')"
-              :style="rowIndent(0)"
-              @click="pickBranch(row.shortName)"
-            >
-              {{ row.shortName }}
-            </button>
-          </div>
-        </div>
-      </div>
+      <ReviewBranchPicker :refs-state="refsState" @pick="pickBranch" />
     </template>
 
     <template v-else>
-      <!-- G19 D5 (item 5): the two compared sides now stack, one per line, with a swap button
-           between them — replacing the old single-row "branch ↔ base" strip (F5: no stacking, no
-           invert control). G19 D11a (item 11): the back-to-selection button renders here too,
-           whenever a branch is picked — including the error phase, which is exactly the state a
-           resumed session pointing at a deleted branch/base lands in (D11b). -->
-      <!-- P110 A16: this header used to restyle .p-panel-head's own geometry (height/gap/padding)
-           but deliberately never its casing/letter-spacing — that primitive styles a short
-           section label, and the branch name here is live data, which must never be re-cased. -->
-      <ViewToolbar>
-        <TooltipIconButton
-          icon="chevron-left"
-          :label="t('git.review.back.tooltip')"
-          data-testid="review-back-button"
-          @click="goBackToSelection"
-        />
-        <CodiconIcon name="git-branch" :size="13" class="shrink-0 text-muted-foreground" />
-        <span
-          class="min-w-0 truncate font-data text-kira-md text-fg"
-          data-testid="review-branch-name"
-          >{{
-            review.branch.value
-          }}</span
-        >
-        <span class="text-muted-foreground shrink-0" aria-hidden="true">↔</span>
-        <BaseSelector
-          :resolution="review.resolution.value"
-          :refs-state="refsState"
-          @select="review.setBase($event)"
-        />
-        <TooltipIconButton
-          icon="arrow-swap"
-          :label="t('git.review.swap.tooltip')"
-          data-testid="review-swap-button"
-          @click="onSwapBaseAndBranch"
-        />
-        <span
-          v-if="review.phase.value === 'listing'"
-          class="ml-auto min-w-0 truncate text-kira-sm text-subtle"
-        >
-          {{ comparisonSummaryLabel }}
-        </span>
-      </ViewToolbar>
-
-      <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
-           filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
-           expanded row plus a third, separately-stateful copy in the Files pane. -->
-      <ViewToolbar v-if="review.phase.value === 'listing'" data-testid="review-toolbar">
-        <SecondaryTabs
-          :aria-label="t('git.review.pane.aria')"
-          :model-value="review.pane.value"
-          :items="panelItems"
-          @update:model-value="onPaneChange"
-        >
-          <template #item="{ item }">
-            <CodiconIcon :name="item.icon ?? ''" :size="13" />
-            <span class="sr-only">{{ item.label }}</span>
-            <span v-if="item.count !== undefined" :class="rowMeta">{{ item.count }}</span>
-          </template>
-        </SecondaryTabs>
-        <!-- G19 D6 (item 6): the always-rendered filter input is now gated behind a search-icon
-             button — F6 found this the one filter in the app that did not already gate behind
-             opening something (BaseSelector.vue's own filter already does). `aria-pressed`
-             whenever the input is revealed *or* a filter is already applied-but-collapsed, so an
-             applied filter still visibly signals itself even while hidden. -->
-        <TooltipIconButton
-          icon="search"
-          :label="t('git.fileTree.filter.placeholder')"
-          :pressed="filterVisible || filter.length > 0"
-          data-testid="review-filter-toggle"
-          @click="toggleFilterVisible"
-        />
-        <div v-if="filterVisible" class="min-w-0 flex-1">
-          <SearchField
-            ref="toolbarFilter"
-            data-testid="review-file-filter"
-            :placeholder="t('git.fileTree.filter.placeholder')"
-            :aria-label="t('git.fileTree.filter.placeholder')"
-            :model-value="filter"
-            @update:model-value="filter = $event"
-          />
-        </div>
-        <SecondaryTabs
-          variant="segmented"
-          :aria-label="t('git.fileTree.display.aria')"
-          :model-value="listMode"
-          :items="listModeItems"
-          @update:model-value="(v) => (listMode = v as FileListMode)"
-        >
-          <template #item="{ item }">
-            <CodiconIcon :name="item.icon ?? ''" :size="13" />
-            <span class="sr-only">{{ item.label }}</span>
-          </template>
-        </SecondaryTabs>
-      </ViewToolbar>
+      <ReviewToolbars
+        v-model:list-mode="listMode"
+        v-model:filter="filter"
+        v-model:filter-visible="filterVisible"
+        :review="review"
+        :refs-state="refsState"
+        :files-count="filesChangedCount"
+        :comments-count="commentsCount"
+        @back="goBackToSelection"
+      />
 
       <div class="flex-1 min-h-0 flex flex-col">
-        <p v-if="review.phase.value === 'resolving'" class=" p-3 text-muted-foreground">
+        <p v-if="review.phase.value === 'resolving'" class="p-3 text-muted-foreground">
           {{ t('git.review.resolving.loading') }}
         </p>
 
@@ -998,7 +509,7 @@ watch(
 
         <div
           v-else-if="review.phase.value === 'ask'"
-          class=" p-3 text-muted-foreground"
+          class="p-3 text-muted-foreground"
           data-testid="review-ask"
         >
           <p>
@@ -1010,7 +521,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'unrelated'"
-          class=" p-3 text-muted-foreground"
+          class="p-3 text-muted-foreground"
           data-testid="review-unrelated"
         >
           {{
@@ -1020,7 +531,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'empty'"
-          class=" p-3 text-muted-foreground"
+          class="p-3 text-muted-foreground"
           data-testid="review-empty"
         >
           {{
@@ -1031,76 +542,13 @@ watch(
         <template
           v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits' && rowActions"
         >
-          <ViewToolbar
-            v-if="review.staleReview.value"
-            class="font-ui"
-            role="status"
-            data-testid="review-stale-banner"
-          >
-            <span>{{ t('git.review.stale.status') }}</span>
-            <TooltipIconButton
-              icon="refresh"
-              :label="t('common.action.refresh.label')"
-              class="ml-auto"
-              @click="review.acknowledgeStaleReview()"
-            />
-          </ViewToolbar>
-
-          <div
-            ref="rowsEl"
-            class="flex-1 min-h-0 overflow-auto"
-            role="tree"
-            :aria-label="t('common.module.commits.label')"
-            :tabindex="focusedRowMounted ? -1 : 0"
-            @scroll="onScroll"
-          >
-            <div class="relative w-full" :style="{ height: `${totalSize}px` }">
-              <div
-                v-for="item in virtualItems"
-                :key="shas[item.index]"
-                :ref="measureRow"
-                role="presentation"
-                :data-index="item.index"
-                :class="VIRTUAL_ROW_CLASS"
-                :style="{ top: `${item.start}px` }"
-              >
-                <ReviewCommitRow
-                  v-bind="nav.rowProps(shas[item.index] as string)"
-                  :sha="shas[item.index] as string"
-                  :store="review.store"
-                  :expanded="review.expandedShas.value.has(shas[item.index] as string)"
-                  :expansion="review.expansionFor(shas[item.index] as string)"
-                  :actions="rowActions"
-                  :focused="item.index === focusedRow"
-                  :aria-setsize="shas.length"
-                  :aria-posinset="item.index + 1"
-                  :list-mode="listMode"
-                  :filter="filter"
-                  @toggle="toggleRow(shas[item.index] as string)"
-                  @focusRow="focusedSha = shas[item.index] as string"
-                />
-              </div>
-            </div>
-          </div>
-          <!-- G16 D9: `remaining > 0` guards against F7's empty-range hole — an empty branch
-               comparison never emits a chunk, so there is no server-side signal to correct here.
-               Kept visible while loading so the affordance does not vanish mid-load.
-               P110 A16: "Load more" stays plain text (its label carries a count), so this button
-               takes no cancellation classes — Button's own toolbar variant already matches. -->
-          <div
-            v-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
-            class="flex justify-center py-1 px-1.5 shrink-0"
-          >
-            <Button
-              data-testid="review-load-more-button"
-              variant="toolbar"
-              size="kira"
-              :disabled="review.isLoadingMore.value"
-              @click="handleLoadMore"
-            >
-              {{ loadMoreLabel() }}
-            </Button>
-          </div>
+          <ReviewCommitList
+            :review="review"
+            :actions="rowActions"
+            :list-mode="listMode"
+            :filter="filter"
+            :boundary="rootEl"
+          />
         </template>
 
         <ReviewFilesPane
