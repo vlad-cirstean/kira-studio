@@ -1,12 +1,15 @@
 package adeflow_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 func TestRunWithoutClaudeOnPath(t *testing.T) {
@@ -68,4 +71,23 @@ func TestWorkflowYamlInvalidThenFixed(t *testing.T) {
 		t.Fatalf("task on the fixed workflow: %v", err)
 	}
 	app.Scenario(fakeagent.Scenario{})
+}
+
+func TestStaleWorkflowSaveReportsCatalogText(t *testing.T) {
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStage("build", agentStep("impl", "")))
+	read, err := f.app.W.AdeTask.WorkflowYaml(ctx, adewire.FileNameArgs{FileName: "flow.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: read.Yaml + "# one\n", BaseHash: read.Hash}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: read.Yaml + "# other\n", BaseHash: read.Hash})
+	var ie *ipcerr.Error
+	if !errors.As(err, &ie) || ie.Code != "E_CONFLICT" {
+		t.Fatalf("stale save err = %v, want E_CONFLICT", err)
+	}
+	if want := i18n.T("backend.space.ade.workflowChanged.body", nil); ie.Message != want {
+		t.Fatalf("message = %q, want %q", ie.Message, want)
+	}
 }

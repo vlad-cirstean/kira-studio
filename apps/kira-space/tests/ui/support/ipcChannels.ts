@@ -26,6 +26,8 @@ export const IPC = {
   // P116 G1-G7: the menu-pushed commands, keep-awake and new-window bound calls, and the app-metrics
   // push — same values as Kira Studio's own ipcChannels.ts.
   openSettings: 'kira:menu:openSettings',
+  commandPalette: 'kira:menu:commandPalette',
+  viewFind: 'kira:menu:viewFind',
   toggleProjectPanel: 'kira:menu:toggleProjectPanel',
   tabNext: 'kira:menu:tabNext',
   tabPrev: 'kira:menu:tabPrev',
