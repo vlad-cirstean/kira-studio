@@ -8,18 +8,19 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        ghost:
-          'hover:bg-field hover:text-fg dark:hover:bg-field/50 aria-expanded:bg-field aria-expanded:text-fg',
-        link: 'text-primary underline-offset-4 hover:underline',
+        ghost: 'hover:bg-field hover:text-fg aria-expanded:bg-field aria-expanded:text-fg',
+        link: 'cursor-pointer text-primary underline-offset-4 hover:underline',
         // P104 §3: AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
         // `variant` axis instead of a second wrapper prop layer (§0's "no hand-rolled fallback").
         // Geometry stays on the `kira`/`kira-lg`/`kira-icon` sizes below (design-system tokens,
         // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2).
-        toolbar: 'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg',
+        toolbar:
+          'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg aria-pressed:bg-field aria-pressed:text-fg',
         'toolbar-primary': 'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80',
-        dialog: 'justify-center rounded-kira-sm border border-border-strong bg-field text-fg',
+        dialog:
+          'justify-center rounded-kira-sm border border-border-strong bg-field text-fg hover:bg-hover',
         'dialog-primary':
-          'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground',
+          'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground hover:bg-primary/80',
         'dialog-danger':
           'justify-center rounded-kira-sm border border-error bg-error/10 text-error hover:bg-error/20',
         danger: 'rounded-kira-sm text-error hover:bg-hover',
@@ -37,6 +38,11 @@ export const buttonVariants = cva(
         'kira-lg':
           'h-control-lg gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         'kira-icon': 'size-control',
+        // Status-bar items, mobile touch targets and bare inline buttons: one size per role.
+        status: 'h-control-sm gap-1 px-1.5 text-kira-sm font-normal',
+        touch: 'h-touch px-4 text-kira-touch',
+        'touch-icon': 'size-touch',
+        inline: 'h-auto p-0',
         // P110 B13
         title: 'size-5.5',
         'title-labelled': 'h-5.5 px-1 gap-1',

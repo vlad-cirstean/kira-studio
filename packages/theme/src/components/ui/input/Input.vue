@@ -10,6 +10,7 @@ const props = defineProps<{
   modelValue?: string | number;
   class?: HTMLAttributes['class'];
   size?: InputVariants['size'];
+  appearance?: InputVariants['appearance'];
 }>();
 
 const emits = defineEmits<(e: 'update:modelValue', payload: string | number) => void>();
@@ -24,6 +25,6 @@ const modelValue = useVModel(props, 'modelValue', emits, {
   <input
     v-model="modelValue"
     data-slot="input"
-    :class="cn(inputVariants({ size: props.size }), props.class)"
+    :class="cn(inputVariants({ size: props.size, appearance: props.appearance }), props.class)"
   >
 </template>
