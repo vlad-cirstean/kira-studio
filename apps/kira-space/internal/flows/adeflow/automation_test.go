@@ -205,7 +205,7 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatalf("with a branch: needs %+v, missing %v, blocker %q", pv.Needs, pv.Missing, pv.Blocker)
 		}
 		if _, err := f.app.W.ScriptRuns.Preview(scriptruns.RunArgs{ScriptID: rec.ID, TaskID: f.task, BranchID: f.docsBr.ID}); err == nil ||
-			!strings.Contains(err.Error(), "that branch cannot run this script now") {
+			!strings.Contains(err.Error(), "That branch can’t run this script now") {
 			t.Fatalf("a draft branch = %v", err)
 		}
 	})
@@ -325,8 +325,8 @@ func TestAutomationRun(t *testing.T) {
 		if pv.Blocker != "a run is working on feat/api-login" {
 			t.Fatalf("preview blocker while a step runs = %q", pv.Blocker)
 		}
-		if _, err := f.app.W.ScriptRuns.Start(scriptruns.StartArgs{RunArgs: args, Hash: pv.Hash}); errCode(err) != "E_INVALID" {
-			t.Fatalf("Start on a busy branch = %v, want E_INVALID", err)
+		if _, err := f.app.W.ScriptRuns.Start(scriptruns.StartArgs{RunArgs: args, Hash: pv.Hash}); errCode(err) != "E_BAD_REQUEST" {
+			t.Fatalf("Start on a busy branch = %v, want E_BAD_REQUEST", err)
 		}
 		release(t, f.gateTwo)
 		testx.WaitUntil(t, waitFor, func() bool {

@@ -215,7 +215,7 @@ func TestScriptFolders(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "gone")
 	fixed := newScript(t, app, scripts.CustomScriptFields{Command: "pwd", DirMode: scripts.DirModeFixed, WorkingDir: missing})
 	d, err = runs.ResolveDir(scriptruns.ResolveDirArgs{ScriptID: fixed.ID})
-	if err != nil || d.Blocker != missing+" does not exist" {
+	if err != nil || d.Blocker != missing+" does not exist." {
 		t.Fatalf("fixed dir = %+v, %v, want a does-not-exist blocker", d, err)
 	}
 	// Contract script-folders: tests/ui automations-scripts "Choose folder…" reads the fixed record.

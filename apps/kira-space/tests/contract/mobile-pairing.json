@@ -13,7 +13,7 @@
   },
   "http:GET /api/me#expired": {
     "code": "E_EXPIRED",
-    "message": "device access expired"
+    "message": "Access for this phone expired."
   },
   "http:GET /api/me#paired": {
     "agentInputGlobal": false,

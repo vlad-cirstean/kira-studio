@@ -128,7 +128,7 @@ func TestTamperDetectionFailsAuthentication(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := c.Decrypt(ScopeConnection, tt.value)
 			ie := asIpcErr(t, err)
-			if ie.Code != "E_SECRET_STORE" || !strings.Contains(ie.Message, "could not be decrypted") {
+			if ie.Code != "E_SECRET_STORE" || !strings.Contains(ie.Message, "couldn’t be decrypted") {
 				t.Errorf("Decrypt(%s) error = %+v, want the decrypt-failure sentence", tt.name, ie)
 			}
 		})
@@ -160,7 +160,7 @@ func TestScopeBindsCiphertextToItsKind(t *testing.T) {
 					t.Fatalf("Decrypt(%s) on a %s-sealed envelope succeeded with %q, want a refusal", openScope, sealScope, got)
 				}
 				ie := asIpcErr(t, err)
-				if ie.Code != "E_SECRET_STORE" || !strings.Contains(ie.Message, "could not be decrypted") {
+				if ie.Code != "E_SECRET_STORE" || !strings.Contains(ie.Message, "couldn’t be decrypted") {
 					t.Fatalf("Decrypt(%s) on a %s-sealed envelope error = %+v, want the decrypt-failure sentence", openScope, sealScope, ie)
 				}
 			})
@@ -213,8 +213,8 @@ func TestAnUnknownScopeIsRefusedByBothDirections(t *testing.T) {
 				t.Errorf("Encrypt(%q) envelope = %q, want empty on refusal", scope, enc)
 			}
 			ie := asIpcErr(t, err)
-			if ie.Code != "E_SECRET_STORE" {
-				t.Errorf("Encrypt(%q) code = %s, want E_SECRET_STORE", scope, ie.Code)
+			if ie.Code != "E_CONTRACT" {
+				t.Errorf("Encrypt(%q) code = %s, want E_CONTRACT", scope, ie.Code)
 			}
 
 			enc2, err := c.Encrypt(ScopeConnection, "s3cr3t")
@@ -226,8 +226,8 @@ func TestAnUnknownScopeIsRefusedByBothDirections(t *testing.T) {
 				t.Fatalf("Decrypt(%q) succeeded, want a refusal", scope)
 			}
 			ie2 := asIpcErr(t, err)
-			if ie2.Code != "E_SECRET_STORE" {
-				t.Errorf("Decrypt(%q) code = %s, want E_SECRET_STORE", scope, ie2.Code)
+			if ie2.Code != "E_CONTRACT" {
+				t.Errorf("Decrypt(%q) code = %s, want E_CONTRACT", scope, ie2.Code)
 			}
 		})
 	}

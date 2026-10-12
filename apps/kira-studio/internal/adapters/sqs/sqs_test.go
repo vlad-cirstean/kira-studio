@@ -522,7 +522,8 @@ func TestSqs_Read_ReadOnlyPollKeepsMessagesVisible(t *testing.T) {
 	}
 }
 
-// P184: a bad filter is a query error before any connection use, so no Docker is needed.
+// P184: a bad filter is refused before any connection use, so no Docker is needed. An
+// out-of-range value is a query error; a filter of the wrong shape is a Kira bug (E_CONTRACT).
 func TestSqs_Read_RejectsInvalidVisibilityTimeout(t *testing.T) {
 	a := newAdapter(t)
 	for _, filter := range []string{
@@ -537,8 +538,12 @@ func TestSqs_Read_RejectsInvalidVisibilityTimeout(t *testing.T) {
 			t.Errorf("filter %s: want an error", filter)
 			continue
 		}
-		if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
-			t.Errorf("filter %s: code = %v, want E_QUERY", filter, code)
+		want := adapters.CodeContract
+		if strings.HasPrefix(filter, `{"visibilityTimeoutSeconds":`) && (strings.HasSuffix(filter, `:0}`) || strings.HasSuffix(filter, `:43201}`)) {
+			want = adapters.CodeQuery
+		}
+		if code, _ := adapters.CodeOf(err); code != want {
+			t.Errorf("filter %s: code = %v, want %v", filter, code, want)
 		}
 	}
 }

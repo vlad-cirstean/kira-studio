@@ -64,7 +64,7 @@ func TestCommentExportText(t *testing.T) {
 	want := "Review comments — feature (3 comments)\n\n" +
 		"a.txt:2-4\n  Line one of note.\n  Line two of note.\n\n" +
 		"a.txt:6\n  Single line comment.\n\n" +
-		"b.txt:1  [lines as of " + tip[:8] + "; feature's history was rewritten since]\n  This will go stale.\n"
+		"b.txt:1  [lines as of " + tip[:7] + "; feature's history was rewritten since]\n  This will go stale.\n"
 	if got := export(); got != want {
 		t.Fatalf("export =\n%q\nwant\n%q", got, want)
 	}

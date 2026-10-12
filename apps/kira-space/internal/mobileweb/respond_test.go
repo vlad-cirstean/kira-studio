@@ -15,6 +15,7 @@ func TestWriteServiceErrorConflictKeepsCatalogText(t *testing.T) {
 	const key = "backend.space.ade.workflowChanged.body"
 	rec := httptest.NewRecorder()
 	writeServiceError(rec, ipcerr.T(ipcerr.CodeConflict, key, nil))
+	want := i18n.T("backend.space.ade.workflowChanged.body", nil)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409", rec.Code)
 	}
@@ -22,7 +23,7 @@ func TestWriteServiceErrorConflictKeepsCatalogText(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Code != string(ipcerr.CodeConflict) || body.Message != i18n.T(key, nil) {
-		t.Fatalf("body = %+v, want E_CONFLICT with %q", body, i18n.T(key, nil))
+	if body.Code != string(ipcerr.CodeConflict) || body.Message != want {
+		t.Fatalf("body = %+v, want E_CONFLICT with %q", body, want)
 	}
 }

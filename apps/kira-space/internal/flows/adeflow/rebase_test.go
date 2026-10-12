@@ -48,6 +48,15 @@ func (f *rbFx) advanceMain(t *testing.T, file, body string) {
 	f.repo.Git("push", "-q", "origin", "main")
 }
 
+// waitBehind waits until the app's cached refs show main ahead of the branch; the watcher lags a push.
+func waitBehind(t *testing.T, app *flowharness.App, br adewire.Branch) {
+	t.Helper()
+	testx.WaitUntil(t, waitFor, func() bool {
+		pv, err := app.W.AdeTask.RebasePreview(ctx, adewire.OntoArgs{BranchID: br.ID})
+		return err == nil && !pv.NoOp
+	})
+}
+
 // agent scripts the next rebase attempt: sh runs in the root branch worktree, then finish is called.
 func (f *rbFx) agent(sh string, finish map[string]any) {
 	a := fakeagent.Action{Name: "nofinish", Sh: sh}
@@ -332,6 +341,7 @@ func TestRebaseRun(t *testing.T) {
 		f.repo.Commit("main moves", map[string]string{"m.txt": "m\n"})
 		f.repo.Git("push", "-q", "origin", "main")
 		br = branchOf(t, board(t, f.app), task.ID, f.repoID)
+		waitBehind(t, f.app, br)
 		res, err := f.app.W.AdeTask.Rebase(ctx, adewire.RebaseArgs{BranchID: br.ID})
 		if err != nil {
 			t.Fatal(err)
@@ -372,6 +382,7 @@ func TestRebaseRun(t *testing.T) {
 		f.repo.Commit("main moves", map[string]string{"m.txt": "m\n"})
 		f.repo.Git("push", "-q", "origin", "main")
 		br = branchOf(t, board(t, f.app), task.ID, f.repoID)
+		waitBehind(t, f.app, br)
 		res, err := f.app.W.AdeTask.Rebase(ctx, adewire.RebaseArgs{BranchID: br.ID})
 		if err != nil {
 			t.Fatal(err)

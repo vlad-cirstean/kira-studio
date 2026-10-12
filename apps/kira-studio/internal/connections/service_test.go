@@ -760,7 +760,7 @@ func TestTestValidatesInputBeforeProbing(t *testing.T) {
 	if result.OK {
 		t.Fatal("Test(port: 70000).OK = true, want a validation failure")
 	}
-	if result.Error == nil || !strings.Contains(*result.Error, "port") {
+	if result.Error == nil || !strings.Contains(*result.Error, "Port") {
 		t.Fatalf("Test(port: 70000).Error = %v, want a message naming the port", result.Error)
 	}
 	if n := h.backend.testCount(); n != 0 {

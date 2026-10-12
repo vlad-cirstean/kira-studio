@@ -35,7 +35,7 @@
     "tools": []
   },
   "ScriptRunsService.Preview#unsaved": {
-    "error": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"scriptId is required\"}",
+    "error": "{\"code\":\"E_CONTRACT\",\"message\":\"scriptId is required\"}",
     "tasks": null
   },
   "args:CustomScriptsService.Update#task": {

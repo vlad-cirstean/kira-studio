@@ -360,7 +360,7 @@ func TestSmartScript(t *testing.T) {
 		if pv.Blocker != want {
 			t.Fatalf("blocker = %q", pv.Blocker)
 		}
-		if _, err := app.W.ScriptRuns.Start(startArgs(args, pv)); errCode(err) != "E_CONFLICT" || !strings.Contains(err.Error(), want) {
+		if _, err := app.W.ScriptRuns.Start(startArgs(args, pv)); errCode(err) != "E_BAD_REQUEST" || !strings.Contains(err.Error(), want) {
 			t.Fatalf("4th Start = %v", err)
 		}
 		for _, id := range ids {

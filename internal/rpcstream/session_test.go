@@ -298,8 +298,8 @@ func TestSession_HandleRequest_RejectsReusedInFlightID(t *testing.T) {
 	if env.Body.OK == nil || *env.Body.OK {
 		t.Fatalf("OK = %v, want false (the reused id must be refused)", env.Body.OK)
 	}
-	if env.Body.Error == nil || env.Body.Error.Code != "E_BAD_REQUEST" {
-		t.Fatalf("error = %+v, want E_BAD_REQUEST", env.Body.Error)
+	if env.Body.Error == nil || env.Body.Error.Code != "E_CONTRACT" {
+		t.Fatalf("error = %+v, want E_CONTRACT", env.Body.Error)
 	}
 
 	// The first request, still in flight, must complete normally once released — its own
@@ -360,8 +360,8 @@ func TestSession_HandleOpen_RejectsReusedInFlightID(t *testing.T) {
 	if env.Body.T != "end" || env.Body.ID != 1 {
 		t.Fatalf("body = %+v, want an end frame for id 1", env.Body)
 	}
-	if env.Body.Error == nil || env.Body.Error.Code != "E_BAD_REQUEST" {
-		t.Fatalf("error = %+v, want E_BAD_REQUEST", env.Body.Error)
+	if env.Body.Error == nil || env.Body.Error.Code != "E_CONTRACT" {
+		t.Fatalf("error = %+v, want E_CONTRACT", env.Body.Error)
 	}
 
 	close(release)

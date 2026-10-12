@@ -11,12 +11,12 @@
     "warnings": [
       {
         "count": 3,
-        "detail": "3 pre-request/test scripts were kept but are not run — they survive an export unchanged.",
+        "detail": "3 pre-request/test scripts were kept but are not run. They survive an export unchanged.",
         "kind": "scripts_inert"
       },
       {
         "count": 2,
-        "detail": "2 requests or folders carry an auth block. It is not applied and its values were not kept — those requests will need an Authorization header.",
+        "detail": "2 requests or folders carry an auth block. It is not applied and its values were not kept. Those requests need an auth header.",
         "kind": "auth_inert"
       },
       {
@@ -31,7 +31,7 @@
       },
       {
         "count": 1,
-        "detail": "1 requests reference a file by a name or a path from another machine. The content is not carried over — a file must be chosen before sending.",
+        "detail": "1 requests reference a file by a name or a path from another machine. The content is not carried over. Choose a file before sending.",
         "kind": "unresolved_file"
       }
     ]

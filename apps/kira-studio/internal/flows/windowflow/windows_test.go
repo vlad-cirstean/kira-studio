@@ -54,8 +54,8 @@ func TestStudioWindows(t *testing.T) {
 	w := app.W.WindowsSvc
 
 	var ie *ipcerr.Error
-	if _, err := w.Ensure(windowsvc.EnsureArgs{}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
-		t.Fatalf("Ensure without a key = %v, want E_BAD_REQUEST", err)
+	if _, err := w.Ensure(windowsvc.EnsureArgs{}); !errors.As(err, &ie) || ie.Code != "E_CONTRACT" {
+		t.Fatalf("Ensure without a key = %v, want E_CONTRACT", err)
 	}
 	for _, key := range []string{"A", "B"} {
 		res, err := w.Ensure(windowsvc.EnsureArgs{WindowKey: key})

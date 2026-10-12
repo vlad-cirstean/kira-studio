@@ -15,7 +15,7 @@ import (
 func TestPreviewRefusesTaskInStudio(t *testing.T) {
 	app := flowharness.New(t)
 	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
-		Name: "plain", Kind: scripts.KindScript, Command: "echo hi",
+		Name: "plain", Kind: scripts.KindScript, Command: "echo hi", Color: "blue", DirMode: scripts.DirModeKira,
 	}})
 	if err != nil {
 		t.Fatal(err)

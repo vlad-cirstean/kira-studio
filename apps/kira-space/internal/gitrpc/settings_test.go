@@ -409,7 +409,7 @@ func TestRepoSettings_PrepareScriptIsRefusedFromTheWire(t *testing.T) {
 
 			_, err := handlersA.Request(context.Background(), "repoSettings.set",
 				[]byte(`{"repoId": "/repos/a", "patch": `+patch+`}`))
-			if err == nil || !strings.Contains(err.Error(), "prepareScript") {
+			if err == nil || !strings.Contains(err.Error(), "prepare script") {
 				t.Fatalf("repoSettings.set err = %v, want a prepareScript refusal", err)
 			}
 			var ie *ipcerr.Error

@@ -17,6 +17,14 @@ var (
 	namedRe       = regexp.MustCompile(`^[a-zA-Z]\w*$`)
 )
 
+// wrappers take the key as a parameter by design; their callers name the literal key.
+var wrappers = map[string]bool{
+	"internal/ipcerr/text.go":                        true,
+	"apps/kira-studio/internal/adapters/errors.go":   true,
+	"apps/kira-studio/internal/httpclient/errors.go": true,
+	"apps/kira-space/internal/mobileweb/respond.go":  true,
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -97,7 +105,7 @@ func TestEveryGoCallNamesBackendKeyWithAllPlaceholders(t *testing.T) {
 		}
 		text := string(src)
 		rel, _ := filepath.Rel(root, path)
-		if got, want := len(callRe.FindAllString(text, -1)), len(literalCallRe.FindAllString(text, -1)); got != want {
+		if got, want := len(callRe.FindAllString(text, -1)), len(literalCallRe.FindAllString(text, -1)); got != want && !wrappers[rel] {
 			t.Errorf("%s: i18n.T needs a literal key and nil or a map literal (%d calls, %d well-formed)", rel, got, want)
 		}
 		for _, m := range literalCallRe.FindAllStringSubmatch(text, -1) {
