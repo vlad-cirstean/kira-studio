@@ -178,7 +178,7 @@ func TestMaskSendErrTimeline_MasksFailedSendHopURL(t *testing.T) {
 	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	sendErr := &httpclient.Error{
-		Code: httpclient.CodeHTTPTransport, Message: "connect: connection refused",
+		Code: httpclient.CodeTransport, Message: "connect: connection refused",
 		Timeline: &httpclient.Timeline{
 			Hops: []httpclient.TimelineHop{
 				{Index: 0, Method: "GET", URL: "https://api.example.com/orders?token=" + secret},
@@ -211,7 +211,7 @@ func TestMaskSendErrTimeline_MasksHopHeadersAndHopError(t *testing.T) {
 	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	sendErr := &httpclient.Error{
-		Code: httpclient.CodeHTTPTransport, Message: "connect: connection refused",
+		Code: httpclient.CodeTransport, Message: "connect: connection refused",
 		Timeline: &httpclient.Timeline{
 			Hops: []httpclient.TimelineHop{
 				{
@@ -275,7 +275,7 @@ func TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors(t *testing.
 		{
 			name: "transport error (has a Timeline)",
 			err: &httpclient.Error{
-				Code:    httpclient.CodeHTTPTransport,
+				Code:    httpclient.CodeTransport,
 				Message: `Get "https://api.example.com/orders?token=` + secret + `": dial tcp: connection refused`,
 				Timeline: &httpclient.Timeline{
 					Hops: []httpclient.TimelineHop{{Index: 0, Method: "GET", URL: "https://api.example.com/orders?token=" + secret}},
@@ -351,7 +351,7 @@ func TestHttpSendFailure_OpLogErrorNeverContainsSecret(t *testing.T) {
 			// message embeds the resolved (secret-bearing) URL, masked exactly as that closure now
 			// does before returning it to RunOp.
 			sendErr := &httpclient.Error{
-				Code:    httpclient.CodeHTTPTransport,
+				Code:    httpclient.CodeTransport,
 				Message: `Get "https://api.example.com/orders?token=` + secret + `": dial tcp: connection refused`,
 				Timeline: &httpclient.Timeline{
 					Hops: []httpclient.TimelineHop{{Index: 0, Method: "GET", URL: "https://api.example.com/orders?token=" + secret}},

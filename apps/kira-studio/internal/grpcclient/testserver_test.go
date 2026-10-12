@@ -202,7 +202,7 @@ func startEchoServer(t *testing.T, protoSource string, impl *echoImpl, withRefle
 // above — let alone its per-connection HTTP/2 dispatch — has actually run: under heavy load the
 // gap is wide enough that a real request lands on a connection nobody is properly serving yet and
 // sees a raw io.EOF instead of a response (the flake this fixes: descriptors_test.go's own
-// NoReflection case, "error = EOF" instead of a proper E_GRPC_SCHEMA).
+// NoReflection case, "error = EOF" instead of a proper E_BAD_REQUEST).
 //
 // This issues the exact RPC descriptors_test.go's flake raced on
 // (grpc_reflection_v1.ServerReflectionInfo — a real Send+Recv, a stronger signal than only

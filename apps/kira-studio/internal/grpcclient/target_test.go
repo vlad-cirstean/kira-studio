@@ -60,7 +60,7 @@ func TestNormalizeTarget(t *testing.T) {
 }
 
 // TestDialConn_CAFile covers the CA-file case (§6.2): a missing or unreadable CA file is refused
-// with a legible E_GRPC_BAD_REQUEST rather than reaching grpc-go at all.
+// with a legible E_BAD_REQUEST rather than reaching grpc-go at all.
 func TestDialConn_CAFile(t *testing.T) {
 	_, err := dialConn(context.Background(), "127.0.0.1:1", TLSConfig{Enabled: true, CAFile: filepath.Join(t.TempDir(), "missing.pem")})
 	if err == nil {

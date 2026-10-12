@@ -339,7 +339,7 @@ test('Http timeline — a failed send carries the timeline it got as far as', as
     {
       channel: IPC.httpSend,
       error: {
-        code: 'E_HTTP_TRANSPORT',
+        code: 'E_TRANSPORT',
         message: 'connect: connection refused',
         details: FAILED_TIMELINE,
       },

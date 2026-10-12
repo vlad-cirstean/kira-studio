@@ -150,7 +150,7 @@ func TestServerStream_MessagesElidedAboveCap(t *testing.T) {
 }
 
 // TestServerStream_CancelledMidStream is §6.2 case 4: cancellation mid-stream — the messages
-// already delivered are kept and the result is E_GRPC_CANCELLED with the true partial count (F8).
+// already delivered are kept and the result is E_CANCELLED with the true partial count (F8).
 func TestServerStream_CancelledMidStream(t *testing.T) {
 	server := startEchoServer(t, echoProtoSource, &echoImpl{
 		streamMessages: 1000, streamSleep: 20 * time.Millisecond,

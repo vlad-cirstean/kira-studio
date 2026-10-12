@@ -1,7 +1,6 @@
 package bridge
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,7 +68,7 @@ type FilesService struct {
 // path (P56 D9, and files.ts:29-30's own comment).
 func (s *FilesService) ChooseSave(args FilesChooseSaveArgs) (FilesChooseSaveResult, error) {
 	if args.DefaultName == "" {
-		return FilesChooseSaveResult{}, ipcerr.BadRequest("defaultName is required")
+		return FilesChooseSaveResult{}, ipcerr.Required("defaultName")
 	}
 	path, err := s.Dialogs.SaveFile(SaveFileRequest{
 		Directory: downloadsDir(),
@@ -101,7 +100,7 @@ func (s *FilesService) ChooseOpen(args FilesChooseOpenArgs) (FilesChooseOpenResu
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return FilesChooseOpenResult{}, ipcerr.Internal(fmt.Sprintf("could not stat %s: %s", path, err))
+		return FilesChooseOpenResult{}, ipcerr.T(ipcerr.CodeInternal, "backend.studio.file.readFailed.error", map[string]string{"path": path, "detail": err.Error()})
 	}
 	return FilesChooseOpenResult{
 		Canceled: false,

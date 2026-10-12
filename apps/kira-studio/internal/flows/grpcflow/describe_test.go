@@ -110,7 +110,7 @@ func TestDescribeProtoAndCall(t *testing.T) {
 	_, err = app.W.Grpc.Describe(ctx, missing)
 	e := ipcErr(t, err)
 	if e.Code != grpcclient.CodeSchema || !strings.Contains(e.Message, "common/types.proto") {
-		t.Errorf("missing import error = %s %q, want E_GRPC_SCHEMA naming common/types.proto", e.Code, e.Message)
+		t.Errorf("missing import error = %s %q, want E_BAD_REQUEST naming common/types.proto", e.Code, e.Message)
 	}
 
 	byProto := describe(t, app, describeArgsProto(protoPath, []string{libDir}))

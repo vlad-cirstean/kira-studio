@@ -189,7 +189,7 @@ func TestDecryptRefusesAnOlderEnvelopeEvenWithTheRightKey(t *testing.T) {
 			if ie.Code != "E_SECRET_STORE" {
 				t.Fatalf("Decrypt(%s) code = %s, want E_SECRET_STORE", oldPrefix, ie.Code)
 			}
-			if !strings.Contains(ie.Message, "kira:v3:") || !strings.Contains(ie.Message, "must be entered again") {
+			if !strings.Contains(ie.Message, "must be entered again") {
 				t.Errorf("Decrypt(%s) message = %q, want D6's wrong-envelope sentence", oldPrefix, ie.Message)
 			}
 		})

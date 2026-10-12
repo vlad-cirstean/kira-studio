@@ -2,17 +2,18 @@ package bridge
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 
-	"github.com/google/uuid"
+	"github.com/google/renameio/v2"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // CollectionsService is P4 D11 — the QueriesService shape (a typed-struct wrapper per method, with
@@ -77,7 +78,7 @@ func readErr[T any](v T, err error) (T, error) {
 
 func (s *CollectionsService) GetRequest(args CollectionsItemArgs) (model.SavedRequest, error) {
 	if args.ItemID == "" {
-		return model.SavedRequest{}, ipcerr.BadRequest("itemId is required")
+		return model.SavedRequest{}, ipcerr.Required("itemId")
 	}
 	return readErr(s.Deps.Repos.Collections.GetRequest(args.ItemID))
 }
@@ -85,7 +86,7 @@ func (s *CollectionsService) GetRequest(args CollectionsItemArgs) (model.SavedRe
 // GetGrpcRequest is GetRequest's own gRPC sibling (P11 D12).
 func (s *CollectionsService) GetGrpcRequest(args CollectionsItemArgs) (model.SavedGrpcRequest, error) {
 	if args.ItemID == "" {
-		return model.SavedGrpcRequest{}, ipcerr.BadRequest("itemId is required")
+		return model.SavedGrpcRequest{}, ipcerr.Required("itemId")
 	}
 	return readErr(s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID))
 }
@@ -98,10 +99,10 @@ type CollectionsSaveRequestArgs struct {
 
 func (s *CollectionsService) SaveRequest(args CollectionsSaveRequestArgs) (ItemSummary, error) {
 	if args.ItemID == "" {
-		return ItemSummary{}, ipcerr.BadRequest("itemId is required")
+		return ItemSummary{}, ipcerr.Required("itemId")
 	}
 	if args.Name == "" {
-		return ItemSummary{}, ipcerr.BadRequest("name is required")
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	item, err := s.Deps.Repos.Collections.SaveRequest(args.ItemID, args.Name, args.Request)
 	if err != nil {
@@ -120,10 +121,10 @@ type CollectionsSaveGrpcRequestArgs struct {
 // SaveGrpcRequest is SaveRequest's own gRPC sibling (P11 D12).
 func (s *CollectionsService) SaveGrpcRequest(args CollectionsSaveGrpcRequestArgs) (ItemSummary, error) {
 	if args.ItemID == "" {
-		return ItemSummary{}, ipcerr.BadRequest("itemId is required")
+		return ItemSummary{}, ipcerr.Required("itemId")
 	}
 	if args.Name == "" {
-		return ItemSummary{}, ipcerr.BadRequest("name is required")
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	item, err := s.Deps.Repos.Collections.SaveGrpcRequest(args.ItemID, args.Name, args.Request)
 	if err != nil {
@@ -139,7 +140,7 @@ type CollectionsCreateCollectionArgs struct {
 
 func (s *CollectionsService) CreateCollection(args CollectionsCreateCollectionArgs) (CollectionSummary, error) {
 	if args.Name == "" {
-		return CollectionSummary{}, ipcerr.BadRequest("name is required")
+		return CollectionSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	c, err := s.Deps.Repos.Collections.CreateCollection(args.Name)
 	if err != nil {
@@ -159,13 +160,13 @@ type CollectionsCreateItemArgs struct {
 
 func (s *CollectionsService) CreateItem(args CollectionsCreateItemArgs) (ItemSummary, error) {
 	if args.CollectionID == "" {
-		return ItemSummary{}, ipcerr.BadRequest("collectionId is required")
+		return ItemSummary{}, ipcerr.Required("collectionId")
 	}
 	if !model.IsCollectionItemKind(args.Kind) {
-		return ItemSummary{}, ipcerr.BadRequest("kind must be 'folder' or 'request'")
+		return ItemSummary{}, ipcerr.Contract("kind must be 'folder' or 'request'")
 	}
 	if args.Name == "" {
-		return ItemSummary{}, ipcerr.BadRequest("name is required")
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	item, err := s.Deps.Repos.Collections.CreateItem(args.CollectionID, args.ParentID, args.Kind, args.Name, args.Request)
 	if err != nil {
@@ -186,10 +187,10 @@ type CollectionsCreateGrpcItemArgs struct {
 // gRPC request has no folder distinction of its own).
 func (s *CollectionsService) CreateGrpcItem(args CollectionsCreateGrpcItemArgs) (ItemSummary, error) {
 	if args.CollectionID == "" {
-		return ItemSummary{}, ipcerr.BadRequest("collectionId is required")
+		return ItemSummary{}, ipcerr.Required("collectionId")
 	}
 	if args.Name == "" {
-		return ItemSummary{}, ipcerr.BadRequest("name is required")
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	item, err := s.Deps.Repos.Collections.CreateGrpcItem(args.CollectionID, args.ParentID, args.Name, args.Request)
 	if err != nil {
@@ -212,7 +213,7 @@ func (s *CollectionsService) Rename(args CollectionsTargetArgs) error {
 		return err
 	}
 	if args.Name == "" {
-		return ipcerr.BadRequest("name is required")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	if err := s.Deps.Repos.Collections.Rename(args.ID, args.Target, args.Name); err != nil {
 		return ipcerr.InternalErr(err)
@@ -244,10 +245,10 @@ type CollectionsMoveItemArgs struct {
 // MoveItem moves a request or folder, with its subtree, to the root of another collection.
 func (s *CollectionsService) MoveItem(args CollectionsMoveItemArgs) error {
 	if args.ItemID == "" {
-		return ipcerr.BadRequest("itemId is required")
+		return ipcerr.Required("itemId")
 	}
 	if args.CollectionID == "" {
-		return ipcerr.BadRequest("collectionId is required")
+		return ipcerr.Required("collectionId")
 	}
 	if err := s.Deps.Repos.Collections.MoveItem(args.ItemID, args.CollectionID); err != nil {
 		return ipcerr.InternalErr(err)
@@ -258,10 +259,10 @@ func (s *CollectionsService) MoveItem(args CollectionsMoveItemArgs) error {
 
 func validTarget(args CollectionsTargetArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if args.Target != "collection" && args.Target != "item" {
-		return ipcerr.BadRequest("target must be 'collection' or 'item'")
+		return ipcerr.Contract("target must be 'collection' or 'item'")
 	}
 	return nil
 }
@@ -284,23 +285,40 @@ type ImportReport struct {
 	Warnings     []ImportWarning `json:"warnings"`
 }
 
-// importWarningDetail is D12's table: one sentence per warning kind, in the order they are
-// reported. %d is the count. The messages live here rather than in internal/postman because they
-// are UI text — that package only knows what it did.
-var importWarningDetail = []struct {
-	kind   string
-	detail string
-}{
-	{postman.WarnScriptsInert, "%d pre-request/test scripts were kept but are not run — they survive an export unchanged."},
-	{postman.WarnAuthInert, "%d requests or folders carry an auth block. It is not applied and its values were not kept — those requests will need an Authorization header."},
-	{postman.WarnVariablesInert, "%d folder- or item-level variables were kept but are not resolved yet. A secret-typed one has its value stripped."},
-	{postman.WarnVariablesImported, "%d collection variables were imported."},
-	{postman.WarnGraphQLBody, "%d GraphQL bodies were imported as JSON bodies carrying the same query."},
-	{postman.WarnUnsupportedMethod, "%d requests use a method this builder cannot show yet and will open as GET."},
-	{postman.WarnUnresolvedFile, "%d requests reference a file by a name or a path from another machine. The content is not carried over — a file must be chosen before sending."},
-	{postman.WarnInlineFileContent, "%d binary bodies carry inline content rather than a file. The content is kept, but a file must be chosen before sending."},
-	{postman.WarnDisabledBody, "%d request bodies are switched off in Postman. They are kept, and this app will send them."},
-	{postman.WarnMalformedItem, "%d items were neither a folder nor a request and were skipped."},
+// importWarningKinds is D12's order: warnings are reported in this order.
+var importWarningKinds = []string{
+	postman.WarnScriptsInert, postman.WarnAuthInert, postman.WarnVariablesInert, postman.WarnVariablesImported,
+	postman.WarnGraphQLBody, postman.WarnUnsupportedMethod, postman.WarnUnresolvedFile,
+	postman.WarnInlineFileContent, postman.WarnDisabledBody, postman.WarnMalformedItem,
+}
+
+// importWarningDetail is D12's table: one sentence per warning kind. The messages live here rather
+// than in internal/postman because they are UI text — that package only knows what it did.
+func importWarningDetail(kind string, n int) string {
+	c := strconv.Itoa(n)
+	switch kind {
+	case postman.WarnScriptsInert:
+		return i18n.T("backend.studio.collection.import.scriptsInert.body", map[string]string{"count": c})
+	case postman.WarnAuthInert:
+		return i18n.T("backend.studio.collection.import.authInert.body", map[string]string{"count": c})
+	case postman.WarnVariablesInert:
+		return i18n.T("backend.studio.collection.import.variablesInert.body", map[string]string{"count": c})
+	case postman.WarnVariablesImported:
+		return i18n.T("backend.studio.collection.import.variablesImported.body", map[string]string{"count": c})
+	case postman.WarnGraphQLBody:
+		return i18n.T("backend.studio.collection.import.graphqlBody.body", map[string]string{"count": c, "format": "GraphQL"})
+	case postman.WarnUnsupportedMethod:
+		return i18n.T("backend.studio.collection.import.unsupportedMethod.body", map[string]string{"count": c, "method": "GET"})
+	case postman.WarnUnresolvedFile:
+		return i18n.T("backend.studio.collection.import.unresolvedFile.body", map[string]string{"count": c})
+	case postman.WarnInlineFileContent:
+		return i18n.T("backend.studio.collection.import.inlineFileContent.body", map[string]string{"count": c})
+	case postman.WarnDisabledBody:
+		return i18n.T("backend.studio.collection.import.disabledBody.body", map[string]string{"count": c})
+	case postman.WarnMalformedItem:
+		return i18n.T("backend.studio.collection.import.malformedItem.body", map[string]string{"count": c})
+	}
+	return ""
 }
 
 type CollectionsImportArgs struct {
@@ -311,11 +329,12 @@ type CollectionsImportArgs struct {
 // the bridge — never the file's bytes (F16).
 func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, error) {
 	if args.Path == "" {
-		return ImportReport{}, ipcerr.BadRequest("path is required")
+		return ImportReport{}, ipcerr.Required("path")
 	}
 	f, err := os.Open(args.Path)
 	if err != nil {
-		return ImportReport{}, ipcerr.BadRequest(fmt.Sprintf("could not read %s: %s", args.Path, err))
+		return ImportReport{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.file.readFailed.error",
+			map[string]string{"path": args.Path, "detail": err.Error()})
 	}
 	defer f.Close()
 
@@ -353,10 +372,8 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 			if delErr := s.Deps.Repos.Collections.Delete(collection.ID, "collection"); delErr != nil {
 				slog.Error("rolling back a collection import after ImportVariables failed",
 					"scope", "bridge/collections", "collectionId", collection.ID, "importVariablesErr", err, "deleteErr", delErr)
-				return ImportReport{}, ipcerr.Internal(fmt.Sprintf(
-					"%s (also failed to remove the partially imported collection %q: %s — it remains visible and must be deleted manually)",
-					err.Error(), collection.Name, delErr,
-				))
+				return ImportReport{}, ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.importRollbackFailed.error",
+					map[string]string{"detail": err.Error(), "name": collection.Name, "rollbackDetail": delErr.Error()})
 			}
 			return ImportReport{}, ipcerr.InternalErr(err)
 		}
@@ -367,13 +384,13 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 		Folders: tree.Report.Folders, Requests: tree.Report.Requests,
 		Warnings: []ImportWarning{},
 	}
-	for _, w := range importWarningDetail {
-		count := tree.Report.Warnings[w.kind]
+	for _, kind := range importWarningKinds {
+		count := tree.Report.Warnings[kind]
 		if count == 0 {
 			continue
 		}
 		report.Warnings = append(report.Warnings, ImportWarning{
-			Kind: w.kind, Count: count, Detail: fmt.Sprintf(w.detail, count),
+			Kind: kind, Count: count, Detail: importWarningDetail(kind, count),
 		})
 	}
 	return report, nil
@@ -384,60 +401,30 @@ type CollectionsExportArgs struct {
 	Path         string `json:"path"`
 }
 
-// writeFileAtomically writes to a sibling `target + ".kira-partial-<uuid>"` temp file via write,
-// then Syncs, Closes and os.Renames it onto target only once write has fully succeeded — mirroring
-// internal/adapters/s3/transfer.go's downloadObject (P21 round 3 finding 7). Extracted out of
-// Export so the atomicity guarantee itself — target is only ever replaced by a complete file, and a
-// failure at any step cleans up the temp file rather than leaving it, or target, half-written — can
-// be exercised directly with an injectable write step, not just through a full DB-backed export.
+// writeExportFile writes to a renameio temp file next to the target and renames it over the target
+// only once write has fully succeeded, so a failed re-export never destroys a good file.
 //
-// P108 F18: target is path with any symlink resolved first (EvalSymlinks errors when path doesn't
-// exist yet, a fresh export, in which case path is used as-is) — otherwise the rename below would
-// replace the link itself with a regular file instead of writing through it, same as `cp` or `mv`
-// onto an existing symlink would. The temp file's mode also mirrors an existing target's mode
-// rather than os.Create's 0666-minus-umask default, which would loosen e.g. a 0600 export target to
-// 0644; a fresh target with nothing to mirror gets a private 0600.
-func writeFileAtomically(path string, write func(*os.File) error) error {
+// The target is path with any symlink resolved first (EvalSymlinks errors when path doesn't exist
+// yet, in which case path is used as-is), so the rename writes through a link instead of replacing
+// it. An existing target keeps its mode; a fresh one is private (0600).
+func writeExportFile(path string, write func(*os.File) error) error {
 	target := path
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		target = resolved
 	}
-	mode := os.FileMode(0o600)
-	if info, err := os.Stat(target); err == nil {
-		mode = info.Mode().Perm()
-	}
-
-	tmpPath := target + ".kira-partial-" + uuid.NewString()
-	f, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
+	f, err := renameio.NewPendingFile(target, renameio.WithExistingPermissions())
 	if err != nil {
-		return ipcerr.BadRequest(fmt.Sprintf("could not write %s: %s", path, err))
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.collection.writeFailed.error",
+			map[string]string{"path": path, "detail": err.Error()})
 	}
-	cleanup := func() { _ = os.Remove(tmpPath) }
+	defer func() { _ = f.Cleanup() }()
 
-	if err := write(f); err != nil {
-		_ = f.Close()
-		cleanup()
+	if err := write(f.File); err != nil {
 		return ipcerr.InternalErr(err)
 	}
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		cleanup()
-		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
-	}
-	if err := f.Close(); err != nil {
-		cleanup()
-		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
-	}
-	// Belt-and-braces: OpenFile's own perm argument is still subject to umask on creation, which
-	// could strip a bit mirrored from an existing target's mode (e.g. group-write under umask 022).
-	// Chmod sets the exact mode regardless.
-	if err := os.Chmod(tmpPath, mode); err != nil {
-		cleanup()
-		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
-	}
-	if err := os.Rename(tmpPath, target); err != nil {
-		cleanup()
-		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
+	if err := f.CloseAtomicallyReplace(); err != nil {
+		return ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.finishWriteFailed.error",
+			map[string]string{"path": path, "detail": err.Error()})
 	}
 	return nil
 }
@@ -461,23 +448,21 @@ type ExportReport struct {
 // stream postman.Write straight into it, so a marshal error, a full disk, or the process dying
 // mid-write left the destination empty or half-written with no cleanup, silently destroying
 // whatever was there before (a re-export is exactly the kind of save people make over last week's
-// file). Now mirrors internal/adapters/s3/transfer.go's downloadObject: write to a sibling
-// *.kira-partial-<uuid> temp file, Sync, Close, then os.Rename onto the destination — the
-// destination is only ever replaced by a complete, fully-flushed file, and every error path
-// unlinks the temp file instead of leaving it behind.
+// file). Now writeExportFile writes a temp file and renames it onto the destination — the
+// destination is only ever replaced by a complete, fully-flushed file.
 func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, error) {
 	if args.CollectionID == "" {
-		return ExportReport{}, ipcerr.BadRequest("collectionId is required")
+		return ExportReport{}, ipcerr.Required("collectionId")
 	}
 	if args.Path == "" {
-		return ExportReport{}, ipcerr.BadRequest("path is required")
+		return ExportReport{}, ipcerr.Required("path")
 	}
 	tree, err := s.Deps.Repos.Collections.LoadTree(args.CollectionID)
 	if err != nil {
 		return ExportReport{}, ipcerr.InternalErr(err)
 	}
 
-	if err := writeFileAtomically(args.Path, func(f *os.File) error { return postman.Write(f, tree) }); err != nil {
+	if err := writeExportFile(args.Path, func(f *os.File) error { return postman.Write(f, tree) }); err != nil {
 		return ExportReport{}, err
 	}
 

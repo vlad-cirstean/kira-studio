@@ -377,7 +377,7 @@ func TestSend_FollowRedirectsOff(t *testing.T) {
 }
 
 // TestSend_MaxRedirectsHonoured is P90 §6.1: a 3-hop chain with MaxRedirects: ptr(1) must fail
-// with CodeHTTPTransport and a message naming how many redirects it stopped after.
+// with CodeTransport and a message naming how many redirects it stopped after.
 func TestSend_MaxRedirectsHonoured(t *testing.T) {
 	var serverURL string
 	mux := http.NewServeMux()
@@ -399,8 +399,8 @@ func TestSend_MaxRedirectsHonoured(t *testing.T) {
 
 	_, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/1"}, Options{MaxRedirects: ptr(1)})
 	code, ok := CodeOf(err)
-	if !ok || code != CodeHTTPTransport {
-		t.Fatalf("CodeOf(err) = %v, %v, want %v, true (err: %v)", code, ok, CodeHTTPTransport, err)
+	if !ok || code != CodeTransport {
+		t.Fatalf("CodeOf(err) = %v, %v, want %v, true (err: %v)", code, ok, CodeTransport, err)
 	}
 	if !strings.Contains(err.Error(), "stopped after 1 redirects") {
 		t.Fatalf("err = %v, want it to contain %q", err, "stopped after 1 redirects")

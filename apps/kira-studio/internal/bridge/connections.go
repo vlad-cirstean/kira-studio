@@ -29,7 +29,7 @@ type ConnectionsUpdateArgs struct {
 
 func (s *ConnectionsService) Update(args ConnectionsUpdateArgs) (model.ConnectionSummary, error) {
 	if args.ID == "" {
-		return model.ConnectionSummary{}, ipcerr.BadRequest("id is required")
+		return model.ConnectionSummary{}, ipcerr.Required("id")
 	}
 	return s.Deps.Connections.Update(args.ID, args.Input)
 }
@@ -41,14 +41,14 @@ type ConnectionsIDArgs struct {
 
 func (s *ConnectionsService) Duplicate(args ConnectionsIDArgs) (model.ConnectionSummary, error) {
 	if args.ID == "" {
-		return model.ConnectionSummary{}, ipcerr.BadRequest("id is required")
+		return model.ConnectionSummary{}, ipcerr.Required("id")
 	}
 	return s.Deps.Connections.Duplicate(args.ID)
 }
 
 func (s *ConnectionsService) Delete(args ConnectionsIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	return s.Deps.Connections.Remove(args.ID)
 }
@@ -99,14 +99,14 @@ func (s *ConnectionsService) Test(args ConnectionsTestArgs) connections.TestResu
 
 func (s *ConnectionsService) Connect(args ConnectionsIDArgs) (model.ConnectionState, error) {
 	if args.ID == "" {
-		return model.ConnectionState{}, ipcerr.BadRequest("id is required")
+		return model.ConnectionState{}, ipcerr.Required("id")
 	}
 	return s.Deps.Connections.Connect(args.ID)
 }
 
 func (s *ConnectionsService) Disconnect(args ConnectionsIDArgs) (model.ConnectionState, error) {
 	if args.ID == "" {
-		return model.ConnectionState{}, ipcerr.BadRequest("id is required")
+		return model.ConnectionState{}, ipcerr.Required("id")
 	}
 	return s.Deps.Connections.Disconnect(args.ID)
 }

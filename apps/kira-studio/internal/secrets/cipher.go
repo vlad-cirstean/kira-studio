@@ -99,14 +99,14 @@ func (c *Cipher) Status() Status { return c.status }
 // docs/v1.2/plans/P29-secret-cipher-aad-scope.md §2 D3.
 func (c *Cipher) Encrypt(scope Scope, plain string) (string, error) {
 	if !scope.valid() {
-		return "", ipcerr.SecretStore(fmt.Sprintf("internal error: %q is not a known secret scope", scope))
+		return "", ipcerr.Contract("%q is not a known secret scope", scope)
 	}
 	if !c.status.Available {
 		return "", ipcerr.SecretStore(*c.status.Reason)
 	}
 	nonce := make([]byte, c.aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
-		return "", ipcerr.SecretStore(fmt.Sprintf("could not generate a nonce (%s)", err))
+		return "", ipcerr.T(ipcerr.CodeSecretStore, "backend.studio.secrets.nonceFailed.error", map[string]string{"detail": err.Error()})
 	}
 	sealed := c.aead.Seal(nonce, nonce, []byte(plain), scope.aad())
 	return envelopePrefix + base64.StdEncoding.EncodeToString(sealed), nil
@@ -115,12 +115,12 @@ func (c *Cipher) Encrypt(scope Scope, plain string) (string, error) {
 // Decrypt satisfies repos.Cipher.
 func (c *Cipher) Decrypt(scope Scope, stored string) (string, error) {
 	if !scope.valid() {
-		return "", ipcerr.SecretStore(fmt.Sprintf("internal error: %q is not a known secret scope", scope))
+		return "", ipcerr.Contract("%q is not a known secret scope", scope)
 	}
 	if !strings.HasPrefix(stored, envelopePrefix) {
 		// P52 §6.4 retires the pre-P25 plaintext passthrough: a non-enveloped value is an error
 		// naming the problem, never returned verbatim.
-		return "", ipcerr.SecretStore("The stored credential is not in this app's kira:v3: envelope format — values saved by an earlier version of Kira Studio cannot be read and must be entered again.")
+		return "", ipcerr.T(ipcerr.CodeSecretStore, "backend.studio.secrets.unknownEnvelope.body", nil)
 	}
 	if !c.status.Available {
 		return "", ipcerr.SecretStore(*c.status.Reason)
@@ -143,10 +143,7 @@ func (c *Cipher) Decrypt(scope Scope, stored string) (string, error) {
 }
 
 func decryptFailure(err error) error {
-	return ipcerr.SecretStore(fmt.Sprintf(
-		"The stored credential could not be decrypted (%s). It may have been written on a different machine or after a keychain reset — re-enter it to fix this connection.",
-		err,
-	))
+	return ipcerr.T(ipcerr.CodeSecretStore, "backend.studio.secrets.decryptFailed.error", map[string]string{"detail": err.Error()})
 }
 
 // probe is New's whole platform switch, with the OS key source injected so every branch is
@@ -157,7 +154,7 @@ func probe(goos, insecureEnv string, loadKey func() ([]byte, error)) (Status, []
 	case "darwin":
 		key, err := loadKey()
 		if err != nil {
-			return Status{Available: false, Backend: BackendUnavailable, Reason: reason(darwinUnavailableReason)}, nil
+			return Status{Available: false, Backend: BackendUnavailable, Reason: reason(darwinUnavailableReason())}, nil
 		}
 		return Status{Available: true, Backend: BackendKeychain}, key
 	case "linux":
@@ -165,8 +162,8 @@ func probe(goos, insecureEnv string, loadKey func() ([]byte, error)) (Status, []
 			sum := sha256.Sum256([]byte(insecureKeyMaterial))
 			return Status{Available: true, Backend: BackendBasicText, InsecureFallback: true}, sum[:]
 		}
-		return Status{Available: false, Backend: BackendUnavailable, Reason: reason(linuxUnavailableReason)}, nil
+		return Status{Available: false, Backend: BackendUnavailable, Reason: reason(linuxUnavailableReason())}, nil
 	default:
-		return Status{Available: false, Backend: BackendUnavailable, Reason: reason(otherPlatformReason)}, nil
+		return Status{Available: false, Backend: BackendUnavailable, Reason: reason(otherPlatformReason())}, nil
 	}
 }

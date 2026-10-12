@@ -252,11 +252,11 @@ func TestTransportErrors(t *testing.T) {
 		wantCode string
 		wantMsg  string
 	}{
-		{"refused", get(closedURL + "/"), "E_HTTP_TRANSPORT", "refused"},
-		{"dns", get("http://flow-nohost.invalid/"), "E_HTTP_TRANSPORT", "no such host"},
-		{"bad url", get("http://[::1"), "E_BAD_REQUEST", "invalid URL"},
-		{"bad scheme", get("ftp://example.com/"), "E_BAD_REQUEST", "unsupported URL scheme"},
-		{"bad method", func() bridge.HttpSendArgs { a := get(closedURL); a.Method = "FETCH"; return a }(), "E_BAD_REQUEST", "unsupported method"},
+		{"refused", get(closedURL + "/"), "E_TRANSPORT", "refused"},
+		{"dns", get("http://flow-nohost.invalid/"), "E_TRANSPORT", "no such host"},
+		{"bad url", get("http://[::1"), "E_BAD_REQUEST", "Invalid URL"},
+		{"bad scheme", get("ftp://example.com/"), "E_BAD_REQUEST", "Unsupported URL scheme"},
+		{"bad method", func() bridge.HttpSendArgs { a := get(closedURL); a.Method = "FETCH"; return a }(), "E_BAD_REQUEST", "Unsupported method"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

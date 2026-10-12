@@ -119,7 +119,7 @@ function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCa
   if (event.done) {
     rt.opId = null;
     if (event.error) {
-      rt.status = event.error.code === 'E_GRPC_CANCELLED' ? 'cancelled' : 'error';
+      rt.status = event.error.code === 'E_CANCELLED' ? 'cancelled' : 'error';
       rt.error = event.error;
       if (event.status) rt.result = event.status;
     } else {

@@ -134,17 +134,17 @@ func renderFormDataBody(fields []FormField, boundary string, mask *strings.Repla
 	var b strings.Builder
 	mw := multipart.NewWriter(&b)
 	if err := mw.SetBoundary(boundary); err != nil {
-		return "", false, newError(CodeBadRequest, "invalid multipart boundary: "+err.Error(), err)
+		return "", false, newErrorT(CodeBadRequest, "backend.studio.http.multipartBoundaryInvalid.error", map[string]string{"detail": err.Error()}, err)
 	}
 	elided := false
 	for _, p := range parts {
 		part, partErr := mw.CreatePart(formPartHeader(p.field))
 		if partErr != nil {
-			return "", false, newError(CodeHTTPTransport, "could not render multipart body: "+partErr.Error(), partErr)
+			return "", false, newErrorT(CodeTransport, "backend.studio.http.multipartRenderFailed.error", map[string]string{"detail": partErr.Error()}, partErr)
 		}
 		if p.field.Kind == "file" {
 			if _, err := part.Write([]byte(binaryMarker(p.size, filepath.Base(p.field.Path)))); err != nil {
-				return "", false, newError(CodeHTTPTransport, "could not render multipart body: "+err.Error(), err)
+				return "", false, newErrorT(CodeTransport, "backend.studio.http.multipartRenderFailed.error", map[string]string{"detail": err.Error()}, err)
 			}
 			elided = true
 			continue
@@ -154,11 +154,11 @@ func renderFormDataBody(fields []FormField, boundary string, mask *strings.Repla
 			elided = true
 		}
 		if _, err := part.Write([]byte(text)); err != nil {
-			return "", false, newError(CodeHTTPTransport, "could not render multipart body: "+err.Error(), err)
+			return "", false, newErrorT(CodeTransport, "backend.studio.http.multipartRenderFailed.error", map[string]string{"detail": err.Error()}, err)
 		}
 	}
 	if err := mw.Close(); err != nil {
-		return "", false, newError(CodeHTTPTransport, "could not render multipart body: "+err.Error(), err)
+		return "", false, newErrorT(CodeTransport, "backend.studio.http.multipartRenderFailed.error", map[string]string{"detail": err.Error()}, err)
 	}
 	return b.String(), elided, nil
 }

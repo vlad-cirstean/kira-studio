@@ -89,7 +89,7 @@ func TestDescribe_Reflection_SameSchemaAsProto(t *testing.T) {
 }
 
 // TestDescribe_Reflection_NoReflection_YieldsSchemaError is §6.2 case 3: a server without
-// reflection yields E_GRPC_SCHEMA carrying F11's Unimplemented cause.
+// reflection yields E_BAD_REQUEST carrying F11's Unimplemented cause.
 func TestDescribe_Reflection_NoReflection_YieldsSchemaError(t *testing.T) {
 	server := startEchoServer(t, echoProtoSource, &echoImpl{}, false)
 	_, err := Describe(context.Background(), Source{Mode: SourceReflection, Target: server.addr})

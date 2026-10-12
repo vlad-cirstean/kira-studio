@@ -63,8 +63,8 @@ func TestUpdateRefusedInDevBuild(t *testing.T) {
 func TestDataGripScan(t *testing.T) {
 	app := flowharness.New(t)
 	var ie *ipcerr.Error
-	if _, err := app.W.DataGrip.Scan(bridge.DataGripScanArgs{}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
-		t.Fatalf("Scan without a path = %v, want E_BAD_REQUEST", err)
+	if _, err := app.W.DataGrip.Scan(bridge.DataGripScanArgs{}); !errors.As(err, &ie) || ie.Code != "E_CONTRACT" {
+		t.Fatalf("Scan without a path = %v, want E_CONTRACT", err)
 	}
 	if _, err := app.W.DataGrip.Scan(bridge.DataGripScanArgs{Path: filepath.Join(app.Home, "no-project")}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
 		t.Fatalf("Scan of a folder with no .idea = %v, want E_BAD_REQUEST", err)
@@ -105,8 +105,8 @@ func TestDataGripScan(t *testing.T) {
 		t.Fatalf("Scan created connections: %v %v", list, err)
 	}
 
-	if _, err := app.W.DataGrip.Import(bridge.DataGripImportArgs{Path: project}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
-		t.Fatalf("Import without a selection = %v, want E_BAD_REQUEST", err)
+	if _, err := app.W.DataGrip.Import(bridge.DataGripImportArgs{Path: project}); !errors.As(err, &ie) || ie.Code != "E_CONTRACT" {
+		t.Fatalf("Import without a selection = %v, want E_CONTRACT", err)
 	}
 	var uuids []string
 	for _, r := range prev.Rows {

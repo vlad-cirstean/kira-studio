@@ -26,7 +26,7 @@ type DataGripScanArgs struct {
 // Scan is D9's first step — file reads only, never a credential store (F11).
 func (s *DataGripService) Scan(args DataGripScanArgs) (datagrip.Preview, error) {
 	if args.Path == "" {
-		return datagrip.Preview{}, ipcerr.BadRequest("path is required")
+		return datagrip.Preview{}, ipcerr.Required("path")
 	}
 	preview, err := datagrip.Scan(args.Path)
 	if err != nil {
@@ -57,10 +57,10 @@ func (c datagripCreator) Create(in datagrip.CreatorInput) (model.ConnectionSumma
 // has no dependency on internal/secrets at all.
 func (s *DataGripService) Import(args DataGripImportArgs) (datagrip.Report, error) {
 	if args.Path == "" {
-		return datagrip.Report{}, ipcerr.BadRequest("path is required")
+		return datagrip.Report{}, ipcerr.Required("path")
 	}
 	if len(args.SelectedUUIDs) == 0 {
-		return datagrip.Report{}, ipcerr.BadRequest("selectedUuids is required")
+		return datagrip.Report{}, ipcerr.Required("selectedUuids")
 	}
 	status := s.Deps.Connections.SecretsStatus()
 	report, err := datagrip.Apply(args.Path, args.SelectedUUIDs, status.Available, datagripCreator{svc: s.Deps.Connections})

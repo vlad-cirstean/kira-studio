@@ -388,7 +388,7 @@ func registerTransitive(reg *protoregistry.Files, fd protoreflect.FileDescriptor
 	}
 	if err := reg.RegisterFile(fd); err != nil {
 		// F14: a private *protoregistry.Files (never GlobalFiles) returns an error here rather
-		// than panicking — turned into a legible E_GRPC_SCHEMA rather than propagated raw.
+		// than panicking — turned into a legible E_BAD_REQUEST rather than propagated raw.
 		return SchemaError(fmt.Sprintf("registering %s: %s", fd.Path(), err))
 	}
 	return nil

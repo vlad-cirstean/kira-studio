@@ -54,16 +54,16 @@ func (in Input) Validate() error {
 func (in Input) validateIdentity() error {
 	name := strings.TrimSpace(in.Name)
 	if name == "" || model.UTF16Len(name) > maxNameLength {
-		return ipcerr.BadRequest("name must be 1-120 characters")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.nameLength.body", nil)
 	}
 	if !model.ValidConnectionKind(in.Kind) {
-		return ipcerr.BadRequest("invalid connection kind")
+		return ipcerr.Contract("invalid connection kind")
 	}
 	if !model.ValidConnectionColor(in.Color) {
-		return ipcerr.BadRequest("invalid connection color")
+		return ipcerr.Contract("invalid connection color")
 	}
 	if !model.ValidConnectionMode(in.Mode) {
-		return ipcerr.BadRequest("invalid connection mode")
+		return ipcerr.Contract("invalid connection mode")
 	}
 	return nil
 }
@@ -71,20 +71,20 @@ func (in Input) validateIdentity() error {
 // validateLimits checks port/preconnect/throttlePerSec — the bounded numeric/length fields.
 func (in Input) validateLimits() error {
 	if in.Port != nil && (*in.Port < 1 || *in.Port > 65535) {
-		return ipcerr.BadRequest("port must be between 1 and 65535")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.portRange.body", nil)
 	}
 	if in.Preconnect != nil {
 		trimmed := strings.TrimSpace(*in.Preconnect)
 		if trimmed == "" || len(*in.Preconnect) > 2000 {
-			return ipcerr.BadRequest("preconnect must be 1-2000 characters")
+			return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.preconnectLength.body", nil)
 		}
 	}
 	if math.IsNaN(in.ThrottlePerSec) || math.IsInf(in.ThrottlePerSec, 0) {
-		return ipcerr.BadRequest("throttlePerSec must be a finite number")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.throttleFinite.body", nil)
 	}
 	if in.ThrottlePerSec != 0 &&
 		(in.ThrottlePerSec < throttlePerSecMin || in.ThrottlePerSec > throttlePerSecMax) {
-		return ipcerr.BadRequest("throttlePerSec must be 0, or between 0.01 and 1000")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.throttleRange.body", nil)
 	}
 	return nil
 }
@@ -94,10 +94,10 @@ func (in Input) validateMcp() error {
 	if !model.ValidMcpPermissionMode(in.McpReadMode) ||
 		!model.ValidMcpPermissionMode(in.McpWriteMode) ||
 		!model.ValidMcpPermissionMode(in.McpDdlMode) {
-		return ipcerr.BadRequest("invalid MCP permission mode")
+		return ipcerr.Contract("invalid MCP permission mode")
 	}
 	if len(in.McpDescription) > 1000 {
-		return ipcerr.BadRequest("mcpDescription must be at most 1000 characters")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.mcpDescriptionLength.body", nil)
 	}
 	return nil
 }
@@ -119,22 +119,21 @@ func (in Input) validateFields() error {
 			path = strings.TrimSpace(*in.Database)
 		}
 		if path == "" {
-			return ipcerr.BadRequest("A database file is required.")
+			return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.databaseFileRequired.body", nil)
 		}
 		if !strings.HasPrefix(path, "/") {
-			return ipcerr.BadRequest("The database file must be an absolute path.")
+			return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.databasePathAbsolute.body", nil)
 		}
 	} else {
 		if !awsStyleKinds[in.Kind] && (in.Host == nil || *in.Host == "") {
-			return ipcerr.BadRequest("Host is required.")
+			return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.hostRequired.body", nil)
 		}
 		if !awsStyleKinds[in.Kind] && in.Port == nil {
-			return ipcerr.BadRequest("Port is required.")
+			return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.portRequired.body", nil)
 		}
 	}
 	if key, found := secretOptionKey(in.Options); found {
-		return ipcerr.BadRequest("The \"" + key + "\" option holds a secret that fields mode cannot " +
-			"store — use URI mode.")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.secretOption.body", map[string]string{"option": key})
 	}
 	return nil
 }
@@ -144,13 +143,12 @@ func (in Input) validateURI() error {
 		return nil
 	}
 	if strings.TrimSpace(*in.URI) == "" {
-		return ipcerr.BadRequest("A connection URI is required.")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.uriRequired.body", nil)
 	}
 	// F3 (P108 Part 3): a password containing a raw '/', '?' or '#' defeats findAuthority's own
 	// delimiter scan, so foldPassword would misplace the password. Reject rather than corrupt it.
 	if uriHasAmbiguousPassword(*in.URI) {
-		return ipcerr.BadRequest("The URI's password contains a character (/, ? or #) that " +
-			"makes it ambiguous — percent-encode special characters in the password.")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.uriPasswordAmbiguous.body", nil)
 	}
 	return nil
 }

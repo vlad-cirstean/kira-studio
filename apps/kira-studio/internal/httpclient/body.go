@@ -95,7 +95,7 @@ func buildBody(b Body, formBoundary string) (
 		mode = string(BodyNone)
 	}
 	if !validBodyModes[mode] {
-		return nil, nil, 0, "", newError(CodeBadRequest, "unknown body mode: "+b.Mode, nil)
+		return nil, nil, 0, "", newError(CodeContract, "unknown body mode: "+b.Mode, nil)
 	}
 	switch BodyMode(mode) {
 	case BodyNone:
@@ -111,7 +111,7 @@ func buildBody(b Body, formBoundary string) (
 	case BodyFormData:
 		return buildFormData(b.FormData, formBoundary)
 	}
-	return nil, nil, 0, "", newError(CodeBadRequest, "unknown body mode: "+b.Mode, nil)
+	return nil, nil, 0, "", newError(CodeContract, "unknown body mode: "+b.Mode, nil)
 }
 
 // buildRaw is plain text only — no sub-language, always text/plain.
@@ -142,7 +142,7 @@ func encodeURLEncodedFields(fields []Field) (string, error) {
 	parts := make([]string, 0, len(fields))
 	for _, f := range fields {
 		if strings.TrimSpace(f.Name) == "" {
-			return "", newError(CodeBadRequest, "a urlencoded field is missing a name", nil)
+			return "", newErrorT(CodeBadRequest, "backend.studio.http.urlencodedFieldNameMissing.body", nil, nil)
 		}
 		parts = append(parts, url.QueryEscape(f.Name)+"="+url.QueryEscape(f.Value))
 	}
@@ -166,18 +166,18 @@ func buildURLEncoded(fields []Field) (io.ReadCloser, func() (io.ReadCloser, erro
 func buildFile(path string) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
-		return nil, nil, 0, "", newError(CodeBadRequest, "no file chosen for the request body", nil)
+		return nil, nil, 0, "", newErrorT(CodeBadRequest, "backend.studio.http.bodyFileMissing.body", nil, nil)
 	}
 	info, err := os.Stat(trimmed)
 	if err != nil {
-		return nil, nil, 0, "", newError(CodeBadRequest, "could not read local file "+trimmed+": "+err.Error(), err)
+		return nil, nil, 0, "", newErrorT(CodeBadRequest, "backend.studio.http.localFileUnreadable.error", map[string]string{"path": trimmed, "detail": err.Error()}, err)
 	}
 	if info.IsDir() {
-		return nil, nil, 0, "", newError(CodeBadRequest, trimmed+" is a directory, not a file", nil)
+		return nil, nil, 0, "", newErrorT(CodeBadRequest, "backend.studio.http.pathIsDirectory.body", map[string]string{"path": trimmed}, nil)
 	}
 	f, err := os.Open(trimmed)
 	if err != nil {
-		return nil, nil, 0, "", newError(CodeBadRequest, "could not read local file "+trimmed+": "+err.Error(), err)
+		return nil, nil, 0, "", newErrorT(CodeBadRequest, "backend.studio.http.localFileUnreadable.error", map[string]string{"path": trimmed, "detail": err.Error()}, err)
 	}
 	getBody := func() (io.ReadCloser, error) {
 		reopened, openErr := os.Open(trimmed)
@@ -202,7 +202,7 @@ func prepareFormParts(fields []FormField) ([]formPart, error) {
 	parts := make([]formPart, 0, len(fields))
 	for _, f := range fields {
 		if strings.TrimSpace(f.Name) == "" {
-			return nil, newError(CodeBadRequest, "a form-data field is missing a name", nil)
+			return nil, newErrorT(CodeBadRequest, "backend.studio.http.formFieldNameMissing.body", nil, nil)
 		}
 		if f.Kind != "file" {
 			parts = append(parts, formPart{field: f})
@@ -210,14 +210,14 @@ func prepareFormParts(fields []FormField) ([]formPart, error) {
 		}
 		trimmed := strings.TrimSpace(f.Path)
 		if trimmed == "" {
-			return nil, newError(CodeBadRequest, "no file chosen for form-data field "+f.Name, nil)
+			return nil, newErrorT(CodeBadRequest, "backend.studio.http.formFieldFileMissing.body", map[string]string{"name": f.Name}, nil)
 		}
 		info, err := os.Stat(trimmed)
 		if err != nil {
-			return nil, newError(CodeBadRequest, "could not read local file "+trimmed+": "+err.Error(), err)
+			return nil, newErrorT(CodeBadRequest, "backend.studio.http.localFileUnreadable.error", map[string]string{"path": trimmed, "detail": err.Error()}, err)
 		}
 		if info.IsDir() {
-			return nil, newError(CodeBadRequest, trimmed+" is a directory, not a file", nil)
+			return nil, newErrorT(CodeBadRequest, "backend.studio.http.pathIsDirectory.body", map[string]string{"path": trimmed}, nil)
 		}
 		f.Path = trimmed
 		parts = append(parts, formPart{field: f, size: info.Size()})
@@ -265,23 +265,23 @@ func multipartLength(parts []formPart, boundary string) (int64, error) {
 	cw := &countWriter{}
 	mw := multipart.NewWriter(cw)
 	if err := mw.SetBoundary(boundary); err != nil {
-		return 0, newError(CodeBadRequest, "invalid multipart boundary: "+err.Error(), err)
+		return 0, newErrorT(CodeBadRequest, "backend.studio.http.multipartBoundaryInvalid.error", map[string]string{"detail": err.Error()}, err)
 	}
 	for _, p := range parts {
 		part, err := mw.CreatePart(formPartHeader(p.field))
 		if err != nil {
-			return 0, newError(CodeHTTPTransport, "could not build multipart body: "+err.Error(), err)
+			return 0, newErrorT(CodeTransport, "backend.studio.http.multipartBuildFailed.error", map[string]string{"detail": err.Error()}, err)
 		}
 		if p.field.Kind == "file" {
 			cw.n += p.size
 			continue
 		}
 		if _, err := part.Write([]byte(p.field.Value)); err != nil {
-			return 0, newError(CodeHTTPTransport, "could not build multipart body: "+err.Error(), err)
+			return 0, newErrorT(CodeTransport, "backend.studio.http.multipartBuildFailed.error", map[string]string{"detail": err.Error()}, err)
 		}
 	}
 	if err := mw.Close(); err != nil {
-		return 0, newError(CodeHTTPTransport, "could not build multipart body: "+err.Error(), err)
+		return 0, newErrorT(CodeTransport, "backend.studio.http.multipartBuildFailed.error", map[string]string{"detail": err.Error()}, err)
 	}
 	return cw.n, nil
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Backend is the slice of adapter lifecycle operations this service calls through instead of
@@ -222,7 +223,7 @@ func (s *Service) onPreconnectExit(exit preconnect.Exit) {
 	if exit.LastStderr != nil && *exit.LastStderr != "" {
 		tail = ": " + *exit.LastStderr
 	}
-	msg := fmt.Sprintf("Pre-connect script exited %s%s — connection dropped.", detail, tail)
+	msg := i18n.T("backend.studio.connection.preconnectExit.error", map[string]string{"detail": detail, "tail": tail})
 	s.emitState(model.ConnectionState{ConnectionID: exit.ConnectionID, Status: "error", Error: &msg, Since: nowMillis()})
 }
 
@@ -281,7 +282,7 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, err
 	}
 	if in.Mode == "uri" && in.URI == nil {
-		return model.ConnectionSummary{}, ipcerr.BadRequest(uriRequiredMessage)
+		return model.ConnectionSummary{}, errURIRequired()
 	}
 
 	// P25 D6: encrypt the secret before writing anything — a failure here (cipher unavailable)
@@ -309,7 +310,13 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 	return created, nil
 }
 
-const uriRequiredMessage = "A connection URI is required."
+func errURIRequired() *ipcerr.Error {
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.uriRequired.body", nil)
+}
+
+func errConnectionNotFound() *ipcerr.Error {
+	return ipcerr.T(ipcerr.CodeNotFound, "backend.studio.connection.notFound.body", nil)
+}
 
 // sealString encrypts plain under scope into a column value.
 func (s *Service) sealString(scope secrets.Scope, plain string) (*string, error) {
@@ -344,10 +351,10 @@ func (s *Service) secretWrites(id string, existing *model.ConnectionSummary, in 
 	}
 	if in.URI == nil {
 		if existing.Mode != "uri" {
-			return password, uri, ipcerr.BadRequest(uriRequiredMessage)
+			return password, uri, errURIRequired()
 		}
 		if in.Password != nil {
-			return password, uri, ipcerr.BadRequest("Change the password inside the URI.")
+			return password, uri, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.passwordInUri.body", nil)
 		}
 		return password, uri, nil
 	}
@@ -382,7 +389,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	if existing == nil {
-		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+		return model.ConnectionSummary{}, errConnectionNotFound()
 	}
 
 	// P25 D6: encrypt before writing anything — a failure here (cipher unavailable) means Update
@@ -443,7 +450,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	if existing == nil {
-		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+		return model.ConnectionSummary{}, errConnectionNotFound()
 	}
 	newID := uuid.NewString()
 	fields := existing.ConnectionFields
@@ -669,7 +676,7 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 	}
 	err := in.Validate()
 	if err == nil && in.Mode == "uri" && in.URI == nil {
-		err = ipcerr.BadRequest(uriRequiredMessage)
+		err = errURIRequired()
 	}
 	if err != nil {
 		msg := errorMessage(err)
@@ -731,7 +738,7 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 		s.mu.Lock()
 		if s.closed {
 			s.mu.Unlock()
-			return model.ConnectionState{}, ipcerr.Internal("connections service is shutting down")
+			return model.ConnectionState{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.studio.connection.shuttingDown.body", nil)
 		}
 		// A Connect arriving mid-teardown waits it out, then starts fresh: starting now would race
 		// the teardown's own Backend.Disconnect / row delete.
@@ -823,7 +830,7 @@ func (s *Service) doConnect(id string, ctx context.Context) (model.ConnectionSta
 		return model.ConnectionState{}, ipcerr.Wrap(err)
 	}
 	if summary == nil {
-		return model.ConnectionState{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+		return model.ConnectionState{}, errConnectionNotFound()
 	}
 
 	s.emitState(model.ConnectionState{ConnectionID: id, Status: "connecting", Since: nowMillis()})

@@ -101,7 +101,7 @@
     "callId": "<masked>",
     "done": true,
     "error": {
-      "code": "E_GRPC_CANCELLED",
+      "code": "E_CANCELLED",
       "message": "context canceled"
     },
     "messages": [],

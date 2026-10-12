@@ -34,7 +34,7 @@ type MaskRulesListArgs struct {
 
 func (s *MaskRulesService) List(args MaskRulesListArgs) ([]model.MaskRule, error) {
 	if args.ConnectionID == "" {
-		return nil, ipcerr.BadRequest("connectionId is required")
+		return nil, ipcerr.Required("connectionId")
 	}
 	return ipcerr.InternalResult(s.Deps.MaskRules.List(args.ConnectionID))
 }
@@ -74,7 +74,7 @@ type MaskRulesUpsertArgs struct {
 
 func (s *MaskRulesService) Upsert(args MaskRulesUpsertArgs) (model.MaskRule, error) {
 	if args.ConnectionID == "" {
-		return model.MaskRule{}, ipcerr.BadRequest("connectionId is required")
+		return model.MaskRule{}, ipcerr.Required("connectionId")
 	}
 	rec, err := s.Deps.MaskRules.Upsert(args.ConnectionID, args.Fields)
 	if err != nil {
@@ -90,7 +90,7 @@ type MaskRulesDeleteArgs struct {
 
 func (s *MaskRulesService) Delete(args MaskRulesDeleteArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	// Removed by id alone — the connection it belonged to has to be resolved before the row is gone,
 	// so broadcastRules below still knows which connection's cache to refresh. (nil, nil) when the
@@ -115,7 +115,7 @@ type MaskRulesRegenerateKeyArgs struct {
 
 func (s *MaskRulesService) RegenerateKey(args MaskRulesRegenerateKeyArgs) error {
 	if args.ConnectionID == "" {
-		return ipcerr.BadRequest("connectionId is required")
+		return ipcerr.Required("connectionId")
 	}
 	if err := s.Deps.MaskRules.RegenerateKey(args.ConnectionID); err != nil {
 		return ipcerr.InternalErr(err)
@@ -137,7 +137,7 @@ func (s *MaskRulesService) Counts() (map[string]int, error) {
 // narrowly.
 func (s *MaskRulesService) CorrelationKey(args MaskRulesListArgs) (string, error) {
 	if args.ConnectionID == "" {
-		return "", ipcerr.BadRequest("connectionId is required")
+		return "", ipcerr.Required("connectionId")
 	}
 	return ipcerr.InternalResult(s.Deps.MaskRules.CorrelationKeyHex(args.ConnectionID))
 }

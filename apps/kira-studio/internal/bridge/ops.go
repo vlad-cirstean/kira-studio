@@ -31,7 +31,7 @@ type OpsRecentArgs struct {
 
 func (s *OpsService) Recent(args OpsRecentArgs) ([]model.OpRecord, error) {
 	if args.Limit <= 0 {
-		return nil, ipcerr.BadRequest("limit must be positive")
+		return nil, ipcerr.Contract("limit must be positive")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.Ops.Recent(args.Limit))
 }
@@ -44,7 +44,7 @@ type OpsCancelArgs struct {
 // internal/oplog to build on, which is why P55 §7 left it here.
 func (s *OpsService) Cancel(args OpsCancelArgs) error {
 	if args.OpID == "" {
-		return ipcerr.BadRequest("opId is required")
+		return ipcerr.Required("opId")
 	}
 	_, err := s.Canceller.Cancel(context.Background(), args.OpID)
 	return err

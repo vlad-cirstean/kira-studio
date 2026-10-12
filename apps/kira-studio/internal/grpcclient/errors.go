@@ -1,5 +1,7 @@
 package grpcclient
 
+import "github.com/kirathecat/kira-studio/internal/ipcerr"
+
 // The four codes this package owns (P11 D16) — deliberately not adapters.ErrorCode
 // (views/shared/viewOp.ts's DISCONNECTED_CODES would misread a connect failure as "the database
 // connection is gone" and pop a Reconnect gate over a tab that has no connection to reconnect),
@@ -11,12 +13,12 @@ package grpcclient
 // everything else a server actually answered with (PermissionDenied, NotFound, ResourceExhausted,
 // …) comes back as a CallResult with Code/CodeName/StatusMessage populated and err == nil.
 const (
-	CodeBadRequest = "E_GRPC_BAD_REQUEST"
-	CodeSchema     = "E_GRPC_SCHEMA"
-	CodeTransport  = "E_GRPC_TRANSPORT"
-	CodeCancelled  = "E_GRPC_CANCELLED"
-	// CodeTimeout is httpclient's own E_TIMEOUT: a server that accepted TCP and then never answered.
-	CodeTimeout = "E_TIMEOUT"
+	CodeBadRequest = string(ipcerr.CodeBadRequest)
+	CodeSchema     = string(ipcerr.CodeBadRequest)
+	CodeTransport  = string(ipcerr.CodeTransport)
+	CodeCancelled  = string(ipcerr.CodeCancelled)
+	// CodeTimeout: a server that accepted TCP and then never answered.
+	CodeTimeout = string(ipcerr.CodeTimeout)
 )
 
 // Error is the one error type every function in this package returns on failure — mirrors

@@ -16,7 +16,7 @@ type FiltersListArgs struct {
 
 func (s *FiltersService) List(args FiltersListArgs) (model.TreeVisibility, error) {
 	if args.ConnectionID == "" {
-		return model.TreeVisibility{}, ipcerr.BadRequest("connectionId is required")
+		return model.TreeVisibility{}, ipcerr.Required("connectionId")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.Filters.List(args.ConnectionID))
 }
@@ -28,7 +28,7 @@ type FiltersReplaceArgs struct {
 
 func (s *FiltersService) Replace(args FiltersReplaceArgs) (model.TreeVisibility, error) {
 	if args.ConnectionID == "" {
-		return model.TreeVisibility{}, ipcerr.BadRequest("connectionId is required")
+		return model.TreeVisibility{}, ipcerr.Required("connectionId")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.Filters.Replace(args.ConnectionID, args.Visibility))
 }

@@ -558,7 +558,7 @@ test('gRPC request — Stop cancels an in-flight stream and keeps what arrived',
     seq: 2,
     messages: [],
     done: true,
-    error: { code: 'E_GRPC_CANCELLED', message: 'the call was stopped' },
+    error: { code: 'E_CANCELLED', message: 'the call was stopped' },
     status: {
       code: 1,
       codeName: 'Canceled',

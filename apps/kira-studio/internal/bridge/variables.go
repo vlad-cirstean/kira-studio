@@ -28,10 +28,10 @@ type VariablesCreateEnvironmentArgs struct {
 
 func (s *VariablesService) CreateEnvironment(args VariablesCreateEnvironmentArgs) (model.Environment, error) {
 	if args.Name == "" {
-		return model.Environment{}, ipcerr.BadRequest("name is required")
+		return model.Environment{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	if !model.ValidPaletteColor(args.Color) {
-		return model.Environment{}, ipcerr.BadRequest("invalid color")
+		return model.Environment{}, ipcerr.Contract("invalid color")
 	}
 	env, err := s.Deps.Repos.Variables.CreateEnvironment(args.Name, args.Description, args.Color)
 	if err != nil {
@@ -52,11 +52,14 @@ type VariablesUpdateEnvironmentArgs struct {
 }
 
 func (s *VariablesService) UpdateEnvironment(args VariablesUpdateEnvironmentArgs) error {
-	if args.ID == "" || args.Name == "" {
-		return ipcerr.BadRequest("id and name are required")
+	if args.ID == "" {
+		return ipcerr.Required("id")
+	}
+	if args.Name == "" {
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	if !model.ValidPaletteColor(args.Color) {
-		return ipcerr.BadRequest("invalid color")
+		return ipcerr.Contract("invalid color")
 	}
 	if err := s.Deps.Repos.Variables.UpdateEnvironment(args.ID, args.Name, args.Description, args.Color); err != nil {
 		return ipcerr.InternalErr(err)
@@ -71,7 +74,7 @@ type VariablesEnvironmentIDArgs struct {
 
 func (s *VariablesService) DeleteEnvironment(args VariablesEnvironmentIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Deps.Repos.Variables.DeleteEnvironment(args.ID); err != nil {
 		return ipcerr.InternalErr(err)
@@ -83,7 +86,7 @@ func (s *VariablesService) DeleteEnvironment(args VariablesEnvironmentIDArgs) er
 // DuplicateEnvironment is P17 D17/item 4 — see repos/variables.go's own DuplicateEnvironment.
 func (s *VariablesService) DuplicateEnvironment(args VariablesEnvironmentIDArgs) (model.Environment, error) {
 	if args.ID == "" {
-		return model.Environment{}, ipcerr.BadRequest("id is required")
+		return model.Environment{}, ipcerr.Required("id")
 	}
 	env, err := s.Deps.Repos.Variables.DuplicateEnvironment(args.ID)
 	if err != nil {
@@ -126,7 +129,7 @@ type VariablesScopeArgs struct {
 
 func validScope(scope model.VariableScope) error {
 	if scope != model.VariableScopeCollection && scope != model.VariableScopeEnvironment {
-		return ipcerr.BadRequest("scope must be 'collection' or 'environment'")
+		return ipcerr.Contract("scope must be 'collection' or 'environment'")
 	}
 	return nil
 }
@@ -136,7 +139,7 @@ func (s *VariablesService) List(args VariablesScopeArgs) ([]model.Variable, erro
 		return nil, err
 	}
 	if args.OwnerID == "" {
-		return nil, ipcerr.BadRequest("ownerId is required")
+		return nil, ipcerr.Required("ownerId")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.Variables.List(args.Scope, args.OwnerID))
 }
@@ -162,10 +165,10 @@ func (s *VariablesService) Upsert(args VariablesUpsertArgs) (model.Variable, err
 		return model.Variable{}, err
 	}
 	if args.Name == "" {
-		return model.Variable{}, ipcerr.BadRequest("name is required")
+		return model.Variable{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
 	}
 	if args.ID == "" && args.Value == nil {
-		return model.Variable{}, ipcerr.BadRequest("value is required")
+		return model.Variable{}, ipcerr.Required("value")
 	}
 	v, err := s.Deps.Repos.Variables.Upsert(args.Scope, args.OwnerID, args.ID, args.Name, args.Value, args.IsSecret, args.Description)
 	if err != nil {
@@ -181,7 +184,7 @@ type VariablesIDArgs struct {
 
 func (s *VariablesService) Delete(args VariablesIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	scope, ownerID, err := s.Deps.Repos.Variables.Delete(args.ID)
 	if err != nil {
@@ -221,7 +224,7 @@ func (s *VariablesService) ApplyBulk(args VariablesApplyBulkArgs) (model.Variabl
 		return model.VariableBulkResult{}, err
 	}
 	if args.OwnerID == "" {
-		return model.VariableBulkResult{}, ipcerr.BadRequest("ownerId is required")
+		return model.VariableBulkResult{}, ipcerr.Required("ownerId")
 	}
 	result, err := s.Deps.Repos.Variables.ApplyBulk(args.Scope, args.OwnerID, args.Entries)
 	if err != nil {
@@ -239,7 +242,7 @@ type VariablesHistoryArgs struct {
 
 func (s *VariablesService) History(args VariablesHistoryArgs) ([]model.VariableHistoryEntry, error) {
 	if args.VariableID == "" {
-		return nil, ipcerr.BadRequest("variableId is required")
+		return nil, ipcerr.Required("variableId")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.Variables.History(args.VariableID))
 }

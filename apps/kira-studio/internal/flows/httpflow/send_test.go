@@ -205,8 +205,8 @@ func TestRedirects(t *testing.T) {
 		args := get(srv.URL + "/redirect?n=3&code=302")
 		args.Options.MaxRedirects = ptr(2)
 		e := sendErr(t, app, args)
-		if e.Code != string(httpclient.CodeHTTPTransport) || !strings.Contains(e.Message, "redirect") {
-			t.Errorf("error = %s %q, want E_HTTP_TRANSPORT naming redirects", e.Code, e.Message)
+		if e.Code != string(httpclient.CodeTransport) || !strings.Contains(e.Message, "redirect") {
+			t.Errorf("error = %s %q, want E_TRANSPORT naming redirects", e.Code, e.Message)
 		}
 		if tl := errTimeline(t, e); len(tl.Hops) < 2 {
 			t.Errorf("failed timeline hops = %d, want the chain walked so far (>= 2)", len(tl.Hops))
@@ -328,8 +328,8 @@ func TestTLSAndHTTPVersion(t *testing.T) {
 	srv := flowharness.HTTPS(t)
 
 	e := sendErr(t, app, get(srv.URL+"/echo"))
-	if e.Code != string(httpclient.CodeHTTPTransport) || !strings.Contains(strings.ToLower(e.Message), "certificate") {
-		t.Errorf("default verify error = %s %q, want E_HTTP_TRANSPORT naming the certificate", e.Code, e.Message)
+	if e.Code != string(httpclient.CodeTransport) || !strings.Contains(strings.ToLower(e.Message), "certificate") {
+		t.Errorf("default verify error = %s %q, want E_TRANSPORT naming the certificate", e.Code, e.Message)
 	}
 
 	skip := get(srv.URL + "/echo")

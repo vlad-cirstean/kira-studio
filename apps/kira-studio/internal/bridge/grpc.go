@@ -140,13 +140,13 @@ func (s *GrpcService) resolveGrpcCallSource(args GrpcCallArgs) (grpcclient.Sourc
 // a Describe result records no history row.
 func (s *GrpcService) Describe(ctx context.Context, args GrpcDescribeArgs) (grpcclient.Schema, error) {
 	if !validDescriptorMode(args.DescriptorMode) {
-		return grpcclient.Schema{}, ipcerr.BadRequest("descriptorMode must be 'reflection' or 'proto'")
+		return grpcclient.Schema{}, ipcerr.Contract("descriptorMode must be 'reflection' or 'proto'")
 	}
 	if args.DescriptorMode == string(grpcclient.SourceReflection) && args.Target == "" {
-		return grpcclient.Schema{}, ipcerr.BadRequest("target is required")
+		return grpcclient.Schema{}, ipcerr.Required("target")
 	}
 	if args.DescriptorMode == string(grpcclient.SourceProto) && args.ProtoPath == "" {
-		return grpcclient.Schema{}, ipcerr.BadRequest("protoPath is required")
+		return grpcclient.Schema{}, ipcerr.Required("protoPath")
 	}
 
 	var used []apivars.UsedSecret
@@ -216,16 +216,16 @@ type GrpcCallArgs struct {
 // same P5 D6/F3 rule HttpService.Send follows, verbatim.
 func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.CallResult, error) {
 	if args.OpID == "" {
-		return grpcclient.CallResult{}, ipcerr.BadRequest("opId is required")
+		return grpcclient.CallResult{}, ipcerr.Required("opId")
 	}
 	if args.TabID == "" {
-		return grpcclient.CallResult{}, ipcerr.BadRequest("tabId is required")
+		return grpcclient.CallResult{}, ipcerr.Required("tabId")
 	}
 	if !validDescriptorMode(args.DescriptorMode) {
-		return grpcclient.CallResult{}, ipcerr.BadRequest("descriptorMode must be 'reflection' or 'proto'")
+		return grpcclient.CallResult{}, ipcerr.Contract("descriptorMode must be 'reflection' or 'proto'")
 	}
 	if args.Service == "" || args.Method == "" {
-		return grpcclient.CallResult{}, ipcerr.BadRequest("service and method are required")
+		return grpcclient.CallResult{}, ipcerr.Contract("service and method are required")
 	}
 
 	timeoutMs := args.TimeoutMs

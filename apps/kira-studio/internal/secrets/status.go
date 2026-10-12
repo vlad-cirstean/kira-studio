@@ -4,6 +4,8 @@
 // SecretStorageStatus probe/reason strings the connection dialog already renders.
 package secrets
 
+import "github.com/kirathecat/kira-studio/packages/theme/src/i18n"
+
 // Backend values mirror packages/shared/domain/secrets.ts's secretStorageStatusSchema.
 const (
 	BackendKeychain    = "keychain"
@@ -23,8 +25,14 @@ type Status struct {
 
 func reason(s string) *string { return &s }
 
-const (
-	darwinUnavailableReason = "The macOS Keychain is unavailable, so passwords cannot be saved. Everything else about this connection can be."
-	linuxUnavailableReason  = "No system keychain is available on Linux in this build. Set KIRA_INSECURE_SECRETS=1 for local development, or run on macOS."
-	otherPlatformReason     = "Credential storage is only supported on macOS in this build."
-)
+func darwinUnavailableReason() string {
+	return i18n.T("backend.studio.secrets.darwinUnavailable.body", nil)
+}
+
+func linuxUnavailableReason() string {
+	return i18n.T("backend.studio.secrets.linuxUnavailable.body", map[string]string{"variable": "KIRA_INSECURE_SECRETS"})
+}
+
+func otherPlatformReason() string {
+	return i18n.T("backend.studio.secrets.otherPlatformUnavailable.body", nil)
+}

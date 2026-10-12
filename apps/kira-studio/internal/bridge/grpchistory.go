@@ -27,14 +27,14 @@ type GrpcHistoryIDArgs struct {
 
 func (s *GrpcHistoryService) Get(args GrpcHistoryIDArgs) (model.GrpcCallSnapshot, error) {
 	if args.ID == "" {
-		return model.GrpcCallSnapshot{}, ipcerr.BadRequest("id is required")
+		return model.GrpcCallSnapshot{}, ipcerr.Required("id")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.GrpcHistory.Get(args.ID))
 }
 
 func (s *GrpcHistoryService) Delete(args GrpcHistoryIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	return ipcerr.InternalErr(s.Deps.Repos.GrpcHistory.Delete(args.ID))
 }
@@ -56,7 +56,7 @@ type GrpcHistoryAdoptResult struct {
 // request's id.
 func (s *GrpcHistoryService) Adopt(args GrpcHistoryAdoptArgs) (GrpcHistoryAdoptResult, error) {
 	if args.TabID == "" || args.ItemID == "" {
-		return GrpcHistoryAdoptResult{}, ipcerr.BadRequest("tabId and itemId are required")
+		return GrpcHistoryAdoptResult{}, ipcerr.Contract("tabId and itemId are required")
 	}
 	n, err := s.Deps.Repos.GrpcHistory.Adopt(args.TabID, args.ItemID)
 	if err != nil {

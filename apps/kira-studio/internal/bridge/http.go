@@ -68,10 +68,10 @@ type HttpSendArgs struct {
 // once the response is known.
 func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.Response, error) {
 	if args.OpID == "" {
-		return httpclient.Response{}, ipcerr.BadRequest("opId is required")
+		return httpclient.Response{}, ipcerr.Required("opId")
 	}
 	if args.TabID == "" {
-		return httpclient.Response{}, ipcerr.BadRequest("tabId is required")
+		return httpclient.Response{}, ipcerr.Required("tabId")
 	}
 
 	// P90 §2.5: the globals are read once per send, from the same repo the Settings dialog writes
@@ -220,7 +220,7 @@ func (s *HttpService) Cookies(args HttpCookiesArgs) ([]httpclient.Cookie, error)
 
 func (s *HttpService) DeleteCookie(args HttpCookieDeleteArgs) ([]httpclient.Cookie, error) {
 	if args.Name == "" || args.Domain == "" || args.Path == "" {
-		return nil, ipcerr.BadRequest("cookie name, domain and path are required")
+		return nil, ipcerr.Contract("cookie name, domain and path are required")
 	}
 	httpclient.DeleteJarCookie(args.Domain, args.Path, args.Name)
 	return s.Cookies(HttpCookiesArgs{URL: args.URL})

@@ -441,7 +441,7 @@ type DbMcpApprovalArgs struct {
 // instead of waiting for its own broadcast to arrive.
 func (s *DbMcpService) ApproveQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot, error) {
 	if args.RequestID == "" {
-		return DbMcpApprovalSnapshot{}, ipcerr.BadRequest("requestId is required")
+		return DbMcpApprovalSnapshot{}, ipcerr.Required("requestId")
 	}
 	s.Approvals.Approve(args.RequestID)
 	return toWireApprovalSnapshot(s.Approvals.Pending()), nil
@@ -449,7 +449,7 @@ func (s *DbMcpService) ApproveQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapsh
 
 func (s *DbMcpService) DenyQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot, error) {
 	if args.RequestID == "" {
-		return DbMcpApprovalSnapshot{}, ipcerr.BadRequest("requestId is required")
+		return DbMcpApprovalSnapshot{}, ipcerr.Required("requestId")
 	}
 	s.Approvals.Deny(args.RequestID)
 	return toWireApprovalSnapshot(s.Approvals.Pending()), nil

@@ -40,14 +40,14 @@ type ResponseHistoryIDArgs struct {
 
 func (s *ResponseHistoryService) Get(args ResponseHistoryIDArgs) (model.ResponseHistorySnapshot, error) {
 	if args.ID == "" {
-		return model.ResponseHistorySnapshot{}, ipcerr.BadRequest("id is required")
+		return model.ResponseHistorySnapshot{}, ipcerr.Required("id")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.ResponseHistory.Get(args.ID))
 }
 
 func (s *ResponseHistoryService) Delete(args ResponseHistoryIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	return ipcerr.InternalErr(s.Deps.Repos.ResponseHistory.Delete(args.ID))
 }
@@ -68,7 +68,7 @@ type ResponseHistoryAdoptResult struct {
 // Adopt is D14 — a scratch tab's entries move onto a newly-saved request's id.
 func (s *ResponseHistoryService) Adopt(args ResponseHistoryAdoptArgs) (ResponseHistoryAdoptResult, error) {
 	if args.TabID == "" || args.ItemID == "" {
-		return ResponseHistoryAdoptResult{}, ipcerr.BadRequest("tabId and itemId are required")
+		return ResponseHistoryAdoptResult{}, ipcerr.Contract("tabId and itemId are required")
 	}
 	n, err := s.Deps.Repos.ResponseHistory.Adopt(args.TabID, args.ItemID)
 	if err != nil {

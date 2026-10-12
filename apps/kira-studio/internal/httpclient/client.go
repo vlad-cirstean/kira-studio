@@ -188,20 +188,20 @@ func HasScheme(s string) bool {
 func resolveURL(raw string) (*url.URL, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return nil, newError(CodeBadRequest, "URL is required", nil)
+		return nil, newErrorT(CodeBadRequest, "backend.studio.http.urlRequired.body", nil, nil)
 	}
 	if !HasScheme(trimmed) {
 		trimmed = "https://" + trimmed
 	}
 	u, err := url.Parse(trimmed)
 	if err != nil {
-		return nil, newError(CodeBadRequest, "invalid URL: "+transportErrText(err), err)
+		return nil, newErrorT(CodeBadRequest, "backend.studio.http.urlInvalid.error", map[string]string{"detail": transportErrText(err)}, err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, newError(CodeBadRequest, "unsupported URL scheme: "+u.Scheme, nil)
+		return nil, newErrorT(CodeBadRequest, "backend.studio.http.urlSchemeUnsupported.body", map[string]string{"scheme": u.Scheme}, nil)
 	}
 	if u.Host == "" {
-		return nil, newError(CodeBadRequest, "URL has no host", nil)
+		return nil, newErrorT(CodeBadRequest, "backend.studio.http.urlHostMissing.body", nil, nil)
 	}
 	return u, nil
 }
@@ -215,11 +215,11 @@ func classifySendErr(sendCtx context.Context, err error, tl Timeline) *Error {
 	var e *Error
 	switch {
 	case sendCtx.Err() == context.DeadlineExceeded:
-		e = newError(CodeTimeout, "request timed out", err)
+		e = newErrorT(CodeTimeout, "backend.studio.http.requestTimedOut.body", nil, err)
 	case sendCtx.Err() != nil:
-		e = newError(CodeCancelled, "request was cancelled", err)
+		e = newErrorT(CodeCancelled, "backend.studio.http.requestCancelled.body", nil, err)
 	default:
-		e = newError(CodeHTTPTransport, transportErrText(err), err)
+		e = newError(CodeTransport, transportErrText(err), err)
 	}
 	e.Timeline = &tl
 	return e
@@ -266,7 +266,7 @@ func statusText(status string) string {
 // 0/none, in which case only ctx's own cancellation applies.
 func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 	if !validMethods[req.Method] {
-		return Response{}, newError(CodeBadRequest, "unsupported method: "+req.Method, nil)
+		return Response{}, newErrorT(CodeBadRequest, "backend.studio.http.methodUnsupported.body", map[string]string{"method": req.Method}, nil)
 	}
 	u, err := resolveURL(req.URL)
 	if err != nil {
@@ -420,7 +420,7 @@ func prepareRequest(sendCtx context.Context, req Request, u *url.URL) (httpReq *
 		if bodyReader != nil {
 			_ = bodyReader.Close()
 		}
-		return nil, formBoundary, defaultContentType, newError(CodeBadRequest, "could not build request: "+err.Error(), err)
+		return nil, formBoundary, defaultContentType, newErrorT(CodeBadRequest, "backend.studio.http.requestBuildFailed.error", map[string]string{"detail": err.Error()}, err)
 	}
 	// F4/F5: assigned explicitly rather than left to NewRequestWithContext's own auto-detection,
 	// which only recognises *strings.Reader/*bytes.Reader/*bytes.Buffer — every streamed mode

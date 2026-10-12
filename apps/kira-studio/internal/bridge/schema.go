@@ -18,7 +18,7 @@ type SchemaGetArgs struct {
 
 func (s *SchemaService) Get(args SchemaGetArgs) (model.ConnectionDDL, error) {
 	if args.ConnectionID == "" {
-		return model.ConnectionDDL{}, ipcerr.BadRequest("connectionId is required")
+		return model.ConnectionDDL{}, ipcerr.Required("connectionId")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.Schema.Get(args.ConnectionID))
 }
@@ -33,7 +33,7 @@ type SchemaSetArgs struct {
 // relaunch.
 func (s *SchemaService) Set(args SchemaSetArgs) (model.ConnectionDDL, error) {
 	if args.ConnectionID == "" {
-		return model.ConnectionDDL{}, ipcerr.BadRequest("connectionId is required")
+		return model.ConnectionDDL{}, ipcerr.Required("connectionId")
 	}
 	ddl, err := s.Deps.Repos.Schema.Set(args.ConnectionID, args.DDL)
 	if err != nil {

@@ -18,7 +18,7 @@ type TreeChildrenArgs struct {
 
 func (s *TreeService) Children(args TreeChildrenArgs) (tree.ChildrenResult, error) {
 	if args.ConnectionID == "" {
-		return tree.ChildrenResult{}, ipcerr.BadRequest("connectionId is required")
+		return tree.ChildrenResult{}, ipcerr.Required("connectionId")
 	}
 	return s.Deps.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
 }
@@ -33,14 +33,14 @@ type TreeDescribeArgs struct {
 
 func (s *TreeService) Describe(args TreeDescribeArgs) (tree.DescribeResult, error) {
 	if args.ConnectionID == "" {
-		return tree.DescribeResult{}, ipcerr.BadRequest("connectionId is required")
+		return tree.DescribeResult{}, ipcerr.Required("connectionId")
 	}
 	return s.Deps.Tree.Describe(args.ConnectionID, args.Path, args.Refresh, args.TabID)
 }
 
 func (s *TreeService) Definition(args TreeDescribeArgs) (tree.DefinitionResult, error) {
 	if args.ConnectionID == "" {
-		return tree.DefinitionResult{}, ipcerr.BadRequest("connectionId is required")
+		return tree.DefinitionResult{}, ipcerr.Required("connectionId")
 	}
 	return s.Deps.Tree.Definition(args.ConnectionID, args.Path, args.Refresh, args.TabID)
 }
@@ -49,7 +49,7 @@ func (s *TreeService) Definition(args TreeDescribeArgs) (tree.DefinitionResult, 
 // not tagged to one tab's op-log row).
 func (s *TreeService) SchemaColumns(args TreeDescribeArgs) (tree.SchemaColumnsResult, error) {
 	if args.ConnectionID == "" {
-		return tree.SchemaColumnsResult{}, ipcerr.BadRequest("connectionId is required")
+		return tree.SchemaColumnsResult{}, ipcerr.Required("connectionId")
 	}
 	return s.Deps.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
 }
@@ -64,7 +64,7 @@ type TreeKeyTypesArgs struct {
 
 func (s *TreeService) KeyTypes(args TreeKeyTypesArgs) ([]string, error) {
 	if args.ConnectionID == "" {
-		return nil, ipcerr.BadRequest("connectionId is required")
+		return nil, ipcerr.Required("connectionId")
 	}
 	return s.Deps.Tree.KeyTypes(args.ConnectionID, args.Paths)
 }
@@ -77,7 +77,7 @@ type TreeInvalidateArgs struct {
 
 func (s *TreeService) Invalidate(args TreeInvalidateArgs) error {
 	if args.ConnectionID == "" {
-		return ipcerr.BadRequest("connectionId is required")
+		return ipcerr.Required("connectionId")
 	}
 	return s.Deps.Tree.Invalidate(args.ConnectionID, args.Path)
 }

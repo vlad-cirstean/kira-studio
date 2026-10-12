@@ -162,7 +162,7 @@ func awaitReady(ctx context.Context, conn *grpc.ClientConn, target string) error
 var metadataKeyPattern = regexp.MustCompile(`^[0-9a-z._-]+$`)
 
 // withMetadata attaches D9's already-resolved metadata to ctx — F6: keys are lowercased, and an
-// illegal key is refused here as E_GRPC_BAD_REQUEST with D17's own sentence, rather than reaching
+// illegal key is refused here as E_BAD_REQUEST with D17's own sentence, rather than reaching
 // grpc-go's own codes.Internal at send time. Shared by reflect.go's own reflection call and
 // call.go's Unary/ServerStream — a reflection fetch may need the same auth (§0.3).
 func withMetadata(ctx context.Context, pairs []MetaPair) (context.Context, error) {

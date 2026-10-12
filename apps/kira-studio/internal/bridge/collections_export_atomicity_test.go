@@ -3,7 +3,7 @@
 // postman.Write straight into it, so any failure after that point (a marshal error, a full disk,
 // the process being killed mid-write) left the destination empty or half-written, with no cleanup.
 // A re-export over an existing, good file is exactly the ordinary case (the save panel offers the
-// existing filename), so this destroyed a good file on a failed re-export. writeFileAtomically now
+// existing filename), so this destroyed a good file on a failed re-export. writeExportFile now
 // writes to a sibling temp file and renames onto the destination only once the write fully
 // succeeds, mirroring internal/adapters/s3/transfer.go's downloadObject.
 package bridge
@@ -24,7 +24,7 @@ func TestWriteFileAtomically_FailedWriteLeavesExistingFileUntouched(t *testing.T
 	}
 
 	writeErr := errors.New("boom: simulated marshal failure partway through the write")
-	err := writeFileAtomically(path, func(f *os.File) error {
+	err := writeExportFile(path, func(f *os.File) error {
 		// Write some real bytes first — under the old os.Create(path)-then-write approach this
 		// would already have landed *in path itself*, truncating it, before the failure below.
 		if _, werr := f.WriteString("partial output that must never reach the destination"); werr != nil {
@@ -33,7 +33,7 @@ func TestWriteFileAtomically_FailedWriteLeavesExistingFileUntouched(t *testing.T
 		return writeErr
 	})
 	if err == nil {
-		t.Fatal("writeFileAtomically: want an error from the failing write step")
+		t.Fatal("writeExportFile: want an error from the failing write step")
 	}
 
 	got, readErr := os.ReadFile(path)
@@ -53,7 +53,7 @@ func TestWriteFileAtomically_FailedWriteLeavesExistingFileUntouched(t *testing.T
 		for i, e := range entries {
 			names[i] = e.Name()
 		}
-		t.Fatalf("directory has %d entries after a failed write, want 1 (no leftover .kira-partial-* temp file): %v", len(entries), names)
+		t.Fatalf("directory has %d entries after a failed write, want 1 (no leftover renameio temp file): %v", len(entries), names)
 	}
 }
 
@@ -64,11 +64,11 @@ func TestWriteFileAtomically_SuccessReplacesExistingFileWhole(t *testing.T) {
 		t.Fatalf("seed original file: %v", err)
 	}
 
-	if err := writeFileAtomically(path, func(f *os.File) error {
+	if err := writeExportFile(path, func(f *os.File) error {
 		_, err := f.WriteString("new content")
 		return err
 	}); err != nil {
-		t.Fatalf("writeFileAtomically: %v", err)
+		t.Fatalf("writeExportFile: %v", err)
 	}
 
 	got, err := os.ReadFile(path)
@@ -97,11 +97,11 @@ func TestWriteFileAtomically_PreservesExistingFileMode(t *testing.T) {
 		t.Fatalf("seed original file: %v", err)
 	}
 
-	if err := writeFileAtomically(path, func(f *os.File) error {
+	if err := writeExportFile(path, func(f *os.File) error {
 		_, err := f.WriteString("new content")
 		return err
 	}); err != nil {
-		t.Fatalf("writeFileAtomically: %v", err)
+		t.Fatalf("writeExportFile: %v", err)
 	}
 
 	info, err := os.Stat(path)
@@ -119,11 +119,11 @@ func TestWriteFileAtomically_FreshFileGetsPrivateDefaultMode(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "collection.json")
 
-	if err := writeFileAtomically(path, func(f *os.File) error {
+	if err := writeExportFile(path, func(f *os.File) error {
 		_, err := f.WriteString("new content")
 		return err
 	}); err != nil {
-		t.Fatalf("writeFileAtomically: %v", err)
+		t.Fatalf("writeExportFile: %v", err)
 	}
 
 	info, err := os.Stat(path)
@@ -149,11 +149,11 @@ func TestWriteFileAtomically_WritesThroughASymlinkRatherThanReplacingIt(t *testi
 		t.Fatalf("Symlink: %v", err)
 	}
 
-	if err := writeFileAtomically(linkPath, func(f *os.File) error {
+	if err := writeExportFile(linkPath, func(f *os.File) error {
 		_, err := f.WriteString("new content")
 		return err
 	}); err != nil {
-		t.Fatalf("writeFileAtomically: %v", err)
+		t.Fatalf("writeExportFile: %v", err)
 	}
 
 	linkInfo, err := os.Lstat(linkPath)
@@ -161,7 +161,7 @@ func TestWriteFileAtomically_WritesThroughASymlinkRatherThanReplacingIt(t *testi
 		t.Fatalf("Lstat(linkPath): %v", err)
 	}
 	if linkInfo.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("writeFileAtomically replaced the symlink with a regular file instead of writing through it")
+		t.Fatal("writeExportFile replaced the symlink with a regular file instead of writing through it")
 	}
 
 	got, err := os.ReadFile(realPath)

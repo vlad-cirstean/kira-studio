@@ -389,7 +389,7 @@ func TestSchemaDDLSetGet(t *testing.T) {
 		t.Fatalf("Schema.Get = %+v (%v), want %+v", got, err, set)
 	}
 	var ie *ipcerr.Error
-	if _, err := app.W.Schema.Get(bridge.SchemaGetArgs{}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
-		t.Fatalf("Schema.Get without a connection = %v, want E_BAD_REQUEST", err)
+	if _, err := app.W.Schema.Get(bridge.SchemaGetArgs{}); !errors.As(err, &ie) || ie.Code != "E_CONTRACT" {
+		t.Fatalf("Schema.Get without a connection = %v, want E_CONTRACT", err)
 	}
 }

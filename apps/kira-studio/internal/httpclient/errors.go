@@ -1,6 +1,11 @@
 package httpclient
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
+)
 
 // ErrorCode is httpclient's own closed error vocabulary — deliberately not adapters.ErrorCode
 // (P2 D8): that set's own comment forbids additions without a matching renderer change, and
@@ -13,14 +18,16 @@ type ErrorCode string
 const (
 	// E_BAD_REQUEST — unparseable URL, non-http(s) scheme, missing host, unknown method: refused
 	// before anything is sent.
-	CodeBadRequest ErrorCode = "E_BAD_REQUEST"
+	CodeBadRequest = ErrorCode(ipcerr.CodeBadRequest)
 	// E_CANCELLED — ctx.Err() == context.Canceled: the Stop button, or the window closing.
-	CodeCancelled ErrorCode = "E_CANCELLED"
+	CodeCancelled = ErrorCode(ipcerr.CodeCancelled)
 	// E_TIMEOUT — context.DeadlineExceeded.
-	CodeTimeout ErrorCode = "E_TIMEOUT"
-	// E_HTTP_TRANSPORT — everything else: DNS failure, refused connection, TLS handshake
+	CodeTimeout = ErrorCode(ipcerr.CodeTimeout)
+	// E_TRANSPORT — everything else: DNS failure, refused connection, TLS handshake
 	// failure, a truncated response.
-	CodeHTTPTransport ErrorCode = "E_HTTP_TRANSPORT"
+	CodeTransport = ErrorCode(ipcerr.CodeTransport)
+	// E_CONTRACT — the UI always sets the value, so a violation is a Kira bug.
+	CodeContract = ErrorCode(ipcerr.CodeContract)
 )
 
 // Error is httpclient's own error type, mirroring adapters.Error's shape (Code/Message/Cause,
@@ -41,6 +48,11 @@ func (e *Error) Unwrap() error { return e.Cause }
 
 func newError(code ErrorCode, message string, cause error) *Error {
 	return &Error{Code: code, Message: message, Cause: cause}
+}
+
+// newErrorT builds an Error whose message is catalog text for key.
+func newErrorT(code ErrorCode, key string, params map[string]string, cause error) *Error {
+	return newError(code, i18n.T(key, params), cause)
 }
 
 // CodeOf reports the ErrorCode of err via errors.As, for a caller to branch on without importing

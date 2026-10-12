@@ -19,7 +19,7 @@ import (
 func TestConnectionsServiceRejectsBareID(t *testing.T) {
 	svc := &bridge.ConnectionsService{Deps: appcore.Deps{}}
 
-	assertBadRequest := func(t *testing.T, err error) {
+	assertContract := func(t *testing.T, err error) {
 		t.Helper()
 		if err == nil {
 			t.Fatal("want an error for a bare id, got nil")
@@ -28,29 +28,29 @@ func TestConnectionsServiceRejectsBareID(t *testing.T) {
 		if !errors.As(err, &ie) {
 			t.Fatalf("err = %v, want *ipcerr.Error", err)
 		}
-		if ie.Code != "E_BAD_REQUEST" {
-			t.Errorf("Code = %q, want E_BAD_REQUEST", ie.Code)
+		if ie.Code != "E_CONTRACT" {
+			t.Errorf("Code = %q, want E_CONTRACT", ie.Code)
 		}
 	}
 
 	t.Run("Update", func(t *testing.T) {
 		_, err := svc.Update(bridge.ConnectionsUpdateArgs{ID: ""})
-		assertBadRequest(t, err)
+		assertContract(t, err)
 	})
 	t.Run("Duplicate", func(t *testing.T) {
 		_, err := svc.Duplicate(bridge.ConnectionsIDArgs{ID: ""})
-		assertBadRequest(t, err)
+		assertContract(t, err)
 	})
 	t.Run("Remove", func(t *testing.T) {
-		assertBadRequest(t, svc.Delete(bridge.ConnectionsIDArgs{ID: ""}))
+		assertContract(t, svc.Delete(bridge.ConnectionsIDArgs{ID: ""}))
 	})
 	t.Run("Connect", func(t *testing.T) {
 		_, err := svc.Connect(bridge.ConnectionsIDArgs{ID: ""})
-		assertBadRequest(t, err)
+		assertContract(t, err)
 	})
 	t.Run("Disconnect", func(t *testing.T) {
 		_, err := svc.Disconnect(bridge.ConnectionsIDArgs{ID: ""})
-		assertBadRequest(t, err)
+		assertContract(t, err)
 	})
 	t.Run("Reveal never errors, but still reports a bare id rather than reaching Deps.Connections", func(t *testing.T) {
 		result := svc.Reveal(bridge.ConnectionsRevealArgs{ID: ""})
