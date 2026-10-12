@@ -65,6 +65,22 @@ test('commit row menu offers New branch…', async ({ relaunch }) => {
   await expect(tid(page, 'menu-item-createBranchHere')).toHaveText('New branch…');
 });
 
+test('a dirty git dialog asks before Esc discards it', async ({ relaunch }) => {
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),
+    results: PICKER_RESULTS,
+  });
+  await firstRow(page).click({ button: 'right' });
+  await tid(page, 'menu-item-createBranchHere').click();
+  const dialog = page.getByRole('dialog', { name: 'Create branch' });
+  await dialog.getByRole('textbox').first().fill('feature/x');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Discard unsaved edits' })).toBeVisible();
+  await expect(
+    page.getByRole('dialog', { name: 'Create branch', includeHidden: true }),
+  ).toBeVisible();
+});
+
 test('the push menu offers Force push…', async ({ relaunch }) => {
   const page = await openPortGraph(relaunch, {
     chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),

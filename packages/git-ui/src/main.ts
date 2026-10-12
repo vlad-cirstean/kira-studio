@@ -1,5 +1,6 @@
 import type { Transport, UiActionKind } from '@kira/git-ipc';
 import { i18n } from '@theme/i18n';
+import { provideShellServices } from '@workbench/bootstrapShell';
 import { createApp, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import type { RepoHead } from './components/GitViewHead.vue';
@@ -113,6 +114,8 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a
   // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
   app.use(i18n);
+  // Dirty dialogs ask through the host's confirm store (git-ui has no Pinia of its own).
+  provideShellServices(app);
   const graphVisible = shallowRef(true);
   app.provide(GRAPH_VISIBLE_KEY, graphVisible);
   container.classList.add('h-full', 'w-full', 'overflow-hidden');

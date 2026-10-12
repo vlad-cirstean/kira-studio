@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import { storeToRefs } from 'pinia';
 import { watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -18,4 +19,5 @@ watch(phase, (p, prev) => {
 
 <template>
   <RouterView />
+  <ConfirmDialog />
 </template>

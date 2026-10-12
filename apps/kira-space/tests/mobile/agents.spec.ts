@@ -50,6 +50,16 @@ test.describe('with agent input', () => {
     expect(sent[0]?.key).not.toBe('');
     await expect(item.locator(t('needs-terminal'))).toBeVisible();
   });
+
+  test('closing a reply with text asks before discarding it', async ({ page, server }) => {
+    const item = page.locator(t('needs-item')).filter({ hasText: 'waiting for your answer' });
+    await waitForQuestion(server, item);
+    await item.locator(t('needs-reply')).click();
+    await page.locator(t('reply-input')).fill('yes, run it');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Discard unsaved edits' })).toBeVisible();
+    await expect(page.locator(t('reply-sheet'))).toBeVisible();
+  });
 });
 
 test('without agent input a waiting agent shows the hint, not Reply', async ({
