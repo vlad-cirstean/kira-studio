@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import {
   Field,
   FieldContent,
@@ -206,9 +207,9 @@ const disableCookieJarId = useId();
         @click="resetLeaf('api', 'sslVerify')"
       />
     </FieldGroup>
-    <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">{{
-      t('studio.settings.api.sslVerify.warning.error')
-    }}</FieldError>
+    <Alert v-if="!draft.api.sslVerify" variant="warn" data-testid="settings-api-sslVerify-warning">
+      <AlertDescription>{{ t('studio.settings.api.sslVerify.warning.error') }}</AlertDescription>
+    </Alert>
 
     <FieldGroup>
       <Field orientation="horizontal">

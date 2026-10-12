@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
@@ -54,7 +55,7 @@ useFocusOnMount(curlEl);
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
-    <DialogContent size="lg" data-testid="import-curl-dialog">
+    <DialogContent size="lg" :dirty="text.trim() !== ''" data-testid="import-curl-dialog">
       <DialogHeader close-testid="import-curl-dialog-close">
         <DialogTitle>{{ t('studio.api.importCurl.title') }}</DialogTitle>
       </DialogHeader>
@@ -72,9 +73,9 @@ useFocusOnMount(curlEl);
           <AlertDescription>{{ preview.error }}</AlertDescription>
         </Alert>
         <template v-else-if="text.trim() !== ''">
-          <div class="text-kira-sm text-muted-foreground" data-testid="import-curl-summary">{{
+          <FieldDescription data-testid="import-curl-summary">{{
             preview.summary
-          }}</div>
+          }}</FieldDescription>
           <!-- D12: the same `warn` variant + `<li :data-kind>` shape ImportReportStrip.vue
              established — shown live, before Import is pressed, rather than as a post-hoc report. -->
           <Alert

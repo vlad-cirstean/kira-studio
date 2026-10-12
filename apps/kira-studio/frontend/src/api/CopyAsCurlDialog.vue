@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
@@ -91,7 +92,7 @@ function close(): void {
             <Button
               variant="dialog"
               size="kira"
-              :disabled="copyAsCurlStore.revealing"
+              :pending="copyAsCurlStore.revealing"
               data-testid="copy-as-curl-reveal"
               @click="onReveal"
             >
@@ -100,13 +101,9 @@ function close(): void {
           </AlertAction>
         </Alert>
 
-        <div
-          v-if="hasDynamicValue"
-          class="text-kira-sm text-muted-foreground"
-          data-testid="copy-as-curl-dynamic-note"
-        >
+        <FieldDescription v-if="hasDynamicValue" data-testid="copy-as-curl-dynamic-note">
           {{ t('studio.api.curl.dynamicValues.hint') }}
-        </div>
+        </FieldDescription>
 
         <Alert v-if="copyAsCurlStore.error" variant="error" data-testid="copy-as-curl-error">
           <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>

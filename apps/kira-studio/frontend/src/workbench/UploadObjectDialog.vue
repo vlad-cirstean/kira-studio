@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { contentTypeForFilename } from '@shared/domain/objectStore';
 import { decodePath } from '@shared/domain/tree';
+import { rowMeta } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -104,7 +105,7 @@ watch(
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
-    <DialogContent size="md" data-testid="upload-dialog">
+    <DialogContent size="md" :dirty="chosenFile !== null" data-testid="upload-dialog">
       <DialogHeader close-testid="upload-close">
         <DialogTitle>{{ t('studio.keyValue.upload.tooltip') }}</DialogTitle>
       </DialogHeader>
@@ -119,11 +120,7 @@ watch(
         >
           {{ t('studio.http.body.chooseFile.label') }}
         </Button>
-        <div
-          v-if="chosenFile"
-          class="text-kira-sm text-muted-foreground p-0"
-          data-testid="upload-chosen-file"
-        >
+        <div v-if="chosenFile" :class="rowMeta" data-testid="upload-chosen-file">
           {{ chosenFile.name }}
           ({{ formatBytes(chosenFile.size) }})
         </div>
@@ -155,7 +152,8 @@ watch(
           variant="dialog-primary"
           size="kira-lg"
           data-testid="upload-submit"
-          :disabled="!chosenFile || !key.trim() || saving"
+          :disabled="!chosenFile || !key.trim()"
+          :pending="saving"
           @click="onUpload"
         >
           {{ t('studio.upload.submit.label') }}

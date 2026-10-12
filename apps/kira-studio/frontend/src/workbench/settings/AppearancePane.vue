@@ -10,6 +10,7 @@ import {
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
+import { ROW_HEIGHT_PX } from '@workbench/lib/rowHeight';
 import FontFamilyField from '@workbench/settings/fields/FontFamilyField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
@@ -35,9 +36,7 @@ const PREVIEW = {
   ],
 };
 
-const rowPreviewHeight = computed(() =>
-  props.draft.appearance.rowDensity === 'compact' ? 22 : 28,
-);
+const rowPreviewHeight = computed(() => ROW_HEIGHT_PX[props.draft.appearance.rowDensity]);
 
 // P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
@@ -80,18 +79,18 @@ const rowColoringId = useId();
       <div class="overflow-hidden rounded-kira-sm border border-border">
         <div class="flex bg-elevated border-b border-border-strong">
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-muted-foreground text-kira-sm bg-elevated"
+            class="flex items-center truncate px-2 border-r border-border flex-none basis-9 justify-end text-muted-foreground text-kira-sm bg-elevated"
             :style="{ height: `${rowPreviewHeight}px` }"
           />
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-muted-foreground text-kira-sm"
+            class="flex items-center truncate px-2 border-r border-border flex-none basis-37.5 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
             >{{
               PREVIEW.idColumn
             }}</span
           >
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-muted-foreground text-kira-sm"
+            class="flex items-center truncate px-2 border-r border-border flex-1 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
             >{{
               PREVIEW.emailColumn
@@ -100,17 +99,17 @@ const rowColoringId = useId();
         </div>
         <div class="flex" :style="{ height: `${rowPreviewHeight}px` }">
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
+            class="flex items-center truncate px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
             >1</span
           >
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
+            class="flex items-center truncate px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
             >{{
               PREVIEW.rows[0].id
             }}</span
           >
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
+            class="flex items-center truncate px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
             >{{
               PREVIEW.rows[0].email
             }}</span
@@ -118,17 +117,17 @@ const rowColoringId = useId();
         </div>
         <div class="flex border-t border-border" :style="{ height: `${rowPreviewHeight}px` }">
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
+            class="flex items-center truncate px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
             >2</span
           >
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
+            class="flex items-center truncate px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
             >{{
               PREVIEW.rows[1].id
             }}</span
           >
           <span
-            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
+            class="flex items-center truncate px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
             >{{
               PREVIEW.rows[1].email
             }}</span

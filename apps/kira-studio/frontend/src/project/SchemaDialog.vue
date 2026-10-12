@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -9,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -50,6 +52,8 @@ const connectionsStore = useConnectionsStore();
 const schemaDialogStore = useSchemaDialogStore();
 const { mutateAsync: saveDdl, isPending: saving } = useSaveDdlMutation();
 const draft = ref('');
+const loaded = ref('');
+const dirty = computed(() => draft.value !== loaded.value);
 
 // P12 round 1 finding #12: `draft` (the editor's own live doc) updates every keystroke, but the
 // parse summary below reads this instead — a full Lezer parse of the whole document (measured up
@@ -90,11 +94,13 @@ watch(
     // connection's DDL text would otherwise fire later and clobber this one's debouncedDraft.
     setDebouncedDraft.cancel();
     draft.value = '';
+    loaded.value = '';
     debouncedDraft.value = '';
     if (!id) return;
     const ddl = await ensureDdl(id);
     if (schemaDialogStore.connectionId !== id) return; // superseded by a later open
     draft.value = ddl;
+    loaded.value = ddl;
     debouncedDraft.value = ddl;
   },
   { immediate: true },
@@ -133,7 +139,7 @@ async function onSave(): Promise<void> {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && schemaDialogStore.closeSchemaDialog()">
-    <DialogContent size="xl" data-testid="schema-dialog">
+    <DialogContent size="xl" fixed-height :dirty="dirty" data-testid="schema-dialog">
       <DialogHeader close-testid="schema-dialog-close">
         <DialogTitle>{{
           connectionName
@@ -142,11 +148,9 @@ async function onSave(): Promise<void> {
         }}</DialogTitle>
       </DialogHeader>
 
-      <DialogBody class="h-[60vh] flex-none">
-        <span class="help text-subtle text-kira-sm leading-normal">
-          {{ t('studio.project.schemaDialog.intro.body') }}
-        </span>
-        <div class="flex-1 min-h-0 overflow-hidden rounded-kira-sm border border-border">
+      <DialogBody>
+        <FieldDescription>{{ t('studio.project.schemaDialog.intro.body') }}</FieldDescription>
+        <div :class="[paneFrame, 'flex-1']">
           <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
              dispatch, project/ may not import views/ per biome.json) gives dialect-correct
              keyword/type-name completion here — useful for hand-typing VARCHAR, NUMERIC(10,2),
@@ -165,7 +169,7 @@ async function onSave(): Promise<void> {
         <Alert variant="info" data-testid="schema-parse-summary">
           <AlertDescription>
             <span v-if="parseSummary">{{ parseSummary }}</span>
-            <span v-else class="text-subtle text-kira-sm">
+            <FieldDescription v-else>
               <CatalogText k="studio.project.schemaDialog.pasteHint.hint">
                 <template #pgDump><span class="font-data">{{ DDL_SOURCES.pgDump }}</span></template>
                 <template #showCreate
@@ -175,7 +179,7 @@ async function onSave(): Promise<void> {
                   ><span class="font-data">{{ DDL_SOURCES.sqliteSchema }}</span></template
                 >
               </CatalogText>
-            </span>
+            </FieldDescription>
           </AlertDescription>
         </Alert>
       </DialogBody>
@@ -183,24 +187,18 @@ async function onSave(): Promise<void> {
       <DialogFooter>
         <template #start>
           <FieldError v-if="saveError" data-testid="schema-save-error">{{ saveError }}</FieldError>
-          <span v-else class="help text-subtle text-kira-sm leading-normal"
+          <FieldDescription v-else
             ><CatalogText k="studio.project.connectionScope.hint">
               <template #connectionName
                 ><span class="font-data">{{ connectionName }}</span></template
               >
-            </CatalogText></span
+            </CatalogText></FieldDescription
           >
         </template>
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          :disabled="saving"
-          @click="schemaDialogStore.closeSchemaDialog"
-          >{{
-            t('common.action.cancel.label')
-          }}</Button
-        >
-        <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
+        <Button variant="dialog" size="kira-lg" @click="schemaDialogStore.closeSchemaDialog">{{
+          t('common.action.cancel.label')
+        }}</Button>
+        <Button variant="dialog-primary" size="kira-lg" :pending="saving" @click="onSave">
           {{ t('common.action.save.label') }}
         </Button>
       </DialogFooter>

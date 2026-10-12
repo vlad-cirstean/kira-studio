@@ -2,6 +2,8 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -14,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { computed } from 'vue';
@@ -238,16 +241,14 @@ async function onConfirm(): Promise<void> {
                 ><CodiconIcon name="circle-slash" :size="13" /></span
               >
 
-              <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{
-                row.name
-              }}</span>
+              <span class="min-w-0 max-w-56 truncate">{{ row.name }}</span>
 
               <template v-if="row.importable">
-                <span class="whitespace-nowrap text-kira-sm text-subtle">
+                <span class="whitespace-nowrap" :class="rowMeta">
                   {{ row.host ? `${row.host}:${row.port}` : ''
                   }}<span v-if="row.database">/{{ row.database }}</span>
                 </span>
-                <span v-if="row.username" class="whitespace-nowrap text-kira-sm text-subtle">{{
+                <span v-if="row.username" class="whitespace-nowrap" :class="rowMeta">{{
                   row.username
                 }}</span>
                 <Tooltip v-if="looksAlreadyImported(row)">
@@ -272,13 +273,9 @@ async function onConfirm(): Promise<void> {
                 </Badge>
               </template>
               <template v-else>
-                <span
-                  class="text-kira-sm text-muted-foreground ml-auto"
-                  data-testid="datagrip-row-skip-reason"
-                  >{{
-                    skipLabel(row)
-                  }}</span
-                >
+                <span class="ml-auto" :class="rowMeta" data-testid="datagrip-row-skip-reason">{{
+                  skipLabel(row)
+                }}</span>
               </template>
 
               <span v-if="row.warnings.length > 0" class="flex shrink-0 gap-0.5">
@@ -292,9 +289,9 @@ async function onConfirm(): Promise<void> {
                 </Tooltip>
               </span>
             </div>
-            <span v-if="rows.length === 0" class="text-center p-3 text-muted-foreground">{{
+            <InlineState v-if="rows.length === 0" kind="empty">{{
               t('studio.project.dataGripImport.rows.empty')
-            }}</span>
+            }}</InlineState>
           </div>
         </div>
 
@@ -318,9 +315,7 @@ async function onConfirm(): Promise<void> {
               <span class="shrink-0 flex" :class="row.created ? 'text-ok' : 'text-error'">
                 <CodiconIcon :name="row.created ? 'check' : 'error'" :size="13" />
               </span>
-              <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{
-                row.name
-              }}</span>
+              <span class="min-w-0 max-w-56 truncate">{{ row.name }}</span>
               <Badge
                 class="ml-auto"
                 :variant="reportOutcome(row).tone"
@@ -335,7 +330,9 @@ async function onConfirm(): Promise<void> {
 
       <DialogFooter>
         <template v-if="!report" #start>
-          <span class="help">{{ datagripImportStore.projectPath }}</span>
+          <FieldDescription class="font-data">{{
+            datagripImportStore.projectPath
+          }}</FieldDescription>
         </template>
         <template v-if="!report">
           <Button
@@ -343,7 +340,7 @@ async function onConfirm(): Promise<void> {
             variant="dialog"
             size="kira-lg"
             data-testid="datagrip-import-choose-another"
-            :disabled="datagripImportStore.busy"
+            :pending="datagripImportStore.busy"
             @click="datagripImportStore.pickAndScanDataGripProject"
           >
             {{ t('studio.project.dataGripImport.chooseAnother.label') }}
@@ -360,7 +357,8 @@ async function onConfirm(): Promise<void> {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="datagrip-import-confirm"
-            :disabled="checkedCount === 0 || datagripImportStore.busy"
+            :disabled="checkedCount === 0"
+            :pending="datagripImportStore.busy"
             @click="onConfirm"
           >
             {{ t('studio.project.dataGripImport.import.label', { count: checkedCount }) }}

@@ -29,18 +29,18 @@ function onCopy(): void {
       <PopoverTrigger as-child>
         <button
           type="button"
-          class="flex items-center min-w-0 max-w-full bg-transparent border-none p-0 cursor-pointer gap-1 text-error text-kira-md"
+          class="flex items-center min-w-0 max-w-full bg-transparent border-none p-0 gap-1 text-error text-kira-md"
           data-testid="error-popover-trigger"
           :aria-label="t('studio.project.errorPopover.aria', { message: props.message })"
           @click.stop
         >
           <CodiconIcon name="error" :size="13" />
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ props.message }}</span>
+          <span class="truncate">{{ props.message }}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        class="border border-border-strong shadow-kira-dialog overflow-hidden w-80 max-h-60 gap-0 p-0 z-(--kira-z-menu) max-w-[calc(100vw-8px)]"
+        class="w-96 max-h-60 gap-0 overflow-hidden p-0 shadow-kira"
         data-testid="error-popover"
       >
         <FieldError

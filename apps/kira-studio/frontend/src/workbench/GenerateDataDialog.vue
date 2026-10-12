@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -14,6 +16,14 @@ import {
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
@@ -61,6 +71,10 @@ const meta = computed(() =>
 const rowCount = ref(100);
 const seed = ref(0);
 const plans = ref<ColumnPlan[]>([]);
+const initialPlans = ref('[]');
+const dirty = computed(
+  () => rowCount.value !== 100 || JSON.stringify(plans.value) !== initialPlans.value,
+);
 
 const previewOpen = ref(false);
 const previewStatements = ref<string[]>([]);
@@ -134,6 +148,7 @@ onMounted(() => {
   const id = tabId.value;
   const page = id ? getPage(id) : undefined;
   plans.value = (page?.columns ?? []).map((c) => recipeFor(c, meta.value));
+  initialPlans.value = JSON.stringify(plans.value);
   rowCount.value = 100;
   // D8: a fresh random seed per open, shown and editable — pinning it is what makes a run
   // reproducible, and it is also what makes the Preview panel show the run's real first rows.
@@ -230,7 +245,7 @@ function onSequenceStartChange(index: number, start: number): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
-    <DialogContent size="xl" data-testid="generate-data-dialog">
+    <DialogContent size="xl" :dirty="dirty" data-testid="generate-data-dialog">
       <DialogHeader close-testid="generate-data-close">
         <DialogTitle>{{ t('studio.shortcuts.palette.generateData.label') }}</DialogTitle>
       </DialogHeader>
@@ -255,7 +270,7 @@ function onSequenceStartChange(index: number, start: number): void {
           />
           <span
             v-if="rowCount > BATCH_SIZE"
-            class="text-kira-sm text-muted-foreground"
+            :class="rowMeta"
             data-testid="generate-data-batch-note"
           >
             {{
@@ -264,63 +279,69 @@ function onSequenceStartChange(index: number, start: number): void {
           </span>
         </div>
 
-        <div class="flex flex-col overflow-y-auto max-h-64 gap-0.5">
-          <!-- grid-cols-[...] is a pre-existing arbitrary-value class already, not a raw
-             declaration -- untouched (P110 B37/B39). -->
-          <div
-            class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1 p-0 text-kira-sm text-muted-foreground"
-          >
-            <span>{{ t('studio.project.connectionDialog.column.placeholder') }}</span>
-            <span>{{ t('common.field.type.label') }}</span>
-            <span>{{ t('studio.generateData.recipe.label') }}</span>
-            <span>{{ t('common.field.value.label') }}</span>
-          </div>
-          <div
-            v-for="(plan, index) in plans"
-            :key="plan.column.name"
-            class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1"
-            data-testid="generate-data-column-row"
-            :data-column="plan.column.name"
-          >
-            <span class="col-name">{{ plan.column.name }}</span>
-            <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{{
-              plan.column.dataType
-            }}</span>
-            <NativeSelect
-              variant="bordered"
-              :data-testid="`generate-data-recipe-${plan.column.name}`"
-              :model-value="recipeSelectValue(plan.recipe)"
-              :disabled="running"
-              @update:model-value="(v) => onRecipeChange(index, String(v))"
-            >
-              <option value="skip">{{ t('common.skip.label') }}</option>
-              <option value="null">{{ t('studio.common.nullValue.label') }}</option>
-              <option value="constant">{{ t('studio.generateData.recipe.constant.label') }}</option>
-              <option v-if="plan.column.typeClass === 'number'" value="sequence">{{
-                t('studio.common.nodeKind.sequence.label')
-              }}</option>
-              <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
-                {{ t(opt.labelKey) }}
-              </option>
-            </NativeSelect>
-            <Input
-              v-if="plan.recipe.kind === 'constant'"
-              :model-value="plan.recipe.value"
-              class="w-full font-data"
-              :data-testid="`generate-data-constant-${plan.column.name}`"
-              :disabled="running"
-              @update:model-value="(v) => onConstantChange(index, String(v))"
-            />
-            <NumberStepperInput
-              v-else-if="plan.recipe.kind === 'sequence'"
-              :model-value="String(plan.recipe.start)"
-              group-class="h-control-lg"
-              :data-testid="`generate-data-sequence-start-${plan.column.name}`"
-              :disabled="running"
-              @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
-            />
-            <span v-else class="text-muted-foreground"></span>
-          </div>
+        <div class="max-h-64 overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow class="hover:bg-transparent">
+                <TableHead>{{ t('studio.project.connectionDialog.column.placeholder') }}</TableHead>
+                <TableHead>{{ t('common.field.type.label') }}</TableHead>
+                <TableHead>{{ t('studio.generateData.recipe.label') }}</TableHead>
+                <TableHead>{{ t('common.field.value.label') }}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow
+                v-for="(plan, index) in plans"
+                :key="plan.column.name"
+                data-testid="generate-data-column-row"
+                :data-column="plan.column.name"
+              >
+                <TableCell class="col-name">{{ plan.column.name }}</TableCell>
+                <TableCell class="max-w-32 text-muted-foreground">
+                  <TruncatedText :text="plan.column.dataType" />
+                </TableCell>
+                <TableCell>
+                  <NativeSelect
+                    variant="bordered"
+                    :data-testid="`generate-data-recipe-${plan.column.name}`"
+                    :model-value="recipeSelectValue(plan.recipe)"
+                    :disabled="running"
+                    @update:model-value="(v) => onRecipeChange(index, String(v))"
+                  >
+                    <option value="skip">{{ t('common.skip.label') }}</option>
+                    <option value="null">{{ t('studio.common.nullValue.label') }}</option>
+                    <option value="constant">{{
+                      t('studio.generateData.recipe.constant.label')
+                    }}</option>
+                    <option v-if="plan.column.typeClass === 'number'" value="sequence">{{
+                      t('studio.common.nodeKind.sequence.label')
+                    }}</option>
+                    <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
+                      {{ t(opt.labelKey) }}
+                    </option>
+                  </NativeSelect>
+                </TableCell>
+                <TableCell>
+                  <Input
+                    v-if="plan.recipe.kind === 'constant'"
+                    :model-value="plan.recipe.value"
+                    class="w-full font-data"
+                    :data-testid="`generate-data-constant-${plan.column.name}`"
+                    :disabled="running"
+                    @update:model-value="(v) => onConstantChange(index, String(v))"
+                  />
+                  <NumberStepperInput
+                    v-else-if="plan.recipe.kind === 'sequence'"
+                    :model-value="String(plan.recipe.start)"
+                    group-class="h-control-lg"
+                    :data-testid="`generate-data-sequence-start-${plan.column.name}`"
+                    :disabled="running"
+                    @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
+                  />
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
 
         <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
@@ -346,8 +367,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <Button
             type="button"
             variant="link"
-            size="kira"
-            class="h-auto p-0 disabled:text-muted-foreground"
+            size="inline"
             data-testid="generate-data-preview-toggle"
             :disabled="noUsableColumns"
             @click="onTogglePreview"
@@ -388,8 +408,7 @@ function onSequenceStartChange(index: number, start: number): void {
              null, so the label is always the em dash RunState's own computed would give it). -->
         <Tooltip v-if="running">
           <TooltipTrigger as-child>
-            <span class="inline-flex items-center gap-1 font-data text-kira-sm text-info">
-              <span class="min-w-[7ch] text-right">—</span>
+            <span class="inline-flex items-center text-info">
               <Spinner :size="12" label="" />
             </span>
           </TooltipTrigger>

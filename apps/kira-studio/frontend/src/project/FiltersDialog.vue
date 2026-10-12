@@ -2,9 +2,13 @@
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/treeFilter';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
@@ -14,12 +18,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { revealElement } from '@workbench/behaviour/focus';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import {
@@ -42,6 +48,10 @@ const treeStore = useTreeStore();
 const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
 const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
+const sig = (v: TreeVisibility): string =>
+  JSON.stringify([[...v.hiddenKinds].sort(), [...v.hiddenPaths].sort()]);
+const baseline = ref(sig(EMPTY_VISIBILITY));
+const dirty = computed(() => sig(draft.value) !== baseline.value);
 // Saving replaces the whole persisted set, so the draft must seed from the loaded set, never from
 // an empty default: Filters... is offered on connections that were never expanded.
 const {
@@ -80,6 +90,7 @@ watch(
     loadError.value = null;
     saveError.value = null;
     draft.value = EMPTY_VISIBILITY;
+    baseline.value = sig(EMPTY_VISIBILITY);
     if (!connectionId) return;
     await runLoad(connectionId);
     if (filtersDialogStore.connectionId !== connectionId) return;
@@ -92,6 +103,7 @@ watch(
       hiddenKinds: [...existing.hiddenKinds],
       hiddenPaths: [...existing.hiddenPaths],
     };
+    baseline.value = sig(draft.value);
     if (!focusPath) return;
     await nextTick();
     const row = document.querySelector(
@@ -186,7 +198,7 @@ const connectionName = computed(
     :open="true"
     @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()"
   >
-    <DialogContent size="lg" data-testid="filters-dialog">
+    <DialogContent size="lg" :dirty="dirty" data-testid="filters-dialog">
       <DialogHeader close-testid="filters-dialog-close">
         <DialogTitle>{{
           connectionName
@@ -196,26 +208,22 @@ const connectionName = computed(
       </DialogHeader>
 
       <DialogBody>
-        <span class="help text-kira-sm leading-normal text-subtle">
-          {{ t('studio.project.filtersDialog.intro.body') }}
-        </span>
+        <FieldDescription>{{ t('studio.project.filtersDialog.intro.body') }}</FieldDescription>
 
         <section class="flex flex-col gap-1">
-          <div class="flex items-center justify-between">
-            <span class="font-medium text-kira-lg text-fg">{{
-              t('studio.project.filtersDialog.kinds.heading.label')
-            }}</span>
+          <SectionHeading :label="t('studio.project.filtersDialog.kinds.heading.label')">
             <span class="flex gap-1">
-              <Button variant="link" size="kira" class="h-auto p-0" @click="allKinds">{{
+              <Button variant="link" size="inline" @click="allKinds">{{
                 t('common.state.all.option')
               }}</Button>
-              <Button variant="link" size="kira" class="h-auto p-0" @click="noneKinds">{{
+              <Button variant="link" size="inline" @click="noneKinds">{{
                 t('common.state.none.option')
               }}</Button>
             </span>
-          </div>
-          <div
-            class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1"
+          </SectionHeading>
+          <Card
+            variant="list"
+            class="flex max-h-56 flex-col gap-px overflow-y-auto"
             data-testid="filter-kind-list"
           >
             <Label
@@ -232,42 +240,35 @@ const connectionName = computed(
               >
                 <CodiconIcon name="check" :size="12" />
               </Checkbox>
-              <span
-                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md"
-                >{{
-                  row.label
-                }}</span
-              >
-              <span class="text-kira-sm text-subtle">{{ row.count }}</span>
+              <span class="min-w-0 flex-1 truncate text-kira-md">{{ row.label }}</span>
+              <span :class="rowMeta">{{ row.count }}</span>
             </Label>
-            <span v-if="kinds.length === 0" class="text-kira-sm text-subtle p-1">{{
+            <InlineState v-if="kinds.length === 0" kind="empty">{{
               t('studio.project.filtersDialog.cache.empty')
-            }}</span>
-          </div>
+            }}</InlineState>
+          </Card>
         </section>
 
         <section class="flex flex-col gap-1">
-          <div class="flex items-center justify-between">
-            <span class="font-medium text-kira-lg text-fg">{{
-              t('studio.project.filtersDialog.objects.heading.label')
-            }}</span>
+          <SectionHeading :label="t('studio.project.filtersDialog.objects.heading.label')">
             <span class="flex gap-1">
-              <Button variant="link" size="kira" class="h-auto p-0" @click="allObjects">{{
+              <Button variant="link" size="inline" @click="allObjects">{{
                 t('common.state.all.option')
               }}</Button>
-              <Button variant="link" size="kira" class="h-auto p-0" @click="noneObjects">{{
+              <Button variant="link" size="inline" @click="noneObjects">{{
                 t('common.state.none.option')
               }}</Button>
             </span>
-          </div>
+          </SectionHeading>
           <SearchField
             v-model="nameFilter"
             size="kira-lg"
             :placeholder="t('studio.project.filtersDialog.nameFilter.placeholder')"
             data-testid="filter-name-input"
           />
-          <div
-            class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1"
+          <Card
+            variant="list"
+            class="flex max-h-56 flex-col gap-px overflow-y-auto"
             data-testid="filter-object-list"
           >
             <div
@@ -279,24 +280,14 @@ const connectionName = computed(
               :data-state="row.state"
               :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
             >
-              <button
-                v-if="row.hasChildren"
-                type="button"
-                class="twisty-btn flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer text-muted-foreground"
-                :aria-label="expandedPaths.has(row.path) ? t('common.action.collapse.label') : t('common.action.expand.label')"
-                @click="onToggleExpand(row.path)"
-              >
-                <CodiconIcon
-                  :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'"
-                  :size="12"
-                />
-              </button>
-              <span v-else class="w-4 shrink-0" />
+              <TreeTwisty
+                :expanded="expandedPaths.has(row.path)"
+                :has-children="row.hasChildren"
+                @toggle="onToggleExpand(row.path)"
+              />
               <Tooltip :disabled="!row.disabledReason">
                 <TooltipTrigger as-child>
-                  <Label
-                    class="object-checkbox-label flex items-center flex-1 min-w-0 cursor-pointer gap-1"
-                  >
+                  <Label class="object-checkbox-label flex items-center flex-1 min-w-0 gap-1">
                     <Checkbox
                       :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
                       :disabled="row.disabled"
@@ -310,31 +301,24 @@ const connectionName = computed(
                         />
                       </template>
                     </Checkbox>
-                    <span
-                      class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md"
-                      >{{
-                        row.name
-                      }}</span
-                    >
+                    <span class="min-w-0 flex-1 truncate text-kira-md">{{ row.name }}</span>
                   </Label>
                 </TooltipTrigger>
                 <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
               </Tooltip>
-              <span v-if="row.hasChildren" class="text-kira-sm text-subtle">{{
-                row.childCount
-              }}</span>
+              <span v-if="row.hasChildren" :class="rowMeta">{{ row.childCount }}</span>
             </div>
-            <span v-if="objects.rows.length === 0" class="text-kira-sm text-subtle p-1">{{
+            <InlineState v-if="objects.rows.length === 0" kind="empty">{{
               t('studio.project.filtersDialog.cache.empty')
-            }}</span>
-            <span
+            }}</InlineState>
+            <InlineState
               v-if="objects.truncated"
-              class="text-kira-sm text-subtle p-1 italic"
+              kind="empty"
               data-testid="filter-object-truncated"
             >
               {{ t('studio.project.filtersDialog.truncated.hint') }}
-            </span>
-          </div>
+            </InlineState>
+          </Card>
         </section>
 
         <Alert variant="info" data-testid="filters-preview">
@@ -346,9 +330,9 @@ const connectionName = computed(
           </AlertDescription>
         </Alert>
 
-        <span class="help cached-note text-kira-sm leading-normal text-subtle self-start">
-          {{ t('studio.project.filtersDialog.cachedNote.hint') }}
-        </span>
+        <FieldDescription class="cached-note">{{
+          t('studio.project.filtersDialog.cachedNote.hint')
+        }}</FieldDescription>
 
         <Alert v-if="loadError || saveError" variant="error" data-testid="filters-error">
           <AlertDescription>{{ loadError ?? saveError }}</AlertDescription>
@@ -357,12 +341,12 @@ const connectionName = computed(
 
       <DialogFooter>
         <template #start>
-          <span class="help text-kira-sm leading-normal text-subtle"
+          <FieldDescription
             ><CatalogText k="studio.project.connectionScope.hint">
               <template #connectionName
                 ><span class="font-data">{{ connectionName }}</span></template
               >
-            </CatalogText></span
+            </CatalogText></FieldDescription
           >
         </template>
         <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">{{
@@ -372,7 +356,8 @@ const connectionName = computed(
           variant="dialog-primary"
           size="kira-lg"
           data-testid="filters-save"
-          :disabled="loading || !!loadError || saving"
+          :disabled="loading || !!loadError"
+          :pending="saving"
           @click="onSave"
           >{{
             t('common.action.save.label')

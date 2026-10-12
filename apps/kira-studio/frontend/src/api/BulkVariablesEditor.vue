@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-core';
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
+import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { errorText } from '@workbench/bridge/codedError';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -71,8 +73,19 @@ const summary = computed(() => {
   );
 });
 
-const applying = ref(false);
-const applyError = ref<string | null>(null);
+const {
+  run: runApply,
+  pending: applying,
+  error: applyError,
+} = useAsyncAction(async () => {
+  await variableSetStore.applyBulkVariables(
+    props.tabId,
+    props.variableScope,
+    props.ownerId,
+    toBulkEntries(parsed.value.entries),
+  );
+  emit('close');
+});
 
 function onDocChange(value: string): void {
   text.value = value;
@@ -134,21 +147,7 @@ async function onApply(): Promise<void> {
     });
     if (!confirmed) return;
   }
-  applying.value = true;
-  applyError.value = null;
-  try {
-    await variableSetStore.applyBulkVariables(
-      props.tabId,
-      props.variableScope,
-      props.ownerId,
-      toBulkEntries(parsed.value.entries),
-    );
-    emit('close');
-  } catch (err) {
-    applyError.value = errorText(err);
-  } finally {
-    applying.value = false;
-  }
+  await runApply();
 }
 
 function onCancel(): void {
@@ -167,7 +166,7 @@ function onCancel(): void {
       </AlertDescription>
     </Alert>
 
-    <div class="flex-1 min-h-52 overflow-hidden rounded-kira border border-border">
+    <div :class="[paneFrame, 'flex-1 min-h-52']">
       <MonacoHost
         :doc="text"
         language="plain"
@@ -183,7 +182,7 @@ function onCancel(): void {
       }}</AlertDescription>
     </Alert>
     <template v-else-if="diff">
-      <div class="text-subtle text-kira-sm" data-testid="variables-bulk-summary">{{ summary }}</div>
+      <FieldDescription data-testid="variables-bulk-summary">{{ summary }}</FieldDescription>
       <Alert v-if="diff.hasRenameRisk" variant="warn" data-testid="variables-bulk-rename-warning">
         <AlertDescription>
           {{ t('studio.api.bulk.renameWarning.body') }}
@@ -203,7 +202,8 @@ function onCancel(): void {
         variant="toolbar-primary"
         size="kira"
         data-testid="variables-bulk-apply"
-        :disabled="parseError !== null || applying"
+        :disabled="parseError !== null"
+        :pending="applying"
         @click="onApply"
       >
         {{ t('common.action.apply.label') }}

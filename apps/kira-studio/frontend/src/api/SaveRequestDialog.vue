@@ -9,12 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { Field } from '@theme/components/ui/field';
+import { Field, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
 import { useSaveRequestDialogStore } from './state/saveRequestDialog';
@@ -52,6 +53,15 @@ const firstTargetValue = computed(() => {
   return first ? `${first.id}:` : '';
 });
 
+const { errorFor, errorId, invalidAttrs, submit, reset } = useFormErrors({
+  name: {
+    value: () => name.value,
+    error: () => (name.value.trim() ? null : t('studio.api.saveRequest.nameRequired.error')),
+  },
+});
+
+const dirty = computed(() => name.value !== saveDialogStore.suggestedName);
+
 watch(
   () => saveDialogStore.open,
   (open) => {
@@ -59,14 +69,15 @@ watch(
     name.value = saveDialogStore.suggestedName;
     target.value = firstTargetValue.value;
     error.value = null;
+    reset();
   },
   { immediate: true },
 );
 
 async function onSave(): Promise<void> {
   if (saving.value) return;
+  if (!(await submit()) || !target.value) return;
   const trimmed = name.value.trim();
-  if (!trimmed || !target.value) return;
   const [collectionId, parentId] = splitTarget(target.value);
   await runSave(collectionId, parentId, trimmed);
 }
@@ -81,14 +92,27 @@ function splitTarget(value: string): [string, string | null] {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && saveDialogStore.closeSaveDialog()">
-    <DialogContent size="md" data-testid="save-request-dialog">
+    <DialogContent size="md" :dirty="dirty" data-testid="save-request-dialog">
       <DialogHeader close-testid="save-request-close">
         <DialogTitle>{{ t('studio.api.saveRequest.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <Field>
           <Label class="text-muted-foreground">{{ t('common.field.name.label') }}</Label>
-          <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
+          <Input
+            v-model="name"
+            v-bind="invalidAttrs('name')"
+            data-testid="save-request-name"
+            @keydown.enter="onSave"
+          />
+          <FieldError
+            v-if="errorFor('name')"
+            :id="errorId('name')"
+            data-testid="save-request-name-error"
+            >{{
+              errorFor('name')
+            }}</FieldError
+          >
         </Field>
 
         <Field>
@@ -135,7 +159,8 @@ function splitTarget(value: string): [string, string | null] {
           variant="dialog-primary"
           size="kira-lg"
           data-testid="save-request-submit"
-          :disabled="!name.trim() || !target || saving"
+          :disabled="!target"
+          :pending="saving"
           @click="onSave"
         >
           {{ t('common.action.save.label') }}

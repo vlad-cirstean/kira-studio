@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -9,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -60,6 +62,8 @@ const preview = computed(() => editRawStore.previewRaw(debouncedText.value));
 // own dynamicNote hit the identical parse error and states the same fix.
 const hint = t('studio.api.editRaw.hint', { variables: '{{variables}}' });
 
+const dirty = computed(() => text.value !== editRawStore.initialText);
+
 function onDocChange(value: string): void {
   text.value = value;
 }
@@ -75,14 +79,14 @@ function close(): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
-    <DialogContent size="xl" data-testid="edit-raw-dialog">
+    <DialogContent size="xl" :dirty="dirty" data-testid="edit-raw-dialog">
       <DialogHeader close-testid="edit-raw-dialog-close">
         <DialogTitle>{{ t('studio.api.editRaw.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <div class="text-kira-sm text-muted-foreground" data-testid="edit-raw-hint">{{ hint }}</div>
+        <FieldDescription data-testid="edit-raw-hint">{{ hint }}</FieldDescription>
 
-        <div class="h-80 overflow-hidden rounded-kira border border-border">
+        <div :class="[paneFrame, 'h-80']">
           <MonacoHost
             :doc="text"
             language="plain"

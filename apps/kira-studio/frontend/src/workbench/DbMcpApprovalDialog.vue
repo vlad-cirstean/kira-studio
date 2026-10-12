@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
+import CodeBlock from '@theme/components/CodeBlock.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -9,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
@@ -81,11 +83,6 @@ async function onDeny(requestId: string): Promise<void> {
 async function onApprove(requestId: string): Promise<void> {
   await dbMcpStore.approveQuery(requestId);
 }
-
-// P110 B39: `.detail`'s own class string, used 5 times in the template below (the plan's own 4+
-// threshold for de-duplication) -- a `const` here rather than a local child component, since every
-// site is a plain `<p>` with no props or behaviour of its own.
-const DETAIL_CLASS = 'm-0 text-subtle';
 </script>
 
 <template>
@@ -105,19 +102,16 @@ const DETAIL_CLASS = 'm-0 text-subtle';
           {{ heavyLede }}
         </p>
         <p v-else class="m-0 whitespace-pre-wrap">{{ classBody }}</p>
-        <pre
-          class="font-data max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm m-0 py-1 px-1.5 bg-field border border-border"
-          data-testid="db-mcp-approval-statement"
-        >{{
+        <CodeBlock class="max-h-56 overflow-auto" data-testid="db-mcp-approval-statement">{{
           dbMcpStore.approval.pending.statement
-        }}</pre>
+        }}</CodeBlock>
 
         <div
           v-if="dbMcpStore.approval.pending.plan"
           class="flex flex-col gap-1"
           data-testid="db-mcp-approval-plan"
         >
-          <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-plan-rows">
+          <FieldDescription data-testid="db-mcp-approval-plan-rows">
             <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
               {{
                 t('studio.dbMcp.approval.estimate.body', {
@@ -127,26 +121,25 @@ const DETAIL_CLASS = 'm-0 text-subtle';
               }}
             </template>
             <template v-else>{{ t('studio.console.plan.noEstimate.body') }}</template>
-          </p>
-          <p
+          </FieldDescription>
+          <FieldDescription
             v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
             :key="i"
-            :class="DETAIL_CLASS"
             data-testid="db-mcp-approval-plan-issue"
           >
             <strong>{{ issue.severity }}</strong> {{ issue.message }}
-          </p>
-          <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" :class="DETAIL_CLASS">
+          </FieldDescription>
+          <FieldDescription v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0">
             {{ t('common.more.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
-          </p>
+          </FieldDescription>
         </div>
 
-        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">{{
+        <FieldDescription data-testid="db-mcp-approval-expires">{{
           t('common.expiresIn.status', { seconds: remainingSeconds })
-        }}</p>
-        <p v-if="more > 0" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
+        }}</FieldDescription>
+        <FieldDescription v-if="more > 0" data-testid="db-mcp-approval-queue-count">
           {{ t('common.moreWaiting.status', { count: more }) }}
-        </p>
+        </FieldDescription>
       </DialogBody>
 
       <DialogFooter>

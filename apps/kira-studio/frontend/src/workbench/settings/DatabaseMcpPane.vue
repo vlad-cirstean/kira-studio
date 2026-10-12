@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { useQuery } from '@tanstack/vue-query';
+import CodeBlock from '@theme/components/CodeBlock.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldLegend,
-} from '@theme/components/ui/field';
+import { Card } from '@theme/components/ui/card';
+import { Field, FieldContent, FieldDescription, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
@@ -133,26 +130,23 @@ const dbMcpEnabledId = useId();
     </Field>
 
     <template v-if="settingsStore.dbMcp.serverEnabled">
-      <p v-if="dbMcpStore.status.error" class="text-subtle text-kira-sm" data-testid="db-mcp-error">
-        {{ dbMcpStore.status.error }}
-      </p>
+      <Alert v-if="dbMcpStore.status.error" variant="error" data-testid="db-mcp-error">
+        <AlertDescription>{{ dbMcpStore.status.error }}</AlertDescription>
+      </Alert>
       <!-- F9: Regenerate must render whenever the server is running, in both branches below —
            the expired-token message further down ("regenerate it above") has no remedy otherwise
            once a command was shown (the common case post-F8: the command shows across ordinary
            restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">
-          <p
-            class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
-            data-testid="db-mcp-command"
-          >
-            {{ dbMcpStore.status.command }}
-          </p>
+          <CodeBlock class="select-all" data-testid="db-mcp-command">{{
+            dbMcpStore.status.command
+          }}</CodeBlock>
           <Button
             variant="dialog"
             size="kira-lg"
             class="self-start"
-            :disabled="dbMcpInstalling"
+            :pending="dbMcpInstalling"
             data-testid="db-mcp-install-button"
             @click="onInstallDbMcpClaudeCode"
             >{{
@@ -165,14 +159,14 @@ const dbMcpEnabledId = useId();
             {{ dbMcpInstallMessage }}
           </FieldDescription>
         </template>
-        <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-no-token">
+        <FieldDescription v-else data-testid="db-mcp-no-token">
           {{ t('studio.settings.dbMcp.noToken.hint') }}
-        </p>
+        </FieldDescription>
         <Button
           variant="dialog"
           size="kira-lg"
           class="self-start"
-          :disabled="dbMcpRegenerating"
+          :pending="dbMcpRegenerating"
           data-testid="db-mcp-regenerate-button"
           @click="onRegenerateDbMcpToken"
         >
@@ -193,53 +187,54 @@ const dbMcpEnabledId = useId();
 
     <FieldLegend>{{ t('studio.settings.dbMcp.exposed.label') }}</FieldLegend>
     <FieldDescription>{{ t('studio.settings.dbMcp.exposed.description') }}</FieldDescription>
-    <p class="text-subtle text-kira-sm">{{ t('studio.settings.dbMcp.defaults.hint') }}</p>
+    <FieldDescription>{{ t('studio.settings.dbMcp.defaults.hint') }}</FieldDescription>
     <ul
       v-if="connectionsStore.records.length"
       class="flex flex-col m-0 p-0 list-none gap-0.5"
       data-testid="db-mcp-connections-list"
     >
-      <li
-        v-for="conn in connectionsStore.records"
-        :key="conn.id"
-        class="flex items-center justify-between rounded-kira-sm gap-1.5 py-1 px-1.5 border border-border"
-        :data-testid="`db-mcp-connection-row-${conn.id}`"
-      >
-        <div class="flex flex-col min-w-0 gap-0.5">
-          <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
-          <FieldDescription>{{
-            t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
+      <li v-for="conn in connectionsStore.records" :key="conn.id">
+        <Card
+          variant="list"
+          class="flex-row items-center justify-between gap-1.5"
+          :data-testid="`db-mcp-connection-row-${conn.id}`"
+        >
+          <div class="flex flex-col min-w-0 gap-0.5">
+            <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
+            <FieldDescription>{{
+              t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
                 read: conn.mcpReadMode,
                 write: conn.mcpWriteMode,
                 ddl: conn.mcpDdlMode,
               })
-          }}</FieldDescription>
-          <FieldDescription v-if="mcpDescriptionFirstLine(conn)">{{
-            mcpDescriptionFirstLine(conn)
-          }}</FieldDescription>
-          <!-- M5 §7.5: extends this existing read-only glance — no second full editor
+            }}</FieldDescription>
+            <FieldDescription v-if="mcpDescriptionFirstLine(conn)">{{
+              mcpDescriptionFirstLine(conn)
+            }}</FieldDescription>
+            <!-- M5 §7.5: extends this existing read-only glance — no second full editor
                here (M2's own established split); editing lives in the connection's own
                Privacy tab. -->
-          <FieldDescription
-            v-if="maskRuleCountsQuery.data.value?.[conn.id]"
-            :data-testid="`db-mcp-connection-masked-${conn.id}`"
-            >{{
-              t('studio.settings.dbMcp.masked.status', { count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0 })
-            }}</FieldDescription
-          >
-        </div>
-        <Switch
-          :model-value="conn.mcpEnabled"
-          :data-testid="`db-mcp-connection-${conn.id}`"
-          @update:model-value="(v) => onToggleConnectionMcpEnabled(conn.id, v === true)"
-        />
+            <FieldDescription
+              v-if="maskRuleCountsQuery.data.value?.[conn.id]"
+              :data-testid="`db-mcp-connection-masked-${conn.id}`"
+              >{{
+                t('studio.settings.dbMcp.masked.status', { count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0 })
+              }}</FieldDescription
+            >
+          </div>
+          <Switch
+            :model-value="conn.mcpEnabled"
+            :data-testid="`db-mcp-connection-${conn.id}`"
+            @update:model-value="(v) => onToggleConnectionMcpEnabled(conn.id, v === true)"
+          />
+        </Card>
       </li>
     </ul>
-    <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-connections-empty">
+    <FieldDescription v-else data-testid="db-mcp-connections-empty">
       {{ t('studio.settings.dbMcp.empty.empty') }}
-    </p>
-    <FieldError v-if="actionError" data-testid="settings-action-error">{{
-      actionError
-    }}</FieldError>
+    </FieldDescription>
+    <Alert v-if="actionError" variant="error" data-testid="settings-action-error">
+      <AlertDescription>{{ actionError }}</AlertDescription>
+    </Alert>
   </div>
 </template>

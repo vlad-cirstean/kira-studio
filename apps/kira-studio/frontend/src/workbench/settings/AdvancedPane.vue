@@ -88,7 +88,7 @@ const expensiveQueryRowsId = useId();
         {{ opLogRetentionError }}
       </FieldError>
     </Field>
-    <p class="text-subtle text-kira-sm">{{ t('studio.settings.restartNote.hint') }}</p>
+    <FieldDescription>{{ t('studio.settings.restartNote.hint') }}</FieldDescription>
 
     <Field>
       <div class="flex items-center justify-between gap-1">

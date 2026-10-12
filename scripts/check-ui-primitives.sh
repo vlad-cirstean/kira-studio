@@ -95,10 +95,6 @@ U62 packages/workbench/src/components/AutocompleteField.vue # accepting a sugges
 U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand marks are third-party logo colours
 U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
 U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
-U36 apps/kira-studio/frontend/src/project/FiltersDialog.vue # bordered scroll list box (input-like), rows own the look
-U36 apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue # SQL statement is a code block (pre), not a content card
-U36 apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue # command code block and a bordered connection list item, not content cards
-U37 apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue # density preview renders the unsaved draft; useRowHeight reads the applied CSS var
 U46 apps/kira-studio/frontend/src/bridge/port.ts # bridge transport timeout
 U41 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host reads modifier keys
 U62 apps/kira-studio/frontend/src/editor/MonacoHost.vue # Monaco engine host owns editor focus
