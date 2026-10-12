@@ -1504,7 +1504,7 @@ body, shared with repo terminals below) are the same six files in both apps, imp
 
 **Module order and tab strip.** Kira Studio `MODE_ORDER`: `studio`, `api`, `automations`, `docker`.
 Kira Space: `git`, `ade`, `automations`, `memory`. `ModeDef.tabStrip: false` hides the tab strip for a
-module without tabs (Docker; Space's Memory mode currently shows an empty strip, Known open items).
+module without tabs (Docker and Space's Memory).
 `WorkbenchShell` takes `mainFramed` (default keeps the main-panel frame); `ade` passes it off so each
 pane carries its own single frame.
 
@@ -2455,6 +2455,87 @@ All user-visible text lives in one catalog, `packages/theme/src/i18n/en.json`. v
 **Add a string.** Pick the key (namespace of the owning module, `common.*` if shared). Add it to `en.json`, sorted (`biome check --write` sorts and formats). Use `t('…')` in script or template, or `CatalogText` around elements. Run `bun run lint` and `bun run typecheck`. Specs keep literal expected strings: the wording is the contract.
 
 **Add a locale.** Copy `en.json` to `<locale>.json`, translate values keeping keys, placeholders and plural branches. Register it in `packages/theme/src/i18n/index.ts` `messages`, add it to `CopyLocale`, add a switch in settings. Monaco, SlickGrid and xterm need their own locale packs.
+
+### Consistency conventions (P266)
+
+One decision per cross-cutting concern. Guards: `scripts/check-ui-primitives.sh` (U72-U82), `scripts/check-conventions.ts` (N1-N7), `internal/conventiontest` (G1-G4), Biome `noConsole`, golangci `sloglint`. Pending migration hits sit in `scripts/consistency-allowlist/`; a stale line fails, so the lists only shrink.
+
+**Icons.** One UI glyph set: codicons, bare names (`trash`, not `codicon-trash`). `simple-icons` for third-party brand marks, seti for file types, `@lucide/vue` only inside vendored `packages/theme/src/components/ui/**` (U72). Concept table `packages/theme/src/icons.ts` `ICON`; a concept uses its row everywhere, a kind of thing (file, engine) uses its kind icon. Banned names: `gear`, `settings`, `kebab-vertical`; no `'codicon-…'` literals outside `CodiconIcon.vue`, `Spinner.vue`, theme (U73).
+
+| Concept | Icon |
+|---|---|
+| Delete (destroys stored data) | `trash` |
+| Remove from a list, row or selection; close; clear field | `close` |
+| Clear all | `clear-all` |
+| Add | `add` |
+| Copy / duplicate | `copy` / `files` |
+| Edit, rename | `edit` |
+| Refresh, search, filter, history | `refresh`, `search`, `filter`, `history` |
+| Run, stop, restart | `play`, `debug-stop`, `debug-restart` |
+| Reset to default, revert, discard | `discard` |
+| Settings | `settings-gear` |
+| More actions | `ellipsis` |
+| Back to previous view | `arrow-left` |
+| Step within a sequence (page, month) | `chevron-left`, `chevron-right` |
+| New collection or folder | `new-folder` |
+| Environments, variables | `server-environment`, `variable-group` |
+| Error, warning, info, success | `error`, `warning`, `info`, `check` |
+
+**Error model.**
+
+- Wire shape `ipcerr.Error{code, message, details?}`. Code registry: Go `internal/ipcerr/codes.go` (typed `Code`), TS `packages/shared/domain/errorCodes.ts` (`ERROR_CODES`, `CLIENT_ERROR_CODES` raised only in TS, `isRetryable`). `check-conventions` N6 fails when the two differ.
+- Generic codes: `E_INTERNAL`, `E_CONTRACT`, `E_BAD_REQUEST`, `E_NOT_FOUND`, `E_CONFLICT`, `E_UNAVAILABLE`, `E_TIMEOUT`, `E_CANCELLED`, `E_TRANSPORT`, `E_UNAUTHORIZED`, `E_FORBIDDEN`, `E_READ_ONLY`, `E_TOO_LARGE`, `E_UNSUPPORTED`, `E_RATE_LIMITED`, `E_DISCONNECTED`, `E_SECRET_STORE`. Domain codes (`E_CONNECT`, `E_AUTH`, `E_QUERY`, `E_ENGINE_DOWN`, `E_GIT_*`, `E_PREPARING`, …) exist only where a UI branches on them. Add a domain code only for that reason. OS errno strings (`ESRCH`) are not codes.
+- `E_BAD_REQUEST`: user input refused. `E_CONFLICT`: state precondition failed, stale `baseHash`. `E_CONTRACT`: caller bug (the UI always sets the value).
+- Messages a user can see are catalog text: `ipcerr.T(code, key, params)` (`adapters.T` for adapters). Raw text from outside Kira (driver, server, git, OS) stays verbatim. `ipcerr.Contract(format, args…)` and `ipcerr.Required(field)` give `E_CONTRACT` with English developer text. Keys: `backend.studio.*`, `backend.space.*`, `backend.core.*`, `backend.error.*`. Go sends non-error text (preview blockers, run notes) the same way. G1 flags a literal message; G2 a `"E_…"` literal outside `codes.go`.
+- `errorText(err)` (`bridge/codedError.ts`) shows `message`; `E_CONTRACT` wraps it in `common.error.contract.body`. Retry shows only when `isRetryable(code)`: never for `E_NOT_FOUND`, `E_CONTRACT`, `E_BAD_REQUEST`, `E_FORBIDDEN`, `E_UNAUTHORIZED`, `E_UNSUPPORTED`, `E_READ_ONLY`, `E_TOO_LARGE`, `E_CONFLICT`.
+- Where a failure shows. No toasts.
+
+| Situation | Surface |
+|---|---|
+| Load | `QueryState` (pane or inline), in place |
+| Dialog action, field-specific | `FieldError` under the field |
+| Dialog action, other | `Alert variant error` at top of `DialogBody`; dialog stays open |
+| Row or tree action | Row error popover, or the module strip `Alert` |
+| Copy or open-link failure | Live-region announcement (`common.error.openLink.announce`) |
+| Background call nobody waits on | `fireAndForget(promise, scope)`: logs, no UI |
+
+- `bridge/log.ts` `logWarn`/`logError` replace `console.*` (Biome `noConsole`). Bare `void control.x()` banned (U77); empty `.catch(() => {})` banned (U81). Links open through `createOpenExternal` (`bridge/openExternal.ts`, U79). Go `slog` calls carry `"scope"` (G3), errors under `"err"`.
+- `packages/shared/protocol/frame.ts` decode errors stay thrown `Error`s (internal invariants, shown only as `E_INTERNAL` detail).
+
+**Bridge API.**
+
+- Method verbs: `List`, `Get`, `Create`, `Update` (patch), `Save` (create or replace from a client draft), `Upsert`, `Set` (one value or whole document), `Delete` (destroys a stored record), `Remove` (detaches, record survives), `Cancel<Thing>`, `Stop`. One `<Service><Method>Args` struct or none. Lists return `[]`, never `null`.
+- Events: `kira:<domain>:<event>`, both segments camelCase (N5). gitrpc `repo.changed` dot names and in-process `op:start`/`op:end` are their own namespaces.
+- Streaming: start method, events keyed by id, stop method. Pagination: `PagePosition` plus `hasMore`; bounded lists use `limit` plus `truncated`.
+- Conflict guard: `baseHash` is the hash of what the client edited, refused with `E_CONFLICT`. `hash` identifies a confirmed preview. Two concepts, two names.
+
+**Settings.**
+
+| State | Home |
+|---|---|
+| User preference | Settings (Go DB leaves, `SettingsService`) |
+| App-wide panel geometry | Layout store (Go DB) |
+| Per-tab view state | Tab `state_json` |
+| Per-device convenience | `usePersistedState`, key `kira.<module>.<name>` |
+| Git view state | `ViewStateStore` |
+| Files under KIRA_HOME | Atomic write (`renameio`) |
+
+- Sections and leaves camelCase; new booleans positive. `api.disableCookieJar` keeps its name (renaming rewrites user data).
+- Inside the Settings dialog every leaf is draft plus Save. A control outside the dialog applies at once through `patchSettings`. `SettingsShell` in both apps: Appearance first, Advanced last. Field anatomy: label row with reset button, control, `FieldError`, description. Booleans are `Switch`.
+- Shared fields live in `packages/workbench/src/settings/fields/` (`FontFamilyField` in both Appearance panes). `rowColoring` is Studio-only.
+- Add a setting: Go model, default and validation; leaf upsert; zod schema and default in `state/settingsDomain.ts`; pane field; catalog keys; reset button; flow test.
+
+**Motion and touch.** Tokens `--kira-motion` (150ms), `--kira-ease`, `--kira-touch-target` (44px; `h-touch`, `size-touch`, `min-h-touch`) in `tokens.css`. App code sets no `duration-*`, `ease-*`, `animate-in/out` (U75). `prefers-reduced-motion: reduce` zeroes transitions and animations in `base.css`, except `Spinner`. `QueryState` shows its default loading state after `TIMING.spinnerDelay` (300ms); `Button pending` shows its spinner at once. Drag ghost class `SORTABLE_GHOST_CLASS` (U76). Mobile never hard-codes `h-11` (U82).
+
+**Empty states and front doors.** `EmptyState` (theme) is the only `Empty` composition (U74): `icon?`, `title`, `description?`, default slot for actions, `media` slot for a custom glyph. A side panel gets icon, title, one-line description, no button (U78); its action lives on the module front door. `ModuleStart` (workbench) is the front door: icon, title, description, one primary action, optional secondary actions and `#below`. Error or unavailable states may carry Retry.
+
+**Parity.** Command palette (`packages/workbench/src/shortcuts/CommandPalette.vue`, `palette.ts`) is shared; each app supplies commands with `providePaletteCommands`. Both menus carry View: Command palette and Find. `WorkbenchTitleBar` replaces per-app title bars. `LogLines` is the one virtualized log viewer. `StatusBar` stays per app. Shared UI test helpers live in `packages/workbench/src/testing/ui/`; app-only ones in `apps/*/tests/ui/support/`.
+
+**Persistence.** Ids: TEXT uuid v4. New timestamp columns: `INTEGER` unix ms named `*_at`; older TEXT ISO columns stay as legacy (N7 refuses new ones). Migrations `NNNN_<phase>_<slug>.sql`. Files a person or another program reads are written with `renameio.WriteFile`; exempt: test tooling and temp snapshots (G4).
+
+**Code conventions.** `.vue` PascalCase; `.ts` camelCase (role suffixes `.worker`, `.check`); colocated test `<module>.spec.ts`, no `.test.ts` (N1, N2). Helper folder `lib/`, never `util`/`utils`/`helpers` (N3). Stores in `state/`, workbench composables in `behaviour/`. Pinia id = export name without `use`/`create` and `Store`, camelCase (N4). Short SHA: 7 characters (`shortSha`, Go `gitclient.ShortSHA`, U82); Docker ids stay 12.
+
+**Performance.** A list that grows with user data and can pass 200 rows uses `useVirtualRows`, `VirtualList` or SlickGrid. A picker section showing a large set caps with `useCappedList` plus `ShowMoreButton` (U80). Plain `v-for` only when bounded to 200 or fewer by construction. Budgets: keystroke p50 50ms, scroll p95 80ms, tab switch gate 300ms.
 
 ## Process model
 
