@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * §6.2's refresh action: the leftmost operation button, `F5`/`Ctrl+R` (`Cmd+R` on macOS). Calls
+ * §6.2's refresh action: the leftmost operation button, `F5`. Calls
  * `GraphViewState.refresh()`, which already carries its own "second press while running is a
  * no-op" idempotency (§6.2) — the `disabled` attribute here is belt-and-braces, not the only
  * guard. Spins only while `loading === "refreshing"`, not for an unrelated `loadMore`/`loadAll`
@@ -12,7 +12,7 @@
  * for whatever case genuinely did not auto-refresh, not as the primary mechanism P4 originally
  * shipped it as.
  *
- * The `F5`/`Ctrl+R` keybinding itself is not attached here: `CommitGrid.vue` (W6) already owns a
+ * The `F5` keybinding itself is not attached here: `CommitGrid.vue` (W6) already owns a
  * keydown listener scoped to its own host element and emits a `refresh` event from it, which is
  * exactly "while the panel has focus" (§6.2) — precise focus scoping a second, independent
  * document-level listener here could not match without duplicating it. `App.vue` (W11) wires
@@ -26,6 +26,7 @@ import { Button } from '@theme/components/ui/button';
 import { Kbd } from '@theme/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed, ref, watch } from 'vue';
 import { ASYNC_FAILURES, type AsyncFailure } from '../state/asyncFailures.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -37,7 +38,7 @@ const props = defineProps<{
   reportError: (err: unknown, failure: AsyncFailure) => void;
 }>();
 
-const REFRESH_CHORD = 'F5';
+const REFRESH_CHORD = formatShortcut('view.refresh');
 const hasPendingChange = ref(false);
 
 watch(

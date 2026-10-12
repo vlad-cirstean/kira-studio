@@ -15,19 +15,14 @@
 
 import type { PullStrategy, PullStrategySource } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@theme/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import SplitButton from '@theme/components/SplitButton.vue';
+import { DropdownMenuContent } from '@theme/components/ui/dropdown-menu';
 import { t } from '@theme/i18n';
+import MenuItems from '@workbench/components/MenuItems.vue';
 import { computed, ref, watch } from 'vue';
-import type { MenuSection } from '../lib/menuModel.ts';
+import { type MenuSection, sectionsToMenuItems } from '../lib/menuModel.ts';
 import { describePullStrategySource, pullStrategyLabel } from '../lib/pullStrategyModel.ts';
 import type { OpsState } from '../state/ops.ts';
-import MenuSections from './MenuSections.vue';
 
 const props = defineProps<{
   ops: OpsState;
@@ -54,10 +49,8 @@ const mainTitle = computed(() => {
 const STRATEGIES: readonly PullStrategy[] = ['ff-only', 'merge', 'rebase'];
 const DEFAULT_ID = 'pull-strategy-default';
 
-// G34 D8: driving `MenuSections` — one section, "Follow your configuration" (the live-resolved
-// preview as its `detail` line) plus the three explicit strategies. Row ids double as their own
-// `data-testid` (MenuSections derives one from the other), so `pull-strategy-default`/
-// `pull-strategy-<strategy>` are unchanged from before this adoption.
+// One section, "Follow your configuration" (the live-resolved preview as its `detail` line) plus
+// the three explicit strategies, rendered by `MenuItems` (testids `menu-item-pull-strategy-*`).
 const menuSections = computed<MenuSection[]>(() => [
   {
     items: [
@@ -85,14 +78,12 @@ const menuSections = computed<MenuSection[]>(() => [
   },
 ]);
 
-function onMenuSelect(id: string): void {
-  if (id === DEFAULT_ID) {
-    void runDefault();
-    return;
-  }
-  const strategy = id.slice('pull-strategy-'.length) as PullStrategy;
-  void runWith(strategy);
+function onMenuSelect(id: string): Promise<void> {
+  if (id === DEFAULT_ID) return runDefault();
+  return runWith(id.slice('pull-strategy-'.length) as PullStrategy);
 }
+
+const menuItems = computed(() => sectionsToMenuItems(menuSections.value, onMenuSelect));
 
 function close(): void {
   isOpen.value = false;
@@ -141,40 +132,22 @@ defineExpose({ run: runDefault });
 </script>
 
 <template>
-  <div class="relative inline-flex">
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira"
-          class="rounded-r-none"
-          :disabled="disabled"
-          data-testid="pull-button"
-          @click="runDefault"
-        >
-          <CodiconIcon name="repo-pull" :size="13" />
-          {{ t('git.toolbar.pull.label') }}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{{ mainTitle }}</TooltipContent>
-    </Tooltip>
-
-    <DropdownMenu :open="isOpen" @update:open="onOpenChange">
-      <DropdownMenuTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          class="rounded-l-none border-l-0 px-0.5"
-          :disabled="disabled"
-          :aria-label="t('git.toolbar.pullOptions.aria')"
-          data-testid="pull-strategy-trigger"
-        >
-          <CodiconIcon name="chevron-down" :size="13" />
-        </Button>
-      </DropdownMenuTrigger>
+  <SplitButton
+    :open="isOpen"
+    :disabled="disabled"
+    :tooltip="mainTitle"
+    :chevron-label="t('git.toolbar.pullOptions.aria')"
+    chevron-testid="pull-strategy-trigger"
+    data-testid="pull-button"
+    @click="runDefault"
+    @update:open="onOpenChange"
+  >
+    <CodiconIcon name="repo-pull" :size="13" />
+    {{ t('git.toolbar.pull.label') }}
+    <template #menu>
       <DropdownMenuContent align="start" :aria-label="t('git.toolbar.pullStrategy.aria')">
-        <MenuSections :sections="menuSections" @select="onMenuSelect" />
+        <MenuItems :items="menuItems" />
       </DropdownMenuContent>
-    </DropdownMenu>
-  </div>
+    </template>
+  </SplitButton>
 </template>

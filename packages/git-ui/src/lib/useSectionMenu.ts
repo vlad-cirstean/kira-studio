@@ -57,5 +57,5 @@ export function useSectionMenu() {
     );
   }
 
-  return { openAtPoint, openAt, openFromButton, close: store.closeContextMenu };
+  return { itemsFor, openAtPoint, openAt, openFromButton, close: store.closeContextMenu };
 }

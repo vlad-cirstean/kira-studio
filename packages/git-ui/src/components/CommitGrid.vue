@@ -102,7 +102,7 @@ const emit = defineEmits<{
   (e: 'openDetail'): void;
   /** `Esc`: close the detail pane unconditionally. */
   (e: 'closeDetail'): void;
-  /** `F5` or `Ctrl/Cmd+R` while this grid has focus. W10 owns the Refresh action itself. */
+  /** `F5` while this grid has focus. W10 owns the Refresh action itself. */
   (e: 'refresh'): void;
   /** `docs/plans/P6.md` W14: a right-click, `Shift+F10`, or the Menu key on a row — `App.vue`
    *  owns the actual menu (`useSectionMenu`) (it is the one place with both `ops` and the

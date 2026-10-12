@@ -241,7 +241,7 @@ export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
   if (prs.length === 0) return undefined;
   return [...prs].sort((a, b) => {
     const precedence = PR_STATE_PRECEDENCE[a.state] - PR_STATE_PRECEDENCE[b.state];
-    return precedence !== 0 ? precedence : b.updatedAt - a.updatedAt;
+    return precedence !== 0 ? precedence : b.updatedAt - a.updatedAt || a.number - b.number;
   })[0];
 }
 

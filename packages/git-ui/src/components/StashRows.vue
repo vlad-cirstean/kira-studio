@@ -10,13 +10,15 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * via `menuSelect` for the caller's own `switch`.
  */
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
+import { inject } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { PickerList } from '../lib/pickerModel.ts';
+import { PICKER_FOCUS_ROW } from '../lib/pickerNav.ts';
 import { useSectionMenu } from '../lib/useSectionMenu.ts';
 import type { StashState } from '../state/stash.ts';
 import RowActionsButton from './RowActionsButton.vue';
@@ -61,6 +63,12 @@ function select(entry: StashEntry): void {
 }
 
 const rowMenu = useSectionMenu();
+const focusRow = inject(PICKER_FOCUS_ROW, () => undefined);
+
+function onContextMenu(event: MouseEvent, entry: StashEntry): void {
+  focusRow(props.rowModel(entry).id);
+  rowMenu.openAt(event, props.menuFor(entry), (id) => onMenuSelect(entry, id));
+}
 
 function onMenuSelect(entry: StashEntry, id: string): void {
   emit('menuSelect', id, entry);
@@ -114,16 +122,14 @@ function onMenuSelect(entry: StashEntry, id: string): void {
           UNTRACKED_FLAG
         }}</span
       >
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{
+      <span :class="cn('whitespace-nowrap', rowMeta)">{{
         t('common.fileCount.label', { count: entry.fileCount })
       }}</span>
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{
-        formatAgeCompact(entry.timestamp)
-      }}</span>
+      <span :class="cn('whitespace-nowrap', rowMeta)">{{ formatAgeCompact(entry.timestamp) }}</span>
     </button>
     <RowActionsButton
       @click="rowMenu.openFromButton($event, menuFor(entry), (id) => onMenuSelect(entry, id))"
-      @contextmenu="rowMenu.openAt($event, menuFor(entry), (id) => onMenuSelect(entry, id))"
+      @contextmenu="onContextMenu($event, entry)"
     />
   </div>
   <InlineState v-if="section.visible.length === 0" kind="empty">{{ emptyMessage }}</InlineState>

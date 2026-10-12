@@ -12,15 +12,14 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
-import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
-import { STATE_ICONS } from '../../icons/index.ts';
 import { buildRefListSections } from '../../lib/refListModel.ts';
 import { useFieldFocus } from '../../lib/useFieldFocus.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -117,18 +116,10 @@ function onOpenAutoFocus(e: Event): void {
   <div class="relative">
     <Popover modal :open="isOpen" @update:open="(o) => (o ? open() : close())">
       <PopoverTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira"
-          class="max-w-full"
-          data-testid="base-selector-trigger"
-        >
-          <span class="truncate">{{ triggerLabel }}</span>
-          <span v-if="triggerReason" class="text-muted-foreground text-kira-sm">{{
-            triggerReason
-          }}</span>
-          <CodiconIcon :name="STATE_ICONS.chevronDown" :size="13" />
-        </Button>
+        <PickerTrigger size="kira" data-testid="base-selector-trigger">
+          {{ triggerLabel }}
+          <span v-if="triggerReason" :class="rowMeta">{{ triggerReason }}</span>
+        </PickerTrigger>
       </PopoverTrigger>
 
       <PopoverContent
@@ -157,9 +148,7 @@ function onOpenAutoFocus(e: Event): void {
                 @click="pick(candidate.ref)"
               >
                 <span class="truncate">{{ candidate.ref }}</span>
-                <span class="ml-auto text-muted-foreground text-kira-sm">{{
-                  candidateReason(candidate)
-                }}</span>
+                <span :class="cn('ml-auto', rowMeta)">{{ candidateReason(candidate) }}</span>
               </button>
             </section>
 

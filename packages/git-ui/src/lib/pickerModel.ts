@@ -29,7 +29,7 @@
  * (§6.2's "pin before cap"); `capSteps` (threaded from `BranchPicker.vue`, §6.3) lets a caller raise
  * one list's own cap for the current panel-open without touching any other list's.
  */
-import { worktreeLabel } from '@kira/git-core';
+import { orderWorktrees, worktreeLabel } from '@kira/git-core';
 import type { RefRow, StackBranch, StackSummary, StashEntry, WorktreeEntry } from '@kira/git-ipc';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import { filterRefs, sortTags } from './refListModel.ts';
@@ -144,17 +144,7 @@ function orderStashStack(entries: readonly StashEntry[]): StashEntry[] {
 
 /** §6.1: the global bucket has no stack position at all, so recency is what is left. */
 function orderGlobalStash(entries: readonly StashEntry[]): StashEntry[] {
-  return [...entries].sort((a, b) => b.timestamp - a.timestamp);
-}
-
-/** §6.1: current, then main, then the rest by path — today's order is whatever `worktree.list`
- *  returned. */
-function orderWorktrees(entries: readonly WorktreeEntry[]): WorktreeEntry[] {
-  const byPath = (a: WorktreeEntry, b: WorktreeEntry) => compareNatural(a.path, b.path);
-  const current = entries.filter((e) => e.isCurrent).sort(byPath);
-  const main = entries.filter((e) => !e.isCurrent && e.isMain).sort(byPath);
-  const rest = entries.filter((e) => !e.isCurrent && !e.isMain).sort(byPath);
-  return [...current, ...main, ...rest];
+  return [...entries].sort((a, b) => b.timestamp - a.timestamp || compareNatural(a.sha, b.sha));
 }
 
 /** The expensive half of the fold (§5.1's filter, plus §5.3's cross-tab counts) — depends only on

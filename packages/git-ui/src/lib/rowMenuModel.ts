@@ -13,6 +13,7 @@ import type {
   StashEntry,
 } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
+import { compareNatural } from '@workbench/behaviour/match';
 // P131 Part 2 §3.3: MenuItem/MenuSection live in this package's own lib/menuModel.ts (a copy
 // of the retired Kui context-menu model -- P131 Part 3
 // §6.1) -- re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
@@ -429,7 +430,7 @@ export function remoteNamesFrom(remoteBranchNames: readonly string[]): string[] 
     const slash = name.indexOf('/');
     if (slash > 0) names.add(name.slice(0, slash));
   }
-  return [...names].sort();
+  return [...names].sort(compareNatural);
 }
 
 /** The remote Fetch/Pull/Push target: the current branch's upstream remote when it names a known

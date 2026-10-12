@@ -59,7 +59,7 @@ function handleNavKey(
   return undefined; // unreachable — NAV_KEYS.has(event.key) above already matched one of the six.
 }
 
-// Every non-nav key handleGridKeyDown claims: Enter/Space (group toggling), Escape/F5/Ctrl+R
+// Every non-nav key handleGridKeyDown claims: Enter/Space (group toggling), Escape/F5
 // (detail pane and refresh), F10/ContextMenu (the row's own context menu).
 function handleActionKey(
   event: KeyboardEvent,
@@ -94,12 +94,6 @@ function handleActionKey(
       deps.emit('closeDetail');
       return true;
     case 'F5':
-      event.preventDefault();
-      deps.emit('refresh');
-      return true;
-    case 'r':
-    case 'R':
-      if (!event.ctrlKey && !event.metaKey) return false;
       event.preventDefault();
       deps.emit('refresh');
       return true;

@@ -114,7 +114,6 @@ U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain(
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha
 # C (rest)
 U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
-U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc
 U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
 U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
 U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
@@ -124,8 +123,7 @@ U52 packages/workbench/src/automations/schedule/scheduleText.ts # cron wording i
 U47 packages/git-ui/src/components/SearchBox.vue # combobox: focus stays in the input, arrows move aria-activedescendant
 U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
 U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones
-U41 packages/git-ui/src/lib/gridKeyboard.ts # SlickGrid engine host reads modifier keys
-U47 packages/git-ui/src/lib/gridKeyboard.ts # grid cell navigation, not list semantics
+U47 packages/git-ui/src/lib/gridKeyboard.ts # PageUp/PageDown over a streamed 100k-row store, not list semantics
 PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not

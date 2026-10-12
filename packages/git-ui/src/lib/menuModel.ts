@@ -12,7 +12,7 @@ export interface MenuItem {
    *  hover-only `title` (kept from `RowContextMenu.vue`'s own precedent). */
   readonly disabledReason: string | undefined;
   /** A codicon name (e.g. `git-branch`), rendered inside the row's own icon slot
-   *  (`MenuSections.vue`). Optional so every pre-existing `MenuItem` producer keeps typechecking
+   *  (`MenuItems.vue`). Optional so every pre-existing `MenuItem` producer keeps typechecking
    *  unchanged. */
   readonly icon?: string;
   /** Renders the item in the danger (destructive) visual treatment — matching the toolbar's own
@@ -69,6 +69,7 @@ export function sectionsToMenuItems(
         type: 'item',
         id: item.id,
         label: item.label,
+        detail: item.detail,
         icon: item.icon,
         danger: item.danger,
         disabled: item.disabled,

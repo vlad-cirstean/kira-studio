@@ -19,7 +19,8 @@ import type { RefRow, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
@@ -41,8 +42,8 @@ import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed, ref, useTemplateRef, watch } from 'vue';
-import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
+import { computed, provide, ref, useTemplateRef, watch } from 'vue';
+import { PICKER_TAB_ICONS } from '../icons/index.ts';
 import { prBadgeClass } from '../lib/badgeClass.ts';
 import {
   filterPickerInput,
@@ -52,6 +53,7 @@ import {
   type PickerTab,
   pickerRowIds,
 } from '../lib/pickerModel.ts';
+import { PICKER_FOCUS_ROW } from '../lib/pickerNav.ts';
 import { prStateLabel } from '../lib/prStateLabel.ts';
 import {
   formatTrack,
@@ -281,6 +283,16 @@ useEventListener(rowsScrollEl, 'focusin', (event: FocusEvent) => {
   const id = (event.target as HTMLElement).closest<HTMLElement>('[data-row-id]')?.dataset.rowId;
   if (id !== undefined) focusedRowId.value = id;
 });
+
+provide(PICKER_FOCUS_ROW, (rowId: string) => void nav.focusKey(rowId));
+
+/** Right-click: the row becomes the roving stop and takes focus (B1), then the menu opens. */
+function onRowContextMenu(event: MouseEvent, row: RefRow, rowId: string): void {
+  const item = model.value.rowIds.find((r) => r.id === rowId);
+  const items = rowMenu.itemsFor(menuFor(row), (id) => onRefMenuSelect(row, id));
+  if (item === undefined) contextMenuStore.openContextMenu(event, items);
+  else nav.contextMenu(item, event, items);
+}
 
 /** §7.2: `ArrowDown` from the filter box moves into the list. */
 function onFilterDown(event: KeyboardEvent): void {
@@ -580,17 +592,15 @@ watch(visibleBranchNames, (names) => {
         <Tooltip>
           <TooltipTrigger as-child>
             <PopoverTrigger as-child>
-              <Button
+              <PickerTrigger
                 data-testid="branch-trigger"
                 ref="triggerEl"
-                variant="toolbar"
                 size="kira"
                 class="max-w-50"
+                :label="triggerLabel"
               >
-                <CodiconIcon name="git-branch" :size="13" />
-                <span class="truncate">{{ triggerLabel }}</span>
-                <CodiconIcon :name="STATE_ICONS.chevronDown" :size="13" />
-              </Button>
+                <template #leading><CodiconIcon name="git-branch" :size="13" /></template>
+              </PickerTrigger>
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ triggerLabel }}</TooltipContent>
@@ -618,7 +628,7 @@ watch(visibleBranchNames, (names) => {
             <template #item="{ item }">
               <CodiconIcon :name="item.icon ?? ''" :size="13" />
               <span class="sr-only">{{ item.label }}</span>
-              <Badge variant="count" data-testid="picker-tab-badge">{{ item.count }}</Badge>
+              <span :class="rowMeta" data-testid="picker-tab-badge">{{ item.count }}</span>
             </template>
           </SecondaryTabs>
 
@@ -681,13 +691,9 @@ watch(visibleBranchNames, (names) => {
                           t('common.worktree.label')
                         }}</Badge
                       >
-                      <span
-                        v-if="formatTrack(row.track)"
-                        class="text-kira-sm text-muted-foreground"
-                        >{{
-                          formatTrack(row.track)
-                        }}</span
-                      >
+                      <span v-if="formatTrack(row.track)" :class="rowMeta">{{
+                        formatTrack(row.track)
+                      }}</span>
                     </button>
                     <button
                       v-if="prFor(row.shortName)"
@@ -699,7 +705,7 @@ watch(visibleBranchNames, (names) => {
                     >
                     <RowActionsButton
                       @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-                      @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                      @contextmenu.prevent="onRowContextMenu($event, row, `branch:${row.refname}`)"
                     />
                   </template>
                 </div>
@@ -749,13 +755,13 @@ watch(visibleBranchNames, (names) => {
                   >
                     <CodiconIcon name="cloud" :size="13" />
                     <span class="truncate">{{ row.shortName }}</span>
-                    <span class="text-kira-sm text-muted-foreground">{{
+                    <span :class="rowMeta">{{
                       remoteCheckoutLabel(row, refs.branches.value)
                     }}</span>
                   </button>
                   <RowActionsButton
                     @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-                    @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                    @contextmenu.prevent="onRowContextMenu($event, row, `remote:${row.refname}`)"
                   />
                 </div>
                 <ShowMoreButton

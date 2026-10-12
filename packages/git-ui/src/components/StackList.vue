@@ -16,6 +16,8 @@
  */
 import type { StackBranch } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
@@ -88,26 +90,19 @@ async function removeFromStack(branch: string): Promise<void> {
     <SectionHeading :label="t('git.stack.list.label')" />
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="mb-1">
-      <div
-        class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
+      <SectionHeading
+        :label="group.summary.base"
+        :data-kira-tip="t('git.stack.base.tooltip', { base: group.summary.base })"
       >
-        <span
-          class="flex-1 min-w-0 truncate"
-          :data-kira-tip="t('git.stack.base.tooltip', { base: group.summary.base })"
-          >{{
-            group.summary.base
-          }}</span
-        >
         <Button
           variant="toolbar"
           size="kira"
-          class="ml-auto"
           :disabled="!group.summary.needsRestack"
           @click="requestRestack(group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base)"
         >
           {{ t('git.common.restack.label') }}
         </Button>
-      </div>
+      </SectionHeading>
 
       <div
         data-testid="branch-row"
@@ -124,7 +119,7 @@ async function removeFromStack(branch: string): Promise<void> {
         >
           <span
             v-if="row.isHead"
-            class="text-kira-sm text-subtle"
+            class="text-kira-sm text-muted-foreground"
             :data-kira-tip="t('git.common.currentBranch.tooltip')"
             >●</span
           >
@@ -141,12 +136,10 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             {{ prBadgeLabel(row.pr) }}
           </button>
-          <span v-if="row.trackText" class="text-kira-sm text-muted-foreground">{{
-            row.trackText
-          }}</span>
+          <span v-if="row.trackText" :class="rowMeta">{{ row.trackText }}</span>
           <span
             v-if="row.checkedOutIn"
-            class="text-kira-sm text-subtle"
+            class="text-muted-foreground"
             :data-kira-tip="row.checkedOutIn"
           >
             <CodiconIcon name="repo" :size="13" />
@@ -166,11 +159,7 @@ async function removeFromStack(branch: string): Promise<void> {
     </div>
 
     <div v-if="orphans.visible.length > 0" class="mb-1">
-      <div
-        class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
-      >
-        <span class="flex-1 min-w-0 truncate">{{ t('git.stack.needsAttention.label') }}</span>
-      </div>
+      <SectionHeading :label="t('git.stack.needsAttention.label')" />
       <div
         data-testid="branch-row"
         v-for="row in orphanRows()"
@@ -194,11 +183,8 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <div
-      v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
-      class="text-kira-sm text-subtle py-1 px-1.5"
-    >
+    <InlineState v-if="stacks.visible.length === 0 && orphans.visible.length === 0" kind="empty">
       {{ t('git.stack.list.empty') }}
-    </div>
+    </InlineState>
   </section>
 </template>

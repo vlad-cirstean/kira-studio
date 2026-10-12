@@ -20,12 +20,15 @@
  */
 import { shortSha } from '@kira/git-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAgeCompact } from '@workbench/behaviour/format';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed } from 'vue';
 import { BADGE_ICONS } from '../icons/index.ts';
 import { SEARCH_LISTBOX_ID } from '../lib/searchListboxId.ts';
@@ -74,20 +77,12 @@ function optionClass(option: SearchOption): string {
          the status line, section titles and options live inside this inner listbox div; the
          stale hint, footers and the body-search button are its *siblings*, not its children. -->
     <div :id="SEARCH_LISTBOX_ID" role="listbox" :aria-label="t('common.searchResults.aria')">
-      <div
-        v-if="searching"
-        class="text-kira-sm text-subtle py-1 px-1.5"
-        data-testid="search-status"
-      >
+      <InlineState v-if="searching" kind="loading" data-testid="search-status">
         {{ t('common.searching.loading') }}
-      </div>
+      </InlineState>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div
-          class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
-        >
-          {{ section.title }} <span class="font-normal">({{ section.options.length }})</span>
-        </div>
+        <SectionHeading :label="section.title" :count="section.options.length" />
 
         <template v-for="option in section.options" :key="option.id">
           <div
@@ -108,48 +103,32 @@ function optionClass(option: SearchOption): string {
               }}</Badge>
             </template>
             <template v-else>
-              <span class="font-data text-muted-foreground">{{ shortSha(option.hit.sha) }}</span>
+              <Identifier :value="option.hit.sha" :short="shortSha" class="text-muted-foreground" />
               <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
-              <span class="text-muted-foreground text-kira-sm">{{ option.hit.authorName }}</span>
-              <span class="text-muted-foreground text-kira-sm">{{
-                formatAgeCompact(option.hit.authorTime)
-              }}</span>
+              <span :class="rowMeta">{{ option.hit.authorName }}</span>
+              <span :class="rowMeta">{{ formatAgeCompact(option.hit.authorTime) }}</span>
               <Badge v-if="fieldLabel(option.hit.fields)">{{
                 fieldLabel(option.hit.fields)
               }}</Badge>
             </template>
           </div>
         </template>
-        <div v-if="section.hiddenCount > 0" class="text-kira-sm text-subtle py-1 px-1.5">
+        <InlineState v-if="section.hiddenCount > 0" kind="empty">
           {{ t('git.search.hidden.hint', { count: section.hiddenCount }) }}
-        </div>
+        </InlineState>
       </template>
 
-      <div v-if="isEmpty" class="text-kira-sm text-subtle py-1 px-1.5">{{
-        t('common.state.noMatches.empty')
-      }}</div>
+      <InlineState v-if="isEmpty" kind="empty">{{ t('common.state.noMatches.empty') }}</InlineState>
     </div>
 
-    <div
-      v-if="tailStale"
-      class="text-kira-sm text-subtle py-1 px-1.5"
-      data-testid="search-tail-stale"
-    >
+    <InlineState v-if="tailStale" kind="empty" data-testid="search-tail-stale">
       {{ t('git.search.tailStale.hint') }}
-    </div>
-    <div v-if="model.loadedFooter" class="text-kira-sm text-subtle py-1 px-1.5">
-      {{ model.loadedFooter }}
-    </div>
-    <div v-if="model.tailFooter" class="text-kira-sm text-subtle py-1 px-1.5">
-      {{ model.tailFooter }}
-    </div>
-    <div
-      v-if="model.tailNotice"
-      class="text-kira-sm text-subtle py-1 px-1.5"
-      data-testid="search-tail-notice"
-    >
+    </InlineState>
+    <InlineState v-if="model.loadedFooter" kind="empty">{{ model.loadedFooter }}</InlineState>
+    <InlineState v-if="model.tailFooter" kind="empty">{{ model.tailFooter }}</InlineState>
+    <InlineState v-if="model.tailNotice" kind="empty" data-testid="search-tail-notice">
       {{ model.tailNotice }}
-    </div>
+    </InlineState>
     <Button
       v-if="showBodySearchAffordance"
       variant="toolbar"

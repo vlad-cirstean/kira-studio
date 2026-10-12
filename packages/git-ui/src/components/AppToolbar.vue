@@ -24,20 +24,18 @@
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
+import SplitButton from '@theme/components/SplitButton.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@theme/components/ui/dropdown-menu';
+import { DropdownMenuContent } from '@theme/components/ui/dropdown-menu';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
+import MenuItems from '@workbench/components/MenuItems.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
-import type { MenuSection } from '../lib/menuModel.ts';
+import { type MenuSection, sectionsToMenuItems } from '../lib/menuModel.ts';
 import type { PickerTab } from '../lib/pickerModel.ts';
 import { defaultRemoteFor, remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import type { AsyncFailure } from '../state/asyncFailures.ts';
@@ -61,7 +59,6 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // `biome.json` for exactly this class of false positive, P96 §5.2); the template is the real
 // caller.
 import BranchPicker from './BranchPicker.vue';
-import MenuSections from './MenuSections.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import RefreshButton from './RefreshButton.vue';
 import UndoButton from './UndoButton.vue';
@@ -176,7 +173,7 @@ async function onAutoFetchMarkerClick(): Promise<void> {
 
 const isForcePushMenuOpen = ref(false);
 
-// G34 D8: driving `MenuSections` — today, one item. `danger: true` renders the error tone.
+// One item through `sectionsToMenuItems`/`MenuItems`. `danger: true` renders the error tone.
 const pushMenuSections = computed<readonly MenuSection[]>(() => [
   {
     items: [
@@ -191,9 +188,11 @@ const pushMenuSections = computed<readonly MenuSection[]>(() => [
   },
 ]);
 
-function onPushMenuSelect(id: string): void {
-  if (id === 'force-push-trigger') void doForcePush();
-}
+const pushMenuItems = computed(() =>
+  sectionsToMenuItems(pushMenuSections.value, (id) => {
+    if (id === 'force-push-trigger') return doForcePush();
+  }),
+);
 
 async function doFetch(): Promise<void> {
   const remote = defaultRemote.value;
@@ -353,43 +352,23 @@ const stashDisabled = computed(
         :disabled="pushPullDisabled"
       />
 
-      <div class="relative inline-flex">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira"
-              class="rounded-r-none"
-              :disabled="pushPullDisabled"
-              data-testid="push-button"
-              @click="doPush"
-            >
-              <CodiconIcon name="repo-push" :size="13" />
-              {{ t('git.toolbar.push.label') }}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{
-            t('git.toolbar.push.tooltip', { remote: defaultRemote ?? '' })
-          }}</TooltipContent>
-        </Tooltip>
-        <DropdownMenu v-model:open="isForcePushMenuOpen">
-          <DropdownMenuTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              class="rounded-l-none border-l-0 px-0.5"
-              :disabled="pushPullDisabled"
-              :aria-label="t('git.toolbar.pushOptions.aria')"
-              data-testid="push-overflow-trigger"
-            >
-              <CodiconIcon name="chevron-down" :size="13" />
-            </Button>
-          </DropdownMenuTrigger>
+      <SplitButton
+        v-model:open="isForcePushMenuOpen"
+        :disabled="pushPullDisabled"
+        :tooltip="t('git.toolbar.push.tooltip', { remote: defaultRemote ?? '' })"
+        :chevron-label="t('git.toolbar.pushOptions.aria')"
+        chevron-testid="push-overflow-trigger"
+        data-testid="push-button"
+        @click="doPush"
+      >
+        <CodiconIcon name="repo-push" :size="13" />
+        {{ t('git.toolbar.push.label') }}
+        <template #menu>
           <DropdownMenuContent align="end" :aria-label="t('git.toolbar.pushOptions.aria')">
-            <MenuSections :sections="pushMenuSections" @select="onPushMenuSelect" />
+            <MenuItems :items="pushMenuItems" />
           </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </template>
+      </SplitButton>
     </template>
 
     <Tooltip v-if="autoFetchStopped !== null">
@@ -429,8 +408,7 @@ const stashDisabled = computed(
     <TooltipIconButton
       icon="list-tree"
       :label="t('git.toolbar.collapseBranches.tooltip')"
-      :aria-pressed="collapseBranches"
-      class="aria-pressed:bg-field aria-pressed:text-fg"
+      :pressed="collapseBranches"
       data-testid="graph-collapse-toggle"
       @click="emit('toggle-collapse-branches')"
     />
@@ -438,8 +416,7 @@ const stashDisabled = computed(
     <TooltipIconButton
       icon="search"
       :label="t('common.action.search.label')"
-      :aria-pressed="searchOpen"
-      class="aria-pressed:bg-field aria-pressed:text-fg"
+      :pressed="searchOpen"
       data-testid="search-toggle-button"
       @click="emit('toggle-search')"
     />
@@ -457,9 +434,7 @@ const stashDisabled = computed(
       data-testid="remote-progress"
     >
       <Spinner label="" />
-      <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65">{{
-        progressText
-      }}</span>
+      <span class="max-w-65 truncate">{{ progressText }}</span>
       <TooltipIconButton
         icon="close"
         :label="cancellable ? t('common.action.cancel.label') : (cancelDisabledReason ?? '')"

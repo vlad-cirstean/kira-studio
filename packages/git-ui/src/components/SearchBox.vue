@@ -21,7 +21,7 @@
  *
  * **Reconciling `Enter` with "next match" (hard part 8, judgment call 6).** Two different things
  * both want `Enter`: `§7.8`'s "step through commit matches" and the listbox's own "accept the
- * highlighted option". `#highlightedIndex` is the tie-break: `-1` (nothing arrowed to yet) means
+ * highlighted option". `descendant.activeIndex` is the tie-break: `-1` (nothing arrowed to yet) means
  * `Enter`/`Shift+Enter` step `SearchState.next()`/`previous()` exactly as `§7.8` describes commit
  * matches only, never refs; the moment an arrow key has moved that cursor onto some option,
  * `Enter` accepts *that* option instead (ref or commit alike) and `Shift+Enter` reverts to no-op,
@@ -54,18 +54,13 @@
  * requirement unchanged.
  */
 import type { SearchScope } from '@kira/git-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
+import { useActiveDescendant } from '@workbench/behaviour/activeDescendant';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { SEARCH_LISTBOX_ID } from '../lib/searchListboxId.ts';
@@ -109,7 +104,6 @@ const countLabel = computed(() => {
 // touching the query (OQ5), reopened by the next keystroke.
 // ---------------------------------------------------------------------------------------
 const dropdownDismissed = ref(false);
-const highlightedIndex = ref(-1);
 
 const resultsModel = computed(() =>
   buildSearchResultsModel({
@@ -149,8 +143,16 @@ function ignoreOwnRow(e: CustomEvent<{ originalEvent: PointerEvent | FocusEvent 
   if (target && rootEl.value?.contains(target)) e.preventDefault();
 }
 
+// Focus stays in the input; arrows move `aria-activedescendant`. Enter selects only once an arrow
+// moved the cursor, otherwise it steps commit matches (judgment call 6 above).
+const descendant = useActiveDescendant<SearchOption>({
+  items: () => resultsModel.value.flatOptions,
+  optionId: (option) => option.id,
+  onSelect: (option) => selectOption(option),
+  when: () => dropdownVisible.value,
+});
 const highlightedOption = computed<SearchOption | undefined>(
-  () => resultsModel.value.flatOptions[highlightedIndex.value],
+  () => resultsModel.value.flatOptions[descendant.activeIndex.value],
 );
 
 /** OQ1's on-demand override, shown only when that is the *actual* reason the tail has not run —
@@ -172,12 +174,13 @@ watch(
   () => props.search.compiled.value,
   () => {
     dropdownDismissed.value = false;
-    highlightedIndex.value = -1;
+    descendant.reset();
   },
 );
 
-function onInput(value: string): void {
-  props.search.text.value = value;
+function onHover(option: SearchOption): void {
+  descendant.activeIndex.value = resultsModel.value.flatOptions.indexOf(option);
+  descendant.navigated.value = true;
 }
 
 function selectOption(option: SearchOption): void {
@@ -192,27 +195,11 @@ const errorText = computed(() => props.search.error.value?.replace(/^\/[\s\S]*\/
 function onKeydown(event: KeyboardEvent): void {
   // An IME composition's Enter/Escape commit or cancel the composition, not the search.
   if (event.isComposing || event.keyCode === 229) return;
-  const flat = resultsModel.value.flatOptions;
-  if (event.key === 'ArrowDown' && dropdownVisible.value && flat.length > 0) {
-    event.preventDefault();
-    highlightedIndex.value = (highlightedIndex.value + 1) % flat.length;
-    return;
-  }
-  if (event.key === 'ArrowUp' && dropdownVisible.value && flat.length > 0) {
-    event.preventDefault();
-    highlightedIndex.value = (highlightedIndex.value - 1 + flat.length) % flat.length;
-    return;
-  }
+  if (descendant.onKeydown(event)) return;
   if (event.key === 'Enter') {
     event.preventDefault();
-    const option = highlightedOption.value;
-    if (option !== undefined) {
-      selectOption(option);
-    } else if (event.shiftKey) {
-      props.search.previous();
-    } else {
-      props.search.next();
-    }
+    if (event.shiftKey) props.search.previous();
+    else props.search.next();
     return;
   }
   if (event.key === 'Escape') {
@@ -243,36 +230,23 @@ defineExpose({ focusInput });
     <PopoverAnchor as-child>
       <div ref="rootEl" class="relative flex-1 min-w-0">
         <div class="flex items-center gap-1">
-          <InputGroup variant="kira" class="flex-1 min-w-0 font-data" data-testid="search-input">
-            <InputGroupAddon>
-              <CodiconIcon name="search" :size="13" />
-            </InputGroupAddon>
-            <InputGroupInput
+          <div class="min-w-0 flex-1" data-testid="search-input">
+            <SearchField
               ref="searchInputEl"
-              :model-value="search.text.value"
-              :placeholder="t('common.action.search.label')"
-              :aria-label="t('common.action.search.label')"
+              v-model="search.text.value"
+              class="font-data"
               role="combobox"
               tabindex="0"
               aria-haspopup="listbox"
               :aria-expanded="dropdownVisible && resultsModel.sections.length > 0"
               :aria-controls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
-              :aria-activedescendant="highlightedOption?.id"
+              :aria-activedescendant="descendant.activeId.value"
               :aria-describedby="search.error.value ? ERROR_ID : undefined"
               :aria-invalid="!!search.error.value"
-              @update:model-value="onInput"
               @keydown="onKeydown"
             />
-            <InputGroupAddon v-if="search.text.value" align="inline-end">
-              <InputGroupButton
-                :aria-label="t('common.action.clearSearch.label')"
-                @click="search.text.value = ''"
-              >
-                <CodiconIcon name="close" :size="12" />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-          <section class="flex gap-0.25" :aria-label="t('git.search.options.aria')">
+          </div>
+          <section class="flex gap-0.5" :aria-label="t('git.search.options.aria')">
             <SearchOptionToggles
               v-model:match-case="search.caseSensitive.value"
               v-model:whole-word="search.wholeWord.value"
@@ -295,7 +269,7 @@ defineExpose({ focusInput });
           </NativeSelect>
           <span
             v-if="countLabel"
-            class="px-0.5 text-muted-foreground text-kira-sm whitespace-nowrap"
+            class="px-0.5 text-muted-foreground text-kira-sm whitespace-nowrap tabular-nums"
             data-testid="search-count"
             >{{
               countLabel
@@ -332,7 +306,7 @@ defineExpose({ focusInput });
         :tail-stale="search.tailStale.value"
         :show-body-search-affordance="showBodySearchAffordance"
         @select="selectOption"
-        @hover="(option) => (highlightedIndex = resultsModel.flatOptions.indexOf(option))"
+        @hover="onHover"
         @run-body-search="search.runBodySearch()"
       />
     </PopoverContent>

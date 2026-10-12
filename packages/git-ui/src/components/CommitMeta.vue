@@ -23,6 +23,7 @@ import { shortSha } from '@kira/git-core';
 import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import KeyValueList from '@theme/components/KeyValueList.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -32,6 +33,7 @@ import { cn } from '@theme/lib/utils';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
+import Identifier from '@workbench/components/Identifier.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { prBadgeClass } from '../lib/badgeClass.ts';
@@ -161,8 +163,6 @@ const signatureText = computed<string | undefined>(() => {
 // P110 A14 (§1.3): a lookup map, not string interpolation, so every text-badge-pr-* class
 // Tailwind must scan appears as a complete literal below. Replaces the old dynamic
 // `meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
-// Inline link: no button chrome, ambient colour, graph font.
-const LINK_BUTTON_CLASS = 'h-auto p-0 border-0 font-normal text-inherit text-graph-sm';
 
 const PR_ICON_CLASS: Readonly<Record<string, string>> = {
   open: 'text-ok',
@@ -245,8 +245,6 @@ const trailerRows = computed<TrailerRow[]>(() =>
   }),
 );
 
-const sha7 = computed(() => (props.detail ? shortSha(props.detail.sha) : ''));
-
 /** G-UX (item 6): the facts row's own copy path — the only sha-copy affordance this pane offers
  *  now (the old header copy button copied the full *message*, not the sha, and is gone). */
 function copySha(): void {
@@ -322,9 +320,9 @@ const prIcon = computed(() => {
       <Tooltip v-if="prIcon">
         <TooltipTrigger as-child>
           <Button
-            variant="link"
-            size="kira"
-            :class="cn('h-auto p-0 border-0 leading-none ml-auto', PR_ICON_CLASS[prIcon!.state])"
+            variant="toolbar"
+            size="inline"
+            :class="cn('ml-auto leading-none', PR_ICON_CLASS[prIcon!.state])"
             :aria-label="t('git.pr.openOnGithub.aria', { number: prIcon!.number })"
             data-testid="commit-meta-pr-icon"
             @click="openPullRequest(prIcon!.number)"
@@ -365,33 +363,30 @@ const prIcon = computed(() => {
           &lt;{{ detail.committer.email }}&gt;
           <span class="text-graph-sm">{{ t('git.commit.committer.label') }}</span>
         </p>
-        <dl
+        <KeyValueList
           data-testid="meta-trailers"
           v-if="trailerRows.length > 0"
-          class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
+          class="text-graph-sm"
         >
           <template v-for="(row, index) in trailerRows" :key="index">
-            <dt class="text-muted-foreground">{{ row.token }}</dt>
+            <dt>{{ row.token }}</dt>
             <dd v-if="row.name !== undefined">
               {{ row.name }} <span class="text-muted-foreground">&lt;{{ row.email }}&gt;</span>
             </dd>
             <dd v-else>{{ row.raw }}</dd>
           </template>
-        </dl>
-        <dl
-          v-if="hasDetails"
-          class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
-        >
+        </KeyValueList>
+        <KeyValueList v-if="hasDetails" class="text-graph-sm">
           <template v-if="detail.decoration.length > 0">
-            <dt class="text-muted-foreground">{{ t('git.common.refs.label') }}</dt>
+            <dt>{{ t('git.common.refs.label') }}</dt>
             <dd data-testid="meta-refs" ref="decorationEl" class="flex flex-wrap gap-0.5"></dd>
           </template>
           <template v-if="signatureText">
-            <dt class="text-muted-foreground">{{ t('git.commit.signature.label') }}</dt>
+            <dt>{{ t('git.commit.signature.label') }}</dt>
             <dd>{{ signatureText }}</dd>
           </template>
           <template v-if="prDetail">
-            <dt class="text-muted-foreground">{{ t('git.commit.pullRequest.label') }}</dt>
+            <dt>{{ t('git.commit.pullRequest.label') }}</dt>
             <dd v-if="prDetail.kind === 'prs'" class="flex flex-col gap-0.5">
               <div v-for="pr in prDetail.prs" :key="pr.number" class="flex items-center gap-0.5">
                 <span :class="prBadgeClass(pr.state)">
@@ -399,8 +394,8 @@ const prIcon = computed(() => {
                 </span>
                 <Button
                   variant="link"
-                  size="kira"
-                  :class="cn(LINK_BUTTON_CLASS, 'justify-start text-left whitespace-normal')"
+                  size="inline"
+                  class="justify-start text-left whitespace-normal text-graph-sm"
                   @click="openPullRequest(pr.number)"
                 >
                   #{{ pr.number }} {{ pr.title }}
@@ -412,7 +407,7 @@ const prIcon = computed(() => {
               {{ prDetail.reason }}
             </dd>
           </template>
-        </dl>
+        </KeyValueList>
       </div>
     </div>
 
@@ -420,8 +415,8 @@ const prIcon = computed(() => {
       <Button
         data-testid="meta-body-toggle"
         variant="link"
-        size="kira"
-        class="h-auto p-0 justify-start text-muted-foreground hover:text-fg"
+        size="inline"
+        class="justify-start"
         @click="expanded = !expanded"
       >
         {{ expanded ? t('common.action.showLess.label') : t('common.action.showMore.label') }}
@@ -432,19 +427,18 @@ const prIcon = computed(() => {
             <Badge
               as="button"
               type="button"
-              class="cursor-pointer"
               :aria-label="t('git.commit.copySha.tooltip')"
               data-testid="commit-meta-sha"
               @click="copySha"
             >
-              {{ sha7 }}
+              <Identifier :value="detail.sha" :short="shortSha" />
             </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ t('git.commit.copySha.tooltip') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="shrink-0 text-kira-sm text-subtle">{{
+            <span class="shrink-0 text-kira-sm text-muted-foreground">{{
               formatAgeCompact(detail.committer.timestamp)
             }}</span>
           </TooltipTrigger>

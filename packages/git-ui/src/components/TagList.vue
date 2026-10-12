@@ -9,10 +9,15 @@
  */
 import { shortSha } from '@kira/git-core';
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
-import { rowVariants } from '@theme/components/rowVariants';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import Identifier from '@workbench/components/Identifier.vue';
+import { inject } from 'vue';
+import { PICKER_FOCUS_ROW } from '../lib/pickerNav.ts';
 import type { RefListSection } from '../lib/refListModel.ts';
 import { buildRefMenu } from '../lib/rowMenuModel.ts';
 import { useSectionMenu } from '../lib/useSectionMenu.ts';
@@ -42,10 +47,16 @@ async function checkout(row: RefRow): Promise<void> {
  *  lightweight one. Mirrors `core`'s `tagTargetCommit`, adapted to the wire's `RefRow` rather than
  *  a full `RefRecord` (this file has no need for `objectType`). */
 function targetCommit(row: RefRow): string {
-  return shortSha(row.peeledObjectId ?? row.objectId);
+  return row.peeledObjectId ?? row.objectId;
 }
 
 const rowMenu = useSectionMenu();
+const focusRow = inject(PICKER_FOCUS_ROW, () => undefined);
+
+function onContextMenu(event: MouseEvent, row: RefRow): void {
+  focusRow(`tag:${row.refname}`);
+  rowMenu.openAt(event, menuFor(row), (id) => onRefMenuSelect(row, id));
+}
 
 function menuFor(row: RefRow) {
   return buildRefMenu({
@@ -93,31 +104,27 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
         :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
         @click="checkout(row)"
       >
-        <span
-          class="codicon codicon-tag"
-          :class="{ 'text-subtle': !row.annotation }"
-          aria-hidden="true"
-        ></span>
+        <CodiconIcon name="tag" :size="13" :class="row.annotation ? '' : 'text-muted-foreground'" />
         <span class="truncate">{{ row.shortName }}</span>
-        <span class="text-kira-sm text-muted-foreground">{{
+        <span :class="rowMeta">{{
           row.annotation ? t('git.tag.annotated.status') : t('git.tag.lightweight.status')
         }}</span>
         <span
           v-if="row.annotation"
-          class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground"
+          :class="cn('flex-1 min-w-0 truncate', rowMeta)"
           :data-kira-tip="row.annotation.subject"
         >
           {{ row.annotation.subject }}
         </span>
-        <span class="font-data text-kira-sm text-muted-foreground">{{ targetCommit(row) }}</span>
+        <Identifier :value="targetCommit(row)" :short="shortSha" :class="rowMeta" />
       </button>
       <RowActionsButton
         @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-        @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+        @contextmenu="onContextMenu($event, row)"
       />
     </div>
-    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
+    <InlineState v-if="section.visible.length === 0" kind="empty">{{
       t('git.tag.list.empty')
-    }}</div>
+    }}</InlineState>
   </section>
 </template>

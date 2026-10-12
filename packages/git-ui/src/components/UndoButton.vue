@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
  * used to render inline.
  */
 import { t } from '@theme/i18n';
+import Identifier from '@workbench/components/Identifier.vue';
 import { composeUndoTooltip } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
 
@@ -49,10 +50,10 @@ async function undo(): Promise<void> {
         <Button
           variant="toolbar"
           size="kira"
-          class="font-data text-kira-sm text-muted-foreground cursor-copy"
+          class="text-kira-sm"
           @click="copy(ops.undoSlot.value.recoverySha, t('git.copy.recoverySha.announce'))"
         >
-          {{ shortSha(ops.undoSlot.value.recoverySha) }}
+          <Identifier :value="ops.undoSlot.value.recoverySha" :short="shortSha" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>{{
