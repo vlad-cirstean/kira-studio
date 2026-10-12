@@ -93,16 +93,28 @@ test('QueryState: the loading spinner stays hidden at 100 ms and shows within 1 
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: [] });
-  await installDockerMocks(page, {
+  const docker = await installDockerMocks(page, {
     bridgePkg: BRIDGE_PKG,
     handlers: { Status: () => DOCKER_OK, Containers: () => new Promise<never>(() => undefined) },
   });
+  // A paused fake clock: only `runFor` moves page time, so a loaded host cannot skew the delay.
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
   await modeTab(page, 'docker').click();
-  await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
 
   const loading = page.locator('[data-testid="docker-panel"] [data-testid="query-loading"]');
+  let elapsed = 0;
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(10);
+      elapsed += 10;
+      return docker.calls('Containers').length;
+    })
+    .toBeGreaterThan(0);
+  expect(elapsed).toBeLessThan(100);
   expect(await loading.count()).toBe(0);
-  await expect(loading).toBeVisible({ timeout: 1000 });
+  await page.clock.runFor(1000);
+  await expect(loading).toBeVisible();
 });
 
 test('reduced motion: dialogs skip animation, the loading Spinner keeps animate-spin', async ({
@@ -128,7 +140,7 @@ test('reduced motion: dialogs skip animation, the loading Spinner keeps animate-
     page.locator(
       '[data-testid="docker-panel"] [data-testid="query-loading"] .codicon.animate-spin',
     ),
-  ).toBeVisible({ timeout: 1000 });
+  ).toBeVisible();
 });
 
 test('LinkService.OpenExternal rejection is announced in the live region', async ({ relaunch }) => {

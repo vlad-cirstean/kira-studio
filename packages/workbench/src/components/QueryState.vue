@@ -59,12 +59,14 @@ const canRetry = computed(
 // A fast load never flashes the default spinner; a caller's own loading slot shows at once.
 const { ready: spinnerReady, start: startSpinnerDelay } = useTimeout(TIMING.spinnerDelay, {
   controls: true,
+  immediate: false,
 });
 watch(
   () => state.value === 'loading',
   (loading) => {
     if (loading) startSpinnerDelay();
   },
+  { immediate: true },
 );
 
 function retry(): void {
