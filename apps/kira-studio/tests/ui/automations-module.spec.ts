@@ -542,10 +542,16 @@ test('Add stays disabled until name and script are filled; it sends the trimmed 
   await expect(dialog(page)).toBeVisible();
 
   const save = dialog(page).locator('[data-testid="script-dialog-save"]');
-  await expect(save).toBeDisabled();
+  const created = () => control.log().filter((e) => e.channel === IPC.customScriptsCreate);
+  await save.click();
+  await expect(dialog(page).locator('[data-testid="script-dialog-name-error"]')).toBeVisible();
+  await expect(dialog(page).locator('[data-testid="script-dialog-name"]')).toBeFocused();
+  expect(created()).toHaveLength(0);
 
   await dialog(page).locator('[data-testid="script-dialog-name"]').fill(`  ${SCRIPT.name}  `);
-  await expect(save).toBeDisabled();
+  await save.click();
+  await expect(dialog(page).locator('[data-testid="script-dialog-name-error"]')).toHaveCount(0);
+  expect(created()).toHaveLength(0);
 
   await dialog(page).locator('[data-testid="script-dialog-command"]').fill(`  ${SCRIPT.command}  `);
   await pickFixed(page);
