@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
@@ -11,6 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
+
+// ErrSavedQueryNotFound is a read or patch of a saved-query id that has no row.
+var ErrSavedQueryNotFound = errors.New("repos/saved_queries: not found")
 
 const savedQuerySelectColumns = `id, connection_id, path, name, kind, body, pinned, created_at, used_at`
 
@@ -130,6 +134,9 @@ func (r *SavedQueriesRepo) insert(connectionID, path, name, kind string, body []
 func (r *SavedQueriesRepo) mustGet(queryID string) (model.SavedQuery, error) {
 	row := r.DB.QueryRow(`SELECT `+savedQuerySelectColumns+` FROM saved_queries WHERE id = ?`, queryID)
 	q, err := scanSavedQueryRow(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.SavedQuery{}, fmt.Errorf("%w: %s", ErrSavedQueryNotFound, queryID)
+	}
 	if err != nil {
 		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: get %s: %w", queryID, err)
 	}

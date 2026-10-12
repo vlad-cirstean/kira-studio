@@ -1569,6 +1569,11 @@
           "body": "Unsupported URL scheme: {scheme}."
         }
       },
+      "query": {
+        "notFound": {
+          "body": "This saved query no longer exists."
+        }
+      },
       "secrets": {
         "darwinUnavailable": {
           "body": "The macOS keychain is unavailable, so passwords can’t be saved. Everything else about this connection can be."

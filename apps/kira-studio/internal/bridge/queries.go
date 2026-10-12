@@ -1,8 +1,11 @@
 package bridge
 
 import (
+	"errors"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
@@ -71,7 +74,11 @@ func (s *QueriesService) Update(args QueriesUpdateArgs) (model.SavedQuery, error
 	if args.ID == "" {
 		return model.SavedQuery{}, ipcerr.Required("id")
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.Update(args.ID, model.SavedQueryPatch{Name: args.Name, Pinned: args.Pinned}))
+	q, err := s.Deps.Repos.SavedQueries.Update(args.ID, model.SavedQueryPatch{Name: args.Name, Pinned: args.Pinned})
+	if errors.Is(err, repos.ErrSavedQueryNotFound) {
+		return model.SavedQuery{}, ipcerr.T(ipcerr.CodeNotFound, "backend.studio.query.notFound.body", nil)
+	}
+	return ipcerr.InternalResult(q, err)
 }
 
 type QueriesIDArgs struct {
