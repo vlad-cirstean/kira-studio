@@ -319,7 +319,7 @@ const prIcon = computed(() => {
             variant="toolbar"
             size="inline"
             :class="cn('ml-auto leading-none', PR_ICON_CLASS[prIcon!.state])"
-            :aria-label="t('git.pr.openOnGithub.aria', { number: prIcon!.number })"
+            :aria-label="t('git.pr.openOnGithub.aria', { number: String(prIcon!.number) })"
             data-testid="commit-meta-pr-icon"
             @click="openPullRequest(prIcon!.number)"
           >
@@ -328,7 +328,7 @@ const prIcon = computed(() => {
         </TooltipTrigger>
         <TooltipContent>{{
           t('git.pr.summary.tooltip', {
-            number: prIcon!.number,
+            number: String(prIcon!.number),
             title: prIcon!.title,
             state: prIcon!.stateLabel,
           })

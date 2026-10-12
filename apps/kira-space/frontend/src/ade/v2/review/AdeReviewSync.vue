@@ -67,7 +67,7 @@ const blockedMessage = computed(() => {
     case 'prClosed':
       return (
         data.value?.message ??
-        t('space.ade.review.sync.prClosed.tooltip', { number: prNumber.value })
+        t('space.ade.review.sync.prClosed.tooltip', { number: String(prNumber.value) })
       );
     case 'ghMissing':
       return t('space.ade.review.sync.ghMissing.tooltip');
@@ -86,7 +86,7 @@ const headDiffers = computed(
 const confirmLabel = computed(() => {
   const m = marks.value.length;
   const u = unmarks.value.length;
-  const pr = prNumber.value;
+  const pr = String(prNumber.value);
   return u > 0
     ? t('space.ade.review.sync.confirmUnmark.label', { count: m, pr, unmarked: u })
     : t('space.ade.review.sync.confirm.label', { count: m, pr });

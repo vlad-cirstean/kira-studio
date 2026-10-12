@@ -17,6 +17,7 @@ export const i18n = createI18n({
 });
 
 // Every numeric param formats with locale digit grouping; `count` also selects the plural branch.
+// An identifier (PR or issue number) is not a quantity: pass `String(n)` so it stays ungrouped.
 export function t(key: MessageKey, params?: MessageParams): string {
   const g = i18n.global;
   if (!params) return g.t(key);
