@@ -20,7 +20,7 @@ import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
 import type { CopyAllFormat } from './copyAll';
-import { mongoDocumentRowMenu, rowAsJsonMenu } from './resultMenu';
+import { mongoDocumentRowMenu, rowAsJsonMenu } from './menu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { useConsoleViewStore } from './state';
@@ -111,7 +111,7 @@ function onToggleDocExpanded(id: string): void {
 const docScrollEl = ref<HTMLElement | null>(null);
 const docVirtual = useVirtualRows({
   count: () => documentRows.value.length,
-  rowHeight: () => 26,
+  rowHeight: () => rowHeight.value,
   rowHeights: () => documentRowHeights.value,
   scrollElement: docScrollEl,
 });

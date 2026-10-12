@@ -16,7 +16,7 @@ const { nextProjectionAfterHidingColumn, nextProjectionFromSelectedColumns } = a
   '../../frontend/src/views/grid/menu'
 );
 const { nextProjectionAfterAddingColumn } = await import(
-  '../../frontend/src/views/definition/columnsMenu'
+  '../../frontend/src/views/definition/menu'
 );
 
 describe('nextProjectionFromSelectedColumns (ColumnsMenu.vue "None"/"All")', () => {

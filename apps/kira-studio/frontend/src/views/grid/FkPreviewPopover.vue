@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import Spinner from '@theme/components/Spinner.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -101,9 +102,7 @@ onUnmounted(() => {
       <div
         class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5"
       >
-        <span class="font-medium overflow-hidden text-ellipsis whitespace-nowrap">{{
-          tableLabel
-        }}</span>
+        <span class="min-w-0 font-medium"><TruncatedText :text="tableLabel" /></span>
         <Badge
           v-if="state.status === 'ready' && state.hasMore"
           variant="info"
@@ -123,13 +122,10 @@ onUnmounted(() => {
       <!-- flex-1 min-h-0 is load-bearing: without it a flex child refuses to shrink below its
            content height, and the panel overflows its own max-height instead of scrolling here. -->
       <div class="flex-1 min-h-0 overflow-y-auto p-1.5">
-        <div
-          v-if="state.status === 'loading'"
-          class="flex items-center justify-center py-2 text-muted-foreground"
-        >
-          <Spinner :size="13" />
-        </div>
-        <Badge v-else-if="state.status === 'error'" variant="error">{{ state.message }}</Badge>
+        <InlineState v-if="state.status === 'loading'" kind="loading" />
+        <InlineState v-else-if="state.status === 'error'" kind="error">{{
+          state.message
+        }}</InlineState>
         <Alert
           v-else-if="state.status === 'ready' && state.rows.length === 0"
           variant="info"

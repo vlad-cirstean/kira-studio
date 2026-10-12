@@ -2,7 +2,7 @@
 // views/grid/menu.ts (grid-row-menu-lazy-snapshot.spec.ts) existed unfixed in two sibling menus —
 // documents/menu.ts's rowMenu (a whole-page `_id` decode built at right-click time, even though
 // setAllExpanded's own `true`/Expand-all branch never reads it at all) and
-// console/resultMenu.ts's rowAsJsonMenu (a whole-page decode/JSON.stringify built at right-click
+// console/menu.ts's rowAsJsonMenu (a whole-page decode/JSON.stringify built at right-click
 // time for ConsoleResultGrid.vue's document/key-value branches). Both `allIds`/`allJson` are
 // thunks now, invoked only inside the "all" item's own run().
 //
@@ -18,7 +18,7 @@ import { createPinia, setActivePinia } from 'pinia';
 setActivePinia(createPinia());
 
 const { rowMenu } = await import('../../frontend/src/views/documents/menu');
-const { rowAsJsonMenu } = await import('../../frontend/src/views/console/resultMenu');
+const { rowAsJsonMenu } = await import('../../frontend/src/views/console/menu');
 
 // The Copy items' own run() calls copyText() -> navigator.clipboard.writeText, which Bun's
 // runtime does not implement — stubbed so run() can actually execute in these tests.
@@ -125,7 +125,7 @@ describe('documents/menu.ts rowMenu — lazy allIds (P21 round 2 performance fin
   });
 });
 
-describe('console/resultMenu.ts rowAsJsonMenu — lazy allJson (P21 round 2 performance finding 2)', () => {
+describe('console/menu.ts rowAsJsonMenu — lazy allJson (P21 round 2 performance finding 2)', () => {
   function menuWithCountedAllJson() {
     let calls = 0;
     const allJson = () => {

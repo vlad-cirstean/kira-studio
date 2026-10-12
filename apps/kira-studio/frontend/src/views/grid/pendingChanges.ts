@@ -1,6 +1,7 @@
 import type { MutationRowOp } from '@shared/domain/mutations';
 import type { MutateResponse } from '@shared/protocol/dataOps';
 import { cellText, isNull, type TabularPage } from '@shared/protocol/page';
+import { compareNatural } from '@workbench/behaviour/match';
 import { defineStore } from 'pinia';
 import { reactive, toRaw } from 'vue';
 import { data } from '../../bridge/data';
@@ -113,7 +114,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
       const chunk = page.chunks[col];
       key[descriptor.name] = isNull(chunk, row) ? null : cellText(chunk, row, keyDecoder);
     }
-    const names = Object.keys(key).sort();
+    const names = Object.keys(key).sort(compareNatural);
     if (names.length === 0) return null;
     // A partial key (Hide column on part of a composite key) cannot address the row.
     if (full?.some((name) => !(name in key))) return null;

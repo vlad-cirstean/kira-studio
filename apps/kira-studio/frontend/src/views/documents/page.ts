@@ -1,4 +1,5 @@
 import { cellByteLength, cellText, type DocumentPage, isTruncated } from '@shared/protocol/page';
+import { compareNatural } from '@workbench/behaviour/match';
 import { useDocumentRowsStore } from '../shared/document/rows';
 import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
 
@@ -82,7 +83,7 @@ export function fieldNamesOnPage(tabId: string): string[] {
       if (key !== '_id') names.add(key);
     }
   }
-  const sorted = [...names].sort();
+  const sorted = [...names].sort(compareNatural);
   fieldNamesCache.set(page, sorted);
   return sorted;
 }

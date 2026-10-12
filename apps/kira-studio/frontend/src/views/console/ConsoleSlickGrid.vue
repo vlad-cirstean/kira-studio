@@ -65,7 +65,7 @@ import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selec
 import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
-import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './resultMenu';
+import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './menu';
 import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { useConsoleViewStore } from './state';
@@ -86,7 +86,7 @@ const consoleViewStore = useConsoleViewStore();
 // P19 D8: the selection model is the one exception — P43 iter2 D22's "never more than one cell
 // selected at once" finding is superseded here, configured identically to SlickGridHost.vue's own
 // SlickHybridSelectionModel (rows/columns/free-form ranges, ⌘C and a context menu per kind,
-// resultMenu.ts) so the console doesn't reinvent a different selection model than the app's main
+// console/menu.ts) so the console doesn't reinvent a different selection model than the app's main
 // grid uses. What stays console-specific: no pending-changes-aware rowSnapshot, no Copy as INSERT
 // (no addressable table), no paste/delete/duplicate (read-only by construction), and a filter
 // change clears the selection outright rather than remapping it (D8 point 1).

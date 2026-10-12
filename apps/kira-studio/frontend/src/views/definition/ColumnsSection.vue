@@ -16,7 +16,7 @@ import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { ref } from 'vue';
 import { columnTypeIcon, columnTypeTextClass } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
-import { columnsSectionMenu } from './columnsMenu';
+import { columnsSectionMenu } from './menu';
 
 const contextMenuStore = useContextMenuStore();
 

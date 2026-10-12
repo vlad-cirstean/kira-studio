@@ -92,7 +92,7 @@ export function rowMenu(
     { type: 'separator' },
     {
       // P22b D11: one named-format submenu, mirroring the SQL grid's own `Copy row(s) ▸`
-      // shape (resultMenu.ts's tabularRowMenu) — a user choosing between mongosh syntax and
+      // shape (console/menu.ts's tabularRowMenu) — a user choosing between mongosh syntax and
       // `{"$oid": …}` has to be told which is which, not read two unlabelled sibling items.
       // Leaf ids preserved (`copy-document`/`copy-as-json`) so existing specs keep passing.
       //

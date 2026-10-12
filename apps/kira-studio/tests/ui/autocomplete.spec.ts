@@ -403,7 +403,7 @@ test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
   });
 
   // P19 D6 (parity half): the same "Canonical Extended JSON" item the console's own document
-  // result gained (resultMenu.ts), copying the canonical extended JSON body — not the shell
+  // result gained (console/menu.ts), copying the canonical extended JSON body — not the shell
   // form above.
   await firstRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();

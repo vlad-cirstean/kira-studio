@@ -265,7 +265,7 @@ export interface MongoDocumentRowMenuContext {
 }
 
 // P22b D11: the Mongo document result's own row menu -- two named-format submenus (mirroring
-// resultMenu.ts's own tabularRowMenu Copy row(s) ▸ shape above) rather than documents/menu.ts's
+// console/menu.ts's own tabularRowMenu Copy row(s) ▸ shape above) rather than documents/menu.ts's
 // old flat "Copy as JSON"/"Copy all as JSON" pair. Leaf ids `copy-as-json`/`copy-all-as-json`
 // preserved so existing specs keep passing on a path change with no assertion change.
 //
