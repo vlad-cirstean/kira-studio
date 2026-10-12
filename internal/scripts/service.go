@@ -68,7 +68,7 @@ type UpdateArgs struct {
 
 func (s *Service) Update(args UpdateArgs) (CustomScript, error) {
 	if args.ID == "" {
-		return CustomScript{}, ipcerr.BadRequest("id is required")
+		return CustomScript{}, ipcerr.Required("id")
 	}
 	rec, err := s.Repo.Update(args.ID, args.Fields)
 	if err != nil {
@@ -84,7 +84,7 @@ type DeleteArgs struct {
 
 func (s *Service) Delete(args DeleteArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Repo.Delete(args.ID); err != nil {
 		return fail(err)
@@ -116,7 +116,7 @@ type RenameCollectionArgs struct {
 
 func (s *Service) RenameCollection(args RenameCollectionArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Repo.RenameCollection(args.ID, args.Name); err != nil {
 		return fail(err)
@@ -131,7 +131,7 @@ type DeleteCollectionArgs struct {
 
 func (s *Service) DeleteCollection(args DeleteCollectionArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Repo.DeleteCollection(args.ID); err != nil {
 		return fail(err)
@@ -147,7 +147,7 @@ type MoveArgs struct {
 
 func (s *Service) Move(args MoveArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Repo.Move(args.ID, args.CollectionID); err != nil {
 		return fail(err)

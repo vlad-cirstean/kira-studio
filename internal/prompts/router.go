@@ -233,13 +233,13 @@ func (r *Router) Close(id string) {
 // Claim moves a popup to windowKey, for as long as that window is registered.
 func (r *Router) Claim(id, windowKey string) error {
 	if id == "" || windowKey == "" {
-		return ipcerr.BadRequest("id and windowKey are required")
+		return ipcerr.Contract("id and windowKey are required")
 	}
 	r.mu.Lock()
 	e, ok := r.entries[id]
 	if !ok {
 		r.mu.Unlock()
-		return ipcerr.NotFound("prompt not found")
+		return ipcerr.T(ipcerr.CodeNotFound, "backend.core.prompt.gone.body", nil)
 	}
 	e.claimed = windowKey
 	r.commit(note{})

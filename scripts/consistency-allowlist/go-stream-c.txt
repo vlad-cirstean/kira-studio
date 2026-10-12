@@ -1,24 +1,3 @@
-G1 internal/appupdate/install.go
-G1 internal/prompts/bound.go
-G1 internal/prompts/router.go
-G1 internal/rpcstream/session.go
-G1 internal/scripts/service.go
-G1 internal/shell/link.go
-G1 internal/terminal/bound.go
-G1 internal/terminal/service.go
-G1 internal/terminal/validate.go
-G1 internal/windowsvc/windowsvc.go
-G2 internal/appupdate/install.go
-G2 internal/prompts/bound.go
-G2 internal/rpcstream/frame.go
-G2 internal/rpcstream/session.go
-G2 internal/terminal/bound.go
-G2 internal/terminal/service.go
-G2 internal/terminal/validate.go
-G3 internal/startupfail/report.go
-G4 internal/agenthooks/agenthooks.go
-G4 internal/agenthooks/statusline.go
-G4 internal/claudeheadless/mcp.go
-G4 internal/claudeheadless/usermcp.go
+# Permanent: test-only harness writes fixtures straight to a temp dir; no crash-safety need.
 G4 internal/flowtest/contract.go
 G4 internal/flowtest/fakeagent/fakeagent.go

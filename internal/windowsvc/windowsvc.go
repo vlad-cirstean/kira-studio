@@ -45,7 +45,7 @@ type EnsureResult struct {
 // which has no shell managing window creation at all.
 func (s *Service) Ensure(args EnsureArgs) (EnsureResult, error) {
 	if args.WindowKey == "" {
-		return EnsureResult{}, ipcerr.BadRequest("windowKey is required")
+		return EnsureResult{}, ipcerr.Required("windowKey")
 	}
 	if err := s.Windows.EnsureExists(args.WindowKey); err != nil {
 		return EnsureResult{}, ipcerr.InternalErr(err)
@@ -68,7 +68,7 @@ type SetModeArgs struct {
 // switch itself schedules no write).
 func (s *Service) SetMode(args SetModeArgs) error {
 	if args.WindowKey == "" {
-		return ipcerr.BadRequest("windowKey is required")
+		return ipcerr.Required("windowKey")
 	}
 	return ipcerr.InternalErr(s.Windows.SetMode(args.WindowKey, args.Mode))
 }
@@ -77,7 +77,7 @@ func (s *Service) SetMode(args SetModeArgs) error {
 // from the renderer for the first time.
 func (s *Service) OpenNew() error {
 	if s.OpenNewWindow == nil {
-		return ipcerr.BadRequest("windows: this build cannot open a window")
+		return ipcerr.Contract("windows: this build cannot open a window")
 	}
 	s.OpenNewWindow()
 	return nil

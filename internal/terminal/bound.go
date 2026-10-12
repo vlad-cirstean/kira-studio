@@ -125,7 +125,7 @@ type CloseArgs struct {
 // client-supplied (the tab id) so the renderer subscribes to ChannelTerminal before this call
 // returns — no output can race the subscription. The cwd check below is not a trust boundary and
 // must not be read as one: the shell it starts is the user's own and can `cd` anywhere on its first
-// line. It exists so a stale path fails with a clear E_INVALID instead of a confusing exec error.
+// line. It exists so a stale path fails with a clear E_BAD_REQUEST instead of a confusing exec error.
 func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	if err := ValidateOpen(args); err != nil {
 		return OpenResult{}, err
@@ -141,7 +141,7 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	var scriptEnv []string
 	if args.ScriptID != "" {
 		if b.Scripts == nil {
-			return OpenResult{}, ipcerr.New("E_INVALID", "scripts are not available")
+			return OpenResult{}, ipcerr.Contract("scripts are not available")
 		}
 		launch, err := b.Scripts.Begin(args.ScriptID, args.TerminalID, args.ScriptLaunchToken)
 		if err != nil {
@@ -151,7 +151,7 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		args.Cwd, args.Command, scriptEnv = launch.Cwd, launch.Command, launch.Env
 		if len(args.Command) > MaxCommandBytes {
 			b.Scripts.Failed(scriptRun, errors.New("command is too long"))
-			return OpenResult{}, ipcerr.New("E_INVALID", "command is too long")
+			return OpenResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.core.terminal.commandTooLong.body", nil)
 		}
 	}
 
@@ -160,13 +160,13 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	if composedAgent {
 		composed, composedEnv, err := b.ComposeAgent(args.TerminalID, args.Cwd, command)
 		if err != nil {
-			return OpenResult{}, ipcerr.New("E_INVALID", err.Error())
+			return OpenResult{}, ipcerr.BadRequest(err.Error())
 		}
 		// ValidateOpen already checked args.Command alone; composing can grow it (the `--settings`
 		// flag, a quoted prompt), so the same bound is rechecked here with the same message.
 		if len(composed) > MaxCommandBytes {
 			b.abortAgent(args.TerminalID)
-			return OpenResult{}, ipcerr.New("E_INVALID", "command is too long")
+			return OpenResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.core.terminal.commandTooLong.body", nil)
 		}
 		command, env = composed, composedEnv
 	}
@@ -202,10 +202,10 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 			b.Scripts.Failed(scriptRun, err)
 		}
 		if errors.Is(err, ErrDuplicateSession) {
-			return OpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
+			return OpenResult{}, ipcerr.Contract("terminalId is already open")
 		}
 		if errors.Is(err, ErrRegistryClosed) {
-			return OpenResult{}, ipcerr.New("E_INVALID", "terminal window is closing")
+			return OpenResult{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.edit.terminalWindowClosing.body", nil)
 		}
 		return OpenResult{}, ipcerr.InternalErr(err)
 	}

@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Conn is the whole of what this protocol needs from one renderer connection. Declared here rather
@@ -125,7 +126,7 @@ func (s *Session) sendChunk(f frame, blob []byte) error {
 		return err
 	}
 	if s.h.MaxFrameBytes > 0 && len(b) > s.h.MaxFrameBytes {
-		return ipcerr.New("E_FRAME_TOO_LARGE", "rpcstream: encoded chunk exceeds the frame size cap")
+		return ipcerr.T(ipcerr.CodeFrameTooLarge, "backend.core.rpcStream.frameTooLarge.body", nil)
 	}
 	select {
 	case s.sendCh <- b:
@@ -147,7 +148,7 @@ func (s *Session) sendResult(id int, resultBytes json.RawMessage) {
 	}
 	if s.h.MaxFrameBytes > 0 && len(b) > s.h.MaxFrameBytes {
 		s.send(frame{T: "res", ID: id, OK: boolPtr(false), Error: &wireError{
-			Code: "E_FRAME_TOO_LARGE", Message: "rpcstream: encoded response exceeds the frame size cap",
+			Code: string(ipcerr.CodeFrameTooLarge), Message: i18n.T("backend.core.rpcStream.frameTooLarge.body", nil),
 		}})
 		return
 	}
@@ -204,7 +205,7 @@ func (s *Session) handleRequest(ctx context.Context, entry *activeEntry, id int,
 	}
 	resultBytes, merr := json.Marshal(result)
 	if merr != nil {
-		s.send(frame{T: "res", ID: id, OK: boolPtr(false), Error: &wireError{Code: "E_INTERNAL", Message: merr.Error()}})
+		s.send(frame{T: "res", ID: id, OK: boolPtr(false), Error: &wireError{Code: string(ipcerr.CodeInternal), Message: merr.Error()}})
 		return
 	}
 	s.sendResult(id, resultBytes)
@@ -303,7 +304,7 @@ func (s *Session) handleRaw(raw []byte) {
 			s.mu.Unlock()
 			cancel()
 			s.send(frame{T: "res", ID: env.Body.ID, OK: boolPtr(false), Error: wireErrorFrom(
-				ipcerr.BadRequest("rpcstream: request id is already in flight"),
+				ipcerr.Contract("rpcstream: request id is already in flight"),
 			)})
 			return
 		}
@@ -319,7 +320,7 @@ func (s *Session) handleRaw(raw []byte) {
 			s.mu.Unlock()
 			cancel()
 			s.send(frame{T: "end", ID: env.Body.ID, Error: wireErrorFrom(
-				ipcerr.BadRequest("rpcstream: request id is already in flight"),
+				ipcerr.Contract("rpcstream: request id is already in flight"),
 			)})
 			return
 		}

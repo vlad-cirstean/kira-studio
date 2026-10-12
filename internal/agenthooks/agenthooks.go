@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/google/renameio/v2"
 	"github.com/kirathecat/kira-studio/internal/localsock"
 )
 
@@ -101,7 +102,7 @@ func New(opts Options) (*Server, error) {
 		return nil, err
 	}
 	shimPath := filepath.Join(ln.Dir, "hook")
-	if err := os.WriteFile(shimPath, []byte(shimBody), 0o700); err != nil {
+	if err := renameio.WriteFile(shimPath, []byte(shimBody), 0o700); err != nil {
 		_ = ln.Close()
 		return nil, fmt.Errorf("agenthooks: write shim: %w", err)
 	}
@@ -117,7 +118,7 @@ func New(opts Options) (*Server, error) {
 		return nil, err
 	}
 	hooksPath := filepath.Join(ln.Dir, "hooks.json")
-	if err := os.WriteFile(hooksPath, hooksDoc, 0o600); err != nil {
+	if err := renameio.WriteFile(hooksPath, hooksDoc, 0o600); err != nil {
 		_ = ln.Close()
 		return nil, fmt.Errorf("agenthooks: write hooks.json: %w", err)
 	}

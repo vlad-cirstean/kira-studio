@@ -490,6 +490,32 @@
   },
   "backend": {
     "core": {
+      "appUpdate": {
+        "canceled": {
+          "body": "The update was cancelled."
+        },
+        "downloadFailed": {
+          "body": "Couldn’t download the installer ({cause})."
+        },
+        "inProgress": {
+          "body": "An update is already in progress."
+        },
+        "installerStopped": {
+          "body": "The installer stopped before changing anything ({cause})."
+        },
+        "logOpenFailed": {
+          "body": "Couldn’t open the install log ({cause})."
+        },
+        "notRelease": {
+          "body": "Updates are available only in release builds."
+        },
+        "stageFailed": {
+          "body": "Couldn’t stage the installer ({cause})."
+        },
+        "timedOut": {
+          "body": "The update took too long and was stopped."
+        }
+      },
       "docker": {
         "edit": {
           "aliasesUnsupported": {
@@ -600,6 +626,24 @@
           "terminalWindowClosing": {
             "body": "The terminal window is closing."
           }
+        },
+        "notFound": {
+          "body": "That Docker item no longer exists."
+        }
+      },
+      "link": {
+        "invalidUrl": {
+          "body": "That isn’t a valid web address."
+        }
+      },
+      "prompt": {
+        "gone": {
+          "body": "This prompt no longer exists."
+        }
+      },
+      "rpcStream": {
+        "frameTooLarge": {
+          "body": "The data is larger than the frame size limit."
         }
       },
       "scriptDir": {
@@ -656,6 +700,14 @@
       },
       "seed": {
         "body": "Core seed placeholder."
+      },
+      "terminal": {
+        "commandTooLong": {
+          "body": "The command is too long."
+        },
+        "cwdMissing": {
+          "body": "The working folder doesn’t exist or isn’t a folder."
+        }
       }
     },
     "definition": {

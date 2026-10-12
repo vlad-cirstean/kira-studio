@@ -16,10 +16,10 @@ import (
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/google/renameio/v2"
+	"github.com/kirathecat/kira-studio/internal/tokenauth"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"github.com/kirathecat/kira-studio/internal/tokenauth"
 )
 
 const (
@@ -381,7 +381,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	}
 	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.mcp.json", name, id))
 	if err == nil {
-		err = os.WriteFile(path, cfg, 0o600)
+		err = renameio.WriteFile(path, cfg, 0o600)
 	}
 	release = func() {
 		_ = os.Remove(path)

@@ -82,5 +82,5 @@ func wireErrorFrom(err error) *wireError {
 	if errors.As(err, &ierr) {
 		return &wireError{Code: ierr.Code, Message: ierr.Message}
 	}
-	return &wireError{Code: "E_INTERNAL", Message: err.Error()}
+	return &wireError{Code: string(ipcerr.CodeInternal), Message: err.Error()}
 }

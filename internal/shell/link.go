@@ -20,7 +20,7 @@ type Browser interface {
 func OpenExternalURL(browser Browser, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return ipcerr.BadRequest("bridge: LinkService.OpenExternal: not a well-formed http(s) URL")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.link.invalidUrl.body", nil)
 	}
 	if err := browser.OpenURL(raw); err != nil {
 		return ipcerr.Internal(err.Error())

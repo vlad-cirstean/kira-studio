@@ -105,7 +105,7 @@ type WindowExistsChecker interface {
 }
 
 // CheckWindow is List/Save's shared guard (P113 G4, P107 I2-6): reject a windowKey that names no
-// `windows` row with a real E_BAD_REQUEST, rather than letting Save surface TabsRepo.Save's own raw
+// `windows` row with a real E_CONTRACT, rather than letting Save surface TabsRepo.Save's own raw
 // FOREIGN KEY constraint failure (C4) — List has no such constraint to fall back on, so it runs the
 // same check up front purely for a consistent error.
 func CheckWindow(windows WindowExistsChecker, windowKey string) error {
@@ -114,7 +114,7 @@ func CheckWindow(windows WindowExistsChecker, windowKey string) error {
 		return ipcerr.Internal(err.Error())
 	}
 	if !ok {
-		return ipcerr.BadRequest("unknown window: " + windowKey)
+		return ipcerr.Contract("unknown window: %s", windowKey)
 	}
 	return nil
 }

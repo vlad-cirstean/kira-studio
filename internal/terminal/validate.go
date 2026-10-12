@@ -36,39 +36,39 @@ const MaxLaunchTokenBytes = 64
 // ValidateOpen is both apps' own TerminalService.Open — identical up to whatever each app's own
 // Open builds into OpenParams past this call (P107 I2-5). The cwd check is not a trust boundary and
 // must not be read as one: the shell it starts is the user's own and can `cd` anywhere on its
-// first line. It exists so a stale path fails with a clear E_INVALID instead of a confusing exec
+// first line. It exists so a stale path fails with a clear E_BAD_REQUEST instead of a confusing exec
 // error.
 func ValidateOpen(args OpenArgs) error {
 	if args.TerminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	if args.WindowKey == "" {
-		return ipcerr.BadRequest("windowKey is required")
+		return ipcerr.Required("windowKey")
 	}
 	if !ValidDim(args.Cols) || !ValidDim(args.Rows) {
-		return ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
+		return ipcerr.Contract("cols/rows must be within [1, 1000]")
 	}
 	if !ValidLaunchKind(args.LaunchKind) {
-		return ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
+		return ipcerr.Contract("launchKind must be shell, claude-code or script")
 	}
 	if args.ScriptLaunchToken != "" && (args.ScriptID == "" || len(args.ScriptLaunchToken) > MaxLaunchTokenBytes) {
-		return ipcerr.New("E_INVALID", "scriptLaunchToken needs scriptId and at most 64 characters")
+		return ipcerr.Contract("scriptLaunchToken needs scriptId and at most 64 characters")
 	}
 	if args.ScriptID != "" {
 		if args.LaunchKind != LaunchKindScript {
-			return ipcerr.New("E_INVALID", "scriptId needs launchKind script")
+			return ipcerr.Contract("scriptId needs launchKind script")
 		}
 		return nil
 	}
 	if !filepath.IsAbs(args.Cwd) {
-		return ipcerr.New("E_INVALID", "cwd must be an absolute path")
+		return ipcerr.Contract("cwd must be an absolute path")
 	}
 	info, err := os.Stat(args.Cwd)
 	if err != nil || !info.IsDir() {
-		return ipcerr.New("E_INVALID", "cwd does not exist or is not a directory")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.terminal.cwdMissing.body", nil)
 	}
 	if len(args.Command) > MaxCommandBytes {
-		return ipcerr.New("E_INVALID", "command is too long")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.terminal.commandTooLong.body", nil)
 	}
 	return nil
 }

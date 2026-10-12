@@ -168,7 +168,7 @@ func TestImagesVolumesNetworks(t *testing.T) {
 			t.Fatalf("inspect %s raw lacks %q", kind, c.want)
 		}
 	}
-	if _, err := svc.Inspect(docker.InspectArgs{Kind: "secret", ID: "x"}); err == nil || testx.AsIpcErr(t, err).Code != "E_BAD_REQUEST" {
-		t.Fatalf("unknown kind = %v, want E_BAD_REQUEST", err)
+	if _, err := svc.Inspect(docker.InspectArgs{Kind: "secret", ID: "x"}); err == nil || testx.AsIpcErr(t, err).Code != "E_CONTRACT" {
+		t.Fatalf("unknown kind = %v, want E_CONTRACT", err)
 	}
 }

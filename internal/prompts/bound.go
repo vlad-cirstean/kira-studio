@@ -45,10 +45,10 @@ func (b *Bound) Claim(args ClaimArgs) error { return ipcerr.Wrap(b.R.Claim(args.
 // Raise opens an update popup; idempotent per ref.
 func (b *Bound) Raise(args RaiseArgs) error {
 	if args.Kind != KindUpdate {
-		return ipcerr.New("E_INVALID", "only the update prompt is raised from the window")
+		return ipcerr.Contract("only the update prompt is raised from the window")
 	}
 	if args.Ref == "" || len(args.Ref) > maxRefBytes || !utf8.ValidString(args.Ref) {
-		return ipcerr.BadRequest("ref is required and at most 64 bytes")
+		return ipcerr.Contract("ref is required and at most 64 bytes")
 	}
 	b.R.Open(Prompt{
 		ID: ID(KindUpdate, args.Ref), Kind: KindUpdate, Ref: args.Ref,
@@ -60,10 +60,10 @@ func (b *Bound) Raise(args RaiseArgs) error {
 // Dismiss closes an update popup.
 func (b *Bound) Dismiss(args IDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if !strings.HasPrefix(args.ID, string(KindUpdate)+":") {
-		return ipcerr.New("E_INVALID", "only the update prompt is dismissed from the window")
+		return ipcerr.Contract("only the update prompt is dismissed from the window")
 	}
 	b.R.Close(args.ID)
 	return nil

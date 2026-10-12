@@ -35,7 +35,7 @@ func ValidLaunchKind(v string) bool {
 const MaxDim = 1000
 
 // MaxCommandBytes bounds an Open command well under macOS's ARG_MAX (1 MiB for argv plus
-// environment together, P85 §4) — a clear E_INVALID instead of an opaque E2BIG out of exec.
+// environment together, P85 §4) — a clear E_BAD_REQUEST instead of an opaque E2BIG out of exec.
 const MaxCommandBytes = 64 * 1024
 
 // ValidDim reports whether n is within [1, MaxDim].
@@ -65,11 +65,11 @@ type Service struct {
 // (Registry.Write's own rule) — a renderer can have a keystroke in flight when a shell exits.
 func (s *Service) Write(terminalID, dataB64 string) error {
 	if terminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	data, err := base64.StdEncoding.DecodeString(dataB64)
 	if err != nil {
-		return ipcerr.New("E_INVALID", "data must be base64")
+		return ipcerr.Contract("data must be base64")
 	}
 	if err := s.Registry.Write(terminalID, data); err != nil {
 		return ipcerr.Internal(err.Error())
@@ -81,10 +81,10 @@ func (s *Service) Write(terminalID, dataB64 string) error {
 // session.
 func (s *Service) Resize(terminalID string, cols, rows int) error {
 	if terminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	if !ValidDim(cols) || !ValidDim(rows) {
-		return ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
+		return ipcerr.Contract("cols/rows must be within [1, 1000]")
 	}
 	if err := s.Registry.Resize(terminalID, uint16(cols), uint16(rows)); err != nil {
 		return ipcerr.Internal(err.Error())
@@ -95,7 +95,7 @@ func (s *Service) Resize(terminalID string, cols, rows int) error {
 // Close kills terminalID's own session — idempotent, per Session.Close.
 func (s *Service) Close(terminalID string) error {
 	if terminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	s.Registry.Close(terminalID)
 	return nil

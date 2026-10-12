@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/google/renameio/v2"
 )
 
 // maxStatusLineBytes bounds one /statusline body; a statusline payload is a few KiB.
@@ -92,7 +94,7 @@ func (s *Server) composeStatusLine(terminalID, cwd string) (string, []string, er
 	}
 	sum := sha256.Sum256([]byte(terminalID))
 	path := filepath.Join(s.ln.Dir, "settings-"+hex.EncodeToString(sum[:])[:12]+".json")
-	if err := os.WriteFile(path, doc, 0o600); err != nil {
+	if err := renameio.WriteFile(path, doc, 0o600); err != nil {
 		return "", nil, fmt.Errorf("agenthooks: write settings: %w", err)
 	}
 	quoted, err := shellSingleQuote(path)

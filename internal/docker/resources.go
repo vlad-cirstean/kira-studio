@@ -232,7 +232,7 @@ func (m *Manager) mapErr(ep Endpoint, err error) error {
 	}
 	switch {
 	case cerrdefs.IsNotFound(err):
-		return ipcerr.NotFound(err.Error())
+		return ipcerr.T(ipcerr.CodeNotFound, "backend.core.docker.notFound.body", nil)
 	case cerrdefs.IsInvalidArgument(err), cerrdefs.IsPermissionDenied(err):
 		return ipcerr.BadRequest(err.Error())
 	case cerrdefs.IsConflict(err):

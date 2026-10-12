@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/renameio/v2"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -228,7 +229,7 @@ func WriteUserConfig(env func(string) string, dir, runID string, names []string)
 		return "", nil, fmt.Errorf("claudeheadless: config dir: %w", err)
 	}
 	path = filepath.Join(dir, runID+"-user.mcp.json")
-	if err := os.WriteFile(path, body, 0o600); err != nil {
+	if err := renameio.WriteFile(path, body, 0o600); err != nil {
 		return "", nil, fmt.Errorf("claudeheadless: write user mcp config: %w", err)
 	}
 	return path, func() { _ = os.Remove(path) }, nil

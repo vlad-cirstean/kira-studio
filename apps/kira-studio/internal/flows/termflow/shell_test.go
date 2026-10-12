@@ -52,21 +52,23 @@ func TestOpenRefusals(t *testing.T) {
 	open(t, app, "w1", "live", app.Home)
 
 	base := terminal.OpenArgs{TerminalID: "r", WindowKey: "w1", Cwd: app.Home, Cols: 80, Rows: 24}
-	cases := map[string]func(a terminal.OpenArgs) terminal.OpenArgs{
-		"relative cwd": func(a terminal.OpenArgs) terminal.OpenArgs { a.Cwd = "relative/dir"; return a },
-		"missing cwd":  func(a terminal.OpenArgs) terminal.OpenArgs { a.Cwd = app.Home + "/nope"; return a },
-		"zero cols":    func(a terminal.OpenArgs) terminal.OpenArgs { a.Cols = 0; return a },
-		"long command": func(a terminal.OpenArgs) terminal.OpenArgs {
+	cases := map[string]struct {
+		mutate func(a terminal.OpenArgs) terminal.OpenArgs
+		code   string
+	}{
+		"relative cwd": {func(a terminal.OpenArgs) terminal.OpenArgs { a.Cwd = "relative/dir"; return a }, "E_CONTRACT"},
+		"missing cwd":  {func(a terminal.OpenArgs) terminal.OpenArgs { a.Cwd = app.Home + "/nope"; return a }, "E_BAD_REQUEST"},
+		"zero cols":    {func(a terminal.OpenArgs) terminal.OpenArgs { a.Cols = 0; return a }, "E_CONTRACT"},
+		"long command": {func(a terminal.OpenArgs) terminal.OpenArgs {
 			a.Command = strings.Repeat("x", terminal.MaxCommandBytes+1)
 			return a
-		},
-		"duplicate id": func(a terminal.OpenArgs) terminal.OpenArgs { a.TerminalID = "live"; a.WindowKey = "w2"; return a },
+		}, "E_BAD_REQUEST"},
+		"duplicate id": {func(a terminal.OpenArgs) terminal.OpenArgs { a.TerminalID = "live"; a.WindowKey = "w2"; return a }, "E_CONTRACT"},
 	}
-	for name, mutate := range cases {
-		args := mutate(base)
-		_, err := svc.Open(args)
-		if err == nil || testx.AsIpcErr(t, err).Code != "E_INVALID" {
-			t.Fatalf("%s: err = %v, want E_INVALID", name, err)
+	for name, c := range cases {
+		_, err := svc.Open(c.mutate(base))
+		if err == nil || testx.AsIpcErr(t, err).Code != c.code {
+			t.Fatalf("%s: err = %v, want %s", name, err, c.code)
 		}
 	}
 	if _, ok := app.W.TerminalRegistry.WindowOf("r"); ok {
@@ -120,8 +122,8 @@ func TestQuitTearsDownTerminals(t *testing.T) {
 		testx.WaitUntil(t, wait, func() bool { return !testx.ProcessAlive(pids[w]) })
 	}
 	_, err := app.W.Terminal.Open(terminal.OpenArgs{TerminalID: "late", WindowKey: "A", Cwd: app.Home, Cols: 80, Rows: 24})
-	if err == nil || testx.AsIpcErr(t, err).Code != "E_INVALID" || !strings.Contains(err.Error(), "window is closing") {
-		t.Fatalf("Open after Quit = %v, want E_INVALID terminal window is closing", err)
+	if err == nil || testx.AsIpcErr(t, err).Code != "E_CONFLICT" {
+		t.Fatalf("Open after Quit = %v, want E_CONFLICT", err)
 	}
 }
 

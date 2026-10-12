@@ -131,18 +131,18 @@ func (i *Installer) Stage(ctx context.Context) error {
 		err = validateScript(body)
 	}
 	if err != nil {
-		return ipcerr.Internal("couldn't download the installer: " + err.Error())
+		return ipcerr.T(ipcerr.CodeInternal, "backend.core.appUpdate.downloadFailed.body", map[string]string{"cause": err.Error()})
 	}
 
 	scriptPath, err := writeScriptFile(body)
 	if err != nil {
-		return ipcerr.Internal("couldn't stage the installer: " + err.Error())
+		return ipcerr.T(ipcerr.CodeInternal, "backend.core.appUpdate.stageFailed.body", map[string]string{"cause": err.Error()})
 	}
 
 	logFile, err := openLogFile(i.logPath, i.app.Name, i.running)
 	if err != nil {
 		_ = os.Remove(scriptPath)
-		return ipcerr.Internal("couldn't open the install log: " + err.Error())
+		return ipcerr.T(ipcerr.CodeInternal, "backend.core.appUpdate.logOpenFailed.body", map[string]string{"cause": err.Error()})
 	}
 
 	staged, stageErr := i.spawnAndAwait(sctx, scriptPath, logFile)
@@ -157,10 +157,10 @@ func (i *Installer) begin(ctx context.Context) (sctx context.Context, ok bool, e
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if !isReleaseBuild(i.running) {
-		return nil, false, ipcerr.BadRequest("update: not a release build")
+		return nil, false, ipcerr.T(ipcerr.CodeUnsupported, "backend.core.appUpdate.notRelease.body", nil)
 	}
 	if i.state != stateIdle {
-		return nil, false, ipcerr.New("E_INVALID", "an update is already in progress")
+		return nil, false, ipcerr.T(ipcerr.CodeConflict, "backend.core.appUpdate.inProgress.body", nil)
 	}
 	i.state = stateStaging
 	sctx, cancel := context.WithTimeout(ctx, stageTimeout)
@@ -362,7 +362,7 @@ func (i *Installer) handleLine(scriptPath, text string, exited <-chan error) (bo
 	case <-time.After(handoffGrace):
 	}
 	_ = os.Remove(scriptPath)
-	return false, ipcerr.Internal("the installer stopped before changing anything: " + tailError(i.logPath))
+	return false, ipcerr.T(ipcerr.CodeInternal, "backend.core.appUpdate.installerStopped.body", map[string]string{"cause": tailError(i.logPath)})
 }
 
 func (i *Installer) handleCancel(scriptPath string, pid int, ctx context.Context, exited <-chan error) error {
@@ -375,9 +375,9 @@ func (i *Installer) handleCancel(scriptPath string, pid int, ctx context.Context
 	}
 	_ = os.Remove(scriptPath)
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return ipcerr.New("E_TIMEOUT", "the update took too long and was stopped")
+		return ipcerr.T(ipcerr.CodeTimeout, "backend.core.appUpdate.timedOut.body", nil)
 	}
-	return ipcerr.New("E_CANCELLED", "update canceled")
+	return ipcerr.T(ipcerr.CodeCancelled, "backend.core.appUpdate.canceled.body", nil)
 }
 
 // tailError returns the last ERROR: line (else the last non-empty line) of logPath's final 4 KiB —

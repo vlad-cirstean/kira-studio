@@ -229,11 +229,11 @@ func TestUpdatePrompt(t *testing.T) {
 		t.Fatal("no update note")
 	}
 
-	if err := app.W.PromptsSvc.Raise(prompts.RaiseArgs{Kind: prompts.KindDbMcp, Ref: "x"}); code(err) != "E_INVALID" {
-		t.Fatalf("Raise of a non-update kind = %v, want E_INVALID", err)
+	if err := app.W.PromptsSvc.Raise(prompts.RaiseArgs{Kind: prompts.KindDbMcp, Ref: "x"}); code(err) != "E_CONTRACT" {
+		t.Fatalf("Raise of a non-update kind = %v, want E_CONTRACT", err)
 	}
-	if err := app.W.PromptsSvc.Dismiss(prompts.IDArgs{ID: "dbmcp:x"}); code(err) != "E_INVALID" {
-		t.Fatalf("Dismiss of a non-update id = %v, want E_INVALID", err)
+	if err := app.W.PromptsSvc.Dismiss(prompts.IDArgs{ID: "dbmcp:x"}); code(err) != "E_CONTRACT" {
+		t.Fatalf("Dismiss of a non-update id = %v, want E_CONTRACT", err)
 	}
 	if err := app.W.PromptsSvc.Dismiss(prompts.IDArgs{ID: "update:1.3.0"}); err != nil {
 		t.Fatal(err)
