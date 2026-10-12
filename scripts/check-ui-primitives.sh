@@ -10,6 +10,11 @@
 #
 # U39-U63 never scan `/behaviour/` (the owning modules) or `/testing/`.
 #
+# P266 pending lists (scripts/consistency-allowlist/*.txt): a line `U<n> path` (n >= 72) exempts that
+# whole file from that one guard while it is unmigrated. Lines for other ids (N*, G*, U64-U71) belong
+# to the other checkers and are ignored here. An entry that exempts nothing fails the run, so each
+# list only shrinks. Guards U72-U82: docs/v2.2/plans/P266-consistency-audit.md section 4.4.
+#
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
 
@@ -30,7 +35,10 @@ if [ -z "$GNU_GREP" ]; then
   exit 1
 fi
 
+ALLOW_DIR=scripts/consistency-allowlist
+
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
+CORE_DIRS="packages/git-core/src packages/git-ipc/src packages/api-core/src"
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -156,7 +164,7 @@ PERMANENT
 PRE='(?(DEFINE)(?<t>(?:"[^"]*"|'"'"'[^'"'"']*'"'"'|[^>"'"'"'])*))'
 TOK='(?<![\w-])'
 
-# id@@files(v=.vue, vt=.vue+.ts, s=.vue+.ts in SIDE_PANELS only, vS=.vue under /settings/ only)@@built-in exempt paths (|; a name
+# id@@files(v=.vue, vt=.vue+.ts, vc=.vue+.ts also in git-core/git-ipc/api-core, vm=.vue+.ts under mobile only, s=.vue+.ts in SIDE_PANELS only, vS=.vue under /settings/ only)@@built-in exempt paths (|; a name
 # matches a file name, a /dir/ matches anywhere in the path)@@message@@regex
 cat >"$TMP/guards" <<GUARDS
 U1@@v@@@@<DialogContent without size=@@<DialogContent\b(?!(?&t)\bsize=)
@@ -225,6 +233,18 @@ U60@@vt@@/behaviour/|/testing/@@vue-draggable-plus (use useSortableReorder)@@fro
 U61@@vt@@/behaviour/|/testing/@@empty catch (give a reason comment or surface the error)@@catch\s*(?:\(\w*\))?\s*\{\s*\}|\.catch\(\(\)\s*=>\s*(?:\{\s*\}|undefined)\)
 U62@@vt@@/behaviour/|/testing/@@manual focus() (use useFocusOnMount, useFocusReturn, useListNavigation)@@\.focus\(\)|nextTick\([^)]*\.focus
 U63@@s@@/behaviour/|/testing/@@side panel with SearchField and no usePanelHeaderSearch@@(?s)\A(?!.*usePanelHeaderSearch).*<SearchField
+U72@@vt@@@@@lucide/vue import outside the theme ui primitives (use CodiconIcon, ICON)@@['"]@lucide/vue
+U73@@vt@@CodiconIcon.vue|Spinner.vue@@retired icon name gear/settings/kebab-vertical, or a 'codicon-' string literal (use ICON)@@\b(?:name|icon)(?:=|:\s*)["']{1,2}(?:gear|settings|kebab-vertical)["']|['"\x60]codicon-
+U74@@v@@EmptyState.vue@@<Empty outside EmptyState.vue (use EmptyState)@@<Empty\b
+U75@@vt@@@@duration-, ease-, animate-in, animate-out outside theme (motion tokens own them)@@${TOK}(?:duration|ease)-[\w\[]|${TOK}animate-(?:in|out)(?![\w-])
+U76@@vt@@sortableReorder.ts@@ghostClass outside sortableReorder.ts (use SORTABLE_GHOST_CLASS)@@\bghostClass:
+U77@@vt@@@@bare void on a bridge call (use fireAndForget)@@\bvoid\s+(?:(?:ctx|props)\.)?(?:control|bridge)\.\w+\(
+U78@@s@@@@Button inside EmptyState in a side panel (the front door has no action button)@@(?s)<EmptyState\b(?&t)(?<!/)>(?:(?!</EmptyState>).)*?<Button\b
+U79@@vt@@openExternal.ts|apps/kira-space/frontend/src/bridge/index.ts|apps/kira-studio/frontend/src/docker/context.ts@@direct linkOpenExternal or LinkService.OpenExternal (use createOpenExternal)@@linkOpenExternal\(|LinkService\.OpenExternal\(
+U80@@v@@ShowMoreButton.vue@@ShowMoreButton without useCappedList@@(?s)\A(?!.*useCappedList\().*ShowMoreButton
+U81@@vt@@@@empty .catch(() => {}) (use fireAndForget or give the error a surface)@@\.catch\(\s*\(\s*\w*\s*\)\s*=>\s*\{\s*\}\s*\)
+U82@@vc@@/lib/sha.ts@@.slice(0, 7|8) on a sha (use shortSha)@@\.slice\(\s*0\s*,\s*[78]\s*\)
+U82@@vm@@@@h-11, size-11 or min-h-11 in mobile (use h-touch, size-touch, min-h-touch)@@${TOK}(?:h|size|min-h)-11(?![\w.-])
 GUARDS
 
 # hits: "U<n> path"
@@ -235,8 +255,13 @@ while IFS= read -r line; do
   exempt=${rest%%@@*}; rest=${rest#*@@}
   rest=${rest#*@@}
   regex=$rest
-  if [ "$kinds" = vt ]; then inc="--include=*.vue --include=*.ts"; else inc="--include=*.vue"; fi
+  case "$kinds" in
+    vt | vc | vm) inc="--include=*.vue --include=*.ts" ;;
+    *) inc="--include=*.vue" ;;
+  esac
   scan=$DIRS; flag=-r
+  if [ "$kinds" = vc ]; then scan="$DIRS $CORE_DIRS"; fi
+  if [ "$kinds" = vm ]; then scan=apps/kira-space/frontend/mobile; fi
   if [ "$kinds" = s ]; then
     inc=""; flag=""
     scan=$(cat "$TMP/side_panels")
@@ -278,11 +303,25 @@ mv "$TMP/perm_ids" "$TMP/perm"
 
 sort -u "$TMP/perm" -o "$TMP/perm"
 
+# pending lists: `U<n> path` (n >= 72); lines for other ids are another checker's
+: >"$TMP/pending"
+if [ -d "$ALLOW_DIR" ]; then
+  for list in "$ALLOW_DIR"/*.txt; do
+    [ -f "$list" ] || continue
+    sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//' "$list" |
+      grep -E '^U(7[2-9]|8[0-9]|9[0-9]) ' >>"$TMP/pending" || true
+  done
+fi
+sort -u "$TMP/pending" -o "$TMP/pending"
+
 STATUS=0
 : >"$TMP/used_perm"
+: >"$TMP/used_pending"
 while read -r id f; do
   if grep -qxF "$id $f" "$TMP/perm"; then
     echo "$id $f" >>"$TMP/used_perm"
+  elif grep -qxF "$id $f" "$TMP/pending"; then
+    echo "$id $f" >>"$TMP/used_pending"
   else
     msg=$(grep "^$id@@" "$TMP/guards" | head -1 | awk -F'@@' '{print $4}')
     echo "check-ui-primitives: $f: $id $msg" >&2
@@ -297,10 +336,17 @@ while read -r id f; do
     STATUS=1
   fi
 done <"$TMP/perm"
+sort -u "$TMP/used_pending" -o "$TMP/used_pending"
+while read -r id f; do
+  if ! grep -qxF "$id $f" "$TMP/used_pending"; then
+    echo "check-ui-primitives: stale pending entry (no $id hit left or file gone): $id $f" >&2
+    STATUS=1
+  fi
+done <"$TMP/pending"
 
 if [ "$STATUS" -ne 0 ]; then
-  echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3." >&2
+  echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3 and P266-consistency-audit.md §4.4." >&2
 else
-  echo "check-ui-primitives: every guarded element follows the P262, P263 and P264 rules."
+  echo "check-ui-primitives: every guarded element follows the P262-P266 rules."
 fi
 exit $STATUS
