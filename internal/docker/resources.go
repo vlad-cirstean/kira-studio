@@ -234,13 +234,13 @@ func (m *Manager) mapErr(ep Endpoint, err error) error {
 	case cerrdefs.IsNotFound(err):
 		return ipcerr.NotFound(err.Error())
 	case cerrdefs.IsInvalidArgument(err), cerrdefs.IsPermissionDenied(err):
-		return ipcerr.New("E_INVALID", err.Error())
+		return ipcerr.BadRequest(err.Error())
 	case cerrdefs.IsConflict(err):
-		return ipcerr.New("E_CONFLICT", err.Error())
+		return ipcerr.New(string(ipcerr.CodeConflict), err.Error())
 	}
 	if !ep.Remote || isConnErr(err) {
 		if reason := m.classify(ep, err); reason != reasonError {
-			e := ipcerr.New("E_DOCKER_UNAVAILABLE", err.Error())
+			e := ipcerr.New(string(ipcerr.CodeUnavailable), err.Error())
 			e.Details, _ = json.Marshal(map[string]string{"reason": reason})
 			return e
 		}
@@ -493,7 +493,7 @@ func (m *Manager) inspect(ctx context.Context, kind, id string) (InspectResult, 
 			}
 			out.Raw = indentJSON(res.Raw)
 		default:
-			return ipcerr.New("E_INVALID", "kind must be image, volume or network")
+			return ipcerr.Contract("kind must be image, volume or network")
 		}
 		return nil
 	})

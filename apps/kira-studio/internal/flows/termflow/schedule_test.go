@@ -160,7 +160,7 @@ func TestScheduleValidation(t *testing.T) {
 	if err != nil || len(fires) != 3 || fires[1]-fires[0] != 24*time.Hour.Milliseconds() {
 		t.Fatalf("NextFires = %v, %v", fires, err)
 	}
-	if _, err := app.W.ScriptRuns.NextFires(scriptruns.NextFiresArgs{Cron: "* * *", Timezone: "UTC"}); errCode(err) != "E_INVALID" ||
+	if _, err := app.W.ScriptRuns.NextFires(scriptruns.NextFiresArgs{Cron: "* * *", Timezone: "UTC"}); errCode(err) != "E_BAD_REQUEST" ||
 		!strings.Contains(err.Error(), "cron needs 5 fields") {
 		t.Fatalf("NextFires with a bad cron = %v", err)
 	}
@@ -305,7 +305,7 @@ func TestScheduleConfirm(t *testing.T) {
 		}
 		app.Contract(t, sc, "ScriptRunsService.ReadLog", page)
 	}
-	if _, err := app.W.ScriptRuns.ConfirmAccept(scriptruns.ConfirmArgs{RunID: waiting.ID, Hash: pv.Hash}); errCode(err) != "E_INVALID" ||
+	if _, err := app.W.ScriptRuns.ConfirmAccept(scriptruns.ConfirmArgs{RunID: waiting.ID, Hash: pv.Hash}); errCode(err) != "E_CONFLICT" ||
 		!strings.Contains(err.Error(), "already answered") {
 		t.Fatalf("second accept = %v", err)
 	}
@@ -419,7 +419,7 @@ func TestRunScheduleNow(t *testing.T) {
 	if run.Trigger != scriptruns.TriggerScheduled || run.TerminalID != "" {
 		t.Fatalf("run = %+v", run)
 	}
-	if _, err := app.W.ScriptRuns.RunScheduleNow(args); errCode(err) != "E_INVALID" || !strings.Contains(err.Error(), "still running") {
+	if _, err := app.W.ScriptRuns.RunScheduleNow(args); errCode(err) != "E_CONFLICT" || !strings.Contains(err.Error(), "still running") {
 		t.Fatalf("second Run now = %v", err)
 	}
 	if n := len(scheduledRuns(t, app, rec.ID)); n != 1 {
@@ -435,7 +435,7 @@ func TestStudioScheduleRefusesTask(t *testing.T) {
 	rec := recurring(t, app, "* * * * *", func(f *scripts.CustomScriptFields) { f.Schedule.TaskID = "task-1" })
 	advance(t, clock, 30*time.Second)
 	r := waitSched(t, app, rec.ID, 0, "skipped")
-	if !strings.Contains(reasonOf(r), "tasks exist only in Kira Space") {
+	if !strings.Contains(reasonOf(r), "Tasks exist only in Kira Space") {
 		t.Fatalf("reason = %q", reasonOf(r))
 	}
 }

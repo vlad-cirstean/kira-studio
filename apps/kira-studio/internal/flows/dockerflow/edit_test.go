@@ -252,11 +252,11 @@ func TestUpdateContainerRejects(t *testing.T) {
 	}
 	app.Contract(t, "docker-edit", "DockerService.UpdateContainer#stale", stale, editOpts(d, box)...)
 	ie := try(func(in *docker.InPlaceSpec) { in.Resources.Memory = 0 }, spec.BaseHash)
-	if ie.Code != "E_INVALID" || !strings.Contains(string(ie.Details), "resources.memory") {
-		t.Fatalf("clear memory = %s %s, want E_INVALID on resources.memory", ie.Code, ie.Details)
+	if ie.Code != "E_BAD_REQUEST" || !strings.Contains(string(ie.Details), "resources.memory") {
+		t.Fatalf("clear memory = %s %s, want E_BAD_REQUEST on resources.memory", ie.Code, ie.Details)
 	}
-	if ie := try(func(in *docker.InPlaceSpec) { in.Resources.Memory, in.Resources.MemorySwap = 128*mib, 64*mib }, spec.BaseHash); ie.Code != "E_INVALID" {
-		t.Fatalf("swap below memory code = %s, want E_INVALID", ie.Code)
+	if ie := try(func(in *docker.InPlaceSpec) { in.Resources.Memory, in.Resources.MemorySwap = 128*mib, 64*mib }, spec.BaseHash); ie.Code != "E_BAD_REQUEST" {
+		t.Fatalf("swap below memory code = %s, want E_BAD_REQUEST", ie.Code)
 	}
 	otherName := strings.TrimPrefix(inspectName(t, d, other), "/")
 	if ie := try(func(in *docker.InPlaceSpec) { in.Name = otherName }, spec.BaseHash); ie.Code != "E_CONFLICT" {
@@ -270,8 +270,8 @@ func TestUpdateContainerRejects(t *testing.T) {
 	}
 	app.Contract(t, "docker-edit", "DockerService.ContainerEditSpec#managed", mspec, editOpts(d, box)...)
 	_, err = svc.UpdateContainer(docker.UpdateArgs{ID: managed, BaseHash: mspec.BaseHash, Spec: mspec.InPlace})
-	if ie := ipcCode(t, err); ie.Code != "E_INVALID" {
-		t.Fatalf("managed code = %s, want E_INVALID", ie.Code)
+	if ie := ipcCode(t, err); ie.Code != "E_BAD_REQUEST" {
+		t.Fatalf("managed code = %s, want E_BAD_REQUEST", ie.Code)
 	}
 }
 
@@ -493,8 +493,8 @@ func TestRecreateRefusals(t *testing.T) {
 	}
 	_, err = svc.RecreateContainer(docker.RecreateArgs{ID: auto, BaseHash: aspec.BaseHash, InPlace: aspec.InPlace, Recreate: aspec.Recreate})
 	ie := ipcCode(t, err)
-	if ie.Code != "E_INVALID" {
-		t.Fatalf("auto-remove code = %s, want E_INVALID", ie.Code)
+	if ie.Code != "E_BAD_REQUEST" {
+		t.Fatalf("auto-remove code = %s, want E_BAD_REQUEST", ie.Code)
 	}
 	autoBox := editBox{}
 	app.Contract(t, "docker-edit", "DockerService.ContainerEditSpec#auto-remove", aspec, editOpts(d, autoBox)...)

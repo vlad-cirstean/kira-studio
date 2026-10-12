@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // maxSmartRuns is how many headless smart runs go at once.
@@ -126,11 +127,11 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 		return nil, ipcerr.InternalErr(err)
 	}
 	if rec == nil {
-		return nil, ipcerr.NotFound("script not found")
+		return nil, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	vals, missing, err := scripts.ParamValues(rec.Params, args.Params)
 	if err != nil {
-		return nil, ipcerr.New("E_INVALID", err.Error())
+		return nil, ipcerr.BadRequest(err.Error())
 	}
 	p := &planned{script: *rec, dir: scripts.ResolveDir(*rec, s.Home), args: args, opts: o}
 	pv := Preview{
@@ -210,14 +211,14 @@ func nonNilStrings(s []string) []string {
 // checkPromptEdit answers why a one-off prompt cannot run, "" when it can.
 func checkPromptEdit(body string, params []scripts.Param) string {
 	if body == "" {
-		return "the prompt is empty"
+		return i18n.T("backend.core.scriptRun.promptEmpty.body", nil)
 	}
 	if utf8.RuneCountInString(body) > scripts.MaxPrompt {
-		return fmt.Sprintf("the prompt is longer than %d characters", scripts.MaxPrompt)
+		return i18n.T("backend.core.scriptRun.promptTooLong.body", map[string]string{"max": strconv.Itoa(scripts.MaxPrompt)})
 	}
 	for _, p := range params {
 		if p.Secret && containsVarName(body, p.Name) {
-			return "secret param " + p.Name + " cannot be used in the prompt"
+			return i18n.T("backend.core.scriptRun.promptSecret.body", map[string]string{"name": p.Name})
 		}
 	}
 	return ""
@@ -238,7 +239,7 @@ func (s *Service) smartBlocker(mcp []string) string {
 	running := len(s.smart)
 	s.mu.Unlock()
 	if running >= maxSmartRuns {
-		return fmt.Sprintf("%d smart scripts are running: wait for one to finish", maxSmartRuns)
+		return i18n.T("backend.core.scriptRun.smartCap.body", map[string]string{"max": strconv.Itoa(maxSmartRuns)})
 	}
 	if len(mcp) == 0 {
 		return ""
@@ -319,7 +320,7 @@ func (s *Service) Start(args StartArgs) (Started, error) {
 func (s *Service) claimWorktree(p *planned, keep bool) (*planned, error) {
 	release, err := s.ADE.ClaimWorktree(context.Background(), p.preview.ADE.BranchID, p.script.Name)
 	if err != nil {
-		return nil, ipcerr.New("E_INVALID", err.Error())
+		return nil, ipcerr.BadRequest(err.Error())
 	}
 	if !keep {
 		release()

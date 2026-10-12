@@ -31,13 +31,13 @@ func (s *Service) startTerminal(p *planned) (Started, error) {
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	if err := scripts.PrepareDir(p.dir); err != nil {
-		return Started{}, ipcerr.New("E_INVALID", err.Error())
+		return Started{}, ipcerr.BadRequest(err.Error())
 	}
 	now := time.UnixMilli(s.now())
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return Started{}, ipcerr.New("E_INVALID", "Kira is closing")
+		return Started{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.core.scriptRun.closing.body", map[string]string{"app": s.App})
 	}
 	if s.launches == nil {
 		s.launches = map[string]launch{}

@@ -168,15 +168,24 @@ func shortID(id string) string {
 	return id
 }
 
-func invalid(field, msg string) error {
-	e := ipcerr.New("E_INVALID", msg)
+// invalid refuses a form value with catalog text; the field name lets the editor mark the input.
+func invalid(field, key string, params map[string]string) error {
+	return withField(ipcerr.T(ipcerr.CodeBadRequest, key, params), field)
+}
+
+// invalidRaw refuses a form value with text from the engine, verbatim.
+func invalidRaw(field, msg string) error {
+	return withField(ipcerr.BadRequest(msg), field)
+}
+
+func withField(e *ipcerr.Error, field string) error {
 	e.Details, _ = json.Marshal(map[string]string{"field": field})
 	return e
 }
 
 func (s EditSpec) readOnlyErr() error {
 	if s.Managed != "" {
-		return ipcerr.New("E_INVALID", "container is managed by "+s.Managed+"; edit the workload instead")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.docker.edit.managed.body", map[string]string{"managed": s.Managed})
 	}
 	return nil
 }
@@ -450,7 +459,7 @@ func swapSet(mem, swap int64) bool { return swap == -1 || swap == 0 || swap >= m
 // validateInPlace checks in against cur (the live spec) with the engine's rules.
 func validateInPlace(cur EditSpec, in InPlaceSpec) error {
 	if !nameRe.MatchString(in.Name) {
-		return invalid("name", "name must match [a-zA-Z0-9][a-zA-Z0-9_.-]+")
+		return invalid("name", "backend.core.docker.edit.nameInvalid.body", nil)
 	}
 	if err := validateResources(in.Resources); err != nil {
 		return err
@@ -459,10 +468,10 @@ func validateInPlace(cur EditSpec, in InPlaceSpec) error {
 		return err
 	}
 	if err := container.ValidateRestartPolicy(container.RestartPolicy{Name: container.RestartPolicyMode(in.Restart.Name), MaximumRetryCount: in.Restart.MaxRetries}); err != nil {
-		return invalid("restart", err.Error())
+		return invalidRaw("restart", err.Error())
 	}
 	if cur.AutoRemove && in.Restart != cur.InPlace.Restart {
-		return invalid("restart", "restart policy cannot change on an auto-remove container")
+		return invalid("restart", "backend.core.docker.edit.restartAutoRemove.body", nil)
 	}
 	return validateNetworks(cur, in.Networks)
 }
@@ -470,31 +479,31 @@ func validateInPlace(cur EditSpec, in InPlaceSpec) error {
 func validateResources(r Resources) error {
 	switch {
 	case r.Memory < 0 || r.MemoryReservation < 0:
-		return invalid("resources.memory", "memory must not be negative")
+		return invalid("resources.memory", "backend.core.docker.edit.memoryNegative.body", nil)
 	case r.Memory != 0 && r.Memory < minMemory:
-		return invalid("resources.memory", "memory minimum is 6 MiB")
+		return invalid("resources.memory", "backend.core.docker.edit.memoryMinimum.body", nil)
 	case r.Memory != 0 && r.MemoryReservation > r.Memory:
-		return invalid("resources.memoryReservation", "reservation must not exceed memory")
+		return invalid("resources.memoryReservation", "backend.core.docker.edit.reservationExceeds.body", nil)
 	case r.MemorySwap < -1 || !swapSet(r.Memory, r.MemorySwap):
-		return invalid("resources.memorySwap", "swap must be -1, 0 or at least memory")
+		return invalid("resources.memorySwap", "backend.core.docker.edit.swapInvalid.body", nil)
 	case r.CPUShares != 0 && r.CPUShares < 2:
-		return invalid("resources.cpuShares", "cpu shares must be 0 or at least 2")
+		return invalid("resources.cpuShares", "backend.core.docker.edit.cpuSharesInvalid.body", nil)
 	case r.BlkioWeight != 0 && (r.BlkioWeight < 10 || r.BlkioWeight > 1000):
-		return invalid("resources.blkioWeight", "block IO weight must be 0 or 10 to 1000")
+		return invalid("resources.blkioWeight", "backend.core.docker.edit.blkioWeightInvalid.body", nil)
 	case r.NanoCPUs < 0:
-		return invalid("resources.nanoCpus", "cpus must not be negative")
+		return invalid("resources.nanoCpus", "backend.core.docker.edit.cpusNegative.body", nil)
 	case r.NanoCPUs != 0 && (r.CPUQuota != 0 || r.CPUPeriod != 0):
-		return invalid("resources.nanoCpus", "cpus and cpu quota cannot both be set")
+		return invalid("resources.nanoCpus", "backend.core.docker.edit.cpusAndQuota.body", nil)
 	case r.CPUQuota < 0 || (r.CPUQuota != 0 && r.CPUQuota < 1000):
-		return invalid("resources.cpuQuota", "cpu quota must be 0 or at least 1000")
+		return invalid("resources.cpuQuota", "backend.core.docker.edit.cpuQuotaInvalid.body", nil)
 	case r.CPUPeriod != 0 && (r.CPUPeriod < 1000 || r.CPUPeriod > 1000000):
-		return invalid("resources.cpuPeriod", "cpu period must be 0 or 1000 to 1000000")
+		return invalid("resources.cpuPeriod", "backend.core.docker.edit.cpuPeriodInvalid.body", nil)
 	case r.CpusetCpus != "" && !cpusetRe.MatchString(r.CpusetCpus):
-		return invalid("resources.cpusetCpus", "cpuset must look like 0-2 or 0,1")
+		return invalid("resources.cpusetCpus", "backend.core.docker.edit.cpusetInvalid.body", nil)
 	case r.CpusetMems != "" && !cpusetRe.MatchString(r.CpusetMems):
-		return invalid("resources.cpusetMems", "cpuset must look like 0-2 or 0,1")
+		return invalid("resources.cpusetMems", "backend.core.docker.edit.cpusetInvalid.body", nil)
 	case r.PidsLimit < 0:
-		return invalid("resources.pidsLimit", "pids limit must not be negative")
+		return invalid("resources.pidsLimit", "backend.core.docker.edit.pidsNegative.body", nil)
 	}
 	return nil
 }
@@ -518,11 +527,11 @@ func validateClears(c, r Resources) error {
 		{"resources.blkioWeight", c.BlkioWeight != 0, r.BlkioWeight == 0},
 	} {
 		if f.had && f.now {
-			return invalid(f.field, "removing this limit needs a recreate")
+			return invalid(f.field, "backend.core.docker.edit.limitRemoveRecreate.body", nil)
 		}
 	}
 	if (c.NanoCPUs != 0 && (r.CPUQuota != 0 || r.CPUPeriod != 0)) || ((c.CPUQuota != 0 || c.CPUPeriod != 0) && r.NanoCPUs != 0) {
-		return invalid("resources.nanoCpus", "switching between cpus and cpu quota needs a recreate")
+		return invalid("resources.nanoCpus", "backend.core.docker.edit.cpuSwitchRecreate.body", nil)
 	}
 	return nil
 }
@@ -531,15 +540,15 @@ func validateNetworks(cur EditSpec, nets []EditNetwork) error {
 	seen := map[string]bool{}
 	for _, n := range nets {
 		if n.Name == "" || seen[n.Name] {
-			return invalid("networks", "network names must be unique and non-empty")
+			return invalid("networks", "backend.core.docker.edit.networkNames.body", nil)
 		}
 		seen[n.Name] = true
 		if len(n.Aliases) > 0 && (n.Name == "bridge" || n.Name == "host" || n.Name == "none") {
-			return invalid("networks."+n.Name, "aliases are not supported on the "+n.Name+" network")
+			return invalid("networks."+n.Name, "backend.core.docker.edit.aliasesUnsupported.body", map[string]string{"network": n.Name})
 		}
 	}
 	if isNetworkless(cur.NetworkMode) && !sameNetworks(cur.InPlace.Networks, nets) {
-		return invalid("networks", "networks cannot change in "+cur.NetworkMode+" network mode")
+		return invalid("networks", "backend.core.docker.edit.networksFixed.body", map[string]string{"mode": cur.NetworkMode})
 	}
 	return nil
 }
@@ -564,13 +573,13 @@ func sameNetworks(a, b []EditNetwork) bool {
 // validateRecreate checks the parts of rc that need no engine.
 func validateRecreate(cur EditSpec, in InPlaceSpec, rc RecreateSpec) error {
 	if cur.AutoRemove {
-		return ipcerr.New("E_INVALID", "an auto-remove container cannot be recreated: stopping it deletes it")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.docker.edit.autoRemoveRecreate.body", nil)
 	}
 	if strings.TrimSpace(rc.Image) == "" {
-		return invalid("recreate.image", "image is required")
+		return invalid("recreate.image", "backend.core.docker.edit.imageRequired.body", nil)
 	}
 	if !nameRe.MatchString(in.Name) {
-		return invalid("name", "name must match [a-zA-Z0-9][a-zA-Z0-9_.-]+")
+		return invalid("name", "backend.core.docker.edit.nameInvalid.body", nil)
 	}
 	if err := validateNetworks(cur, in.Networks); err != nil {
 		return err
@@ -579,20 +588,20 @@ func validateRecreate(cur EditSpec, in InPlaceSpec, rc RecreateSpec) error {
 	for _, p := range rc.Ports {
 		switch {
 		case p.ContainerPort < 1 || p.ContainerPort > 65535:
-			return invalid("recreate.ports", "container port must be 1 to 65535")
+			return invalid("recreate.ports", "backend.core.docker.edit.containerPortRange.body", nil)
 		case p.Proto != "tcp" && p.Proto != "udp" && p.Proto != "sctp":
-			return invalid("recreate.ports", "protocol must be tcp, udp or sctp")
+			return invalid("recreate.ports", "backend.core.docker.edit.protocolInvalid.body", nil)
 		case seenPort[p]:
-			return invalid("recreate.ports", fmt.Sprintf("duplicate port %d/%s", p.ContainerPort, p.Proto))
+			return invalid("recreate.ports", "backend.core.docker.edit.duplicatePort.body", map[string]string{"port": strconv.Itoa(p.ContainerPort), "protocol": p.Proto})
 		}
 		if p.HostPort != "" {
 			if n, err := strconv.Atoi(p.HostPort); err != nil || n < 0 || n > 65535 {
-				return invalid("recreate.ports", "host port must be a number from 0 to 65535")
+				return invalid("recreate.ports", "backend.core.docker.edit.hostPortRange.body", nil)
 			}
 		}
 		if p.HostIP != "" {
 			if _, err := netip.ParseAddr(p.HostIP); err != nil {
-				return invalid("recreate.ports", "host IP is not a valid address")
+				return invalid("recreate.ports", "backend.core.docker.edit.hostIpInvalid.body", nil)
 			}
 		}
 		seenPort[p] = true
@@ -601,19 +610,19 @@ func validateRecreate(cur EditSpec, in InPlaceSpec, rc RecreateSpec) error {
 	for _, row := range rc.Mounts {
 		switch {
 		case row.Type != "bind" && row.Type != "volume":
-			return invalid("recreate.mounts", "mount type must be bind or volume")
+			return invalid("recreate.mounts", "backend.core.docker.edit.mountType.body", nil)
 		case !strings.HasPrefix(row.Target, "/"):
-			return invalid("recreate.mounts", "mount target must be an absolute path")
+			return invalid("recreate.mounts", "backend.core.docker.edit.mountTargetAbsolute.body", nil)
 		case targets[row.Target]:
-			return invalid("recreate.mounts", "duplicate mount target "+row.Target)
+			return invalid("recreate.mounts", "backend.core.docker.edit.duplicateMount.body", map[string]string{"target": row.Target})
 		case row.Source == "":
-			return invalid("recreate.mounts", "mount source is required")
+			return invalid("recreate.mounts", "backend.core.docker.edit.mountSourceRequired.body", nil)
 		}
 		targets[row.Target] = true
 	}
 	for _, e := range rc.Env {
 		if k, _, ok := strings.Cut(e, "="); !ok || k == "" {
-			return invalid("recreate.env", "env entries must look like KEY=value")
+			return invalid("recreate.env", "backend.core.docker.edit.envEntry.body", nil)
 		}
 	}
 	return nil

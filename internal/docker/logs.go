@@ -204,15 +204,15 @@ type LogsOpenArgs struct {
 // (unknown container, daemon down) return here; later failures arrive as the stream's final event.
 func (m *Manager) logsOpen(args LogsOpenArgs) error {
 	if args.WindowKey == "" || args.StreamID == "" || args.ContainerID == "" {
-		return ipcerr.New("E_INVALID", "windowKey, streamId and containerId are required")
+		return ipcerr.Contract("windowKey, streamId and containerId are required")
 	}
 	if args.Tail < -1 {
-		return ipcerr.New("E_INVALID", "tail must be -1 (all) or a line count")
+		return ipcerr.Contract("tail must be -1 (all) or a line count")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	if !m.logs.add(args.StreamID, &logStream{windowKey: args.WindowKey, cancel: cancel}) {
 		cancel()
-		return ipcerr.New("E_INVALID", "streamId is already open")
+		return ipcerr.Contract("streamId is already open")
 	}
 	body, tty, err := m.openLogs(ctx, args)
 	if err != nil {

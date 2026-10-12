@@ -309,8 +309,8 @@ func TestContexts(t *testing.T) {
 	}
 
 	_, err = svc.UseContext(docker.UseContextArgs{Name: "bogus"})
-	if err == nil || testx.AsIpcErr(t, err).Code != "E_INVALID" {
-		t.Fatalf("bogus context = %v, want E_INVALID", err)
+	if err == nil || testx.AsIpcErr(t, err).Code != "E_BAD_REQUEST" {
+		t.Fatalf("bogus context = %v, want E_BAD_REQUEST", err)
 	}
 	st, err = svc.UseContext(docker.UseContextArgs{})
 	if err != nil {

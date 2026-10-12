@@ -94,7 +94,7 @@ func TestContainerSize(t *testing.T) {
 	}
 	app.Contract(t, "docker-disk", "DockerService.ContainerSize", got, flowharness.Mask("sizeRw", "sizeRootFs", "durationMs"))
 
-	for id, code := range map[string]string{"": "E_INVALID", "kira-flow-no-such-container": "E_NOT_FOUND"} {
+	for id, code := range map[string]string{"": "E_BAD_REQUEST", "kira-flow-no-such-container": "E_NOT_FOUND"} {
 		_, err := app.W.Docker.ContainerSize(docker.IDArgs{ID: id})
 		var ie *ipcerr.Error
 		if !errors.As(err, &ie) || ie.Code != code {

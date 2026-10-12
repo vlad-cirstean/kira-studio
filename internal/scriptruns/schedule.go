@@ -46,10 +46,10 @@ func (s *Service) scheduled(scriptID string) (*scripts.CustomScript, error) {
 		return nil, ipcerr.InternalErr(err)
 	}
 	if rec == nil {
-		return nil, ipcerr.NotFound("script not found")
+		return nil, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	if rec.Schedule == nil {
-		return nil, ipcerr.New("E_INVALID", "this script has no schedule")
+		return nil, ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.noSchedule.body", nil)
 	}
 	return rec, nil
 }
@@ -100,13 +100,13 @@ func (s *Service) startScheduled(p *planned, existing *Run) (Started, error) {
 // checkStart refuses a plan that cannot start: a changed script, a blocker or missing values.
 func checkStart(p *planned, hash string) error {
 	if p.preview.Hash != hash {
-		return ipcerr.New("E_CONFLICT", "the script changed since the preview: check it again")
+		return ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.changedSincePreview.body", nil)
 	}
 	if p.preview.Blocker != "" {
-		return ipcerr.New("E_INVALID", p.preview.Blocker)
+		return ipcerr.BadRequest(p.preview.Blocker)
 	}
 	if len(p.preview.Missing) > 0 {
-		return ipcerr.New("E_INVALID", "fill in "+strings.Join(p.preview.Missing, ", "))
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.fillIn.body", map[string]string{"names": strings.Join(p.preview.Missing, ", ")})
 	}
 	return nil
 }

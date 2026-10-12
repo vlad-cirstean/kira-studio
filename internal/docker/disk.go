@@ -102,7 +102,7 @@ func (m *Manager) measureDisk(ctx context.Context) (DiskUsage, error) {
 // containerSize measures one container's writable layer and total size.
 func (m *Manager) containerSize(id string) (ContainerSize, error) {
 	if id == "" {
-		return ContainerSize{}, ipcerr.New("E_INVALID", "id is required")
+		return ContainerSize{}, ipcerr.Required("id")
 	}
 	_, ep, _ := m.client()
 	v, err, _ := m.flight.Do("size|"+ep.Host+"|"+ep.Context+"|"+id, func() (any, error) {

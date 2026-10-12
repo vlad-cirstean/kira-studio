@@ -2,10 +2,10 @@ package scriptruns
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
@@ -87,11 +87,11 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	case s.closed:
 		s.mu.Unlock()
 		cancel()
-		return Started{}, ipcerr.New("E_INVALID", "Kira "+s.App+" is closing")
+		return Started{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.core.scriptRun.closing.body", map[string]string{"app": s.App})
 	case len(s.smart) >= maxSmartRuns:
 		s.mu.Unlock()
 		cancel()
-		return Started{}, ipcerr.New("E_INVALID", fmt.Sprintf("%d smart scripts are running: wait for one to finish", maxSmartRuns))
+		return Started{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.smartCap.body", map[string]string{"max": strconv.Itoa(maxSmartRuns)})
 	}
 	if s.smart == nil {
 		s.smart = map[string]*bgRun{}
@@ -116,7 +116,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 			run.State, run.Outcome, run.FinishedAt = string(o.Status), &o, &now
 			s.record(run)
 		}
-		return Started{}, ipcerr.New("E_INVALID", err.Error())
+		return Started{}, ipcerr.BadRequest(err.Error())
 	}
 	s.mu.Lock()
 	srv := s.mcpServer()
@@ -133,7 +133,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		if err != nil {
 			releaseGrant()
 			abandon()
-			return Started{}, ipcerr.New("E_INVALID", err.Error())
+			return Started{}, ipcerr.BadRequest(err.Error())
 		}
 		extra, releaseUser = []string{path}, rel
 	}

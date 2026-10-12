@@ -6,6 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // ADE is Kira Space's task board as script runs see it. Studio leaves Service.ADE nil.
@@ -74,7 +75,7 @@ var branchVars = map[string]bool{"repo": true, "branch": true, "base": true, "wo
 func (s *Service) planADE(args RunArgs, p *planned, pv *Preview, text string, rendered map[string]string) error {
 	if s.ADE == nil {
 		if args.TaskID != "" {
-			return ipcerr.New("E_INVALID", "tasks exist only in Kira Space")
+			return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.tasksSpaceOnly.body", nil)
 		}
 		return nil
 	}
@@ -84,10 +85,10 @@ func (s *Service) planADE(args RunArgs, p *planned, pv *Preview, text string, re
 	}
 	c, err := s.ADE.Context(args.TaskID, args.BranchID)
 	if err != nil {
-		return ipcerr.New("E_INVALID", err.Error())
+		return ipcerr.BadRequest(err.Error())
 	}
 	if args.BranchID != "" && c.Branch == nil {
-		return ipcerr.New("E_INVALID", "that branch cannot run this script now")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.branchCannotRun.body", nil)
 	}
 	askBranch(p, pv, c, used)
 	applyVars(p, pv, c, rendered)
@@ -137,7 +138,7 @@ func askBranch(p *planned, pv *Preview, c ADEContext, used []string) {
 	switch {
 	case !needs:
 	case enabled == 0:
-		setBlocker(pv, "the task has no branch yet")
+		setBlocker(pv, i18n.T("backend.core.scriptRun.taskNoBranch.body", nil))
 	default:
 		pv.Needs.Branches = c.Branches
 		pv.Missing = append(pv.Missing, "branch")

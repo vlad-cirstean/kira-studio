@@ -9,13 +9,15 @@ import (
 )
 
 // errAnswered is what a second answer to a run gets.
-func errAnswered() error { return ipcerr.New("E_INVALID", "this run was already answered") }
+func errAnswered() error {
+	return ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.answered.body", nil)
+}
 
 // ConfirmAccept starts a waiting scheduled run the user accepted. hash is the preview the user saw.
 func (s *Service) ConfirmAccept(runID, hash string, secrets map[string][]string) (Started, error) {
 	run, err := s.Runs.Get(runID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Started{}, ipcerr.NotFound("run not found")
+		return Started{}, ipcerr.T(ipcerr.CodeNotFound, "backend.core.scriptRun.runNotFound.body", nil)
 	}
 	if err != nil {
 		return Started{}, ipcerr.InternalErr(err)
@@ -33,12 +35,12 @@ func (s *Service) ConfirmAccept(runID, hash string, secrets map[string][]string)
 			reason = "the schedule was turned off"
 		}
 		s.skipWaiting(skipByID, runID, reason, runoutcome.SourceSchedule)
-		return Started{}, ipcerr.New("E_INVALID", reason)
+		return Started{}, ipcerr.New(string(ipcerr.CodeConflict), reason)
 	}
 	if active, err := s.Runs.Active(rec.ID, run.ID); err != nil {
 		return Started{}, ipcerr.InternalErr(err)
 	} else if active != nil {
-		return Started{}, ipcerr.New("E_INVALID", overlapText(*rec, *active))
+		return Started{}, ipcerr.New(string(ipcerr.CodeConflict), overlapText(*rec, *active))
 	}
 	p, err := s.plan(scheduleArgs(*rec, secrets), planOpts{headless: true})
 	if err != nil {
@@ -64,7 +66,7 @@ func (s *Service) RunScheduleNow(scriptID, hash string, secrets map[string][]str
 	if active, err := s.Runs.Active(rec.ID, ""); err != nil {
 		return Started{}, ipcerr.InternalErr(err)
 	} else if active != nil {
-		return Started{}, ipcerr.New("E_INVALID", overlapText(*rec, *active))
+		return Started{}, ipcerr.New(string(ipcerr.CodeConflict), overlapText(*rec, *active))
 	}
 	p, err := s.plan(scheduleArgs(*rec, secrets), planOpts{headless: true})
 	if err != nil {

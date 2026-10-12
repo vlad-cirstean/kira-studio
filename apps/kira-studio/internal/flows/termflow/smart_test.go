@@ -177,8 +177,8 @@ func TestSmartScript(t *testing.T) {
 		if got := previewOf(t, app, scriptruns.RunArgs{ScriptID: rec.ID}); len(got.Missing) != 1 || got.Missing[0] != "topic" {
 			t.Fatalf("missing = %v", got.Missing)
 		}
-		if _, err := app.W.ScriptRuns.Start(startArgs(scriptruns.RunArgs{ScriptID: rec.ID}, previewOf(t, app, scriptruns.RunArgs{ScriptID: rec.ID}))); errCode(err) != "E_INVALID" {
-			t.Fatalf("Start with a missing param = %v, want E_INVALID", err)
+		if _, err := app.W.ScriptRuns.Start(startArgs(scriptruns.RunArgs{ScriptID: rec.ID}, previewOf(t, app, scriptruns.RunArgs{ScriptID: rec.ID}))); errCode(err) != "E_BAD_REQUEST" {
+			t.Fatalf("Start with a missing param = %v, want E_BAD_REQUEST", err)
 		}
 
 		bash := newSmart(t, app, "run", func(f *scripts.CustomScriptFields) {
@@ -356,11 +356,11 @@ func TestSmartScript(t *testing.T) {
 			ids = append(ids, id)
 		}
 		pv := previewOf(t, app, args)
-		const want = "3 smart scripts are running: wait for one to finish"
+		const want = "3 smart scripts are running. Wait for one to finish."
 		if pv.Blocker != want {
 			t.Fatalf("blocker = %q", pv.Blocker)
 		}
-		if _, err := app.W.ScriptRuns.Start(startArgs(args, pv)); errCode(err) != "E_INVALID" || !strings.Contains(err.Error(), want) {
+		if _, err := app.W.ScriptRuns.Start(startArgs(args, pv)); errCode(err) != "E_CONFLICT" || !strings.Contains(err.Error(), want) {
 			t.Fatalf("4th Start = %v", err)
 		}
 		for _, id := range ids {
@@ -390,7 +390,7 @@ func TestSmartScript(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := app.W.ScriptRuns.Start(startArgs(args, pv)); errCode(err) != "E_CONFLICT" ||
-			!strings.Contains(err.Error(), "the script changed since the preview: check it again") {
+			!strings.Contains(err.Error(), "The script changed since the preview. Preview it again.") {
 			t.Fatalf("Start with a stale hash = %v", err)
 		}
 
@@ -520,7 +520,7 @@ func TestSmartScript(t *testing.T) {
 		}
 		write(t, app, "p1", "\n")
 		waitRun(t, app, "p1", "done")
-		if err := open("p2", started.Terminal.Token); err == nil || !strings.Contains(err.Error(), "this run expired: start it again") {
+		if err := open("p2", started.Terminal.Token); err == nil || !strings.Contains(err.Error(), "This run expired. Start it again.") {
 			t.Errorf("reusing a token = %v", err)
 		}
 		if err := open("p3", "not-a-token"); err == nil {
@@ -535,7 +535,7 @@ func TestSmartScript(t *testing.T) {
 			t.Fatal(err)
 		}
 		time.Sleep(400 * time.Millisecond)
-		if err := open("p4", started.Terminal.Token); err == nil || !strings.Contains(err.Error(), "this run expired") {
+		if err := open("p4", started.Terminal.Token); err == nil || !strings.Contains(err.Error(), "This run expired.") {
 			t.Errorf("an old token = %v", err)
 		}
 		if _, err := app.W.Terminal.Open(terminal.OpenArgs{
@@ -605,8 +605,8 @@ func TestStudioRefusesTaskContext(t *testing.T) {
 	app := flowharness.New(t)
 	rec := newSmart(t, app, "hi", func(f *scripts.CustomScriptFields) { f.UseAdeDir = true })
 	_, err := app.W.ScriptRuns.Preview(scriptruns.RunArgs{ScriptID: rec.ID, TaskID: "t1"})
-	if errCode(err) != "E_INVALID" || !strings.Contains(err.Error(), "tasks exist only in Kira Space") {
-		t.Fatalf("Preview err = %v, want E_INVALID naming Kira Space", err)
+	if errCode(err) != "E_BAD_REQUEST" || !strings.Contains(err.Error(), "Tasks exist only in Kira Space") {
+		t.Fatalf("Preview err = %v, want E_BAD_REQUEST naming Kira Space", err)
 	}
 	snap, err := app.W.CustomScripts.List()
 	if err != nil || len(snap.Scripts) != 1 || !snap.Scripts[0].UseAdeDir {

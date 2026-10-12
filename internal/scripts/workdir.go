@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // automationsDir is the folder under the app home that holds one folder per script.
@@ -27,14 +29,14 @@ func ResolveDir(s CustomScript, appHome string) Dir {
 	case DirModeFixed:
 		d := Dir{Path: s.WorkingDir, Mode: DirModeFixed}
 		if info, err := os.Stat(s.WorkingDir); err != nil || !info.IsDir() {
-			d.Blocker = s.WorkingDir + " does not exist"
+			d.Blocker = i18n.T("backend.core.scriptDir.missing.body", map[string]string{"path": s.WorkingDir})
 		}
 		return d
 	case DirModeHome:
 		d := Dir{Mode: DirModeHome}
 		home, err := os.UserHomeDir()
 		if err != nil || home == "" {
-			d.Blocker = "your home folder could not be resolved"
+			d.Blocker = i18n.T("backend.core.scriptDir.homeUnresolved.body", nil)
 			return d
 		}
 		d.Path, d.Base = home, home

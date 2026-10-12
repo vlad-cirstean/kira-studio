@@ -149,15 +149,15 @@ type execFinal struct {
 // terminal module's own event shape.
 func (m *Manager) execOpen(args ExecOpenArgs) (ExecOpenResult, error) {
 	if args.WindowKey == "" || args.TerminalID == "" || args.ContainerID == "" {
-		return ExecOpenResult{}, ipcerr.New("E_INVALID", "windowKey, terminalId and containerId are required")
+		return ExecOpenResult{}, ipcerr.Contract("windowKey, terminalId and containerId are required")
 	}
 	if !terminal.ValidDim(args.Cols) || !terminal.ValidDim(args.Rows) {
-		return ExecOpenResult{}, ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
+		return ExecOpenResult{}, ipcerr.Contract("cols/rows must be within [1, 1000]")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	if !m.execs.reserve(args.TerminalID, args.WindowKey, cancel) {
 		cancel()
-		return ExecOpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
+		return ExecOpenResult{}, ipcerr.Contract("terminalId is already open")
 	}
 	defer m.execs.release(args.TerminalID)
 
@@ -199,7 +199,7 @@ func (m *Manager) execOpen(args ExecOpenArgs) (ExecOpenResult, error) {
 	sess := &execSession{windowKey: args.WindowKey, execID: created.ID, conn: att.HijackedResponse, cancel: cancel}
 	if !m.execs.register(args.TerminalID, sess) {
 		sess.close()
-		return ExecOpenResult{}, ipcerr.New("E_INVALID", "terminal window is closing")
+		return ExecOpenResult{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.edit.terminalWindowClosing.body", nil)
 	}
 	go m.pumpExec(ctx, cli, args, sess)
 	return ExecOpenResult{Shell: "sh"}, nil
@@ -253,11 +253,11 @@ func (m *Manager) pumpExec(ctx context.Context, cli *client.Client, args ExecOpe
 
 func (m *Manager) execWrite(terminalID, dataB64 string) error {
 	if terminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	data, err := base64.StdEncoding.DecodeString(dataB64)
 	if err != nil {
-		return ipcerr.New("E_INVALID", "data must be base64")
+		return ipcerr.Contract("data must be base64")
 	}
 	sess := m.execs.get(terminalID)
 	if sess == nil {
@@ -271,10 +271,10 @@ func (m *Manager) execWrite(terminalID, dataB64 string) error {
 
 func (m *Manager) execResize(ctx context.Context, terminalID string, cols, rows int) error {
 	if terminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	if !terminal.ValidDim(cols) || !terminal.ValidDim(rows) {
-		return ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
+		return ipcerr.Contract("cols/rows must be within [1, 1000]")
 	}
 	sess := m.execs.get(terminalID)
 	if sess == nil {
@@ -288,7 +288,7 @@ func (m *Manager) execResize(ctx context.Context, terminalID string, cols, rows 
 
 func (m *Manager) execClose(terminalID string) error {
 	if terminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	if sess := m.execs.take(terminalID); sess != nil {
 		sess.close()

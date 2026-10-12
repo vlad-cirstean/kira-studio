@@ -490,6 +490,170 @@
   },
   "backend": {
     "core": {
+      "docker": {
+        "edit": {
+          "aliasesUnsupported": {
+            "body": "Aliases are not supported on the {network} network."
+          },
+          "autoRemoveRecreate": {
+            "body": "An auto-remove container can’t be recreated. Stopping it deletes it."
+          },
+          "blkioWeightInvalid": {
+            "body": "The block weight must be 0 or 10 to 1000."
+          },
+          "changedSinceLoad": {
+            "body": "This container changed since the editor loaded. Refresh the editor."
+          },
+          "containerPortRange": {
+            "body": "The container port must be 1 to 65535."
+          },
+          "cpuPeriodInvalid": {
+            "body": "CPU period must be 0 or 1000 to 1000000."
+          },
+          "cpuQuotaInvalid": {
+            "body": "CPU quota must be 0 or at least 1000."
+          },
+          "cpuSharesInvalid": {
+            "body": "CPU shares must be 0 or at least 2."
+          },
+          "cpuSwitchRecreate": {
+            "body": "Switching between a CPU limit and a CPU quota needs a recreate."
+          },
+          "cpusAndQuota": {
+            "body": "The CPU limit and CPU quota can’t both be set."
+          },
+          "cpusetInvalid": {
+            "body": "The CPU set must look like 0-2 or 0,1."
+          },
+          "cpusNegative": {
+            "body": "The CPU limit must not be negative."
+          },
+          "duplicateMount": {
+            "body": "Duplicate mount target {target}."
+          },
+          "duplicatePort": {
+            "body": "Duplicate port {port}/{protocol}."
+          },
+          "editInProgress": {
+            "body": "Another edit of this container is in progress."
+          },
+          "envEntry": {
+            "body": "Environment entries must look like name=value."
+          },
+          "hostIpInvalid": {
+            "body": "The host IP is not a valid address."
+          },
+          "hostPortRange": {
+            "body": "The host port must be a number from 0 to 65535."
+          },
+          "imageMissing": {
+            "body": "The image {image} is not present locally. Pull it first."
+          },
+          "imageRequired": {
+            "body": "The image is required."
+          },
+          "limitRemoveRecreate": {
+            "body": "Removing this limit needs a recreate."
+          },
+          "managed": {
+            "body": "This container is managed by {managed}. Edit the workload instead."
+          },
+          "memoryMinimum": {
+            "body": "Memory must be at least 6 mebibytes."
+          },
+          "memoryNegative": {
+            "body": "Memory must not be negative."
+          },
+          "mountSourceRequired": {
+            "body": "The mount source is required."
+          },
+          "mountTargetAbsolute": {
+            "body": "The mount target must be an absolute path."
+          },
+          "mountType": {
+            "body": "The mount type must be bind or volume."
+          },
+          "nameInvalid": {
+            "body": "Name must match [a-zA-Z0-9][a-zA-Z0-9_.-]+."
+          },
+          "networkNames": {
+            "body": "Network names must be unique and not empty."
+          },
+          "networksFixed": {
+            "body": "Networks can’t change in {mode} network mode."
+          },
+          "pidsNegative": {
+            "body": "The process limit must not be negative."
+          },
+          "protocolInvalid": {
+            "body": "The protocol must be tcp, udp or sctp."
+          },
+          "reservationExceeds": {
+            "body": "The reservation must not exceed memory."
+          },
+          "restartAutoRemove": {
+            "body": "The restart policy can’t change on an auto-remove container."
+          },
+          "swapInvalid": {
+            "body": "Swap must be -1, 0 or at least memory."
+          },
+          "terminalWindowClosing": {
+            "body": "The terminal window is closing."
+          }
+        }
+      },
+      "scriptDir": {
+        "homeUnresolved": {
+          "body": "Your home folder couldn’t be resolved."
+        },
+        "missing": {
+          "body": "{path} does not exist."
+        }
+      },
+      "scriptRun": {
+        "answered": {
+          "body": "This run was already answered."
+        },
+        "branchCannotRun": {
+          "body": "That branch can’t run this script now."
+        },
+        "changedSincePreview": {
+          "body": "The script changed since the preview. Preview it again."
+        },
+        "closing": {
+          "body": "Kira {app} is closing."
+        },
+        "expired": {
+          "body": "This run expired. Start it again."
+        },
+        "fillIn": {
+          "body": "Fill in {names}."
+        },
+        "noSchedule": {
+          "body": "This script has no schedule."
+        },
+        "promptEmpty": {
+          "body": "The prompt is empty."
+        },
+        "promptSecret": {
+          "body": "The secret {name} can’t be used in the prompt."
+        },
+        "promptTooLong": {
+          "body": "The prompt is longer than {max} characters."
+        },
+        "runNotFound": {
+          "body": "This run no longer exists."
+        },
+        "smartCap": {
+          "body": "{max} smart scripts are running. Wait for one to finish."
+        },
+        "taskNoBranch": {
+          "body": "The task has no branch yet."
+        },
+        "tasksSpaceOnly": {
+          "body": "Tasks exist only in Kira Space."
+        }
+      },
       "seed": {
         "body": "Core seed placeholder."
       }

@@ -77,7 +77,7 @@ func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaun
 		return terminal.ScriptLaunch{}, ipcerr.InternalErr(err)
 	}
 	if rec == nil {
-		return terminal.ScriptLaunch{}, ipcerr.NotFound("script not found")
+		return terminal.ScriptLaunch{}, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	dir, command, trigger := scripts.ResolveDir(*rec, s.Home), rec.Command, TriggerTerminal
 	var env []string
@@ -86,7 +86,7 @@ func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaun
 	if token != "" {
 		l, ok := s.takeLaunch(token, scriptID)
 		if !ok {
-			return terminal.ScriptLaunch{}, ipcerr.New("E_INVALID", "this run expired: start it again")
+			return terminal.ScriptLaunch{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.expired.body", nil)
 		}
 		dir, command, env, params, trigger, ade = l.dir, l.command, l.env, l.params, l.trigger, l.ade
 	}
@@ -103,7 +103,7 @@ func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaun
 		o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err})
 		run.State, run.Outcome, run.FinishedAt = string(o.Status), &o, &now
 		s.record(run)
-		return terminal.ScriptLaunch{}, ipcerr.New("E_INVALID", err.Error())
+		return terminal.ScriptLaunch{}, ipcerr.BadRequest(err.Error())
 	}
 	if err := s.Runs.Insert(run); err != nil {
 		return terminal.ScriptLaunch{}, ipcerr.InternalErr(err)

@@ -27,12 +27,10 @@ const recreateTimeout = 3 * time.Minute
 // lockEdit serialises edits of one container; the engine has no lock of its own.
 func (m *Manager) lockEdit(id string) (func(), error) {
 	if _, held := m.editing.LoadOrStore(id, struct{}{}); held {
-		return nil, ipcerr.New("E_CONFLICT", "another edit of this container is in progress")
+		return nil, ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.edit.editInProgress.body", nil)
 	}
 	return func() { m.editing.Delete(id) }, nil
 }
-
-func conflictErr(msg string) error { return ipcerr.New("E_CONFLICT", msg) }
 
 // stepErr maps err and tags it with the failed step and what already landed.
 func (m *Manager) stepErr(ep Endpoint, step string, err error, extra map[string]any) error {
@@ -55,7 +53,7 @@ func (m *Manager) loadForEdit(ctx context.Context, cli *client.Client, id, baseH
 	}
 	cur := specFromInspect(res.Container)
 	if cur.BaseHash != baseHash {
-		return container.InspectResponse{}, EditSpec{}, conflictErr("container changed since the editor loaded; reload")
+		return container.InspectResponse{}, EditSpec{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.edit.changedSinceLoad.body", nil)
 	}
 	if err := cur.readOnlyErr(); err != nil {
 		return container.InspectResponse{}, EditSpec{}, err
@@ -516,7 +514,7 @@ func (x *recreateRun) rollback(step string, cause error) error {
 	e := x.m.stepErr(x.ep, step, cause, d)
 	var ie *ipcerr.Error
 	if errors.As(e, &ie) {
-		ie.Code = "E_RECREATE_FAILED"
+		ie.Code = string(ipcerr.CodeRecreateFailed)
 	}
 	return e
 }
@@ -560,7 +558,7 @@ func (m *Manager) prepareRecreate(ctx context.Context, cli *client.Client, args 
 	}
 	if _, err := cli.ImageInspect(ctx, rc.Image); err != nil {
 		if cerrdefs.IsNotFound(err) {
-			return r, cur, recreateBuild{}, ipcerr.NotFound("image " + rc.Image + " not present locally; pull it first")
+			return r, cur, recreateBuild{}, ipcerr.T(ipcerr.CodeNotFound, "backend.core.docker.edit.imageMissing.body", map[string]string{"image": rc.Image})
 		}
 		return r, cur, recreateBuild{}, err
 	}

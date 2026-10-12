@@ -111,7 +111,7 @@ func (b *BoundService) Contexts() ([]ContextInfo, error) {
 func (b *BoundService) UseContext(args UseContextArgs) (Status, error) {
 	if args.Name != "" {
 		if _, _, err := resolveEndpoint(b.m.env, args.Name); err != nil {
-			return Status{}, ipcerr.New("E_INVALID", err.Error())
+			return Status{}, ipcerr.BadRequest(err.Error())
 		}
 	}
 	return b.m.useContext(context.Background(), args.Name), nil
@@ -145,7 +145,7 @@ func (b *BoundService) Restart(args IDArgs) error { return b.m.restart(context.B
 // Watch starts pushing ChannelChanged for the window.
 func (b *BoundService) Watch(args WindowArgs) error {
 	if args.WindowKey == "" {
-		return ipcerr.New("E_INVALID", "windowKey is required")
+		return ipcerr.Required("windowKey")
 	}
 	b.m.events.watch(args.WindowKey)
 	return nil
@@ -159,7 +159,7 @@ func (b *BoundService) Unwatch(args WindowArgs) error {
 // StatsSubscribe replaces the window's set of containers whose stats it receives.
 func (b *BoundService) StatsSubscribe(args StatsArgs) error {
 	if args.WindowKey == "" {
-		return ipcerr.New("E_INVALID", "windowKey is required")
+		return ipcerr.Required("windowKey")
 	}
 	b.m.stats.subscribe(args.WindowKey, args.IDs)
 	return nil

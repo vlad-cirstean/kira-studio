@@ -29,11 +29,11 @@ func (b *Bound) List(args ListArgs) ([]Run, error) {
 
 func (b *Bound) Get(args IDArgs) (Run, error) {
 	if args.ID == "" {
-		return Run{}, ipcerr.BadRequest("id is required")
+		return Run{}, ipcerr.Required("id")
 	}
 	run, err := b.Svc.Get(args.ID)
 	if IsCallerError(err) {
-		return Run{}, ipcerr.NotFound("run not found")
+		return Run{}, ipcerr.T(ipcerr.CodeNotFound, "backend.core.scriptRun.runNotFound.body", nil)
 	}
 	if err != nil {
 		return Run{}, ipcerr.InternalErr(err)
@@ -43,11 +43,11 @@ func (b *Bound) Get(args IDArgs) (Run, error) {
 
 func (b *Bound) Stop(args IDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	err := b.Svc.Stop(args.ID)
 	if IsCallerError(err) {
-		return ipcerr.NotFound("run not found")
+		return ipcerr.T(ipcerr.CodeNotFound, "backend.core.scriptRun.runNotFound.body", nil)
 	}
 	if err != nil {
 		return ipcerr.InternalErr(err)
@@ -59,7 +59,7 @@ func (b *Bound) Stop(args IDArgs) error {
 func (b *Bound) ResolveDir(args ResolveDirArgs) (scripts.Dir, error) {
 	dir, err := b.Svc.ResolveDir(args.ScriptID)
 	if IsCallerError(err) {
-		return scripts.Dir{}, ipcerr.NotFound("script not found")
+		return scripts.Dir{}, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	if err != nil {
 		return scripts.Dir{}, ipcerr.InternalErr(err)
@@ -74,7 +74,7 @@ type ResolveDirArgs struct {
 // Preview resolves a run the way Start would, without starting it.
 func (b *Bound) Preview(args RunArgs) (Preview, error) {
 	if args.ScriptID == "" {
-		return Preview{}, ipcerr.BadRequest("scriptId is required")
+		return Preview{}, ipcerr.Required("scriptId")
 	}
 	pv, err := b.Svc.Preview(args)
 	if err != nil {
@@ -87,7 +87,7 @@ func (b *Bound) Preview(args RunArgs) (Preview, error) {
 // terminal tab opens with.
 func (b *Bound) Start(args StartArgs) (Started, error) {
 	if args.ScriptID == "" {
-		return Started{}, ipcerr.BadRequest("scriptId is required")
+		return Started{}, ipcerr.Required("scriptId")
 	}
 	started, err := b.Svc.Start(args)
 	if err != nil {
@@ -104,7 +104,7 @@ type ReadLogArgs struct {
 // ReadLog returns a smart run's log lines after AfterSeq.
 func (b *Bound) ReadLog(args ReadLogArgs) (LogPage, error) {
 	if args.ID == "" {
-		return LogPage{}, ipcerr.BadRequest("id is required")
+		return LogPage{}, ipcerr.Required("id")
 	}
 	return ipcerr.InternalResult(b.Svc.Runs.ReadLog(args.ID, args.AfterSeq))
 }
@@ -121,7 +121,7 @@ type McpToolsArgs struct {
 // McpTools lists the tools of one of those servers.
 func (b *Bound) McpTools(args McpToolsArgs) ([]claudeheadless.UserTool, error) {
 	if args.Server == "" {
-		return nil, ipcerr.BadRequest("server is required")
+		return nil, ipcerr.Required("server")
 	}
 	return ipcerr.InternalResult(b.Svc.McpTools(context.Background(), args.Server))
 }
@@ -141,7 +141,7 @@ func (b *Bound) NextFires(args NextFiresArgs) ([]int64, error) {
 	}
 	fires, err := scripts.NextFires(args.Cron, args.Timezone, time.UnixMilli(b.Svc.now()), count)
 	if err != nil {
-		return nil, ipcerr.New("E_INVALID", err.Error())
+		return nil, ipcerr.BadRequest(err.Error())
 	}
 	out := make([]int64, 0, len(fires))
 	for _, f := range fires {
@@ -159,7 +159,7 @@ type ScheduleArgs struct {
 // SchedulePreview resolves the run a script's schedule would start.
 func (b *Bound) SchedulePreview(args ScheduleArgs) (Preview, error) {
 	if args.ScriptID == "" {
-		return Preview{}, ipcerr.BadRequest("scriptId is required")
+		return Preview{}, ipcerr.Required("scriptId")
 	}
 	pv, err := b.Svc.SchedulePreview(args.ScriptID, args.Secrets)
 	if err != nil {
@@ -177,7 +177,7 @@ type ScheduleStartArgs struct {
 // RunScheduleNow starts a script's scheduled run at once.
 func (b *Bound) RunScheduleNow(args ScheduleStartArgs) (Started, error) {
 	if args.ScriptID == "" {
-		return Started{}, ipcerr.BadRequest("scriptId is required")
+		return Started{}, ipcerr.Required("scriptId")
 	}
 	started, err := b.Svc.RunScheduleNow(args.ScriptID, args.Hash, args.Secrets)
 	if err != nil {
@@ -196,7 +196,7 @@ type ConfirmArgs struct {
 // ConfirmAccept starts a waiting scheduled run.
 func (b *Bound) ConfirmAccept(args ConfirmArgs) (Started, error) {
 	if args.RunID == "" {
-		return Started{}, ipcerr.BadRequest("runId is required")
+		return Started{}, ipcerr.Required("runId")
 	}
 	started, err := b.Svc.ConfirmAccept(args.RunID, args.Hash, args.Secrets)
 	if err != nil {
@@ -208,7 +208,7 @@ func (b *Bound) ConfirmAccept(args ConfirmArgs) (Started, error) {
 // ConfirmDecline ends a waiting scheduled run without running it.
 func (b *Bound) ConfirmDecline(args IDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	b.Svc.ConfirmDecline(args.ID)
 	return nil

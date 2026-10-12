@@ -59,7 +59,7 @@ func (s *Service) begin(run Run, existing bool) error {
 		return ipcerr.InternalErr(err)
 	}
 	if !ok {
-		return ipcerr.New("E_INVALID", "this run was already answered")
+		return errAnswered()
 	}
 	s.emit(run)
 	s.closePrompt(run.ID)
@@ -75,7 +75,7 @@ func (s *Service) startHeadless(p *planned, run Run, existing bool) (Started, er
 	if s.closed {
 		s.mu.Unlock()
 		cancel()
-		return Started{}, ipcerr.New("E_INVALID", "Kira "+s.App+" is closing")
+		return Started{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.core.scriptRun.closing.body", map[string]string{"app": s.App})
 	}
 	if s.bg == nil {
 		s.bg = map[string]*bgRun{}
@@ -98,7 +98,7 @@ func (s *Service) startHeadless(p *planned, run Run, existing bool) (Started, er
 			run.State, run.Outcome, run.FinishedAt = string(o.Status), &o, &now
 			s.record(run)
 		}
-		return Started{}, ipcerr.New("E_INVALID", err.Error())
+		return Started{}, ipcerr.BadRequest(err.Error())
 	}
 	if err := s.begin(run, existing); err != nil {
 		abandon()
