@@ -1,7 +1,6 @@
 package apivars
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
@@ -60,7 +59,7 @@ func (s *Service) reveal(reason, id string, confirmed bool, decrypt func(string)
 	switch outcome {
 	case localauth.GateAuthError:
 		msg := err.Error()
-		slog.Warn(fmt.Sprintf("local authentication errored before revealing a %s (%s): %s", subject, id, msg), "scope", "apivars")
+		slog.Warn("local authentication errored before reveal", "scope", "apivars", "subject", subject, "id", id, "err", msg)
 		return RevealResult{Outcome: OutcomeError, Error: &msg}
 	case localauth.GateCancelled:
 		// D11 (inherited via P14): the user cancelled on purpose — no message, that would nag.
@@ -69,10 +68,10 @@ func (s *Service) reveal(reason, id string, confirmed bool, decrypt func(string)
 		return RevealResult{Outcome: OutcomeConfirmationRequired}
 	case localauth.GateFetchError:
 		msg := err.Error()
-		slog.Warn(fmt.Sprintf("reveal failed for a %s (%s): %s", subject, id, msg), "scope", "apivars")
+		slog.Warn("reveal failed", "scope", "apivars", "subject", subject, "id", id, "err", msg)
 		return RevealResult{Outcome: OutcomeError, Error: &msg}
 	}
 	// D5: the subject, never the value — connections.Service.Reveal's own precedent.
-	slog.Info(fmt.Sprintf("%s revealed for %s", subject, id), "scope", "apivars")
+	slog.Info("secret revealed", "scope", "apivars", "subject", subject, "id", id)
 	return RevealResult{Outcome: OutcomeRevealed, Value: value}
 }

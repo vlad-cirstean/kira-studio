@@ -32,6 +32,7 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "suspicious": { "noConsole": "error" },
       "performance": {
         "noAccumulatingSpread": "error",
         "noDelete": "error",
@@ -71,6 +72,48 @@
     }
   },
   "overrides": [
+    {
+      "includes": [
+        "apps/kira-space/frontend/src/main.ts",
+        "apps/kira-space/frontend/src/repo/state/repoHeads.ts",
+        "apps/kira-space/frontend/src/state/agentNotify.ts",
+        "apps/kira-space/frontend/src/state/repoOpenHold.ts",
+        "apps/kira-space/frontend/src/views/repo/reviewDecorations.ts",
+        "apps/kira-space/frontend/src/views/repo/useDiffEditor.ts",
+        "apps/kira-space/frontend/src/workbench/TitleBar.vue",
+        "apps/kira-space/frontend/src/workbench/settings/ClaudeCodePane.vue",
+        "apps/kira-studio/frontend/src/api/state/apiQueries.ts",
+        "apps/kira-studio/frontend/src/api/state/collections.ts",
+        "apps/kira-studio/frontend/src/workbench/TitleBar.vue",
+        "apps/kira-studio/frontend/src/workbench/panels/OperationsPanel.vue",
+        "packages/git-ui/src/state/clipboardActions.ts",
+        "packages/git-ui/src/state/graphView.ts",
+        "packages/git-ui/src/state/packedStream.ts",
+        "packages/git-ui/src/state/repoScopedReload.ts",
+        "packages/git-ui/src/state/repoSettings.ts",
+        "packages/workbench/src/bootstrapShell.ts",
+        "packages/workbench/src/state/createOpLogStore.ts",
+        "packages/workbench/src/state/createTabsStore.ts",
+        "packages/workbench/src/state/createTerminalsStore.ts",
+        "tools/mutation/stryker.config.mjs",
+        "tools/mutation/summarize.ts"
+      ],
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
+    {
+      "includes": [
+        "packages/workbench/src/bridge/log.ts",
+        "apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts",
+        "packages/workbench/src/testing/**",
+        "**/tests/**",
+        "**/test/**",
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "scripts/**",
+        "apps/kira-studio/frontend/proto/**"
+      ],
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
     {
       "includes": ["**/tests/**", "**/test/**", "**/*.test.ts", "**/*.spec.ts"],
       "linter": {

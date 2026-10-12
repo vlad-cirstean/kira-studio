@@ -100,20 +100,12 @@ func (a *Authorizer) graceLive() bool {
 // package's own platform-selected Evaluate/Available.
 func New(now func() time.Time, evaluate EvaluateFunc, available AvailableFunc) *Authorizer {
 	avail := available()
-	msg := "local authentication: available=" + boolString(avail)
 	if avail {
-		slog.Info(msg, "scope", "localauth")
+		slog.Info("local authentication available", "scope", "localauth")
 	} else {
-		slog.Warn(msg+" — reveals fall back to an in-app confirmation", "scope", "localauth")
+		slog.Warn("local authentication unavailable, reveals fall back to an in-app confirmation", "scope", "localauth")
 	}
 	return &Authorizer{now: now, evaluate: evaluate, available: available}
-}
-
-func boolString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }
 
 // Authorize is P14 D6's table, one reveal request at a time. confirmed is honoured only on the

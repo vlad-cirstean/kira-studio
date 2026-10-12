@@ -296,7 +296,7 @@ func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv quer
 	// bypass the gate, and never a way to break a connection either.
 	class, cerr := s.cfg.Query.ClassifyStatement(ctx, args.ConnectionID, args.SQL)
 	if cerr != nil {
-		s.log.Warn("dbmcp: run_query: classification failed, treating as unknown", "connectionId", args.ConnectionID, "error", cerr)
+		s.log.Warn("dbmcp: run_query: classification failed, treating as unknown", "connectionId", args.ConnectionID, "err", cerr)
 		class = adapters.ClassUnknown
 	}
 	rv.class = class
@@ -330,7 +330,7 @@ func (s *Server) maybeExplain(ctx context.Context, summary model.ConnectionSumma
 	if summary.McpAutoExplain {
 		p, planErr := s.planFor(ctx, summary, args.SQL, args.Path)
 		if planErr != nil {
-			s.log.Warn("dbmcp: run_query: auto-force-explain failed, running without a plan", "connectionId", args.ConnectionID, "error", planErr)
+			s.log.Warn("dbmcp: run_query: auto-force-explain failed, running without a plan", "connectionId", args.ConnectionID, "err", planErr)
 		} else {
 			plan = p
 		}

@@ -75,7 +75,7 @@ func NewReporter(d Deps) *Reporter {
 		r.stderr = os.Stderr
 	}
 	if r.log == nil {
-		r.log = func(msg string, args ...any) { slog.Error(msg, args...) }
+		r.log = func(msg string, args ...any) { slog.Error(msg, args...) } //nolint:sloglint // forwards the caller's static message
 	}
 	if r.now == nil {
 		r.now = time.Now

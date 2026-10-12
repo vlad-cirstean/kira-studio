@@ -1,7 +1,6 @@
 package shell
 
 import (
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -177,7 +176,7 @@ func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach fu
 	})
 	offReady := win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 		ms := time.Since(d.StartedAt).Milliseconds()
-		slog.Info(fmt.Sprintf("did-finish-load at uptime %dms", ms), "scope", "startup")
+		slog.Info("did-finish-load", "scope", "startup", "uptimeMs", ms)
 	})
 
 	return func() {

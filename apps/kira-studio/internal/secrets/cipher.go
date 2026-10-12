@@ -50,11 +50,10 @@ func New() *Cipher {
 	if status.InsecureFallback {
 		suffix = " — Linux development fallback (KIRA_INSECURE_SECRETS=1): credentials are obfuscated with a hardcoded key, not a real keychain"
 	}
-	msg := fmt.Sprintf("secret storage: backend=%s available=%t%s", status.Backend, status.Available, suffix)
 	if status.InsecureFallback {
-		slog.Warn(msg, "scope", "secrets")
+		slog.Warn("secret storage", "scope", "secrets", "backend", status.Backend, "available", status.Available, "note", suffix)
 	} else {
-		slog.Info(msg, "scope", "secrets")
+		slog.Info("secret storage", "scope", "secrets", "backend", status.Backend, "available", status.Available)
 	}
 
 	c := &Cipher{status: status}

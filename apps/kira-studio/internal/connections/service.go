@@ -421,10 +421,10 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		// only case. A failed reconnect lands the connection in its normal "error" state, which the
 		// UI already renders — never a silent no-op.
 		if _, err := s.Disconnect(id); err != nil {
-			slog.Warn(fmt.Sprintf("disconnect before reconnect failed for %s: %s", id, err), "scope", "connections")
+			slog.Warn("disconnect before reconnect failed", "scope", "connections", "id", id, "err", err)
 		}
 		if _, err := s.Connect(id); err != nil {
-			slog.Warn(fmt.Sprintf("reconnect after update failed for %s: %s", id, err), "scope", "connections")
+			slog.Warn("reconnect after update failed", "scope", "connections", "id", id, "err", err)
 		}
 	} else if s.StateOf(id).Status == "connected" {
 		// P28 §5.5: applies live, but only while actually connected — an edit to a disconnected
@@ -559,7 +559,7 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 	switch outcome {
 	case localauth.GateAuthError:
 		msg := errorMessage(err)
-		slog.Warn(fmt.Sprintf("local authentication errored before reveal of %s: %s", id, msg), "scope", "connections")
+		slog.Warn("local authentication errored before reveal", "scope", "connections", "id", id, "err", msg)
 		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
 	case localauth.GateCancelled:
 		// D11: the user cancelled on purpose — no message, that would be nagging.
@@ -568,10 +568,10 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 		return RevealResult{Outcome: revealOutcomeConfirmationRequired}
 	case localauth.GateFetchError:
 		msg := errorMessage(err)
-		slog.Warn(fmt.Sprintf("secret reveal failed for %s: %s", id, msg), "scope", "connections")
+		slog.Warn("secret reveal failed", "scope", "connections", "id", id, "err", msg)
 		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
 	}
-	slog.Info(fmt.Sprintf("secret revealed for %s", id), "scope", "connections")
+	slog.Info("secret revealed", "scope", "connections", "id", id)
 	if uriMode {
 		return RevealResult{Outcome: revealOutcomeRevealed, URI: value}
 	}

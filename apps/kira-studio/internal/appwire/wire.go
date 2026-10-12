@@ -62,11 +62,11 @@ func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *rep
 	adapterDeps := adapters.Deps{Log: func(level, message string) {
 		switch level {
 		case "error":
-			slog.Error(message, "scope", "adapter")
+			slog.Error("adapter log", "scope", "adapter", "detail", message)
 		case "warn":
-			slog.Warn(message, "scope", "adapter")
+			slog.Warn("adapter log", "scope", "adapter", "detail", message)
 		default:
-			slog.Info(message, "scope", "adapter")
+			slog.Info("adapter log", "scope", "adapter", "detail", message)
 		}
 	}}
 	goCache := enginecache.NewCache(settings.Cache.L2BudgetMb*1024*1024, adapterDeps.Log)

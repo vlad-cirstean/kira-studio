@@ -67,7 +67,7 @@ func (e *Service[S, ST]) stopLocked() {
 func (e *Service[S, ST]) StartIfEnabled(scope string, enabledSetting func() (bool, error)) {
 	ok, err := enabledSetting()
 	if err != nil {
-		slog.Warn(scope+": read settings at boot", "scope", scope, "err", err)
+		slog.Warn("read settings at boot", "scope", scope, "err", err)
 		return
 	}
 	if !ok {
@@ -76,7 +76,7 @@ func (e *Service[S, ST]) StartIfEnabled(scope string, enabledSetting func() (boo
 	e.Mu.Lock()
 	defer e.Mu.Unlock()
 	if err := e.startLocked(false); err != nil {
-		slog.Warn(scope+": start at boot", "scope", scope, "err", err)
+		slog.Warn("start at boot", "scope", scope, "err", err)
 	}
 }
 

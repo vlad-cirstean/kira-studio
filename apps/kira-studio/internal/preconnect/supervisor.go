@@ -170,7 +170,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 	if err := cmd.Start(); err != nil {
 		_ = stderrW.Close()
 		_ = stderrR.Close()
-		slog.Error(fmt.Sprintf("preconnect[%s] failed to spawn: %s", connectionID, err), "scope", "preconnect")
+		slog.Error("preconnect failed to spawn", "scope", "preconnect", "connectionId", connectionID, "err", err)
 		return Start{}, fmt.Errorf("Pre-connect script could not start: %s", err)
 	}
 	_ = stderrW.Close()
@@ -215,7 +215,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 
 	case out := <-outcomeCh:
 		if out.signal == "" && out.code != nil && *out.code == 0 {
-			slog.Info(fmt.Sprintf("preconnect[%s] one-shot exited 0", connectionID), "scope", "preconnect")
+			slog.Info("preconnect one-shot exited 0", "scope", "preconnect", "connectionId", connectionID)
 			// A background child left in the group (`kubectl port-forward ... & sleep 1`) stays
 			// tracked so Stop/StopAll still reach it.
 			if !e.groupDead() {
@@ -358,7 +358,7 @@ func (s *Supervisor) killEntry(connectionID string, e *entry) {
 		select {
 		case <-e.groupGone:
 		case <-giveUp:
-			slog.Warn(fmt.Sprintf("preconnect[%s] pid %d did not exit within %s of SIGKILL, giving up", connectionID, e.pid, killGrace), "scope", "preconnect")
+			slog.Warn("preconnect process did not exit after SIGKILL, giving up", "scope", "preconnect", "connectionId", connectionID, "pid", e.pid, "grace", killGrace)
 		}
 		escalate.Stop()
 	}

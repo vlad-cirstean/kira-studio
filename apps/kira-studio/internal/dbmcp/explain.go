@@ -140,7 +140,7 @@ func (s *Server) assertComposedStatementsAreReads(ctx context.Context, connectio
 	for _, stmt := range statements {
 		class, err := s.cfg.Query.ClassifyStatement(ctx, connectionID, stmt)
 		if err != nil {
-			s.log.Warn("dbmcp: explain: classification of composed EXPLAIN failed", "connectionId", connectionID, "error", err)
+			s.log.Warn("dbmcp: explain: classification of composed EXPLAIN failed", "connectionId", connectionID, "err", err)
 			return fmt.Errorf("dbmcp: classify composed EXPLAIN statement: %w", err)
 		}
 		if class != adapters.ClassRead {

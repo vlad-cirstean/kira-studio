@@ -15,9 +15,15 @@ linters:
     - ineffassign    # dead stores — dead code, statement level. 1.
     - makezero       # make([]T, n) then append. 0 findings — keeps it so.
     - prealloc       # perf: a growable slice with a known length. 4 (non-test).
+    - sloglint       # P266: static messages, camelCase keys, errors under "err" (scope presence: internal/conventiontest).
     - unconvert      # redundant conversions. 1.
     - unused         # SPEC's Go dead-code answer, staticcheck-based. 11.
   settings:
+    sloglint:
+      static-msg: true
+      key-naming-case: camel
+      forbidden-keys:
+        - error
     gocognit:
       min-complexity: 30
     gocyclo:
