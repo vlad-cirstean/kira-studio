@@ -23,6 +23,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -68,6 +69,8 @@ type TaskBoardDeps struct {
 	OnRuns func(adewire.RunsChangedEvent)
 	// AgentDir holds each run's MCP config file (0700 dir, 0600 files).
 	AgentDir string
+	// Prompts resolves the editable LLM prompt texts; nil means the registry defaults.
+	Prompts llmprompts.Source
 	// ClaudeBin defaults to "claude" (a test points it at a fake).
 	ClaudeBin string
 	// Tracker records and launches interactive (TUI) task sessions.
@@ -147,6 +150,14 @@ type TaskBoard struct {
 	ghPending map[string]bool        // branch id -> an unmark worker is queued
 }
 
+// prompts is the source of every LLM prompt the board sends.
+func (b *TaskBoard) prompts() llmprompts.Source {
+	if b.deps.Prompts == nil {
+		return llmprompts.Defaults()
+	}
+	return b.deps.Prompts
+}
+
 // NewTaskBoard builds the engine; Close releases it.
 func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	if deps.Now == nil {
@@ -160,7 +171,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
-	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b})
+	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Prompts: b.prompts()})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)

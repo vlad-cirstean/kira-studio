@@ -460,7 +460,7 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 	}
 	message := args.Message
 	if message == "" {
-		message = composeStageMessage(stage, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
+		message = composeStageMessage(b.prompts(), stage, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
 	}
 	pa := PrepareArgs{TaskID: tc.task.ID, StageID: stage.ID, Cwd: cwd, Message: message}
 	if len(extra) > 0 {
@@ -560,7 +560,7 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	}
 	message := args.Message
 	if message == "" {
-		message = composeStartMessage(taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
+		message = composeStartMessage(b.prompts(), taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
 			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc))
 	}
 	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "")

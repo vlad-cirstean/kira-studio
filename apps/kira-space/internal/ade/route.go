@@ -7,6 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // route.go routes a finished step run on its result (R4, R5): forward, to the end of the stage, to a
@@ -145,7 +146,7 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 	}
 	loop.attempt, loop.opts.Loops = prev.Attempt+1, b.nextLoops(plan, run.BranchID)
 	loop.opts.Launch = model.AdeRunLaunch{Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}
-	line := fmt.Sprintf("%s failed on %s: %s. Fix the implementation.", from.Name, branchName, reason)
+	line := llmprompts.AdeSendBackLine.Text(b.prompts(), llmprompts.SendBackVars{From: from.Name, Branch: branchName, Reason: reason})
 	if id := b.claudeIDOfSession(prev.SessionID); id != "" {
 		loop.opts.Launch.ResumeID, loop.opts.Launch.Prompt = id, line
 	} else {

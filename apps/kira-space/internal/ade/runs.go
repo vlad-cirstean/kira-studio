@@ -490,11 +490,11 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
 		switch {
 		case spec.ResumeID != "":
-			prompt = composeResumePrompt(spec.Prompt, def.Results)
+			prompt = composeResumePrompt(b.prompts(), spec.Prompt, def.Results)
 		case smart != nil:
 			prompt = smart.prompt
 		default:
-			prompt = composePrompt(promptInput{
+			prompt = composePrompt(b.prompts(), promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: spec.Extra,
 				Space: b.spaceEnabled(tc.task), Context: b.rebaseContext(tc),

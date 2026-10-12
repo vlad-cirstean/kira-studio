@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -396,12 +397,12 @@ func (b *TaskBoard) RebasePreview(ctx context.Context, args adewire.OntoArgs) (a
 	if err != nil {
 		return adewire.RebasePreview{}, err
 	}
-	out := adewire.RebasePreview{Suffix: claudeheadless.RebaseReportSuffix, Stack: []adewire.RebaseStackItem{}, Blockers: p.blockers, NoOp: p.noOp}
+	out := adewire.RebasePreview{Suffix: claudeheadless.RebaseReport(b.prompts()), Stack: []adewire.RebaseStackItem{}, Blockers: p.blockers, NoOp: p.noOp}
 	if out.Blockers == nil {
 		out.Blockers = []adewire.RebaseBlocker{}
 	}
 	if p.resolved {
-		out.Prompt = composeRebasePrompt(p.spec)
+		out.Prompt = composeRebasePrompt(b.prompts(), p.spec)
 		for _, st := range p.spec.Stack {
 			out.Stack = append(out.Stack, adewire.RebaseStackItem{BranchID: st.BranchID, Name: st.Name, Worktree: st.Worktree, OntoRef: st.ParentRef})
 		}
@@ -439,7 +440,7 @@ func (b *TaskBoard) Rebase(ctx context.Context, args adewire.RebaseArgs) (adewir
 	}
 	message := args.Message
 	if message == "" {
-		message = composeRebasePrompt(p.spec)
+		message = composeRebasePrompt(b.prompts(), p.spec)
 	} else {
 		for _, st := range p.spec.Stack { // the preview predicted a path for a worktree that did not exist yet
 			if pred := p.predicted[st.BranchID]; pred != "" && pred != st.Worktree {
@@ -462,7 +463,7 @@ func (b *TaskBoard) Rebase(ctx context.Context, args adewire.RebaseArgs) (adewir
 	if err := b.deps.Tasks.InsertRun(run); err != nil {
 		return adewire.RebaseStart{}, err
 	}
-	run, err = b.startRebase(run, p.spec, rebaseRunPrompt(message))
+	run, err = b.startRebase(run, p.spec, rebaseRunPrompt(b.prompts(), message))
 	if err != nil {
 		if !errors.Is(err, errBoardClosed) {
 			b.failLaunch(run, err)
@@ -768,7 +769,9 @@ func (b *TaskBoard) rebaseContext(tc *taskCtx) []string {
 		default:
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("- Last rebase of %s %s: %s (run %s; call run_outcome for details)", sb.Name, what, run.Outcome.Reason, run.ID))
+		lines = append(lines, llmprompts.AdeRebaseContextLine.Text(b.prompts(), llmprompts.RebaseContextVars{
+			Branch: sb.Name, Outcome: what, Reason: run.Outcome.Reason, RunID: run.ID,
+		}))
 	}
 	return lines
 }

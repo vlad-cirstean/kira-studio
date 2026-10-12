@@ -1,11 +1,11 @@
 package ade
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // runVars are the prompt and command variables of one run (SPEC2 section 5.1.1).
@@ -45,39 +45,32 @@ type promptInput struct {
 	Context []string
 }
 
+// stepVars maps a run to the step prompt's template variables. Message and the step prompt arrive
+// with placeholders substituted and trailing newlines trimmed.
+func stepVars(in promptInput) llmprompts.StepVars {
+	v := llmprompts.StepVars{
+		Title: in.Vars.Task, JiraKey: in.JiraKey, JiraURL: in.JiraURL,
+		Repo: in.Vars.Repo, Branch: in.Vars.Branch, Worktree: in.Vars.Worktree,
+		StepNumber: in.Step, StepCount: in.Of, StepName: in.Def.Name,
+		StepPrompt: strings.TrimRight(substitute(in.Def.Prompt, in.Vars, false), "\n"),
+		Extra:      in.Extra, Context: in.Context, Space: in.Space,
+		Finish: claudeheadless.FinishVars(resultSpecs(in.Def.Results)),
+	}
+	if in.Message != "" {
+		v.Message = strings.TrimRight(substitute(in.Message, in.Vars, false), "\n")
+	}
+	return v
+}
+
 // composePrompt builds an agent run's prompt (SPEC2 section 9 "Start step" shape) and always ends
 // it with the finish_step instruction.
-func composePrompt(in promptInput) string {
-	var body string
-	if in.Message != "" {
-		body = substitute(in.Message, in.Vars, false)
-	} else {
-		var sb strings.Builder
-		fmt.Fprintf(&sb, "Task: %s\n", in.Vars.Task)
-		if in.JiraKey != "" {
-			fmt.Fprintf(&sb, "- Jira: %s %s\n", in.JiraKey, in.JiraURL)
-		}
-		fmt.Fprintf(&sb, "- Repo: %s · Branch: %s · Worktree: %s\n", in.Vars.Repo, in.Vars.Branch, in.Vars.Worktree)
-		fmt.Fprintf(&sb, "Step %d/%d: %s\n", in.Step, in.Of, in.Def.Name)
-		sb.WriteString(substitute(in.Def.Prompt, in.Vars, false))
-		body = sb.String()
-	}
-	body = strings.TrimRight(body, "\n")
-	if in.Extra != "" {
-		body += "\n\n" + in.Extra
-	}
-	if len(in.Context) > 0 {
-		body += "\n\n" + strings.Join(in.Context, "\n")
-	}
-	if in.Space {
-		body += "\n\n" + claudeheadless.SpaceSuffix
-	}
-	return body + "\n\n" + claudeheadless.FinishStepSuffixFor(resultSpecs(in.Def.Results)) + "\n"
+func composePrompt(src llmprompts.Source, in promptInput) string {
+	return llmprompts.AdeStepPrompt.Text(src, stepVars(in))
 }
 
 // composeResumePrompt is the message a resumed run gets: the line, then the finish_step instruction.
-func composeResumePrompt(line string, results []adewire.StepResult) string {
-	return line + "\n\n" + claudeheadless.FinishStepSuffixFor(resultSpecs(results)) + "\n"
+func composeResumePrompt(src llmprompts.Source, line string, results []adewire.StepResult) string {
+	return line + "\n\n" + claudeheadless.FinishInstruction(src, resultSpecs(results)) + "\n"
 }
 
 // repoLine is one repo of a launch message.
@@ -89,39 +82,25 @@ type repoLine struct {
 	ReadOnlyRoot string
 }
 
-func (l repoLine) String() string {
-	if l.ReadOnlyRoot != "" {
-		return fmt.Sprintf("- Repo: %s (read only, in %s)", l.Nick, l.ReadOnlyRoot)
+func repoLineVars(repos []repoLine) []llmprompts.RepoLineVars {
+	out := make([]llmprompts.RepoLineVars, len(repos))
+	for i, r := range repos {
+		out[i] = llmprompts.RepoLineVars{Repo: r.Nick, Branch: r.Branch, Worktree: r.Worktree, Base: r.Base, ReadOnlyRoot: r.ReadOnlyRoot}
 	}
-	return fmt.Sprintf("- Repo: %s · Branch: %s · Worktree: %s", l.Nick, l.Branch, l.Worktree)
-}
-
-func jiraLine(key, url string) string {
-	if key == "" {
-		return ""
-	}
-	return fmt.Sprintf("- Jira: %s %s", key, url)
+	return out
 }
 
 // composeStageMessage is the first message of a user stage's interactive session (SPEC2 section 5).
 // The stage prompt sees every writable repo, joined with ", ".
-func composeStageMessage(stage adewire.Stage, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
-	var lines []string
-	lines = append(lines, fmt.Sprintf("%s: %s", stage.Name, title))
-	if l := jiraLine(jiraKey, jiraURL); l != "" {
-		lines = append(lines, l)
-	}
-	for _, r := range repos {
-		lines = append(lines, r.String())
-	}
-	vars := repoVars(title, jiraKey, repos)
-	if notes != "" {
-		lines = append(lines, "- Notes: "+capNotes(notes))
+func composeStageMessage(src llmprompts.Source, stage adewire.Stage, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+	v := llmprompts.StageVars{
+		StageName: stage.Name, Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
+		Notes: capNotes(notes), Repos: repoLineVars(repos),
 	}
 	if stage.Prompt != "" {
-		lines = append(lines, substitute(stage.Prompt, vars, false))
+		v.StagePrompt = substitute(stage.Prompt, repoVars(title, jiraKey, repos), false)
 	}
-	return strings.Join(lines, "\n")
+	return llmprompts.AdeStageMessage.Text(src, v)
 }
 
 // repoVars is the stage prompt's variable set: every writable repo, joined with ", ".
@@ -148,36 +127,18 @@ func capNotes(notes string) string {
 }
 
 // composeReviewMessage is the first message of a task's review agent.
-func composeReviewMessage(title, jiraKey, jiraURL, notes string, repos []repoLine) string {
-	lines := []string{"Task: " + title}
-	if l := jiraLine(jiraKey, jiraURL); l != "" {
-		lines = append(lines, l)
-	}
-	if notes != "" {
-		lines = append(lines, "- Notes: "+capNotes(notes))
-	}
-	for _, r := range repos {
-		if r.ReadOnlyRoot != "" {
-			lines = append(lines, fmt.Sprintf("- %s: read only, in %s", r.Nick, r.ReadOnlyRoot))
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("- %s: %s (base %s) worktree %s", r.Nick, r.Branch, r.Base, r.Worktree))
-	}
-	lines = append(lines, "I review these branches in Kira Space and will ask you questions about them. Answer from the code; change files only when I ask you to.")
-	return strings.Join(lines, "\n")
+func composeReviewMessage(src llmprompts.Source, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+	return llmprompts.AdeReviewMessage.Text(src, llmprompts.ReviewVars{
+		Title: title, JiraKey: jiraKey, JiraURL: jiraURL, Notes: capNotes(notes), Repos: repoLineVars(repos),
+	})
 }
 
 // composeStartMessage is the first message of a branch-level Start session (SPEC2 section 9); step
 // is the first step not done, "" when the stage has none.
-func composeStartMessage(title, jiraKey, jiraURL string, repo repoLine, step string, context []string) string {
-	lines := []string{"Task: " + title}
-	if l := jiraLine(jiraKey, jiraURL); l != "" {
-		lines = append(lines, l)
-	}
-	lines = append(lines, repo.String())
-	if step != "" {
-		lines = append(lines, "Step: "+step)
-	}
-	lines = append(lines, context...)
-	return strings.Join(lines, "\n")
+func composeStartMessage(src llmprompts.Source, title, jiraKey, jiraURL string, repo repoLine, step string, context []string) string {
+	return llmprompts.AdeStartMessage.Text(src, llmprompts.StartVars{
+		Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
+		Repo: repo.Nick, Branch: repo.Branch, Worktree: repo.Worktree, ReadOnlyRoot: repo.ReadOnlyRoot,
+		StepName: step, Context: context,
+	})
 }

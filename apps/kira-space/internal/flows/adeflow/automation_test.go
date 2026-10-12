@@ -16,6 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -233,7 +234,7 @@ func TestAutomationRun(t *testing.T) {
 				t.Errorf("allowed tools lack %q: %s", want, allowed)
 			}
 		}
-		if !strings.HasPrefix(pv.Suffix, claudeheadless.SpaceSuffix) {
+		if !strings.HasPrefix(pv.Suffix, claudeheadless.SpaceNote(llmprompts.Defaults())) {
 			t.Errorf("suffix = %q, want it to start with the Space suffix", pv.Suffix)
 		}
 		if pv.Dir.Mode != scripts.DirModeWorktree || pv.Dir.Path != f.apiBr.Worktree || pv.Dir.Pending {
@@ -476,7 +477,7 @@ func TestAutomationStep(t *testing.T) {
 		if r.State != "done" {
 			t.Fatalf("run = %+v", r)
 		}
-		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+claudeheadless.FinishStepSuffix; got != want {
+		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+claudeheadless.FinishInstruction(llmprompts.Defaults(), nil); got != want {
 			t.Fatalf("prompt = %q, want %q", got, want)
 		}
 		args := fakeFile(t, f.app, "api-1.args")

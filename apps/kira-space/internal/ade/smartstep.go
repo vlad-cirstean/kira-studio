@@ -79,9 +79,9 @@ func (b *TaskBoard) planSmartStep(tc *taskCtx, sb model.AdeTaskBranch, path stri
 		step.dir = dir.Path
 	}
 	body := scripts.PlainText(scripts.Compose(script.Command, rendered))
-	suffix := claudeheadless.FinishStepSuffixFor(resultSpecs(def.Results))
+	suffix := claudeheadless.FinishInstruction(b.prompts(), resultSpecs(def.Results))
 	if b.spaceEnabled(tc.task) {
-		suffix = claudeheadless.SpaceSuffix + "\n\n" + suffix
+		suffix = claudeheadless.SpaceNote(b.prompts()) + "\n\n" + suffix
 	}
 	step.prompt = body + "\n\n" + suffix
 	return step, nil

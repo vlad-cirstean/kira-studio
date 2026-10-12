@@ -48,7 +48,7 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 	}
 	if message == "" {
 		title := taskTitle(tc.task, tc.branches)
-		message = composeReviewMessage(title, tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
+		message = composeReviewMessage(b.prompts(), title, tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
 		if stage != nil && stage.Prompt != "" {
 			message += "\n" + substitute(stage.Prompt, repoVars(title, tc.task.JiraKey, lines), false)
 		}

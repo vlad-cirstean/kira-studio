@@ -1,54 +1,32 @@
 package ade
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // composeRebasePrompt is the one rebase prompt: the preview shows it, the run sends it. The fixed
 // report suffix is appended separately so an edited message keeps it.
-func composeRebasePrompt(spec model.AdeRebaseSpec) string {
+func composeRebasePrompt(src llmprompts.Source, spec model.AdeRebaseSpec) string {
 	if len(spec.Stack) == 0 {
 		return ""
 	}
-	root := spec.Stack[0]
-	stash := ""
-	if spec.Autostash {
-		stash = "--autostash "
-	}
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "Rebase %s (repo %s) onto %s", root.Name, spec.Repo, spec.OntoName)
-	if len(spec.Stack) > 1 {
-		sb.WriteString(", then restack the branches built on it")
-	}
-	sb.WriteString(":\n")
+	stack := make([]llmprompts.RebaseStackVar, len(spec.Stack))
 	for i, st := range spec.Stack {
-		fmt.Fprintf(&sb, "%d. In %s: ", i+1, st.Worktree)
-		if i == 0 {
-			if spec.Remote != "" {
-				fmt.Fprintf(&sb, "git fetch %s, then ", spec.Remote)
-			}
-			fmt.Fprintf(&sb, "git rebase %s%s\n", stash, st.ParentRef)
-			continue
+		stack[i] = llmprompts.RebaseStackVar{
+			Name: st.Name, Worktree: st.Worktree, ParentRef: st.ParentRef, ParentName: st.ParentName, ParentBefore: st.ParentBefore,
 		}
-		fmt.Fprintf(&sb, "git rebase %s--onto %s %s\n", stash, st.ParentName, st.ParentBefore)
 	}
-	if spec.Review != "" {
-		fmt.Fprintf(&sb, "Do not modify %s.\n", spec.Review)
-	}
-	sb.WriteString("Resolve any conflicts by editing the files, then git add and git rebase --continue.\n")
-	if spec.Push {
-		sb.WriteString("Then push each rebased branch with git push --force-with-lease.")
-	} else {
-		sb.WriteString("Do not push.")
-	}
-	return sb.String()
+	return llmprompts.AdeRebasePrompt.Text(src, llmprompts.RebaseVars{
+		Repo: spec.Repo, Onto: spec.OntoName, Remote: spec.Remote, Review: spec.Review,
+		Autostash: spec.Autostash, Push: spec.Push, Stack: stack,
+	})
 }
 
 // rebaseRunPrompt is what the agent receives: the (possibly edited) message and the report suffix.
-func rebaseRunPrompt(message string) string {
-	return strings.TrimRight(message, "\n") + "\n\n" + claudeheadless.RebaseReportSuffix
+func rebaseRunPrompt(src llmprompts.Source, message string) string {
+	return strings.TrimRight(message, "\n") + "\n\n" + claudeheadless.RebaseReport(src)
 }

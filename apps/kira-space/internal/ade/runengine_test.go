@@ -23,6 +23,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -406,7 +407,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
 	if strings.Contains(args, "Bearer") {
 		t.Fatal("bearer token on argv")
 	}
-	if prompt := e.fakeFile("api-1.prompt"); !strings.Contains(prompt, "Step 1/2: one") || !strings.Contains(prompt, claudeheadless.FinishStepSuffix) {
+	if prompt := e.fakeFile("api-1.prompt"); !strings.Contains(prompt, "Step 1/2: one") || !strings.Contains(prompt, claudeheadless.FinishInstruction(llmprompts.Defaults(), nil)) {
 		t.Fatalf("prompt = %q", prompt)
 	}
 
