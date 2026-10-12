@@ -2,15 +2,20 @@ package claude
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
+	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
 const memoryServer = "kira-memory"
 
 // TestMemoryMcpThroughClaude points the real claude at this test binary re-executed as the
-// memory-mcp stdio server and has it call search_memories.
+// memory-mcp stdio server and has it call search_memories, then store_memory and memory_context.
+// The second run starts in a git repository whose origin remote names the project key.
 func TestMemoryMcpThroughClaude(t *testing.T) {
 	app := newRealApp(t)
 	exe, err := os.Executable()
@@ -40,6 +45,55 @@ func TestMemoryMcpThroughClaude(t *testing.T) {
 	}
 	if res := resultMsg(t, msgs); res.IsError {
 		t.Fatalf("claude run ended in error: %+v", res)
+	}
+	storeThroughClaude(t, app, cfg)
+}
+
+// sessionID is the --session-id of the store run; the server records it when claude exports it.
+const sessionID = "5f1c0f55-7a62-4a5b-9b52-0d6a2f0c1e11"
+
+func storeThroughClaude(t *testing.T, app *realApp, cfg string) {
+	t.Helper()
+	repo := filepath.Join(app.Work, "billing")
+	for _, args := range [][]string{
+		{"init", "-q", repo},
+		{"-C", repo, "remote", "add", "origin", "https://github.com/acme/billing.git"},
+	} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	tools := "mcp__" + memoryServer + "__store_memory,mcp__" + memoryServer + "__memory_context"
+	out, _ := app.claudeP(t, repo, nil,
+		"Call store_memory once with one item: fact \"The billing-api service listens on port 8080 in production.\", "+
+			"reason \"Stated in the deployment manifest.\", origin agent, scope project, and no project argument. "+
+			"Then call memory_context with the fact id from the result. Reply with the word done.",
+		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools, "--session-id", sessionID,
+		"--output-format", "stream-json", "--verbose")
+	msgs := parseStream(out)
+	for _, tool := range []string{"store_memory", "memory_context"} {
+		uses := toolUses(msgs, "mcp__"+memoryServer+"__"+tool)
+		if len(uses) == 0 {
+			t.Fatalf("no %s tool use in the stream:\n%s", tool, tail(out, 1500))
+		}
+		if text, isErr, ok := toolResult(msgs, uses[0].ID); !ok || isErr {
+			t.Fatalf("%s result missing or an error (ok=%v, text=%q)", tool, ok, text)
+		}
+	}
+	recent, err := app.W.Memory.Recent(ctx)
+	if err != nil || len(recent) != 1 {
+		t.Fatalf("Recent = %+v, %v, want the stored fact", recent, err)
+	}
+	m := recent[0]
+	if m.Origin != memory.OriginAgent || m.Scope != memory.ScopeProject || m.Project == nil || *m.Project != "github.com/acme/billing" {
+		t.Fatalf("stored memory = %+v, want an agent fact in project github.com/acme/billing", m)
+	}
+	// Step 0 of P272 found CLAUDE_CODE_SESSION_ID exported to MCP servers and equal to --session-id.
+	if m.SessionID == nil || *m.SessionID != sessionID {
+		t.Fatalf("session = %v, want %s", m.SessionID, sessionID)
+	}
+	if c, err := app.W.Memory.Context(ctx, bridge.MemoryContextArgs{ID: m.LineageID}); err != nil || c.Memory.ID != m.ID {
+		t.Fatalf("Context = %+v, %v, want the stored fact", c, err)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"slices"
 	"testing"
 	"time"
 
@@ -86,6 +87,13 @@ func TestMemoryImport(t *testing.T) {
 			if ev.Source == memory.SourceImport && ev.Action == memory.ActionAdd {
 				imported++
 			}
+		}
+		if m.Origin != memory.OriginExternal || m.SourceTag == nil || *m.SourceTag != "doc" || m.Scope != memory.ScopePersonal {
+			t.Errorf("memory %s = %+v, want external/doc in personal scope", m.ID, m)
+		}
+		c, err := svc.Context(context.Background(), m.ID, 0)
+		if err != nil || !slices.ContainsFunc(c.Groups, func(g memory.GroupContext) bool { return g.Kind == memory.GroupDocument }) {
+			t.Errorf("memory %s context = %+v, %v, want a document group", m.ID, c, err)
 		}
 		t.Logf("memory: %s\n    reason: %s", m.Fact, m.Reason)
 	}

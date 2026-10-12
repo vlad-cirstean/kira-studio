@@ -53,10 +53,9 @@ func importAppGate(t *testing.T, gateSystem string, extract ...fakeagent.PromptR
 	)
 	app.Scenario(fakeagent.Scenario{Prompts: prompts, Claude: map[string][]fakeagent.Action{"*": {{
 		MCP: []fakeagent.MCPCall{{Server: "kira-memory", Tool: "store_memory", Args: map[string]any{
-			"author": "agent",
 			"items": []map[string]string{
-				{"fact": "first", "reason": "document"},
-				{"fact": "second", "reason": "document"},
+				{"fact": "first", "reason": "document", "origin": "agent", "scope": "personal"},
+				{"fact": "second", "reason": "document", "origin": "agent", "scope": "personal"},
 			},
 		}}},
 		Emit: finalize,
@@ -154,7 +153,14 @@ func TestImportLifecycle(t *testing.T) {
 
 	hits, err := app.W.Memory.Search(ctx, bridge.MemorySearchArgs{Query: "invoices"})
 	if err != nil || len(hits) == 0 || hits[0].Origin != memory.OriginExternal {
-		t.Fatalf("Search invoices = %+v, %v, want an agent memory", hits, err)
+		t.Fatalf("Search invoices = %+v, %v, want an imported memory", hits, err)
+	}
+	if m := hits[0]; m.SourceTag == nil || *m.SourceTag != "doc" || m.Scope != memory.ScopePersonal || m.SessionID != nil {
+		t.Fatalf("imported memory = %+v, want external/doc, personal scope and no session", m)
+	}
+	imported, err := app.W.Memory.Context(ctx, bridge.MemoryContextArgs{ID: hits[0].ID})
+	if err != nil || !slices.ContainsFunc(imported.Groups, func(g memory.GroupContext) bool { return g.Kind == memory.GroupDocument }) {
+		t.Fatalf("Context = %+v, %v, want a document group", imported, err)
 	}
 	hist, err := app.W.Memory.History(ctx, bridge.MemoryIDArgs{ID: hits[0].ID})
 	if err != nil || len(hist.Events) != 1 || hist.Events[0].Source != memory.SourceImport || hist.Events[0].SourceLabel != "billing.md" {

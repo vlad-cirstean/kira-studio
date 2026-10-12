@@ -282,7 +282,11 @@ function memoryRecord(id: string, fact: string): Record<string, unknown> {
     fact,
     reason: 'Because.',
     keywords: [],
-    author: 'user',
+    origin: 'user',
+    sourceTag: null,
+    scope: 'personal',
+    project: null,
+    sessionId: null,
     status: 'current',
     historical: false,
     supersedesId: null,
@@ -302,6 +306,7 @@ test('memory list — focus on mount, arrows, Home/End, Enter selects and a type
     control: [
       { channel: IPC.memoryRecent, response: [first, second] },
       { channel: IPC.memoryHistory, response: { memories: [second], events: [] } },
+      { channel: IPC.memoryContext, response: { memory: second, groups: [] } },
     ],
   });
   await page.locator('[data-testid="mode-tab"][data-mode="memory"]').click();

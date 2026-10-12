@@ -15,7 +15,11 @@ function memory(over: Record<string, unknown>) {
     fact: 'The billing API listens on port 9090.',
     reason: 'Manifest changed in March.',
     keywords: ['billing', 'port'],
-    author: 'user',
+    origin: 'user',
+    sourceTag: null,
+    scope: 'personal',
+    project: null,
+    sessionId: null,
     status: 'current',
     historical: false,
     supersedesId: null,
@@ -33,7 +37,7 @@ const CURRENT = memory({
   version: 2,
   versions: 2,
   supersedesId: 'm1',
-  author: 'agent',
+  origin: 'agent',
 });
 const OLD = memory({
   id: 'm1',
@@ -56,7 +60,9 @@ const HISTORY = {
       lineageId: 'm1',
       memoryId: 'm1',
       previousId: null,
-      author: 'user',
+      origin: 'user',
+      sourceTag: null,
+      sessionId: null,
       rationale: 'No related memory.',
       createdAt: OLD.createdAt,
     },
@@ -69,7 +75,9 @@ const HISTORY = {
       lineageId: 'm1',
       memoryId: 'm2',
       previousId: 'm1',
-      author: 'agent',
+      origin: 'agent',
+      sourceTag: null,
+      sessionId: null,
       rationale: 'Port corrected.',
       createdAt: CURRENT.createdAt,
     },
@@ -89,6 +97,7 @@ const BASE: ControlSnapshot[] = [
     response: [CURRENT, OLD],
   },
   { channel: IPC.memoryHistory, response: HISTORY },
+  { channel: IPC.memoryContext, response: { memory: CURRENT, groups: [] } },
 ];
 
 function modeTab(page: Page, mode: 'git' | 'automations' | 'ade' | 'memory') {
@@ -106,7 +115,7 @@ test('Memory mode lists recent memories, searches, and flags history', async ({ 
   const { window: page, control } = await relaunch({ control: BASE });
   await openMemory(page);
 
-  const rows = page.locator('[data-testid^="memory-row-"]');
+  const rows = page.locator('button[data-testid^="memory-row-"]');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('port 9090');
   await expect(rows.first()).toContainText('Agent');
@@ -162,7 +171,7 @@ test('contract: Add memory: free text, a challenge shows questions, resubmit sen
       ...BASE,
       {
         channel: IPC.memoryStore,
-        args: { items: [item], clarifications: [] },
+        args: { items: [item], clarifications: [], scope: 'personal', project: '' },
         response: {
           ...challenged,
           challenges: [{ index: 0, fact: item.fact, questions: [question] }],
@@ -170,7 +179,7 @@ test('contract: Add memory: free text, a challenge shows questions, resubmit sen
       },
       {
         channel: IPC.memoryStore,
-        args: { items: [item], clarifications: [answer] },
+        args: { items: [item], clarifications: [answer], scope: 'personal', project: '' },
         response: stored,
       },
     ],
@@ -230,7 +239,7 @@ for (const [scenario, key] of [
       control: [{ channel: IPC.memoryRecent, response: recent }],
     });
     await openMemory(page);
-    await expect(page.locator('[data-testid^="memory-row-"]')).toHaveCount(recent.length);
+    await expect(page.locator('button[data-testid^="memory-row-"]')).toHaveCount(recent.length);
     for (const m of recent) {
       await expect(page.locator(`[data-testid="memory-row-${m.id}"]`)).toContainText(m.fact);
     }
@@ -250,7 +259,7 @@ test('contract: a search hit lists the fact found by its gate keyword', async ({
   });
   await openMemory(page);
   await page.locator('[data-testid="memory-search"]').fill('postgresql');
-  await expect(page.locator('[data-testid^="memory-row-"]')).toHaveCount(hits.length);
+  await expect(page.locator('button[data-testid^="memory-row-"]')).toHaveCount(hits.length);
   await expect(page.locator(`[data-testid="memory-row-${hits[0]?.id}"]`)).toContainText(
     hits[0]?.fact ?? '',
   );

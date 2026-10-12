@@ -18,6 +18,10 @@ func memoryFacts(ms []memory.Memory) []string {
 	return out
 }
 
+func item(fact, reason string) memory.Item {
+	return memory.Item{Fact: fact, Reason: reason, Origin: memory.OriginUser, Scope: memory.ScopePersonal}
+}
+
 func TestMemoryGate(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err != nil {
 		t.Skip("real claude tests: no claude on PATH")
@@ -29,7 +33,7 @@ func TestMemoryGate(t *testing.T) {
 	defer cancel()
 	do := func(r memory.StoreRequest) memory.StoreResult {
 		t.Helper()
-		r.Author, r.Source = memory.AuthorUser, memory.SourceUI
+		r.Source = memory.SourceUI
 		res, err := svc.Store(ctx, r)
 		if err != nil {
 			t.Fatal(err)
@@ -38,20 +42,20 @@ func TestMemoryGate(t *testing.T) {
 		return res
 	}
 
-	if res := do(memory.StoreRequest{Items: []memory.Item{{Fact: "it uses port 8080", Reason: "because"}}}); res.Status != "challenged" {
+	if res := do(memory.StoreRequest{Items: []memory.Item{item("it uses port 8080", "because")}}); res.Status != "challenged" {
 		t.Errorf("ambiguous item: status = %s, want challenged", res.Status)
 	}
-	res := do(memory.StoreRequest{Items: []memory.Item{{
-		Fact:   "The billing-api service listens on port 8080 in production.",
-		Reason: "Stated in the billing-api deployment manifest.",
-	}}})
+	res := do(memory.StoreRequest{Items: []memory.Item{item(
+		"The billing-api service listens on port 8080 in production.",
+		"Stated in the billing-api deployment manifest.",
+	)}})
 	if res.Status != "stored" || len(res.Outcomes) != 1 || res.Outcomes[0].Action != memory.ActionAdd {
 		t.Fatalf("clear item: %+v", res)
 	}
-	res = do(memory.StoreRequest{Items: []memory.Item{{
-		Fact:   "The billing-api service now listens on port 9090 in production, not 8080.",
-		Reason: "The manifest changed in the March release.",
-	}}})
+	res = do(memory.StoreRequest{Items: []memory.Item{item(
+		"The billing-api service now listens on port 9090 in production, not 8080.",
+		"The manifest changed in the March release.",
+	)}})
 	if res.Status != "stored" || len(res.Outcomes) != 1 || res.Outcomes[0].Action != memory.ActionUpdate {
 		t.Fatalf("refining item: %+v", res)
 	}

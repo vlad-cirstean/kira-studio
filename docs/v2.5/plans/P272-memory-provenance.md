@@ -407,3 +407,10 @@ Existing specs `memory-module.spec.ts` and `list-keyboard.spec.ts` and flows `st
 - No search filters, no non-persist flag: P275 and P273 own them.
 - Nested argument descriptions in `InputSchema`: agents must see what origin and scope mean.
 - One sequential implementer: one dependency chain, SPEC Process.
+
+## 9. Result
+
+### 9.1 Step 0 probe
+
+Real `claude -p --strict-mcp-config` started a stdio server that printed its env. `CLAUDE_CODE_SESSION_ID`
+arrived and equaled the run's `--session-id`. Session capture from env works; no known open item.

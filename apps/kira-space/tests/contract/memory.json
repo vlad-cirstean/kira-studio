@@ -1,11 +1,213 @@
 {
+  "MemoryService.Context#mcp": {
+    "groups": [
+      {
+        "facts": [
+          {
+            "createdAt": "<masked>",
+            "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+            "historical": false,
+            "id": "<id:1>.1",
+            "keywords": [
+              "deploy",
+              "staging",
+              "schedule",
+              "release",
+              "weekday"
+            ],
+            "lineageId": "<id:1>",
+            "origin": "agent",
+            "project": null,
+            "reason": "The release calendar says so.",
+            "scope": "company",
+            "sessionId": "flow-session",
+            "sourceTag": null,
+            "status": "current",
+            "supersededAt": null,
+            "supersededById": null,
+            "supersedesId": null,
+            "version": 1,
+            "versions": 1
+          }
+        ],
+        "id": "<id:3>",
+        "key": "C123/1700.1",
+        "kind": "thread",
+        "title": "Billing thread",
+        "total": 1
+      },
+      {
+        "facts": [
+          {
+            "createdAt": "<masked>",
+            "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+            "historical": false,
+            "id": "<id:1>.1",
+            "keywords": [
+              "deploy",
+              "staging",
+              "schedule",
+              "release",
+              "weekday"
+            ],
+            "lineageId": "<id:1>",
+            "origin": "agent",
+            "project": null,
+            "reason": "The release calendar says so.",
+            "scope": "company",
+            "sessionId": "flow-session",
+            "sourceTag": null,
+            "status": "current",
+            "supersededAt": null,
+            "supersededById": null,
+            "supersedesId": null,
+            "version": 1,
+            "versions": 1
+          }
+        ],
+        "id": "<id:4>",
+        "key": "<id:5>",
+        "kind": "request",
+        "title": "",
+        "total": 1
+      },
+      {
+        "facts": [
+          {
+            "createdAt": "<masked>",
+            "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+            "historical": false,
+            "id": "<id:1>.1",
+            "keywords": [
+              "deploy",
+              "staging",
+              "schedule",
+              "release",
+              "weekday"
+            ],
+            "lineageId": "<id:1>",
+            "origin": "agent",
+            "project": null,
+            "reason": "The release calendar says so.",
+            "scope": "company",
+            "sessionId": "flow-session",
+            "sourceTag": null,
+            "status": "current",
+            "supersededAt": null,
+            "supersededById": null,
+            "supersedesId": null,
+            "version": 1,
+            "versions": 1
+          }
+        ],
+        "id": "<id:6>",
+        "key": "flow-session",
+        "kind": "session",
+        "title": "",
+        "total": 1
+      }
+    ],
+    "memory": {
+      "createdAt": "<masked>",
+      "fact": "The billing service uses PostgreSQL 16.",
+      "historical": false,
+      "id": "<id:2>.1",
+      "keywords": [
+        "billing",
+        "postgres",
+        "postgresql",
+        "database",
+        "db"
+      ],
+      "lineageId": "<id:2>",
+      "origin": "external",
+      "project": null,
+      "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "company",
+      "sessionId": "flow-session",
+      "sourceTag": "slack",
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    }
+  },
+  "MemoryService.Context#request": {
+    "groups": [
+      {
+        "facts": [
+          {
+            "createdAt": "<masked>",
+            "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+            "historical": false,
+            "id": "<id:1>.1",
+            "keywords": [
+              "deploy",
+              "staging",
+              "schedule",
+              "release",
+              "weekday"
+            ],
+            "lineageId": "<id:1>",
+            "origin": "user",
+            "project": null,
+            "reason": "The release calendar says so.",
+            "scope": "personal",
+            "sessionId": null,
+            "sourceTag": null,
+            "status": "current",
+            "supersededAt": null,
+            "supersededById": null,
+            "supersedesId": null,
+            "version": 1,
+            "versions": 1
+          }
+        ],
+        "id": "<id:2>",
+        "key": "<id:3>",
+        "kind": "request",
+        "title": "",
+        "total": 1
+      }
+    ],
+    "memory": {
+      "createdAt": "<masked>",
+      "fact": "The billing service uses PostgreSQL 16.",
+      "historical": false,
+      "id": "<id:4>.1",
+      "keywords": [
+        "billing",
+        "postgres",
+        "postgresql",
+        "database",
+        "db"
+      ],
+      "lineageId": "<id:4>",
+      "origin": "user",
+      "project": null,
+      "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    }
+  },
+  "MemoryService.Projects#one": [
+    "github.com/acme/billing"
+  ],
   "MemoryService.Recent#gated": [
     {
-      "author": "user",
       "createdAt": "<masked>",
       "fact": "Deploys to staging run every weekday at 09:00 UTC.",
       "historical": false,
-      "id": "<id:2>",
+      "id": "<id:2>.1",
       "keywords": [
         "deploy",
         "staging",
@@ -14,7 +216,12 @@
         "weekday"
       ],
       "lineageId": "<id:2>",
+      "origin": "user",
+      "project": null,
       "reason": "The release calendar says so.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
       "status": "current",
       "supersededAt": null,
       "supersededById": null,
@@ -23,11 +230,10 @@
       "versions": 1
     },
     {
-      "author": "user",
       "createdAt": "<masked>",
       "fact": "The billing service uses PostgreSQL 16.",
       "historical": false,
-      "id": "<id:1>",
+      "id": "<id:1>.1",
       "keywords": [
         "billing",
         "postgres",
@@ -36,7 +242,120 @@
         "db"
       ],
       "lineageId": "<id:1>",
+      "origin": "user",
+      "project": null,
       "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    }
+  ],
+  "MemoryService.Recent#mcp": [
+    {
+      "createdAt": "<masked>",
+      "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+      "historical": false,
+      "id": "<id:1>.1",
+      "keywords": [
+        "deploy",
+        "staging",
+        "schedule",
+        "release",
+        "weekday"
+      ],
+      "lineageId": "<id:1>",
+      "origin": "agent",
+      "project": null,
+      "reason": "The release calendar says so.",
+      "scope": "company",
+      "sessionId": "flow-session",
+      "sourceTag": null,
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    },
+    {
+      "createdAt": "<masked>",
+      "fact": "The billing service uses PostgreSQL 16.",
+      "historical": false,
+      "id": "<id:2>.1",
+      "keywords": [
+        "billing",
+        "postgres",
+        "postgresql",
+        "database",
+        "db"
+      ],
+      "lineageId": "<id:2>",
+      "origin": "external",
+      "project": null,
+      "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "company",
+      "sessionId": "flow-session",
+      "sourceTag": "slack",
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    }
+  ],
+  "MemoryService.Recent#scoped": [
+    {
+      "createdAt": "<masked>",
+      "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+      "historical": false,
+      "id": "<id:1>.1",
+      "keywords": [
+        "deploy",
+        "staging",
+        "schedule",
+        "release",
+        "weekday"
+      ],
+      "lineageId": "<id:1>",
+      "origin": "user",
+      "project": "github.com/acme/billing",
+      "reason": "The release calendar says so.",
+      "scope": "project",
+      "sessionId": null,
+      "sourceTag": null,
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    },
+    {
+      "createdAt": "<masked>",
+      "fact": "The billing service uses PostgreSQL 16.",
+      "historical": false,
+      "id": "<id:2>.1",
+      "keywords": [
+        "billing",
+        "postgres",
+        "postgresql",
+        "database",
+        "db"
+      ],
+      "lineageId": "<id:2>",
+      "origin": "user",
+      "project": "github.com/acme/billing",
+      "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "project",
+      "sessionId": null,
+      "sourceTag": null,
       "status": "current",
       "supersededAt": null,
       "supersededById": null,
@@ -47,11 +366,10 @@
   ],
   "MemoryService.Search#postgresql": [
     {
-      "author": "user",
       "createdAt": "<masked>",
       "fact": "The billing service uses PostgreSQL 16.",
       "historical": false,
-      "id": "<id:1>",
+      "id": "<id:1>.1",
       "keywords": [
         "billing",
         "postgres",
@@ -61,7 +379,12 @@
       ],
       "lineageId": "<id:1>",
       "match": "keyword",
+      "origin": "user",
+      "project": null,
       "reason": "Stated by the maintainer in the migration notes.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
       "status": "current",
       "supersededAt": null,
       "supersededById": null,
@@ -97,7 +420,7 @@
         "action": "add",
         "error": "",
         "fact": "The billing service uses PostgreSQL 16.",
-        "id": "<id:1>",
+        "id": "<id:1>.1",
         "lineageId": "<id:1>",
         "previousId": "",
         "reason": "Stated by the maintainer in the migration notes.",
@@ -108,7 +431,7 @@
         "action": "add",
         "error": "",
         "fact": "Deploys to staging run every weekday at 09:00 UTC.",
-        "id": "<id:2>",
+        "id": "<id:2>.1",
         "lineageId": "<id:2>",
         "previousId": "",
         "reason": "The release calendar says so.",
@@ -129,6 +452,23 @@
         "fact": "staging deploys at 09:00",
         "reason": "release calendar"
       }
-    ]
+    ],
+    "project": "",
+    "scope": "personal"
+  },
+  "args:MemoryService.Store#scoped": {
+    "clarifications": null,
+    "items": [
+      {
+        "fact": "billing runs postgres",
+        "reason": "migration notes"
+      },
+      {
+        "fact": "staging deploys at 09:00",
+        "reason": "release calendar"
+      }
+    ],
+    "project": "github.com/acme/billing",
+    "scope": "project"
   }
 }
