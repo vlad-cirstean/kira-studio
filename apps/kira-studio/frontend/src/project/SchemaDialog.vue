@@ -160,7 +160,6 @@ async function onSave(): Promise<void> {
             :doc="draft"
             language="sql"
             :sql-dialect="dialect"
-            :read-only="false"
             :autocomplete="true"
             :completion-sources="completionSources"
             @update:doc="onDocChange"

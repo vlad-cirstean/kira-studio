@@ -3,6 +3,7 @@ import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import { useMutation } from '@tanstack/vue-query';
 import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
@@ -10,7 +11,6 @@ import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../state/settings';
 import { clearJarCookies, deleteJarCookie } from './cookies';
@@ -61,17 +61,14 @@ const filteredRequestCookies = computed(() => {
 
 const emit = defineEmits<{ refresh: [] }>();
 
-const removeMutation = useMutation(
-  {
-    mutationKey: ['httpJarCookies', 'remove'],
-    mutationFn: (c: HttpCookieWire) => deleteJarCookie(props.url ?? '', c),
-  },
-  queryClient,
-);
-const clearMutation = useMutation(
-  { mutationKey: ['httpJarCookies', 'clear'], mutationFn: clearJarCookies },
-  queryClient,
-);
+const removeMutation = useMutation({
+  mutationKey: ['httpJarCookies', 'remove'],
+  mutationFn: (c: HttpCookieWire) => deleteJarCookie(props.url ?? '', c),
+});
+const clearMutation = useMutation({
+  mutationKey: ['httpJarCookies', 'clear'],
+  mutationFn: clearJarCookies,
+});
 const requestError = computed(
   () => (removeMutation.error.value ?? clearMutation.error.value ?? props.error)?.message ?? null,
 );
@@ -126,14 +123,15 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       icon="circle-slash"
       :title="t('studio.http.cookies.jarOff.empty')"
     >
-      <button
-        type="button"
-        class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+      <Button
+        variant="link"
+        size="inline"
+        class="mt-1"
         data-testid="http-cookies-edit-defaults"
         @click="onEditGlobalDefaults"
       >
         {{ t('studio.http.settings.editGlobal.label') }}
-      </button>
+      </Button>
     </EmptyState>
     <template v-else>
       <div class="flex items-center gap-1">
@@ -147,6 +145,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           size="kira"
           class="shrink-0"
           :disabled="requestCookies.length === 0"
+          :pending="clearMutation.isPending.value"
           data-testid="http-cookies-clear-all"
           @click="onClearAll"
         >
@@ -155,7 +154,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       </div>
       <span
         v-if="filter.trim()"
-        class="text-kira-sm subtle px-1.5 pt-1 pb-0"
+        class="text-kira-sm text-subtle px-1.5 pt-1 pb-0"
         data-testid="http-cookies-filtered-count"
       >
         {{
@@ -196,15 +195,15 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         icon="symbol-key"
         :title="t('studio.http.cookies.none.empty')"
       >
-        <button
-          type="button"
-          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+        <Button
+          variant="link"
+          size="inline"
+          class="mt-1"
           data-testid="http-cookies-retry"
           @click="emit('refresh')"
-          >{{
-            t('common.action.refresh.label')
-          }}</button
         >
+          {{ t('common.action.refresh.label') }}
+        </Button>
       </EmptyState>
     </template>
   </div>
@@ -217,9 +216,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
     <template v-if="response">
       <template v-if="sentCookies.length > 0 || receivedCookies.length > 0">
         <div v-if="sentCookies.length > 0" class="pt-1.5">
-          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">{{
-            t('common.sent.status')
-          }}</h3>
+          <SectionHeading :label="t('common.sent.status')" />
           <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
             <div
               v-for="(c, i) in sentCookies"
@@ -241,9 +238,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </div>
         </div>
         <div v-if="receivedCookies.length > 0" class="pt-1.5">
-          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">{{
-            t('studio.http.cookies.received.label')
-          }}</h3>
+          <SectionHeading :label="t('studio.http.cookies.received.label')" />
           <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
             <div
               v-for="(c, i) in receivedCookies"

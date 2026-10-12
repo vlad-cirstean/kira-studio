@@ -88,7 +88,7 @@ function close(): void {
         t('studio.grid.previewCommand.empty')
       }}</InlineState>
       <div v-else class="h-60">
-        <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
+        <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" readonly />
       </div>
     </div>
   </PopoverContent>

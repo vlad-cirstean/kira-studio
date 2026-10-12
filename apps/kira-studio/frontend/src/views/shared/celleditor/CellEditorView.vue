@@ -65,11 +65,11 @@ const statusEncoder = new TextEncoder();
 // `readOnly` (P40 D11): forwarded from CellEditorDock — true when the mounting view (the query
 // console) has no write path for its cells at all, distinct from a cell being individually
 // uneditable (readOnlyReasonFor below, unaffected by this flag).
-const props = withDefaults(defineProps<{ cell: SelectedCell; readOnly?: boolean }>(), {
-  readOnly: false,
+const props = withDefaults(defineProps<{ cell: SelectedCell; readonly?: boolean }>(), {
+  readonly: false,
 });
 const selectedCell = computed(() => props.cell);
-const viewerMode = computed(() => props.readOnly === true);
+const viewerMode = computed(() => props.readonly === true);
 
 const override = computed<CellFormat | null>(() =>
   cellEditorFormatStore.overrideFor(selectedCell.value),
@@ -681,7 +681,7 @@ const statusLine = computed(() => {
           :doc="doc"
           :language="language"
           :sql-dialect="sqlDialect"
-          :read-only="!isEditable"
+          :readonly="!isEditable"
           :lint-source="cellLintSource"
           :range-highlights="docHighlights"
           @update:doc="onMainDocInput"
@@ -705,7 +705,7 @@ const statusLine = computed(() => {
           <MonacoHost
             :doc="decodedDoc"
             language="plain"
-            :read-only="!isEditable"
+            :readonly="!isEditable"
             @update:doc="onDecodedInput"
           />
         </div>
@@ -736,7 +736,7 @@ const statusLine = computed(() => {
           class="flex-1 basis-5/12 min-h-0"
           :doc="doc"
           :format="effectiveFormat"
-          :read-only="!isEditable"
+          :readonly="!isEditable"
           @update:doc="writeDoc($event)"
         />
       </template>

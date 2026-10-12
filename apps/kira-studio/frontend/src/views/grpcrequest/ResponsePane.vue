@@ -21,6 +21,7 @@ import { formatBytes, formatClockTime, formatDuration } from '@workbench/behavio
 import { useVirtualRows } from '@workbench/behaviour/virtualRows';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -165,14 +166,16 @@ function toggleExpanded(seq: number): void {
 }
 
 // Finding 11: the message list is virtualized (below), which needs one known height per row —
-// MESSAGE_ROW_HEIGHT for a collapsed header, or that plus MESSAGE_DETAIL_HEIGHT for an expanded
+// the density row height for a collapsed header, or that plus MESSAGE_DETAIL_HEIGHT for an expanded
 // one (a fixed, internally-scrollable box, not an auto-growing one — the same "one resolved
 // height per row" contract OperationsPanel.vue's own expandable row already follows).
-const MESSAGE_ROW_HEIGHT = 22; // matches --kira-h-sm
+const { single: messageRowHeight } = useRowHeight();
 const MESSAGE_DETAIL_HEIGHT = 200;
 const messageRowHeights = computed(() =>
   messages.value.map((m) =>
-    expanded.value.has(m.seq) ? MESSAGE_ROW_HEIGHT + MESSAGE_DETAIL_HEIGHT : MESSAGE_ROW_HEIGHT,
+    expanded.value.has(m.seq)
+      ? messageRowHeight.value + MESSAGE_DETAIL_HEIGHT
+      : messageRowHeight.value,
   ),
 );
 
@@ -181,7 +184,7 @@ const messageRowHeights = computed(() =>
 const scrollRef = ref<HTMLElement | null>(null);
 const { virtualItems: virtualMessages, totalSize: totalMessagesSize } = useVirtualRows({
   count: () => messages.value.length,
-  rowHeight: () => MESSAGE_ROW_HEIGHT,
+  rowHeight: () => messageRowHeight.value,
   rowHeights: () => messageRowHeights.value,
   scrollElement: scrollRef,
   overscan: 8,
@@ -319,7 +322,7 @@ onUnmounted(() => {
         v-if="tab.state.responsePane === 'messages'"
         :icon="ICON.search"
         :label="t('studio.grpc.response.find.label')"
-        :class="{ 'bg-field text-fg': findOpen }"
+        :pressed="findOpen"
         data-testid="grpc-find-toggle"
         @click="toggleFind"
       />
@@ -459,13 +462,13 @@ onUnmounted(() => {
             data-testid="grpc-message-entry"
             :style="{ transform: `translateY(${entry.row.start}px)` }"
           >
-            <!-- height (not padding) so this row's own rendered height stays exactly
-                 MESSAGE_ROW_HEIGHT (22px, the script's own numeric constant, kept equal to
-                 --kira-h-sm here) — VirtualList positions every row assuming that exact height,
-                 border included via box-sizing. -->
+            <!-- height (not padding) so this row's own rendered height stays exactly the density
+                 row height — the virtualizer positions every row assuming it, border included via
+                 box-sizing. -->
             <button
               type="button"
-              :class="cn(rowVariants(), 'box-border h-5.5 w-full rounded-none border-0 border-b border-border bg-none px-1.5')"
+              :class="cn(rowVariants(), 'box-border w-full rounded-none border-0 border-b border-border bg-none px-1.5')"
+              :style="{ height: `${messageRowHeight}px` }"
               @click="toggleExpanded(entry.m.seq)"
             >
               <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">{{
@@ -499,7 +502,7 @@ onUnmounted(() => {
                 :ref="(el) => setMessageHost(entry.m.seq, el)"
                 :doc="entry.m.json"
                 language="json"
-                :read-only="true"
+                readonly
                 :range-highlights="entry.m.seq === targetSeq ? messageHighlights : undefined"
               />
             </div>
@@ -511,15 +514,16 @@ onUnmounted(() => {
         icon="arrow-right"
         :title="t('studio.grpc.response.empty')"
       >
-        <button
+        <Button
           v-if="hasHistory"
-          type="button"
-          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+          variant="link"
+          size="inline"
+          class="mt-1"
           data-testid="grpc-history-hint"
           @click="viewHistory"
         >
           {{ t('studio.grpc.response.viewHistory.label', { count: historyCount }) }}
-        </button>
+        </Button>
       </EmptyState>
     </div>
 

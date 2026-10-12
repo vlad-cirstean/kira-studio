@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -14,21 +15,28 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
 
-// formatBytes is read.ts's formatBytes. Asserted byte-exactly by the acceptance suite (P58d D15),
-// not reasoned about — Go's %.1f and JS's toFixed(1) agree on every value the fixture produces,
-// and do not agree in general (Go rounds half to even, toFixed does not).
+var byteUnits = []string{"B", "KB", "MB", "GB", "TB"}
+
+// formatBytes matches the frontend's formatBytes: 1024 steps, one decimal under 100, none above.
+// The decimal rounds half up like JS toFixed, where Go's %.1f rounds half to even.
 func formatBytes(n int64) string {
-	if n < 1024 {
-		return fmt.Sprintf("%d B", n)
-	}
-	units := []string{"KB", "MB", "GB", "TB"}
-	value := float64(n) / 1024
+	value := float64(max(n, 0))
 	unit := 0
-	for value >= 1024 && unit < len(units)-1 {
+	for unit < len(byteUnits)-1 && math.Round(value) >= 1024 {
 		value /= 1024
 		unit++
 	}
-	return fmt.Sprintf("%.1f %s", value, units[unit])
+	if unit == 0 {
+		return fmt.Sprintf("%d B", int64(math.Round(value)))
+	}
+	if value < 99.95 {
+		return fmt.Sprintf("%.1f %s", math.Floor(value*10+0.5)/10, byteUnits[unit])
+	}
+	text := fmt.Sprintf("%.0f", math.Round(value))
+	if text == "1024" && unit < len(byteUnits)-1 {
+		return "1.0 " + byteUnits[unit+1]
+	}
+	return text + " " + byteUnits[unit]
 }
 
 // headObjectLike is the subset of HeadObjectOutput/GetObjectOutput pushMetadataFields needs — the

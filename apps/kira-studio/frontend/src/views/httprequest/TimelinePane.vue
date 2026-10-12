@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
+import Disclosure from '@theme/components/Disclosure.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
+import KeyValueList from '@theme/components/KeyValueList.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
@@ -50,13 +53,6 @@ function failureText(hop: HttpTimelineHop): string {
   return t('studio.http.timeline.failedDownload.description');
 }
 
-// F18's one extension to RunState.vue's own ms/s convention: a sub-millisecond figure keeps two
-// decimals rather than rounding to "0 ms" — the reused-connection case this pane exists to explain
-// is exactly the sub-millisecond one (D4).
-function formatHopMs(ms: number): string {
-  return ms < 1 ? t('format.duration.ms', { value: ms.toFixed(2) }) : formatDuration(ms);
-}
-
 const summary = computed(() => {
   const tl = timeline.value;
   if (!tl) return '';
@@ -64,7 +60,7 @@ const summary = computed(() => {
   const key = tl.hops[0]?.reused
     ? 'studio.http.timeline.summaryReused.status'
     : 'studio.http.timeline.summary.status';
-  return t(key, { count: n, total: formatHopMs(tl.totalMs) });
+  return t(key, { count: n, total: formatDuration(tl.totalMs) });
 });
 
 interface PhaseSegment {
@@ -111,6 +107,12 @@ function hopSegments(hop: HttpTimelineHop): Array<{ bgClass: string; widthPct: n
   return [...segs, { bgClass: 'bg-conn-grey', widthPct: residuePct }];
 }
 
+function hopHeaders(hop: HttpTimelineHop): Array<{ name: string; value: string }> {
+  if (hop.headers && hop.headers.length > 0) return hop.headers;
+  const last = hop.index === (activeTimeline.value?.hops.length ?? 0) - 1;
+  return last ? (response.value?.headers ?? []) : [];
+}
+
 function residueMs(hop: HttpTimelineHop): number {
   const measured =
     (hop.dns?.durationMs ?? 0) +
@@ -155,7 +157,7 @@ function reuseNote(hop: HttpTimelineHop): string {
     return '';
   }
   return hop.idleMs !== undefined
-    ? t('studio.http.timeline.reusedIdle.hint', { idle: formatHopMs(hop.idleMs) })
+    ? t('studio.http.timeline.reusedIdle.hint', { idle: formatDuration(hop.idleMs) })
     : t('studio.http.timeline.reused.hint');
 }
 
@@ -171,7 +173,7 @@ function info1xxNote(hop: HttpTimelineHop): string {
 
 function residueNote(hop: HttpTimelineHop): string {
   if (!residueIsNotable(hop)) return '';
-  return t('studio.http.timeline.residue.hint', { duration: formatHopMs(residueMs(hop)) });
+  return t('studio.http.timeline.residue.hint', { duration: formatDuration(residueMs(hop)) });
 }
 
 // D11: a "note" that fires on the common case (a reused connection is the common case) is a
@@ -257,9 +259,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           >
             <span class="text-muted-foreground">{{ hop.index + 1 }}</span>
             <span>{{ hop.method }}</span>
-            <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-              hop.url
-            }}</span>
+            <span class="min-w-0 flex-1"><TruncatedText :text="hop.url" /></span>
             <span>→</span>
             <Tooltip v-if="hop.status > 0">
               <TooltipTrigger as-child>
@@ -286,12 +286,12 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-1.5 text-kira-sm text-subtle">
+          <div class="flex flex-wrap gap-1.5 text-kira-sm">
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
                   <span
-                    class="data-[present=false]:opacity-60"
+                    class="text-muted-foreground data-[present=false]:text-subtle"
                     :data-testid="`http-timeline-phase-${seg.key}`"
                     data-present="false"
                   >
@@ -303,11 +303,11 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
               </Tooltip>
               <span
                 v-else
-                class="data-[present=false]:opacity-60"
+                class="text-muted-foreground data-[present=false]:text-subtle"
                 :data-testid="`http-timeline-phase-${seg.key}`"
                 data-present="true"
               >
-                {{ t(seg.labelKey) }} {{ formatHopMs(hop[seg.key]!.durationMs) }}
+                {{ t(seg.labelKey) }} {{ formatDuration(hop[seg.key]!.durationMs) }}
               </span>
             </template>
           </div>
@@ -321,35 +321,19 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             }}</div>
           </div>
 
-          <details v-if="hop.headers && hop.headers.length > 0" class="group mt-0.5">
-            <summary
-              class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
-            >
-              {{ t('studio.http.timeline.responseHeaders.label') }}
-            </summary>
-            <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-sm py-0.5">
-              <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
-              <span class="wrap-anywhere font-data">{{ h.value }}</span>
-            </div>
-          </details>
-          <details
-            v-else-if="hop.index === activeTimeline!.hops.length - 1 && response?.headers.length"
-            class="group mt-0.5"
+          <Disclosure
+            v-if="hopHeaders(hop).length > 0"
+            class="mt-0.5"
+            :label="t('studio.http.timeline.responseHeaders.label')"
+            trigger-class="text-kira-sm text-subtle"
           >
-            <summary
-              class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
-            >
-              {{ t('studio.http.timeline.responseHeaders.label') }}
-            </summary>
-            <div
-              v-for="(h, i) in response!.headers"
-              :key="i"
-              class="flex gap-1.5 text-kira-sm py-0.5"
-            >
-              <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
-              <span class="wrap-anywhere font-data">{{ h.value }}</span>
-            </div>
-          </details>
+            <KeyValueList class="py-0.5 text-kira-sm font-data">
+              <template v-for="(h, i) in hopHeaders(hop)" :key="i">
+                <dt>{{ h.name }}</dt>
+                <dd class="wrap-anywhere">{{ h.value }}</dd>
+              </template>
+            </KeyValueList>
+          </Disclosure>
         </Card>
       </div>
     </template>
@@ -367,7 +351,5 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       :title="t('studio.http.timeline.failed.empty')"
     />
     <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
-    <!-- P110 I2-17: `.hop-phase[data-present='false']` moved onto the span's own
-         `data-[present=false]:opacity-60` (compile-verified) -- no test locates by `.hop-phase`. -->
   </div>
 </template>

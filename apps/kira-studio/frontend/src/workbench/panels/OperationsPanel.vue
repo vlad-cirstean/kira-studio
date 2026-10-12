@@ -184,14 +184,14 @@ function menuFor(record: OpRecord): MenuItem[] {
           "
           :language="record.kind === 'http' ? 'plain' : 'sql'"
           :sql-dialect="opSqlDialect(record)"
-          :read-only="true"
+          readonly
           :single-line="true"
         />
         <MonacoHost
           v-else
           :doc="`error: ${record.error}`"
           language="plain"
-          :read-only="true"
+          readonly
           :single-line="true"
         />
       </div>

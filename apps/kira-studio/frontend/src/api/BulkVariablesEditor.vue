@@ -170,7 +170,6 @@ function onCancel(): void {
       <MonacoHost
         :doc="text"
         language="plain"
-        :read-only="false"
         data-testid="variables-bulk-textarea"
         @update:doc="onDocChange"
       />

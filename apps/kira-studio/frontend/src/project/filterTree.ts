@@ -63,22 +63,12 @@ export function kindRows(connectionId: string, v: TreeVisibility): FilterKindRow
     }));
 }
 
-/** Rows past this count are dropped and `truncated` is set — a Redis namespace with 20 000 cached
- *  keys must not render 20 000 checkboxes (D18); the name filter is the intended way through such
- *  a level. */
-const FILTER_ROW_CAP = 500;
-
-export interface FilterNodeRows {
-  rows: FilterNodeRow[];
-  truncated: boolean;
-}
-
 export function nodeRows(
   connectionId: string,
   v: TreeVisibility,
   expandedPaths: ReadonlySet<string>,
   nameFilter: string,
-): FilterNodeRows {
+): FilterNodeRow[] {
   const hiddenKinds = new Set(v.hiddenKinds);
   const hiddenPaths = new Set(v.hiddenPaths);
   const connectionKind = connectionKindFor(connectionId);
@@ -125,7 +115,6 @@ export function nodeRows(
   }
 
   const rows: FilterNodeRow[] = [];
-  let truncated = false;
 
   function emit(
     nodes: TreeNode[],
@@ -135,10 +124,6 @@ export function nodeRows(
   ): void {
     for (const node of nodes) {
       if (query && !matches(node)) continue;
-      if (rows.length >= FILTER_ROW_CAP) {
-        truncated = true;
-        return;
-      }
 
       const kindHidden = hiddenKinds.has(node.kind);
       const ownPathHidden = hiddenPaths.has(node.path);
@@ -167,7 +152,7 @@ export function nodeRows(
   }
 
   emit(rootChildren, 0, false, null);
-  return { rows, truncated };
+  return rows;
 }
 
 /** The mockup's live-consequence strip (F9): nodes the tree will show, of nodes cached. Flat over

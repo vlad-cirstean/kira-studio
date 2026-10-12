@@ -257,7 +257,7 @@ function onCellClick(
     // Always true here (unlike the grid's real per-table computation, state.ts's own doc comment)
     // — "no primary key" would misleadingly suggest the grid's editability story applies to a
     // stream row at all, when this panel is a viewer for every row regardless (P43 F3/D4: the dock
-    // mount below passes `:read-only="true"`, the same flag the console's own viewer mount uses).
+    // mount below passes `readonly`, the same flag the console's own viewer mount uses).
     hasPrimaryKey: true,
   };
   cellSelectionStore.publishSelectedCell(selected);
@@ -1480,7 +1480,7 @@ onUnmounted(() => {
           </div>
         </template>
       </div>
-      <CellEditorDock :tab-id="tab.id" :read-only="true" />
+      <CellEditorDock :tab-id="tab.id" readonly />
     </div>
   </div>
 </template>

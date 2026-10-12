@@ -26,7 +26,8 @@ import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { templateToken } from '@workbench/editor/fieldCompletion';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useSavedGrpcRequest, useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
@@ -124,7 +125,7 @@ function onMethodSelect(rawValue: unknown): void {
 }
 
 // D4/P175: the schema is fetched once a reflection target (or a .proto path) exists, debounced like
-// a fast typist (150ms) — see schemaQuery.ts.
+// a fast typist — see schemaQuery.ts.
 const {
   schema,
   loading: schemaLoading,
@@ -294,6 +295,9 @@ async function onBeautify(): Promise<void> {
   }
 }
 
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useShortcut(rootEl, ['form.save'], onSave);
+
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
   // P108 F5, subsumed by P112: HttpRequestView.vue's own fix, mirrored — see its comment.
@@ -310,7 +314,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col" data-testid="grpc-request-view">
+  <div ref="rootEl" class="flex h-full min-h-0 flex-col" data-testid="grpc-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <ViewToolbar>
       <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
@@ -454,7 +458,8 @@ onUnmounted(() => {
               variant="toolbar-primary"
               size="kira"
               data-testid="grpc-call"
-              :disabled="running || !tab.state.service || !tab.state.method || !methodResolved"
+              :pending="running"
+              :disabled="!tab.state.service || !tab.state.method || !methodResolved"
               @click="onCall"
             >
               <CodiconIcon :name="ICON.run" :size="13" />
@@ -475,7 +480,7 @@ onUnmounted(() => {
           icon="eye-closed"
           :label="incognito ? t('studio.api.common.incognitoOff.tooltip') : t('studio.api.common.incognitoOn.tooltip')"
           :aria-label="t('studio.tabs.incognito.label')"
-          :class="{ 'bg-field text-fg': incognito }"
+          :pressed="incognito"
           data-testid="grpc-incognito-toggle"
           @click="toggleIncognito"
         />
@@ -500,7 +505,7 @@ onUnmounted(() => {
         v-if="tab.state.requestPane === 'metadata'"
         :icon="ICON.search"
         :label="t('common.action.filter.label')"
-        :class="{ 'bg-field text-fg': fieldFilterOpen }"
+        :pressed="fieldFilterOpen"
         data-testid="grpc-field-filter-toggle"
         @click="toggleFieldFilter"
       />
@@ -509,7 +514,7 @@ onUnmounted(() => {
         icon="note"
         :label="tab.state.fieldDescriptions ? t('studio.api.common.descriptionsHide.tooltip') : t('studio.api.common.descriptionsShow.tooltip')"
         :aria-label="t('studio.api.common.descriptions.aria')"
-        :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
+        :pressed="tab.state.fieldDescriptions"
         data-testid="grpc-field-descriptions-toggle"
         @click="toggleFieldDescriptions"
       />
@@ -518,7 +523,7 @@ onUnmounted(() => {
           <TooltipIconButton
             :icon="ICON.variables"
             :label="t('common.module.variables.label')"
-            :class="{ 'bg-field text-fg': overviewOpen }"
+            :pressed="overviewOpen"
             data-testid="grpc-variables-overview-toggle"
             @click="overviewOpen = !overviewOpen"
           />
@@ -553,7 +558,6 @@ onUnmounted(() => {
           v-if="tab.state.requestPane === 'message'"
           :doc="tab.state.message"
           language="json"
-          :read-only="false"
           :range-highlights="variables.rangeHighlights"
           :hover-source="variableHoverSource(variables.hoverInfo)"
           autocomplete

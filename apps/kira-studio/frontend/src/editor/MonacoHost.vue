@@ -39,13 +39,12 @@ type DeltaDecoration = import('monaco-editor').editor.IModelDeltaDecoration;
 type MarkerData = import('monaco-editor').editor.IMarkerData;
 
 const props = defineProps<{
-  doc: string;
   language: EditorLanguageId;
   /** Only consulted when `language === 'sql'` — kept for prop-shape parity with
    *  `CodeMirrorHost.vue`; Monaco's own `sql` Monarch has no per-dialect keyword set (P60b's own
    *  scope owns SQL language services proper). */
   sqlDialect?: SqlDialect;
-  readOnly: boolean;
+  readonly?: boolean;
   autocomplete?: boolean;
   /** §3.1: pure data in, pure data out — replaces `@codemirror/autocomplete`'s `CompletionSource`
    *  at this seam. */
@@ -61,7 +60,8 @@ const props = defineProps<{
   keepSelectionOnExternalSync?: boolean;
 }>();
 
-const emit = defineEmits<{ 'update:doc': [value: string]; 'update:cursor': [pos: number] }>();
+const docModel = defineModel<string>('doc', { required: true });
+const emit = defineEmits<{ 'update:cursor': [pos: number] }>();
 
 const settingsStore = useSettingsStore();
 
@@ -78,7 +78,9 @@ const FILL_CHUNK_CHARS = 262_144;
 
 const previewShown = ref(true);
 const previewDoc = computed(() =>
-  props.doc.length > PENDING_PREVIEW_CHARS ? props.doc.slice(0, PENDING_PREVIEW_CHARS) : props.doc,
+  docModel.value.length > PENDING_PREVIEW_CHARS
+    ? docModel.value.slice(0, PENDING_PREVIEW_CHARS)
+    : docModel.value,
 );
 let fillCtrl: AbortController | null = null;
 // §4.7's own `externalSync` annotation equivalent — a plain flag, no annotation machinery needed.
@@ -398,8 +400,8 @@ function scheduleLint(m: MonacoModule): void {
 function applyBaseOptions(): ConstructionOptions {
   return {
     automaticLayout: true,
-    readOnly: props.readOnly,
-    domReadOnly: props.readOnly,
+    readOnly: props.readonly,
+    domReadOnly: props.readonly,
     lineNumbers: props.singleLine ? 'off' : 'on',
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -423,7 +425,7 @@ function applyBaseOptions(): ConstructionOptions {
     tabCompletion: 'on',
     wordBasedSuggestions: wordBasedSuggestions(),
     occurrencesHighlight: 'off',
-    hover: { delay: 400, above: true },
+    hover: { delay: TIMING.hoverInfo, above: true },
     fontFamily: settingsStore.appearance.fontFamily,
     fontSize: settingsStore.appearance.fontSize,
     ...(props.singleLine
@@ -453,7 +455,7 @@ async function fillModel(doc: string, onFirstContent?: () => void): Promise<void
   applyingExternal = true;
   lastAppliedVersionId = -1;
   try {
-    if (!props.readOnly || doc.length <= LARGE_DOC_CHARS) {
+    if (!props.readonly || doc.length <= LARGE_DOC_CHARS) {
       target.setValue(doc);
       onFirstContent?.();
       finishFill(target, doc);
@@ -493,7 +495,7 @@ onMounted(async () => {
   const resolved = await loadMonaco();
   // Unmounted while the import was in flight — dispose nothing, mount nothing.
   if (!rootRef.value) return;
-  if (props.doc.length > LARGE_DOC_CHARS) {
+  if (docModel.value.length > LARGE_DOC_CHARS) {
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
     if (!rootRef.value) return;
   }
@@ -511,14 +513,14 @@ onMounted(async () => {
   registerProviders(mod, monacoLanguageIdFor(props.language));
   model.onDidChangeContent(() => {
     if (filling) return;
-    if (!applyingExternal) emit('update:doc', model?.getValue() ?? '');
+    if (!applyingExternal) docModel.value = model?.getValue() ?? '';
     repaintRanges();
     if (mod) scheduleLint(mod);
     updateDebugHook();
   });
   // The pending <pre> is removed once Monaco's own DOM holds the first content (Vue batches the
   // v-if), so there is never a window with neither showing real content.
-  void fillModel(props.doc, () => {
+  void fillModel(docModel.value, () => {
     previewShown.value = false;
   });
   editor.onDidChangeCursorPosition((e) => {
@@ -594,7 +596,7 @@ function applyExternalDoc(doc: string): void {
   if (doc === unchanged) return;
   const currentPosition = editor.getPosition();
   const priorOffset = currentPosition ? model.getOffsetAt(currentPosition) : 0;
-  if (props.readOnly) {
+  if (props.readonly) {
     // Nothing to undo on a read-only host: `setValue`/chunked `applyEdits` keep no copy of the
     // previous doc. Large docs stream in; the position reset below applies to the first chunk.
     void fillModel(doc);
@@ -623,7 +625,7 @@ function applyExternalDoc(doc: string): void {
 }
 
 watch(
-  () => props.doc,
+  () => docModel.value,
   (doc) => applyExternalDoc(doc),
 );
 
@@ -638,7 +640,7 @@ watch(
 );
 
 watch(
-  () => props.readOnly,
+  () => props.readonly,
   (readOnly) => {
     editor?.updateOptions({ readOnly, domReadOnly: readOnly });
   },

@@ -15,8 +15,8 @@ const layoutStore = useLayoutStore();
 // query console) — a viewer, not an editor that happens to be refusing this particular cell.
 // Distinct from a cell being individually uneditable (a read-only connection, a truncated value),
 // which stays governed by CellEditorView's own readOnlyReasonFor regardless of this flag.
-const props = withDefaults(defineProps<{ tabId: string; readOnly?: boolean }>(), {
-  readOnly: false,
+const props = withDefaults(defineProps<{ tabId: string; readonly?: boolean }>(), {
+  readonly: false,
 });
 
 const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
@@ -46,7 +46,7 @@ const pane = useLiveSize(
       :data-tab-id="tabId"
       :style="{ flex: `0 1 ${pane.size.value}px` }"
     >
-      <CellEditorView :cell="cell" :read-only="readOnly" />
+      <CellEditorView :cell="cell" :readonly="readonly" />
     </div>
   </template>
 </template>

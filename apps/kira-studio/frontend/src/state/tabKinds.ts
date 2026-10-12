@@ -23,6 +23,8 @@ import { useTreeStore } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
+import { usePendingChangesStore } from '../views/grid/pendingChanges';
+import { isEditDirty } from '../views/shared/editDirty';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { useConnectionsStore } from './connections';
@@ -152,6 +154,7 @@ export const TAB_KINDS: TabKindRegistry<
     railColor,
     defaultState: () => defaultDataTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: DataTabRecord): DataTabState => defaultDataTabState(tab.state.pageSize),
+    isDirty: (tabId) => usePendingChangesStore().hasPending(tabId),
     dropResources: dropGridPagesForTab,
     menuExtras: revealInProjectPanel,
     parseState: parseStateWith(dataTabStateSchema),
@@ -186,6 +189,7 @@ export const TAB_KINDS: TabKindRegistry<
     defaultState: () => defaultDocumentTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: DocumentTabRecord): DocumentTabState =>
       defaultDocumentTabState(tab.state.pageSize),
+    isDirty: isEditDirty,
     dropResources: dropDocumentPagesForTab,
     menuExtras: revealInProjectPanel,
     parseState: parseStateWith(documentTabStateSchema),
@@ -200,6 +204,7 @@ export const TAB_KINDS: TabKindRegistry<
     defaultState: () => defaultKeyValueTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: KeyValueTabRecord): KeyValueTabState =>
       defaultKeyValueTabState(tab.state.pageSize),
+    isDirty: isEditDirty,
     dropResources: dropKeyValuePagesForTab,
     menuExtras: revealInProjectPanel,
     parseState: parseStateWith(keyValueTabStateSchema),

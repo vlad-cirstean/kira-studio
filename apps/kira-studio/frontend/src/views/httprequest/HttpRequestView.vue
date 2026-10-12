@@ -34,12 +34,14 @@ import { ICON } from '@theme/icons';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
 import { refDebounced } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { templateToken } from '@workbench/editor/fieldCompletion';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
 import { useSavedRequest, useVariableRows } from '../../api/state/apiQueries';
@@ -60,7 +62,7 @@ import ResponseFindBar, {
 } from '../shared/ResponseFindBar.vue';
 import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
-import { bodyTabLabel } from './bodyTabLabel';
+import { bodyTabItem } from './bodyTabItem';
 import CookiesPane from './CookiesPane.vue';
 import { useJarCookies } from './cookies';
 import QueryParamsTable from './QueryParamsTable.vue';
@@ -336,44 +338,32 @@ const settingsOverrideCount = computed(
 // P90 §3.1: the Cookies segment's own count badge — reads the same jar query CookiesPane gets.
 const requestCookiesCount = computed(() => jarCookies.data.value?.length ?? 0);
 
-// D12: a count badge per segment — SegmentedControl has no dedicated count slot, so it is baked
-// into the label text instead of widening that shared primitive for one caller.
+// D12: a count per segment; zero shows no count.
+const countOrUndefined = (n: number): number | undefined => (n > 0 ? n : undefined);
 const REQUEST_PANE_OPTIONS = computed(() => [
   {
     value: 'params' as const,
-    label:
-      paramsCount.value > 0
-        ? t('studio.http.pane.paramsCount.label', { count: paramsCount.value })
-        : t('studio.http.pane.params.label'),
+    label: t('studio.http.pane.params.label'),
+    count: countOrUndefined(paramsCount.value),
     testid: 'http-request-pane-params',
   },
   {
     value: 'headers' as const,
-    label:
-      headersCount.value > 0
-        ? t('studio.http.pane.headersCount.label', { count: headersCount.value })
-        : t('studio.http.pane.headers.label'),
+    label: t('studio.http.pane.headers.label'),
+    count: countOrUndefined(headersCount.value),
     testid: 'http-request-pane-headers',
   },
-  {
-    value: 'body' as const,
-    label: bodyTabLabel(props.tab.state),
-    testid: 'http-request-pane-body',
-  },
+  { ...bodyTabItem(props.tab.state), value: 'body' as const, testid: 'http-request-pane-body' },
   {
     value: 'settings' as const,
-    label:
-      settingsOverrideCount.value > 0
-        ? t('studio.http.pane.settingsCount.label', { count: settingsOverrideCount.value })
-        : t('common.module.settings.label'),
+    label: t('common.module.settings.label'),
+    count: countOrUndefined(settingsOverrideCount.value),
     testid: 'http-request-pane-settings',
   },
   {
     value: 'cookies' as const,
-    label:
-      requestCookiesCount.value > 0
-        ? t('studio.http.pane.cookiesCount.label', { count: requestCookiesCount.value })
-        : t('studio.http.pane.cookies.label'),
+    label: t('studio.http.pane.cookies.label'),
+    count: countOrUndefined(requestCookiesCount.value),
     testid: 'http-request-pane-cookies',
   },
 ]);
@@ -432,8 +422,7 @@ const resolvedCookiesUrl = computed(() => {
   );
   return resolveTabState(props.tab.state, values, secretNames).url;
 });
-const COOKIES_FETCH_DEBOUNCE_MS = 300;
-const cookiesUrl = refDebounced(resolvedCookiesUrl, COOKIES_FETCH_DEBOUNCE_MS);
+const cookiesUrl = refDebounced(resolvedCookiesUrl, TIMING.preview);
 const jarCookies = useJarCookies(cookiesUrl, () => !effectiveDisableCookieJar.value);
 function toggleFieldFilter(): void {
   fieldFilterOpen.value = !fieldFilterOpen.value;
@@ -460,6 +449,9 @@ const requestPane = useLiveSize(
 // F15: view.run (⌘Return) and view.refresh (the refresh shortcut) both already route through
 // this per-mounted-view registry with no menu/accelerator change (D13) — they both just trigger
 // Send here, same as ConsoleView.vue registers Run/Run all onto the same two channels' shape.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useShortcut(rootEl, ['form.save'], onSave);
+
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
   // P108 F5, subsumed by P112: collectionIdFor(props.tab.state) used to read a tree this view had
@@ -484,7 +476,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col" data-testid="http-request-view">
+  <div ref="rootEl" class="flex h-full min-h-0 flex-col" data-testid="http-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <ViewToolbar data-testid="view-head">
       <span
@@ -617,7 +609,7 @@ onUnmounted(() => {
               variant="toolbar-primary"
               size="kira"
               data-testid="http-send"
-              :disabled="running"
+              :pending="running"
               @click="onSend"
             >
               <CodiconIcon :name="ICON.run" :size="13" />
@@ -657,7 +649,7 @@ onUnmounted(() => {
           icon="eye-closed"
           :label="incognito ? t('studio.api.common.incognitoOff.tooltip') : t('studio.api.common.incognitoOn.tooltip')"
           :aria-label="t('studio.tabs.incognito.label')"
-          :class="{ 'bg-field text-fg': incognito }"
+          :pressed="incognito"
           data-testid="http-incognito-toggle"
           @click="toggleIncognito"
         />
@@ -675,7 +667,7 @@ onUnmounted(() => {
         v-if="showFieldFilterToggle"
         :icon="ICON.search"
         :label="t('common.action.filter.label')"
-        :class="{ 'bg-field text-fg': fieldFilterOpen }"
+        :pressed="fieldFilterOpen"
         data-testid="http-field-filter-toggle"
         @click="toggleFieldFilter"
       />
@@ -684,7 +676,7 @@ onUnmounted(() => {
         icon="note"
         :label="tab.state.fieldDescriptions ? t('studio.api.common.descriptionsHide.tooltip') : t('studio.api.common.descriptionsShow.tooltip')"
         :aria-label="t('studio.api.common.descriptions.aria')"
-        :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
+        :pressed="tab.state.fieldDescriptions"
         data-testid="http-field-descriptions-toggle"
         @click="toggleFieldDescriptions"
       />
@@ -692,7 +684,7 @@ onUnmounted(() => {
         :icon="ICON.search"
         :label="t('studio.http.request.find.label')"
         :aria-label="t('studio.http.request.find.label')"
-        :class="{ 'bg-field text-fg': requestFindOpen }"
+        :pressed="requestFindOpen"
         data-testid="http-request-find-toggle"
         @click="toggleRequestFind"
       />
@@ -701,7 +693,7 @@ onUnmounted(() => {
           <TooltipIconButton
             :icon="ICON.variables"
             :label="t('common.module.variables.label')"
-            :class="{ 'bg-field text-fg': overviewOpen }"
+            :pressed="overviewOpen"
             data-testid="http-variables-overview-toggle"
             @click="overviewOpen = !overviewOpen"
           />

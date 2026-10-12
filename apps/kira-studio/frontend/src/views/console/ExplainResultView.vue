@@ -199,12 +199,7 @@ const rawLanguage = computed(() =>
         class="h-64 border border-border rounded-kira-sm overflow-hidden"
         data-testid="explain-raw"
       >
-        <MonacoHost
-          :doc="plan.raw"
-          :language="rawLanguage"
-          :read-only="true"
-          :autocomplete="false"
-        />
+        <MonacoHost :doc="plan.raw" :language="rawLanguage" readonly :autocomplete="false" />
       </div>
     </template>
     <InlineState v-else kind="empty">{{ t('studio.console.plan.empty.empty') }}</InlineState>

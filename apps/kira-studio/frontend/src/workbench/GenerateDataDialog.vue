@@ -393,7 +393,7 @@ function onSequenceStartChange(index: number, start: number): void {
               :doc="previewDoc"
               language="sql"
               :sql-dialect="sqlDialect"
-              :read-only="true"
+              readonly
             />
           </div>
         </div>

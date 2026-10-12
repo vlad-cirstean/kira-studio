@@ -246,10 +246,6 @@ func (j *journey) manage(conn model.ConnectionSummary) {
 	if err != nil || dup.ID == conn.ID {
 		t.Fatalf("Duplicate = %+v (%v)", dup, err)
 	}
-	order, err := app.W.Connections.Reorder(bridge.ConnectionsReorderArgs{IDs: []string{dup.ID, conn.ID}})
-	if err != nil || len(order) != 2 || order[0].ID != dup.ID {
-		t.Fatalf("Reorder = %+v (%v), want the duplicate first", order, err)
-	}
 	upd := j.input
 	upd.Name = j.input.Name + " renamed"
 	upd.Color = "green"

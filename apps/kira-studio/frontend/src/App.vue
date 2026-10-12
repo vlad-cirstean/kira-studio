@@ -90,7 +90,7 @@ function onToggleKeepAwake(): void {
 }
 
 function closeActiveTab(): void {
-  if (modeStore.activeTab) tabsStore.closeTab(modeStore.activeTab.id);
+  if (modeStore.activeTab) fireAndForget(tabsStore.closeTab(modeStore.activeTab.id), 'close tab');
 }
 
 onMounted(() => {

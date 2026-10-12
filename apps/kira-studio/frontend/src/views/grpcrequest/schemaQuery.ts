@@ -2,6 +2,7 @@ import { loadDynamicGenerator } from '@kira/api-core';
 import type { GrpcMetadataState, GrpcMetaPairWire, GrpcSchemaWire } from '@shared/domain/grpc';
 import { useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
@@ -18,8 +19,6 @@ import { resolveGrpcTabState } from './resolve';
 // Go's descriptor cache (grpcclient/descriptors.go cacheKey) hashes the resolved target instead, so
 // a variables change invalidates every reflection key (apiQueries.ts handleApiDataChange). Metadata
 // *values* are read at fetch time, because Go ignores them on a non-reload Describe.
-
-const SCHEMA_DEBOUNCE_MS = 150;
 
 export interface GrpcSchemaSource {
   mode: 'reflection' | 'proto';
@@ -128,7 +127,7 @@ async function describeSchema(
  *  schema watcher this replaces). A source change is a new query — nothing to supersede. */
 export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
   const source = computed(() => grpcSchemaSourceFor(toValue(tab)));
-  const debounced = refDebounced(source, SCHEMA_DEBOUNCE_MS);
+  const debounced = refDebounced(source, TIMING.search);
   const query = useQuery(() => {
     const s = debounced.value;
     return {

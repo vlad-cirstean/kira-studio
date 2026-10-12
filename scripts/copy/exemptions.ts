@@ -14,11 +14,6 @@ export const EXEMPTIONS: readonly Exemption[] = [
   },
   {
     rule: 'U67',
-    path: 'apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue',
-    reason: 'HTTP auth scheme tokens inserted verbatim (protocol vocabulary, not wording)',
-  },
-  {
-    rule: 'U67',
     path: 'apps/kira-studio/frontend/src/views/shared/document/ejson.ts',
     reason: 'EJSON shell-literal syntax (ObjectId(...), ISODate(...)), not wording',
   },

@@ -109,8 +109,6 @@ const studioControl = {
     unwrap(ConnectionsService.Duplicate({ id })).then((r) => trust<ConnectionSummary>(r)),
   // Go-side name is Remove, not Delete (P57 §1.9) — read the .go file, do not assume lowerCamel.
   connectionsDelete: (id: string): Promise<void> => unwrap(ConnectionsService.Delete({ id })),
-  connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
-    unwrap(ConnectionsService.Reorder({ ids })).then((r) => trust<ConnectionSummary[]>(r ?? [])),
   // P14 D6: outcome is one of revealed | cancelled | confirmation-required | error — confirmed is
   // honoured by the backend only on the confirmation-required path (a Mac where LocalAuthentication
   // works ignores it entirely).

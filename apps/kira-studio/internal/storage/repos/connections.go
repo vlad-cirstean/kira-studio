@@ -140,8 +140,8 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 }
 
 // List orders by sort_order ASC, name ASC (the name tiebreak connections.ts's own listConnections
-// applies — two rows sharing a sort_order must not come back in arbitrary order once Reorder
-// exists) and never selects password.
+// applies — two rows sharing a sort_order must not come back in arbitrary order) and never selects
+// password.
 func (r *ConnectionsRepo) List() ([]model.ConnectionSummary, error) {
 	rows, err := r.DB.Query(`SELECT ` + connectionSelectColumns + ` FROM connections ORDER BY sort_order ASC, name ASC`)
 	if err != nil {
@@ -403,28 +403,6 @@ func (r *ConnectionsRepo) Delete(connID string) error {
 		return fmt.Errorf("repos/connections: delete %s: %w", connID, err)
 	}
 	return nil
-}
-
-// Reorder applies ids as the new order in one transaction (rows ids omits follow, in their existing
-// order; an unknown id is an error), keeping sort_order dense, then returns List().
-func (r *ConnectionsRepo) Reorder(ids []string) ([]model.ConnectionSummary, error) {
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("repos/connections: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	if err := sqlitex.ReorderSortOrder(tx,
-		`SELECT id FROM connections ORDER BY sort_order, name, id`,
-		`UPDATE connections SET sort_order = ? WHERE id = ?`,
-		ids,
-	); err != nil {
-		return nil, fmt.Errorf("repos/connections: reorder: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("repos/connections: commit reorder: %w", err)
-	}
-	return r.List()
 }
 
 func boolToInt(b bool) int {

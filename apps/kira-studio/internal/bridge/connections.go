@@ -53,14 +53,6 @@ func (s *ConnectionsService) Delete(args ConnectionsIDArgs) error {
 	return s.Deps.Connections.Remove(args.ID)
 }
 
-type ConnectionsReorderArgs struct {
-	IDs []string `json:"ids"`
-}
-
-func (s *ConnectionsService) Reorder(args ConnectionsReorderArgs) ([]model.ConnectionSummary, error) {
-	return s.Deps.Connections.Reorder(args.IDs)
-}
-
 // ConnectionsRevealArgs is Reveal's own args struct (P14 D6) — it leaves the shared
 // ConnectionsIDArgs above, whose own comment scopes it to methods "that need nothing but a
 // connection id", which is no longer true here.

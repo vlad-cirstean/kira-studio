@@ -31,7 +31,7 @@ import {
 // `doc` (hand-typed in the main editor, Reset, a fresh cell) re-renders this pane — never a
 // one-shot commit. Stages nothing itself; staging is `.editor-body`'s existing focusout/
 // Ctrl+Enter rule, which this pane inherits by living inside it.
-const props = defineProps<{ doc: string; format: CellFormat; readOnly: boolean }>();
+const props = defineProps<{ doc: string; format: CellFormat; readonly?: boolean }>();
 const emit = defineEmits<{ 'update:doc': [string] }>();
 
 const zone = ref<'local' | 'utc'>('local');
@@ -150,7 +150,7 @@ watch(calendarOpen, (open) => {
             <TooltipDisabledTrigger class="w-full">
               <Input
                 :model-value="fieldText"
-                :disabled="readOnly"
+                :disabled="readonly"
                 size="kira"
                 class="w-full"
                 data-testid="cell-editor-timestamp-field"
@@ -170,7 +170,7 @@ watch(calendarOpen, (open) => {
             :label="t('studio.common.pickDateTime.tooltip')"
             disabled-trigger
             ref="calendarTriggerEl"
-            :disabled="readOnly"
+            :disabled="readonly"
             data-testid="cell-editor-timestamp-calendar"
             @click="calendarOpen = !calendarOpen"
           />

@@ -24,7 +24,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { useCappedList } from '@workbench/behaviour/cappedList';
 import { revealElement } from '@workbench/behaviour/focus';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -118,11 +120,15 @@ const kinds = computed(() =>
   filtersDialogStore.connectionId ? kindRows(filtersDialogStore.connectionId, draft.value) : [],
 );
 
-const objects = computed(() =>
+const objectRows = computed(() =>
   filtersDialogStore.connectionId
     ? nodeRows(filtersDialogStore.connectionId, draft.value, expandedPaths.value, nameFilter.value)
-    : { rows: [], truncated: false },
+    : [],
 );
+// A Redis namespace with 20 000 cached keys must not render 20 000 checkboxes (D18); the name
+// filter is the intended way through such a level.
+const objects = useCappedList(objectRows, 500);
+watch(nameFilter, objects.reset);
 
 // A live preview computed from the same filterTree.ts previewCounts() the tree itself is
 // evaluated with, so this dialog cannot disagree with what the tree will actually show.
@@ -154,7 +160,7 @@ function onToggleExpand(path: string): void {
 function allObjects(): void {
   if (loading.value) return;
   let v = draft.value;
-  for (const row of objects.value.rows) {
+  for (const row of objectRows.value) {
     if (row.state !== 'on' && !row.disabled) v = toggleNode(v, row);
   }
   draft.value = v;
@@ -163,7 +169,7 @@ function allObjects(): void {
 function noneObjects(): void {
   if (loading.value) return;
   let v = draft.value;
-  for (const row of objects.value.rows) {
+  for (const row of objectRows.value) {
     if (row.state !== 'off' && !row.disabled) v = toggleNode(v, row);
   }
   draft.value = v;
@@ -272,7 +278,7 @@ const connectionName = computed(
             data-testid="filter-object-list"
           >
             <div
-              v-for="row in objects.rows"
+              v-for="row in objects.visible.value"
               :key="row.path"
               class="flex items-center cursor-default gap-1 h-6.5"
               data-testid="filter-object-row"
@@ -308,16 +314,15 @@ const connectionName = computed(
               </Tooltip>
               <span v-if="row.hasChildren" :class="rowMeta">{{ row.childCount }}</span>
             </div>
-            <InlineState v-if="objects.rows.length === 0" kind="empty">{{
+            <InlineState v-if="objectRows.length === 0" kind="empty">{{
               t('studio.project.filtersDialog.cache.empty')
             }}</InlineState>
-            <InlineState
-              v-if="objects.truncated"
-              kind="empty"
-              data-testid="filter-object-truncated"
-            >
-              {{ t('studio.project.filtersDialog.truncated.hint') }}
-            </InlineState>
+            <ShowMoreButton
+              :hidden-count="objects.hiddenCount.value"
+              :step="objects.step"
+              data-testid="filter-object-show-more"
+              @click="objects.showMore"
+            />
           </Card>
         </section>
 

@@ -592,7 +592,7 @@ test('Http request — a Settings-segment override survives a tab restore', asyn
   const { window: page } = await relaunch({ control: CONTROL });
 
   await expect(page.locator('[data-testid="http-request-pane-settings"]')).toContainText(
-    'Settings (1)',
+    /Settings\s*1/,
   );
   await expect(
     page.locator('[data-testid="http-settings-followRedirects-inherit"]'),

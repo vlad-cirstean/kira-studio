@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import EmptyState from '@theme/components/EmptyState.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -92,16 +93,13 @@ const RESPONSE_PANE_OPTIONS = computed(() => [
 ]);
 
 // P90 §3.2: the sixth segment, count-badged like REQUEST_PANE_OPTIONS's own Settings/Cookies
-// entries — a computed array rather than the plain literal list above, since the label carries a
-// count that changes with the response.
+// entries — a computed array since the count changes with the response.
 const RESPONSE_PANE_OPTIONS_WITH_COOKIES = computed(() => [
   ...RESPONSE_PANE_OPTIONS.value,
   {
     value: 'cookies' as const,
-    label:
-      responseCookiesCount.value > 0
-        ? t('studio.http.pane.cookiesCount.label', { count: responseCookiesCount.value })
-        : t('studio.http.pane.cookies.label'),
+    label: t('studio.http.pane.cookies.label'),
+    count: responseCookiesCount.value > 0 ? responseCookiesCount.value : undefined,
     testid: 'http-response-pane-cookies',
   },
 ]);
@@ -130,7 +128,6 @@ const {
   format: prettyFormat,
   bodyText,
   pending: bodyPending,
-  formatting: bodyFormatting,
 } = useResponseBody(
   response,
   computed(() => props.tab.state.responseView),
@@ -297,14 +294,14 @@ onUnmounted(() => {
         <span class="ml-auto" />
         <Tooltip>
           <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="text-kira-md text-subtle cursor-pointer border-0 bg-none p-0 hover:text-fg"
+            <Button
+              variant="toolbar"
+              size="status"
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
               {{ formatDuration(response.elapsedMs) }}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>{{ t('studio.http.response.timeTooltip.tooltip') }}</TooltipContent>
         </Tooltip>
@@ -326,7 +323,7 @@ onUnmounted(() => {
         v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'"
         :icon="ICON.search"
         :label="t('studio.http.response.find.label')"
-        :class="{ 'bg-field text-fg': findOpen }"
+        :pressed="findOpen"
         data-testid="http-find-toggle"
         @click="toggleFind"
       />
@@ -404,14 +401,15 @@ onUnmounted(() => {
     </Alert>
     <Tooltip v-if="redirectCaption">
       <TooltipTrigger as-child>
-        <button
-          type="button"
-          class="text-kira-md text-subtle block w-full text-left cursor-pointer border-0 bg-none p-0 hover:text-fg"
+        <Button
+          variant="toolbar"
+          size="status"
+          class="w-full justify-start"
           data-testid="http-redirects"
           @click="viewTimeline"
         >
           {{ redirectCaption }}
-        </button>
+        </Button>
       </TooltipTrigger>
       <TooltipContent>{{ t('studio.http.response.timeTooltip.tooltip') }}</TooltipContent>
     </Tooltip>
@@ -434,7 +432,7 @@ onUnmounted(() => {
         />
         <span
           v-if="headerFilter.trim()"
-          class="text-kira-sm subtle px-1.5 pt-1 pb-0"
+          class="text-kira-sm text-subtle px-1.5 pt-1 pb-0"
           data-testid="http-response-headers-count"
         >
           {{
@@ -477,34 +475,29 @@ onUnmounted(() => {
         >
           {{ t('studio.http.response.binary.status', { count: response.bodyBytes }) }}
         </span>
-        <template v-else-if="bodyPending">
-          <span
-            v-if="bodyFormatting"
-            class="text-kira-sm text-muted-foreground p-1.5"
-            data-testid="http-response-formatting"
-          >
-            {{ t('studio.http.response.formatting.loading') }}
-          </span>
-        </template>
+        <InlineState v-else-if="bodyPending" kind="loading" data-testid="http-response-formatting">
+          {{ t('studio.http.response.formatting.loading') }}
+        </InlineState>
         <MonacoHost
           v-else
           ref="bodyHostRef"
           :doc="bodyText"
           :language="prettyFormat ?? 'plain'"
-          :read-only="true"
+          readonly
           :range-highlights="bodyHighlights"
         />
       </template>
       <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')">
-        <button
+        <Button
           v-if="hasHistory"
-          type="button"
-          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+          variant="link"
+          size="inline"
+          class="mt-1"
           data-testid="http-history-hint"
           @click="viewHistory"
         >
           {{ t('studio.http.response.viewHistory.label', { count: historyCount }) }}
-        </button>
+        </Button>
       </EmptyState>
     </div>
 

@@ -1420,10 +1420,6 @@ func TestListNeverCarriesTheURI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Duplicate: %v", err)
 	}
-	reordered, err := h.svc.Reorder([]string{dup.ID, created.ID})
-	if err != nil {
-		t.Fatalf("Reorder: %v", err)
-	}
 	listed, err := h.svc.List()
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -1443,9 +1439,6 @@ func TestListNeverCarriesTheURI(t *testing.T) {
 	check("Create", created)
 	check("Update", updated)
 	check("Duplicate", dup)
-	for _, c := range reordered {
-		check("Reorder", c)
-	}
 	for _, c := range listed {
 		check("List", c)
 	}

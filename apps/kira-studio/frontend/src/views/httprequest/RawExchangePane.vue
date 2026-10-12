@@ -3,6 +3,7 @@ import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-c
 import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
 import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { type MessageKey, t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
@@ -251,10 +252,10 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
         <div class="flex min-h-52 flex-col gap-0.5">
           <div class="flex items-center gap-1">
             <span
-              class="text-kira-sm text-subtle font-data overflow-hidden text-ellipsis whitespace-nowrap"
+              class="min-w-0 text-kira-sm text-subtle font-data"
               :data-testid="section.captionTestid"
             >
-              {{ section.caption }}
+              <TruncatedText :text="section.caption" />
             </span>
             <span class="ml-auto" />
             <TooltipIconButton
@@ -272,7 +273,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
               :ref="(el) => setHostRef(section.key, el)"
               :doc="section.doc"
               language="plain"
-              :read-only="true"
+              readonly
               :range-highlights="section.highlights"
               :data-testid="section.editorTestid"
             />

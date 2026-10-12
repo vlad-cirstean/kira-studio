@@ -2,15 +2,17 @@
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { cn } from '@theme/lib/utils';
@@ -152,7 +154,7 @@ function selectMethod(service: string, method: string): void {
         variant="toolbar"
         size="kira"
         data-testid="grpc-schema-reload"
-        :disabled="loading"
+        :pending="loading"
         @click="emit('reload')"
       >
         <CodiconIcon :name="ICON.refresh" :size="13" />
@@ -165,24 +167,12 @@ function selectMethod(service: string, method: string): void {
       class="flex flex-col gap-0.5 border-b border-border px-1.5 py-1"
       data-testid="grpc-import-paths"
     >
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
-        t('studio.grpc.schema.importPaths.label')
-      }}</span>
+      <SectionHeading :label="t('studio.grpc.schema.importPaths.label')" />
       <!-- D14: a real cap + scroll, so a large .proto tree's import list can never push the
            source row and the whole service browser off the pane. -->
       <div class="flex max-h-32 flex-col overflow-auto">
         <div v-for="(p, i) in tab.state.importPaths" :key="i" :class="rowVariants()">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <span
-                class="text-kira-sm font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                >{{
-                  p
-                }}</span
-              >
-            </TooltipTrigger>
-            <TooltipContent>{{ p }}</TooltipContent>
-          </Tooltip>
+          <span class="min-w-0 text-kira-sm font-data"><TruncatedText :text="p" /></span>
           <TooltipIconButton
             :icon="ICON.close"
             :label="t('common.action.remove.label')"
@@ -190,9 +180,9 @@ function selectMethod(service: string, method: string): void {
             @click="removeImportPath(i)"
           />
         </div>
-        <div v-if="tab.state.importPaths.length === 0" class="text-kira-sm text-subtle">
+        <InlineState v-if="tab.state.importPaths.length === 0" kind="empty">
           {{ t('studio.grpc.schema.noImportPaths.empty') }}
-        </div>
+        </InlineState>
       </div>
       <div class="flex items-center gap-1">
         <Input
@@ -226,13 +216,7 @@ function selectMethod(service: string, method: string): void {
     <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
       <template v-if="schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.fullName" class="mb-1.5">
-          <div
-            class="text-kira-sm text-muted-foreground uppercase tracking-wider py-0.5"
-            data-testid="grpc-service-name"
-            >{{
-              svc.name
-            }}</div
-          >
+          <SectionHeading :label="svc.name" data-testid="grpc-service-name" />
           <!-- The row's own template class list (P110 B29) supplies height/display/align-items/
                gap/padding/border-radius/color/font-size/cursor and its own hover/selected
                background; the extra classes here only supply what that list does not. -->

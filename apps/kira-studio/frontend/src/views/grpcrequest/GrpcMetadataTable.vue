@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
+import { metadataValueCompletions, WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
 import { t } from '@theme/i18n';
-import type { Completion } from '@workbench/editor/fieldCompletion';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
@@ -24,29 +23,6 @@ const props = defineProps<{
 
 function blankMetadata(): GrpcMetadataState {
   return { name: '', value: '', enabled: true, description: '' };
-}
-
-// P22b D2: this table's own value vocabulary — genuinely different from
-// packages/api-core/src/http/headers.ts's headerValueCompletions (gRPC metadata keys are
-// lowercase by wire rule), covering the two metadata keys with a real value vocabulary.
-function metadataValueCompletions(name: string): readonly Completion[] {
-  switch (name.trim().toLowerCase()) {
-    case 'authorization':
-      return [
-        { label: 'Bearer ', insert: 'Bearer ', icon: 'symbol-value' },
-        { label: 'Basic ', insert: 'Basic ', icon: 'symbol-value' },
-        { label: 'Digest ', insert: 'Digest ', icon: 'symbol-value' },
-        { label: 'Token ', insert: 'Token ', icon: 'symbol-value' },
-        { label: 'ApiKey ', insert: 'ApiKey ', icon: 'symbol-value' },
-      ];
-    case 'grpc-accept-encoding':
-      return [
-        { label: 'identity', icon: 'symbol-value' },
-        { label: 'gzip', icon: 'symbol-value' },
-      ];
-    default:
-      return [];
-  }
 }
 
 function onUpdateRows(metadata: GrpcMetadataState[]): void {

@@ -55,7 +55,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   connectionsUpdate: 'ConnectionsService.Update',
   connectionsDuplicate: 'ConnectionsService.Duplicate',
   connectionsDelete: 'ConnectionsService.Delete',
-  connectionsReorder: 'ConnectionsService.Reorder',
   connectionsReveal: 'ConnectionsService.Reveal',
   connectionsSecretsStatus: 'ConnectionsService.SecretsStatus',
   connectionsTest: 'ConnectionsService.Test',

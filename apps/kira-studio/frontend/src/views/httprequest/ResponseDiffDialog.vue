@@ -26,6 +26,7 @@ import {
 } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import {
   displayValue,
   formatBytes,
@@ -49,7 +50,8 @@ const snapA = ref<ResponseHistorySnapshot | null>(null);
 const snapB = ref<ResponseHistorySnapshot | null>(null);
 const loadingSnapshots = ref(true);
 const loadError = ref<string | null>(null);
-const mergeLoading = ref(false);
+const monacoLoad = useAsyncAction(loadMonaco);
+const mergeLoading = monacoLoad.pending;
 const mergeHostRef = ref<HTMLElement | null>(null);
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 type TextModel = import('monaco-editor').editor.ITextModel;
@@ -213,9 +215,8 @@ const unchangedHeaderRows = computed(() =>
 // read-write diff widget would otherwise offer).
 async function buildMergeView(): Promise<void> {
   if (!bothStored.value || !snapA.value || !snapB.value) return;
-  mergeLoading.value = true;
+  if (!(await monacoLoad.run())) return;
   const mod = await loadMonaco();
-  mergeLoading.value = false;
   disposeMergeView();
   await nextTick();
   if (!mergeHostRef.value) return;

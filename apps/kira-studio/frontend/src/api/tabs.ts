@@ -11,6 +11,7 @@ import {
   httpRequestTabStateSchema,
 } from '@shared/domain/http';
 import type { VariableScope } from '@shared/domain/variables';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import {
   asGrpcRequestTab,
   asHttpRequestTab,
@@ -227,6 +228,7 @@ export function closeVariableSetTabsForOwner(scope: VariableScope, ownerId: stri
   for (const tab of [...tabsStore.tabs]) {
     if (tab.kind !== 'variable-set') continue;
     const vt = tab as VariableSetTabRecord;
-    if (vt.state.scope === scope && vt.state.ownerId === ownerId) tabsStore.closeTab(tab.id);
+    if (vt.state.scope === scope && vt.state.ownerId === ownerId)
+      fireAndForget(tabsStore.closeTab(tab.id), 'close variable-set tab');
   }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
@@ -343,13 +344,14 @@ const disableCookieJarId = useId();
       t(global.disableCookieJar ? 'studio.http.settings.globalOff.status' : 'studio.http.settings.globalOn.status')
     }}</FieldDescription>
 
-    <button
-      type="button"
-      class="self-start cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+    <Button
+      variant="link"
+      size="inline"
+      class="self-start"
       data-testid="http-settings-edit-global"
       @click="onEditGlobalDefaults"
     >
       {{ t('studio.http.settings.editGlobal.label') }}
-    </button>
+    </Button>
   </div>
 </template>

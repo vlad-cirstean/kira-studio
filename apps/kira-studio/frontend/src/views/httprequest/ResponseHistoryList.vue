@@ -6,6 +6,7 @@ import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -197,7 +198,7 @@ async function onClear(): Promise<void> {
       <div
         v-for="(entry, i) in filteredEntries"
         :key="entry.id"
-        :class="cn(rowVariants({ layout: 'double', selected: entry.id === viewingId }), 'cursor-pointer border-b border-border')"
+        :class="cn(rowVariants({ layout: 'double', selected: entry.id === viewingId }), 'border-b border-border')"
         data-testid="http-history-row"
         role="option"
         v-bind="nav.rowProps(entry.id)"
@@ -252,13 +253,9 @@ async function onClear(): Promise<void> {
               @click.stop="onDelete(entry.id)"
             />
           </div>
-          <div
-            v-if="showUrl(i)"
-            class="text-kira-sm text-subtle overflow-hidden text-ellipsis whitespace-nowrap"
-            >{{
-              entry.url
-            }}</div
-          >
+          <div v-if="showUrl(i)" class="min-w-0 text-kira-sm text-subtle">
+            <TruncatedText :text="entry.url" />
+          </div>
         </div>
       </div>
     </div>

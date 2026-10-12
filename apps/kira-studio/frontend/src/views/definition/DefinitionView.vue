@@ -382,7 +382,7 @@ const breadcrumb = computed(() => {
           :doc="document"
           :language="definition?.language === 'json' ? 'json' : 'sql'"
           :sql-dialect="dialect"
-          :read-only="true"
+          readonly
           :range-highlights="docHighlights"
         />
       </div>

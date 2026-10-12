@@ -583,7 +583,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     queryClient,
   );
 
-  /** D14: the full new order, in full — ConnectionsService.Reorder's own shape. */
+  /** D14: the full new order, in full. */
   async function reorderVariables(
     tabId: string,
     scope: VariableScope,

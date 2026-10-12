@@ -1,4 +1,5 @@
 import { t } from '@theme/i18n';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { runCommand } from '@workbench/shortcuts/commands';
 import type { PaletteCommand } from '@workbench/shortcuts/palette';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
@@ -153,7 +154,7 @@ export function studioPaletteCommands(): () => PaletteCommand[] {
       label: t('studio.shortcuts.palette.closeTab.label'),
       run: () => {
         const active = useModeStore().activeTab;
-        if (active) tabsStore.closeTab(active.id);
+        if (active) fireAndForget(tabsStore.closeTab(active.id), 'close tab');
       },
     },
   ];

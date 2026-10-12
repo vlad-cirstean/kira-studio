@@ -926,7 +926,6 @@ const statusLine = computed(() => {
             :doc="localDoc"
             :language="language"
             :sql-dialect="dialect"
-            :read-only="false"
             :autocomplete="language !== 'plain'"
             :completion-sources="completionSources"
             :lint-source="lintSource"
@@ -1048,7 +1047,7 @@ const statusLine = computed(() => {
       </div>
       <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
            viewer, not an editor refusing this particular cell (F12/F13). -->
-      <CellEditorDock :tab-id="tab.id" :read-only="true" />
+      <CellEditorDock :tab-id="tab.id" readonly />
     </div>
   </div>
 </template>

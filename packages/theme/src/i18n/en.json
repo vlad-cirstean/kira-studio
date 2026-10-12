@@ -10113,9 +10113,6 @@
         "bodyCode": {
           "label": "Body (code)"
         },
-        "bodyCount": {
-          "label": "Body ({count})"
-        },
         "bodyFile": {
           "label": "Body (1 file)"
         },
@@ -10128,23 +10125,11 @@
         "cookies": {
           "label": "Cookies"
         },
-        "cookiesCount": {
-          "label": "Cookies ({count})"
-        },
         "headers": {
           "label": "Headers"
         },
-        "headersCount": {
-          "label": "Headers ({count})"
-        },
         "params": {
           "label": "Params"
-        },
-        "paramsCount": {
-          "label": "Params ({count})"
-        },
-        "settingsCount": {
-          "label": "Settings ({count})"
         },
         "timeline": {
           "label": "Timeline"
@@ -11014,9 +10999,6 @@
           "kindHidden": {
             "tooltip": "Hidden by the “{label}” type filter"
           }
-        },
-        "truncated": {
-          "hint": "Showing the first 500 rows. Type to narrow."
         }
       },
       "group": {

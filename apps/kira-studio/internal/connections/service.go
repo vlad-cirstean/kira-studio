@@ -532,15 +532,6 @@ func (s *Service) Remove(id string) error {
 	return nil
 }
 
-func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
-	reordered, err := s.deps.Conns.Reorder(ids)
-	if err != nil {
-		return nil, ipcerr.Wrap(err)
-	}
-	s.emitListChanged()
-	return reordered, nil
-}
-
 // Reveal never errors (P25 D9): the renderer's edit dialog has no error handling around this
 // call, so an undecryptable stored secret — or a failed/declined authentication — must not become
 // an unhandled failure, only a RevealResult whose Outcome names what happened.

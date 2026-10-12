@@ -1094,7 +1094,7 @@ onUnmounted(() => {
         class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated"
         data-testid="document-new"
       >
-        <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
+        <MonacoHost v-model:doc="newBuffer.doc.value" language="json" />
         <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
           <EditBufferActions
             :buffer="newBuffer"
@@ -1254,11 +1254,7 @@ onUnmounted(() => {
                     <!-- The editor is the same code surface the definition view and the console views
                        use — the only difference is the language. -->
                     <template v-if="editingRow === rows[vi.index]">
-                      <MonacoHost
-                        v-model:doc="editBuffer.doc.value"
-                        language="json"
-                        :read-only="false"
-                      />
+                      <MonacoHost v-model:doc="editBuffer.doc.value" language="json" />
                       <div
                         class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2"
                       >
@@ -1301,7 +1297,7 @@ onUnmounted(() => {
                       v-else
                       :doc="rowAt(rows[vi.index])!.body"
                       language="json"
-                      :read-only="true"
+                      readonly
                     />
                   </div>
                 </template>

@@ -1,4 +1,5 @@
 import { useIntervalFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { defineStore } from 'pinia';
 import { type ComputedRef, computed, ref, watchEffect } from 'vue';
 import { useOpsStore } from './ops';
@@ -8,9 +9,6 @@ export interface RunStateVm {
   status: 'idle' | 'running' | 'error';
   elapsedMs: number | null;
 }
-
-// Sub-second: the toolbar label shows tenths of a second (TIMING has no entry this fast).
-const RUN_TICK_MS = 200;
 
 const IDLE: RunStateVm = { status: 'idle', elapsedMs: null };
 
@@ -23,7 +21,7 @@ const useRunStateStore = defineStore('runState', () => {
     () => {
       now.value = Date.now();
     },
-    RUN_TICK_MS,
+    TIMING.runTick,
     { immediate: false },
   );
 
