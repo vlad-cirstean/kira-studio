@@ -68,6 +68,7 @@ function installInBrowser({
   (window as unknown as { __kiraGitParams: unknown[] }).__kiraGitParams = [];
 
   let streamOpenCount = 0;
+  const seqCounts: Record<string, number> = {};
   let wireVersion = 0;
   let releaseHeld: (() => void) | undefined;
   (window as unknown as { __kiraGitRelease: () => void }).__kiraGitRelease = () => releaseHeld?.();
@@ -249,10 +250,28 @@ function installInBrowser({
         };
         const method = frame.method;
         if (method === undefined || !(method in resultByMethod)) return; // hang forever
-        deliver(socket, {
-          version: envelope.version,
-          body: { t: 'res', id: frame.id, ok: true, result: resultByMethod[method] },
-        });
+        // `{ __sequence: [a, b, ...] }`: the Nth request for this method answers entry N (the last
+        // repeats); an entry `{ __error: { code, message } }` answers a wire failure.
+        let answer = resultByMethod[method] as { __sequence?: unknown[] } | undefined;
+        if (answer && typeof answer === 'object' && Array.isArray(answer.__sequence)) {
+          const n = seqCounts[method] ?? 0;
+          seqCounts[method] = n + 1;
+          answer = answer.__sequence[Math.min(n, answer.__sequence.length - 1)] as typeof answer;
+        }
+        const failure = (answer as { __error?: { code: string; message: string } } | undefined)
+          ?.__error;
+        deliver(
+          socket,
+          failure
+            ? {
+                version: envelope.version,
+                body: { t: 'res', id: frame.id, ok: false, error: failure },
+              }
+            : {
+                version: envelope.version,
+                body: { t: 'res', id: frame.id, ok: true, result: answer },
+              },
+        );
       },
       close() {
         socket.readyState = CLOSED;

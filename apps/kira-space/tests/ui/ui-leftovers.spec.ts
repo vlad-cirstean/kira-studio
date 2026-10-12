@@ -2,6 +2,8 @@ import type { Page } from '@playwright/test';
 import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { FIXED_NOW, openPlan } from './support/adeV2';
+import { gitStreamParams } from './support/gitStreamMock';
+import { BASE_RESULTS, PORT_CONTROL, PORT_REPO, SHA_A, SHA_B } from './support/gitUiPortFixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -219,4 +221,75 @@ test('a markdown heading link scrolls its target to the pane top', async ({ rela
       return Math.abs(at - top);
     })
     .toBeLessThan(48);
+});
+
+test('a review diff that fails to load shows an Alert with Retry, and Retry reloads', async ({
+  relaunch,
+}) => {
+  const branch = 'feature/example';
+  const { window: page } = await relaunch({
+    control: [
+      ...PORT_CONTROL,
+      {
+        channel: IPC.tabsList,
+        response: [
+          {
+            id: 'restored-review-diff',
+            kind: 'repo-diff',
+            connectionId: null,
+            path: 'a.ts',
+            order: 0,
+            active: true,
+            workspaceId: PORT_REPO.id,
+            state: {
+              left: SHA_B,
+              right: SHA_A,
+              leftLabel: 'main',
+              rightLabel: branch,
+              review: { branch, branchTip: SHA_A, leftLabel: 'main' },
+            },
+          },
+        ],
+      },
+    ],
+    gitStream: {
+      repoId: PORT_REPO.repoId,
+      extraResults: {
+        ...BASE_RESULTS,
+        'file.read': { kind: 'found', content: 'one\ntwo\nthree\n' },
+        'review.snapshot': { kind: 'absent', text: null, reviewedAtSha: null },
+        'review.resolveBase': {
+          __sequence: [
+            { __error: { code: 'E_INTERNAL', message: 'index.lock exists' } },
+            {
+              branch,
+              base: 'main',
+              reason: 'defaultBranch',
+              range: { kind: 'ready', commitCount: 1 },
+              candidates: [],
+            },
+          ],
+        },
+        'review.fileDiff': {
+          path: 'a.ts',
+          deltaSource: 'noSnapshot',
+          body: { kind: 'text', hunks: [] },
+          reviewedRanges: [],
+          lineCount: 3,
+          reviewedAtSha: null,
+        },
+        'review.comment.list': { at: SHA_A, comments: [] },
+      },
+      graphStreamChunks: [],
+    },
+  });
+  const alert = page.locator('[data-slot="alert"]');
+  await expect(alert).toBeVisible();
+  const retry = alert.getByRole('button', { name: 'Retry' });
+  await expect(retry).toBeVisible();
+  expect(await gitStreamParams(page, 'review.resolveBase')).toHaveLength(1);
+
+  await retry.click();
+  await expect(alert).toHaveCount(0);
+  expect((await gitStreamParams(page, 'review.resolveBase')).length).toBeGreaterThanOrEqual(2);
 });

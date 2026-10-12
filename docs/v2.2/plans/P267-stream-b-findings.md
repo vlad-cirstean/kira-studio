@@ -17,9 +17,11 @@ Needs from foundation or other streams, and planned named exemptions for R.
 - `TruncatedText` tooltip shows only on overflow. Repo-row root-path tooltip now appears only when truncated.
 - `Spinner` has no `data-slot`. Mobile loading spec matches `.animate-spin`.
 
-## Specs not written
+## Review decoration load failure spec
 
-- Review decoration load failure (`[data-slot="alert"]` with Retry in `ReviewBanner.vue`). `gitStreamMock` answers only `ok` results and has no wire-error path. Opening a review diff tab also needs `repo.file`/diff fixtures. Needs a mock extension (`{ t:'res', ok:false, error }`) first.
+Written in `ui-leftovers.spec.ts`. `gitStreamMock` now answers `{ __sequence: [...] }` per method (Nth request gets entry N, last repeats) and `{ __error: { code, message } }` as a wire failure. The spec restores a review `repo-diff` tab, fails `review.resolveBase` once, asserts `[data-slot="alert"]` plus a Retry button, clicks it, and asserts the alert is gone and `resolveBase` ran twice. Not run; Monaco and tab-restore timing unverified.
+
+`ade.reviewCode` and `CHANNEL.reviewCode` need `internal/shell/accel.go` and `packages/shared/protocol/events.ts`, both outside Stream B. Left for R.
 
 ## Specs updated, unverified (not run, by instruction)
 
