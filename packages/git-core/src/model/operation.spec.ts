@@ -369,43 +369,54 @@ describe('describeInProgress', () => {
     };
   }
 
-  test('merge: label plus truncated sha', () => {
-    expect(describeInProgress(op({ kind: 'merge', otherSha: '0123456789abcdef' }))).toBe(
-      'Merging `0123456`',
-    );
+  test('merge: key with the shortened sha', () => {
+    expect(describeInProgress(op({ kind: 'merge', otherSha: '0123456789abcdef' }))).toEqual({
+      key: 'git.op.inProgress.merge.withSha.label',
+      params: { sha: '0123456' },
+    });
   });
 
-  test('cherryPick: label plus truncated sha', () => {
-    expect(describeInProgress(op({ kind: 'cherryPick', otherSha: 'fedcba9876543210' }))).toBe(
-      'Cherry-picking `fedcba9`',
-    );
+  test('cherryPick: key with the shortened sha', () => {
+    expect(describeInProgress(op({ kind: 'cherryPick', otherSha: 'fedcba9876543210' }))).toEqual({
+      key: 'git.op.inProgress.cherryPick.withSha.label',
+      params: { sha: 'fedcba9' },
+    });
   });
 
-  test('revert: label plus truncated sha', () => {
-    expect(describeInProgress(op({ kind: 'revert', otherSha: 'aaaaaaaaaaaa' }))).toBe(
-      'Reverting `aaaaaaa`',
-    );
+  test('revert: key with the shortened sha', () => {
+    expect(describeInProgress(op({ kind: 'revert', otherSha: 'aaaaaaaaaaaa' }))).toEqual({
+      key: 'git.op.inProgress.revert.withSha.label',
+      params: { sha: 'aaaaaaa' },
+    });
   });
 
-  test('bisect: label, no sha to show', () => {
-    expect(describeInProgress(op({ kind: 'bisect' }))).toBe('Bisecting');
+  test('bisect: plain key, no sha to show', () => {
+    expect(describeInProgress(op({ kind: 'bisect' }))).toEqual({
+      key: 'git.op.inProgress.bisect.label',
+    });
   });
 
   test('rebase: strips the refs/heads/ prefix from headName', () => {
     expect(
       describeInProgress(op({ kind: 'rebase', headName: 'refs/heads/feature', otherSha: 'sha' })),
-    ).toBe('Rebasing feature');
+    ).toEqual({ key: 'git.op.inProgress.rebase.withBranch.label', params: { branch: 'feature' } });
   });
 
-  test("rebase: falls back to bare 'Rebasing' when headName is undefined", () => {
-    expect(describeInProgress(op({ kind: 'rebase', headName: undefined }))).toBe('Rebasing');
+  test('rebase: plain key when headName is undefined', () => {
+    expect(describeInProgress(op({ kind: 'rebase', headName: undefined }))).toEqual({
+      key: 'git.op.inProgress.rebase.label',
+    });
   });
 
-  test('unmergedOnly: fixed sentence, ignores any otherSha', () => {
-    expect(describeInProgress(op({ kind: 'unmergedOnly' }))).toBe('Unresolved conflict');
+  test('unmergedOnly: fixed key, ignores any otherSha', () => {
+    expect(describeInProgress(op({ kind: 'unmergedOnly' }))).toEqual({
+      key: 'git.op.inProgress.unmergedOnly.label',
+    });
   });
 
-  test('a kind with no otherSha omits the trailing sha entirely (no dangling backticks)', () => {
-    expect(describeInProgress(op({ kind: 'merge', otherSha: undefined }))).toBe('Merging');
+  test('a kind with no otherSha takes the plain key', () => {
+    expect(describeInProgress(op({ kind: 'merge', otherSha: undefined }))).toEqual({
+      key: 'git.op.inProgress.merge.label',
+    });
   });
 });

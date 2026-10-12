@@ -20,6 +20,7 @@ import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { t } from '@theme/i18n';
 import { useEventListener, useResizeObserver } from '@vueuse/core';
+import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -49,7 +50,7 @@ import {
   createCommitDataView,
   GRAPH_COLUMN_ID,
 } from './columns.ts';
-import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
+import { measureAbsoluteDateWidth } from './dateFormat.ts';
 import { type GridKeyboardDeps, handleGridKeyDown } from './gridKeyboard.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
 
@@ -811,8 +812,8 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
       const commit = props.graphView.store.commitAt(entry.storeRow);
       const dateText =
         props.dateFormat === 'absolute'
-          ? formatAbsoluteDate(commit.author.timestamp)
-          : formatRelativeDate(commit.author.timestamp, Date.now());
+          ? formatAbsoluteUtc(commit.author.timestamp)
+          : formatAgeCompact(commit.author.timestamp, Date.now());
       rowNode.setAttribute('aria-label', composeRowLabel(commit, dateText));
     }
 

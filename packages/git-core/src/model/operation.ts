@@ -7,6 +7,8 @@
  */
 
 /** `HeadState` is already `core`'s own (`model/repo.ts`) — not re-declared here. */
+import { shortSha } from '../lib/sha.ts';
+import type { TextRef } from '../lib/textRef.ts';
 import type { HeadState } from './repo.ts';
 
 export type InProgressKind =
@@ -469,24 +471,35 @@ export function canRunOp(
   return !GATED_OP_KINDS.has(opKind);
 }
 
-const KIND_LABEL: Record<InProgressKind, string> = {
-  merge: 'Merging',
-  cherryPick: 'Cherry-picking',
-  revert: 'Reverting',
-  rebase: 'Rebasing',
-  bisect: 'Bisecting',
-  unmergedOnly: 'Unresolved conflict',
-};
-
 /** The one sentence naming an in-progress operation in the user's terms — shared by the banner
  *  and every gated control's disabled tooltip, so the two can never disagree about the reason
  *  (§7.11: "disabled with the banner as the explanation"). */
-export function describeInProgress(op: InProgressOperation): string {
-  if (op.kind === 'rebase') {
-    const branch = op.headName?.replace(/^refs\/heads\//, '');
-    return branch ? `Rebasing ${branch}` : 'Rebasing';
+export function describeInProgress(op: InProgressOperation): TextRef {
+  switch (op.kind) {
+    case 'rebase': {
+      const branch = op.headName?.replace(/^refs\/heads\//, '');
+      return branch
+        ? { key: 'git.op.inProgress.rebase.withBranch.label', params: { branch } }
+        : { key: 'git.op.inProgress.rebase.label' };
+    }
+    case 'unmergedOnly':
+      return { key: 'git.op.inProgress.unmergedOnly.label' };
+    case 'bisect':
+      return { key: 'git.op.inProgress.bisect.label' };
+    case 'merge':
+      return op.otherSha
+        ? { key: 'git.op.inProgress.merge.withSha.label', params: { sha: shortSha(op.otherSha) } }
+        : { key: 'git.op.inProgress.merge.label' };
+    case 'cherryPick':
+      return op.otherSha
+        ? {
+            key: 'git.op.inProgress.cherryPick.withSha.label',
+            params: { sha: shortSha(op.otherSha) },
+          }
+        : { key: 'git.op.inProgress.cherryPick.label' };
+    case 'revert':
+      return op.otherSha
+        ? { key: 'git.op.inProgress.revert.withSha.label', params: { sha: shortSha(op.otherSha) } }
+        : { key: 'git.op.inProgress.revert.label' };
   }
-  if (op.kind === 'unmergedOnly') return 'Unresolved conflict';
-  const shortSha = op.otherSha ? ` \`${op.otherSha.slice(0, 7)}\`` : '';
-  return `${KIND_LABEL[op.kind]}${shortSha}`;
 }

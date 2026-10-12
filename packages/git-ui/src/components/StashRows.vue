@@ -14,10 +14,10 @@ import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import { formatAgeCompact } from '@workbench/behaviour/format';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { StashState } from '../state/stash.ts';
-import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import { REF_LIST_SECTION_CAP } from './refListModel.ts';
@@ -98,7 +98,7 @@ function onMenuSelect(entry: StashEntry, id: string): void {
       <span data-testid="stash-message" class="flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
       <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" :data-kira-tip="t('git.stash.untracked.hint')">{{ UNTRACKED_FLAG }}</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ t('common.fileCount.label', { count: entry.fileCount }) }}</span>
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatAgeCompact(entry.timestamp) }}</span>
     </button>
     <RowActionsButton
       @click="rowMenu.openFromButton($event, menuFor(entry), (id) => onMenuSelect(entry, id))"

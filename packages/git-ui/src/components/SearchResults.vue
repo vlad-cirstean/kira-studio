@@ -23,8 +23,8 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import { formatAgeCompact } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { formatRelativeDate } from './dateFormat.ts';
 import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
 import type { SearchOption, SearchResultsModel } from './searchResultsModel.ts';
 import { fieldLabel } from './searchResultsModel.ts';
@@ -106,7 +106,7 @@ function optionClass(option: SearchOption): string {
               <span class="font-data text-muted-foreground">{{ option.hit.sha.slice(0, 7) }}</span>
               <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
               <span class="text-muted-foreground text-kira-sm">{{ option.hit.authorName }}</span>
-              <span class="text-muted-foreground text-kira-sm">{{ formatRelativeDate(option.hit.authorTime) }}</span>
+              <span class="text-muted-foreground text-kira-sm">{{ formatAgeCompact(option.hit.authorTime) }}</span>
               <Badge v-if="fieldLabel(option.hit.fields)">{{ fieldLabel(option.hit.fields) }}</Badge>
             </template>
           </div>

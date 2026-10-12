@@ -6,6 +6,7 @@
  * loaded ref list, to run client-side (`ui/src/state/ops.ts` imports `classifyTagCreate`
  * directly).
  */
+import type { TextRef } from '../lib/textRef.ts';
 import type { InProgressOperation, ResetMode } from '../model/operation.ts';
 import type { RefKind } from '../model/ref.ts';
 import type { PullStrategy, PullStrategySource } from '../model/remote.ts';
@@ -141,7 +142,7 @@ export interface PushPreflight {
  *  a re-supplied message (probe P3: `git tag -f <name> <sha>` silently downgrades it). */
 export interface TagCreatePreflight {
   readonly nameValid: boolean;
-  readonly nameError: string | undefined;
+  readonly nameError: TextRef | undefined;
   readonly exists: boolean;
   readonly existingIsAnnotated: boolean;
   readonly requiresAnnotationToPreserve: boolean;

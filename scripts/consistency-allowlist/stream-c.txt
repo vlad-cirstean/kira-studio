@@ -3,7 +3,6 @@ U67 packages/api-core/src/http/curl/parse.ts
 U67 packages/api-core/src/http/curl/tokenize.ts
 U67 packages/api-core/src/http/dotenv.ts
 U67 packages/api-core/src/http/raw/parse.ts
-U67 packages/git-core/src/settings/schema.ts
 U72 packages/docker-ui/src/components/OriginIcon.vue
 U72 packages/git-ui/src/components/FileTree.vue
 U73 packages/git-ui/src/components/AppToolbar.vue
@@ -41,9 +40,6 @@ U80 packages/git-ui/src/components/StackList.vue
 U80 packages/git-ui/src/components/StashRows.vue
 U80 packages/git-ui/src/components/TagList.vue
 U80 packages/git-ui/src/components/WorktreeList.vue
-U82 packages/git-core/src/model/operation.ts
-U82 packages/git-core/src/store/shaTable.spec.ts
-U82 packages/git-core/src/worktree/label.ts
 U82 packages/git-ui/src/App.vue
 U82 packages/git-ui/src/components/BranchPicker.vue
 U82 packages/git-ui/src/components/CommitMeta.vue

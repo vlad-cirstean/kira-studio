@@ -1,3 +1,5 @@
+import { shortSha } from '../lib/sha.ts';
+
 /**
  * A structural, not imported, copy of `@kira/git-ipc`'s own `WorktreeEntry` shape (B3 — core and
  * ipc both depend on nothing, so neither imports the other) narrowed to the fields this label
@@ -15,6 +17,6 @@ export interface WorktreeLabelInput {
  *  render — shared so a filter pass matches exactly what the row shows. */
 export function worktreeLabel(entry: WorktreeLabelInput): string {
   if (entry.branch) return entry.branch.replace(/^refs\/heads\//, '');
-  if (entry.isDetached && entry.head) return `detached @ ${entry.head.slice(0, 7)}`;
+  if (entry.isDetached && entry.head) return `detached @ ${shortSha(entry.head)}`;
   return entry.isBare ? 'bare' : 'unknown';
 }

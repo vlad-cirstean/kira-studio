@@ -76,6 +76,7 @@ import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import { useSectionMenu } from './components/useSectionMenu.ts';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { useGraphVisible } from './graphVisibility.ts';
+import { renderText } from './lib/text.ts';
 import { ASYNC_FAILURES, type AsyncFailure } from './state/asyncFailures.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';
@@ -842,7 +843,7 @@ const viewHeadBindings = computed(() => {
     headLabel: head === undefined ? undefined : head.kind === 'detached' ? 'detached' : head.name,
     ahead: tracked?.ahead,
     behind: tracked?.behind,
-    operation: inProgress ? describeInProgress(inProgress) : undefined,
+    operation: inProgress ? renderText(describeInProgress(inProgress)) : undefined,
   };
 });
 

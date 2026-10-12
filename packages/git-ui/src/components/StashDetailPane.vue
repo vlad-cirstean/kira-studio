@@ -21,11 +21,11 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { StashState } from '../state/stash.ts';
-import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import FileTree from './FileTree.vue';
 import { openFileAnnounced } from './openFileAnnounced.ts';
 
@@ -80,9 +80,9 @@ function onOpenFile(index: number, pinned: boolean): void {
         <Badge v-if="entry.includedUntracked">{{ t('git.stash.untracked.example') }}</Badge>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(entry.timestamp) }}</span>
+            <span class="shrink-0 text-kira-sm text-subtle">{{ formatAgeCompact(entry.timestamp) }}</span>
           </TooltipTrigger>
-          <TooltipContent>{{ formatAbsoluteDate(entry.timestamp) }}</TooltipContent>
+          <TooltipContent>{{ formatAbsoluteUtc(entry.timestamp) }}</TooltipContent>
         </Tooltip>
       </ViewToolbar>
       <FileTree

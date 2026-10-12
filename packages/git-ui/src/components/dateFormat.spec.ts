@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { measureAbsoluteDateWidth } from './dateFormat.ts';
 
-// P62 D2: formatAbsoluteDate/formatRelativeDate's own tests moved to
-// packages/git-core/src/lib/dateFormat.spec.ts alongside the functions themselves. Only
-// measureAbsoluteDateWidth (DOM-bound canvas measurement) stays here.
 describe('measureAbsoluteDateWidth — G21 D6b', () => {
   /** Bun's own `bun:test` environment has no DOM — no `document`, no `OffscreenCanvas` (the same
    *  reason `rowSvg.ts`'s DOM-construction half is Playwright-only, not covered here). This

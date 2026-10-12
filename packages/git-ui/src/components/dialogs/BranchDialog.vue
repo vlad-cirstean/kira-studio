@@ -27,6 +27,7 @@ import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId, watch } from 'vue';
+import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 
 const props = defineProps<{ open: boolean; startPoint: string; ops: OpsState }>();
@@ -49,7 +50,7 @@ watch(
 const nameError = computed(() => {
   if (name.value === '') return undefined;
   const { valid, error } = validateRefName(name.value);
-  return valid ? undefined : error;
+  return valid || error === undefined ? undefined : renderText(error);
 });
 const canSubmit = computed(() => name.value !== '' && nameError.value === undefined);
 

@@ -8,6 +8,7 @@
  * one.
  */
 import { assert } from '../lib/assert.ts';
+import type { TextRef } from '../lib/textRef.ts';
 
 /** `docs/plans/P7.md` W7/D43: `"stringArray"` is the first array-valued setting type — added for
  *  `kiraSpace.review.baseCandidates` (§6.8) exclusively; nothing else in the schema needs it
@@ -19,7 +20,7 @@ export interface SettingDef<T> {
   readonly type: SettingType;
   readonly default: T;
   /** Shown as the setting's description. */
-  readonly description: string;
+  readonly description: TextRef;
   readonly enum?: readonly string[];
   readonly minimum?: number;
   readonly maximum?: number;
@@ -49,16 +50,14 @@ export const SETTINGS = {
     key: 'kiraSpace.github.enabled',
     type: 'boolean',
     default: true,
-    description:
-      'Show pull request status for this repository (requires the GitHub CLI, `gh`, to be ' +
-      'installed and authenticated). Off disables every gh probe, spawn and badge for this repo.',
+    description: { key: 'git.settings.githubEnabled.description' },
     source: 'repo',
   },
   'kiraSpace.graph.pageSize': {
     key: 'kiraSpace.graph.pageSize',
     type: 'number',
     default: 5000,
-    description: 'How many commits a single Load more page fetches.',
+    description: { key: 'git.settings.graphPageSize.description' },
     minimum: 100,
     maximum: 50000,
     source: 'repo',
@@ -67,7 +66,7 @@ export const SETTINGS = {
     key: 'kiraSpace.graph.scope',
     type: 'enum',
     default: 'all',
-    description: 'Whether the graph shows every ref ("all") or only the current HEAD\'s ancestry.',
+    description: { key: 'git.settings.graphScope.description' },
     enum: ['all', 'head'],
     source: 'repo',
   },
@@ -75,10 +74,7 @@ export const SETTINGS = {
     key: 'kiraSpace.review.baseCandidates',
     type: 'stringArray',
     default: ['main', 'master'],
-    description:
-      'Branch review (§6.8): candidate base branches to compare against, in order, tried ' +
-      "after the branch's own upstream and the repository's detected default branch " +
-      '(origin/HEAD) both fail to resolve.',
+    description: { key: 'git.settings.reviewBaseCandidates.description' },
     source: 'repo',
   },
   'kiraSpace.pull.strategy': {
@@ -86,19 +82,14 @@ export const SETTINGS = {
     type: 'enum',
     default: 'auto',
     enum: ['auto', 'ff-only', 'merge', 'rebase'],
-    description:
-      'How Pull integrates fetched commits. "auto" follows your git configuration ' +
-      '(branch.<name>.rebase, then pull.rebase, then pull.ff), falling back to fast-forward-only.',
+    description: { key: 'git.settings.pullStrategy.description' },
     source: 'repo',
   },
   'kiraSpace.stash.includeUntracked': {
     key: 'kiraSpace.stash.includeUntracked',
     type: 'boolean',
     default: false,
-    description:
-      'Whether the Stash dialog\'s "include untracked files" box starts checked. Untracked ' +
-      'files are restored by a checkout, not a merge, so a pop can fail on a name collision ' +
-      'even when the merge itself is clean (§7.6).',
+    description: { key: 'git.settings.stashIncludeUntracked.description' },
     source: 'repo',
   },
   // G25 D10: the worktree prepare script and its own path pre-fill — two more `source: 'repo'`
@@ -108,30 +99,21 @@ export const SETTINGS = {
     key: 'kiraSpace.worktree.prepareScript',
     type: 'string',
     default: '',
-    description:
-      'A shell command run automatically after creating a worktree (e.g. "npm ci"). Runs as ' +
-      'your own login shell with your own permissions — treat it exactly like a command you ' +
-      'would type into a terminal yourself. Empty disables the feature entirely: no shell is ' +
-      "ever spawned. Set in Kira Space's repo settings only. The exact script text is always " +
-      'shown before it runs for the first time.',
+    description: { key: 'git.settings.worktreePrepareScript.description' },
     source: 'repo',
   },
   'kiraSpace.worktree.basePath': {
     key: 'kiraSpace.worktree.basePath',
     type: 'string',
     default: '',
-    description:
-      'Pre-fills the "Create Worktree" dialog\'s path field. Purely a convenience — never a ' +
-      'security boundary, and never validated as an existing directory.',
+    description: { key: 'git.settings.worktreeBasePath.description' },
     source: 'repo',
   },
   'kiraSpace.stash.showInGraph': {
     key: 'kiraSpace.stash.showInGraph',
     type: 'boolean',
     default: true,
-    description:
-      'Whether stash entries appear as nodes in the commit graph. When off, the walk drops ' +
-      'refs/stash entirely and stashes are visible only in the stash list.',
+    description: { key: 'git.settings.stashShowInGraph.description' },
     source: 'repo',
   },
   // G28 D16: the one new leaf this phase adds — read CLIENT-SIDE ONLY (the server never consults
@@ -143,12 +125,7 @@ export const SETTINGS = {
     key: 'kiraSpace.checkout.autoStash',
     type: 'boolean',
     default: true,
-    description:
-      'When a branch switch is blocked by uncommitted changes, automatically stash them and ' +
-      'switch anyway instead of asking. The stash is tagged with the branch you switched FROM ' +
-      'and is never popped back automatically — bring it back deliberately from the stash list, ' +
-      'even onto a different branch. Off restores the old dialog (discard / stash and carry / ' +
-      'cancel).',
+    description: { key: 'git.settings.checkoutAutoStash.description' },
     source: 'repo',
   },
 } as const satisfies Record<string, SettingDef<unknown>>;
@@ -194,7 +171,7 @@ export function defaultSettings(): Settings {
 
 export interface CoerceProblem {
   readonly key: string;
-  readonly reason: 'unknown key' | 'wrong type' | 'out of range' | 'unknown enum member';
+  readonly reason: 'unknownKey' | 'wrongType' | 'outOfRange' | 'unknownEnumMember';
 }
 
 export interface CoerceResult {
@@ -209,31 +186,31 @@ type CoerceOne =
 function coerceOne(def: SettingDef<unknown>, value: unknown): CoerceOne {
   switch (def.type) {
     case 'string':
-      return typeof value === 'string' ? { ok: true, value } : { ok: false, reason: 'wrong type' };
+      return typeof value === 'string' ? { ok: true, value } : { ok: false, reason: 'wrongType' };
     case 'boolean':
-      return typeof value === 'boolean' ? { ok: true, value } : { ok: false, reason: 'wrong type' };
+      return typeof value === 'boolean' ? { ok: true, value } : { ok: false, reason: 'wrongType' };
     case 'number': {
       if (typeof value !== 'number' || !Number.isFinite(value)) {
-        return { ok: false, reason: 'wrong type' };
+        return { ok: false, reason: 'wrongType' };
       }
       if (def.minimum !== undefined && value < def.minimum)
-        return { ok: false, reason: 'out of range' };
+        return { ok: false, reason: 'outOfRange' };
       if (def.maximum !== undefined && value > def.maximum)
-        return { ok: false, reason: 'out of range' };
+        return { ok: false, reason: 'outOfRange' };
       return { ok: true, value };
     }
     case 'enum': {
-      if (typeof value !== 'string') return { ok: false, reason: 'wrong type' };
+      if (typeof value !== 'string') return { ok: false, reason: 'wrongType' };
       const members: readonly string[] | undefined = def.enum;
       assert(members !== undefined, `SETTINGS[${def.key}]: type "enum" without an enum list`);
-      if (!members.includes(value)) return { ok: false, reason: 'unknown enum member' };
+      if (!members.includes(value)) return { ok: false, reason: 'unknownEnumMember' };
       return { ok: true, value };
     }
     case 'stringArray': {
       // Never-partly-valid, exactly like every other type: one non-string member and the
       // WHOLE array falls back to the default, rather than silently dropping just that member.
       if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
-        return { ok: false, reason: 'wrong type' };
+        return { ok: false, reason: 'wrongType' };
       }
       return { ok: true, value };
     }
@@ -252,7 +229,7 @@ export function coerceSettings(raw: Readonly<Record<string, unknown>>): CoerceRe
 
   for (const rawKey of Object.keys(raw)) {
     if (!isSettingKey(rawKey)) {
-      problems.push({ key: rawKey, reason: 'unknown key' });
+      problems.push({ key: rawKey, reason: 'unknownKey' });
       continue;
     }
     const outcome = coerceOne(SETTINGS[rawKey], raw[rawKey]);

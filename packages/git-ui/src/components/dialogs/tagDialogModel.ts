@@ -6,14 +6,14 @@
  * `objectType`/`isAnnotated` at all. `validateRefName` itself IS imported from `core` — it takes
  * no `RefRecord`, so there is no reason to duplicate probe P3's own `@{`/leading-`-`/empty rules.
  */
-import { validateRefName } from '@kira/git-core';
+import { type TextRef, validateRefName } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';
 
 type TagCreateVerdict = 'clean' | 'blockedByExisting' | 'movesWithForce' | 'invalidName';
 
 export interface TagCreateState {
   readonly nameValid: boolean;
-  readonly nameError: string | undefined;
+  readonly nameError: TextRef | undefined;
   readonly exists: boolean;
   readonly existingIsAnnotated: boolean;
   /** Probe P3: `git tag -f <name> <sha>` on an existing ANNOTATED tag silently downgrades it to

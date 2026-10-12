@@ -47,6 +47,7 @@ import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId, watch } from 'vue';
+import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 import { stashLabel } from '../stashListModel.ts';
 
@@ -174,7 +175,7 @@ watch(branchName, async (name) => {
 const branchNameLocalError = computed(() => {
   if (branchName.value.trim() === '') return undefined;
   const { valid, error } = validateRefName(branchName.value.trim());
-  return valid ? undefined : error;
+  return valid || error === undefined ? undefined : renderText(error);
 });
 
 /** Only a genuinely invalid/taken name (or nothing typed yet) blocks the button — a `blocked`

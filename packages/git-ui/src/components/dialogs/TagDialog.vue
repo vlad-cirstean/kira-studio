@@ -27,6 +27,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref, useId, watch } from 'vue';
+import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 import { canSubmitTagCreate, classifyTagName } from './tagDialogModel.ts';
 
@@ -98,7 +99,7 @@ async function submit(): Promise<void> {
         <Field>
           <FieldLabel :for="nameId">{{ t('common.field.name.label') }}</FieldLabel>
           <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
-          <FieldError v-if="state.nameError">{{ state.nameError }}</FieldError>
+          <FieldError v-if="state.nameError">{{ renderText(state.nameError) }}</FieldError>
         </Field>
 
         <template v-if="state.verdict === 'blockedByExisting'">

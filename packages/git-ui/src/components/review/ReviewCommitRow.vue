@@ -23,13 +23,13 @@ import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import { formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, useTemplateRef } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
-import { formatRelativeDate } from '../dateFormat.ts';
 import FileTree from '../FileTree.vue';
 import { openAllChangesAnnounced } from '../openAllChangesAnnounced.ts';
 import { buildReadOnlyRowMenu } from '../rowMenuModel.ts';
@@ -62,7 +62,7 @@ const row = computed(() => props.store.rowOfSha(props.sha));
 const commit = computed(() => (row.value === -1 ? undefined : props.store.commitAt(row.value)));
 const shortSha = computed(() => props.sha.slice(0, 7));
 const dateText = computed(() =>
-  commit.value ? formatRelativeDate(commit.value.committer.timestamp) : '',
+  commit.value ? formatAgeCompact(commit.value.committer.timestamp) : '',
 );
 
 /** G-UX D5 (item 5): the row-action cluster (Open all changes, Open in graph) sits inside this

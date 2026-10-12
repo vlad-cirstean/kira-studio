@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
+import { shortSha } from '../lib/sha.ts';
 import { ShaTable } from './shaTable.ts';
 
 /** A deterministic, genuinely unique-per-seed hex string — sha1 (40 hex) or sha256-truncated
@@ -107,7 +108,7 @@ describe('ShaTable', () => {
     const table = new ShaTable();
     const hex = hexOfLength(1, 40);
     const row = table.append(hex);
-    expect(table.shortHexAt(row, 7)).toBe(hex.slice(0, 7));
+    expect(table.shortHexAt(row, 7)).toBe(shortSha(hex));
   });
 
   test('append rejects a malformed sha length', () => {

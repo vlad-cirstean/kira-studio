@@ -2817,6 +2817,17 @@
         },
         "title": "Can’t pull with local changes"
       },
+      "refName": {
+        "empty": {
+          "error": "Name can’t be empty."
+        },
+        "leadingDash": {
+          "error": "Name can’t start with a dash."
+        },
+        "reflogShorthand": {
+          "error": "Name can’t contain {sequence}, which git reserves for reflog shorthand."
+        }
+      },
       "rename": {
         "description": "Renaming {name}.",
         "name": {
@@ -3573,6 +3584,38 @@
       "forcePushed": {
         "announce": "Force-pushed {branch} to {remote}"
       },
+      "inProgress": {
+        "bisect": {
+          "label": "Bisecting"
+        },
+        "cherryPick": {
+          "label": "Cherry-picking",
+          "withSha": {
+            "label": "Cherry-picking {sha}"
+          }
+        },
+        "merge": {
+          "label": "Merging",
+          "withSha": {
+            "label": "Merging {sha}"
+          }
+        },
+        "rebase": {
+          "label": "Rebasing",
+          "withBranch": {
+            "label": "Rebasing {branch}"
+          }
+        },
+        "revert": {
+          "label": "Reverting",
+          "withSha": {
+            "label": "Reverting {sha}"
+          }
+        },
+        "unmergedOnly": {
+          "label": "Unresolved conflict"
+        }
+      },
       "mismatchKept": {
         "body": "Your stash was kept."
       },
@@ -4121,6 +4164,38 @@
       },
       "tailStale": {
         "hint": "Refs changed since this search ran."
+      }
+    },
+    "settings": {
+      "checkoutAutoStash": {
+        "description": "When uncommitted changes block a branch switch, stash them and switch instead of asking. The stash is tagged with the branch you left and is never popped automatically. Off restores the old dialog (discard, stash and carry, or cancel)."
+      },
+      "githubEnabled": {
+        "description": "Show pull request status for this repository. Needs the GitHub CLI (gh), installed and signed in. Off stops every gh call and hides every badge."
+      },
+      "graphPageSize": {
+        "description": "How many commits a single page fetches when you load more."
+      },
+      "graphScope": {
+        "description": "Whether the graph shows every ref or only the ancestry of the checked-out commit."
+      },
+      "pullStrategy": {
+        "description": "How pulling integrates fetched commits. Auto follows your git configuration (branch rebase, then pull rebase, then pull fast-forward), falling back to fast-forward only."
+      },
+      "reviewBaseCandidates": {
+        "description": "Candidate base branches for branch review, in order. Tried after the branch’s upstream and the detected default branch both fail to resolve."
+      },
+      "stashIncludeUntracked": {
+        "description": "Whether the stash dialog starts with the untracked files box checked. A pop can fail on a name collision even when the merge itself is clean."
+      },
+      "stashShowInGraph": {
+        "description": "Whether stash entries appear as nodes in the commit graph. Off shows stashes only in the stash list."
+      },
+      "worktreeBasePath": {
+        "description": "Pre-fills the path field of the new worktree dialog. A convenience only, never validated as an existing folder."
+      },
+      "worktreePrepareScript": {
+        "description": "Shell command run after creating a worktree, such as npm ci. Runs in your login shell with your permissions, like a command you type yourself. Empty disables the feature. Set in Kira Space repository settings only. The script text is shown before its first run."
       }
     },
     "signature": {

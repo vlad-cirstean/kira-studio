@@ -8,7 +8,9 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    // Type-only import of MessageKey; the i18n index re-exports a .vue file, hence the env shim.
+    "paths": { "@theme/*": ["../theme/src/*"] }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "../workbench/env.d.ts"]
 }

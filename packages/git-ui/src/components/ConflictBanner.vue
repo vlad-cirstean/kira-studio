@@ -24,6 +24,7 @@ import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
+import { renderText } from '../lib/text.ts';
 import type { OpsState } from '../state/ops.ts';
 
 const props = defineProps<{
@@ -83,7 +84,7 @@ const PATH_DISPLAY_CAP = 20;
     data-testid="conflict-banner"
   >
     <div class="flex items-center gap-1">
-      <span>{{ describeInProgress(inProgress) }}</span>
+      <span>{{ renderText(describeInProgress(inProgress)) }}</span>
       <span v-if="inProgress.unmergedCount > 0" class="text-muted-foreground text-kira-sm">
         {{ t('git.conflict.unresolved.label', { count: inProgress.unmergedCount }) }}
       </span>

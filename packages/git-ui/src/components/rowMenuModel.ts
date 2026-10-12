@@ -18,6 +18,7 @@ import { t } from '@theme/i18n';
 // §6.1) -- re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
 // unchanged.
 import type { MenuItem, MenuSection } from '../lib/menuModel.ts';
+import { renderText } from '../lib/text.ts';
 import { applyMenuLabel, originLabel } from './stashListModel.ts';
 
 export type { MenuSection };
@@ -35,7 +36,8 @@ function gatedItem(
     id,
     label,
     disabled: !allowed,
-    disabledReason: allowed || inProgress === null ? undefined : describeInProgress(inProgress),
+    disabledReason:
+      allowed || inProgress === null ? undefined : renderText(describeInProgress(inProgress)),
     icon,
     danger,
   };

@@ -6,10 +6,10 @@
  * lifecycle P62 §4.3 wrote and P76 §4 only relocates. `blameAnnotation.ts` keeps just the Monaco
  * decoration/hover/reveal-action rendering of `state` below.
  */
-import { formatAbsoluteDate, formatRelativeDate } from '@kira/git-core';
 import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
+import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import { type ShallowRef, shallowRef } from 'vue';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 
@@ -85,7 +85,7 @@ function toState(line: number, result: BlameResult | null): BlameLineState {
 /** `<author>, <age> · <subject>` — today's inline annotation text, verbatim. */
 export function blameLineText(state: Extract<BlameLineState, { kind: 'resolved' }>): string {
   const subject = clampSubject(state.summary);
-  const age = formatRelativeDate(state.authorTimeSeconds);
+  const age = formatAgeCompact(state.authorTimeSeconds);
   return subject.length > 0
     ? t('space.repo.blame.line.label', { author: state.author, when: age, subject })
     : t('common.commaPair.label', { first: state.author, second: age });
@@ -98,7 +98,7 @@ export function blameLineTooltip(state: Extract<BlameLineState, { kind: 'resolve
     subject.length > 0 ? subject : t('space.repo.blame.noMessage.label'),
     t('common.commaPair.label', {
       first: state.author,
-      second: formatAbsoluteDate(state.authorTimeSeconds),
+      second: formatAbsoluteUtc(state.authorTimeSeconds),
     }),
   ];
 }

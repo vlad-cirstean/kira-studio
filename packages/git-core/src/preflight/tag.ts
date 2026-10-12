@@ -2,6 +2,7 @@
  * §7.9's tag-create classifier, plus the shared ref-name prefilter both branch and tag creation
  * need before proposing a spawn at all.
  */
+import type { TextRef } from '../lib/textRef.ts';
 import type { RefRecord } from '../model/ref.ts';
 import { isAnnotated } from '../model/tag.ts';
 import type { TagCreatePreflight } from './types.ts';
@@ -16,14 +17,21 @@ import type { TagCreatePreflight } from './types.ts';
  */
 export function validateRefName(name: string): {
   readonly valid: boolean;
-  readonly error: string | undefined;
+  readonly error: TextRef | undefined;
 } {
-  if (name.length === 0) return { valid: false, error: 'Name cannot be empty.' };
-  if (name.startsWith('-')) return { valid: false, error: "Name cannot start with '-'." };
+  if (name.length === 0) {
+    return { valid: false, error: { key: 'git.dialog.refName.empty.error' } };
+  }
+  if (name.startsWith('-')) {
+    return { valid: false, error: { key: 'git.dialog.refName.leadingDash.error' } };
+  }
   if (name.includes('@{')) {
     return {
       valid: false,
-      error: "Name cannot contain '@{' (reserved by git's reflog shorthand).",
+      error: {
+        key: 'git.dialog.refName.reflogShorthand.error',
+        params: { sequence: '@{' },
+      },
     };
   }
   return { valid: true, error: undefined };

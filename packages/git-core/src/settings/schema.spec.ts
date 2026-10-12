@@ -35,7 +35,7 @@ describe('coerceSettings', () => {
   // like any other stranger, not specially.
   test('kiraSpace.git.path is an unknown key, not a settable string (G18 D15)', () => {
     const result = coerceSettings({ 'kiraSpace.git.path': '/usr/bin/git' });
-    expect(result.problems).toEqual([{ key: 'kiraSpace.git.path', reason: 'unknown key' }]);
+    expect(result.problems).toEqual([{ key: 'kiraSpace.git.path', reason: 'unknownKey' }]);
   });
 
   test('stringArray: a non-array value falls back to the default and is reported', () => {
@@ -44,7 +44,7 @@ describe('coerceSettings', () => {
       SETTINGS['kiraSpace.review.baseCandidates'].default,
     );
     expect(result.problems).toEqual([
-      { key: 'kiraSpace.review.baseCandidates', reason: 'wrong type' },
+      { key: 'kiraSpace.review.baseCandidates', reason: 'wrongType' },
     ]);
   });
 
@@ -56,7 +56,7 @@ describe('coerceSettings', () => {
       SETTINGS['kiraSpace.review.baseCandidates'].default,
     );
     expect(result.problems).toEqual([
-      { key: 'kiraSpace.review.baseCandidates', reason: 'wrong type' },
+      { key: 'kiraSpace.review.baseCandidates', reason: 'wrongType' },
     ]);
   });
 
@@ -71,7 +71,7 @@ describe('coerceSettings', () => {
     expect(result.settings['kiraSpace.graph.pageSize']).toBe(
       SETTINGS['kiraSpace.graph.pageSize'].default,
     );
-    expect(result.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'wrong type' }]);
+    expect(result.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'wrongType' }]);
   });
 
   test('an out-of-range number falls back to the default and is reported', () => {
@@ -79,10 +79,10 @@ describe('coerceSettings', () => {
     expect(tooLow.settings['kiraSpace.graph.pageSize']).toBe(
       SETTINGS['kiraSpace.graph.pageSize'].default,
     );
-    expect(tooLow.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'out of range' }]);
+    expect(tooLow.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'outOfRange' }]);
 
     const tooHigh = coerceSettings({ 'kiraSpace.graph.pageSize': 1_000_000 });
-    expect(tooHigh.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'out of range' }]);
+    expect(tooHigh.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'outOfRange' }]);
   });
 
   test('an unknown enum member falls back to the default and is reported', () => {
@@ -91,7 +91,7 @@ describe('coerceSettings', () => {
       SETTINGS['kiraSpace.graph.scope'].default,
     );
     expect(result.problems).toEqual([
-      { key: 'kiraSpace.graph.scope', reason: 'unknown enum member' },
+      { key: 'kiraSpace.graph.scope', reason: 'unknownEnumMember' },
     ]);
   });
 
@@ -101,7 +101,7 @@ describe('coerceSettings', () => {
       'kiraSpace.graph.pageSize': 200,
     });
     expect(result.settings).toEqual({ ...defaultSettings(), 'kiraSpace.graph.pageSize': 200 });
-    expect(result.problems).toEqual([{ key: 'kiraSpace.nonsense', reason: 'unknown key' }]);
+    expect(result.problems).toEqual([{ key: 'kiraSpace.nonsense', reason: 'unknownKey' }]);
   });
 
   test('never throws on a hostile input shape', () => {

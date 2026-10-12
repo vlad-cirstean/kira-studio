@@ -16,9 +16,9 @@
  */
 import type { CommitRecord, CommitStore, DecorationRef, RowPlan } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
+import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
 import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
-import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { buildPrBadge, buildRefBadges, type StackBadgeInfo } from './refBadges.ts';
 import { splitHighlights } from './searchHighlight.ts';
 
@@ -257,8 +257,8 @@ function dateFormatter(
     const timestamp = dataContext.author.timestamp;
     const text =
       ctx.dateFormat() === 'absolute'
-        ? formatAbsoluteDate(timestamp)
-        : formatRelativeDate(timestamp, ctx.now());
+        ? formatAbsoluteUtc(timestamp)
+        : formatAgeCompact(timestamp, ctx.now());
     return textCell(text, CELL_DATE_CLASS);
   };
 }

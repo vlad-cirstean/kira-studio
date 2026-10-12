@@ -28,13 +28,13 @@ import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import { prBadgeClass } from './badgeClass.ts';
-import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { appendLinkifiedText } from './linkify.ts';
 import { openAllChangesAnnounced } from './openAllChangesAnnounced.ts';
 import { prStateLabel } from './prStateLabel.ts';
@@ -438,9 +438,9 @@ const prIcon = computed(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(detail.committer.timestamp) }}</span>
+            <span class="shrink-0 text-kira-sm text-subtle">{{ formatAgeCompact(detail.committer.timestamp) }}</span>
           </TooltipTrigger>
-          <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
+          <TooltipContent>{{ formatAbsoluteUtc(detail.committer.timestamp) }}</TooltipContent>
         </Tooltip>
         <TooltipIconButton
           icon="diff-multiple"

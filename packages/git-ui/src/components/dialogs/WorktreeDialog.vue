@@ -31,6 +31,7 @@ import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId, watch } from 'vue';
+import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../../state/worktrees.ts';
@@ -99,7 +100,7 @@ watch([branch, startPoint], ([b, s]) => {
 const newBranchNameError = computed(() => {
   if (mode.value !== 'newBranch' || branch.value.trim() === '') return undefined;
   const { valid, error } = validateRefName(branch.value.trim());
-  return valid ? undefined : error;
+  return valid || error === undefined ? undefined : renderText(error);
 });
 
 watch([path, mode, branch, startPoint], async ([p, m, b, s]) => {

@@ -1,16 +1,10 @@
 /**
- * The date column's two renderings (`docs/plans/P4.md` W6, §6.2: "clicking toggles relative/
- * absolute for every row and persists"). P62 D2: `formatRelativeDate`/`formatAbsoluteDate`
- * themselves moved to `@kira/git-core/src/lib/dateFormat.ts` (no DOM dependency, and already
- * eager in every host that needs them) — re-exported here so this package's own existing importers
- * (`CommitGrid.vue`, `columns.ts`, `ReviewCommitRow.vue`) need no change. `measureAbsoluteDateWidth`
- * stays: it is canvas measurement, DOM-bound, and git-core has none.
+ * Canvas measurement for the commit grid's absolute date column. DOM-bound, so it lives here
+ * rather than in git-core.
  */
-import { formatAbsoluteDate, formatRelativeDate } from '@kira/git-core';
+import { formatAbsoluteUtc } from '@workbench/behaviour/format';
 
-export { formatAbsoluteDate, formatRelativeDate };
-
-/** G21 D6b: a representative widest sample `formatAbsoluteDate` can produce — the format's own
+/** G21 D6b: a representative widest sample `formatAbsoluteUtc` can produce — the format's own
  *  shape ("YYYY-MM-DD HH:MM") never varies in length, and `.kira-cell-date`'s own
  *  `font-variant-numeric: tabular-nums` makes which digits appear irrelevant to the rendered
  *  width, so any one concrete timestamp is as "widest" as any other. `Date.UTC` rather than a
@@ -20,7 +14,7 @@ const WIDEST_SAMPLE_TIMESTAMP = Date.UTC(2024, 11, 30, 22, 48) / 1000;
 let measureCanvas: HTMLCanvasElement | OffscreenCanvas | undefined;
 
 /**
- * The pixel width of the widest string `formatAbsoluteDate` can produce, rendered in `font` (a
+ * The pixel width of the widest string `formatAbsoluteUtc` can produce, rendered in `font` (a
  * CSS font shorthand — `CommitGrid.vue` reads this from a live `.kira-cell-date` probe's own
  * computed style). Item 6's second gap (F6): a hard-coded pixel width is only correct at one
  * font size, and G14 already made the type scale follow the host's own settings, so this measures
@@ -51,5 +45,5 @@ export function measureAbsoluteDateWidth(font: string): number {
     | null;
   if (!ctx) return 0;
   ctx.font = font;
-  return ctx.measureText(formatAbsoluteDate(WIDEST_SAMPLE_TIMESTAMP)).width;
+  return ctx.measureText(formatAbsoluteUtc(WIDEST_SAMPLE_TIMESTAMP)).width;
 }

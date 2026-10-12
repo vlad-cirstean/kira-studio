@@ -48,7 +48,8 @@ export {
   UNRESOLVED_ROW,
 } from './graph/types.ts';
 export { AssertionError, assert, assertDefined } from './lib/assert.ts';
-export { formatAbsoluteDate, formatRelativeDate } from './lib/dateFormat.ts';
+export { shortSha } from './lib/sha.ts';
+export type { TextRef } from './lib/textRef.ts';
 export type {
   CommitDetail,
   CommitIdentity,
