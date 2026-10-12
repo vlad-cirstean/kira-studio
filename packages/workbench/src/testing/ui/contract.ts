@@ -21,6 +21,10 @@ const FIXED: Record<string, string> = {
   '<masked>': '',
 };
 
+/** A contract fixture's untyped JSON object, for specs that spread and patch Go-written fixtures. */
+// biome-ignore lint/suspicious/noExplicitAny: fixtures are Go-written JSON with no static shape
+export type ContractJson = Record<string, any>;
+
 export interface ContractOptions<T> {
   /** Parses the hydrated value (a zod schema from packages/shared/domain): TS type drift fails the spec too. */
   schema?: { parse(value: unknown): T };

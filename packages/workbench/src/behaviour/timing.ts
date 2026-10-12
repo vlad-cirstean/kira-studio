@@ -21,6 +21,12 @@ export const TIMING = {
   hoverInfo: 400,
   pollFast: 5000,
   pollSlow: 60000,
+  /** Hourly refresh (update checks, slow caches). */
+  pollHourly: 3_600_000,
+  /** Elapsed-time display tick of a running operation. */
+  runTick: 200,
+  /** Wait before a dropped connection retries. */
+  reconnect: 3000,
   /** QueryState shows its loading state only after this wait, so fast loads do not flash. */
   spinnerDelay: 300,
   /** Scroll-position persistence. */

@@ -50,6 +50,8 @@ export {
 export { AssertionError, assert, assertDefined } from './lib/assert.ts';
 export { shortSha } from './lib/sha.ts';
 export type { TextRef } from './lib/textRef.ts';
+export type { OrderableWorktree } from './lib/worktreeOrder.ts';
+export { orderWorktrees } from './lib/worktreeOrder.ts';
 export type {
   CommitDetail,
   CommitIdentity,

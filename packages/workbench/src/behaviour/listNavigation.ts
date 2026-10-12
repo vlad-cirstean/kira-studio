@@ -1,6 +1,7 @@
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, type Ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
+import { type ContextMenuOptions, type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { TIMING } from './timing';
 
 /** What the key rules need to know about one row. */
@@ -297,6 +298,25 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
 
   useEventListener(opts.container, 'keydown', onKeydown);
 
+  const contextMenuStore = useContextMenuStore();
+
+  /** Right-click handler body: selects `item` first (B1), then opens the shared menu at the pointer;
+   *  closing the menu returns focus to the row. */
+  function contextMenu(
+    item: T,
+    event: MouseEvent,
+    items: MenuItem[],
+    options: ContextMenuOptions = {},
+  ): void {
+    const key = opts.key(item);
+    opts.activeKey.value = key;
+    opts.onSelect?.(item, { reason: 'key' });
+    contextMenuStore.openContextMenu(event, items, {
+      onRestoreFocus: () => void focusKey(key),
+      ...options,
+    });
+  }
+
   /** Bind on a row: `v-bind="nav.rowProps(key)"` (roving tabindex, key attribute, focus tracking). */
   function rowProps(key: string) {
     return {
@@ -308,5 +328,12 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
     };
   }
 
-  return { activeKey: opts.activeKey, tabindexFor, focusKey, rowProps };
+  return {
+    activeKey: opts.activeKey,
+    container: opts.container,
+    tabindexFor,
+    focusKey,
+    rowProps,
+    contextMenu,
+  };
 }

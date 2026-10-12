@@ -30,6 +30,9 @@ export interface TabKindDef<
   parseState(raw: unknown): Extract<R, { kind: K }>['state'] | null;
   /** "Same target, fresh default state" for most kinds — some keep one field from the source. */
   duplicateState(tab: Extract<R, { kind: K }>): Extract<R, { kind: K }>['state'];
+  /** True while the tab holds unsaved work (pending grid edits, a dirty edit buffer); closing it
+   *  asks to discard first. Absent for a kind that never holds any. */
+  isDirty?(tabId: string): boolean;
   /** Frees whichever page store this kind populated (a no-op miss for a kind with none). */
   dropResources(tabId: string): void;
   /** Appended to the tab strip's own generic context-menu items. */

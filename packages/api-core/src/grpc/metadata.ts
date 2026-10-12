@@ -37,3 +37,31 @@ export const WELL_KNOWN_REQUEST_METADATA: readonly HeaderCompletion[] = [
   metadataKey('tracestate', 'tracing'),
   metadataKey('user-agent', 'tracing'),
 ] as const;
+
+function value(label: string): HeaderCompletion {
+  return { label, icon: 'symbol-value' };
+}
+
+function prefix(label: string): HeaderCompletion {
+  return { label, insert: label, icon: 'symbol-value' };
+}
+
+/** The value vocabulary for the two metadata keys that have one, beside `headerValueCompletions`
+ *  (gRPC metadata keys are lowercase by wire rule, so the HTTP vocabulary does not apply). A
+ *  prefix (`Bearer `) leaves the caret after the space for a `{{variable}}` to take over. */
+export function metadataValueCompletions(name: string): readonly HeaderCompletion[] {
+  switch (name.trim().toLowerCase()) {
+    case 'authorization':
+      return [
+        prefix('Bearer '),
+        prefix('Basic '),
+        prefix('Digest '),
+        prefix('Token '),
+        prefix('ApiKey '),
+      ];
+    case 'grpc-accept-encoding':
+      return [value('identity'), value('gzip')];
+    default:
+      return [];
+  }
+}

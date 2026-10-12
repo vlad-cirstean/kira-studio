@@ -1,6 +1,7 @@
 import type { AppearanceSettings } from '@shared/domain/settings';
 import { defineStore } from 'pinia';
 import { reactive, ref, toRefs } from 'vue';
+import { ROW_HEIGHT_PX } from '../lib/rowHeight';
 import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P103 Part 2 (§5.3): hoisted from Kira Studio's own state/settings.ts (P100 Part 2's comment on
@@ -85,7 +86,7 @@ export function createSettingsStore<S extends string, Se extends SettingsShape, 
         root.setProperty('--kira-font-size', `${settingsState.appearance.fontSize}px`);
         root.setProperty(
           '--kira-row-height',
-          settingsState.appearance.rowDensity === 'compact' ? '22px' : '28px',
+          `${ROW_HEIGHT_PX[settingsState.appearance.rowDensity]}px`,
         );
         onApplyAppearance?.();
       }

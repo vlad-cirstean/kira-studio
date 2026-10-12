@@ -12098,6 +12098,10 @@
       }
     },
     "tabStrip": {
+      "discard": {
+        "body": "{count} tab has unsaved changes. Closing discards them. | {count} tabs have unsaved changes. Closing discards them.",
+        "title": "Discard unsaved changes"
+      },
       "duplicate": {
         "label": "Duplicate tab"
       },
