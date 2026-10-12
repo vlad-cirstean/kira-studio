@@ -71,8 +71,7 @@ func resolveReadSortPlan(req readReq) (readSortPlan, error) {
 	}
 	wantsKeyset := req.Cursor.Mode == "after" || req.Cursor.Mode == "before"
 	if wantsKeyset && !idOnlySort {
-		return readSortPlan{}, adapters.New(adapters.CodeUnsupported,
-			"keyset pagination is unavailable for this sort; the client must use an offset cursor", nil)
+		return readSortPlan{}, adapters.Contract("keyset pagination is unavailable for this sort; the client must use an offset cursor", nil)
 	}
 	reverseRows := req.Cursor.Mode == "before" && idOnlySort
 	mongoDirection := 1
@@ -98,11 +97,11 @@ func buildKeysetFilter(req readReq, plan readSortPlan, baseFilter bson.D, finger
 		return nil, err
 	}
 	if len(keyValues) != 1 {
-		return nil, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+		return nil, adapters.Contract("malformed page token", nil)
 	}
 	boundaryID, err := ParseJSON5Literal(keyValues[0])
 	if err != nil {
-		return nil, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+		return nil, adapters.Contract("malformed page token", nil)
 	}
 	boundaryID = ResolveEJSONWrappers(boundaryID)
 	cmpOp := "$gt"

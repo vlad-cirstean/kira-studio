@@ -32,7 +32,7 @@ type OrderTerm struct {
 // this into a failed op, never a crash).
 func QuoteIdentDouble(name string) string {
 	if strings.ContainsRune(name, '\x00') {
-		panic(New(CodeQuery, "identifier contains a NUL byte", nil))
+		panic(Contract("identifier contains a NUL byte", nil))
 	}
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
@@ -40,7 +40,7 @@ func QuoteIdentDouble(name string) string {
 // QuoteIdentBacktick is read.ts's quoteIdent for MySQL/MariaDB's backtick dialect.
 func QuoteIdentBacktick(name string) string {
 	if strings.ContainsRune(name, '\x00') {
-		panic(New(CodeQuery, "identifier contains a NUL byte", nil))
+		panic(Contract("identifier contains a NUL byte", nil))
 	}
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
@@ -67,7 +67,7 @@ func BuildKeysetWhereSQL(req ReadReq, order EffectiveOrder, fingerprint, whereSQ
 		return "", err
 	}
 	if len(keyValues) != len(order.KeysetColumns) {
-		return "", New(CodeQuery, "page token key length does not match the sort key", nil)
+		return "", Contract("page token key length does not match the sort key", nil)
 	}
 	firstIndex := 0
 	for i, v := range keyValues {
@@ -201,11 +201,11 @@ func EncodePageToken(key []string, fingerprint string) string {
 func DecodePageToken(token, expectedFingerprint string) ([]string, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
-		return nil, New(CodeQuery, "malformed page token", err)
+		return nil, Contract("malformed page token", err)
 	}
 	var payload pageTokenPayload
 	if err := json.Unmarshal(raw, &payload); err != nil || payload.V != 1 || payload.K == nil {
-		return nil, New(CodeQuery, "malformed page token", err)
+		return nil, Contract("malformed page token", err)
 	}
 	if payload.F != expectedFingerprint {
 		return nil, New(CodeQuery,
@@ -257,7 +257,7 @@ func ResolveProjection(columns []model.ColumnMeta, requested []string) ([]model.
 	// otherwise become an empty string — SELECT  FROM ... — a syntax error rather than a
 	// classified, actionable one.
 	if len(resolved) == 0 {
-		return nil, New(CodeQuery, "projection selects zero columns", nil)
+		return nil, Contract("projection selects zero columns", nil)
 	}
 	return resolved, nil
 }
@@ -267,7 +267,7 @@ func ResolveProjection(columns []model.ColumnMeta, requested []string) ([]model.
 // rather than bound, per each adapter's own note.
 func SafeInt(value int, label string) (int, error) {
 	if value < 0 {
-		return 0, New(CodeQuery, fmt.Sprintf("invalid %s: %d", label, value), nil)
+		return 0, Contract(fmt.Sprintf("invalid %s: %d", label, value), nil)
 	}
 	return value, nil
 }
@@ -300,7 +300,7 @@ func ParseCountValue(raw any) (int64, error) {
 			return n, nil
 		}
 	}
-	return 0, New(CodeQuery, fmt.Sprintf("count returned a non-numeric result: %v", raw), nil)
+	return 0, Contract(fmt.Sprintf("count returned a non-numeric result: %v", raw), nil)
 }
 
 // PrimaryKeyFromIndexes ports sql-text.ts's primaryKeyFromIndexes. nil when there is none.
@@ -451,8 +451,7 @@ func SingleStatusPage(text, dataType string) page.TabularPage {
 // AssertKeysetSupported ports sql-text.ts's assertKeysetSupported.
 func AssertKeysetSupported(wantsKeyset, isTextSort, eligible bool) error {
 	if wantsKeyset && (isTextSort || !eligible) {
-		return New(CodeUnsupported,
-			"keyset pagination is unavailable for this sort; the client must use an offset cursor", nil)
+		return Contract("keyset pagination is unavailable for this sort; the client must use an offset cursor", nil)
 	}
 	return nil
 }
@@ -673,7 +672,7 @@ func keysetValueAt(args KeysetPositionArgs, row int) ([]string, error) {
 			v = args.CellAt(row, idx)
 		}
 		if v == nil {
-			return nil, New(CodeQuery, fmt.Sprintf("keyset tiebreaker column %q was NULL", name), nil)
+			return nil, Contract(fmt.Sprintf("keyset tiebreaker column %q was NULL", name), nil)
 		}
 		values[i] = *v
 	}

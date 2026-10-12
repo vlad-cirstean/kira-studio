@@ -155,7 +155,7 @@ func parseCollectionString(parser *LiteralParser, open, closer string) (string, 
 	}
 	name, ok := v.(string)
 	if !ok || name == "" {
-		return "", adapters.New(adapters.CodeQuery, "collection name must be a non-empty string", nil)
+		return "", adapters.T(adapters.CodeQuery, "backend.studio.adapter.mongoCollectionName.body", nil, nil)
 	}
 	if err := parser.ExpectPunct(closer); err != nil {
 		return "", err
@@ -205,7 +205,7 @@ func parseStatement(text string) (parsedStatement, error) {
 		return parsedStatement{}, err
 	}
 	if !parser.AtEnd() {
-		return parsedStatement{}, adapters.New(adapters.CodeQuery, "unexpected trailing content after statement", nil)
+		return parsedStatement{}, adapters.T(adapters.CodeQuery, "backend.studio.adapter.trailingContentStatement.body", nil, nil)
 	}
 	return parsedStatement{collection: collection, method: method, args: args}, nil
 }
@@ -376,7 +376,7 @@ func runFindOne(ctx context.Context, collection *mongodriver.Collection, stmt pa
 
 func runInsertOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	if len(stmt.args) == 0 {
-		return page.DocumentPage{}, adapters.New(adapters.CodeQuery, "insertOne() document must be a document literal", nil)
+		return page.DocumentPage{}, adapters.T(adapters.CodeQuery, "backend.studio.adapter.mongoInsertOneDocument.body", map[string]string{"method": "insertOne"}, nil)
 	}
 	doc, err := asDoc(stmt.args[0], "insertOne() document")
 	if err != nil {
@@ -397,7 +397,7 @@ func runInsertOne(ctx context.Context, collection *mongodriver.Collection, stmt 
 
 func runInsertMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	if len(stmt.args) == 0 {
-		return page.DocumentPage{}, adapters.New(adapters.CodeQuery, "insertMany() documents must be an array", nil)
+		return page.DocumentPage{}, adapters.T(adapters.CodeQuery, "backend.studio.adapter.mongoInsertManyDocuments.body", map[string]string{"method": "insertMany"}, nil)
 	}
 	docs, err := asDocArray(stmt.args[0], "insertMany() documents")
 	if err != nil {
@@ -580,7 +580,7 @@ func runStatement(ctx context.Context, db *mongodriver.Database, stmt parsedStat
 // re-running after fixing the typo then double-applied them.
 func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *adapters.OpCtx, statements []string, track TrackQuery, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 	op.SetCommand(adapters.JoinConsoleStatements(statements, "//"))
 

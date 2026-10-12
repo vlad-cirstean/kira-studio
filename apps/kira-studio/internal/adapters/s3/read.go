@@ -97,7 +97,7 @@ func isoOrNil(t *time.Time) *string {
 	return &s
 }
 
-var errObjectChanged = adapters.New(adapters.CodeQuery, "this object changed since it was loaded; reload and try again", nil)
+var errObjectChanged = adapters.T(adapters.CodeQuery, "backend.studio.adapter.s3ObjectChanged.body", nil, nil)
 
 // readObject is read.ts's readObject. HeadObject first, always — it answers "is this too large to
 // preview" without ever opening a body stream. Every SDK call takes ctx directly (P58d D3).

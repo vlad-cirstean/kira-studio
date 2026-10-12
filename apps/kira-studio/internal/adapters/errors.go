@@ -74,18 +74,18 @@ func CodeOf(err error) (ErrorCode, bool) {
 
 // Unsupported is errors.ts's unsupported(kind, what) — P39 F18's shared capability-stub message.
 func Unsupported(kind, what string) error {
-	return New(CodeUnsupported, what+" is not supported for "+kind, nil)
+	return T(CodeUnsupported, "backend.studio.adapter.unsupportedFor.body", map[string]string{"what": what, "kind": kind}, nil)
 }
 
 // NoQueryConsole is errors.ts's noQueryConsole(kind).
 func NoQueryConsole(kind string) error {
-	return New(CodeUnsupported, kind+" has no query console", nil)
+	return T(CodeUnsupported, "backend.studio.adapter.noQueryConsole.body", map[string]string{"kind": kind}, nil)
 }
 
 // AssertWritable is errors.ts's assertWritable(readOnly) — P39 iter2 F15's shared read-only guard.
 func AssertWritable(readOnly bool) error {
 	if readOnly {
-		return New(CodeUnsupported, "connection is read-only", nil)
+		return T(CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 	}
 	return nil
 }
@@ -520,7 +520,7 @@ func AssertNoTransactionEscalation(statements []string, d SQLDialect) error {
 		}
 		stripped := StripSQLComments(stmt, d)
 		if sqlReadWrite.MatchString(stripped) || sqlReadOnlyVarOff.MatchString(stripped) || endsTransaction(stripped) {
-			return New(CodeUnsupported, "connection is read-only", nil)
+			return T(CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 		}
 	}
 	return nil
@@ -544,11 +544,11 @@ func AssertNoTransactionEscalation(statements []string, d SQLDialect) error {
 //     semicolon is removed — a hidden second statement a naive split missed.
 func AssertNoHiddenStatement(s string, d SQLDialect) error {
 	if quoteHasBackslash(s) {
-		return New(CodeUnsupported, "connection is read-only", nil)
+		return T(CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 	}
 	stripped := strings.TrimSpace(StripOneTrailingSemicolon(strings.TrimSpace(StripSQLComments(s, d))))
 	if strings.Contains(stripped, ";") {
-		return New(CodeUnsupported, "connection is read-only", nil)
+		return T(CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 	}
 	return nil
 }
@@ -586,7 +586,7 @@ func quoteHasBackslash(s string) bool {
 // (A6): the two report genuinely different moments.
 func CheckNotStarted(ctx context.Context) error {
 	if ctx.Err() != nil {
-		return New(CodeCancelled, "operation was cancelled before it started", ctx.Err())
+		return T(CodeCancelled, "backend.studio.adapter.cancelledBeforeStart.body", nil, ctx.Err())
 	}
 	return nil
 }
@@ -595,7 +595,7 @@ func CheckNotStarted(ctx context.Context) error {
 // await, not before starting.
 func CheckCancelled(ctx context.Context) error {
 	if ctx.Err() != nil {
-		return New(CodeCancelled, "operation was cancelled", ctx.Err())
+		return T(CodeCancelled, "backend.studio.adapter.cancelled.body", nil, ctx.Err())
 	}
 	return nil
 }
@@ -603,9 +603,9 @@ func CheckCancelled(ctx context.Context) error {
 // RequireConnected is errors.ts's requireConnected(handle) — the "did connect() ever run" guard.
 // Go has no null-vs-nil-pointer distinction to worry about here: a nil handle is the same "not
 // connected" state a nullish TS handle represents.
-func RequireConnected[T any](handle *T) (*T, error) {
+func RequireConnected[H any](handle *H) (*H, error) {
 	if handle == nil {
-		return nil, New(CodeConnect, "adapter is not connected", nil)
+		return nil, T(CodeConnect, "backend.studio.adapter.notConnected.body", nil, nil)
 	}
 	return handle, nil
 }

@@ -747,8 +747,8 @@ func TestMongo_Mutate_InsertWithoutDocumentSentinelIsUnsupported(t *testing.T) {
 		t.Fatal("Mutate: want an error, got nil")
 	}
 	code, _ := adapters.CodeOf(err)
-	if code != adapters.CodeUnsupported {
-		t.Errorf("code = %v, want E_UNSUPPORTED", code)
+	if code != adapters.CodeContract {
+		t.Errorf("code = %v, want E_CONTRACT", code)
 	}
 	if err.Error() != "document mutation requires a $document body" {
 		t.Errorf("message = %q", err.Error())

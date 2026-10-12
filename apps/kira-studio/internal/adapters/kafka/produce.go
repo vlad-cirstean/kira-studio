@@ -29,7 +29,7 @@ const (
 func renderOpText(op model.MutationRowOp, topic string) (string, error) {
 	if op.Kind != "insert" {
 		// A topic's log is immutable — no per-message update or delete (caps.go's own comment).
-		return "", adapters.New(adapters.CodeUnsupported, "kafka only supports producing new messages (insert)", nil)
+		return "", adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.kafkaInsertOnly.body", nil, nil)
 	}
 	keyText := "<none>"
 	if key, _ := op.Values.Get(keyField); key != nil {
@@ -82,7 +82,7 @@ func produce(ctx context.Context, client *kgo.Client, topic string, readOnly boo
 	records := make([]*kgo.Record, 0, len(plan.Ops))
 	for _, rowOp := range plan.Ops {
 		if rowOp.Kind != "insert" {
-			return model.MutationResult{}, adapters.New(adapters.CodeUnsupported, "kafka only supports producing new messages (insert)", nil)
+			return model.MutationResult{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.kafkaInsertOnly.body", nil, nil)
 		}
 		body, ok := rowOp.Values.Get(bodyField)
 		if !ok || body == nil {
@@ -134,8 +134,7 @@ func produce(ctx context.Context, client *kgo.Client, topic string, readOnly boo
 		}
 		// The host drops a result that travels with an error; the message must say what landed so a
 		// retry does not duplicate it.
-		return model.MutationResult{AffectedRows: landed}, adapters.New(mapped.Code,
-			fmt.Sprintf("%d of %d messages were produced; message(s) %s failed: %s", landed, len(records), strings.Join(failed, ", "), mapped.Message), mapped.Cause)
+		return model.MutationResult{AffectedRows: landed}, adapters.T(mapped.Code, "backend.studio.adapter.kafkaPartialProduce.error", map[string]string{"landed": fmt.Sprint(landed), "total": fmt.Sprint(len(records)), "failed": strings.Join(failed, ", "), "detail": mapped.Message}, mapped.Cause)
 	}
 
 	return model.MutationResult{AffectedRows: len(records)}, nil

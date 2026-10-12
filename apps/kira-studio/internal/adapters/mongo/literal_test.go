@@ -76,7 +76,7 @@ func TestLiteral_StringEscapes(t *testing.T) {
 
 func TestLiteral_UnterminatedString(t *testing.T) {
 	_, err := mongo.ParseJSON5Literal(`"abc`)
-	wantQueryError(t, err, "unterminated string literal")
+	wantQueryError(t, err, "Unterminated string literal.")
 }
 
 func TestLiteral_Comments(t *testing.T) {
@@ -117,7 +117,7 @@ func TestLiteral_UnadornedNumberIsFloat64(t *testing.T) {
 
 func TestLiteral_InvalidNumber(t *testing.T) {
 	_, err := mongo.ParseJSON5Literal("1.2.3e+-4")
-	wantQueryError(t, err, `invalid number "1.2.3e+-4" at position 0`)
+	wantQueryError(t, err, `Invalid number “1.2.3e+-4” at position 0.`)
 }
 
 // --- objects, arrays, trailing commas ----------------------------------------------------------
@@ -159,7 +159,7 @@ func TestLiteral_ObjectFieldOrderPreserved(t *testing.T) {
 
 func TestLiteral_ObjectNumericKeyRejected(t *testing.T) {
 	_, err := mongo.ParseJSON5Literal(`{ 1: "x" }`)
-	wantQueryError(t, err, `expected an object key at position 2`)
+	wantQueryError(t, err, `Expected an object key at position 2.`)
 }
 
 // --- identifiers, literals, bare words -----------------------------------------------------
@@ -181,7 +181,7 @@ func TestLiteral_BooleanAndNullLiterals(t *testing.T) {
 
 func TestLiteral_BareIdentifierRejected(t *testing.T) {
 	_, err := mongo.ParseJSON5Literal("notAThing")
-	wantQueryError(t, err, `unrecognized identifier "notAThing" at position 0`)
+	wantQueryError(t, err, `Unrecognized identifier “notAThing” at position 0.`)
 }
 
 func TestLiteral_ObjectIdWithoutParensRejected(t *testing.T) {
@@ -189,7 +189,7 @@ func TestLiteral_ObjectIdWithoutParensRejected(t *testing.T) {
 	// constructor call and falls through to the same rejection as any other bare word
 	// (literal.ts:177).
 	_, err := mongo.ParseJSON5Literal("ObjectId")
-	wantQueryError(t, err, `unrecognized identifier "ObjectId" at position 0`)
+	wantQueryError(t, err, `Unrecognized identifier “ObjectId” at position 0.`)
 }
 
 // --- constructors ----------------------------------------------------------------------------
@@ -226,7 +226,7 @@ func TestLiteral_ISODateConstructor(t *testing.T) {
 
 func TestLiteral_ISODateInvalidIsError(t *testing.T) {
 	_, err := mongo.ParseJSON5Literal(`ISODate("not a date")`)
-	wantQueryError(t, err, `invalid date "not a date" at position 0`)
+	wantQueryError(t, err, `Invalid date “not a date” at position 0.`)
 }
 
 func TestLiteral_DateConstructor(t *testing.T) {
@@ -395,10 +395,10 @@ func TestLiteral_PositionBearingErrorMessages(t *testing.T) {
 		text string
 		want string
 	}{
-		{"unexpected character", "{a: 1} #", `unexpected character "#" at position 7`},
-		{"expected punct", "{a: 1", `expected "}" at position 5`},
-		{"unrecognized identifier", "foo(1)", `unrecognized identifier "foo" at position 0`},
-		{"trailing content", "1 2", "unexpected trailing content after literal"},
+		{"unexpected character", "{a: 1} #", `Unexpected character "#" at position 7.`},
+		{"expected punct", "{a: 1", `Expected “}” at position 5.`},
+		{"unrecognized identifier", "foo(1)", `Unrecognized identifier “foo” at position 0.`},
+		{"trailing content", "1 2", "Unexpected trailing content after the literal."},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

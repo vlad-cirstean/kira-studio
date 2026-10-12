@@ -74,7 +74,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}
 	if len(rows) == 0 {
 		_ = a.Disconnect(context.Background())
-		return adapters.ConnectInfo{}, adapters.New(adapters.CodeConnect, "connect probe returned no rows", nil)
+		return adapters.ConnectInfo{}, adapters.Contract("connect probe returned no rows", nil)
 	}
 	row := rows[0]
 	return adapters.ConnectInfo{
@@ -171,7 +171,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected object kind: "+objectSegment.Kind, nil)
 	}
 
-	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
+	return adapters.TreeChildren{}, adapters.Contract("unrecognized path depth", nil)
 }
 
 // requireRelationPath is Describe/Definition/Read/Count's shared database/table path check (P113

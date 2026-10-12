@@ -21,7 +21,7 @@ const documentSentinel = "$document"
 // parseIdKey ports mutate.ts's parseIdKey.
 func parseIdKey(key model.RowValues) (any, error) {
 	if len(key) != 1 || key[0].Name != "_id" {
-		return nil, adapters.New(adapters.CodeQuery, "a document mutation key must be exactly { _id }", nil)
+		return nil, adapters.Contract("a document mutation key must be exactly { _id }", nil)
 	}
 	raw := key[0].Value
 	if raw == nil {
@@ -32,7 +32,7 @@ func parseIdKey(key model.RowValues) (any, error) {
 	// through ParseDocumentLiteral's own object-only shape, since _id need not be an object.
 	value, err := ParseJSON5Literal(*raw)
 	if err != nil {
-		return nil, adapters.New(adapters.CodeQuery, "malformed _id in mutation key", nil)
+		return nil, adapters.Contract("malformed _id in mutation key", nil)
 	}
 	return ResolveEJSONWrappers(value), nil
 }
@@ -42,7 +42,7 @@ func renderOpText(op model.MutationRowOp, collectionName string) (string, error)
 	case "update":
 		doc, ok := op.Changes.Get(documentSentinel)
 		if !ok || doc == nil {
-			return "", adapters.New(adapters.CodeUnsupported, "document mutation requires a $document replacement", nil)
+			return "", adapters.Contract("document mutation requires a $document replacement", nil)
 		}
 		return "db." + collectionName + ".replaceOne({_id: ...}, " + *doc + ")", nil
 	case "delete":
@@ -50,7 +50,7 @@ func renderOpText(op model.MutationRowOp, collectionName string) (string, error)
 	default: // insert
 		doc, ok := op.Values.Get(documentSentinel)
 		if !ok || doc == nil {
-			return "", adapters.New(adapters.CodeUnsupported, "document mutation requires a $document body", nil)
+			return "", adapters.Contract("document mutation requires a $document body", nil)
 		}
 		return "db." + collectionName + ".insertOne(" + *doc + ")", nil
 	}
@@ -84,7 +84,7 @@ func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *ad
 	}
 	bodyText, ok := rowOp.Changes.Get(documentSentinel)
 	if !ok || bodyText == nil {
-		return 0, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document replacement", nil)
+		return 0, adapters.Contract("document mutation requires a $document replacement", nil)
 	}
 	parsed, err := ParseDocumentLiteral(*bodyText)
 	if err != nil {
@@ -137,7 +137,7 @@ func applyDelete(ctx context.Context, collection *mongodriver.Collection, op *ad
 func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp, track TrackQuery) (int, error) {
 	bodyText, ok := rowOp.Values.Get(documentSentinel)
 	if !ok || bodyText == nil {
-		return 0, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document body", nil)
+		return 0, adapters.Contract("document mutation requires a $document body", nil)
 	}
 	parsed, err := ParseDocumentLiteral(*bodyText)
 	if err != nil {
@@ -154,7 +154,7 @@ func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *ad
 		return 0, err
 	}
 	if !acknowledged {
-		return 0, adapters.New(adapters.CodeQuery, "insert was not acknowledged by the server", nil)
+		return 0, adapters.T(adapters.CodeQuery, "backend.studio.adapter.insertNotAcknowledged.body", nil, nil)
 	}
 	return 1, nil
 }

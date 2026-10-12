@@ -178,7 +178,7 @@ func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, tra
 	if _, err := conn.ExecContext(cleanupCtx, "SET SESSION TRANSACTION READ ONLY"); err != nil {
 		return mapError(err)
 	}
-	return adapters.New(adapters.CodeUnsupported, "connection is read-only", nil)
+	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 }
 
 // sessionReadOnly reports whether every variable row (MariaDB lists both spellings) is ON, and at
@@ -210,7 +210,7 @@ func sessionReadOnly(p page.TabularPage) bool {
 // AssertNoTransactionEscalation is the cheap first line of defense.
 func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 	if readOnly {
 		if err := adapters.AssertNoTransactionEscalation(statements, adapters.MySQLDialect); err != nil {

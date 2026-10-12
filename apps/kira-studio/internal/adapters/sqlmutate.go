@@ -63,11 +63,11 @@ func AssertKeyIsPrimaryKey(primaryKey []string, key model.RowValues, qualifiedNa
 	pk := append([]string{}, primaryKey...)
 	sort.Strings(pk)
 	if len(given) != len(pk) {
-		return New(CodeQuery, "row key must be exactly the primary key columns", nil)
+		return Contract("row key must be exactly the primary key columns", nil)
 	}
 	for i := range given {
 		if given[i] != pk[i] {
-			return New(CodeQuery, "row key must be exactly the primary key columns", nil)
+			return Contract("row key must be exactly the primary key columns", nil)
 		}
 	}
 	return nil
@@ -95,7 +95,7 @@ func DecodeBinaryCellText(text string) ([]byte, error) {
 	trimmed := strings.TrimPrefix(strings.TrimPrefix(text, "0x"), "0X")
 	decoded, err := hex.DecodeString(trimmed)
 	if err != nil {
-		return nil, New(CodeQuery, "not a valid 0x<hex> binary value", err)
+		return nil, T(CodeQuery, "backend.studio.adapter.binaryValueInvalid.body", nil, err)
 	}
 	return decoded, nil
 }

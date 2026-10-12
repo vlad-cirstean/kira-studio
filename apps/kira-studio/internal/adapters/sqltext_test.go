@@ -235,7 +235,7 @@ func TestPageToken_MismatchedFingerprint(t *testing.T) {
 	if !ok || code != CodeQuery {
 		t.Fatalf("got %v, want E_QUERY", err)
 	}
-	if !strings.Contains(err.Error(), "does not match") {
+	if !strings.Contains(err.Error(), "doesn’t match") {
 		t.Errorf("message %q does not mention the mismatch", err.Error())
 	}
 }

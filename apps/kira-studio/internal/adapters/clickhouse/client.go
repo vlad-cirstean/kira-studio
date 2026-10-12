@@ -60,7 +60,7 @@ type resolvedTarget struct {
 func targetFromURI(rawURI string) (host, database, username, password *string, port *int, err error) {
 	u, err := url.Parse(rawURI)
 	if err != nil {
-		return nil, nil, nil, nil, nil, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
+		return nil, nil, nil, nil, nil, adapters.T(adapters.CodeConnect, "backend.studio.adapter.uriParseFailed.body", nil, err)
 	}
 	h := u.Hostname()
 	host = &h
@@ -128,7 +128,7 @@ func resolveTarget(cfg model.ResolvedConnectionConfig, log func(level, message s
 		host, database, username, password, port = targetFromFields(cfg)
 	}
 	if host == nil || *host == "" {
-		return resolvedTarget{}, adapters.New(adapters.CodeConnect, "no host was given", nil)
+		return resolvedTarget{}, adapters.T(adapters.CodeConnect, "backend.studio.adapter.hostMissing.body", nil, nil)
 	}
 
 	scheme, err := resolveScheme(cfg.Options)
@@ -156,7 +156,7 @@ func parsePort(s string) (int, error) {
 	n := 0
 	for _, c := range s {
 		if c < '0' || c > '9' {
-			return 0, adapters.New(adapters.CodeConnect, "invalid port", nil)
+			return 0, adapters.T(adapters.CodeConnect, "backend.studio.adapter.portInvalid.body", nil, nil)
 		}
 		n = n*10 + int(c-'0')
 	}

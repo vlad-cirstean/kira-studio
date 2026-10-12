@@ -66,14 +66,16 @@ func ParseHeaderPairs(raw *string) ([]HeaderPair, error) {
 	if raw == nil || *raw == "" {
 		return nil, nil
 	}
-	malformed := func(err error) error { return New(CodeQuery, "malformed $headers JSON", err) }
+	malformed := func(err error) error {
+		return T(CodeQuery, "backend.studio.adapter.headersJsonMalformed.body", nil, err)
+	}
 	dec := json.NewDecoder(strings.NewReader(*raw))
 	tok, err := dec.Token()
 	if err != nil {
 		return nil, malformed(err)
 	}
 	if d, ok := tok.(json.Delim); !ok || d != '{' {
-		return nil, New(CodeQuery, "$headers must be a JSON object of string values", nil)
+		return nil, T(CodeQuery, "backend.studio.adapter.headersNotObject.body", nil, nil)
 	}
 	var out []HeaderPair
 	for dec.More() {

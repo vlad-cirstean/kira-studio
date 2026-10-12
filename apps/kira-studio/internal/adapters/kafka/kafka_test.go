@@ -1196,7 +1196,7 @@ func TestKafka_Mutate_PartialBatchFailureNamesWhatLanded(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error for the oversized message")
 	}
-	if !strings.Contains(err.Error(), "2 of 3 messages were produced") || !strings.Contains(err.Error(), "message(s) 2 failed") {
+	if !strings.Contains(err.Error(), "2 of 3 messages were produced") || !strings.Contains(err.Error(), "Messages 2 failed") {
 		t.Errorf("error = %q, want it to name 2 of 3 produced and message 2 failed", err)
 	}
 	p, err := a.Read(ctx, offsetRead(topicPath(f, topic), 10), adapters.NewOpCtx("op-14b"))

@@ -1243,6 +1243,12 @@
     },
     "studio": {
       "adapter": {
+        "binaryValueInvalid": {
+          "body": "Not a valid binary value. Use 0x followed by hexadecimal digits."
+        },
+        "cancelled": {
+          "body": "The operation was cancelled."
+        },
         "cancelledBeforeStart": {
           "body": "The operation was cancelled before it started."
         },
@@ -1258,14 +1264,80 @@
         "databasePathCharacters": {
           "body": "The database file path must not contain “?”, “#” or “%”."
         },
+        "expectedIdentifier": {
+          "body": "Expected identifier “{identifier}” at position {position}."
+        },
+        "expectedToken": {
+          "body": "Expected “{token}” at position {position}."
+        },
+        "headersJsonMalformed": {
+          "body": "The headers aren’t valid JSON."
+        },
+        "headersNotObject": {
+          "body": "The headers must be a JSON object of string values."
+        },
+        "hostMissing": {
+          "body": "No host was given."
+        },
+        "identifierUnrecognized": {
+          "body": "Unrecognized identifier “{identifier}” at position {position}."
+        },
+        "insertNotAcknowledged": {
+          "body": "The server didn’t acknowledge the insert."
+        },
+        "kafkaForwardOnly": {
+          "body": "Kafka offset-window pagination is forward-only. There is no previous page."
+        },
+        "kafkaInsertOnly": {
+          "body": "Kafka only supports producing new messages (insert)."
+        },
+        "kafkaOffsetFilterMalformed": {
+          "body": "Malformed offset filter “{filter}”."
+        },
+        "kafkaPartialProduce": {
+          "error": "{landed} of {total} messages were produced. Messages {failed} failed: {detail}"
+        },
+        "kafkaPartitionsMissing": {
+          "body": "Topic {topic} has no partitions {partitions}."
+        },
+        "literalInvalid": {
+          "body": "Invalid {type} “{value}” at position {position}."
+        },
+        "literalTooDeep": {
+          "body": "Literal nested too deeply at position {position}."
+        },
+        "mongoCollectionName": {
+          "body": "The collection name must be a non-empty string."
+        },
+        "mongoInsertManyDocuments": {
+          "body": "{method}() documents must be an array."
+        },
+        "mongoInsertOneDocument": {
+          "body": "{method}() document must be a document literal."
+        },
+        "mongoNoDatabase": {
+          "body": "No database is selected for the console."
+        },
         "multipleStatements": {
           "body": "Multiple statements aren’t supported in a single statement."
+        },
+        "noQueryConsole": {
+          "body": "{kind} has no query console."
         },
         "noStatements": {
           "body": "There are no statements to run."
         },
         "notConnected": {
           "body": "This connection isn’t open."
+        },
+        "numberInvalid": {
+          "body": "Invalid number “{value}” at position {position}."
+        },
+        "objectKeyExpected": {
+          "body": "Expected an object key at position {position}."
+        },
+        "portInvalid": {
+          "body": "Invalid port."
         },
         "quotedStringUnterminated": {
           "body": "Unterminated quoted string."
@@ -1297,6 +1369,15 @@
         "responseTooLarge": {
           "body": "The response was too large to return."
         },
+        "s3AclGrant": {
+          "body": "This object has an access control grant this editor can’t preserve across an edit. Edit it outside this app."
+        },
+        "s3ObjectChanged": {
+          "body": "This object changed since it was loaded. Refresh and retry."
+        },
+        "s3Tags": {
+          "body": "This object has tags, which this editor doesn’t preserve across an edit. Remove its tags first, or edit it outside this app."
+        },
         "serverCertificateMissing": {
           "body": "The server presented no certificate."
         },
@@ -1311,6 +1392,24 @@
         },
         "sqsVisibilityTimeout": {
           "body": "The visibility timeout must be a whole number of seconds from 1 to 43200."
+        },
+        "stringUnterminated": {
+          "body": "Unterminated string literal."
+        },
+        "trailingContentLiteral": {
+          "body": "Unexpected trailing content after the literal."
+        },
+        "trailingContentStatement": {
+          "body": "Unexpected trailing content after the statement."
+        },
+        "unexpectedCharacter": {
+          "body": "Unexpected character {character} at position {position}."
+        },
+        "unexpectedToken": {
+          "body": "Unexpected token at position {position}."
+        },
+        "unsupportedFor": {
+          "body": "{what} isn’t supported for {kind}."
         },
         "uriParseFailed": {
           "body": "Couldn’t parse the connection URI."

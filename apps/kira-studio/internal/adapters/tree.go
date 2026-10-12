@@ -25,7 +25,7 @@ func UnexpectedPathKind(depth int, kind string) error {
 	if depth == 0 {
 		return New(CodeNotFound, "unexpected root path segment kind: "+kind, nil)
 	}
-	return New(CodeNotFound, fmt.Sprintf("unexpected path segment kind at depth %d: %s", depth, kind), nil)
+	return Contract(fmt.Sprintf("unexpected path segment kind at depth %d: %s", depth, kind), nil)
 }
 
 // LeafChildren is Children's own leaf-depth check, byte-identical across all three relational

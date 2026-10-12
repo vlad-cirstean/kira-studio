@@ -99,7 +99,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	if !found {
 		release()
 		_ = a.Disconnect(context.Background())
-		return adapters.ConnectInfo{}, adapters.New(adapters.CodeConnect, "connect probe returned no rows", nil)
+		return adapters.ConnectInfo{}, adapters.Contract("connect probe returned no rows", nil)
 	}
 	release()
 
@@ -179,7 +179,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		return adapters.LeafChildren(objectSegment.Kind, leafObjectKinds)
 	}
 
-	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
+	return adapters.TreeChildren{}, adapters.Contract("unrecognized path depth", nil)
 }
 
 var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "table": true, "view": true}
@@ -332,7 +332,7 @@ func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) { return pr
 // Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	if len(plan.Path.Segments) == 0 || plan.Path.Segments[0].Kind != "database" {
-		return model.MutationResult{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind", nil)
+		return model.MutationResult{}, adapters.Contract("unexpected root path segment kind", nil)
 	}
 	entry, release, err := a.requireEntry(ctx, plan.Path.Segments[0].Name)
 	if err != nil {

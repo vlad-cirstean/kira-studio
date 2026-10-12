@@ -142,7 +142,7 @@ func runRowReturning(ctx context.Context, h *Handle, queryID string, op *adapter
 // execute is console.ts's own execute.
 func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuery, statements []string, nextQueryID func() string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
-		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
 	// One op-log row for the whole batch (P5 D9's precedent) — StreamQuery/RunCommand deliberately
 	// never call op.SetCommand() themselves so this one call is authoritative.

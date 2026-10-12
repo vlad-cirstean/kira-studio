@@ -21,7 +21,7 @@ import (
 // terminating the identifier, corrupting the query or letting subsequent text run as SQL.
 func quoteIdent(name string) string {
 	if strings.ContainsRune(name, '\x00') {
-		panic(adapters.New(adapters.CodeQuery, "identifier contains a NUL byte", nil))
+		panic(adapters.Contract("identifier contains a NUL byte", nil))
 	}
 	escaped := strings.ReplaceAll(name, "\\", "\\\\")
 	escaped = strings.ReplaceAll(escaped, "`", "``")

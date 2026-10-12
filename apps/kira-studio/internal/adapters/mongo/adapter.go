@@ -215,7 +215,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		return adapters.TreeChildren{Nodes: []model.TreeNode{}}, nil
 	}
 
-	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
+	return adapters.TreeChildren{}, adapters.Contract("unrecognized path depth", nil)
 }
 
 // requireTwoSegmentObjectPath is Describe/Definition/Read/Count/Mutate's shared database/collection
@@ -329,7 +329,7 @@ func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) {
 // Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	if len(plan.Path.Segments) == 0 || plan.Path.Segments[0].Kind != "database" {
-		return model.MutationResult{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind", nil)
+		return model.MutationResult{}, adapters.Contract("unexpected root path segment kind", nil)
 	}
 	db, err := a.dbFor(plan.Path.Segments[0].Name)
 	if err != nil {
@@ -346,7 +346,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		dbName = &name
 	}
 	if dbName == nil {
-		return nil, adapters.New(adapters.CodeNotFound, "no database selected for the console", nil)
+		return nil, adapters.T(adapters.CodeNotFound, "backend.studio.adapter.mongoNoDatabase.body", nil, nil)
 	}
 	db, err := a.dbFor(*dbName)
 	if err != nil {

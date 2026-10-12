@@ -38,7 +38,7 @@ func resolveBucketSegment(path model.NodePath) (string, error) {
 func keyFrom(values model.RowValues, label string) (string, error) {
 	raw, ok := values.Get(objectKeySentinel)
 	if !ok || raw == nil || *raw == "" {
-		return "", adapters.New(adapters.CodeQuery, fmt.Sprintf("an s3 %s mutation requires a non-empty %s", label, objectKeySentinel), nil)
+		return "", adapters.Contract(fmt.Sprintf("an s3 %s mutation requires a non-empty %s", label, objectKeySentinel), nil)
 	}
 	return *raw, nil
 }
@@ -200,15 +200,13 @@ func aclGrantHeaders(ctx context.Context, client *s3.Client, bucket, key string,
 		case g.Grantee.Type == types.TypeAmazonCustomerByEmail && g.Grantee.EmailAddress != nil:
 			grantee = `emailAddress="` + *g.Grantee.EmailAddress + `"`
 		default:
-			return grantHeaders{}, adapters.New(adapters.CodeUnsupported,
-				"this object has an ACL grant this editor cannot preserve across an edit; edit it outside this app", nil)
+			return grantHeaders{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.s3AclGrant.body", nil, nil)
 		}
 		switch g.Permission {
 		case types.PermissionRead, types.PermissionReadAcp, types.PermissionWriteAcp, types.PermissionFullControl:
 			byPermission[g.Permission] = append(byPermission[g.Permission], grantee)
 		default:
-			return grantHeaders{}, adapters.New(adapters.CodeUnsupported,
-				"this object has an ACL grant this editor cannot preserve across an edit; edit it outside this app", nil)
+			return grantHeaders{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.s3AclGrant.body", nil, nil)
 		}
 	}
 	header := func(p types.Permission) *string {
@@ -259,8 +257,7 @@ func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model
 	// edit is the more contained fix (over adding that second call's own surface) and never
 	// silently drops data the user did not know was there.
 	if head.TagCount != nil && *head.TagCount > 0 {
-		return 0, adapters.New(adapters.CodeUnsupported,
-			"this object has tags, which this editor does not preserve across an edit; remove its tags first, or edit it outside this app", nil)
+		return 0, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.s3Tags.body", nil, nil)
 	}
 	grants, err := aclGrantHeaders(ctx, client, bucket, key, log)
 	if err != nil {
@@ -279,8 +276,7 @@ func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model
 		return 1, nil
 	}
 	if isPreconditionFailed(err) {
-		return 0, adapters.New(adapters.CodeQuery,
-			"this object changed since it was loaded; reload and try again", nil)
+		return 0, adapters.T(adapters.CodeQuery, "backend.studio.adapter.s3ObjectChanged.body", nil, nil)
 	}
 	if isConditionalPutUnsupported(err) {
 		log("warn", "s3: endpoint rejected the conditional If-Match update; retrying unconditionally for s3://"+bucket+"/"+key)

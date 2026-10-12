@@ -59,7 +59,7 @@ func applyFixedDefaults(mc *mysql.Config) {
 func applyURIOptions(mc *mysql.Config, options map[string]any, uri string, log LogFunc) error {
 	parsed, err := url.Parse(uri)
 	if err != nil {
-		return adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
+		return adapters.T(adapters.CodeConnect, "backend.studio.adapter.uriParseFailed.body", nil, err)
 	}
 	mc.Addr = parsed.Host
 	if mc.Addr == "" {

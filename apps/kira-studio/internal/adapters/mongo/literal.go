@@ -140,7 +140,7 @@ func scanStringToken(runes []rune, i int) (token, int, error) {
 		j++
 	}
 	if j >= n {
-		return token{}, i, adapters.New(adapters.CodeQuery, "unterminated string literal", nil)
+		return token{}, i, adapters.T(adapters.CodeQuery, "backend.studio.adapter.stringUnterminated.body", nil, nil)
 	}
 	return token{tokString, sb.String(), i}, j + 1, nil
 }
@@ -200,8 +200,7 @@ func tokenize(text string) ([]token, error) {
 			i = next
 			continue
 		}
-		return nil, adapters.New(adapters.CodeQuery,
-			fmt.Sprintf("unexpected character %s at position %d", jsonQuoteString(string(c)), i), nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.unexpectedCharacter.body", map[string]string{"character": jsonQuoteString(string(c)), "position": fmt.Sprint(i)}, nil)
 	}
 	tokens = append(tokens, token{tokEOF, "", n})
 	return tokens, nil
@@ -274,8 +273,7 @@ var constructors = map[string]constructorFn{
 		hex := jsToString(arg, hasArg)
 		id, err := bson.ObjectIDFromHex(hex)
 		if err != nil {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid ObjectId %q at position %d", hex, pos), err)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": hex, "position": fmt.Sprint(pos), "type": "ObjectId"}, err)
 		}
 		return id, nil
 	},
@@ -289,8 +287,7 @@ var constructors = map[string]constructorFn{
 		s := jsToString(arg, hasArg)
 		t, ok := parseISODate(s)
 		if !ok {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid date %q at position %d", s, pos), nil)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": s, "position": fmt.Sprint(pos), "type": "date"}, nil)
 		}
 		return t, nil
 	},
@@ -301,8 +298,7 @@ var constructors = map[string]constructorFn{
 		s := jsToString(arg, hasArg)
 		t, ok := parseISODate(s)
 		if !ok {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid date %q at position %d", s, pos), nil)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": s, "position": fmt.Sprint(pos), "type": "date"}, nil)
 		}
 		return t, nil
 	},
@@ -310,8 +306,7 @@ var constructors = map[string]constructorFn{
 		s := jsToString(arg, hasArg)
 		v, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid NumberLong %q at position %d", s, pos), err)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": s, "position": fmt.Sprint(pos), "type": "NumberLong"}, err)
 		}
 		return v, nil
 	},
@@ -323,12 +318,10 @@ var constructors = map[string]constructorFn{
 		s := jsToString(arg, hasArg)
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid NumberInt %q at position %d", s, pos), err)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": s, "position": fmt.Sprint(pos), "type": "NumberInt"}, err)
 		}
 		if f != math.Trunc(f) || f < math.MinInt32 || f > math.MaxInt32 {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid NumberInt %q at position %d", s, pos), nil)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": s, "position": fmt.Sprint(pos), "type": "NumberInt"}, nil)
 		}
 		return int32(f), nil
 	},
@@ -336,8 +329,7 @@ var constructors = map[string]constructorFn{
 		s := jsToString(arg, hasArg)
 		d, err := bson.ParseDecimal128(s)
 		if err != nil {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("invalid NumberDecimal %q at position %d", s, pos), err)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalInvalid.body", map[string]string{"value": s, "position": fmt.Sprint(pos), "type": "NumberDecimal"}, err)
 		}
 		return d, nil
 	},
@@ -390,8 +382,7 @@ func (p *LiteralParser) PeekPunct(value string) bool {
 func (p *LiteralParser) ExpectPunct(value string) error {
 	t := p.nextTok()
 	if t.typ != tokPunct || t.value != value {
-		return adapters.New(adapters.CodeQuery,
-			fmt.Sprintf(`expected "%s" at position %d`, value, t.pos), nil)
+		return adapters.T(adapters.CodeQuery, "backend.studio.adapter.expectedToken.body", map[string]string{"token": value, "position": fmt.Sprint(t.pos)}, nil)
 	}
 	return nil
 }
@@ -402,8 +393,7 @@ func (p *LiteralParser) ExpectPunct(value string) error {
 func (p *LiteralParser) ExpectIdent(expected string) (string, error) {
 	t := p.nextTok()
 	if t.typ != tokIdent || (expected != "" && t.value != expected) {
-		return "", adapters.New(adapters.CodeQuery,
-			fmt.Sprintf(`expected identifier "%s" at position %d`, expected, t.pos), nil)
+		return "", adapters.T(adapters.CodeQuery, "backend.studio.adapter.expectedIdentifier.body", map[string]string{"identifier": expected, "position": fmt.Sprint(t.pos)}, nil)
 	}
 	return t.value, nil
 }
@@ -418,8 +408,7 @@ func (p *LiteralParser) ParseValue() (any, error) {
 	defer func() { p.depth-- }()
 	t := p.peekTok()
 	if p.depth > maxLiteralDepth {
-		return nil, adapters.New(adapters.CodeQuery,
-			fmt.Sprintf("literal nested too deep at position %d", t.pos), nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.literalTooDeep.body", map[string]string{"position": fmt.Sprint(t.pos)}, nil)
 	}
 	switch {
 	case t.typ == tokPunct && t.value == "{":
@@ -436,8 +425,7 @@ func (p *LiteralParser) ParseValue() (any, error) {
 			// literal.ts's Number("1.2.3") is NaN, silently. This Go port rejects it instead
 			// (P58c C4's one deliberate new message) rather than encoding a double NaN nobody
 			// asked for.
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf(`invalid number "%s" at position %d`, t.value, t.pos), nil)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.numberInvalid.body", map[string]string{"value": t.value, "position": fmt.Sprint(t.pos)}, nil)
 		}
 		return f, nil
 	case t.typ == tokIdent:
@@ -473,11 +461,9 @@ func (p *LiteralParser) ParseValue() (any, error) {
 			}
 			return ctor(arg, hasArg, t.pos)
 		}
-		return nil, adapters.New(adapters.CodeQuery,
-			fmt.Sprintf(`unrecognized identifier "%s" at position %d`, t.value, t.pos), nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.identifierUnrecognized.body", map[string]string{"identifier": t.value, "position": fmt.Sprint(t.pos)}, nil)
 	}
-	return nil, adapters.New(adapters.CodeQuery,
-		fmt.Sprintf("unexpected token at position %d", t.pos), nil)
+	return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.unexpectedToken.body", map[string]string{"position": fmt.Sprint(t.pos)}, nil)
 }
 
 // parseKey accepts a string or a bare identifier — never a number, which is why `{ 1: "x" }` is
@@ -487,8 +473,7 @@ func (p *LiteralParser) parseKey() (string, error) {
 	if t.typ == tokString || t.typ == tokIdent {
 		return t.value, nil
 	}
-	return "", adapters.New(adapters.CodeQuery,
-		fmt.Sprintf("expected an object key at position %d", t.pos), nil)
+	return "", adapters.T(adapters.CodeQuery, "backend.studio.adapter.objectKeyExpected.body", map[string]string{"position": fmt.Sprint(t.pos)}, nil)
 }
 
 // parseObject and parseArray both allow one trailing comma and both terminate on it
@@ -573,7 +558,7 @@ func ParseJSON5Literal(text string) (any, error) {
 		return nil, err
 	}
 	if !parser.AtEnd() {
-		return nil, adapters.New(adapters.CodeQuery, "unexpected trailing content after literal", nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.trailingContentLiteral.body", nil, nil)
 	}
 	return value, nil
 }

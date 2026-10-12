@@ -166,8 +166,7 @@ func filterPartitions(partitions []int32, filter kafkaStreamFilter, topic string
 		for i, p := range filter.Partitions {
 			names[i] = strconv.FormatInt(int64(p), 10)
 		}
-		return nil, adapters.New(adapters.CodeQuery,
-			fmt.Sprintf("topic %s has no partition(s) %s", topic, strings.Join(names, ", ")), nil)
+		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.kafkaPartitionsMissing.body", map[string]string{"topic": topic, "partitions": strings.Join(names, ", ")}, nil)
 	}
 	return selected, nil
 }
@@ -204,8 +203,7 @@ func resolveStartOffsets(ctx context.Context, adm *kadm.Client, topic string, pa
 	case filter.Offset != nil:
 		requested, err := strconv.ParseInt(*filter.Offset, 10, 64)
 		if err != nil {
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("malformed offset filter: %q", *filter.Offset), nil)
+			return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.kafkaOffsetFilterMalformed.body", map[string]string{"filter": *filter.Offset}, nil)
 		}
 		for _, p := range partitions {
 			lo := startsByPartition[p].Offset
@@ -249,7 +247,7 @@ func freshWindows(ctx context.Context, adm *kadm.Client, topic string, rawFilter
 
 	filter, err := parseStreamFilter(rawFilter)
 	if err != nil {
-		return nil, adapters.New(adapters.CodeQuery, "malformed stream filter", err)
+		return nil, adapters.Contract("malformed stream filter", err)
 	}
 
 	endsByPartition := ends[topic]
@@ -319,10 +317,10 @@ func prepareWindows(ctx context.Context, adm *kadm.Client, topic string, req ada
 			return nil, nil, err
 		}
 		if len(keys) != 1 {
-			return nil, nil, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+			return nil, nil, adapters.Contract("malformed page token", nil)
 		}
 		if err := json.Unmarshal([]byte(keys[0]), &windows); err != nil {
-			return nil, nil, adapters.New(adapters.CodeQuery, "malformed page token", err)
+			return nil, nil, adapters.Contract("malformed page token", err)
 		}
 	} else {
 		w, err := freshWindows(ctx, adm, topic, req.Filter)
@@ -387,7 +385,7 @@ func pollRound(ctx context.Context, browse *kgo.Client, windows []partitionWindo
 	if err := fetches.Err(); err != nil {
 		if ctx.Err() != nil {
 			// The op's own context is what ended this, not the round's bound (P58e E3).
-			return collected, pollRoundStop, adapters.New(adapters.CodeCancelled, "operation was cancelled", ctx.Err())
+			return collected, pollRoundStop, adapters.T(adapters.CodeCancelled, "backend.studio.adapter.cancelled.body", nil, ctx.Err())
 		}
 		if errors.Is(err, kgo.ErrClientClosed) {
 			return collected, pollRoundStop, nil // the browse client's own teardown racing this poll
@@ -494,8 +492,7 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 		return page.StreamPage{}, err
 	}
 	if req.Cursor.Mode == "before" {
-		return page.StreamPage{}, adapters.New(adapters.CodeUnsupported,
-			"kafka offset-window pagination is forward-only; there is no previous page", nil)
+		return page.StreamPage{}, adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.kafkaForwardOnly.body", nil, nil)
 	}
 	fingerprint := adapters.RequestFingerprint(readFingerprintParts{Topic: topic, PageSize: req.PageSize, Filter: req.Filter})
 
