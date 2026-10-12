@@ -1,6 +1,6 @@
 import { type MessageKey, t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
-import { formatDuration } from '@workbench/behaviour/format';
+import { formatCompactDuration } from '@workbench/behaviour/format';
 import type { Branch, Plan, Run, Session, Task } from '../wire';
 import { type BranchGraph, shortBranchName } from './branchGraph';
 import { catalogParts } from './catalogParts';
@@ -272,7 +272,7 @@ export function tagLabel(tag: { label: string; since?: number }, nowMs: number):
   return tag.since === undefined
     ? tag.label
     : t('space.ade.board.branchTag.preparing.label', {
-        duration: formatDuration(nowMs - tag.since),
+        duration: formatCompactDuration(nowMs - tag.since),
       });
 }
 
@@ -333,7 +333,7 @@ const preparing: Rule = (i) => {
   return {
     ...tag(
       t('space.ade.board.branchTag.preparing.label', {
-        duration: formatDuration(i.nowMs - s.startedAt),
+        duration: formatCompactDuration(i.nowMs - s.startedAt),
       }),
       'blue',
       t('space.ade.board.branchTag.preparing.tooltip'),
