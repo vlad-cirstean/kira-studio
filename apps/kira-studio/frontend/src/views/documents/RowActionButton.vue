@@ -15,7 +15,13 @@ defineProps<{ icon: string; label: string; disabled?: boolean }>();
        a disabled control, so the tip needs a live ancestor to hang off. -->
   <!-- Only a disabled button needs the wrapper as its tab stop; an enabled one is its own. -->
   <span :tabindex="disabled ? 0 : undefined" class="inline-flex" :data-tip="label">
-    <Button variant="toolbar" size="kira-icon" :aria-label="label" :disabled="disabled" v-bind="$attrs">
+    <Button
+      variant="toolbar"
+      size="kira-icon"
+      :aria-label="label"
+      :disabled="disabled"
+      v-bind="$attrs"
+    >
       <CodiconIcon :name="icon" :size="13" />
     </Button>
   </span>

@@ -32,7 +32,9 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
       :data-result="r.id"
     >
       <div class="flex items-center gap-2">
-        <Label :for="id('id', r.id)" class="sr-only">{{ t('space.ade.workflows.results.id.aria') }}</Label>
+        <Label :for="id('id', r.id)" class="sr-only">{{
+          t('space.ade.workflows.results.id.aria')
+        }}</Label>
         <Input
           :id="id('id', r.id)"
           :model-value="r.id"
@@ -41,7 +43,9 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           data-testid="ade-wf-result-id"
           @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { id: String(v) })"
         />
-        <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">{{ t('space.ade.workflows.results.ok.label') }}</Label>
+        <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">{{
+          t('space.ade.workflows.results.ok.label')
+        }}</Label>
         <Checkbox
           :id="id('ok', r.id)"
           :model-value="r.ok"
@@ -57,7 +61,9 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           @click="draft.deleteResult(stageId, step.id, r.id)"
         />
       </div>
-      <Label :for="id('desc', r.id)" class="sr-only">{{ t('space.ade.workflows.results.description.aria') }}</Label>
+      <Label :for="id('desc', r.id)" class="sr-only">{{
+        t('space.ade.workflows.results.description.aria')
+      }}</Label>
       <Input
         :id="id('desc', r.id)"
         :model-value="r.description"
@@ -77,7 +83,9 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           @update:model-value="(v) => draft.route(stageId, step.id, r.id, String(v))"
         >
           <option value="next">{{ t('space.ade.workflows.route.next.option') }}</option>
-          <option v-for="s in steps" :key="s.id" :value="s.id">{{ s.id === step.id ? t('space.ade.workflows.route.thisStep.option') : s.name }}</option>
+          <option v-for="s in steps" :key="s.id" :value="s.id">{{
+            s.id === step.id ? t('space.ade.workflows.route.thisStep.option') : s.name
+          }}</option>
           <option value="end">{{ t('space.ade.workflows.route.end.option') }}</option>
           <option v-if="!r.ok" value="stop">{{ t('common.action.stop.label') }}</option>
         </NativeSelect>

@@ -48,7 +48,11 @@ const icon = computed(() => {
   return nodeIcon(props.row.kind === 'connection' ? 'connection' : props.row.kind);
 });
 
-const STATUS_TONE: Record<string, 'ok' | 'warn' | 'error'> = { connected: 'ok', connecting: 'warn', error: 'error' };
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'error'> = {
+  connected: 'ok',
+  connecting: 'warn',
+  error: 'error',
+};
 
 const statusTitle = computed(() => {
   if (props.row.kind !== 'connection') return undefined;
@@ -149,10 +153,7 @@ function onKeydown(e: KeyboardEvent): void {
     @keydown="onKeydown"
     @contextmenu.prevent.stop="onContextMenu"
   >
-    <div
-      :class="colorMarkClass('rail', railColor)"
-      data-testid="tree-rail"
-    />
+    <div :class="colorMarkClass('rail', railColor)" data-testid="tree-rail" />
 
     <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
          drawn by the chevron direction, and it fires on the single most-hovered control in the
@@ -180,13 +181,20 @@ function onKeydown(e: KeyboardEvent): void {
     <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
       <EngineIcon :kind="connectionKind" :size="13" />
     </span>
-    <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="13" class="shrink-0 text-muted-foreground" />
+    <CodiconIcon
+      v-else-if="row.kind !== 'connection'"
+      :name="icon"
+      :size="13"
+      class="shrink-0 text-muted-foreground"
+    />
 
     <Tooltip>
       <TooltipTrigger as-child>
         <span class="label overflow-hidden text-ellipsis min-w-0">
           <template v-for="(part, i) in parts" :key="i">
-            <mark v-if="part.hit" class="rounded-kira-xs bg-search-match text-inherit">{{ part.text }}</mark>
+            <mark v-if="part.hit" class="rounded-kira-xs bg-search-match text-inherit">{{
+              part.text
+            }}</mark>
             <template v-else>{{ part.text }}</template>
           </template>
         </span>
@@ -207,11 +215,23 @@ function onKeydown(e: KeyboardEvent): void {
          truncated by default, full text on hover" shape. -->
     <Tooltip v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail">
       <TooltipTrigger as-child>
-        <span class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-error" data-testid="connection-error-detail">{{ row.statusDetail }}</span>
+        <span
+          class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-error"
+          data-testid="connection-error-detail"
+          >{{
+            row.statusDetail
+          }}</span
+        >
       </TooltipTrigger>
       <TooltipContent>{{ row.statusDetail }}</TooltipContent>
     </Tooltip>
-    <span v-else-if="row.detail" class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-muted-foreground text-kira-sm">{{ row.detail }}</span>
+    <span
+      v-else-if="row.detail"
+      class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-muted-foreground text-kira-sm"
+      >{{
+        row.detail
+      }}</span
+    >
     <!-- P110 I2-14: `.tree-row`'s hover/selected ternary moved onto the root binding (stateClass,
          above) -- see packages/theme/src/base.css's own pointer comment for the retired
          `@utility tree-row`. P110 I2-13: the twisty moved to TreeTwisty.vue; the loading-spinner

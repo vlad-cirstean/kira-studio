@@ -20,7 +20,11 @@ const repos = computed(() => props.entry.codeRepoIds.map(repoLabel).join(' · ')
 </script>
 
 <template>
-  <AdePanelFrame v-model="tab" :title="t('space.ade.panel.archivedTitle.title')" :tabs="[{ value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count }) }]">
+  <AdePanelFrame
+    v-model="tab"
+    :title="t('space.ade.panel.archivedTitle.title')"
+    :tabs="[{ value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count }) }]"
+  >
     <template #header>
       <div class="flex items-start gap-2">
         <span class="mt-1 box-border size-3 shrink-0 rounded-kira-xs bg-disabled" />
@@ -34,7 +38,9 @@ const repos = computed(() => props.entry.codeRepoIds.map(repoLabel).join(' · ')
           </h3>
         </AdeTip>
       </div>
-      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ repos }}</div>
+      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{
+        repos
+      }}</div>
     </template>
     <AdeSessionsTab :task-id="entry.taskId" archived />
   </AdePanelFrame>

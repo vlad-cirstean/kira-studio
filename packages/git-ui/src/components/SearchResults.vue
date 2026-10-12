@@ -47,9 +47,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "select", option: SearchOption): void;
-  (e: "hover", option: SearchOption): void;
-  (e: "runBodySearch"): void;
+  (e: 'select', option: SearchOption): void;
+  (e: 'hover', option: SearchOption): void;
+  (e: 'runBodySearch'): void;
 }>();
 
 const isEmpty = computed(() => props.model.sections.length === 0);
@@ -83,7 +83,9 @@ function optionClass(option: SearchOption): string {
       </div>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
+        <div
+          class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
+        >
           {{ section.title }} <span class="font-normal">({{ section.options.length }})</span>
         </div>
 
@@ -101,14 +103,20 @@ function optionClass(option: SearchOption): string {
             <template v-if="option.kind === 'ref'">
               <CodiconIcon :name="REF_ICON[option.hit.ref.kind]" />
               <span class="flex-1 min-w-0 truncate">{{ option.hit.ref.shortName }}</span>
-              <Badge v-if="fieldLabel(option.hit.fields)">{{ fieldLabel(option.hit.fields) }}</Badge>
+              <Badge v-if="fieldLabel(option.hit.fields)">{{
+                fieldLabel(option.hit.fields)
+              }}</Badge>
             </template>
             <template v-else>
               <span class="font-data text-muted-foreground">{{ shortSha(option.hit.sha) }}</span>
               <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
               <span class="text-muted-foreground text-kira-sm">{{ option.hit.authorName }}</span>
-              <span class="text-muted-foreground text-kira-sm">{{ formatAgeCompact(option.hit.authorTime) }}</span>
-              <Badge v-if="fieldLabel(option.hit.fields)">{{ fieldLabel(option.hit.fields) }}</Badge>
+              <span class="text-muted-foreground text-kira-sm">{{
+                formatAgeCompact(option.hit.authorTime)
+              }}</span>
+              <Badge v-if="fieldLabel(option.hit.fields)">{{
+                fieldLabel(option.hit.fields)
+              }}</Badge>
             </template>
           </div>
         </template>
@@ -117,7 +125,9 @@ function optionClass(option: SearchOption): string {
         </div>
       </template>
 
-      <div v-if="isEmpty" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('common.state.noMatches.empty') }}</div>
+      <div v-if="isEmpty" class="text-kira-sm text-subtle py-1 px-1.5">{{
+        t('common.state.noMatches.empty')
+      }}</div>
     </div>
 
     <div

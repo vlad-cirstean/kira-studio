@@ -21,6 +21,15 @@ const { retrying, retry } = useRetryStatus();
       <CodiconIcon v-if="status.data.value" name="debug-disconnect" :size="24" class="text-error" />
       <Spinner v-else :size="24" label="" />
     </template>
-    <Button v-if="status.data.value" size="kira" variant="toolbar" :disabled="retrying" @click="retry">{{ t('common.action.retry.label') }}</Button>
+    <Button
+      v-if="status.data.value"
+      size="kira"
+      variant="toolbar"
+      :disabled="retrying"
+      @click="retry"
+      >{{
+        t('common.action.retry.label')
+      }}</Button
+    >
   </EmptyState>
 </template>

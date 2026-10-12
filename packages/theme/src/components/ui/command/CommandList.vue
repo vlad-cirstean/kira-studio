@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { ListboxContentProps } from 'reka-ui'
-import { ListboxContent, useForwardProps } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { ListboxContentProps } from 'reka-ui';
+import { ListboxContent, useForwardProps } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
-const props = defineProps<ListboxContentProps & { class?: HTMLAttributes['class'] }>()
+const props = defineProps<ListboxContentProps & { class?: HTMLAttributes['class'] }>();
 
-const delegatedProps = reactiveOmit(props, 'class')
+const delegatedProps = reactiveOmit(props, 'class');
 
-const forwarded = useForwardProps(delegatedProps)
+const forwarded = useForwardProps(delegatedProps);
 </script>
 
 <template>

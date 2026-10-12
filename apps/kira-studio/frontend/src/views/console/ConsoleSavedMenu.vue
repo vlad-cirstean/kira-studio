@@ -31,7 +31,12 @@ const saved = ref<SavedConsoleQuery[]>([]);
 
 // P107 T2-19: shared in-app substitute for window.prompt() — see
 // packages/workbench/src/prompt/useTextPrompt.ts (same one FilterHistoryMenu.vue uses).
-const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
+const {
+  prompt: textPrompt,
+  open: promptText,
+  submit: submitPrompt,
+  cancel: cancelPrompt,
+} = useTextPrompt();
 
 // Every action runs through `attempt`: a storage failure shows in the footer, never as an
 // unhandled rejection with nothing on screen.
@@ -113,7 +118,9 @@ const saveCurrent = (): Promise<void> =>
             entry.name
           }}</span>
         </TooltipTrigger>
-        <TooltipContent class="whitespace-pre-wrap">{{ `${entry.name}\n${entry.body.text}` }}</TooltipContent>
+        <TooltipContent class="whitespace-pre-wrap">{{
+          `${entry.name}\n${entry.body.text}`
+        }}</TooltipContent>
       </Tooltip>
     </template>
     <template #entry-actions="{ entry }">
@@ -132,8 +139,15 @@ const saveCurrent = (): Promise<void> =>
            --kira-accent, same workaround as api/CollectionRow.vue's rename-input (Part 3). P110
            I2-37 retired the shadcn accent alias this comment used to warn against; hover is its
            I2-37 replacement name. -->
-      <button type="button" :class="cn(rowVariants(), 'w-full text-primary')" data-testid="console-save-current" @click="saveCurrent">
-        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
+      <button
+        type="button"
+        :class="cn(rowVariants(), 'w-full text-primary')"
+        data-testid="console-save-current"
+        @click="saveCurrent"
+      >
+        <span class="size-4 flex items-center justify-center shrink-0"
+          ><CodiconIcon name="add" :size="13" /></span
+        >
         {{ t('studio.console.savedMenu.saveCurrent.label') }}
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent

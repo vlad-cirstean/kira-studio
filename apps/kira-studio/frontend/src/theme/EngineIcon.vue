@@ -46,7 +46,11 @@ const iconSize = computed(() => props.size ?? 16);
         stroke-linejoin="round"
         :d="siPostgresql.path"
       />
-      <path transform="translate(2,2) scale(0.5)" :fill="`#${siPostgresql.hex}`" :d="siPostgresql.path" />
+      <path
+        transform="translate(2,2) scale(0.5)"
+        :fill="`#${siPostgresql.hex}`"
+        :d="siPostgresql.path"
+      />
     </template>
 
     <template v-if="kind === 'mariadb'">
@@ -118,7 +122,11 @@ const iconSize = computed(() => props.size ?? 16);
         stroke-linejoin="round"
         :d="siApachekafka.path"
       />
-      <path transform="translate(2,2) scale(0.5)" :fill="`#${siApachekafka.hex}`" :d="siApachekafka.path" />
+      <path
+        transform="translate(2,2) scale(0.5)"
+        :fill="`#${siApachekafka.hex}`"
+        :d="siApachekafka.path"
+      />
     </template>
 
     <template v-if="kind === 'sqs'">
@@ -159,7 +167,11 @@ const iconSize = computed(() => props.size ?? 16);
         stroke-linejoin="round"
         :d="siClickhouse.path"
       />
-      <path transform="translate(2,2) scale(0.5)" :fill="`#${siClickhouse.hex}`" :d="siClickhouse.path" />
+      <path
+        transform="translate(2,2) scale(0.5)"
+        :fill="`#${siClickhouse.hex}`"
+        :d="siClickhouse.path"
+      />
     </template>
 
     <template v-if="kind === 's3'">

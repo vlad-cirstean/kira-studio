@@ -9,7 +9,16 @@ defineProps<{ raw: string }>();
 
 <template>
   <div class="relative h-full" data-testid="docker-inspect">
-    <TooltipIconButton icon="copy" :label="t('common.action.copyAsJson.label')" class="absolute right-2 top-1" data-testid="docker-inspect-copy" @click="copyText(raw)" />
-    <pre class="h-full overflow-auto p-3 font-data text-kira-sm" data-testid="docker-inspect-json">{{ raw }}</pre>
+    <TooltipIconButton
+      icon="copy"
+      :label="t('common.action.copyAsJson.label')"
+      class="absolute right-2 top-1"
+      data-testid="docker-inspect-copy"
+      @click="copyText(raw)"
+    />
+    <pre
+      class="h-full overflow-auto p-3 font-data text-kira-sm"
+      data-testid="docker-inspect-json"
+    >{{ raw }}</pre>
   </div>
 </template>

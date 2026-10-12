@@ -121,7 +121,8 @@ async function onEnvColorChange(color: PaletteColor): Promise<void> {
   await variablesStore.updateEnvironment(env.id, env.name, env.description, color);
 }
 async function onDuplicateEnvironment(): Promise<void> {
-  if (owningEnvironment.value) await variablesStore.duplicateEnvironment(owningEnvironment.value.id);
+  if (owningEnvironment.value)
+    await variablesStore.duplicateEnvironment(owningEnvironment.value.id);
 }
 
 // ---- the row table (VariablesDialog.vue's own mechanics, verbatim but tab-scoped) ----
@@ -495,14 +496,16 @@ function onBulkClose(): void {
   <div class="flex h-full min-h-0 flex-col" data-testid="variables-dialog" :data-scope="scope">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span class="size-4 flex items-center justify-center shrink-0">
-        <CodiconIcon :name="scope === 'environment' ? ICON.environments : ICON.variables" :size="13" />
+        <CodiconIcon
+          :name="scope === 'environment' ? ICON.environments : ICON.variables"
+          :size="13"
+        />
       </span>
-      <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || t('common.module.variables.label') }}</span>
+      <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{
+        tab.state.name || t('common.module.variables.label')
+      }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
@@ -511,7 +514,13 @@ function onBulkClose(): void {
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
     <ViewToolbar border="none">
-      <div v-if="!bulkMode" class="w-64"><SearchField v-model="filterQuery" :placeholder="t('studio.api.common.filterByName.placeholder')" data-testid="variables-filter" /></div>
+      <div v-if="!bulkMode" class="w-64"
+        ><SearchField
+          v-model="filterQuery"
+          :placeholder="t('studio.api.common.filterByName.placeholder')"
+          data-testid="variables-filter"
+        /></div
+      >
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 shrink-0">
@@ -526,7 +535,12 @@ function onBulkClose(): void {
       </div>
     </ViewToolbar>
 
-    <EmptyState v-if="ownersLoaded && !ownerExists" data-testid="variable-set-orphan" icon="warning" :title="t('studio.api.variableSet.orphan.empty')" />
+    <EmptyState
+      v-if="ownersLoaded && !ownerExists"
+      data-testid="variable-set-orphan"
+      icon="warning"
+      :title="t('studio.api.variableSet.orphan.empty')"
+    />
     <BulkVariablesEditor
       v-else-if="bulkMode"
       :tab-id="tab.id"
@@ -574,7 +588,9 @@ function onBulkClose(): void {
           />
         </Label>
         <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-sm text-subtle">{{ t('common.field.description.label') }}</span>
+          <span class="pl-0.5 text-kira-sm text-subtle">{{
+            t('common.field.description.label')
+          }}</span>
           <Input
             v-model="envDescriptionDraft"
             :placeholder="t('common.field.description.label')"
@@ -611,7 +627,12 @@ function onBulkClose(): void {
             <TooltipContent>{{ colourLabel(color) }}</TooltipContent>
           </Tooltip>
         </fieldset>
-        <Button variant="toolbar" size="kira" data-testid="environment-duplicate" @click="onDuplicateEnvironment">
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="environment-duplicate"
+          @click="onDuplicateEnvironment"
+        >
           {{ t('common.action.duplicate.label') }}
         </Button>
       </div>
@@ -622,7 +643,9 @@ function onBulkClose(): void {
            grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2 allowlist
            gap as .overview-row (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue) --
            a pre-existing value relocated, not a new one. -->
-      <div class="grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]">
+      <div
+        class="grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]"
+      >
         <span class="cell"></span>
         <span class="cell">{{ t('common.field.name.label') }}</span>
         <span class="cell">{{ t('common.field.value.label') }}</span>

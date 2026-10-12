@@ -98,7 +98,10 @@ function onDelete(id: string): void {
 async function onClear(): Promise<void> {
   const ok = await confirmDialogStore.confirm({
     title: t('studio.grpc.history.clearConfirm.title'),
-    message: [t('studio.grpc.history.clearConfirm.body'), t('common.confirm.irreversible.body')].join(' '),
+    message: [
+      t('studio.grpc.history.clearConfirm.body'),
+      t('common.confirm.irreversible.body'),
+    ].join(' '),
     confirmLabel: t('common.action.clear.label'),
     tone: 'danger',
   });
@@ -109,7 +112,9 @@ async function onClear(): Promise<void> {
 <template>
   <div class="flex flex-1 min-h-0 flex-col" data-testid="grpc-history-list">
     <ViewToolbar>
-      <span class="text-kira-sm text-subtle">{{ t('studio.grpc.history.count.status', { count: entries.length }) }}</span>
+      <span class="text-kira-sm text-subtle">{{
+        t('studio.grpc.history.count.status', { count: entries.length })
+      }}</span>
       <span class="ml-auto" />
       <Button
         variant="toolbar"
@@ -126,11 +131,24 @@ async function onClear(): Promise<void> {
     <Alert v-if="errorMessage" variant="error">
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
-    <EmptyState v-else-if="entries.length === 0" :icon="ICON.history" :title="incognito ? t('studio.grpc.history.incognito.empty') : t('studio.grpc.history.empty')" />
+    <EmptyState
+      v-else-if="entries.length === 0"
+      :icon="ICON.history"
+      :title="incognito ? t('studio.grpc.history.incognito.empty') : t('studio.grpc.history.empty')"
+    />
 
     <template v-else>
-      <SearchField v-model="filterQuery" :placeholder="t('studio.common.filterHistory.placeholder')" data-testid="grpc-history-filter" />
-      <EmptyState v-if="isFiltered && filteredEntries.length === 0" data-testid="grpc-history-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
+      <SearchField
+        v-model="filterQuery"
+        :placeholder="t('studio.common.filterHistory.placeholder')"
+        data-testid="grpc-history-filter"
+      />
+      <EmptyState
+        v-if="isFiltered && filteredEntries.length === 0"
+        data-testid="grpc-history-filter-empty"
+        :icon="ICON.search"
+        :title="t('common.state.noMatches.empty')"
+      />
     </template>
 
     <div
@@ -175,7 +193,11 @@ async function onClear(): Promise<void> {
       </div>
     </div>
 
-    <div v-if="atCap" class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="grpc-history-cap-note">
+    <div
+      v-if="atCap"
+      class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1"
+      data-testid="grpc-history-cap-note"
+    >
       {{ t('studio.grpc.history.capNote.hint', { limit: GRPC_HISTORY_PER_SCOPE_LIMIT }) }}
     </div>
     <!-- P110 I2-17: `.history-row:hover`/`.history-row.is-viewing` (same background either way)

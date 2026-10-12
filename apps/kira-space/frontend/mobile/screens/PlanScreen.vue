@@ -15,27 +15,41 @@ const open = ref<string | null>(null);
 <template>
   <section class="flex flex-col" data-testid="plan-screen">
     <QueryState :query="boardQuery" :is-empty="() => false">
-    <template #loading><p class="m-0 p-4 text-muted-foreground">{{ t('common.state.loading.loading') }}</p></template>
-    <template #error>
-      <Alert variant="error" strip data-testid="plan-error">{{ t('mobile.plan.loadError.error') }}</Alert>
-    </template>
-    <EmptyState v-if="model && !model.plan.length" class="py-10" data-testid="plan-empty" :title="t('mobile.plan.list.empty')" :description="t('mobile.plan.list.emptyHint')" />
-    <template v-else-if="model">
-      <div v-for="group in model.plan" :key="group.key" data-testid="plan-group">
-        <h2 class="m-0 border-b border-border bg-chrome px-3 py-1.5 text-kira-sm font-medium uppercase tracking-wide text-subtle">
-          {{ group.label }}
-        </h2>
-        <ul class="m-0 flex list-none flex-col p-0">
-          <PlanTaskCard
-            v-for="card in group.cards"
-            :key="card.task.id"
-            :card="card"
-            :open="open === card.task.id"
-            @toggle="open = open === card.task.id ? null : card.task.id"
-          />
-        </ul>
-      </div>
-    </template>
+      <template #loading
+        ><p class="m-0 p-4 text-muted-foreground">{{
+          t('common.state.loading.loading')
+        }}</p></template
+      >
+      <template #error>
+        <Alert variant="error" strip data-testid="plan-error">{{
+          t('mobile.plan.loadError.error')
+        }}</Alert>
+      </template>
+      <EmptyState
+        v-if="model && !model.plan.length"
+        class="py-10"
+        data-testid="plan-empty"
+        :title="t('mobile.plan.list.empty')"
+        :description="t('mobile.plan.list.emptyHint')"
+      />
+      <template v-else-if="model">
+        <div v-for="group in model.plan" :key="group.key" data-testid="plan-group">
+          <h2
+            class="m-0 border-b border-border bg-chrome px-3 py-1.5 text-kira-sm font-medium uppercase tracking-wide text-subtle"
+          >
+            {{ group.label }}
+          </h2>
+          <ul class="m-0 flex list-none flex-col p-0">
+            <PlanTaskCard
+              v-for="card in group.cards"
+              :key="card.task.id"
+              :card="card"
+              :open="open === card.task.id"
+              @toggle="open = open === card.task.id ? null : card.task.id"
+            />
+          </ul>
+        </div>
+      </template>
     </QueryState>
   </section>
 </template>

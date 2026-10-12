@@ -34,7 +34,8 @@ const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
 const { sessions } = useSessionViews();
 const sessionCount = computed(
-  () => sessions.value.filter((x) => x.taskId === props.card.task.id && x.state === 'running').length,
+  () =>
+    sessions.value.filter((x) => x.taskId === props.card.task.id && x.state === 'running').length,
 );
 const update = useUpdateTask();
 const taskMenu = useTaskMenu(() => props.card);
@@ -44,7 +45,9 @@ function openMore(ev: MouseEvent): void {
 const reviewCode = useReviewCode();
 const choices = computed(() => reviewCode.choicesOf(props.card));
 const reviewTip = computed(() => taskReviewTip(choices.value));
-const reviewDisabled = computed(() => reviewCode.pending.value || choices.value.every((c) => c.disabled));
+const reviewDisabled = computed(
+  () => reviewCode.pending.value || choices.value.every((c) => c.disabled),
+);
 const notesError = ref('');
 
 /** A finished task shows Archive as its stage action; any other task gets the quiet one. */
@@ -61,7 +64,9 @@ const facts = computed(() => {
   const e = props.card.entry;
   const cal = props.model.cal;
   const span =
-    e.day === LATER ? t('common.later.label') : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
+    e.day === LATER
+      ? t('common.later.label')
+      : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
   const repos: string[] = [];
   for (const row of props.card.rows) if (!repos.includes(row.repo)) repos.push(row.repo);
   const p = props.card.progress;
@@ -146,7 +151,9 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           </h3>
         </AdeTip>
       </div>
-      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
+      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{
+        facts
+      }}</div>
       <FieldError v-if="ui.actionError[card.task.id]" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
       </FieldError>
@@ -157,14 +164,18 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         :class="TONE_TAG_CLASS.blue"
         data-testid="ade-panel-review-note"
       >
-        {{ t('space.ade.taskPanel.reviewNote.body', { owner: card.task.owner || t('space.ade.taskPanel.someone.label') }) }}
+        {{
+          t('space.ade.taskPanel.reviewNote.body', { owner: card.task.owner || t('space.ade.taskPanel.someone.label') })
+        }}
       </div>
     </template>
     <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />
     <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
     <div v-else class="flex min-h-0 flex-1 flex-col p-3" data-testid="ade-notes-tab">
       <AdeNotesEditor :notes="card.task.notes" :item-id="card.task.id" @save="saveNotes" />
-      <FieldError v-if="notesError" class="pt-1" data-testid="ade-notes-error">{{ notesError }}</FieldError>
+      <FieldError v-if="notesError" class="pt-1" data-testid="ade-notes-error">{{
+        notesError
+      }}</FieldError>
     </div>
   </AdePanelFrame>
 </template>

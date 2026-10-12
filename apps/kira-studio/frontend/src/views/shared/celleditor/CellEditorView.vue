@@ -8,7 +8,12 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
@@ -65,7 +70,9 @@ const props = withDefaults(defineProps<{ cell: SelectedCell; readOnly?: boolean 
 const selectedCell = computed(() => props.cell);
 const viewerMode = computed(() => props.readOnly === true);
 
-const override = computed<CellFormat | null>(() => cellEditorFormatStore.overrideFor(selectedCell.value));
+const override = computed<CellFormat | null>(() =>
+  cellEditorFormatStore.overrideFor(selectedCell.value),
+);
 
 const isNullValue = computed(() => selectedCell.value.value === null);
 const isEmptyValue = computed(() => selectedCell.value.value === '');
@@ -500,7 +507,8 @@ const statusLine = computed(() => {
   parts.push(formatBytes(statusEncoder.encode(value).length));
   const reading = describeValue(effectiveFormat.value, value);
   if (reading) parts.push(reading);
-  if (isTruncatedValue.value) parts.push(t('studio.cellEditor.truncatedPrefix.status', { size: formatBytes(64 * 1024) }));
+  if (isTruncatedValue.value)
+    parts.push(t('studio.cellEditor.truncatedPrefix.status', { size: formatBytes(64 * 1024) }));
   if (beautifyFailure.value) parts.push(beautifyFailure.value);
   return parts.join(' · ');
 });
@@ -528,9 +536,9 @@ const statusLine = computed(() => {
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="symbol-string" :size="13" />
       </span>
-      <span class="text-kira-md text-fg truncate" data-testid="cell-editor-target"
-        >{{ t('studio.cellEditor.target.label', { target: targetLabel, row: selectedCell.row + 1 }) }}</span
-      >
+      <span class="text-kira-md text-fg truncate" data-testid="cell-editor-target">{{
+        t('studio.cellEditor.target.label', { target: targetLabel, row: selectedCell.row + 1 })
+      }}</span>
       <Tooltip v-if="dataTypeHint">
         <TooltipTrigger as-child>
           <Badge data :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
@@ -538,18 +546,33 @@ const statusLine = computed(() => {
         <TooltipContent>{{ dataTypeHint }}</TooltipContent>
       </Tooltip>
       <Badge data v-else :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
-      <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">{{ t('studio.common.nullValue.label') }}</Badge>
-      <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">{{ t('studio.cellEditor.empty.status') }}</Badge>
-      <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">{{ t('studio.common.truncated.status') }}</Badge>
+      <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">{{
+        t('studio.common.nullValue.label')
+      }}</Badge>
+      <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">{{
+        t('studio.cellEditor.empty.status')
+      }}</Badge>
+      <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">{{
+        t('studio.common.truncated.status')
+      }}</Badge>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Badge class="max-w-56 overflow-hidden text-ellipsis" data-testid="cell-editor-status">{{ statusLine }}</Badge>
+          <Badge class="max-w-56 overflow-hidden text-ellipsis" data-testid="cell-editor-status">{{
+            statusLine
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ statusLine }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="formatProblem">
         <TooltipTrigger as-child>
-          <Badge variant="error" class="max-w-56 overflow-hidden text-ellipsis whitespace-nowrap" data-testid="cell-editor-invalid">{{ formatProblem.message }}</Badge>
+          <Badge
+            variant="error"
+            class="max-w-56 overflow-hidden text-ellipsis whitespace-nowrap"
+            data-testid="cell-editor-invalid"
+            >{{
+              formatProblem.message
+            }}</Badge
+          >
         </TooltipTrigger>
         <TooltipContent>{{ formatProblem.message }}</TooltipContent>
       </Tooltip>
@@ -602,7 +625,11 @@ const statusLine = computed(() => {
               />
               <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
             </span>
-            <PopoverContent align="start" class="w-56 gap-0 p-0" data-testid="cell-editor-generate-popover">
+            <PopoverContent
+              align="start"
+              class="w-56 gap-0 p-0"
+              data-testid="cell-editor-generate-popover"
+            >
               <div class="flex flex-col gap-px p-1">
                 <Tooltip v-for="gen in GENERATORS" :key="gen.id">
                   <TooltipTrigger as-child>
@@ -684,11 +711,17 @@ const statusLine = computed(() => {
       <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
            above in both directions (encode<->decode, see onDecodedInput). -->
       <template v-if="showDecodedPane">
-        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2">
+        <div
+          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2"
+        >
           <CodiconIcon name="symbol-string" :size="13" />
           <span>{{ t('studio.cellEditor.decoded.label') }}</span>
         </div>
-        <div v-if="decodedDoc !== null" class="flex-1 basis-5/12 min-h-0" data-testid="cell-editor-decoded">
+        <div
+          v-if="decodedDoc !== null"
+          class="flex-1 basis-5/12 min-h-0"
+          data-testid="cell-editor-decoded"
+        >
           <MonacoHost
             :doc="decodedDoc"
             language="plain"
@@ -703,7 +736,9 @@ const statusLine = computed(() => {
           data-testid="cell-editor-decoded-empty"
         >
           <AlertDescription>
-            {{ t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) }) }}
+            {{
+              t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) })
+            }}
           </AlertDescription>
         </Alert>
       </template>
@@ -711,7 +746,9 @@ const statusLine = computed(() => {
       <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
            field and calendar entirely — this file only decides whether to show it. -->
       <template v-else-if="isTimestampFormat">
-        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2">
+        <div
+          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2"
+        >
           <CodiconIcon name="calendar" :size="13" />
           <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
         </div>
@@ -727,12 +764,7 @@ const statusLine = computed(() => {
 
     <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring ResponsePane.vue's own
          find bar. -->
-    <ResponseFindBar
-      v-if="findOpen"
-      ref="findBarRef"
-      :targets="findTargets"
-      @close="closeFind"
-    />
+    <ResponseFindBar v-if="findOpen" ref="findBarRef" :targets="findTargets" @close="closeFind" />
     <!-- P110 I2-18: `.editor-body.has-translate .encoded-pane` moved to the ternary above. -->
   </div>
 </template>

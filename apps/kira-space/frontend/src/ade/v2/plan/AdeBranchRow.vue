@@ -32,7 +32,9 @@ const reviewCode = useReviewCode();
 const automation = useRunAutomation();
 const choice = computed(() => reviewCode.choiceOf(props.row));
 const rowRef = useTemplateRef<HTMLElement>('rowEl');
-const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
+const hasChips = computed(
+  () => props.row.chips.merged.length + props.row.chips.deployed.length > 0,
+);
 const selected = computed(() => ui.selectedBranchId === props.row.id);
 
 function pick(): void {
@@ -51,14 +53,21 @@ function onMenu(ev: MouseEvent): void {
         after: m.view.after,
         unpushed: m.board.plan.unpushed,
         runs: m.view.graph.byTask.get(props.row.branch.taskId)?.runs ?? [],
-        mainName: m.board.repos.find((r) => r.codeRepoId === props.row.branch.codeRepoId)?.mainName ?? '',
+        mainName:
+          m.board.repos.find((r) => r.codeRepoId === props.row.branch.codeRepoId)?.mainName ?? '',
       })
     : null;
   ev.preventDefault();
   ev.stopPropagation();
   const id = props.row.id;
   contextMenu.openContextMenu(ev, [
-    { type: 'label', label: t('space.ade.plan.branchRow.menuTitle.label', { name: props.row.name, repo: props.row.repo }) },
+    {
+      type: 'label',
+      label: t('space.ade.plan.branchRow.menuTitle.label', {
+        name: props.row.name,
+        repo: props.row.repo,
+      }),
+    },
     ...(choice.value
       ? [
           {
@@ -78,19 +87,27 @@ function onMenu(ev: MouseEvent): void {
     ...(!items
       ? []
       : items.length === 0
-      ? [{ type: 'item' as const, id: 'ade-fix-none', label: t('space.ade.board.fixMenu.none.label'), disabled: true, run: () => {} }]
-      : items.map((it) => ({
-          type: 'item' as const,
-          id: it.id,
-          label: it.label,
-          disabled: it.kind === 'act' ? it.act.disabled : undefined,
-          hint: it.kind === 'act' ? it.hint : undefined,
-          run: () => {
-            if (it.kind === 'merge') dialogs.merge(id, it.target);
-            else if (it.kind === 'act') dialogs.act(it.act);
-            else emit('forcePush');
-          },
-        }))),
+        ? [
+            {
+              type: 'item' as const,
+              id: 'ade-fix-none',
+              label: t('space.ade.board.fixMenu.none.label'),
+              disabled: true,
+              run: () => {},
+            },
+          ]
+        : items.map((it) => ({
+            type: 'item' as const,
+            id: it.id,
+            label: it.label,
+            disabled: it.kind === 'act' ? it.act.disabled : undefined,
+            hint: it.kind === 'act' ? it.hint : undefined,
+            run: () => {
+              if (it.kind === 'merge') dialogs.merge(id, it.target);
+              else if (it.kind === 'act') dialogs.act(it.act);
+              else emit('forcePush');
+            },
+          }))),
   ]);
 }
 
@@ -108,7 +125,9 @@ const progClass = computed(() => {
   if (tone === 'green') return 'text-tone-green';
   return tone === 'grey' ? 'text-muted-foreground' : 'text-tone-amber';
 });
-const elbowClass = computed(() => (props.row.base?.tone === 'blue' ? 'border-tone-blue-solid' : 'border-border-strong'));
+const elbowClass = computed(() =>
+  props.row.base?.tone === 'blue' ? 'border-tone-blue-solid' : 'border-border-strong',
+);
 const rowBgClass = computed(() => {
   if (props.merged) return 'bg-tone-purple-solid/8';
   return props.row.isReview
@@ -144,7 +163,15 @@ const rowBgClass = computed(() => {
         :class="elbowClass"
       />
     </span>
-    <Badge variant="chip" :class="repoTintOf.class" :style="repoTintOf.style" data-testid="ade-branch-repo">{{ row.repo }}</Badge>
+    <Badge
+      variant="chip"
+      :class="repoTintOf.class"
+      :style="repoTintOf.style"
+      data-testid="ade-branch-repo"
+      >{{
+        row.repo
+      }}</Badge
+    >
     <AdeTip v-if="row.base" :parts="row.base.tip">
       <Badge
         variant="chip"
@@ -156,12 +183,14 @@ const rowBgClass = computed(() => {
         ]"
         data-testid="ade-base-marker"
         :data-pending="row.base.pending || undefined"
-        ><VarText :parts="row.base.label"
-      /></Badge>
+        ><VarText :parts="row.base.label" /></Badge
+      >
     </AdeTip>
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" :text="t('space.ade.plan.branchRow.review.tooltip')">
-      <Badge variant="chip" :class="TONE_TAG_CLASS.blue" data-testid="ade-owner-pill">{{ row.branch.owner }}</Badge>
+      <Badge variant="chip" :class="TONE_TAG_CLASS.blue" data-testid="ade-owner-pill">{{
+        row.branch.owner
+      }}</Badge>
     </AdeTip>
     <AdeTip v-if="row.branch.origin === 'agent'" :text="t('space.ade.agentOrigin.tooltip')">
       <span class="inline-flex shrink-0 text-subtle" data-testid="ade-branch-agent">
@@ -174,10 +203,15 @@ const rowBgClass = computed(() => {
           class="truncate font-data text-kira-md font-medium leading-4"
           :class="row.isReview ? 'text-tone-blue' : row.draft ? 'italic text-muted-foreground' : 'text-fg'"
           data-testid="ade-branch-name"
-          >{{ row.name }}</span
+          >{{
+            row.name
+          }}</span
         >
       </AdeTip>
-      <span v-if="row.context || row.prog || hasChips" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-3.5">
+      <span
+        v-if="row.context || row.prog || hasChips"
+        class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-3.5"
+      >
         <AdeTip v-if="row.prog" :text="row.prog.tip">
           <span class="inline-flex shrink-0 items-center gap-1" data-testid="ade-branch-prog">
             <span class="inline-flex gap-0.5">
@@ -196,14 +230,18 @@ const rowBgClass = computed(() => {
           class="truncate text-kira-sm text-subtle"
           :class="row.draft ? 'italic' : ''"
           data-testid="ade-branch-context"
-          >{{ row.context }}</span
+          >{{
+            row.context
+          }}</span
         >
         <AdeTip v-for="c in row.chips.merged" :key="c.label" :text="c.tip">
           <span
             class="shrink-0 text-kira-sm font-medium"
             :class="c.tone === 'stale' ? 'text-tone-amber' : 'text-subtle'"
             data-testid="ade-branch-merged"
-            >{{ c.label }}</span
+            >{{
+              c.label
+            }}</span
           >
         </AdeTip>
         <span v-if="row.chips.divider" class="h-2.5 w-px shrink-0 bg-border-strong" />
@@ -212,7 +250,9 @@ const rowBgClass = computed(() => {
             class="shrink-0 text-kira-sm font-medium"
             :class="c.tone === 'stale' ? 'text-tone-amber' : 'text-subtle'"
             data-testid="ade-branch-deployed"
-            >{{ c.label }}</span
+            >{{
+              c.label
+            }}</span
           >
         </AdeTip>
       </span>
@@ -220,7 +260,7 @@ const rowBgClass = computed(() => {
     <TooltipIconButton
       v-if="choice"
       icon="git-compare"
-        :label="t('space.ade.board.taskMenu.reviewCode.label')"
+      :label="t('space.ade.board.taskMenu.reviewCode.label')"
       class="size-5 shrink-0"
       :class="selected ? 'opacity-100' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'"
       disabled-trigger

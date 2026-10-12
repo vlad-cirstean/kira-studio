@@ -20,29 +20,47 @@ const mem = computed(() => history.value.map((s) => s.memUsage));
   <div class="h-full overflow-auto p-3" data-testid="docker-stats">
     <div class="@container flex flex-col gap-3">
       <ContainerSizeSection :id="containerId" />
-      <p v-if="!running" class="text-muted-foreground" data-testid="docker-stats-stopped">{{ t('docker.stats.stopped.emptyHint') }}</p>
-      <p v-else-if="!latest" class="text-muted-foreground" data-testid="docker-stats-waiting">{{ t('docker.stats.waiting.loading') }}</p>
+      <p v-if="!running" class="text-muted-foreground" data-testid="docker-stats-stopped">{{
+        t('docker.stats.stopped.emptyHint')
+      }}</p>
+      <p v-else-if="!latest" class="text-muted-foreground" data-testid="docker-stats-waiting">{{
+        t('docker.stats.waiting.loading')
+      }}</p>
       <div v-else class="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
         <DetailSection :title="t('docker.metric.cpu.label')">
           <div class="mb-2 flex items-baseline justify-between">
-            <span class="text-kira-xl font-medium" data-testid="docker-stats-cpu">{{ formatPercent(latest.cpuPercent) }}</span>
-            <span class="text-kira-sm text-muted-foreground">{{ t('docker.stats.samples.label', { count: cpu.length }) }}</span>
+            <span class="text-kira-xl font-medium" data-testid="docker-stats-cpu">{{
+              formatPercent(latest.cpuPercent)
+            }}</span>
+            <span class="text-kira-sm text-muted-foreground">{{
+              t('docker.stats.samples.label', { count: cpu.length })
+            }}</span>
           </div>
           <StatsSparkline :values="cpu" height-class="h-24" />
         </DetailSection>
         <DetailSection :title="t('common.module.memory.label')">
           <div class="mb-2 flex items-baseline justify-between">
-            <span class="text-kira-xl font-medium" data-testid="docker-stats-mem">{{ formatBytes(latest.memUsage) }}</span>
-            <span class="text-kira-sm text-muted-foreground">{{ t('docker.stats.memOf.label', { limit: formatBytes(latest.memLimit), percent: formatPercent(latest.memPercent) }) }}</span>
+            <span class="text-kira-xl font-medium" data-testid="docker-stats-mem">{{
+              formatBytes(latest.memUsage)
+            }}</span>
+            <span class="text-kira-sm text-muted-foreground">{{
+              t('docker.stats.memOf.label', { limit: formatBytes(latest.memLimit), percent: formatPercent(latest.memPercent) })
+            }}</span>
           </div>
           <StatsSparkline :values="mem" :max="latest.memLimit" height-class="h-24" />
         </DetailSection>
         <DetailSection :title="t('docker.stats.io.title')" class="@3xl:col-span-2">
           <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
             <dt class="text-muted-foreground">{{ t('docker.stats.network.label') }}</dt>
-            <dd class="font-data">{{ formatBytes(latest.netRx) }} / {{ formatBytes(latest.netTx) }}</dd>
+            <dd class="font-data"
+              >{{ formatBytes(latest.netRx) }}
+              / {{ formatBytes(latest.netTx) }}</dd
+            >
             <dt class="text-muted-foreground">{{ t('docker.stats.block.label') }}</dt>
-            <dd class="font-data">{{ formatBytes(latest.blockRead) }} / {{ formatBytes(latest.blockWrite) }}</dd>
+            <dd class="font-data"
+              >{{ formatBytes(latest.blockRead) }}
+              / {{ formatBytes(latest.blockWrite) }}</dd
+            >
             <dt class="text-muted-foreground">{{ t('docker.stats.pids.label') }}</dt>
             <dd class="font-data">{{ latest.pids }}</dd>
           </dl>

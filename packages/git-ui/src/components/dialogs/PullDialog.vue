@@ -44,9 +44,7 @@ function stashAndCarry(): void {
 
 <template>
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      size="md"
-    >
+    <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.pull.title') }}</DialogTitle>
       </DialogHeader>
@@ -64,8 +62,15 @@ function stashAndCarry(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
-        <Button variant="dialog-primary" size="kira-lg" data-testid="pull-stash-and-carry" @click="stashAndCarry">
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="pull-stash-and-carry"
+          @click="stashAndCarry"
+        >
           {{ t('git.dialog.pull.stashAndPull.confirm') }}
         </Button>
       </DialogFooter>

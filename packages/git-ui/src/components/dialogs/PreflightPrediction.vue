@@ -40,7 +40,9 @@ const noCommitModel = computed({
       <AlertDescription>
         <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
         <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-          <li v-for="path in prediction.paths" :key="path"><code class="font-data">{{ path }}</code></li>
+          <li v-for="path in prediction.paths" :key="path"
+            ><code class="font-data">{{ path }}</code></li
+          >
         </ul>
       </AlertDescription>
     </Alert>

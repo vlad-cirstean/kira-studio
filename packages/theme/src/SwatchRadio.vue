@@ -27,7 +27,7 @@ const emit = defineEmits<{ change: [value: string] }>();
       :aria-label="color === 'none' ? t('common.field.noColour.label') : color"
       :data-testid="`color-${color}`"
       @change="emit('change', value)"
-    />
+    >
     <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past an *empty*
          sibling element — &nbsp; keeps this decorative span non-empty. -->
     <span

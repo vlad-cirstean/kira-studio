@@ -43,7 +43,6 @@ export interface FindBarTarget {
 const props = defineProps<{ targets: readonly FindBarTarget[] }>();
 const emit = defineEmits<{ close: [] }>();
 
-
 const query = ref('');
 // 0-based, across every target's matches concatenated in order.
 const currentGlobal = ref(0);
@@ -134,7 +133,13 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
     <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField v-model="query" @keydown.escape.stop="close" :placeholder="t('common.action.find.label')" :aria-invalid="invalid" data-testid="http-find-input" />
+      <SearchField
+        v-model="query"
+        @keydown.escape.stop="close"
+        :placeholder="t('common.action.find.label')"
+        :aria-invalid="invalid"
+        data-testid="http-find-input"
+      />
     </div>
     <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
@@ -147,8 +152,13 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
         testid-prefix="http-find-"
       />
     </div>
-    <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="http-find-count">
-      {{ totalMatches === 0 ? t('common.state.noMatches.empty') : t('common.matchPosition.status', { position: displayIndex, total: totalMatches }) }}
+    <span
+      class="text-kira-sm text-muted-foreground whitespace-nowrap"
+      data-testid="http-find-count"
+    >
+      {{
+        totalMatches === 0 ? t('common.state.noMatches.empty') : t('common.matchPosition.status', { position: displayIndex, total: totalMatches })
+      }}
     </span>
     <TooltipIconButton
       icon="chevron-up"

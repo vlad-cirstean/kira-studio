@@ -70,16 +70,15 @@ function confirm(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      size="md"
-      destructive
-    >
+    <DialogContent size="md" destructive>
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.revert.title', { count: commitCount }) }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          {{ t(isMultiSha ? 'git.dialog.revert.multiple.description' : 'git.dialog.revert.description') }}
+          {{
+            t(isMultiSha ? 'git.dialog.revert.multiple.description' : 'git.dialog.revert.description')
+          }}
         </DialogDescription>
 
         <Alert v-if="preflight?.detachedHead" variant="warn">
@@ -91,10 +90,7 @@ function confirm(): void {
         <template v-if="needsMainline">
           <p>{{ t('git.dialog.revert.mainline.body') }}</p>
           <RadioGroup v-model="selectedMainline">
-            <Card
-              v-for="entry in preflight?.mainlineRequired"
-              :key="entry.sha"
-            >
+            <Card v-for="entry in preflight?.mainlineRequired" :key="entry.sha">
               <p class="m-0 mb-0.5"><code class="font-data">{{ shortSha(entry.sha) }}</code></p>
               <Field
                 v-for="parent in entry.parents"
@@ -108,8 +104,13 @@ function confirm(): void {
                 />
                 <FieldLabel :for="`${mainlineId}-${entry.sha}-${parent.parentNumber}`">
                   <span>
-                    <CatalogText k="git.common.mergeParent.option" :params="{ number: parent.parentNumber, subject: parent.subject }">
-                      <template #sha><code class="font-data">{{ shortSha(parent.sha) }}</code></template>
+                    <CatalogText
+                      k="git.common.mergeParent.option"
+                      :params="{ number: parent.parentNumber, subject: parent.subject }"
+                    >
+                      <template #sha
+                        ><code class="font-data">{{ shortSha(parent.sha) }}</code></template
+                      >
                     </CatalogText>
                   </span>
                 </FieldLabel>
@@ -134,7 +135,9 @@ function confirm(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canConfirm" @click="confirm">
           {{ t('common.revert.label') }}
         </Button>

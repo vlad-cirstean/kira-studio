@@ -53,7 +53,9 @@ function openLink(e: MouseEvent): void {
           class="shrink-0 text-kira-md text-info"
           :data-testid="`${id}-link`"
           @click="openLink"
-          >{{ text }}</a
+          >{{
+            text
+          }}</a
         >
         <span v-else class="shrink-0 text-kira-md" :data-testid="`${id}-link`">{{ text }}</span>
         <span class="min-w-0 flex-1" />

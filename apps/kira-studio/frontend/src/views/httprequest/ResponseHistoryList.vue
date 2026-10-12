@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { httpMethodToken, statusClass, statusHint } from '@shared/domain/http';
-import {
-  HISTORY_PER_SCOPE_LIMIT,
-  type ResponseHistoryEntry,
-} from '@shared/domain/responseHistory';
+import { HISTORY_PER_SCOPE_LIMIT, type ResponseHistoryEntry } from '@shared/domain/responseHistory';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
@@ -42,7 +39,8 @@ const { viewingId, error: snapshotError } = useHttpHistoryViewing(() => props.ta
 const ui = computed(() => httpHistoryStore.ui[props.tab.id]);
 const selected = computed(() => ui.value?.selected ?? []);
 const errorMessage = computed(
-  () => ui.value?.actionError ?? listQuery.error.value?.message ?? snapshotError.value?.message ?? null,
+  () =>
+    ui.value?.actionError ?? listQuery.error.value?.message ?? snapshotError.value?.message ?? null,
 );
 const isScratch = computed(() => !props.tab.state.itemId);
 // P71 §3.5: nothing is suppressed here — with nothing recorded, historyList simply returns the
@@ -125,7 +123,10 @@ function onCompare(): void {
 async function onClear(): Promise<void> {
   const ok = await confirmDialogStore.confirm({
     title: t('studio.http.history.clearConfirm.title'),
-    message: [t('studio.http.history.clearConfirm.body'), t('common.confirm.irreversible.body')].join(' '),
+    message: [
+      t('studio.http.history.clearConfirm.body'),
+      t('common.confirm.irreversible.body'),
+    ].join(' '),
     confirmLabel: t('common.action.clear.label'),
     tone: 'danger',
   });
@@ -136,7 +137,9 @@ async function onClear(): Promise<void> {
 <template>
   <div class="flex flex-1 min-h-0 flex-col" data-testid="http-history-list">
     <ViewToolbar>
-      <span class="text-kira-sm text-subtle">{{ t('studio.http.history.count.status', { count: entries.length }) }}</span>
+      <span class="text-kira-sm text-subtle">{{
+        t('studio.http.history.count.status', { count: entries.length })
+      }}</span>
       <span class="ml-auto" />
       <Button
         variant="toolbar"
@@ -171,8 +174,17 @@ async function onClear(): Promise<void> {
     />
 
     <template v-else>
-      <SearchField v-model="filterQuery" :placeholder="t('studio.common.filterHistory.placeholder')" data-testid="http-history-filter" />
-      <EmptyState v-if="isFiltered && filteredEntries.length === 0" data-testid="http-history-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
+      <SearchField
+        v-model="filterQuery"
+        :placeholder="t('studio.common.filterHistory.placeholder')"
+        data-testid="http-history-filter"
+      />
+      <EmptyState
+        v-if="isFiltered && filteredEntries.length === 0"
+        data-testid="http-history-filter-empty"
+        :icon="ICON.search"
+        :title="t('common.state.noMatches.empty')"
+      />
     </template>
 
     <div
@@ -207,20 +219,31 @@ async function onClear(): Promise<void> {
           <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="text-kira-sm text-subtle min-w-16">{{ formatRelative(entry.sentAt) }}</span>
+                <span class="text-kira-sm text-subtle min-w-16">{{
+                  formatRelative(entry.sentAt)
+                }}</span>
               </TooltipTrigger>
               <TooltipContent>{{ entry.sentAt }}</TooltipContent>
             </Tooltip>
-            <Badge data variant="chip" :class="methodTextClass(httpMethodToken(entry.method))">{{ entry.method }}</Badge>
+            <Badge data variant="chip" :class="methodTextClass(httpMethodToken(entry.method))">{{
+              entry.method
+            }}</Badge>
             <Tooltip>
               <TooltipTrigger as-child>
-                <Badge data :variant="statusClass(entry.status)" data-testid="http-history-status-chip">{{ entry.status }} {{ entry.statusText }}</Badge>
+                <Badge
+                  data
+                  :variant="statusClass(entry.status)"
+                  data-testid="http-history-status-chip"
+                  >{{ entry.status }} {{ entry.statusText }}</Badge
+                >
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
             </Tooltip>
             <span class="text-kira-sm text-subtle">{{ formatDuration(entry.elapsedMs) }}</span>
             <span class="text-kira-sm text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
-            <span v-if="entry.environment" class="text-kira-sm text-subtle">{{ entry.environment }}</span>
+            <span v-if="entry.environment" class="text-kira-sm text-subtle">{{
+              entry.environment
+            }}</span>
             <span class="ml-auto" />
             <TooltipIconButton
               :icon="ICON.delete"
@@ -229,12 +252,22 @@ async function onClear(): Promise<void> {
               @click.stop="onDelete(entry.id)"
             />
           </div>
-          <div v-if="showUrl(i)" class="text-kira-sm text-subtle overflow-hidden text-ellipsis whitespace-nowrap">{{ entry.url }}</div>
+          <div
+            v-if="showUrl(i)"
+            class="text-kira-sm text-subtle overflow-hidden text-ellipsis whitespace-nowrap"
+            >{{
+              entry.url
+            }}</div
+          >
         </div>
       </div>
     </div>
 
-    <div v-if="atCap" class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="http-history-cap-note">
+    <div
+      v-if="atCap"
+      class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1"
+      data-testid="http-history-cap-note"
+    >
       {{ t('studio.http.history.capNote.hint', { limit: HISTORY_PER_SCOPE_LIMIT }) }}
     </div>
     <!-- P110 I2-17: `.history-row:hover`/`.history-row.is-viewing` (same background either way)

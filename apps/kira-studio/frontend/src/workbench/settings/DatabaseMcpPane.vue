@@ -2,7 +2,13 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { useQuery } from '@tanstack/vue-query';
 import { Button } from '@theme/components/ui/button';
-import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLegend,
+} from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
@@ -149,7 +155,7 @@ const dbMcpEnabledId = useId();
             :disabled="dbMcpInstalling"
             data-testid="db-mcp-install-button"
             @click="onInstallDbMcpClaudeCode"
-          >{{
+            >{{
               dbMcpStore.status.claudeAvailable
                 ? t('common.registerWithClaudeCode.label')
                 : t('studio.settings.dbMcp.copyCommandAbove.label')
@@ -202,12 +208,12 @@ const dbMcpEnabledId = useId();
         <div class="flex flex-col min-w-0 gap-0.5">
           <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
           <FieldDescription>{{
-              t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
+            t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
                 read: conn.mcpReadMode,
                 write: conn.mcpWriteMode,
                 ddl: conn.mcpDdlMode,
               })
-            }}</FieldDescription>
+          }}</FieldDescription>
           <FieldDescription v-if="mcpDescriptionFirstLine(conn)">{{
             mcpDescriptionFirstLine(conn)
           }}</FieldDescription>
@@ -232,6 +238,8 @@ const dbMcpEnabledId = useId();
     <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-connections-empty">
       {{ t('studio.settings.dbMcp.empty.empty') }}
     </p>
-    <FieldError v-if="actionError" data-testid="settings-action-error">{{ actionError }}</FieldError>
+    <FieldError v-if="actionError" data-testid="settings-action-error">{{
+      actionError
+    }}</FieldError>
   </div>
 </template>

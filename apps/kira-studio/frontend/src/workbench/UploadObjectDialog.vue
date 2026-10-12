@@ -3,7 +3,14 @@ import { contentTypeForFilename } from '@shared/domain/objectStore';
 import { decodePath } from '@shared/domain/tree';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
@@ -103,11 +110,22 @@ watch(
       </DialogHeader>
 
       <DialogBody>
-        <Button variant="dialog" size="kira-lg" class="self-start" data-testid="upload-choose-file" @click="chooseFile">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          class="self-start"
+          data-testid="upload-choose-file"
+          @click="chooseFile"
+        >
           {{ t('studio.http.body.chooseFile.label') }}
         </Button>
-        <div v-if="chosenFile" class="text-kira-sm text-muted-foreground p-0" data-testid="upload-chosen-file">
-          {{ chosenFile.name }} ({{ formatBytes(chosenFile.size) }})
+        <div
+          v-if="chosenFile"
+          class="text-kira-sm text-muted-foreground p-0"
+          data-testid="upload-chosen-file"
+        >
+          {{ chosenFile.name }}
+          ({{ formatBytes(chosenFile.size) }})
         </div>
 
         <template v-if="chosenFile">
@@ -117,7 +135,9 @@ watch(
           </Field>
 
           <Field>
-            <Label class="text-muted-foreground p-0">{{ t('studio.http.body.contentType.placeholder') }}</Label>
+            <Label class="text-muted-foreground p-0">{{
+              t('studio.http.body.contentType.placeholder')
+            }}</Label>
             <Input v-model="contentType" class="font-data" data-testid="upload-content-type" />
           </Field>
         </template>
@@ -129,8 +149,8 @@ watch(
 
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">{{
-            t('common.action.cancel.label')
-          }}</Button>
+          t('common.action.cancel.label')
+        }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"

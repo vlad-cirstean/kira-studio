@@ -2,7 +2,14 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
@@ -49,12 +56,17 @@ const smartBody = computed(() => {
   const c = card.value;
   const script = step ? scripts.records.find((r) => r.name === step.smartScript) : undefined;
   if (!step || !c || !script) return null;
-  return smartBodyParts(script.command, step.params, { task: c.title, jira: c.task.jira?.key ?? '' });
+  return smartBodyParts(script.command, step.params, {
+    task: c.title,
+    jira: c.task.jira?.key ?? '',
+  });
 });
 // The finish instruction the first step ends with, as its results declare it.
 const suffix = computed(() => finishStepSuffix(stage.value?.steps[0]?.results ?? []));
 const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
-const pending = computed(() => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? []);
+const pending = computed(
+  () => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? [],
+);
 // With the Kira Space tools on the agent names its branches (request_branch), so no name is asked.
 const named = computed(() => (spaceTools.value ? [] : pending.value));
 const slug = computed(() => `feat/${branchSlug(card.value?.title ?? '')}`);
@@ -62,7 +74,10 @@ const slug = computed(() => `feat/${branchSlug(card.value?.title ?? '')}`);
 // Setups of the task's branches still running or failed: the runs queue behind them after Start.
 const setups = computed(() =>
   (card.value?.rows ?? []).filter(
-    (r) => r.branch.kind === 'mine' && r.branch.name !== '' && ['running', 'failed'].includes(r.branch.setup?.state ?? ''),
+    (r) =>
+      r.branch.kind === 'mine' &&
+      r.branch.name !== '' &&
+      ['running', 'failed'].includes(r.branch.setup?.state ?? ''),
   ),
 );
 
@@ -72,16 +87,13 @@ const names = ref<Record<string, string>>({});
 const opening = ref('');
 const edited = computed(() => message.value !== opening.value);
 
-watch(
-  open,
-  (o) => {
-    if (!o) return;
-    opening.value = initial.value;
-    message.value = initial.value;
-    names.value = {};
-    sending.error.value = null;
-  },
-);
+watch(open, (o) => {
+  if (!o) return;
+  opening.value = initial.value;
+  message.value = initial.value;
+  names.value = {};
+  sending.error.value = null;
+});
 
 const sending = useAsyncAction(async () => {
   if (!card.value) return;
@@ -124,7 +136,13 @@ const send = sending.run;
         <div v-if="named.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
           <div v-for="r in named" :key="r.id" class="flex items-center gap-2.5">
             <AdeRepoTag :code-repo-id="r.branch.codeRepoId" :label="r.repo" />
-            <Label :for="`ade-run-branch-${r.id}`" class="whitespace-nowrap text-muted-foreground">{{ t('common.field.branch.label') }}</Label>
+            <Label
+              :for="`ade-run-branch-${r.id}`"
+              class="whitespace-nowrap text-muted-foreground"
+              >{{
+                t('common.field.branch.label')
+              }}</Label
+            >
             <Input
               :id="`ade-run-branch-${r.id}`"
               v-model="names[r.id]"
@@ -146,15 +164,23 @@ const send = sending.run;
             <SmartBadge />
             <span>{{ smartStep.smartScript }}</span>
           </div>
-          <Card v-if="smartBody" class="whitespace-pre-wrap font-data text-kira-sm" data-testid="ade-run-smart-body">
+          <Card
+            v-if="smartBody"
+            class="whitespace-pre-wrap font-data text-kira-sm"
+            data-testid="ade-run-smart-body"
+          >
             <VarText :parts="smartBody" />
           </Card>
-          <FieldError v-else data-testid="ade-run-smart-missing">{{ t('space.ade.runDialog.smartMissing.error') }}</FieldError>
+          <FieldError v-else data-testid="ade-run-smart-missing">{{
+            t('space.ade.runDialog.smartMissing.error')
+          }}</FieldError>
           <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ suffix }}</p>
         </div>
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <Label for="ade-run-message" class="flex-1 text-muted-foreground">{{ t('space.ade.claudeDialog.message.label') }}</Label>
+            <Label for="ade-run-message" class="flex-1 text-muted-foreground">{{
+              t('space.ade.claudeDialog.message.label')
+            }}</Label>
             <Button
               v-if="edited"
               variant="toolbar"
@@ -172,10 +198,7 @@ const send = sending.run;
               class="max-h-90 resize-y"
               data-testid="ade-run-message"
             />
-            <p
-              class="m-0 text-kira-sm text-subtle"
-              data-testid="ade-run-suffix"
-            >
+            <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">
               {{ suffix }}
             </p>
           </div>
@@ -185,7 +208,9 @@ const send = sending.run;
         </Alert>
       </DialogBody>
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="ade-run-cancel" @click="close">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="ade-run-cancel" @click="close">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"

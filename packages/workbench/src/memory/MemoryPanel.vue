@@ -41,7 +41,9 @@ useImportChangeSync();
 const imports = useImportUiStore();
 
 const rootEl = useTemplateRef<HTMLElement>('root');
-const searchInput = computed(() => rootEl.value?.querySelector<HTMLInputElement>('[data-testid="memory-search"]') ?? null);
+const searchInput = computed(
+  () => rootEl.value?.querySelector<HTMLInputElement>('[data-testid="memory-search"]') ?? null,
+);
 useFocusOnMount(searchInput);
 // Recall-first: the field is always shown; a printable key on the list redirects into it.
 const { showSearch } = usePanelHeaderSearch(rootEl, {
@@ -73,7 +75,9 @@ const nav = useListNavigation({
 });
 const semanticStatus = useMemorySemanticStatus();
 const semanticState = computed(() => semanticStatus.data.value?.state);
-const semanticNeedsSetup = computed(() => semanticState.value === 'notInstalled' || semanticState.value === 'unavailable');
+const semanticNeedsSetup = computed(
+  () => semanticState.value === 'notInstalled' || semanticState.value === 'unavailable',
+);
 
 function selectMemory(id: string): void {
   selectedId.value = id;
@@ -98,9 +102,17 @@ const historyToggleId = useId();
       </template>
     </PanelHeader>
     <PanelBar>
-      <SearchField v-model="query" :placeholder="t('memory.panel.search.placeholder')" data-testid="memory-search" />
+      <SearchField
+        v-model="query"
+        :placeholder="t('memory.panel.search.placeholder')"
+        data-testid="memory-search"
+      />
       <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
-        <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
+        <Switch
+          :id="historyToggleId"
+          v-model="includeHistory"
+          data-testid="memory-include-history"
+        />
         <Label :for="historyToggleId">{{ t('memory.panel.includeHistory.label') }}</Label>
       </div>
       <MemorySetupHint
@@ -132,32 +144,45 @@ const historyToggleId = useId();
           </EmptyState>
         </template>
         <template #default="{ data }">
-        <div class="flex flex-col">
-        <button
-          v-for="memory in data"
-          :key="memory.id"
-          type="button"
-          v-bind="nav.rowProps(memory.id)"
-          :class="
+          <div class="flex flex-col">
+            <button
+              v-for="memory in data"
+              :key="memory.id"
+              type="button"
+              v-bind="nav.rowProps(memory.id)"
+              :class="
             cn(
               rowVariants({ layout: 'double', selected: selectedId === memory.id }),
               'w-full flex-col gap-1 whitespace-normal border-b border-border py-1.5 text-left',
               memory.historical && 'opacity-70',
             )
           "
-          :style="rowIndent(0)"
-          :data-testid="`memory-row-${memory.id}`"
-          @click="selectMemory(memory.id)"
-        >
-          <span class="line-clamp-2 text-kira-md">{{ memory.fact }}</span>
-          <span class="flex items-center gap-1">
-            <Badge :variant="memory.author === 'user' ? 'info' : 'default'">{{ t(AUTHOR_LABEL[memory.author]) }}</Badge>
-            <Badge v-if="memory.historical" variant="warn">{{ t('memory.common.historical.status') }}</Badge>
-            <Badge v-if="memory.match === 'semantic'" variant="info" data-testid="memory-match-semantic">{{ t('memory.panel.semantic.status') }}</Badge>
-            <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">{{ t('memory.common.version.label', { version: memory.version }) }}</span>
-          </span>
-        </button>
-        </div>
+              :style="rowIndent(0)"
+              :data-testid="`memory-row-${memory.id}`"
+              @click="selectMemory(memory.id)"
+            >
+              <span class="line-clamp-2 text-kira-md">{{ memory.fact }}</span>
+              <span class="flex items-center gap-1">
+                <Badge :variant="memory.author === 'user' ? 'info' : 'default'">{{
+                  t(AUTHOR_LABEL[memory.author])
+                }}</Badge>
+                <Badge v-if="memory.historical" variant="warn">{{
+                  t('memory.common.historical.status')
+                }}</Badge>
+                <Badge
+                  v-if="memory.match === 'semantic'"
+                  variant="info"
+                  data-testid="memory-match-semantic"
+                  >{{
+                    t('memory.panel.semantic.status')
+                  }}</Badge
+                >
+                <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">{{
+                  t('memory.common.version.label', { version: memory.version })
+                }}</span>
+              </span>
+            </button>
+          </div>
         </template>
       </QueryState>
     </div>

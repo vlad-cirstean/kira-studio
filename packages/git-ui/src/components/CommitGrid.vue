@@ -181,7 +181,11 @@ function minWidthFor(column: keyof ColumnWidths): number {
 }
 
 function graphWidth(): number {
-  return effectiveGraphWidth(widths.value.graph, minWidthFor('graph'), laneFloor.value > 0 && graphAuto);
+  return effectiveGraphWidth(
+    widths.value.graph,
+    minWidthFor('graph'),
+    laneFloor.value > 0 && graphAuto,
+  );
 }
 
 /** P93 §7: every translation site in this file's own coordinate conversion — SlickGrid's rows

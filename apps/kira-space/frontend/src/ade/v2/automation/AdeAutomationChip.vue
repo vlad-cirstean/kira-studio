@@ -51,7 +51,11 @@ function open(): void {
     >
       <SmartBadge v-if="run.kind === 'smart'" />
       <AdeChip :label="label" :tone="tone" class="max-w-40 truncate" />
-      <RunElapsed v-if="run.state === 'running'" :run="run" class="text-kira-sm text-muted-foreground" />
+      <RunElapsed
+        v-if="run.state === 'running'"
+        :run="run"
+        class="text-kira-sm text-muted-foreground"
+      />
     </button>
   </AdeTip>
 </template>

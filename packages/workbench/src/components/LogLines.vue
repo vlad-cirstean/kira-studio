@@ -52,7 +52,9 @@ function streamClass(stream: string): string {
     :data-testid="testid"
     @scroll.passive="onScroll"
   >
-    <InlineState v-if="error" kind="error" :data-testid="`${testid}-error`">{{ error }}</InlineState>
+    <InlineState v-if="error" kind="error" :data-testid="`${testid}-error`">{{
+      error
+    }}</InlineState>
     <template v-else>
       <div v-if="truncated" class="text-subtle">{{ t('common.truncated.status') }}</div>
       <div v-if="lines.length === 0" class="text-subtle">{{ t('common.noOutput.emptyHint') }}</div>
@@ -66,7 +68,10 @@ function streamClass(stream: string): string {
           :style="{ transform: `translateY(${item.start}px)` }"
           :data-testid="`${testid}-line`"
           :data-stream="lines[item.index]?.stream"
-        >{{ lines[item.index]?.text.replace(/\n$/, '') }}</div>
+          >{{
+            lines[item.index]?.text.replace(/\n$/, '')
+          }}</div
+        >
       </div>
     </template>
   </div>

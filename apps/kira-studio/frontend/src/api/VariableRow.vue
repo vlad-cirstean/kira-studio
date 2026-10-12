@@ -6,7 +6,12 @@ import { Badge } from '@theme/components/ui/badge';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { useEventListener } from '@vueuse/core';
@@ -139,7 +144,11 @@ useEventListener(rootEl, 'keydown', onKeydown);
   >
     <Tooltip v-if="filtered && !trailing">
       <TooltipTrigger as-child>
-        <span class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="variable-grip">
+        <span
+          class="flex cursor-grab items-center text-subtle"
+          aria-hidden="true"
+          data-testid="variable-grip"
+        >
           <CodiconIcon name="gripper" :size="13" />
         </span>
       </TooltipTrigger>
@@ -163,13 +172,20 @@ useEventListener(rootEl, 'keydown', onKeydown);
         @update:model-value="onNameInput(String($event))"
         @blur="emit('blur')"
       />
-      <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">{{ t('studio.api.variables.duplicate.status') }}</Badge>
+      <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">{{
+        t('studio.api.variables.duplicate.status')
+      }}</Badge>
     </div>
     <div class="flex min-w-0 items-center gap-1 value-cell">
       <!-- tracking-widest (0.1em) is the widest step Tailwind's default scale has; at this row's
            inherited body font-size (--kira-font-size, 12px default) that is 1.2px, not the
            original flat 2px, but nothing further out exists on the scale. -->
-      <span v-if="notYetRevealed()" class="flex-1 text-subtle tracking-widest" data-testid="variable-value-masked">••••••••</span>
+      <span
+        v-if="notYetRevealed()"
+        class="flex-1 text-subtle tracking-widest"
+        data-testid="variable-value-masked"
+        >••••••••</span
+      >
       <Input
         v-else
         size="kira"
@@ -213,7 +229,9 @@ useEventListener(rootEl, 'keydown', onKeydown);
           </Checkbox>
         </TooltipDisabledTrigger>
       </TooltipTrigger>
-      <TooltipContent>{{ secretsUnavailable ? t('studio.api.variables.secretsUnavailable.tooltip') : t('common.secret.label') }}</TooltipContent>
+      <TooltipContent>{{
+        secretsUnavailable ? t('studio.api.variables.secretsUnavailable.tooltip') : t('common.secret.label')
+      }}</TooltipContent>
     </Tooltip>
     <Popover
       :open="showHistory && variableSetStore.variableId === row.id"

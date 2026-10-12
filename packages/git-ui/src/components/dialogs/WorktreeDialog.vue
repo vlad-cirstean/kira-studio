@@ -179,10 +179,7 @@ function onClose(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && onClose()">
-    <DialogContent
-      :aria-describedby="undefined"
-      size="md"
-    >
+    <DialogContent :aria-describedby="undefined" size="md">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.worktree.title') }}</DialogTitle>
       </DialogHeader>
@@ -204,15 +201,21 @@ function onClose(): void {
             <RadioGroup v-model="mode">
               <Field orientation="horizontal">
                 <RadioGroupItem :id="`${modeId}-existingBranch`" value="existingBranch" />
-                <FieldLabel :for="`${modeId}-existingBranch`">{{ t('git.dialog.worktree.existingBranch.option') }}</FieldLabel>
+                <FieldLabel :for="`${modeId}-existingBranch`">{{
+                  t('git.dialog.worktree.existingBranch.option')
+                }}</FieldLabel>
               </Field>
               <Field orientation="horizontal">
                 <RadioGroupItem :id="`${modeId}-newBranch`" value="newBranch" />
-                <FieldLabel :for="`${modeId}-newBranch`">{{ t('git.dialog.worktree.newBranch.option') }}</FieldLabel>
+                <FieldLabel :for="`${modeId}-newBranch`">{{
+                  t('git.dialog.worktree.newBranch.option')
+                }}</FieldLabel>
               </Field>
               <Field orientation="horizontal">
                 <RadioGroupItem :id="`${modeId}-detach`" value="detach" />
-                <FieldLabel :for="`${modeId}-detach`">{{ t('git.dialog.worktree.detach.option') }}</FieldLabel>
+                <FieldLabel :for="`${modeId}-detach`">{{
+                  t('git.dialog.worktree.detach.option')
+                }}</FieldLabel>
               </Field>
             </RadioGroup>
           </FieldSet>
@@ -229,22 +232,46 @@ function onClose(): void {
               :placeholder="t('git.dialog.worktree.existingBranch.placeholder')"
             />
             <datalist id="">
-              <option v-for="row in refs.branches.value" :key="row.refname" :value="row.shortName" />
+              <option
+                v-for="row in refs.branches.value"
+                :key="row.refname"
+                :value="row.shortName"
+              />
             </datalist>
           </Field>
           <template v-else-if="mode === 'newBranch'">
             <Field>
-              <FieldLabel :for="branchId">{{ t('git.dialog.worktree.newBranch.label') }}</FieldLabel>
-              <Input :id="branchId" v-model="branch" type="text" size="kira-lg" class="w-full" :placeholder="t('git.dialog.worktree.newBranch.example')" />
+              <FieldLabel :for="branchId">{{
+                t('git.dialog.worktree.newBranch.label')
+              }}</FieldLabel>
+              <Input
+                :id="branchId"
+                v-model="branch"
+                type="text"
+                size="kira-lg"
+                class="w-full"
+                :placeholder="t('git.dialog.worktree.newBranch.example')"
+              />
               <FieldError v-if="newBranchNameError">{{ newBranchNameError }}</FieldError>
             </Field>
             <Field>
-              <FieldLabel :for="startPointId">{{ t('git.dialog.worktree.startPoint.label') }}</FieldLabel>
-              <Input :id="startPointId" v-model="startPoint" type="text" size="kira-lg" class="w-full" :placeholder="t('git.dialog.worktree.startPoint.example')" />
+              <FieldLabel :for="startPointId">{{
+                t('git.dialog.worktree.startPoint.label')
+              }}</FieldLabel>
+              <Input
+                :id="startPointId"
+                v-model="startPoint"
+                type="text"
+                size="kira-lg"
+                class="w-full"
+                :placeholder="t('git.dialog.worktree.startPoint.example')"
+              />
             </Field>
           </template>
           <Field v-else>
-            <FieldLabel :for="startPointId">{{ t('git.dialog.worktree.commitish.label') }}</FieldLabel>
+            <FieldLabel :for="startPointId">{{
+              t('git.dialog.worktree.commitish.label')
+            }}</FieldLabel>
             <Input
               :id="startPointId"
               v-model="startPoint"
@@ -256,55 +283,76 @@ function onClose(): void {
           </Field>
 
           <template v-if="preflight">
-            <Alert v-for="blocker in preflight.blockers" :key="blocker.kind" variant="error"><AlertDescription>
-              <template v-if="blocker.kind === 'invalidPath'">{{ t('git.dialog.worktree.blocker.invalidPath.error') }}</template>
-              <template v-else-if="blocker.kind === 'pathExists'">
-                <CatalogText k="git.dialog.worktree.blocker.pathExists.error">
-                  <template #path><code class="font-data">{{ blocker.path }}</code></template>
-                </CatalogText>
-              </template>
-              <template v-else-if="blocker.kind === 'branchCheckedOutElsewhere'">
-                <CatalogText k="git.dialog.worktree.blocker.checkedOut.error">
-                  <template #branch><code class="font-data">{{ blocker.branch }}</code></template>
-                  <template #path><code class="font-data">{{ blocker.worktreePath }}</code></template>
-                </CatalogText>
-              </template>
-              <template v-else-if="blocker.kind === 'branchExists'">
-                <CatalogText k="git.dialog.worktree.blocker.branchExists.error">
-                  <template #branch><code class="font-data">{{ blocker.branch }}</code></template>
-                </CatalogText>
-              </template>
-              <template v-else-if="blocker.kind === 'unknownStartPoint'">
-                <CatalogText k="git.dialog.worktree.blocker.unknownStartPoint.error">
-                  <template #startPoint><code class="font-data">{{ blocker.startPoint }}</code></template>
-                </CatalogText>
-              </template>
-            </AlertDescription></Alert>
+            <Alert v-for="blocker in preflight.blockers" :key="blocker.kind" variant="error"
+              ><AlertDescription>
+                <template v-if="blocker.kind === 'invalidPath'">{{
+                  t('git.dialog.worktree.blocker.invalidPath.error')
+                }}</template>
+                <template v-else-if="blocker.kind === 'pathExists'">
+                  <CatalogText k="git.dialog.worktree.blocker.pathExists.error">
+                    <template #path><code class="font-data">{{ blocker.path }}</code></template>
+                  </CatalogText>
+                </template>
+                <template v-else-if="blocker.kind === 'branchCheckedOutElsewhere'">
+                  <CatalogText k="git.dialog.worktree.blocker.checkedOut.error">
+                    <template #branch><code class="font-data">{{ blocker.branch }}</code></template>
+                    <template #path
+                      ><code class="font-data">{{ blocker.worktreePath }}</code></template
+                    >
+                  </CatalogText>
+                </template>
+                <template v-else-if="blocker.kind === 'branchExists'">
+                  <CatalogText k="git.dialog.worktree.blocker.branchExists.error">
+                    <template #branch><code class="font-data">{{ blocker.branch }}</code></template>
+                  </CatalogText>
+                </template>
+                <template v-else-if="blocker.kind === 'unknownStartPoint'">
+                  <CatalogText k="git.dialog.worktree.blocker.unknownStartPoint.error">
+                    <template #startPoint
+                      ><code class="font-data">{{ blocker.startPoint }}</code></template
+                    >
+                  </CatalogText>
+                </template>
+              </AlertDescription></Alert
+            >
             <Alert v-if="canOfferDetachHere" variant="warn">
               <AlertDescription>{{ t('git.dialog.worktree.detachedHead.hint') }}</AlertDescription>
             </Alert>
-            <Button v-if="canOfferDetachHere" variant="dialog-primary" size="kira-lg" @click="submitCreateDetached">
+            <Button
+              v-if="canOfferDetachHere"
+              variant="dialog-primary"
+              size="kira-lg"
+              @click="submitCreateDetached"
+            >
               {{ t('git.dialog.worktree.detachHere.label') }}
             </Button>
-            <Alert v-for="note in preflight.notes" :key="note.kind" variant="warn"><AlertDescription>
-              <template v-if="note.kind === 'pathInsideRepo'">
-                {{ t('git.dialog.worktree.note.insideRepo.hint') }}
-              </template>
-              <template v-else-if="note.kind === 'parentDirectoryMissing'">
-                {{ t('git.dialog.worktree.note.parentMissing.hint') }}
-              </template>
-              <template v-else-if="note.kind === 'detachedHead'">
-                {{ t('git.dialog.worktree.detachedHead.hint') }}
-              </template>
-            </AlertDescription></Alert>
+            <Alert v-for="note in preflight.notes" :key="note.kind" variant="warn"
+              ><AlertDescription>
+                <template v-if="note.kind === 'pathInsideRepo'">
+                  {{ t('git.dialog.worktree.note.insideRepo.hint') }}
+                </template>
+                <template v-else-if="note.kind === 'parentDirectoryMissing'">
+                  {{ t('git.dialog.worktree.note.parentMissing.hint') }}
+                </template>
+                <template v-else-if="note.kind === 'detachedHead'">
+                  {{ t('git.dialog.worktree.detachedHead.hint') }}
+                </template>
+              </AlertDescription></Alert
+            >
           </template>
         </template>
-
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancelCreate">{{ t('common.action.cancel.label') }}</Button>
-        <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitCreate" @click="submitCreate">
+        <Button variant="dialog" size="kira-lg" @click="cancelCreate">{{
+          t('common.action.cancel.label')
+        }}</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :disabled="!canSubmitCreate"
+          @click="submitCreate"
+        >
           {{ t('common.action.create.label') }}
         </Button>
       </DialogFooter>

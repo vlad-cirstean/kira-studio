@@ -56,7 +56,9 @@ const props = withDefaults(defineProps<{ tabId?: string }>(), { tabId: '' });
 
 // reka radio values cannot be '' — "No environment" travels as this sentinel.
 const NONE = '__none__';
-const radioValue = computed(() => (activeEnvironmentId.value === '' ? NONE : activeEnvironmentId.value));
+const radioValue = computed(() =>
+  activeEnvironmentId.value === '' ? NONE : activeEnvironmentId.value,
+);
 
 const activeEnvironmentId = computed(() => variablesStore.environmentIdForTab(props.tabId));
 const activeEnvironment = computed(
@@ -83,11 +85,10 @@ function manage(): void {
           data-testid="api-environment-select"
           :data-value="activeEnvironmentId"
         >
-          <span
-            :class="colorMarkClass('dot', activeEnvironment?.color)"
-            data-testid="conn-dot"
-          />
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ activeEnvironment?.name ?? t('studio.api.environments.none.option') }}</span>
+          <span :class="colorMarkClass('dot', activeEnvironment?.color)" data-testid="conn-dot" />
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
+            activeEnvironment?.name ?? t('studio.api.environments.none.option')
+          }}</span>
           <CodiconIcon name="chevron-down" :size="12" />
         </button>
       </DropdownMenuTrigger>
@@ -100,7 +101,9 @@ function manage(): void {
           data-value=""
         >
           <span :class="colorMarkClass('dot', 'none')" data-testid="conn-dot" />
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('studio.api.environments.none.option') }}</span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            t('studio.api.environments.none.option')
+          }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem
@@ -110,17 +113,16 @@ function manage(): void {
           data-testid="api-environment-option"
           :data-value="env.id"
         >
-          <span
-            :class="colorMarkClass('dot', env.color)"
-            data-testid="conn-dot"
-          />
+          <span :class="colorMarkClass('dot', env.color)" data-testid="conn-dot" />
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ env.name }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem data-testid="api-environment-manage" @select="manage">
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('studio.api.environments.manage.label') }}</span>
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+          t('studio.api.environments.manage.label')
+        }}</span>
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

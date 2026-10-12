@@ -28,7 +28,10 @@ function summary(p: ScriptParam): string {
   <div class="flex flex-col gap-3" data-testid="run-params">
     <Field v-for="p in params" :key="p.name" :data-testid="`run-param-${p.name}`">
       <FieldLabel :for="`${idBase}-${p.name}`">
-        {{ p.label || p.name }}<span v-if="p.required" class="text-error"> *<span class="sr-only"> {{ t('common.required.label') }}</span></span>
+        {{ p.label || p.name
+        }}<span v-if="p.required" class="text-error">
+          *<span class="sr-only"> {{ t('common.required.label') }}</span></span
+        >
       </FieldLabel>
       <Input
         v-if="p.type === 'text'"
@@ -65,10 +68,19 @@ function summary(p: ScriptParam): string {
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-80 p-0">
-          <Command multiple :model-value="values[p.name] ?? []" @update:model-value="(v) => set(p.name, v as string[])">
+          <Command
+            multiple
+            :model-value="values[p.name] ?? []"
+            @update:model-value="(v) => set(p.name, v as string[])"
+          >
             <CommandList>
               <CommandGroup>
-                <CommandItem v-for="o in p.options" :key="o" :value="o" :data-testid="`run-param-option-${p.name}-${o}`">
+                <CommandItem
+                  v-for="o in p.options"
+                  :key="o"
+                  :value="o"
+                  :data-testid="`run-param-option-${p.name}-${o}`"
+                >
                   {{ o }}
                 </CommandItem>
               </CommandGroup>

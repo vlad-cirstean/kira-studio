@@ -123,7 +123,9 @@ const targetTail = computed(() => pathTail(host.value?.path ?? ''));
 // row's own `field`.
 const keyName = computed(() => targetTail.value?.name ?? '');
 
-const connRecord = computed(() => connectionsStore.connectionRecord(host.value?.connectionId ?? null));
+const connRecord = computed(() =>
+  connectionsStore.connectionRecord(host.value?.connectionId ?? null),
+);
 
 // P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
@@ -223,7 +225,11 @@ function memoryText(bytes: number | null): string {
 
 // --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -
 const PAGE_SIZE_OPTIONS = pageSizeOptions('keyvalue-');
-const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid }));
+const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({
+  value: String(o.value),
+  label: o.label,
+  testid: o.testid,
+}));
 function onPageSize(size: PageSize): void {
   void keyValueViewStore.setPageSize(props.viewKey, size);
 }
@@ -342,9 +348,9 @@ const objectEditGate = computed<ObjectEditGate>(() => {
     return {
       editable: false,
       reason: t('studio.keyValue.objectGate.sizeLimit.hint', {
-          size: formatBytes(size),
-          limit: formatBytes(OBJECT_BODY_EDIT_BYTES),
-        }),
+        size: formatBytes(size),
+        limit: formatBytes(OBJECT_BODY_EDIT_BYTES),
+      }),
     };
   }
   return { editable: true, reason: t('studio.keyValue.editValue.label') };
@@ -446,9 +452,18 @@ async function onDeleteKey(): Promise<void> {
   const isObject = isSingleObjectPage.value;
   const name = keyName.value;
   const confirmed = await confirmDialogStore.confirm({
-    title: t(isObject ? 'studio.browse.deleteObjectConfirm.title' : 'studio.keyValue.deleteKeyConfirm.title'),
+    title: t(
+      isObject
+        ? 'studio.browse.deleteObjectConfirm.title'
+        : 'studio.keyValue.deleteKeyConfirm.title',
+    ),
     message: [
-      t(isObject ? 'studio.browse.deleteObjectConfirm.body' : 'studio.keyValue.deleteKeyConfirm.body', { name }),
+      t(
+        isObject
+          ? 'studio.browse.deleteObjectConfirm.body'
+          : 'studio.keyValue.deleteKeyConfirm.body',
+        { name },
+      ),
       t('common.confirm.irreversible.body'),
     ].join(' '),
     confirmLabel: t('common.action.delete.label'),
@@ -531,28 +546,28 @@ function rowMenuFor(field: string, value: string) {
   if (!p) return null;
   const isObject = p.redisType === 'object';
   return rowMenu({
-      field,
-      value,
-      redisType: p.redisType,
-      canUpdate: canUpdate.value,
-      canDelete: canDelete.value,
-      canDownload: canDownload.value,
-      editable: isObject ? objectEditGate.value.editable : p.redisType === 'string',
-      editUnavailableLabel: isObject
-        ? objectEditGate.value.reason
-        : t('studio.keyValue.editStringOnly.tooltip'),
-      onEdit: () => {
-        if (isObject) {
-          openEdit();
-          return;
-        }
-        editDraft.value = value;
-        editError.value = null;
-        editOpen.value = true;
-      },
-      onDelete: () => void onDeleteKey(),
-      onDownload: () => void onDownload(),
-    });
+    field,
+    value,
+    redisType: p.redisType,
+    canUpdate: canUpdate.value,
+    canDelete: canDelete.value,
+    canDownload: canDownload.value,
+    editable: isObject ? objectEditGate.value.editable : p.redisType === 'string',
+    editUnavailableLabel: isObject
+      ? objectEditGate.value.reason
+      : t('studio.keyValue.editStringOnly.tooltip'),
+    onEdit: () => {
+      if (isObject) {
+        openEdit();
+        return;
+      }
+      editDraft.value = value;
+      editError.value = null;
+      editOpen.value = true;
+    },
+    onDelete: () => void onDeleteKey(),
+    onDownload: () => void onDownload(),
+  });
 }
 
 function onRowContextMenu(e: MouseEvent, i: number): void {
@@ -709,7 +724,9 @@ function onStop(): void {
 }
 
 function onRefresh(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => keyValueViewStore.reload(props.viewKey));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
+    keyValueViewStore.reload(props.viewKey),
+  );
 }
 
 // "row(s)" doesn't fit a keyspace — these are keys/fields, not table rows — and cursor-based
@@ -721,9 +738,14 @@ const statusLine = computed(() => {
   const parts: string[] = [t('studio.keyValue.status.loaded.status', { count: r.rowCount })];
   if (r.count) {
     parts.push(
-      t(r.count.exact ? 'studio.keyValue.status.total.status' : 'studio.keyValue.status.totalApprox.status', {
-        total: formatCount(r.count.value),
-      }),
+      t(
+        r.count.exact
+          ? 'studio.keyValue.status.total.status'
+          : 'studio.keyValue.status.totalApprox.status',
+        {
+          total: formatCount(r.count.value),
+        },
+      ),
     );
   }
   return parts.join(' · ');
@@ -766,10 +788,7 @@ onUnmounted(() => {
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <template v-if="tab">
       <ViewToolbar>
-        <span
-          v-if="connColor !== undefined"
-          :class="colorMarkClass('dot', connColor)"
-        />
+        <span v-if="connColor !== undefined" :class="colorMarkClass('dot', connColor)" />
         <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
           <EngineIcon :kind="connRecord.kind" :size="13" />
         </span>
@@ -777,8 +796,8 @@ onUnmounted(() => {
           <CodiconIcon :name="page?.redisType === 'object' ? 'file' : 'key'" :size="13" />
         </span>
         <span class="text-kira-md text-fg truncate" data-testid="keyvalue-target"
-          ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
-          >{{ targetTail?.name ?? tab.path }}</span
+          ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>
+          {{ targetTail?.name ?? tab.path }}</span
         >
         <span class="ml-auto flex items-center gap-1" />
       </ViewToolbar>
@@ -807,318 +826,412 @@ onUnmounted(() => {
       </ViewToolbar>
     </template>
 
-        <div class="flex flex-1 min-h-0 flex-col">
-    <div class="flex min-h-0 flex-1 flex-col">
-    <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
+    <div class="flex flex-1 min-h-0 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
+        <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
          renders its own header, same discipline every other main-tab view follows.
          P104 §3: ReconnectGate inlined (no library counterpart). -->
-    <EmptyState v-if="needsReconnect" data-testid="keyvalue-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
-      <Button variant="dialog-primary" size="kira-lg" data-testid="keyvalue-reconnect-load" @click="onReconnectAndLoad">
-        {{ t('studio.common.reconnectAndLoad.label') }}
-      </Button>
-    </EmptyState>
-    <template v-else>
-      <ViewToolbar v-if="page" data-testid="keyvalue-badges">
-        <Badge data data-testid="keyvalue-type">{{ page.redisType }}</Badge>
-        <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
+        <EmptyState
+          v-if="needsReconnect"
+          data-testid="keyvalue-reconnect"
+          icon="plug"
+          :title="t('studio.common.disconnected.empty')"
+        >
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="keyvalue-reconnect-load"
+            @click="onReconnectAndLoad"
+          >
+            {{ t('studio.common.reconnectAndLoad.label') }}
+          </Button>
+        </EmptyState>
+        <template v-else>
+          <ViewToolbar v-if="page" data-testid="keyvalue-badges">
+            <Badge data data-testid="keyvalue-type">{{ page.redisType }}</Badge>
+            <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
              it) — showing "no expiry" for every object would be a permanently-meaningless chip,
              not real information. Memory/size (P33 D5) is real for both: read.ts now sets
              memoryBytes to the object's own ContentLength. -->
-        <template v-if="!isSingleObjectPage">
-          <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
+            <template v-if="!isSingleObjectPage">
+              <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                vanish should look like one (see the mockup's KeyValue.html). -->
-          <Badge data :variant="page.ttlMs !== null ? 'warn' : 'chip'" data-testid="keyvalue-ttl">
-            <CodiconIcon :name="ICON.history" :size="13" />
-            {{ page.ttlMs !== null ? t('studio.keyValue.expires.status', { time: ttlText(page.ttlMs) }) : t('studio.keyValue.noExpiry.status') }}
-          </Badge>
-        </template>
-        <Badge data data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
-        <Badge v-if="connRecord">{{ connRecord.readOnly ? t('common.state.readOnly.status') : t('studio.grid.writable.status') }}</Badge>
-      </ViewToolbar>
+              <Badge
+                data
+                :variant="page.ttlMs !== null ? 'warn' : 'chip'"
+                data-testid="keyvalue-ttl"
+              >
+                <CodiconIcon :name="ICON.history" :size="13" />
+                {{
+                  page.ttlMs !== null ? t('studio.keyValue.expires.status', { time: ttlText(page.ttlMs) }) : t('studio.keyValue.noExpiry.status')
+                }}
+              </Badge>
+            </template>
+            <Badge data data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
+            <Badge v-if="connRecord">{{
+              connRecord.readOnly ? t('common.state.readOnly.status') : t('studio.grid.writable.status')
+            }}</Badge>
+          </ViewToolbar>
 
-      <ViewToolbar border="none" data-testid="keyvalue-toolbar">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <!-- Prev/Next are meaningless for a single-object page (readObject's own doc comment:
+          <ViewToolbar border="none" data-testid="keyvalue-toolbar">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <!-- Prev/Next are meaningless for a single-object page (readObject's own doc comment:
                "there is nothing to paginate") — hidden rather than shown permanently disabled,
                same call StreamView.vue's isBatch makes for SQS. The status text stays: it's the
                only place the Count button's result (below) ever gets shown, for every engine. -->
-          <TooltipIconButton
-            v-if="!isSingleObjectPage"
-            icon="arrow-left"
-            :label="t('common.action.previousPage.label')"
-            disabled-trigger
-            data-testid="keyvalue-prev"
-            :disabled="prevDisabled"
-            @click="keyValueViewStore.goPrev(viewKey)"
-          />
-          <span class="font-data text-kira-sm text-muted-foreground" data-testid="keyvalue-status">{{ statusLine }}</span>
-          <TooltipIconButton
-            v-if="!isSingleObjectPage"
-            icon="arrow-right"
-            :label="t('common.action.nextPage.label')"
-            disabled-trigger
-            data-testid="keyvalue-next"
-            :disabled="!rt?.hasMore"
-            @click="keyValueViewStore.goNext(viewKey)"
-          />
-        </div>
+              <TooltipIconButton
+                v-if="!isSingleObjectPage"
+                icon="arrow-left"
+                :label="t('common.action.previousPage.label')"
+                disabled-trigger
+                data-testid="keyvalue-prev"
+                :disabled="prevDisabled"
+                @click="keyValueViewStore.goPrev(viewKey)"
+              />
+              <span
+                class="font-data text-kira-sm text-muted-foreground"
+                data-testid="keyvalue-status"
+                >{{
+                  statusLine
+                }}</span
+              >
+              <TooltipIconButton
+                v-if="!isSingleObjectPage"
+                icon="arrow-right"
+                :label="t('common.action.nextPage.label')"
+                disabled-trigger
+                data-testid="keyvalue-next"
+                :disabled="!rt?.hasMore"
+                @click="keyValueViewStore.goNext(viewKey)"
+              />
+            </div>
 
-        <template v-if="!isSingleObjectPage">
-          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+            <template v-if="!isSingleObjectPage">
+              <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-          <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
+              <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
                DataToolbar.vue's own page-size segmented control occupies. -->
-          <SecondaryTabs variant="segmented" :model-value="String(host?.pageSize ?? 100)" :items="PAGE_SIZE_ITEMS" data-testid="keyvalue-page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
-        </template>
+              <SecondaryTabs
+                variant="segmented"
+                :model-value="String(host?.pageSize ?? 100)"
+                :items="PAGE_SIZE_ITEMS"
+                data-testid="keyvalue-page-size-picker"
+                @update:model-value="(v) => onPageSize(Number(v) as PageSize)"
+              />
+            </template>
 
-        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+            <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-        <!-- DataToolbar's [count, columns] group — Redis has no columns/fields equivalent
+            <!-- DataToolbar's [count, columns] group — Redis has no columns/fields equivalent
              (a key has no schema), so this group is count alone, same slot as SQL/Document. -->
-        <div class="flex items-center gap-1.5 min-w-0">
-          <TooltipIconButton
-            icon="symbol-number"
-            :label="t('studio.documents.count.run.aria')"
-            data-testid="keyvalue-count"
-            @click="keyValueViewStore.runCount(viewKey)"
-          />
-        </div>
+            <div class="flex items-center gap-1.5 min-w-0">
+              <TooltipIconButton
+                icon="symbol-number"
+                :label="t('studio.documents.count.run.aria')"
+                data-testid="keyvalue-count"
+                @click="keyValueViewStore.runCount(viewKey)"
+              />
+            </div>
 
-        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+            <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-        <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
+            <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
              add-before-delete order), search trails, same as every other view. -->
-        <div class="flex items-center gap-1.5 min-w-0">
-          <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
-            <div ref="addAnchorRef" class="relative">
-              <TooltipIconButton
-                :icon="ICON.add"
-                :label="addTitle"
-                :aria-label="t('common.action.add.label')"
-                disabled-trigger
-                :disabled="!canInsert"
-                data-testid="keyvalue-add"
-                @click="openAdd"
-              />
-              <PopoverAnchor :reference="addAnchorRef ?? undefined" />
-            </div>
-            <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
-              <div class="flex flex-col gap-1.5 p-1.5">
-                <div class="p-0 text-kira-sm text-muted-foreground">{{ t('studio.keyValue.add.title') }}</div>
-                <Input v-model="addName" size="kira-lg" :placeholder="t('studio.keyValue.add.namePlaceholder.placeholder')" class="w-full" data-testid="keyvalue-add-name" />
-                <Input
-                  v-model="addValue"
-                  size="kira-lg"
-                  :placeholder="t('studio.keyValue.add.valuePlaceholder.placeholder')"
-                  class="w-full"
-                  data-testid="keyvalue-add-value"
-                  @keydown.enter="submitAdd"
-                  @keydown.escape="closeAdd"
-                />
-                <FieldError v-if="addError" data-testid="keyvalue-add-error">{{ addError }}</FieldError>
-                <div class="flex justify-end gap-1">
-                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-add-cancel" @click="closeAdd">{{ t('common.action.cancel.label') }}</Button>
-                  <Button
-                    variant="dialog-primary"
-                    size="kira-lg"
-                    data-testid="keyvalue-add-save"
-                    :disabled="addSaving"
-                    @click="submitAdd"
-                  >{{ t('common.action.save.label') }}</Button>
+            <div class="flex items-center gap-1.5 min-w-0">
+              <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
+                <div ref="addAnchorRef" class="relative">
+                  <TooltipIconButton
+                    :icon="ICON.add"
+                    :label="addTitle"
+                    :aria-label="t('common.action.add.label')"
+                    disabled-trigger
+                    :disabled="!canInsert"
+                    data-testid="keyvalue-add"
+                    @click="openAdd"
+                  />
+                  <PopoverAnchor :reference="addAnchorRef ?? undefined" />
                 </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+                <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
+                  <div class="flex flex-col gap-1.5 p-1.5">
+                    <div class="p-0 text-kira-sm text-muted-foreground">{{
+                      t('studio.keyValue.add.title')
+                    }}</div>
+                    <Input
+                      v-model="addName"
+                      size="kira-lg"
+                      :placeholder="t('studio.keyValue.add.namePlaceholder.placeholder')"
+                      class="w-full"
+                      data-testid="keyvalue-add-name"
+                    />
+                    <Input
+                      v-model="addValue"
+                      size="kira-lg"
+                      :placeholder="t('studio.keyValue.add.valuePlaceholder.placeholder')"
+                      class="w-full"
+                      data-testid="keyvalue-add-value"
+                      @keydown.enter="submitAdd"
+                      @keydown.escape="closeAdd"
+                    />
+                    <FieldError v-if="addError" data-testid="keyvalue-add-error">{{
+                      addError
+                    }}</FieldError>
+                    <div class="flex justify-end gap-1">
+                      <Button
+                        variant="dialog"
+                        size="kira-lg"
+                        data-testid="keyvalue-add-cancel"
+                        @click="closeAdd"
+                        >{{
+                          t('common.action.cancel.label')
+                        }}</Button
+                      >
+                      <Button
+                        variant="dialog-primary"
+                        size="kira-lg"
+                        data-testid="keyvalue-add-save"
+                        :disabled="addSaving"
+                        @click="submitAdd"
+                        >{{
+                          t('common.action.save.label')
+                        }}</Button
+                      >
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
 
-          <Popover :open="editOpen && !isSingleObjectPage" @update:open="(v) => !v && closeEdit()">
-            <div ref="editAnchorRef" class="relative">
-              <TooltipIconButton
-                :icon="ICON.edit"
-                :label="editTitle"
-                :aria-label="t('common.action.edit.label')"
-                disabled-trigger
-                :disabled="editDisabled"
-                data-testid="keyvalue-edit"
-                @click="openEdit"
-              />
-              <PopoverAnchor :reference="editAnchorRef ?? undefined" />
-            </div>
-            <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
-              <div class="flex flex-col gap-1.5 p-1.5">
-                <div class="p-0 text-kira-sm text-muted-foreground">{{ t('studio.keyValue.editValue.label') }}</div>
-                <Input
-                  v-model="editDraft"
-                  size="kira-lg"
-                  class="w-full"
-                  data-testid="keyvalue-edit-input"
-                  @keydown.enter="saveEdit"
-                  @keydown.escape="closeEdit"
-                />
-                <FieldError v-if="editError" data-testid="keyvalue-edit-error">{{ editError }}</FieldError>
-                <div class="flex justify-end gap-1">
-                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-edit-cancel" @click="closeEdit">{{ t('common.action.cancel.label') }}</Button>
-                  <Button
-                    variant="dialog-primary"
-                    size="kira-lg"
-                    data-testid="keyvalue-edit-save"
-                    :disabled="editSaving"
-                    @click="saveEdit"
-                  >{{ t('common.action.save.label') }}</Button>
+              <Popover
+                :open="editOpen && !isSingleObjectPage"
+                @update:open="(v) => !v && closeEdit()"
+              >
+                <div ref="editAnchorRef" class="relative">
+                  <TooltipIconButton
+                    :icon="ICON.edit"
+                    :label="editTitle"
+                    :aria-label="t('common.action.edit.label')"
+                    disabled-trigger
+                    :disabled="editDisabled"
+                    data-testid="keyvalue-edit"
+                    @click="openEdit"
+                  />
+                  <PopoverAnchor :reference="editAnchorRef ?? undefined" />
                 </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+                <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
+                  <div class="flex flex-col gap-1.5 p-1.5">
+                    <div class="p-0 text-kira-sm text-muted-foreground">{{
+                      t('studio.keyValue.editValue.label')
+                    }}</div>
+                    <Input
+                      v-model="editDraft"
+                      size="kira-lg"
+                      class="w-full"
+                      data-testid="keyvalue-edit-input"
+                      @keydown.enter="saveEdit"
+                      @keydown.escape="closeEdit"
+                    />
+                    <FieldError v-if="editError" data-testid="keyvalue-edit-error">{{
+                      editError
+                    }}</FieldError>
+                    <div class="flex justify-end gap-1">
+                      <Button
+                        variant="dialog"
+                        size="kira-lg"
+                        data-testid="keyvalue-edit-cancel"
+                        @click="closeEdit"
+                        >{{
+                          t('common.action.cancel.label')
+                        }}</Button
+                      >
+                      <Button
+                        variant="dialog-primary"
+                        size="kira-lg"
+                        data-testid="keyvalue-edit-save"
+                        :disabled="editSaving"
+                        @click="saveEdit"
+                        >{{
+                          t('common.action.save.label')
+                        }}</Button
+                      >
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
 
-          <TooltipIconButton
-            :icon="ICON.delete"
-            :label="deleteTitle"
-            :aria-label="t('common.action.delete.label')"
-            disabled-trigger
-            :disabled="!canDelete"
-            data-testid="keyvalue-delete"
-            @click="onDeleteKey"
-          />
+              <TooltipIconButton
+                :icon="ICON.delete"
+                :label="deleteTitle"
+                :aria-label="t('common.action.delete.label')"
+                disabled-trigger
+                :disabled="!canDelete"
+                data-testid="keyvalue-delete"
+                @click="onDeleteKey"
+              />
 
-          <TooltipIconButton
-            v-if="canDownload"
-            icon="cloud-download"
-            :label="downloadTitle"
-            :aria-label="t('common.action.download.label')"
-            data-testid="keyvalue-download"
-            @click="onDownload"
-          />
+              <TooltipIconButton
+                v-if="canDownload"
+                icon="cloud-download"
+                :label="downloadTitle"
+                :aria-label="t('common.action.download.label')"
+                data-testid="keyvalue-download"
+                @click="onDownload"
+              />
 
-          <TooltipIconButton
-            :icon="ICON.search"
-            :label="t('studio.common.searchPage.label')"
-            :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
-            data-testid="keyvalue-search"
-            @click="onToggleSearch"
-          />
-        </div>
-      </ViewToolbar>
+              <TooltipIconButton
+                :icon="ICON.search"
+                :label="t('studio.common.searchPage.label')"
+                :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
+                data-testid="keyvalue-search"
+                @click="onToggleSearch"
+              />
+            </div>
+          </ViewToolbar>
 
-      <Alert v-if="rt?.status === 'error' && rt.error" variant="error" strip data-testid="keyvalue-error">
-        <AlertDescription>{{ rt.error.message }}</AlertDescription>
-      </Alert>
-      <!-- P43 F6/D7: a failed delete — the edit/add popovers already show their own failures
+          <Alert
+            v-if="rt?.status === 'error' && rt.error"
+            variant="error"
+            strip
+            data-testid="keyvalue-error"
+          >
+            <AlertDescription>{{ rt.error.message }}</AlertDescription>
+          </Alert>
+          <!-- P43 F6/D7: a failed delete — the edit/add popovers already show their own failures
            inline (editError/objectSaveError/addError above); delete has no popover of its own
            to hold one, so it uses the shared per-tab field every other view's own strip does. -->
-      <Alert v-if="rt?.actionError" variant="error" strip data-testid="keyvalue-action-error">
-        <AlertDescription>{{ rt.actionError }}</AlertDescription>
-      </Alert>
-      <!-- P33 D4: an object over SINGLE_ROW_MAX_BYTES has no Body row at all — this is the
+          <Alert v-if="rt?.actionError" variant="error" strip data-testid="keyvalue-action-error">
+            <AlertDescription>{{ rt.actionError }}</AlertDescription>
+          </Alert>
+          <!-- P33 D4: an object over SINGLE_ROW_MAX_BYTES has no Body row at all — this is the
            renderer's own honest explanation of that absence, gated on the same shared constant
            the adapter used, not a parsed string. -->
-      <Alert
-        v-if="isSingleObjectPage && page && objectBodyRow === null && page.memoryBytes !== null"
-        variant="warn"
-        strip
-        data-testid="keyvalue-object-too-large"
-      >
-        <AlertDescription>
-          {{ t('studio.keyValue.tooLarge.description', { size: formatBytes(page.memoryBytes), limit: formatBytes(SINGLE_ROW_MAX_BYTES) }) }}
-        </AlertDescription>
-      </Alert>
-      <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
+          <Alert
+            v-if="isSingleObjectPage && page && objectBodyRow === null && page.memoryBytes !== null"
+            variant="warn"
+            strip
+            data-testid="keyvalue-object-too-large"
+          >
+            <AlertDescription>
+              {{
+                t('studio.keyValue.tooLarge.description', { size: formatBytes(page.memoryBytes), limit: formatBytes(SINGLE_ROW_MAX_BYTES) })
+              }}
+            </AlertDescription>
+          </Alert>
+          <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
            onEdit stages into objectDraft, never writing to S3 directly) — this strip is the
            explicit Save/Discard step that turns the staged draft into a real PutObject. -->
-      <Alert v-if="objectDraft !== null" variant="warn" strip data-testid="keyvalue-object-edit-pending">
-        <AlertDescription>
-          <span data-testid="keyvalue-object-edit-note">{{
-            objectSaveError
+          <Alert
+            v-if="objectDraft !== null"
+            variant="warn"
+            strip
+            data-testid="keyvalue-object-edit-pending"
+          >
+            <AlertDescription>
+              <span data-testid="keyvalue-object-edit-note">{{
+                objectSaveError
               ? t('studio.keyValue.objectEdit.pendingError.status', { error: objectSaveError })
               : t('studio.keyValue.objectEdit.pending.status')
-          }}</span>
-        </AlertDescription>
-        <AlertAction>
-          <Button
-            variant="toolbar-primary"
-            size="kira"
-            data-testid="keyvalue-object-edit-save"
-            :disabled="objectSaving"
-            @click="saveObjectEdit"
-          >
-            {{ t('common.action.save.label') }}
-          </Button>
-        </AlertAction>
-      </Alert>
+              }}</span>
+            </AlertDescription>
+            <AlertAction>
+              <Button
+                variant="toolbar-primary"
+                size="kira"
+                data-testid="keyvalue-object-edit-save"
+                :disabled="objectSaving"
+                @click="saveObjectEdit"
+              >
+                {{ t('common.action.save.label') }}
+              </Button>
+            </AlertAction>
+          </Alert>
 
-      <SearchToolbar
-        v-if="rt?.searchOpen"
-        :tab-id="viewKey"
-        testid-prefix="keyvalue-"
-        kind="rows"
-        :api="pageSearchApi"
-        @go-to-match="onGoToMatch"
-        @close="onCloseSearch"
-      />
+          <SearchToolbar
+            v-if="rt?.searchOpen"
+            :tab-id="viewKey"
+            testid-prefix="keyvalue-"
+            kind="rows"
+            :api="pageSearchApi"
+            @go-to-match="onGoToMatch"
+            @close="onCloseSearch"
+          />
 
-      <div class="bg-bg overflow-hidden flex flex-col flex-1 min-h-0 border-0 rounded-none">
-        <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
-          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-10 shrink-0"></div>
-          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-56 shrink-0">
-            <span class="text-fg overflow-hidden text-ellipsis">{{
-              page?.redisType === 'string'
+          <div class="bg-bg overflow-hidden flex flex-col flex-1 min-h-0 border-0 rounded-none">
+            <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
+              <div
+                class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-10 shrink-0"
+              ></div>
+              <div
+                class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-56 shrink-0"
+              >
+                <span class="text-fg overflow-hidden text-ellipsis">{{
+                  page?.redisType === 'string'
                 ? ''
                 : page?.redisType === 'list'
                   ? t('studio.keyValue.column.index.label')
                   : t('studio.keyValue.column.field.label')
-            }}</span>
-          </div>
-          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap flex-1 min-w-0">
-            <span class="text-fg overflow-hidden text-ellipsis">{{ page?.redisType === 'zset' ? t('studio.keyValue.column.score.label') : t('common.field.value.label') }}</span>
-          </div>
-        </div>
-        <!-- P49 D5/P104 §3.4: the virtualizer's own scroll container (kv-virtual-scroll below) owns
+                }}</span>
+              </div>
+              <div
+                class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap flex-1 min-w-0"
+              >
+                <span class="text-fg overflow-hidden text-ellipsis">{{
+                  page?.redisType === 'zset' ? t('studio.keyValue.column.score.label') : t('common.field.value.label')
+                }}</span>
+              </div>
+            </div>
+            <!-- P49 D5/P104 §3.4: the virtualizer's own scroll container (kv-virtual-scroll below) owns
              scrolling now, against this flex:1/min-height:0 parent — EmptyState's two branches
              above never needed to scroll either. -->
-        <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
-          <EmptyState
-            v-if="!rt || rt.rowCount === 0"
-            :icon="rt ? 'database' : undefined"
-            :title="rt ? t('studio.keyValue.noData.empty') : t('common.state.loading.loading')"
-          >
-            <template v-if="!rt" #media><Spinner :size="24" /></template>
-          </EmptyState>
-          <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+            <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
+              <EmptyState
+                v-if="!rt || rt.rowCount === 0"
+                :icon="rt ? 'database' : undefined"
+                :title="rt ? t('studio.keyValue.noData.empty') : t('common.state.loading.loading')"
+              >
+                <template v-if="!rt" #media><Spinner :size="24" /></template>
+              </EmptyState>
+              <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
-          <SearchFilterNotice
-            v-else-if="displayRows && displayRows.length === 0"
-            data-testid="keyvalue-no-matching-rows"
-            :filter-key="viewKey"
-            show-all-testid="keyvalue-show-all-rows"
-          />
-          <!-- P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against
+              <SearchFilterNotice
+                v-else-if="displayRows && displayRows.length === 0"
+                data-testid="keyvalue-no-matching-rows"
+                :filter-key="viewKey"
+                show-all-testid="keyvalue-show-all-rows"
+              />
+              <!-- P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against
                — this component owns it directly now, VirtualList.vue no longer wraps it. -->
-          <div
-            v-else
-            ref="scrollRef"
-            class="flex-1 min-h-0 overflow-auto"
-            data-testid="virtual-list"
-            role="listbox"
-            :aria-label="t('studio.keyValue.rows.aria')"
-          >
-            <div class="relative w-full" :style="{ height: `${totalSize}px` }">
-              <template v-for="entry in visibleRows" :key="entry.row.index">
-                <div
-                  :class="cn(rowVariants({ layout: 'tree' }), 'cursor-pointer gap-0 h-row px-0', VIRTUAL_ROW_CLASS)"
-                  data-testid="keyvalue-row"
-                  :data-row="entry.i"
-                  :style="{ transform: `translateY(${entry.row.start}px)` }"
-                  role="option"
-                  v-bind="nav.rowProps(String(entry.i))"
-                  :tabindex="nav.tabindexFor(String(entry.i))"
-                  @click="onRowClickFromEvent"
-                  @keydown="onRowKeydownFromEvent"
-                  @contextmenu="onRowContextMenuFromEvent"
-                >
-                  <div class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10 shrink-0">{{ entry.i + 1 }}</div>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
+              <div
+                v-else
+                ref="scrollRef"
+                class="flex-1 min-h-0 overflow-auto"
+                data-testid="virtual-list"
+                role="listbox"
+                :aria-label="t('studio.keyValue.rows.aria')"
+              >
+                <div class="relative w-full" :style="{ height: `${totalSize}px` }">
+                  <template v-for="entry in visibleRows" :key="entry.row.index">
+                    <div
+                      :class="cn(rowVariants({ layout: 'tree' }), 'cursor-pointer gap-0 h-row px-0', VIRTUAL_ROW_CLASS)"
+                      data-testid="keyvalue-row"
+                      :data-row="entry.i"
+                      :style="{ transform: `translateY(${entry.row.start}px)` }"
+                      role="option"
+                      v-bind="nav.rowProps(String(entry.i))"
+                      :tabindex="nav.tabindexFor(String(entry.i))"
+                      @click="onRowClickFromEvent"
+                      @keydown="onRowKeydownFromEvent"
+                      @contextmenu="onRowContextMenuFromEvent"
+                    >
                       <div
-                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate w-56 shrink-0"
-                        :class="[
+                        class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10 shrink-0"
+                        >{{
+                          entry.i + 1
+                        }}</div
+                      >
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <div
+                            class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate w-56 shrink-0"
+                            :class="[
                           {
                             'search-match bg-search-match': isSearchMatch(entry.i, 'field'),
                             'search-match-current bg-search-match-current': isCurrentSearchMatch(
@@ -1128,18 +1241,18 @@ onUnmounted(() => {
                           },
                           isCurrentSearchMatch(entry.i, 'field') ? 'text-bg' : 'text-fg',
                         ]"
-                        data-testid="keyvalue-field"
-                      >
-                        {{ rowAt(entry.i)?.field }}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ rowAt(entry.i)?.field }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <div
-                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate flex-1 min-w-0"
-                        :class="[
+                            data-testid="keyvalue-field"
+                          >
+                            {{ rowAt(entry.i)?.field }}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>{{ rowAt(entry.i)?.field }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <div
+                            class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate flex-1 min-w-0"
+                            :class="[
                           {
                             'search-match bg-search-match': isSearchMatch(entry.i, 'value'),
                             'search-match-current bg-search-match-current': isCurrentSearchMatch(
@@ -1149,28 +1262,36 @@ onUnmounted(() => {
                           },
                           isCurrentSearchMatch(entry.i, 'value') ? 'text-bg' : 'text-fg',
                         ]"
-                        data-testid="keyvalue-value"
-                      >
-                        {{ rowAt(entry.i)?.value }}
-                        <Tooltip v-if="rowAt(entry.i)?.isTruncated">
-                          <TooltipTrigger as-child>
-                            <Badge variant="chip" class="bg-field text-subtle ml-1.5 shrink-0">{{ t('studio.common.truncated.status') }}</Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>{{ t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ rowAt(entry.i)?.value }}</TooltipContent>
-                  </Tooltip>
+                            data-testid="keyvalue-value"
+                          >
+                            {{ rowAt(entry.i)?.value }}
+                            <Tooltip v-if="rowAt(entry.i)?.isTruncated">
+                              <TooltipTrigger as-child>
+                                <Badge
+                                  variant="chip"
+                                  class="bg-field text-subtle ml-1.5 shrink-0"
+                                  >{{
+                                    t('studio.common.truncated.status')
+                                  }}</Badge
+                                >
+                              </TooltipTrigger>
+                              <TooltipContent>{{
+                                t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) })
+                              }}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>{{ rowAt(entry.i)?.value }}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </template>
                 </div>
-              </template>
+              </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
-    </template>
-    </div>
-    <CellEditorDock :tab-id="viewKey" />
+      <CellEditorDock :tab-id="viewKey" />
     </div>
   </div>
 </template>

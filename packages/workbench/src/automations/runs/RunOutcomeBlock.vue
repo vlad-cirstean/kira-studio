@@ -18,25 +18,49 @@ const { copy, copied, error: copyError } = useCopy();
 
 async function copyForAgent(): Promise<void> {
   const tail = props.tail ? await props.tail() : '';
-  await copy(runReportText(props.run, tail), { message: t('automations.run.reportCopied.announce') });
+  await copy(runReportText(props.run, tail), {
+    message: t('automations.run.reportCopied.announce'),
+  });
 }
 </script>
 
 <template>
   <div class="flex flex-col gap-1 text-kira-sm" data-testid="run-outcome">
-    <span data-testid="run-outcome-reason">{{ run.outcome?.reason || t('automations.run.outcome.none.emptyHint') }}</span>
-    <span v-if="run.outcome?.summary" data-testid="run-outcome-summary">{{ run.outcome.summary }}</span>
-    <span v-if="run.outcome?.costUsd !== undefined" class="text-muted-foreground" data-testid="run-outcome-cost">
+    <span data-testid="run-outcome-reason">{{
+      run.outcome?.reason || t('automations.run.outcome.none.emptyHint')
+    }}</span>
+    <span v-if="run.outcome?.summary" data-testid="run-outcome-summary">{{
+      run.outcome.summary
+    }}</span>
+    <span
+      v-if="run.outcome?.costUsd !== undefined"
+      class="text-muted-foreground"
+      data-testid="run-outcome-cost"
+    >
       {{ t('common.cost.label', { value: costText(run.outcome.costUsd) }) }}
     </span>
-    <span v-if="run.outcome?.permissionDenials?.length" class="text-muted-foreground" data-testid="run-outcome-denials">
-      {{ t('automations.run.outcome.denied.label', { tools: run.outcome.permissionDenials.join(', ') }) }}
+    <span
+      v-if="run.outcome?.permissionDenials?.length"
+      class="text-muted-foreground"
+      data-testid="run-outcome-denials"
+    >
+      {{
+        t('automations.run.outcome.denied.label', { tools: run.outcome.permissionDenials.join(', ') })
+      }}
     </span>
     <template v-if="!compact">
-      <span v-if="run.outcome?.exitCode !== undefined" class="text-muted-foreground" data-testid="run-outcome-exit">
+      <span
+        v-if="run.outcome?.exitCode !== undefined"
+        class="text-muted-foreground"
+        data-testid="run-outcome-exit"
+      >
         {{ t('automations.run.outcome.exitCode.label', { code: run.outcome.exitCode }) }}
       </span>
-      <span v-if="run.outcome?.lastError" class="font-data text-error whitespace-pre-wrap" data-testid="run-outcome-error">
+      <span
+        v-if="run.outcome?.lastError"
+        class="font-data text-error whitespace-pre-wrap"
+        data-testid="run-outcome-error"
+      >
         {{ run.outcome.lastError }}
       </span>
     </template>
@@ -45,7 +69,13 @@ async function copyForAgent(): Promise<void> {
       <Button variant="dialog" size="kira-lg" data-testid="run-copy" @click="copyForAgent">
         {{ copied ? t('common.copy.copied.announce') : t('common.copyForAgent.label') }}
       </Button>
-      <Button v-if="run.scriptId" variant="dialog" size="kira-lg" data-testid="run-again" @click="emit('rerun')">
+      <Button
+        v-if="run.scriptId"
+        variant="dialog"
+        size="kira-lg"
+        data-testid="run-again"
+        @click="emit('rerun')"
+      >
         {{ t('automations.run.again.label') }}
       </Button>
     </div>

@@ -52,7 +52,9 @@ useShortcut(head, ['menu.open'], () => {
 // One branch opens Change base at once; several ask which.
 const baseChoices = computed(() => {
   const m = model.value;
-  return m ? changeBaseChoices(props.card, { graph: m.view.graph, after: m.view.after, board: m.board }) : [];
+  return m
+    ? changeBaseChoices(props.card, { graph: m.view.graph, after: m.view.after, board: m.board })
+    : [];
 });
 
 function act(row: BranchRowModel, a: BranchAction): void {
@@ -88,7 +90,9 @@ const labelClass = computed(() => {
 });
 
 // The left border colour is task data (`card.color`) except on a review card, which wears blue.
-const boxStyle = computed(() => (props.card.review ? undefined : { borderLeftColor: props.card.color }));
+const boxStyle = computed(() =>
+  props.card.review ? undefined : { borderLeftColor: props.card.color },
+);
 const boxClass = computed(() => {
   const c = props.card;
   return [
@@ -101,7 +105,9 @@ const boxClass = computed(() => {
   ];
 });
 
-const headStyle = computed(() => (props.card.selected ? undefined : { background: `${props.card.color}1c` }));
+const headStyle = computed(() =>
+  props.card.selected ? undefined : { background: `${props.card.color}1c` },
+);
 </script>
 
 <template>
@@ -170,11 +176,15 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
               class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm"
               :class="labelClass"
               data-testid="ade-stage-label"
-              >{{ p.label }}</span
+              >{{
+                p.label
+              }}</span
             >
             <AdeTip v-if="p.showBar" :text="p.barTip">
               <span class="inline-flex shrink-0 items-center gap-1">
-                <span class="inline-block h-1.25 w-11.5 overflow-hidden rounded-kira-xs bg-border-strong">
+                <span
+                  class="inline-block h-1.25 w-11.5 overflow-hidden rounded-kira-xs bg-border-strong"
+                >
                   <span
                     class="block h-full"
                     :class="p.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid'"
@@ -191,7 +201,9 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
             <span
               class="min-w-0 flex-1 truncate text-kira-sm leading-3.5 text-subtle"
               data-testid="ade-card-meta"
-              >{{ card.meta }}</span
+              >{{
+                card.meta
+              }}</span
             >
           </AdeTip>
           <DropdownMenu v-if="baseChoices.length > 1">
@@ -248,7 +260,8 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
           </TooltipIconButton>
         </div>
         <AdeTip :text="card.title">
-          <Button size="kira"
+          <Button
+            size="kira"
             type="button"
             variant="link"
             class="line-clamp-2 block h-auto justify-start whitespace-normal break-words rounded-none border-0 p-0 text-left text-kira-lg leading-4"
@@ -261,7 +274,13 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
           </Button>
         </AdeTip>
       </div>
-      <AdeBranchRow v-for="row in card.rows" :key="row.id" :row="row" :merged="row.branch.mergedIntoMain" @force-push="emit('forcePush', row)" />
+      <AdeBranchRow
+        v-for="row in card.rows"
+        :key="row.id"
+        :row="row"
+        :merged="row.branch.mergedIntoMain"
+        @force-push="emit('forcePush', row)"
+      />
     </div>
   </div>
 </template>

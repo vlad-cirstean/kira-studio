@@ -34,7 +34,12 @@ function patch(i: number, change: Partial<ScriptParam>): void {
 }
 
 function setType(i: number, type: ScriptParamType): void {
-  patch(i, { type, options: type === 'text' ? [] : (params.value[i]?.options ?? []), default: [], secret: false });
+  patch(i, {
+    type,
+    options: type === 'text' ? [] : (params.value[i]?.options ?? []),
+    default: [],
+    secret: false,
+  });
 }
 
 function addOption(i: number): void {
@@ -55,7 +60,10 @@ function removeOption(i: number, k: number): void {
   const p = params.value[i];
   if (!p) return;
   const old = p.options[k];
-  patch(i, { options: p.options.filter((_, j) => j !== k), default: p.default.filter((d) => d !== old) });
+  patch(i, {
+    options: p.options.filter((_, j) => j !== k),
+    default: p.default.filter((d) => d !== old),
+  });
 }
 
 function moveOption(i: number, k: number, by: -1 | 1): void {
@@ -72,7 +80,9 @@ function toggleDefault(i: number, option: string, on: boolean): void {
   const p = params.value[i];
   if (!p) return;
   const rest = p.default.filter((d) => d !== option);
-  patch(i, { default: p.type === 'multiselect' ? (on ? [...rest, option] : rest) : on ? [option] : [] });
+  patch(i, {
+    default: p.type === 'multiselect' ? (on ? [...rest, option] : rest) : on ? [option] : [],
+  });
 }
 </script>
 
@@ -80,7 +90,16 @@ function toggleDefault(i: number, option: string, on: boolean): void {
   <FieldSet data-testid="params-editor">
     <div class="flex items-center gap-2">
       <FieldLegend class="mb-0">{{ t('automations.params.title.label') }}</FieldLegend>
-      <Button variant="dialog" size="kira-lg" class="ml-auto" data-testid="param-add" @click="add">{{ t('automations.params.add.label') }}</Button>
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        class="ml-auto"
+        data-testid="param-add"
+        @click="add"
+        >{{
+          t('automations.params.add.label')
+        }}</Button
+      >
     </div>
     <FieldDescription v-if="kind === 'script'">
       {{ t('automations.params.scriptHint.description', { variable: PARAM_VAR }) }}
@@ -88,11 +107,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
     <FieldDescription v-else>
       {{ t('automations.params.smartHint.description', { token: '{name}', variable: PARAM_VAR }) }}
     </FieldDescription>
-    <Card
-      v-for="(p, i) in params"
-      :key="i"
-      data-testid="param-row"
-    >
+    <Card v-for="(p, i) in params" :key="i" data-testid="param-row">
       <div class="flex items-center gap-1.5">
         <Input
           :model-value="p.name"
@@ -119,9 +134,15 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           <option value="select">{{ t('common.action.select.label') }}</option>
           <option value="multiselect">{{ t('automations.params.multiselect.option') }}</option>
         </NativeSelect>
-        <TooltipIconButton icon="trash" :label="t('automations.params.remove.tooltip', { name: p.name })" @click="remove(i)" />
+        <TooltipIconButton
+          icon="trash"
+          :label="t('automations.params.remove.tooltip', { name: p.name })"
+          @click="remove(i)"
+        />
       </div>
-      <FieldError v-for="m in errors?.[i] ?? []" :key="m" :data-testid="`param-error-${i}`">{{ m }}</FieldError>
+      <FieldError v-for="m in errors?.[i] ?? []" :key="m" :data-testid="`param-error-${i}`">{{
+        m
+      }}</FieldError>
       <Input
         v-if="p.type === 'text'"
         :model-value="p.default[0] ?? ''"
@@ -146,11 +167,29 @@ function toggleDefault(i: number, option: string, on: boolean): void {
             :data-testid="`param-option-${i}-${k}`"
             @update:model-value="(v) => setOption(i, k, String(v))"
           />
-          <TooltipIconButton icon="arrow-up" :label="t('common.moveUp.tooltip')" @click="moveOption(i, k, -1)" />
-          <TooltipIconButton icon="arrow-down" :label="t('common.moveDown.tooltip')" @click="moveOption(i, k, 1)" />
-          <TooltipIconButton icon="close" :label="t('automations.params.removeOption.tooltip')" @click="removeOption(i, k)" />
+          <TooltipIconButton
+            icon="arrow-up"
+            :label="t('common.moveUp.tooltip')"
+            @click="moveOption(i, k, -1)"
+          />
+          <TooltipIconButton
+            icon="arrow-down"
+            :label="t('common.moveDown.tooltip')"
+            @click="moveOption(i, k, 1)"
+          />
+          <TooltipIconButton
+            icon="close"
+            :label="t('automations.params.removeOption.tooltip')"
+            @click="removeOption(i, k)"
+          />
         </div>
-        <Button variant="dialog" size="kira-lg" class="self-start" :data-testid="`param-option-add-${i}`" @click="addOption(i)">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          class="self-start"
+          :data-testid="`param-option-add-${i}`"
+          @click="addOption(i)"
+        >
           {{ t('automations.params.addOption.label') }}
         </Button>
       </div>

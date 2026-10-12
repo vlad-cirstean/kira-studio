@@ -8,8 +8,6 @@ defineProps<{ what: string }>();
 
 <template>
   <Alert variant="info" strip data-testid="permission-hint">
-    <AlertDescription>
-      {{ what }} {{ t('mobile.permission.allow.hint') }}
-    </AlertDescription>
+    <AlertDescription> {{ what }} {{ t('mobile.permission.allow.hint') }} </AlertDescription>
   </Alert>
 </template>

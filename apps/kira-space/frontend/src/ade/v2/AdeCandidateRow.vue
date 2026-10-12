@@ -15,17 +15,29 @@ const repoLabel = computed(() => repoText(repoLinks.repoColorOf(props.branch.cod
 </script>
 
 <template>
-  <Button size="kira"
+  <Button
+    size="kira"
     variant="ghost"
     class="box-border h-row w-full justify-start gap-2 px-2 text-left text-fg"
     data-testid="ade-candidate"
     @click="emit('pick')"
   >
     <span class="w-13 shrink-0 text-kira-sm text-muted-foreground">{{ ago }}</span>
-    <span class="shrink-0 text-kira-sm" :class="branch.mine ? 'text-fg' : 'text-muted-foreground'">{{
-      branch.mine ? 'you' : branch.author
-    }}</span>
-    <span class="shrink-0 text-kira-sm font-medium" :class="repoLabel.class" :style="repoLabel.style">{{ repo }}</span>
+    <span
+      class="shrink-0 text-kira-sm"
+      :class="branch.mine ? 'text-fg' : 'text-muted-foreground'"
+      >{{
+        branch.mine ? 'you' : branch.author
+      }}</span
+    >
+    <span
+      class="shrink-0 text-kira-sm font-medium"
+      :class="repoLabel.class"
+      :style="repoLabel.style"
+      >{{
+        repo
+      }}</span
+    >
     <span class="min-w-0 flex-1 truncate font-data text-kira-md">{{ branch.name }}</span>
   </Button>
 </template>

@@ -24,24 +24,38 @@ const modeItems = computed(() => [
 ]);
 
 // The selected step: name, run scope, approval gate, timeout, tools, prompt or smart script, results.
-const props = defineProps<{ stageId: string; step: PipelineStep; steps: PipelineStep[]; scopes: string[] }>();
+const props = defineProps<{
+  stageId: string;
+  step: PipelineStep;
+  steps: PipelineStep[];
+  scopes: string[];
+}>();
 const draft = useAdeWorkflowDraftStore();
 const patch = (p: Partial<PipelineStep>): void => draft.patchStep(props.stageId, props.step.id, p);
 
 const scripts = useCustomScriptsStore();
 const smartScripts = computed(() => scripts.records.filter((r) => r.kind === 'smart'));
 const smart = computed(() => props.step.smartScript !== '');
-const script = computed(() => smartScripts.value.find((r) => r.name === props.step.smartScript) ?? null);
+const script = computed(
+  () => smartScripts.value.find((r) => r.name === props.step.smartScript) ?? null,
+);
 const mode = computed(() => (smart.value ? 'smart' : 'prompt'));
 // A step sets its params by name; switching mode clears the other side.
 function setMode(v: string): void {
   if (v === 'smart' && !smart.value) {
-    patch({ smartScript: smartScripts.value[0]?.name ?? '', prompt: '', allowedTools: [], params: {} });
+    patch({
+      smartScript: smartScripts.value[0]?.name ?? '',
+      prompt: '',
+      allowedTools: [],
+      params: {},
+    });
   } else if (v === 'prompt' && smart.value) {
     patch({ smartScript: '', params: {} });
   }
 }
-const bodyParts = computed(() => (script.value ? smartBodyParts(script.value.command, props.step.params) : []));
+const bodyParts = computed(() =>
+  script.value ? smartBodyParts(script.value.command, props.step.params) : [],
+);
 const preview = computed(() => promptParts(props.step.prompt));
 const finish = computed(() => finishStepParts(props.step.results));
 
@@ -49,7 +63,8 @@ const toolsText = ref(formatTools(props.step.allowedTools));
 watch(
   () => props.step.allowedTools,
   (tools) => {
-    if (formatTools(parseTools(toolsText.value)) !== formatTools(tools)) toolsText.value = formatTools(tools);
+    if (formatTools(parseTools(toolsText.value)) !== formatTools(tools))
+      toolsText.value = formatTools(tools);
   },
 );
 function onTools(v: string | number): void {
@@ -63,7 +78,9 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
 <template>
   <div class="flex flex-col gap-2.5" data-testid="ade-wf-step" :data-step-id="step.id">
     <div class="flex items-center gap-2">
-      <Label :for="id('name')" class="sr-only">{{ t('space.ade.workflows.stepInspector.name.aria') }}</Label>
+      <Label :for="id('name')" class="sr-only">{{
+        t('space.ade.workflows.stepInspector.name.aria')
+      }}</Label>
       <Input
         :id="id('name')"
         :model-value="step.name"
@@ -79,7 +96,9 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-start"
         @click="draft.makeStart(stageId, step.id)"
       >
-        {{ isStart ? t('space.ade.workflows.stepInspector.startStep.label') : t('space.ade.workflows.stepInspector.makeStart.label') }}
+        {{
+          isStart ? t('space.ade.workflows.stepInspector.startStep.label') : t('space.ade.workflows.stepInspector.makeStart.label')
+        }}
       </Button>
       <Button
         variant="dialog"
@@ -130,7 +149,9 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       @update:model-value="setMode"
     />
     <div v-if="smart" class="flex flex-col gap-2" data-testid="ade-wf-step-smart">
-      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">{{ t('common.smartScript.label') }}</Label>
+      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">{{
+        t('common.smartScript.label')
+      }}</Label>
       <NativeSelect
         :id="id('script')"
         variant="bordered"
@@ -138,10 +159,16 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-script"
         @update:model-value="(v) => patch({ smartScript: String(v), params: {} })"
       >
-        <option v-if="!script && step.smartScript" :value="step.smartScript">{{ step.smartScript }}</option>
+        <option v-if="!script && step.smartScript" :value="step.smartScript">{{
+          step.smartScript
+        }}</option>
         <option v-for="r in smartScripts" :key="r.id" :value="r.name">✦ {{ r.name }}</option>
       </NativeSelect>
-      <span v-if="step.smartScript && !script" class="text-kira-sm text-error" data-testid="ade-wf-step-script-missing">
+      <span
+        v-if="step.smartScript && !script"
+        class="text-kira-sm text-error"
+        data-testid="ade-wf-step-script-missing"
+      >
         {{ t('space.ade.workflows.stepInspector.scriptMissing.error') }}
       </span>
       <ParamsForm
@@ -150,7 +177,11 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         :params="script.params"
         @update:model-value="(v) => patch({ params: v })"
       />
-      <Card v-if="script" class="font-data text-kira-sm whitespace-pre-wrap" data-testid="ade-wf-step-body">
+      <Card
+        v-if="script"
+        class="font-data text-kira-sm whitespace-pre-wrap"
+        data-testid="ade-wf-step-body"
+      >
         <VarText :parts="bodyParts" />
       </Card>
     </div>
@@ -158,7 +189,9 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       <div class="flex flex-col gap-1">
         <Label :for="id('tools')" class="text-kira-sm text-muted-foreground"
           >{{ t('space.ade.workflows.stepInspector.tools.label') }}
-          <span class="text-subtle">{{ t('space.ade.workflows.stepInspector.tools.hint') }}</span></Label
+          <span class="text-subtle">{{
+            t('space.ade.workflows.stepInspector.tools.hint')
+          }}</span></Label
         >
         <Input
           :id="id('tools')"
@@ -179,7 +212,11 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-prompt"
         @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
       />
-      <Card v-if="step.prompt" class="text-kira-sm text-muted-foreground" data-testid="ade-wf-step-preview">
+      <Card
+        v-if="step.prompt"
+        class="text-kira-sm text-muted-foreground"
+        data-testid="ade-wf-step-preview"
+      >
         <VarText :parts="preview" />
       </Card>
     </template>

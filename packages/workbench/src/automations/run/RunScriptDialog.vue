@@ -4,7 +4,15 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
@@ -156,7 +164,13 @@ useShortcut(window, ['form.submit'], run);
               <Card class="font-data text-kira-sm" data-testid="run-prompt-text">
                 <VarText :parts="promptParts" />
               </Card>
-              <Button variant="dialog" size="kira-lg" class="self-start" data-testid="run-prompt-edit" @click="editPrompt">
+              <Button
+                variant="dialog"
+                size="kira-lg"
+                class="self-start"
+                data-testid="run-prompt-edit"
+                @click="editPrompt"
+              >
                 {{ t('automations.dialog.run.editPrompt.label') }}
               </Button>
             </template>
@@ -170,12 +184,24 @@ useShortcut(window, ['form.submit'], run);
                 @update:model-value="(v) => (oneOff = String(v))"
               />
               <div class="flex items-center gap-2">
-                <Button variant="dialog" size="kira-lg" data-testid="run-prompt-reset" @click="oneOff = null">{{ t('common.action.reset.label') }}</Button>
+                <Button
+                  variant="dialog"
+                  size="kira-lg"
+                  data-testid="run-prompt-reset"
+                  @click="oneOff = null"
+                  >{{
+                    t('common.action.reset.label')
+                  }}</Button
+                >
                 <FieldDescription>{{ t('automations.dialog.run.notSaved.hint') }}</FieldDescription>
               </div>
             </template>
-            <FieldLabel class="mt-1 text-muted-foreground">{{ t('automations.dialog.run.suffix.label') }}</FieldLabel>
-            <div class="font-data text-kira-sm text-muted-foreground" data-testid="run-suffix">{{ pv.suffix }}</div>
+            <FieldLabel class="mt-1 text-muted-foreground">{{
+              t('automations.dialog.run.suffix.label')
+            }}</FieldLabel>
+            <div class="font-data text-kira-sm text-muted-foreground" data-testid="run-suffix">{{
+              pv.suffix
+            }}</div>
           </Field>
 
           <AdeContextFields
@@ -209,9 +235,17 @@ useShortcut(window, ['form.submit'], run);
 
       <DialogFooter>
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" data-testid="run-cancel">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="run-cancel">{{
+            t('common.action.cancel.label')
+          }}</Button>
         </DialogClose>
-        <Button variant="dialog-primary" size="kira-lg" :disabled="!canRun" data-testid="run-start" @click="run">
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :disabled="!canRun"
+          data-testid="run-start"
+          @click="run"
+        >
           {{ t('common.action.run.label') }}
         </Button>
       </DialogFooter>

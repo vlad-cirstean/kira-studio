@@ -70,11 +70,14 @@ interface OpsListItem {
 
 const expandedId = ref<string | null>(null);
 
-const statusFilterOptions = computed(() => [
-  { value: 'all', label: t('common.state.all.option') },
-  { value: 'running', label: t('common.state.running.status') },
-  { value: 'error', label: t('workbench.opLog.errors.option') },
-] as const);
+const statusFilterOptions = computed(
+  () =>
+    [
+      { value: 'all', label: t('common.state.all.option') },
+      { value: 'running', label: t('common.state.running.status') },
+      { value: 'error', label: t('workbench.opLog.errors.option') },
+    ] as const,
+);
 
 const STATUS_LABEL: Record<OpStatus, MessageKey> = {
   running: 'common.state.running.status',
@@ -178,10 +181,14 @@ function durationText(ms: number | null): string | null {
         :items="statusFilterOptions"
         @update:model-value="(v) => emit('update:statusFilter', v as OpLogStatusFilter)"
       />
-      <span class="ml-auto text-muted-foreground">{{ t('automations.runs.running.label', { count: runningCount }) }}</span>
+      <span class="ml-auto text-muted-foreground">{{
+        t('automations.runs.running.label', { count: runningCount })
+      }}</span>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button variant="dialog" size="kira-lg" @click="emit('clear')">{{ t('common.action.clear.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" @click="emit('clear')">{{
+            t('common.action.clear.label')
+          }}</Button>
         </TooltipTrigger>
         <TooltipContent>{{ clearHint }}</TooltipContent>
       </Tooltip>
@@ -213,7 +220,11 @@ function durationText(ms: number | null): string | null {
           has to stay numerically equal to --kira-h-xs (18px), which every row below and any #detail
           content's own fixed-height styling must match.
         -->
-        <ul :aria-label="t('common.module.operations.label')" class="relative m-0 p-0" :style="{ height: `${totalSize}px` }">
+        <ul
+          :aria-label="t('common.module.operations.label')"
+          class="relative m-0 p-0"
+          :style="{ height: `${totalSize}px` }"
+        >
           <template v-for="vi in virtualItems" :key="String(vi.key)">
             <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the list container. -->
             <li
@@ -251,13 +262,17 @@ function durationText(ms: number | null): string | null {
                 <template v-else-if="column.id === 'command'">
                   <Tooltip v-if="listItems[vi.index].record.status === 'error'">
                     <TooltipTrigger as-child>
-                      <span class="font-data truncate min-w-0 text-error block">{{ listItems[vi.index].record.error }}</span>
+                      <span class="font-data truncate min-w-0 text-error block">{{
+                        listItems[vi.index].record.error
+                      }}</span>
                     </TooltipTrigger>
                     <TooltipContent>{{ listItems[vi.index].record.error ?? '' }}</TooltipContent>
                   </Tooltip>
                   <Tooltip v-else>
                     <TooltipTrigger as-child>
-                      <span class="font-data truncate min-w-0 block">{{ displayValue(listItems[vi.index].record.command) }}</span>
+                      <span class="font-data truncate min-w-0 block">{{
+                        displayValue(listItems[vi.index].record.command)
+                      }}</span>
                     </TooltipTrigger>
                     <TooltipContent>{{ listItems[vi.index].record.command ?? '' }}</TooltipContent>
                   </Tooltip>
@@ -272,7 +287,9 @@ function durationText(ms: number | null): string | null {
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <slot name="detail" :record="listItems[vi.index].record" part="command">
-                <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{ t('common.command.label', { value: listItems[vi.index].record.command ?? '' }) }}</span>
+                <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{
+                  t('common.command.label', { value: listItems[vi.index].record.command ?? '' })
+                }}</span>
               </slot>
             </li>
             <li
@@ -282,7 +299,9 @@ function durationText(ms: number | null): string | null {
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <slot name="detail" :record="listItems[vi.index].record" part="error">
-                <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{ t('workbench.opLog.errorDetail.label', { value: listItems[vi.index].record.error ?? '' }) }}</span>
+                <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{
+                  t('workbench.opLog.errorDetail.label', { value: listItems[vi.index].record.error ?? '' })
+                }}</span>
               </slot>
             </li>
           </template>

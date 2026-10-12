@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import type { HTMLAttributes } from 'vue'
-import { dialogBodyClass } from '.'
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
+import { dialogBodyClass } from '.';
 
 const props = defineProps<{
-  flush?: boolean
-  class?: HTMLAttributes['class']
-}>()
+  flush?: boolean;
+  class?: HTMLAttributes['class'];
+}>();
 </script>
 
 <template>

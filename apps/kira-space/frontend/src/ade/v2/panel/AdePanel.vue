@@ -34,10 +34,14 @@ const pane = useLiveSize(
 );
 const width = pane.size;
 
-const card = computed(() => (ui.selectedTaskId ? (model.value?.cardFor(ui.selectedTaskId) ?? null) : null));
+const card = computed(() =>
+  ui.selectedTaskId ? (model.value?.cardFor(ui.selectedTaskId) ?? null) : null,
+);
 /** The selected task when it is archived: it left the board and survives in History. */
 const archived = computed(() =>
-  card.value ? null : (model.value?.board.history.find((h) => h.taskId === ui.selectedTaskId) ?? null),
+  card.value
+    ? null
+    : (model.value?.board.history.find((h) => h.taskId === ui.selectedTaskId) ?? null),
 );
 const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBranchId) ?? null);
 </script>

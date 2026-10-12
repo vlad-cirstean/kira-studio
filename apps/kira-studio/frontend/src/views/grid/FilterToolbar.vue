@@ -38,7 +38,9 @@ const hasError = computed(() => rt.value?.status === 'error');
 // Mirrors PreviewCommandPanel.vue's/ConsoleView.vue's own three-line dialect computed exactly —
 // undefined for every non-SQL connection kind, which filterCompletion.ts's dialect-conditional
 // vocabularies (ILIKE, NULLS FIRST/LAST) already treat as "the non-Postgres list".
-const dialect = computed(() => sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind));
+const dialect = computed(() =>
+  sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind),
+);
 const whereCandidates = computed(() => buildWhereCandidates(props.tab.id, dialect.value));
 const orderByCandidates = computed(() => buildOrderByCandidates(props.tab.id, dialect.value));
 
@@ -138,7 +140,9 @@ const historyTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 function applyFromHistory(where: string | null, orderBy: SortSpec | null): void {
   whereText.value = where ?? '';
   orderByText.value = sortToText(orderBy);
-  void gridViewStore.setFilter(props.tab.id, where).then(() => gridViewStore.setSort(props.tab.id, orderBy));
+  void gridViewStore
+    .setFilter(props.tab.id, where)
+    .then(() => gridViewStore.setSort(props.tab.id, orderBy));
 }
 </script>
 
@@ -155,7 +159,10 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       @click="historyOpen = !historyOpen"
     />
     <Popover :open="historyOpen" @update:open="(v) => (historyOpen = v)">
-      <PopoverAnchor :reference="(historyTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+      <PopoverAnchor
+        :reference="(historyTriggerEl?.$el as HTMLElement) ?? undefined"
+        class="hidden"
+      />
       <FilterHistoryMenu
         v-if="historyOpen"
         :connection-id="tab.connectionId"
@@ -202,7 +209,9 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   </div>
   <Tooltip>
     <TooltipTrigger as-child>
-      <Button variant="toolbar" size="kira" @click="onClear">{{ t('common.action.clear.label') }}</Button>
+      <Button variant="toolbar" size="kira" @click="onClear">{{
+        t('common.action.clear.label')
+      }}</Button>
     </TooltipTrigger>
     <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
   </Tooltip>

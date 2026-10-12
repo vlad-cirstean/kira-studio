@@ -96,10 +96,15 @@ function bandSpans(band: TimelineBand) {
       taskId: s.taskId,
       title: card.title,
       color: card.color,
-      note: t(s.merges ? 'space.ade.plan.view.spanNoteMerges.label' : 'space.ade.plan.view.spanNote.label', {
-        day: s.dayNumber,
-        count: s.dayCount,
-      }),
+      note: t(
+        s.merges
+          ? 'space.ade.plan.view.spanNoteMerges.label'
+          : 'space.ade.plan.view.spanNote.label',
+        {
+          day: s.dayNumber,
+          count: s.dayCount,
+        },
+      ),
       merges: s.merges,
       tip: t('space.ade.plan.view.spanTip.tooltip', { day: dayLabel(m.cal, s.startDay) }),
     };
@@ -109,7 +114,9 @@ function bandSpans(band: TimelineBand) {
 function bandHistory(band: TimelineBand) {
   return band.history.map((h) => ({
     key: h.taskId,
-    how: h.mergedAt ? t('space.ade.plan.view.mergedArchived.status') : t('space.ade.panel.archived.label'),
+    how: h.mergedAt
+      ? t('space.ade.plan.view.mergedArchived.status')
+      : t('space.ade.panel.archived.label'),
     repos: h.codeRepoIds.map(repoLabel).join(' · '),
     title: h.title,
   }));
@@ -132,7 +139,10 @@ function overflowLabel(band: TimelineBand): string {
   const ids = band.overflowTaskIds;
   const day = dayLabel(m.cal, band.overflowMoveTo);
   return ids.length === 1
-    ? t('space.ade.plan.view.overflowOne.label', { day, title: m.cards.get(ids[0] as string)?.title ?? '' })
+    ? t('space.ade.plan.view.overflowOne.label', {
+        day,
+        title: m.cards.get(ids[0] as string)?.title ?? '',
+      })
     : t('space.ade.plan.view.overflowMany.label', { day, count: ids.length });
 }
 
@@ -165,7 +175,9 @@ const dragOverDay = computed(() =>
 );
 
 // ---- day menu
-const dayOff = ref<{ title: string; text: string; yes: string; ids: string[]; to: number } | null>(null);
+const dayOff = ref<{ title: string; text: string; yes: string; ids: string[]; to: number } | null>(
+  null,
+);
 
 function startIdsOf(band: TimelineBand): string[] {
   const entries = model.value?.view.entries;
@@ -223,7 +235,12 @@ function scrollToDay(k: number): void {
   const el = scrollEl.value;
   const target = el?.querySelector<HTMLElement>(`[data-ade-day="${k}"]`);
   if (!el || !target) return;
-  scrollY.value = el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - headerHeight.value - 2;
+  scrollY.value =
+    el.scrollTop +
+    target.getBoundingClientRect().top -
+    el.getBoundingClientRect().top -
+    headerHeight.value -
+    2;
 }
 
 async function openHistory(): Promise<void> {
@@ -246,7 +263,8 @@ const inHistory = computed(() => {
   const el = scrollEl.value;
   const todayBand = el?.querySelector<HTMLElement>('[data-ade-day="0"]');
   if (!el || !todayBand) return false;
-  const todayTop = todayBand.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+  const todayTop =
+    todayBand.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
   return scrollY.value + headerHeight.value < todayTop - 30;
 });
 
@@ -295,84 +313,104 @@ function onForcePush(row: BranchRowModel): void {
 </script>
 
 <template>
-  <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg" data-testid="ade-plan">
-    <QueryState :query="boardQuery" :is-empty="() => false" :loading-label="t('space.ade.plan.view.loading.loading')">
-    <template v-if="model">
-      <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
-        <AdePlanHeader
-          :repos="chips"
-          :all-busy="allBusy"
-          :ripple="model.ripple"
-          @refresh-all="runRefresh([], true)"
-          @refresh-one="(id) => runRefresh([id], false)"
-          @toggle="(id) => ui.toggleRepo(id)"
-        />
-        <AdeHistoryBar v-if="inHistory" @go-to-date="onGoToDate" @hide="hideHistory" @current="scrollToDay(0)" />
-      </div>
-      <div class="px-4 pb-4 pt-3">
-      <div v-if="planError" class="mb-2">
-        <Alert variant="error" data-testid="ade-plan-error">
-          <AlertDescription>{{ planError }}</AlertDescription>
-          <AlertAction>
-            <Button variant="link" size="kira" @click="setPlan.reset()">{{ t('common.action.dismiss.label') }}</Button>
-          </AlertAction>
-        </Alert>
-      </div>
-      <div v-if="!ui.showHistory" class="mb-2.5 ml-15">
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          class="w-full border-dashed bg-transparent text-muted-foreground"
-          data-testid="ade-load-history"
-          @click="openHistory"
-        >
-          <span>↑</span>
-          <span class="font-medium text-fg">{{ model.view.historyButtonLabel }}</span>
-        </Button>
-      </div>
-      <template v-for="band in model.view.bands" :key="band.key">
-        <AdeDayControls v-if="band.isLater" :min-date="minExtraDate" @more-week="onMoreWeek" @pick-date="onPickDate" />
-        <AdeDayBand
-          :band="band"
-          :cards="bandCards(band)"
-          :spans="bandSpans(band)"
-          :history="bandHistory(band)"
-          :overdue-note="overdueNote(band)"
-          :overflow-note="overflowNote(band)"
-          :overflow-label="overflowLabel(band)"
-          :drag-over="dragOverDay === band.key"
-          @select="(id) => ui.select(id)"
-          @rollover="onRollover(band)"
-          @overflow-move="onOverflowMove(band)"
-          @day-menu="(ev) => onDayMenu(band, ev)"
-          @force-push="onForcePush"
-          @drag-start="drag.begin"
-          @drag-end="drag.end"
-        />
+  <div
+    ref="scrollEl"
+    class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg"
+    data-testid="ade-plan"
+  >
+    <QueryState
+      :query="boardQuery"
+      :is-empty="() => false"
+      :loading-label="t('space.ade.plan.view.loading.loading')"
+    >
+      <template v-if="model">
+        <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
+          <AdePlanHeader
+            :repos="chips"
+            :all-busy="allBusy"
+            :ripple="model.ripple"
+            @refresh-all="runRefresh([], true)"
+            @refresh-one="(id) => runRefresh([id], false)"
+            @toggle="(id) => ui.toggleRepo(id)"
+          />
+          <AdeHistoryBar
+            v-if="inHistory"
+            @go-to-date="onGoToDate"
+            @hide="hideHistory"
+            @current="scrollToDay(0)"
+          />
+        </div>
+        <div class="px-4 pb-4 pt-3">
+          <div v-if="planError" class="mb-2">
+            <Alert variant="error" data-testid="ade-plan-error">
+              <AlertDescription>{{ planError }}</AlertDescription>
+              <AlertAction>
+                <Button variant="link" size="kira" @click="setPlan.reset()">{{
+                  t('common.action.dismiss.label')
+                }}</Button>
+              </AlertAction>
+            </Alert>
+          </div>
+          <div v-if="!ui.showHistory" class="mb-2.5 ml-15">
+            <Button
+              variant="dialog"
+              size="kira-lg"
+              class="w-full border-dashed bg-transparent text-muted-foreground"
+              data-testid="ade-load-history"
+              @click="openHistory"
+            >
+              <span>↑</span>
+              <span class="font-medium text-fg">{{ model.view.historyButtonLabel }}</span>
+            </Button>
+          </div>
+          <template v-for="band in model.view.bands" :key="band.key">
+            <AdeDayControls
+              v-if="band.isLater"
+              :min-date="minExtraDate"
+              @more-week="onMoreWeek"
+              @pick-date="onPickDate"
+            />
+            <AdeDayBand
+              :band="band"
+              :cards="bandCards(band)"
+              :spans="bandSpans(band)"
+              :history="bandHistory(band)"
+              :overdue-note="overdueNote(band)"
+              :overflow-note="overflowNote(band)"
+              :overflow-label="overflowLabel(band)"
+              :drag-over="dragOverDay === band.key"
+              @select="(id) => ui.select(id)"
+              @rollover="onRollover(band)"
+              @overflow-move="onOverflowMove(band)"
+              @day-menu="(ev) => onDayMenu(band, ev)"
+              @force-push="onForcePush"
+              @drag-start="drag.begin"
+              @drag-end="drag.end"
+            />
+          </template>
+          <div v-if="model.view.hiddenCount > 0" class="ml-15 mt-2.5">
+            <Button
+              variant="dialog"
+              size="kira-lg"
+              class="w-full border-dashed bg-transparent "
+              data-testid="ade-load-all"
+              @click="ui.showAllItems = true"
+            >
+              ↓ {{ model.view.moreButtonLabel }}
+            </Button>
+          </div>
+          <div v-if="model.view.canCollapse" class="ml-15 mt-2.5">
+            <Button
+              variant="toolbar"
+              size="kira-lg"
+              data-testid="ade-collapse"
+              @click="ui.showAllItems = false"
+            >
+              {{ t('space.ade.plan.view.collapse.label', { count: ITEM_LIMIT }) }}
+            </Button>
+          </div>
+        </div>
       </template>
-      <div v-if="model.view.hiddenCount > 0" class="ml-15 mt-2.5">
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          class="w-full border-dashed bg-transparent "
-          data-testid="ade-load-all"
-          @click="ui.showAllItems = true"
-        >
-          ↓ {{ model.view.moreButtonLabel }}
-        </Button>
-      </div>
-      <div v-if="model.view.canCollapse" class="ml-15 mt-2.5">
-        <Button
-          variant="toolbar"
-          size="kira-lg"
-          data-testid="ade-collapse"
-          @click="ui.showAllItems = false"
-        >
-          {{ t('space.ade.plan.view.collapse.label', { count: ITEM_LIMIT }) }}
-        </Button>
-      </div>
-      </div>
-    </template>
     </QueryState>
     <ConfirmDialogView
       :open="dayOff !== null"

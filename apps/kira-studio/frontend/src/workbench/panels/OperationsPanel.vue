@@ -186,7 +186,13 @@ function menuFor(record: OpRecord): MenuItem[] {
           :read-only="true"
           :single-line="true"
         />
-        <MonacoHost v-else :doc="`error: ${record.error}`" language="plain" :read-only="true" :single-line="true" />
+        <MonacoHost
+          v-else
+          :doc="`error: ${record.error}`"
+          language="plain"
+          :read-only="true"
+          :single-line="true"
+        />
       </div>
     </template>
   </OpLogPanel>

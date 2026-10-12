@@ -84,7 +84,12 @@ const summary = computed(() => {
   <!-- P112 §4.3: a failed tree List used to reject into a void'd promise with nothing shown — this
        is the read side's own strip, alongside the mutation-failure one above. No dismiss: it
        clears itself once the query's own retry/next refetch succeeds. -->
-  <Alert v-if="collectionsStore.treeLoadError" variant="error" strip data-testid="collections-tree-load-error">
+  <Alert
+    v-if="collectionsStore.treeLoadError"
+    variant="error"
+    strip
+    data-testid="collections-tree-load-error"
+  >
     <AlertDescription>{{ collectionsStore.treeLoadError }}</AlertDescription>
   </Alert>
 </template>

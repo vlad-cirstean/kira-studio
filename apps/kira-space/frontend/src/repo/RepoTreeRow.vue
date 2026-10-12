@@ -112,7 +112,9 @@ function onContextMenu(e: MouseEvent): void {
     </span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span class="overflow-hidden text-ellipsis min-w-0" :class="labelStatusClass">{{ row.name }}</span>
+        <span class="overflow-hidden text-ellipsis min-w-0" :class="labelStatusClass">{{
+          row.name
+        }}</span>
       </TooltipTrigger>
       <TooltipContent>{{ row.name }}</TooltipContent>
     </Tooltip>

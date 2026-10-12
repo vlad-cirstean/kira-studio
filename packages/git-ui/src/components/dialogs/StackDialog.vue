@@ -116,9 +116,15 @@ function blockerText(pf: RestackPreflight): string {
     case 'cycle':
       return t('git.dialog.stack.blocker.cycle.error', { branches: b.branches.join(' → ') });
     case 'parentMissing':
-      return t('git.dialog.stack.blocker.parentMissing.error', { branch: b.branch, parent: b.parent });
+      return t('git.dialog.stack.blocker.parentMissing.error', {
+        branch: b.branch,
+        parent: b.parent,
+      });
     case 'checkedOutElsewhere':
-      return t('git.dialog.stack.blocker.checkedOut.error', { branch: b.branch, path: b.worktreePath });
+      return t('git.dialog.stack.blocker.checkedOut.error', {
+        branch: b.branch,
+        path: b.worktreePath,
+      });
     case 'dirtyWorktree':
       return t('git.dialog.stack.blocker.dirty.error');
   }
@@ -144,10 +150,7 @@ function closeDialog(): void {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && closeDialog()">
-    <DialogContent
-      :aria-describedby="undefined"
-      size="md"
-    >
+    <DialogContent :aria-describedby="undefined" size="md">
       <DialogHeader>
         <DialogTitle>
           {{
@@ -201,7 +204,9 @@ function closeDialog(): void {
               </li>
             </ul>
             <p v-if="preflight.needsForcePush.length > 0" class="text-muted-foreground">
-              {{ t('git.dialog.stack.forcePush.hint', { branches: preflight.needsForcePush.join(', ') }) }}
+              {{
+                t('git.dialog.stack.forcePush.hint', { branches: preflight.needsForcePush.join(', ') })
+              }}
             </p>
           </template>
 
@@ -209,7 +214,9 @@ function closeDialog(): void {
             <p>{{ t('git.toolbar.restacking.loading') }}</p>
             <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="(p, i) in stack.progress.value" :key="i">
-                {{ t('git.dialog.stack.progress.status', { branch: p.branch, index: p.index, total: p.total }) }}
+                {{
+                  t('git.dialog.stack.progress.status', { branch: p.branch, index: p.index, total: p.total })
+                }}
               </li>
             </ul>
           </template>
@@ -218,15 +225,23 @@ function closeDialog(): void {
 
       <DialogFooter>
         <template v-if="target?.mode === 'setParent'">
-          <Button variant="dialog" size="kira-lg" @click="closeDialog">{{ t('common.action.cancel.label') }}</Button>
-          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">{{ t('common.action.save.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" @click="closeDialog">{{
+            t('common.action.cancel.label')
+          }}</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">{{
+            t('common.action.save.label')
+          }}</Button>
         </template>
         <template v-else-if="target?.mode === 'restack'">
           <template v-if="stack.restacking.value">
-            <Button variant="dialog" size="kira-lg" @click="cancelRestack">{{ t('git.dialog.stack.cancelRestack.label') }}</Button>
+            <Button variant="dialog" size="kira-lg" @click="cancelRestack">{{
+              t('git.dialog.stack.cancelRestack.label')
+            }}</Button>
           </template>
           <template v-else>
-            <Button variant="dialog" size="kira-lg" @click="closeDialog">{{ t('common.action.close.label') }}</Button>
+            <Button variant="dialog" size="kira-lg" @click="closeDialog">{{
+              t('common.action.close.label')
+            }}</Button>
             <Button
               variant="dialog-primary"
               size="kira-lg"

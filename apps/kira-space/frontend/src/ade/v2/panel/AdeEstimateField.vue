@@ -55,7 +55,8 @@ const canExtend = computed(() => Number(extendBy.value) > 0);
 
 function extend(): void {
   if (!canExtend.value) return;
-  const total = Math.round((Number.parseFloat(parsed.value.num) + Number(extendBy.value)) * 100) / 100;
+  const total =
+    Math.round((Number.parseFloat(parsed.value.num) + Number(extendBy.value)) * 100) / 100;
   emit('save', `${total}${parsed.value.unit}`);
   extendBy.value = '';
 }
@@ -74,7 +75,9 @@ const hint = computed(() =>
   <div class="flex flex-col gap-0.5">
     <div v-if="locked" class="flex min-h-row items-center gap-1.5">
       <span class="text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
-      <Label for="ade-estimate-extend" class="sr-only">{{ t('space.ade.estimate.extend.aria') }}</Label>
+      <Label for="ade-estimate-extend" class="sr-only">{{
+        t('space.ade.estimate.extend.aria')
+      }}</Label>
       <Input
         id="ade-estimate-extend"
         v-model="extendBy"
@@ -85,7 +88,9 @@ const hint = computed(() =>
         class="w-20"
         data-testid="ade-estimate-extend"
       />
-      <span class="text-kira-sm text-muted-foreground">{{ parsed.unit === 'd' ? t('space.ade.estimate.days.option') : t('space.ade.estimate.hours.option') }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{
+        parsed.unit === 'd' ? t('space.ade.estimate.days.option') : t('space.ade.estimate.hours.option')
+      }}</span>
       <Button
         variant="dialog"
         size="kira-lg"

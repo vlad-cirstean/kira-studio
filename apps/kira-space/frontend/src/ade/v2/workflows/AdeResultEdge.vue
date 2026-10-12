@@ -9,7 +9,11 @@ import { type EdgeData, NODE_H, type Point, RANK_SEP } from '../board/workflowGr
 // the left gutter of its stage and enters the target from above, dashed, with its budget.
 const props = defineProps<EdgeProps<EdgeData>>();
 const d = computed(() => props.data as EdgeData);
-const TONE_STROKE = { ok: 'stroke-tone-green-solid', fail: 'stroke-tone-red-solid', neutral: 'stroke-muted-foreground' };
+const TONE_STROKE = {
+  ok: 'stroke-tone-green-solid',
+  fail: 'stroke-tone-red-solid',
+  neutral: 'stroke-muted-foreground',
+};
 const TONE_MARKER = { ok: 'ade-arrow-ok', fail: 'ade-arrow-fail', neutral: 'ade-arrow-neutral' };
 const RADIUS = 10;
 const DROP = 16;
@@ -19,13 +23,19 @@ const HALF_GAP = RANK_SEP / 2;
 
 /** Polyline through the corners, each corner smoothed to at most `RADIUS`. */
 function smoothCorners(pts: Point[]): string {
-  const p = pts.filter((q, i) => i === 0 || q.x !== (pts[i - 1] as Point).x || q.y !== (pts[i - 1] as Point).y);
+  const p = pts.filter(
+    (q, i) => i === 0 || q.x !== (pts[i - 1] as Point).x || q.y !== (pts[i - 1] as Point).y,
+  );
   let out = `M ${(p[0] as Point).x} ${(p[0] as Point).y}`;
   for (let i = 1; i < p.length - 1; i += 1) {
     const a = p[i - 1] as Point;
     const b = p[i] as Point;
     const c = p[i + 1] as Point;
-    const r = Math.min(RADIUS, Math.hypot(b.x - a.x, b.y - a.y) / 2, Math.hypot(c.x - b.x, c.y - b.y) / 2);
+    const r = Math.min(
+      RADIUS,
+      Math.hypot(b.x - a.x, b.y - a.y) / 2,
+      Math.hypot(c.x - b.x, c.y - b.y) / 2,
+    );
     const u = (from: Point, to: Point): Point => {
       const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
       return { x: (to.x - from.x) / len, y: (to.y - from.y) / len };
@@ -66,7 +76,9 @@ const geometry = computed(() => {
   pts.push({ x, y: ty - HALF_GAP }, { x: tx, y: ty - HALF_GAP }, { x: tx, y: ty });
   return { path: smoothCorners(pts), x: sx, y: sy + DROP, anchor: 'centre' };
 });
-const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ` ↩ ≤${d.value.max}` : ''}`);
+const label = computed(
+  () => `${d.value.results.join(', ')}${d.value.loop ? ` ↩ ≤${d.value.max}` : ''}`,
+);
 </script>
 
 <template>

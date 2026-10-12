@@ -37,7 +37,9 @@ const open = computed({
 const attachTo = computed(() => addUi.attachTo);
 const tab = ref('new');
 const tabItems = computed(() => [
-  ...(addUi.attachTo ? [] : [{ value: 'new', label: t('space.ade.board.newTask.label'), testid: 'ade-add-tab-new' }]),
+  ...(addUi.attachTo
+    ? []
+    : [{ value: 'new', label: t('space.ade.board.newTask.label'), testid: 'ade-add-tab-new' }]),
   { value: 'branch', label: t('space.ade.add.tabBranch.label'), testid: 'ade-add-tab-branch' },
 ]);
 const error = ref('');
@@ -73,8 +75,12 @@ watch(open, (o) => {
 });
 
 function toggleRepo(id: string): void {
-  picked.value = picked.value.includes(id) ? picked.value.filter((x) => x !== id) : [...picked.value, id];
-  bases.value = Object.fromEntries(Object.entries(bases.value).filter(([k]) => picked.value.includes(k)));
+  picked.value = picked.value.includes(id)
+    ? picked.value.filter((x) => x !== id)
+    : [...picked.value, id];
+  bases.value = Object.fromEntries(
+    Object.entries(bases.value).filter(([k]) => picked.value.includes(k)),
+  );
 }
 
 const cantAdd = computed(
@@ -110,7 +116,9 @@ const candidates = useCandidates(() => open.value && tab.value === 'branch');
 const addBranch = useAddExistingBranch();
 const shown = computed<CandidateBranch[]>(() => {
   const all = candidates.data.value?.branches ?? [];
-  return all.filter((b) => matchesQuery(`${b.name} ${repoLabel(b.codeRepoId)} ${b.author}`, q.value));
+  return all.filter((b) =>
+    matchesQuery(`${b.name} ${repoLabel(b.codeRepoId)} ${b.author}`, q.value),
+  );
 });
 
 async function pick(b: CandidateBranch): Promise<void> {
@@ -137,14 +145,30 @@ async function pick(b: CandidateBranch): Promise<void> {
         {{ t('space.ade.add.trigger.label') }}
       </Button>
     </PopoverTrigger>
-    <PopoverContent align="end" class="w-120 gap-0 overflow-hidden p-0" data-testid="ade-add-popover">
+    <PopoverContent
+      align="end"
+      class="w-120 gap-0 overflow-hidden p-0"
+      data-testid="ade-add-popover"
+    >
       <div class="border-b border-border p-1">
         <SecondaryTabs v-model="tab" :items="tabItems" size="kira-lg" class="w-full" />
       </div>
-      <div v-if="tab === 'new'" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-3 text-kira-md">
-        <Label for="ade-nw-title" class="text-muted-foreground">{{ t('common.field.title.label') }}</Label>
-        <Input id="ade-nw-title" v-model="title" :placeholder="t('space.ade.add.title.placeholder')" data-testid="ade-nw-title" />
-        <Label for="ade-nw-jira" class="text-muted-foreground">{{ t('common.product.jira.label') }}</Label>
+      <div
+        v-if="tab === 'new'"
+        class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-3 text-kira-md"
+      >
+        <Label for="ade-nw-title" class="text-muted-foreground">{{
+          t('common.field.title.label')
+        }}</Label>
+        <Input
+          id="ade-nw-title"
+          v-model="title"
+          :placeholder="t('space.ade.add.title.placeholder')"
+          data-testid="ade-nw-title"
+        />
+        <Label for="ade-nw-jira" class="text-muted-foreground">{{
+          t('common.product.jira.label')
+        }}</Label>
         <Input
           id="ade-nw-jira"
           v-model="jira"
@@ -152,7 +176,10 @@ async function pick(b: CandidateBranch): Promise<void> {
           data-testid="ade-nw-jira"
         />
         <span class="text-muted-foreground">{{ t('common.module.repositories.label') }}</span>
-        <fieldset :aria-label="t('common.module.repositories.label')" class="m-0 flex min-w-0 flex-wrap gap-1.5 border-0 p-0">
+        <fieldset
+          :aria-label="t('common.module.repositories.label')"
+          class="m-0 flex min-w-0 flex-wrap gap-1.5 border-0 p-0"
+        >
           <Toggle
             v-for="r in repos.data.value?.repos ?? []"
             :key="r.codeRepoId"
@@ -169,7 +196,9 @@ async function pick(b: CandidateBranch): Promise<void> {
           </Toggle>
         </fieldset>
         <template v-for="id in picked" :key="id">
-          <span class="text-muted-foreground" data-testid="ade-nw-base-label">{{ t('space.ade.add.base.label', { repo: repoLabel(id) }) }}</span>
+          <span class="text-muted-foreground" data-testid="ade-nw-base-label">{{
+            t('space.ade.add.base.label', { repo: repoLabel(id) })
+          }}</span>
           <div class="min-w-0" :data-repo-id="id" data-testid="ade-nw-base">
             <AdeBasePicker
               :code-repo-id="id"
@@ -178,7 +207,9 @@ async function pick(b: CandidateBranch): Promise<void> {
             />
           </div>
         </template>
-        <Label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">{{ t('space.common.notes.label') }}</Label>
+        <Label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">{{
+          t('space.common.notes.label')
+        }}</Label>
         <Textarea
           id="ade-nw-notes"
           v-model="notes"
@@ -188,7 +219,13 @@ async function pick(b: CandidateBranch): Promise<void> {
         />
         <span />
         <div class="flex items-center gap-2.5">
-          <Button variant="dialog-primary" size="kira-lg" :disabled="cantAdd" data-testid="ade-nw-add" @click="addNew">
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            :disabled="cantAdd"
+            data-testid="ade-nw-add"
+            @click="addNew"
+          >
             {{ t('space.ade.add.addToLater.label') }}
           </Button>
           <span class="text-kira-sm text-subtle">{{ t('space.ade.add.noBranchesYet.hint') }}</span>
@@ -201,7 +238,9 @@ async function pick(b: CandidateBranch): Promise<void> {
           data-testid="ade-add-attach"
         >
           <CatalogText k="space.ade.add.attach.label">
-            <template #title><span class="font-medium text-fg">{{ attachTo.title }}</span></template>
+            <template #title
+              ><span class="font-medium text-fg">{{ attachTo.title }}</span></template
+            >
           </CatalogText>
         </p>
         <div class="border-b border-border p-1">
@@ -214,11 +253,21 @@ async function pick(b: CandidateBranch): Promise<void> {
           />
         </div>
         <div class="max-h-70 overflow-auto p-1">
-          <AdeCandidateRow v-for="b in shown" :key="`${b.codeRepoId}/${b.name}`" :branch="b" :repo="repoLabel(b.codeRepoId)" @pick="pick(b)" />
-          <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">{{ t('space.common.noBranches.empty') }}</div>
+          <AdeCandidateRow
+            v-for="b in shown"
+            :key="`${b.codeRepoId}/${b.name}`"
+            :branch="b"
+            :repo="repoLabel(b.codeRepoId)"
+            @pick="pick(b)"
+          />
+          <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">{{
+            t('space.common.noBranches.empty')
+          }}</div>
         </div>
       </div>
-      <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-add-error">{{ error }}</FieldError>
+      <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-add-error">{{
+        error
+      }}</FieldError>
     </PopoverContent>
   </Popover>
 </template>

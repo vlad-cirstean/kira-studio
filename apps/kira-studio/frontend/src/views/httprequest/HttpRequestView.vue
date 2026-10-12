@@ -22,7 +22,12 @@ import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
@@ -232,9 +237,7 @@ async function onCopyAsCurl(): Promise<void> {
 // would take literally.
 const canEditRaw = computed(() => canEditAsRaw(props.tab.state.bodyMode));
 const editRawTooltip = computed(() =>
-  canEditRaw.value
-    ? t('studio.api.editRaw.title')
-    : t('studio.http.editRaw.unavailable.tooltip'),
+  canEditRaw.value ? t('studio.api.editRaw.title') : t('studio.http.editRaw.unavailable.tooltip'),
 );
 
 // P9 D9: the buffer is generated pre-substitution, from the tab's own text — {{variables}} appear
@@ -303,11 +306,17 @@ const unresolvedRefs = computed(() => {
 const saveTooltip = computed(() => {
   if (incognito.value) return t('studio.api.common.save.incognito.tooltip');
   if (unresolved.value) return t('studio.api.common.save.checking.tooltip');
-  return t(canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip');
+  return t(
+    canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip',
+  );
 });
 const unresolvedTooltip = computed(() =>
   unresolvedRefs.value
-    .map((r) => (r.kind === 'dynamic' ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name }) : r.name))
+    .map((r) =>
+      r.kind === 'dynamic'
+        ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name })
+        : r.name,
+    )
     .join(', '),
 );
 
@@ -483,28 +492,50 @@ onUnmounted(() => {
         :class="colorMarkClass('dot', railColor)"
         data-testid="conn-dot"
       />
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
-      <span class="text-kira-md text-fg truncate" data-testid="http-request-target">{{ title }}</span>
-      <Badge data variant="chip" :class="methodTextClass(methodToken)" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
+      <span class="size-4 flex items-center justify-center shrink-0"
+        ><CodiconIcon name="globe" :size="13" /></span
+      >
+      <span class="text-kira-md text-fg truncate" data-testid="http-request-target">{{
+        title
+      }}</span>
+      <Badge
+        data
+        variant="chip"
+        :class="methodTextClass(methodToken)"
+        data-testid="http-method-chip"
+        >{{
+          tab.state.method
+        }}</Badge
+      >
       <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
            which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="http-dirty" :aria-label="t('common.state.unsavedChanges.status')">•</span>
+          <span
+            class="text-warn text-kira-lg leading-none"
+            role="img"
+            data-testid="http-dirty"
+            :aria-label="t('common.state.unsavedChanges.status')"
+            >•</span
+          >
         </TooltipTrigger>
         <TooltipContent>{{ t('common.state.unsavedChanges.status') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="http-unresolved-chip">{{ t('common.unresolved.label', { count: unresolvedRefs.length }) }}</Badge>
+          <Badge variant="warn" data-testid="http-unresolved-chip">{{
+            t('common.unresolved.label', { count: unresolvedRefs.length })
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P71 §5.1: the view head's own incognito chip, beside the tab strip's icon. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
-          <Badge variant="chip" data-testid="http-incognito-chip">{{ t('studio.tabs.incognito.label') }}</Badge>
+          <Badge variant="chip" data-testid="http-incognito-chip">{{
+            t('studio.tabs.incognito.label')
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ t('studio.api.common.incognitoChip.tooltip') }}</TooltipContent>
       </Tooltip>
@@ -531,10 +562,7 @@ onUnmounted(() => {
         </Tooltip>
       </span>
     </ViewToolbar>
-    <div
-      :class="colorMarkClass('band', railColor)"
-      data-testid="toolbar-rail"
-    />
+    <div :class="colorMarkClass('band', railColor)" data-testid="toolbar-rail" />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
@@ -637,7 +665,12 @@ onUnmounted(() => {
     </ViewToolbar>
 
     <ViewToolbar border="none">
-      <SecondaryTabs :model-value="tab.state.requestPane" :items="REQUEST_PANE_OPTIONS" data-testid="http-request-pane-toggle" @update:model-value="(v) => setRequestPane(v as HttpRequestPane)" />
+      <SecondaryTabs
+        :model-value="tab.state.requestPane"
+        :items="REQUEST_PANE_OPTIONS"
+        data-testid="http-request-pane-toggle"
+        @update:model-value="(v) => setRequestPane(v as HttpRequestPane)"
+      />
       <TooltipIconButton
         v-if="showFieldFilterToggle"
         :icon="ICON.search"
@@ -700,7 +733,12 @@ onUnmounted(() => {
         data-testid="http-request-pane"
         :style="{ flex: `0 1 ${requestPane.size.value}px` }"
       >
-        <SearchField v-if="fieldFilterOpen && showFieldFilterToggle" v-model="fieldFilterQuery" :placeholder="t('common.action.filter.label')" data-testid="http-field-filter" />
+        <SearchField
+          v-if="fieldFilterOpen && showFieldFilterToggle"
+          v-model="fieldFilterQuery"
+          :placeholder="t('common.action.filter.label')"
+          data-testid="http-field-filter"
+        />
         <QueryParamsTable
           v-if="tab.state.requestPane === 'params'"
           :tab="tab"

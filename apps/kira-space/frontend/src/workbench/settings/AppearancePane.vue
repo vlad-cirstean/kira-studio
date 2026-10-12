@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLegend,
+} from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
@@ -30,7 +36,11 @@ const inlineBlameId = useId();
 <template>
   <div class="contents" v-show="active">
     <FieldLegend class="pt-0">{{ t('common.typography.label') }}</FieldLegend>
-    <FontFamilyField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
+    <FontFamilyField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    />
 
     <FontSizeField
       :appearance="draft.appearance"
@@ -39,11 +49,21 @@ const inlineBlameId = useId();
       :register-field-error="registerFieldError"
     />
 
-    <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>{{ t('space.settings.appearance.rowDensity.description') }}</FieldDescription>
+    <RowDensityField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    >
+      <FieldDescription>{{
+        t('space.settings.appearance.rowDensity.description')
+      }}</FieldDescription>
     </RowDensityField>
 
-    <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
+    <WordWrapField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    >
       <FieldDescription>{{ t('space.settings.appearance.wordWrap.description') }}</FieldDescription>
     </WordWrapField>
 
@@ -57,7 +77,9 @@ const inlineBlameId = useId();
         />
         <FieldContent>
           <Label :for="inlineBlameId">{{ t('space.settings.appearance.inlineBlame.label') }}</Label>
-          <FieldDescription>{{ t('space.settings.appearance.inlineBlame.description') }}</FieldDescription>
+          <FieldDescription>{{
+            t('space.settings.appearance.inlineBlame.description')
+          }}</FieldDescription>
         </FieldContent>
       </Field>
       <TooltipIconButton
@@ -71,6 +93,10 @@ const inlineBlameId = useId();
       />
     </FieldGroup>
 
-    <DateFormatField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
+    <DateFormatField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    />
   </div>
 </template>

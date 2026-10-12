@@ -180,11 +180,7 @@ const nav = useListNavigation<RepoSearchRowVm>({
     <Alert v-if="error" variant="error" data-testid="repo-search-error">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
-    <Alert
-      v-else-if="statusLine"
-      variant="info"
-      data-testid="repo-search-status"
-    >
+    <Alert v-else-if="statusLine" variant="info" data-testid="repo-search-status">
       <AlertDescription>{{ statusLine }}</AlertDescription>
     </Alert>
     <div
@@ -214,4 +210,3 @@ const nav = useListNavigation<RepoSearchRowVm>({
   <!-- P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/lib/
        virtualRows.ts) -- see kira-studio's ProjectTree.vue's identical note. -->
 </template>
-

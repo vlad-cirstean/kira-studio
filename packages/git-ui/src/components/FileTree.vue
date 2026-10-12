@@ -237,7 +237,10 @@ watch(
   (value) => {
     if (value.hiddenCount > 0 && value.hiddenCount !== lastHiddenCount) {
       props.actions.announce(
-        t('git.fileTree.capped.announce', { shown: value.visible.length, total: rows.value.length }),
+        t('git.fileTree.capped.announce', {
+          shown: value.visible.length,
+          total: rows.value.length,
+        }),
       );
     }
     lastHiddenCount = value.hiddenCount;
@@ -401,7 +404,9 @@ function openFileMenu(x: number, y: number, path: string): void {
   contextMenu.openContextMenuAt(
     x,
     y,
-    sectionsToMenuItems(buildFileRowMenu(props.sha !== undefined), (id) => onFileMenuSelect(path, id)),
+    sectionsToMenuItems(buildFileRowMenu(props.sha !== undefined), (id) =>
+      onFileMenuSelect(path, id),
+    ),
   );
 }
 
@@ -430,9 +435,7 @@ async function goToFile(path: string): Promise<void> {
         props.actions.announce(t('git.fileTree.opened.announce', { path: outcome.path }));
         break;
       case 'unavailable':
-        props.actions.announce(
-          t('git.fileTree.openError.error', { path, error: outcome.reason }),
-        );
+        props.actions.announce(t('git.fileTree.openError.error', { path, error: outcome.reason }));
         break;
     }
   } catch (err) {
@@ -585,7 +588,9 @@ const parentSelectId = useId();
             @click.stop
             @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
           >
-            <CodiconIcon :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'" />
+            <CodiconIcon
+              :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'"
+            />
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
             <span
@@ -604,11 +609,14 @@ const parentSelectId = useId();
           <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
                directory row already carries this path via its own ancestor rows). -->
           <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span data-testid="file-tree-status"
+            <span
+              data-testid="file-tree-status"
               class="min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
-              >{{ statusLetter(row.node.change) }}</span
+              >{{
+                statusLetter(row.node.change)
+              }}</span
             >
           </span>
           <StatusDot
@@ -677,7 +685,9 @@ const parentSelectId = useId();
             @click.stop
             @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
           >
-            <CodiconIcon :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'" />
+            <CodiconIcon
+              :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'"
+            />
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
             <span
@@ -696,14 +706,19 @@ const parentSelectId = useId();
           <span
             v-if="dirOf(row.node.path)"
             class="overflow-hidden text-ellipsis text-muted-foreground text-graph-sm"
-            >{{ dirOf(row.node.path) }}</span
+            >{{
+              dirOf(row.node.path)
+            }}</span
           >
           <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span data-testid="file-tree-status"
+            <span
+              data-testid="file-tree-status"
               class="min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
-              >{{ statusLetter(row.node.change) }}</span
+              >{{
+                statusLetter(row.node.change)
+              }}</span
             >
           </span>
           <StatusDot
@@ -726,7 +741,5 @@ const parentSelectId = useId();
     >
       {{ t('git.fileTree.showAll.label', { count: rows.length }) }}
     </Button>
-
   </div>
 </template>
-

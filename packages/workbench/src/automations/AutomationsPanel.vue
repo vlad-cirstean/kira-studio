@@ -219,7 +219,8 @@ async function rerun(run: ScriptRun): Promise<void> {
 const { data: runs } = useScriptRuns();
 const liveRunByScript = computed(() => {
   const m = new Map<string, ScriptRun>();
-  for (const r of runs.value ?? []) if (r.state === 'running' && !m.has(r.scriptId)) m.set(r.scriptId, r);
+  for (const r of runs.value ?? [])
+    if (r.state === 'running' && !m.has(r.scriptId)) m.set(r.scriptId, r);
   return m;
 });
 
@@ -254,7 +255,12 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
             label: t('automations.script.editSchedule.label'),
             icon: 'watch',
             run: () => {
-              editor.value = { script, kind: script.kind, collectionId: null, initialTab: 'schedule' };
+              editor.value = {
+                script,
+                kind: script.kind,
+                collectionId: null,
+                initialTab: 'schedule',
+              };
             },
           },
         ] satisfies MenuItem[])
@@ -365,42 +371,58 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
       </PanelBar>
       <div ref="bodyEl" class="flex min-h-0 flex-1 flex-col" data-testid="automations-body">
         <div v-if="!empty" class="flex h-full flex-col overflow-y-auto">
-          <InlineState v-if="actionError" kind="error" data-testid="script-error">{{ actionError }}</InlineState>
+          <InlineState v-if="actionError" kind="error" data-testid="script-error">{{
+            actionError
+          }}</InlineState>
           <div class="flex flex-col" data-testid="script-list">
             <template v-for="script in view.ungrouped" :key="script.id">
               <Tooltip>
                 <TooltipTrigger as-child>
-                <button
-                type="button"
-                :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
-                :style="rowIndent(0)"
-                :data-testid="`script-${script.id}`"
-                @click="runScript(script)"
-                @contextmenu.prevent.stop="onContextMenu($event, script)"
-              >
-                <span :class="colorMarkClass('rail', script.color)" data-testid="script-rail" aria-hidden="true" />
-                <div class="flex-1 min-w-0 flex flex-col">
-                  <span class="flex min-w-0 items-center gap-1">
-                    <SmartBadge v-if="script.kind === 'smart'" />
-                    <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
-                  </span>
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
-                  <ScriptScheduleLine v-if="script.schedule" :script="script" />
-                </div>
-                <RunElapsed
-                  v-if="liveRunByScript.get(script.id)"
-                  :run="liveRunByScript.get(script.id)!"
-                  class="shrink-0 text-kira-sm text-muted-foreground"
-                />
-                <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
-                  <Spinner
-                    v-if="liveRunByScript.get(script.id)"
-                    label=""
-                    data-testid="script-running"
-                  />
-                  <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
+                    :style="rowIndent(0)"
+                    :data-testid="`script-${script.id}`"
+                    @click="runScript(script)"
+                    @contextmenu.prevent.stop="onContextMenu($event, script)"
+                  >
+                    <span
+                      :class="colorMarkClass('rail', script.color)"
+                      data-testid="script-rail"
+                      aria-hidden="true"
+                    />
+                    <div class="flex-1 min-w-0 flex flex-col">
+                      <span class="flex min-w-0 items-center gap-1">
+                        <SmartBadge v-if="script.kind === 'smart'" />
+                        <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
+                          script.name
+                        }}</span>
+                      </span>
+                      <span
+                        class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm"
+                        >{{
+                          firstLine(script.command)
+                        }}</span
+                      >
+                      <ScriptScheduleLine v-if="script.schedule" :script="script" />
+                    </div>
+                    <RunElapsed
+                      v-if="liveRunByScript.get(script.id)"
+                      :run="liveRunByScript.get(script.id)!"
+                      class="shrink-0 text-kira-sm text-muted-foreground"
+                    />
+                    <span
+                      class="flex w-5 shrink-0 items-center justify-center"
+                      data-testid="script-run-slot"
+                    >
+                      <Spinner
+                        v-if="liveRunByScript.get(script.id)"
+                        label=""
+                        data-testid="script-running"
+                      />
+                      <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
+                    </span>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
               </Tooltip>
@@ -408,7 +430,6 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             <template v-for="group in view.groups" :key="group.collection.id">
               <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
               <div
-                
                 :class="rowVariants({ layout: 'tree' })"
                 :style="rowIndent(0)"
                 data-testid="script-group"
@@ -421,7 +442,11 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   :has-children="group.rows.length > 0"
                   @toggle="toggleGroup(group.collection.id)"
                 />
-                <CodiconIcon name="folder-library" :size="13" class="shrink-0 text-muted-foreground" />
+                <CodiconIcon
+                  name="folder-library"
+                  :size="13"
+                  class="shrink-0 text-muted-foreground"
+                />
                 <InlineEditInput
                   v-if="renamingId === group.collection.id"
                   :name="group.collection.name"
@@ -435,43 +460,60 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
                   :aria-expanded="isOpen(group.collection.id)"
                   @click="toggleGroup(group.collection.id)"
-                >{{ group.collection.name }}</button>
+                  >{{
+                    group.collection.name
+                  }}</button
+                >
                 <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
               </div>
               <div v-if="isOpen(group.collection.id)" class="flex flex-col">
                 <Tooltip v-for="script in group.rows" :key="script.id">
                   <TooltipTrigger as-child>
-                  <button
-                  type="button"
-                  :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
-                  :style="rowIndent(1)"
-                  :data-testid="`script-${script.id}`"
-                  @click="runScript(script)"
-                  @contextmenu.prevent.stop="onContextMenu($event, script)"
-                >
-                  <span :class="colorMarkClass('rail', script.color)" data-testid="script-rail" aria-hidden="true" />
-                  <div class="flex-1 min-w-0 flex flex-col">
-                    <span class="flex min-w-0 items-center gap-1">
-                    <SmartBadge v-if="script.kind === 'smart'" />
-                    <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
-                  </span>
-                    <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
-                  <ScriptScheduleLine v-if="script.schedule" :script="script" />
-                  </div>
-                  <RunElapsed
-                    v-if="liveRunByScript.get(script.id)"
-                    :run="liveRunByScript.get(script.id)!"
-                    class="shrink-0 text-kira-sm text-muted-foreground"
-                  />
-                  <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
-                    <Spinner
-                      v-if="liveRunByScript.get(script.id)"
-                      label=""
-                      data-testid="script-running"
-                    />
-                    <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
-                  </span>
-                </button>
+                    <button
+                      type="button"
+                      :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
+                      :style="rowIndent(1)"
+                      :data-testid="`script-${script.id}`"
+                      @click="runScript(script)"
+                      @contextmenu.prevent.stop="onContextMenu($event, script)"
+                    >
+                      <span
+                        :class="colorMarkClass('rail', script.color)"
+                        data-testid="script-rail"
+                        aria-hidden="true"
+                      />
+                      <div class="flex-1 min-w-0 flex flex-col">
+                        <span class="flex min-w-0 items-center gap-1">
+                          <SmartBadge v-if="script.kind === 'smart'" />
+                          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
+                            script.name
+                          }}</span>
+                        </span>
+                        <span
+                          class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm"
+                          >{{
+                            firstLine(script.command)
+                          }}</span
+                        >
+                        <ScriptScheduleLine v-if="script.schedule" :script="script" />
+                      </div>
+                      <RunElapsed
+                        v-if="liveRunByScript.get(script.id)"
+                        :run="liveRunByScript.get(script.id)!"
+                        class="shrink-0 text-kira-sm text-muted-foreground"
+                      />
+                      <span
+                        class="flex w-5 shrink-0 items-center justify-center"
+                        data-testid="script-run-slot"
+                      >
+                        <Spinner
+                          v-if="liveRunByScript.get(script.id)"
+                          label=""
+                          data-testid="script-running"
+                        />
+                        <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
+                      </span>
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
                 </Tooltip>

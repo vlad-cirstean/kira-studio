@@ -32,19 +32,31 @@ function download(): void {
 </script>
 
 <template>
-  <FieldSet v-if="data && data.state !== 'off'" data-testid="memory-semantic" :data-state="data.state">
+  <FieldSet
+    v-if="data && data.state !== 'off'"
+    data-testid="memory-semantic"
+    :data-state="data.state"
+  >
     <FieldLegend>{{ t('memory.semantic.title') }}</FieldLegend>
     <template v-if="data.state === 'notInstalled'">
       <FieldDescription>{{ t('memory.semantic.description') }}</FieldDescription>
       <Alert v-if="installError" variant="error" data-testid="memory-semantic-error">
         <AlertDescription>{{ installError }}</AlertDescription>
       </Alert>
-      <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-download" @click="download">
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        class="self-start"
+        data-testid="memory-semantic-download"
+        @click="download"
+      >
         {{ t('memory.semantic.download.label', { size: formatBytes(MODEL_BYTES) }) }}
       </Button>
     </template>
     <template v-else-if="data.state === 'downloading'">
-      <FieldDescription>{{ t('memory.semantic.downloading.status', { done: formatBytes(data.done), total: formatBytes(data.total) }) }}</FieldDescription>
+      <FieldDescription>{{
+        t('memory.semantic.downloading.status', { done: formatBytes(data.done), total: formatBytes(data.total) })
+      }}</FieldDescription>
       <Progress :model-value="percent" />
       <Button
         variant="dialog"
@@ -57,17 +69,29 @@ function download(): void {
       </Button>
     </template>
     <template v-else-if="data.state === 'indexing'">
-      <FieldDescription>{{ t('memory.semantic.indexing.status', { done: data.done, total: data.total }) }}</FieldDescription>
+      <FieldDescription>{{
+        t('memory.semantic.indexing.status', { done: data.done, total: data.total })
+      }}</FieldDescription>
       <Progress :model-value="percent" />
     </template>
     <template v-else-if="data.state === 'unavailable'">
       <Alert variant="error" data-testid="memory-semantic-error">
-        <AlertDescription>{{ t('memory.semantic.unavailable.error', { message: data.message }) }}</AlertDescription>
+        <AlertDescription>{{
+          t('memory.semantic.unavailable.error', { message: data.message })
+        }}</AlertDescription>
       </Alert>
-      <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-retry" @click="retry.mutate()">
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        class="self-start"
+        data-testid="memory-semantic-retry"
+        @click="retry.mutate()"
+      >
         {{ t('common.action.retry.label') }}
       </Button>
     </template>
-    <FieldDescription v-else>{{ data.model ? t('memory.semantic.onWithModel.status', { model: data.model }) : t('memory.semantic.on.status') }}</FieldDescription>
+    <FieldDescription v-else>{{
+      data.model ? t('memory.semantic.onWithModel.status', { model: data.model }) : t('memory.semantic.on.status')
+    }}</FieldDescription>
   </FieldSet>
 </template>

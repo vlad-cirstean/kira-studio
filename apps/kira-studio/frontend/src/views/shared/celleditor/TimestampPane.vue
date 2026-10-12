@@ -4,7 +4,12 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { useFocus } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
@@ -107,28 +112,38 @@ watch(calendarOpen, (open) => {
     <Alert class="shrink-0" variant="info" icon="clock" data-testid="cell-editor-timestamp">
       <AlertDescription>
         <div class="flex items-center gap-1">
-        <template v-if="reading">
-          <TimestampReading :subtle="zone !== 'local'" data-testid="cell-editor-timestamp-local"
-            >{{ reading.local }}</TimestampReading
-          >
-          <span class="opacity-50">·</span>
-          <TimestampReading :subtle="zone !== 'utc'" data-testid="cell-editor-timestamp-utc"
-            >{{ reading.utc }}</TimestampReading
-          >
-          <span class="opacity-50">·</span>
-          <TimestampReading subtle data-testid="cell-editor-timestamp-relative">{{
-            reading.relative
+          <template v-if="reading">
+            <TimestampReading
+              :subtle="zone !== 'local'"
+              data-testid="cell-editor-timestamp-local"
+              >{{
+                reading.local
+              }}</TimestampReading
+            >
+            <span class="opacity-50">·</span>
+            <TimestampReading :subtle="zone !== 'utc'" data-testid="cell-editor-timestamp-utc">{{
+              reading.utc
+            }}</TimestampReading>
+            <span class="opacity-50">·</span>
+            <TimestampReading subtle data-testid="cell-editor-timestamp-relative">{{
+              reading.relative
+            }}</TimestampReading>
+          </template>
+          <TimestampReading v-else subtle data-testid="cell-editor-timestamp-unparseable">{{
+            t('studio.cellEditor.timestamp.unparseable.status', { format: formatLabel(format) })
           }}</TimestampReading>
-        </template>
-        <TimestampReading v-else subtle data-testid="cell-editor-timestamp-unparseable"
-          >{{ t('studio.cellEditor.timestamp.unparseable.status', { format: formatLabel(format) }) }}</TimestampReading
-        >
         </div>
       </AlertDescription>
     </Alert>
 
     <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
-      <SecondaryTabs variant="segmented" :model-value="zone" :items="zoneOptions" data-testid="cell-editor-timestamp-zone" @update:model-value="(v) => setZone(v)" />
+      <SecondaryTabs
+        variant="segmented"
+        :model-value="zone"
+        :items="zoneOptions"
+        data-testid="cell-editor-timestamp-zone"
+        @update:model-value="(v) => setZone(v)"
+      />
       <div class="flex-1 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -143,7 +158,9 @@ watch(calendarOpen, (open) => {
               />
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ t('studio.cellEditor.timestamp.field.tooltip', { format: FIELD_PATTERN }) }}</TooltipContent>
+          <TooltipContent>{{
+            t('studio.cellEditor.timestamp.field.tooltip', { format: FIELD_PATTERN })
+          }}</TooltipContent>
         </Tooltip>
       </div>
       <Popover :open="calendarOpen" @update:open="calendarOpen = $event">
@@ -159,11 +176,14 @@ watch(calendarOpen, (open) => {
           />
           <PopoverAnchor :reference="calendarAnchorRef ?? undefined" />
         </span>
-        <PopoverContent align="start" class="w-56 gap-0 p-0" data-testid="cell-editor-timestamp-calendar-popover">
+        <PopoverContent
+          align="start"
+          class="w-56 gap-0 p-0"
+          data-testid="cell-editor-timestamp-calendar-popover"
+        >
           <DateTimePicker :model-value="pickerDate" :zone="zone" @update:model-value="onPick" />
         </PopoverContent>
       </Popover>
     </div>
   </div>
 </template>
-

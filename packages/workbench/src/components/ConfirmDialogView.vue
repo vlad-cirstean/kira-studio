@@ -24,7 +24,9 @@ const props = withDefaults(
     busy?: boolean;
     error?: string;
     touch?: boolean;
-    testids?: Partial<Record<'root' | 'close' | 'message' | 'cancel' | 'confirm' | 'error', string>>;
+    testids?: Partial<
+      Record<'root' | 'close' | 'message' | 'cancel' | 'confirm' | 'error', string>
+    >;
   }>(),
   {
     busy: false,
@@ -44,22 +46,19 @@ const ids = {
   error: 'confirm-dialog-error',
 };
 const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
-
 </script>
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && !busy && emit('cancel')">
-    <DialogContent
-      size="sm"
-      :destructive="tone === 'danger'"
-      :data-testid="id('root')"
-    >
+    <DialogContent size="sm" :destructive="tone === 'danger'" :data-testid="id('root')">
       <DialogHeader :close-testid="id('close')">
         <DialogTitle class="break-all">{{ title }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody>
-        <p v-if="message" class="m-0 whitespace-pre-wrap" :data-testid="id('message')">{{ message }}</p>
+        <p v-if="message" class="m-0 whitespace-pre-wrap" :data-testid="id('message')">{{
+          message
+        }}</p>
         <Alert v-if="error" variant="error" :data-testid="id('error')">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>

@@ -15,7 +15,7 @@ import { matchesQuery } from '@workbench/behaviour/match';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref, } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -70,13 +70,25 @@ const responseCookiesCount = computed(
 
 const RESPONSE_PANE_OPTIONS = computed(() => [
   { value: 'body' as const, label: t('common.body.label'), testid: 'http-response-pane-body' },
-  { value: 'headers' as const, label: t('studio.http.pane.headers.label'), testid: 'http-response-pane-headers' },
-  { value: 'history' as const, label: t('common.module.history.label'), testid: 'http-response-pane-history' },
+  {
+    value: 'headers' as const,
+    label: t('studio.http.pane.headers.label'),
+    testid: 'http-response-pane-headers',
+  },
+  {
+    value: 'history' as const,
+    label: t('common.module.history.label'),
+    testid: 'http-response-pane-history',
+  },
   // P9 D12/F19: the fourth segment — never on screen at the same time as the body's own Pretty/Raw
   // toggle (gated on responsePane === 'body' below), so the shared "Raw" label never collides.
   { value: 'raw' as const, label: t('common.raw.label'), testid: 'http-response-pane-raw' },
   // P10 D11/F19: the fifth segment — where the time went, per hop.
-  { value: 'timeline' as const, label: t('studio.http.pane.timeline.label'), testid: 'http-response-pane-timeline' },
+  {
+    value: 'timeline' as const,
+    label: t('studio.http.pane.timeline.label'),
+    testid: 'http-response-pane-timeline',
+  },
 ]);
 
 // P90 §3.2: the sixth segment, count-badged like REQUEST_PANE_OPTIONS's own Settings/Cookies
@@ -125,7 +137,11 @@ const {
 );
 
 const RESPONSE_VIEW_OPTIONS = computed(() => [
-  { value: 'pretty' as const, label: t('studio.http.view.pretty.label'), testid: 'http-response-view-pretty' },
+  {
+    value: 'pretty' as const,
+    label: t('studio.http.view.pretty.label'),
+    testid: 'http-response-view-pretty',
+  },
   { value: 'raw' as const, label: t('common.raw.label'), testid: 'http-response-view-raw' },
 ]);
 
@@ -259,7 +275,12 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="http-response-pane">
-    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="http-send-error">
+    <Alert
+      strip
+      v-if="rt?.status === 'error' && rt.error"
+      variant="error"
+      data-testid="http-send-error"
+    >
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
@@ -287,8 +308,15 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>{{ t('studio.http.response.timeTooltip.tooltip') }}</TooltipContent>
         </Tooltip>
-        <span class="text-kira-sm text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
-        <SecondaryTabs :model-value="tab.state.responseView" :items="RESPONSE_VIEW_OPTIONS" data-testid="http-response-view-toggle" @update:model-value="(v) => setResponseView(v as 'pretty' | 'raw')" />
+        <span class="text-kira-sm text-subtle" data-testid="http-body-bytes">{{
+          formatBytes(response.bodyBytes)
+        }}</span>
+        <SecondaryTabs
+          :model-value="tab.state.responseView"
+          :items="RESPONSE_VIEW_OPTIONS"
+          data-testid="http-response-view-toggle"
+          @update:model-value="(v) => setResponseView(v as 'pretty' | 'raw')"
+        />
       </template>
       <span v-else class="ml-auto" />
       <!-- D11: only the two panes with a rangeHighlights compartment free (Body, Raw) get the
@@ -302,7 +330,12 @@ onUnmounted(() => {
         data-testid="http-find-toggle"
         @click="toggleFind"
       />
-      <SecondaryTabs :model-value="tab.state.responsePane" :items="RESPONSE_PANE_OPTIONS_WITH_COOKIES" data-testid="http-response-pane-toggle" @update:model-value="(v) => setResponsePane(v as HttpResponsePane)" />
+      <SecondaryTabs
+        :model-value="tab.state.responsePane"
+        :items="RESPONSE_PANE_OPTIONS_WITH_COOKIES"
+        data-testid="http-response-pane-toggle"
+        @update:model-value="(v) => setResponsePane(v as HttpResponsePane)"
+      />
     </ViewToolbar>
 
     <!-- Real-interaction fix (reported bug — the response search bar sat below/at the bottom of
@@ -327,18 +360,29 @@ onUnmounted(() => {
 
     <Alert strip v-if="viewing" variant="info" data-testid="http-history-band">
       <AlertDescription>
-        {{ t('studio.http.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.entry.method ?? '', url: viewing?.snapshot.entry.url ?? '' }) }}
+        {{
+          t('studio.http.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.entry.method ?? '', url: viewing?.snapshot.entry.url ?? '' })
+        }}
       </AlertDescription>
       <AlertAction>
-        <Button variant="toolbar" size="kira" data-testid="http-history-back" @click="onBackToLatest">
-          {{ rt?.response ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label') }}
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="http-history-back"
+          @click="onBackToLatest"
+        >
+          {{
+            rt?.response ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label')
+          }}
         </Button>
       </AlertAction>
     </Alert>
 
     <Alert strip v-if="response?.bodyTruncated" variant="warn" data-testid="http-body-truncated">
       <AlertDescription>
-        {{ t('studio.http.response.truncated.description', { size: formatBytes(response.bodyBytes) }) }}
+        {{
+          t('studio.http.response.truncated.description', { size: formatBytes(response.bodyBytes) })
+        }}
       </AlertDescription>
     </Alert>
     <Alert strip v-if="bodyStorageTruncated" variant="info" data-testid="http-history-truncated">
@@ -353,7 +397,9 @@ onUnmounted(() => {
     </Alert>
     <Alert strip v-if="bodyNotStored" variant="info" data-testid="http-history-binary-note">
       <AlertDescription>
-        {{ t('studio.http.response.binaryNotKept.description', { size: response ? formatBytes(response.bodyBytes) : '' }) }}
+        {{
+          t('studio.http.response.binaryNotKept.description', { size: response ? formatBytes(response.bodyBytes) : '' })
+        }}
       </AlertDescription>
     </Alert>
     <Tooltip v-if="redirectCaption">
@@ -375,18 +421,33 @@ onUnmounted(() => {
       :tab="tab"
       @compare="onCompare"
     />
-    <div v-else-if="tab.state.responsePane === 'headers'" class="flex flex-1 min-h-0 flex-col" data-testid="http-response-headers">
+    <div
+      v-else-if="tab.state.responsePane === 'headers'"
+      class="flex flex-1 min-h-0 flex-col"
+      data-testid="http-response-headers"
+    >
       <template v-if="response">
-        <SearchField v-model="headerFilter" :placeholder="t('studio.http.response.headersFilter.placeholder')" data-testid="http-response-headers-filter" />
+        <SearchField
+          v-model="headerFilter"
+          :placeholder="t('studio.http.response.headersFilter.placeholder')"
+          data-testid="http-response-headers-filter"
+        />
         <span
           v-if="headerFilter.trim()"
           class="text-kira-sm subtle px-1.5 pt-1 pb-0"
           data-testid="http-response-headers-count"
         >
-          {{ t('studio.http.response.headersCount.status', { shown: filteredHeaders.length, count: response.headers.length }) }}
+          {{
+            t('studio.http.response.headersCount.status', { shown: filteredHeaders.length, count: response.headers.length })
+          }}
         </span>
         <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
-          <div v-for="(h, i) in filteredHeaders" :key="i" class="flex gap-1.5 text-kira-sm" data-testid="response-header-row">
+          <div
+            v-for="(h, i) in filteredHeaders"
+            :key="i"
+            class="flex gap-1.5 text-kira-sm"
+            data-testid="response-header-row"
+          >
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
             <span class="wrap-anywhere font-data">{{ h.value }}</span>
           </div>
@@ -402,7 +463,11 @@ onUnmounted(() => {
       :response-highlights="rawResponseHighlights"
     />
     <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
-    <CookiesPane v-else-if="tab.state.responsePane === 'cookies'" mode="response" :response="response" />
+    <CookiesPane
+      v-else-if="tab.state.responsePane === 'cookies'"
+      mode="response"
+      :response="response"
+    />
     <div v-else class="response-body flex flex-1 min-h-0 flex-col">
       <template v-if="response">
         <span

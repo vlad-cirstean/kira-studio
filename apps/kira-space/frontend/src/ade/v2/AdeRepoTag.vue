@@ -11,5 +11,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
 </script>
 
 <template>
-  <Badge variant="chip" :class="tint.class" :style="tint.style" data-testid="ade-repo-tag">{{ label }}</Badge>
+  <Badge variant="chip" :class="tint.class" :style="tint.style" data-testid="ade-repo-tag">{{
+    label
+  }}</Badge>
 </template>

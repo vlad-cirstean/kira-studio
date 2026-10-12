@@ -76,7 +76,10 @@ const diffModeItems = computed(() =>
   })),
 );
 const showingItems = computed(() => [
-  { value: 'needsReview', label: t('git.review.files.needsReview.label', { count: needsReviewCount.value }) },
+  {
+    value: 'needsReview',
+    label: t('git.review.files.needsReview.label', { count: needsReviewCount.value }),
+  },
   { value: 'all', label: t('common.state.all.option') },
 ]);
 
@@ -159,7 +162,9 @@ function onToggleReviewed(path: string): void {
             <span class="sr-only">{{ item.label }}</span>
           </template>
         </SecondaryTabs>
-        <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{ deltaStatusText }}</span>
+        <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{
+          deltaStatusText
+        }}</span>
       </ViewToolbar>
       <FieldError v-if="reviewFiles.diffError.value" class="p-3">
         {{ t('git.review.files.diffError.error', { error: reviewFiles.diffError.value }) }}
@@ -184,7 +189,8 @@ function onToggleReviewed(path: string): void {
         {{ t('git.review.files.nothingToReview.emptyHint') }}
       </p>
 
-      <FileTree data-testid="review-files-tree"
+      <FileTree
+        data-testid="review-files-tree"
         v-else
         class="flex-auto min-h-0 border-b border-border"
         :files="files"
@@ -206,4 +212,3 @@ function onToggleReviewed(path: string): void {
     </template>
   </div>
 </template>
-

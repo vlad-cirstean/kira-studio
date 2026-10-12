@@ -1,44 +1,52 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip'
-import { t } from '@theme/i18n'
-import { cn } from '@theme/lib/utils'
-import type { HTMLAttributes } from 'vue'
-import { ref, useAttrs } from 'vue'
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
+import { ref, useAttrs } from 'vue';
 
 // P110 I2-22 (§3.10): today's InputGroup + InputGroupInput type="number" + two Tooltip-wrapped
 // InputGroupButton steppers recipe, carried once instead of 14 times. Owns the container ref and
 // the stepUp/stepDown + synthetic input/change dispatch that used to live in the now-deleted
 // useNumberStepper.ts composable.
-defineOptions({ inheritAttrs: false })
+defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
-  modelValue: string
-  groupClass?: HTMLAttributes['class']
-  inputClass?: HTMLAttributes['class']
-}>()
+  modelValue: string;
+  groupClass?: HTMLAttributes['class'];
+  inputClass?: HTMLAttributes['class'];
+}>();
 
 // $attrs (testid, @input/@update:model-value, aria-invalid, min/max, id, ...) bind to the inner
 // input. `disabled` additionally reaches the step buttons directly -- stepBy's own el.disabled
 // guard already no-ops a disabled field, but the buttons themselves should show it too.
-const attrs = useAttrs()
+const attrs = useAttrs();
 
-const containerRef = ref<HTMLElement | null>(null)
+const containerRef = ref<HTMLElement | null>(null);
 
 function stepBy(dir: 1 | -1): void {
-  const el = containerRef.value?.querySelector('input')
-  if (!el || el.disabled) return
-  if (dir > 0) el.stepUp()
-  else el.stepDown()
-  el.dispatchEvent(new Event('input', { bubbles: true }))
-  el.dispatchEvent(new Event('change', { bubbles: true }))
+  const el = containerRef.value?.querySelector('input');
+  if (!el || el.disabled) return;
+  if (dir > 0) el.stepUp();
+  else el.stepDown();
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 </script>
 
 <template>
   <div ref="containerRef" class="contents">
-    <InputGroup variant="default" :class="cn('h-control-lg w-full rounded-kira-sm border-border-strong bg-field', props.groupClass)">
+    <InputGroup
+      variant="default"
+      :class="cn('h-control-lg w-full rounded-kira-sm border-border-strong bg-field', props.groupClass)"
+    >
       <InputGroupInput
         type="number"
         :model-value="props.modelValue"

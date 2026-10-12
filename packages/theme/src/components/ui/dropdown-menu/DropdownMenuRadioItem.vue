@@ -1,22 +1,18 @@
 <script setup lang="ts">
-import { CheckIcon } from '@lucide/vue'
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { DropdownMenuRadioItemEmits, DropdownMenuRadioItemProps } from 'reka-ui'
-import {
-  DropdownMenuItemIndicator,
-  DropdownMenuRadioItem,
-  useForwardPropsEmits,
-} from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { CheckIcon } from '@lucide/vue';
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { DropdownMenuRadioItemEmits, DropdownMenuRadioItemProps } from 'reka-ui';
+import { DropdownMenuItemIndicator, DropdownMenuRadioItem, useForwardPropsEmits } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
-const props = defineProps<DropdownMenuRadioItemProps & { class?: HTMLAttributes['class'] }>()
+const props = defineProps<DropdownMenuRadioItemProps & { class?: HTMLAttributes['class'] }>();
 
-const emits = defineEmits<DropdownMenuRadioItemEmits>()
+const emits = defineEmits<DropdownMenuRadioItemEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class')
+const delegatedProps = reactiveOmit(props, 'class');
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const forwarded = useForwardPropsEmits(delegatedProps, emits);
 </script>
 
 <template>

@@ -117,9 +117,16 @@ function onOpenAutoFocus(e: Event): void {
   <div class="relative">
     <Popover modal :open="isOpen" @update:open="(o) => (o ? open() : close())">
       <PopoverTrigger as-child>
-        <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
+        <Button
+          variant="toolbar"
+          size="kira"
+          class="max-w-full"
+          data-testid="base-selector-trigger"
+        >
           <span class="truncate">{{ triggerLabel }}</span>
-          <span v-if="triggerReason" class="text-muted-foreground text-kira-sm">{{ triggerReason }}</span>
+          <span v-if="triggerReason" class="text-muted-foreground text-kira-sm">{{
+            triggerReason
+          }}</span>
           <CodiconIcon :name="STATE_ICONS.chevronDown" :size="13" />
         </Button>
       </PopoverTrigger>
@@ -150,7 +157,9 @@ function onOpenAutoFocus(e: Event): void {
                 @click="pick(candidate.ref)"
               >
                 <span class="truncate">{{ candidate.ref }}</span>
-                <span class="ml-auto text-muted-foreground text-kira-sm">{{ candidateReason(candidate) }}</span>
+                <span class="ml-auto text-muted-foreground text-kira-sm">{{
+                  candidateReason(candidate)
+                }}</span>
               </button>
             </section>
 
@@ -175,18 +184,16 @@ function onOpenAutoFocus(e: Event): void {
                 <CodiconIcon name="cloud" :size="13" />
                 <span class="truncate">{{ row.shortName }}</span>
               </button>
-              <InlineState
-                v-if="hiddenCount > 0"
-                kind="empty"
-                data-testid="base-selector-hidden"
-              >
+              <InlineState v-if="hiddenCount > 0" kind="empty" data-testid="base-selector-hidden">
                 {{ t('git.review.base.hidden.hint', { count: hiddenCount }) }}
               </InlineState>
               <InlineState
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
                 :kind="refsLoading ? 'loading' : 'empty'"
               >
-                {{ refsLoading ? t('git.review.base.loading.loading') : t('common.state.noMatches.empty') }}
+                {{
+                  refsLoading ? t('git.review.base.loading.loading') : t('common.state.noMatches.empty')
+                }}
               </InlineState>
             </section>
           </div>

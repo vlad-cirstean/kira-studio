@@ -101,7 +101,10 @@ const rawLanguage = computed(() =>
 </script>
 
 <template>
-  <div class="h-full overflow-auto flex flex-col text-kira-md gap-1.5 p-2" data-testid="explain-result-view">
+  <div
+    class="h-full overflow-auto flex flex-col text-kira-md gap-1.5 p-2"
+    data-testid="explain-result-view"
+  >
     <template v-if="plan && result">
       <div class="flex items-center flex-wrap gap-2">
         <div
@@ -115,14 +118,30 @@ const rawLanguage = computed(() =>
         </div>
         <Tooltip v-if="nativeCostLabel">
           <TooltipTrigger as-child>
-            <span class="text-muted-foreground text-kira-sm cursor-default" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
+            <span
+              class="text-muted-foreground text-kira-sm cursor-default"
+              data-testid="explain-native-cost"
+              >{{
+                nativeCostLabel
+              }}</span
+            >
           </TooltipTrigger>
           <TooltipContent>{{ t('studio.console.plan.nativeCost.tooltip') }}</TooltipContent>
         </Tooltip>
       </div>
-      <p class="text-muted-foreground text-kira-sm whitespace-pre-wrap break-words font-data" data-testid="explain-statement">{{ result.statement }}</p>
+      <p
+        class="text-muted-foreground text-kira-sm whitespace-pre-wrap break-words font-data"
+        data-testid="explain-statement"
+        >{{
+          result.statement
+        }}</p
+      >
 
-      <ul v-if="plan.issues.length > 0" class="flex flex-col list-none m-0 p-0 gap-1" data-testid="explain-issues">
+      <ul
+        v-if="plan.issues.length > 0"
+        class="flex flex-col list-none m-0 p-0 gap-1"
+        data-testid="explain-issues"
+      >
         <li
           v-for="(issue, i) in plan.issues"
           :key="i"
@@ -134,7 +153,9 @@ const rawLanguage = computed(() =>
           <span>{{ issue.message }}</span>
         </li>
       </ul>
-      <p v-else class="text-subtle m-0" data-testid="explain-no-issues">{{ t('studio.console.plan.noIssues.empty') }}</p>
+      <p v-else class="text-subtle m-0" data-testid="explain-no-issues">{{
+        t('studio.console.plan.noIssues.empty')
+      }}</p>
 
       <div class="border border-border rounded-kira-sm py-1" data-testid="explain-tree">
         <div
@@ -151,16 +172,33 @@ const rawLanguage = computed(() =>
             :aria-label="collapsedIds.has(row.id) ? t('common.action.expand.label') : t('common.action.collapse.label')"
             @click="toggleNode(row.id)"
           >
-            <CodiconIcon :name="collapsedIds.has(row.id) ? 'chevron-right' : 'chevron-down'" :size="12" />
+            <CodiconIcon
+              :name="collapsedIds.has(row.id) ? 'chevron-right' : 'chevron-down'"
+              :size="12"
+            />
           </button>
           <span v-else class="inline-flex items-center w-3 shrink-0 cursor-pointer"></span>
           <span class="font-data">{{ row.node.label }}</span>
-          <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-sm"
-            >{{ t('studio.console.plan.nodeRows.label', { count: row.node.estimatedRows }) }}</span
+          <span
+            v-if="row.node.estimatedRows !== undefined"
+            class="plan-meta text-muted-foreground text-kira-sm"
+            >{{
+              t('studio.console.plan.nodeRows.label', { count: row.node.estimatedRows })
+            }}</span
           >
-          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">{{ t('common.cost.label', { value: formatCount(row.node.cost.total) }) }}</span>
-          <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{ row.node.detail }}</span>
-          <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-sm">{{ metricsLine(row.node) }}</span>
+          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">{{
+            t('common.cost.label', { value: formatCount(row.node.cost.total) })
+          }}</span>
+          <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{
+            row.node.detail
+          }}</span>
+          <span
+            v-if="row.node.metrics.length"
+            class="plan-metrics text-muted-foreground text-kira-sm"
+            >{{
+              metricsLine(row.node)
+            }}</span
+          >
         </div>
       </div>
 
@@ -175,11 +213,22 @@ const rawLanguage = computed(() =>
         />
         <span class="text-muted-foreground text-kira-sm">{{ t('common.raw.label') }}</span>
       </div>
-      <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
-        <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
+      <div
+        v-if="showRaw"
+        class="h-64 border border-border rounded-kira-sm overflow-hidden"
+        data-testid="explain-raw"
+      >
+        <MonacoHost
+          :doc="plan.raw"
+          :language="rawLanguage"
+          :read-only="true"
+          :autocomplete="false"
+        />
       </div>
     </template>
-    <p v-else class="text-muted-foreground text-kira-sm m-0">{{ t('studio.console.plan.empty.empty') }}</p>
+    <p v-else class="text-muted-foreground text-kira-sm m-0">{{
+      t('studio.console.plan.empty.empty')
+    }}</p>
   </div>
   <!-- P110 I2-16: `.verdict.warn`/`.issue-list li[.warn/.info]`/`.plan-row:hover` all moved onto
        the template as ternaries/utilities -- `issue.severity` is exhaustively 'warn'/'info'

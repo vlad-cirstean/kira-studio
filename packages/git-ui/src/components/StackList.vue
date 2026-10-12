@@ -83,8 +83,16 @@ async function removeFromStack(branch: string): Promise<void> {
     <SectionHeading :label="t('git.stack.list.label')" />
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="mb-1">
-      <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
-        <span class="flex-1 min-w-0 truncate" :data-kira-tip="t('git.stack.base.tooltip', { base: group.summary.base })">{{ group.summary.base }}</span>
+      <div
+        class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
+      >
+        <span
+          class="flex-1 min-w-0 truncate"
+          :data-kira-tip="t('git.stack.base.tooltip', { base: group.summary.base })"
+          >{{
+            group.summary.base
+          }}</span
+        >
         <Button
           variant="toolbar"
           size="kira"
@@ -96,7 +104,8 @@ async function removeFromStack(branch: string): Promise<void> {
         </Button>
       </div>
 
-      <div data-testid="branch-row"
+      <div
+        data-testid="branch-row"
         v-for="row in rowsFor(group.branches)"
         :key="row.name"
         class="flex items-center gap-0.5 px-1"
@@ -104,14 +113,18 @@ async function removeFromStack(branch: string): Promise<void> {
         :data-row-id="`stack:${row.name}`"
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
-        <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
-          <span v-if="row.isHead" class="text-kira-sm text-subtle" :data-kira-tip="t('git.common.currentBranch.tooltip')">●</span>
-          <span class="truncate">{{ row.name }}</span>
+        <div
+          data-testid="branch-row-main"
+          class="flex items-center gap-0.5 flex-1 min-w-0 text-left"
+        >
           <span
-            v-if="row.stale"
-            :class="refBadgeClass('warn')"
-            :data-kira-tip="row.staleText"
+            v-if="row.isHead"
+            class="text-kira-sm text-subtle"
+            :data-kira-tip="t('git.common.currentBranch.tooltip')"
+            >●</span
           >
+          <span class="truncate">{{ row.name }}</span>
+          <span v-if="row.stale" :class="refBadgeClass('warn')" :data-kira-tip="row.staleText">
             {{ t('common.stale.status') }}
           </span>
           <button
@@ -123,8 +136,14 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             {{ prBadgeLabel(row.pr) }}
           </button>
-          <span v-if="row.trackText" class="text-kira-sm text-muted-foreground">{{ row.trackText }}</span>
-          <span v-if="row.checkedOutIn" class="text-kira-sm text-subtle" :data-kira-tip="row.checkedOutIn">
+          <span v-if="row.trackText" class="text-kira-sm text-muted-foreground">{{
+            row.trackText
+          }}</span>
+          <span
+            v-if="row.checkedOutIn"
+            class="text-kira-sm text-subtle"
+            :data-kira-tip="row.checkedOutIn"
+          >
             <CodiconIcon name="repo" :size="13" />
           </span>
         </div>
@@ -142,17 +161,23 @@ async function removeFromStack(branch: string): Promise<void> {
     </div>
 
     <div v-if="orphans.visible.length > 0" class="mb-1">
-      <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
+      <div
+        class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
+      >
         <span class="flex-1 min-w-0 truncate">{{ t('git.stack.needsAttention.label') }}</span>
       </div>
-      <div data-testid="branch-row"
+      <div
+        data-testid="branch-row"
         v-for="row in orphanRows()"
         :key="row.name"
         class="flex items-center gap-0.5 px-1"
         :data-row-id="`orphan:${row.name}`"
         :tabindex="focusedRowId === `orphan:${row.name}` ? 0 : -1"
       >
-        <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
+        <div
+          data-testid="branch-row-main"
+          class="flex items-center gap-0.5 flex-1 min-w-0 text-left"
+        >
           <span class="truncate">{{ row.name }}</span>
           <span class="truncate text-kira-sm text-error">{{ row.orphanReason }}</span>
         </div>
@@ -163,7 +188,6 @@ async function removeFromStack(branch: string): Promise<void> {
         />
       </div>
     </div>
-
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"

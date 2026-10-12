@@ -70,7 +70,12 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
     </template>
     <!-- FirstRun.html's empty pane: says what the panel is for, nothing more — the headline
          already lives on the main start page, so it is not repeated here. -->
-    <EmptyState v-else class="h-full" icon="database" :title="t('studio.project.panel.empty.empty')" />
+    <EmptyState
+      v-else
+      class="h-full"
+      icon="database"
+      :title="t('studio.project.panel.empty.empty')"
+    />
   </div>
   <FiltersDialog />
   <CredentialsUpdateDialog v-if="credentialsDialogStore.open" />

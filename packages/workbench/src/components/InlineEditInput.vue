@@ -34,5 +34,5 @@ const edit = useInlineEdit({
     @dblclick.stop
     @keydown="edit.onKeydown"
     @blur="edit.onCommit"
-  />
+  >
 </template>

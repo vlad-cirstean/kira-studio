@@ -203,7 +203,10 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 </script>
 
 <template>
-  <div class="flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5" data-testid="http-timeline-pane">
+  <div
+    class="flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5"
+    data-testid="http-timeline-pane"
+  >
     <template v-if="activeTimeline && activeTimeline.hops.length > 0">
       <!-- D15: a failed send's own partial timeline — the failure sentence names the phase the
            request never got past, from the same measured phases the hop below already shows. -->
@@ -222,12 +225,21 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
         <div class="text-kira-sm text-subtle px-0.5" data-testid="http-timeline-summary">
           {{ summary }}
         </div>
-        <div class="flex flex-wrap gap-1.5 px-0.5 text-kira-sm text-subtle" data-testid="http-timeline-legend">
-          <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="inline-flex items-center gap-0.5">
-            <span class="inline-block h-2 w-2 rounded-kira-sm" :class="seg.bgClass" />{{ t(seg.labelKey) }}
+        <div
+          class="flex flex-wrap gap-1.5 px-0.5 text-kira-sm text-subtle"
+          data-testid="http-timeline-legend"
+        >
+          <span
+            v-for="seg in PHASE_SEGMENTS"
+            :key="seg.key"
+            class="inline-flex items-center gap-0.5"
+          >
+            <span class="inline-block h-2 w-2 rounded-kira-sm" :class="seg.bgClass" />
+            {{ t(seg.labelKey) }}
           </span>
           <span class="inline-flex items-center gap-0.5">
-            <span class="inline-block h-2 w-2 rounded-kira-sm bg-conn-grey" />{{ t('studio.http.timeline.unattributed.label') }}
+            <span class="inline-block h-2 w-2 rounded-kira-sm bg-conn-grey" />
+            {{ t('studio.http.timeline.unattributed.label') }}
           </span>
         </div>
       </div>
@@ -239,14 +251,21 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           class="gap-0.5"
           data-testid="http-timeline-hop"
         >
-          <div class="flex items-center gap-1 text-kira-sm font-data" data-testid="http-timeline-hop-caption">
+          <div
+            class="flex items-center gap-1 text-kira-sm font-data"
+            data-testid="http-timeline-hop-caption"
+          >
             <span class="text-muted-foreground">{{ hop.index + 1 }}</span>
             <span>{{ hop.method }}</span>
-            <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ hop.url }}</span>
+            <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+              hop.url
+            }}</span>
             <span>→</span>
             <Tooltip v-if="hop.status > 0">
               <TooltipTrigger as-child>
-                <Badge data :variant="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</Badge>
+                <Badge data :variant="statusClass(hop.status)"
+                  >{{ hop.status }} {{ hop.statusText }}</Badge
+                >
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(hop.status) }}</TooltipContent>
             </Tooltip>
@@ -271,20 +290,35 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
-                  <span class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="false">
-                    {{ t(seg.labelKey) }} —
+                  <span
+                    class="data-[present=false]:opacity-60"
+                    :data-testid="`http-timeline-phase-${seg.key}`"
+                    data-present="false"
+                  >
+                    {{ t(seg.labelKey) }}
+                    —
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>{{ phaseTooltip(hop, seg.key) }}</TooltipContent>
               </Tooltip>
-              <span v-else class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="true">
+              <span
+                v-else
+                class="data-[present=false]:opacity-60"
+                :data-testid="`http-timeline-phase-${seg.key}`"
+                data-present="true"
+              >
                 {{ t(seg.labelKey) }} {{ formatHopMs(hop[seg.key]!.durationMs) }}
               </span>
             </template>
           </div>
 
-          <div v-if="hopNotes(hop).length > 0" class="flex flex-col gap-0.5 text-kira-sm text-subtle">
-            <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{ n.text }}</div>
+          <div
+            v-if="hopNotes(hop).length > 0"
+            class="flex flex-col gap-0.5 text-kira-sm text-subtle"
+          >
+            <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{
+              n.text
+            }}</div>
           </div>
 
           <details v-if="hop.headers && hop.headers.length > 0" class="group mt-0.5">
@@ -307,7 +341,11 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             >
               {{ t('studio.http.timeline.responseHeaders.label') }}
             </summary>
-            <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-sm py-0.5">
+            <div
+              v-for="(h, i) in response!.headers"
+              :key="i"
+              class="flex gap-1.5 text-kira-sm py-0.5"
+            >
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
               <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
@@ -316,8 +354,18 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </div>
     </template>
 
-    <EmptyState v-else-if="response" data-testid="http-timeline-empty" icon="watch" :title="t('studio.http.timeline.none.empty')" />
-    <EmptyState v-else-if="rt?.status === 'error'" data-testid="http-timeline-empty" :icon="ICON.warning" :title="t('studio.http.timeline.failed.empty')" />
+    <EmptyState
+      v-else-if="response"
+      data-testid="http-timeline-empty"
+      icon="watch"
+      :title="t('studio.http.timeline.none.empty')"
+    />
+    <EmptyState
+      v-else-if="rt?.status === 'error'"
+      data-testid="http-timeline-empty"
+      :icon="ICON.warning"
+      :title="t('studio.http.timeline.failed.empty')"
+    />
     <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
     <!-- P110 I2-17: `.hop-phase[data-present='false']` moved onto the span's own
          `data-[present=false]:opacity-60` (compile-verified) -- no test locates by `.hop-phase`. -->

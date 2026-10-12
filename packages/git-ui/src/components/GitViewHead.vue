@@ -37,12 +37,13 @@ const sync = computed(() => {
       <CodiconIcon name="source-control" :size="13" />
     </span>
     <span class="text-kira-md text-fg truncate" data-testid="git-view-head-name"
-      ><span v-if="repo.dir" class="text-subtle">{{ repo.dir }}</span
-      >{{ repo.name }}</span
+      ><span v-if="repo.dir" class="text-subtle">{{ repo.dir }}</span>{{ repo.name }}</span
     >
     <Badge v-if="headLabel" data-testid="git-view-head-branch">{{ headLabel }}</Badge>
     <Badge v-if="sync" data-testid="git-view-head-sync">{{ sync }}</Badge>
-    <Badge v-if="operation" variant="warn" class="ml-auto" data-testid="git-view-head-operation">{{ operation }}</Badge>
+    <Badge v-if="operation" variant="warn" class="ml-auto" data-testid="git-view-head-operation">{{
+      operation
+    }}</Badge>
   </ViewToolbar>
   <div :class="colorMarkClass('band', repo.color)" />
 </template>

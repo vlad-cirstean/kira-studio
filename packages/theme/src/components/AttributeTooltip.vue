@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 // P104 §6.4: the one attribute-driven tooltip residue. SlickGridHost.vue/ConsoleSlickGrid.vue put
 // `data-kira-tip`/`data-kira-tip-parts` into SlickGrid's own `headerCellAttrs` -- a static bag on
 // DOM SlickGrid creates, not Vue, so no `TooltipTrigger` can wrap a header cell. This drives the
@@ -123,7 +128,9 @@ useEventListener(containerRef, 'focusout', onFocusOut);
               v-if="parts.meta"
               data-testid="tooltip-meta"
               :style="parts.metaColor ? { color: parts.metaColor } : undefined"
-              >{{ parts.meta }}</span
+              >{{
+                parts.meta
+              }}</span
             >
           </div>
           <div v-if="parts.body" data-testid="tooltip-body">{{ parts.body }}</div>

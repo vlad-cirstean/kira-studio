@@ -43,7 +43,8 @@ const {
   scrollElement: filesEl,
 });
 
-const dirtyClass = (d: DirtyEntry): string => (d.code === 'M' ? 'text-tone-amber' : 'text-tone-green');
+const dirtyClass = (d: DirtyEntry): string =>
+  d.code === 'M' ? 'text-tone-amber' : 'text-tone-green';
 const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
 </script>
 
@@ -54,13 +55,19 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
   >
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
       <span class="text-muted-foreground">{{ t('space.common.base.label') }}</span>
-      <span class="font-data text-kira-sm">{{ base }} · ↑{{ branch.ahead }} ↓{{ branch.behind }}</span>
+      <span class="font-data text-kira-sm"
+        >{{ base }}
+        · ↑{{ branch.ahead }}
+        ↓{{ branch.behind }}</span
+      >
       <span class="text-muted-foreground">{{ t('common.worktree.label') }}</span>
       <span
         class="font-data text-kira-sm"
         :class="branch.dirty.length ? 'text-tone-amber' : undefined"
         data-testid="ade-changes-worktree"
-        >{{ worktree }}</span
+        >{{
+          worktree
+        }}</span
       >
       <template v-if="conflicts">
         <span class="text-muted-foreground">{{ t('space.ade.changes.conflicts.label') }}</span>
@@ -100,14 +107,22 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
         <span class="font-data text-kira-sm text-tone-amber-solid">{{ c.sha }}</span>
         <AdeTip :text="commitTitle(c)"><span class="truncate">{{ c.message }}</span></AdeTip>
       </div>
-      <div v-if="branch.commitCount > branch.commits.length" class="text-kira-sm text-muted-foreground">
+      <div
+        v-if="branch.commitCount > branch.commits.length"
+        class="text-kira-sm text-muted-foreground"
+      >
         {{ t('common.more.label', { count: branch.commitCount - branch.commits.length }) }}
       </div>
     </div>
 
     <div class="flex flex-col gap-0.5">
       <div class="text-muted-foreground">{{ t('common.module.files.label') }}</div>
-      <div ref="filesEl" class="max-h-64 overflow-auto" data-testid="ade-changes-files" @scroll.passive="onFilesScroll">
+      <div
+        ref="filesEl"
+        class="max-h-64 overflow-auto"
+        data-testid="ade-changes-files"
+        @scroll.passive="onFilesScroll"
+      >
         <div class="relative w-full" :style="{ height: `${filesSize}px` }">
           <div
             v-for="item in fileItems"

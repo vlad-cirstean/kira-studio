@@ -12,13 +12,22 @@ import { useDebounceFn } from '@vueuse/core';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue';
-import { type PasteCandidate, type PasteField, type PasteResult, parseCredentialPaste } from './parse';
+import {
+  type PasteCandidate,
+  type PasteField,
+  type PasteResult,
+  parseCredentialPaste,
+} from './parse';
 
 // The pasted text lives only in this component's refs: never in a store, localStorage, the op log
 // or the console. Clearing drops the references (JS strings are immutable, so memory is not zeroed).
 // `retain`: keep the text after Apply, for a caller whose apply can fail and be retried; the
 // caller then closes the panel, which clears it on unmount.
-const props = defineProps<{ kind: ConnectionKind; allowed: readonly PasteField[]; retain?: boolean }>();
+const props = defineProps<{
+  kind: ConnectionKind;
+  allowed: readonly PasteField[];
+  retain?: boolean;
+}>();
 const emit = defineEmits<{
   apply: [values: Partial<Record<PasteField, string>>];
   cancel: [];
@@ -116,7 +125,9 @@ function onCancel(): void {
   <div class="flex flex-col gap-2 text-kira-md" data-testid="paste-credentials-panel">
     <div class="flex flex-col gap-1">
       <div class="flex items-center justify-between gap-1">
-        <Label class="leading-none text-muted-foreground">{{ t('studio.project.credentialPaste.heading.label') }}</Label>
+        <Label class="leading-none text-muted-foreground">{{
+          t('studio.project.credentialPaste.heading.label')
+        }}</Label>
         <TooltipIconButton
           :icon="showText ? 'eye-closed' : 'eye'"
           :label="showText ? t('studio.project.credentialPaste.hideText.tooltip') : t('studio.project.credentialPaste.showText.tooltip')"
@@ -159,13 +170,18 @@ function onCancel(): void {
           :data-testid="`paste-credentials-pick-${row.field}`"
           @update:model-value="(v) => (picks[row.field] = Number(v))"
         >
-          <option v-for="(c, i) in row.candidates" :key="i" :value="i">{{ shown(row.field, c) }} ({{ c.label }})</option>
+          <option v-for="(c, i) in row.candidates" :key="i" :value="i"
+            >{{ shown(row.field, c) }}
+            ({{ c.label }})</option
+          >
         </NativeSelect>
         <template v-else>
           <span class="min-w-0 flex-1 truncate font-data">{{ shown(row.field, chosen(row)) }}</span>
           <span class="shrink-0 text-kira-sm text-muted-foreground">{{ chosen(row).label }}</span>
         </template>
-        <Badge v-if="chosen(row).guessed" variant="warn">{{ t('studio.project.credentialPaste.guessed.label') }}</Badge>
+        <Badge v-if="chosen(row).guessed" variant="warn">{{
+          t('studio.project.credentialPaste.guessed.label')
+        }}</Badge>
         <TooltipIconButton
           v-if="row.field === 'password'"
           :icon="showPassword ? 'eye-closed' : 'eye'"
@@ -175,11 +191,19 @@ function onCancel(): void {
         />
       </div>
     </div>
-    <p v-else-if="result && !result.tooLong" class="m-0 text-muted-foreground" data-testid="paste-credentials-empty">
+    <p
+      v-else-if="result && !result.tooLong"
+      class="m-0 text-muted-foreground"
+      data-testid="paste-credentials-empty"
+    >
       {{ t('studio.project.credentialPaste.empty.empty') }}
     </p>
 
-    <p v-if="alsoFound.length > 0" class="m-0 text-kira-sm text-muted-foreground" data-testid="paste-credentials-also-found">
+    <p
+      v-if="alsoFound.length > 0"
+      class="m-0 text-kira-sm text-muted-foreground"
+      data-testid="paste-credentials-also-found"
+    >
       {{ t('studio.project.credentialPaste.alsoFound.hint', { fields: alsoFound.join(', ') }) }}
     </p>
     <div
@@ -194,7 +218,15 @@ function onCancel(): void {
     </div>
 
     <div class="flex justify-end gap-1">
-      <Button variant="dialog" size="kira-lg" data-testid="paste-credentials-cancel" @click="onCancel">{{ t('common.action.cancel.label') }}</Button>
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        data-testid="paste-credentials-cancel"
+        @click="onCancel"
+        >{{
+          t('common.action.cancel.label')
+        }}</Button
+      >
       <Button
         variant="dialog-primary"
         size="kira-lg"

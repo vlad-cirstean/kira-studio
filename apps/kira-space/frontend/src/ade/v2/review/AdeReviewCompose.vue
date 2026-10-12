@@ -32,7 +32,9 @@ const turn: { current: TurnWatch | null } = { current: null };
 
 // Claude Code accepts a pasted message only when it is not waiting for an answer in its terminal.
 const blocked = computed(() => activityKind(props.session) === 'input');
-const canSend = computed(() => store.draft.trim() !== '' && !blocked.value && !sendM.isPending.value);
+const canSend = computed(
+  () => store.draft.trim() !== '' && !blocked.value && !sendM.isPending.value,
+);
 
 function lines(sel: ReviewSelection): string {
   return sel.start === sel.end ? `L${sel.start}` : `L${sel.start}-L${sel.end}`;
@@ -112,9 +114,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-none flex-col gap-1.5 border-t border-border p-2" data-testid="ade-review-compose">
-    <div v-if="store.reference" class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
-      <span class="truncate font-data" data-testid="ade-review-reference">{{ store.reference.path }}:{{ lines(store.reference) }}</span>
+  <div
+    class="flex flex-none flex-col gap-1.5 border-t border-border p-2"
+    data-testid="ade-review-compose"
+  >
+    <div
+      v-if="store.reference"
+      class="flex items-center gap-1.5 text-kira-sm text-muted-foreground"
+    >
+      <span class="truncate font-data" data-testid="ade-review-reference"
+        >{{ store.reference.path }}:{{ lines(store.reference) }}</span
+      >
       <Button
         v-if="store.asked"
         variant="toolbar"
@@ -138,12 +148,28 @@ onUnmounted(() => {
       <Tooltip :disabled="!blocked">
         <TooltipTrigger as-child>
           <span>
-            <Button variant="dialog" size="kira" :disabled="!canSend" data-testid="ade-review-send" @click="send">{{ t('common.action.send.label') }}</Button>
+            <Button
+              variant="dialog"
+              size="kira"
+              :disabled="!canSend"
+              data-testid="ade-review-send"
+              @click="send"
+              >{{
+                t('common.action.send.label')
+              }}</Button
+            >
           </span>
         </TooltipTrigger>
         <TooltipContent>{{ t('space.ade.review.compose.blocked.tooltip') }}</TooltipContent>
       </Tooltip>
-      <span v-if="status" class="text-kira-sm text-muted-foreground" data-testid="ade-review-status">{{ t(STATUS_TEXT[status]) }}</span>
+      <span
+        v-if="status"
+        class="text-kira-sm text-muted-foreground"
+        data-testid="ade-review-status"
+        >{{
+          t(STATUS_TEXT[status])
+        }}</span
+      >
       <FieldError v-else-if="error" data-testid="ade-review-error">{{ error }}</FieldError>
     </div>
   </div>

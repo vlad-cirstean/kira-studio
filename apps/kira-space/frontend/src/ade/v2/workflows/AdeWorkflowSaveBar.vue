@@ -9,11 +9,25 @@ const emit = defineEmits<{ save: []; discard: [] }>();
 
 <template>
   <div class="flex flex-wrap items-center gap-2" data-testid="ade-wf-savebar">
-    <span class="min-w-0 flex-1 text-kira-sm text-subtle">{{ t('space.ade.workflows.saveBar.applies.hint') }}</span>
-    <Button variant="dialog" size="kira-lg" :disabled="!dirty || saving" data-testid="ade-wf-discard" @click="emit('discard')">
+    <span class="min-w-0 flex-1 text-kira-sm text-subtle">{{
+      t('space.ade.workflows.saveBar.applies.hint')
+    }}</span>
+    <Button
+      variant="dialog"
+      size="kira-lg"
+      :disabled="!dirty || saving"
+      data-testid="ade-wf-discard"
+      @click="emit('discard')"
+    >
       {{ t('common.action.discard.label') }}
     </Button>
-    <Button variant="dialog-primary" size="kira-lg" :disabled="!dirty || saving" data-testid="ade-wf-save" @click="emit('save')">
+    <Button
+      variant="dialog-primary"
+      size="kira-lg"
+      :disabled="!dirty || saving"
+      data-testid="ade-wf-save"
+      @click="emit('save')"
+    >
       {{ t('common.action.save.label') }}
     </Button>
   </div>

@@ -140,7 +140,9 @@ function onDiscard(): void {
 }
 
 function onRefresh(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => gridViewStore.reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
+    gridViewStore.reload(props.tab.id),
+  );
 }
 function onStop(): void {
   gridViewStore.stop(props.tab.id);
@@ -193,31 +195,41 @@ function onCloseSearch(): void {
 <template>
   <div class="h-full flex flex-col min-h-0">
     <ViewToolbar data-testid="view-head">
-      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" data-testid="conn-dot" />
-      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
-      <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass"><CodiconIcon :name="targetIcon" :size="13" /></span>
-      <span class="text-kira-md text-fg truncate" data-testid="grid-target">
-        <span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
-      </span>
-      <Badge v-if="targetTail?.kind" data-testid="grid-kind-badge">{{ nodeKindLabel(targetTail.kind) }}</Badge>
-      <Badge v-if="columnCount !== null" data-testid="grid-column-count-badge"
-        >{{ t('studio.grid.columnCount.status', { count: columnCount }) }}</Badge
+      <span
+        v-if="railColor !== undefined"
+        :class="colorMarkClass('dot', railColor)"
+        data-testid="conn-dot"
+      />
+      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"
+        ><EngineIcon :kind="connRecord.kind" :size="13" /></span
       >
+      <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass"
+        ><CodiconIcon :name="targetIcon" :size="13" /></span
+      >
+      <span class="text-kira-md text-fg truncate" data-testid="grid-target">
+        <span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>
+        {{ targetTail?.name ?? tab.path }}
+      </span>
+      <Badge v-if="targetTail?.kind" data-testid="grid-kind-badge">{{
+        nodeKindLabel(targetTail.kind)
+      }}</Badge>
+      <Badge v-if="columnCount !== null" data-testid="grid-column-count-badge">{{
+        t('studio.grid.columnCount.status', { count: columnCount })
+      }}</Badge>
       <Badge data-testid="grid-writable-badge">{{
         effectivelyWritable ? t('studio.grid.writable.status') : t('common.state.readOnly.status')
       }}</Badge>
-      <Badge v-if="rt?.count" data-testid="grid-row-count-badge"
-        >{{ t('studio.grid.rowCount.status', { count: rt.count.value }) }}</Badge
-      >
+      <Badge v-if="rt?.count" data-testid="grid-row-count-badge">{{
+        t('studio.grid.rowCount.status', { count: rt.count.value })
+      }}</Badge>
       <span class="ml-auto flex items-center gap-1">
-        <Badge data v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>
+        <Badge data v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{
+          primaryKeyLabel
+        }}</Badge>
       </span>
     </ViewToolbar>
 
-    <div
-      :class="colorMarkClass('band', railColor)"
-      data-testid="toolbar-rail"
-    />
+    <div :class="colorMarkClass('band', railColor)" data-testid="toolbar-rail" />
     <ViewToolbar data-testid="data-toolbar">
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
@@ -246,14 +258,16 @@ function onCloseSearch(): void {
            group. -->
       <div class="flex items-center gap-1.5 min-w-0">
         <template v-if="tabHasPending">
-          <Badge variant="warn" data-testid="pending-count-chip"
-            >{{ t('studio.grid.pending.rows.status', { count: pendingCount }) }}</Badge
-          >
+          <Badge variant="warn" data-testid="pending-count-chip">{{
+            t('studio.grid.pending.rows.status', { count: pendingCount })
+          }}</Badge>
           <span
             v-if="offPageCount > 0"
             class="text-kira-sm text-muted-foreground truncate"
             data-testid="pending-off-page"
-            >{{ t('studio.grid.pending.offPage.status', { count: offPageCount }) }}</span
+            >{{
+              t('studio.grid.pending.offPage.status', { count: offPageCount })
+            }}</span
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">
             <div ref="previewAnchorRef" class="relative">
@@ -310,7 +324,12 @@ function onCloseSearch(): void {
 
     <div class="flex flex-1 min-h-0 flex-col">
       <div class="flex min-h-0 flex-1 flex-col">
-        <EmptyState v-if="needsReconnect" data-testid="reconnect-panel" icon="plug" :title="t('studio.common.disconnected.empty')">
+        <EmptyState
+          v-if="needsReconnect"
+          data-testid="reconnect-panel"
+          icon="plug"
+          :title="t('studio.common.disconnected.empty')"
+        >
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -325,7 +344,8 @@ function onCloseSearch(): void {
                that started it (RunState, above), never a bar across the top of the view — §8.5's
                "never a spinner that replaces the previous page" still holds, it just no longer needs a
                bar of its own to say so. -->
-          <Alert strip
+          <Alert
+            strip
             v-if="rt?.status === 'error' && rt.error"
             variant="error"
             data-testid="error-strip"
@@ -335,7 +355,8 @@ function onCloseSearch(): void {
           </Alert>
           <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
                showing a perfectly valid page, only the write was refused. -->
-          <Alert strip
+          <Alert
+            strip
             v-if="rt?.actionError"
             variant="error"
             data-testid="data-action-error"
@@ -347,7 +368,13 @@ function onCloseSearch(): void {
                stored data — a preview convenience (§6.1), not the security boundary, but a user
                switching tabs or taking a screenshot must not mistake a bucket string for a literal
                value. -->
-          <Alert strip v-if="rt?.maskPreview" variant="info" icon="eye-closed" data-testid="mask-preview-strip">
+          <Alert
+            strip
+            v-if="rt?.maskPreview"
+            variant="info"
+            icon="eye-closed"
+            data-testid="mask-preview-strip"
+          >
             <AlertDescription>{{ t('studio.grid.maskPreview.description') }}</AlertDescription>
           </Alert>
           <div class="flex-1 min-h-0 relative">

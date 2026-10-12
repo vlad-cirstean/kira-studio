@@ -31,7 +31,12 @@ import { SlickEventHandler, type SlickHybridSelectionModel, SlickRange } from 's
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
-import { correlationKeyFor, loadMaskRules, maskRulesFor, maskRulesQueryKey } from '../../state/maskRules';
+import {
+  correlationKeyFor,
+  loadMaskRules,
+  maskRulesFor,
+  maskRulesQueryKey,
+} from '../../state/maskRules';
 import { useSettingsStore } from '../../state/settings';
 import { useTabsStore } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
@@ -921,7 +926,12 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
   const ds = dataSource;
   grid.setCellCssStyles(
     'kira-cell-selected',
-    computeCellFillHash(pageSel, grid.lastRenderedRowBounds, (pos) => ds.getItem(pos).row, fieldAtDisplayCol),
+    computeCellFillHash(
+      pageSel,
+      grid.lastRenderedRowBounds,
+      (pos) => ds.getItem(pos).row,
+      fieldAtDisplayCol,
+    ),
   );
 }
 
@@ -1076,7 +1086,12 @@ function placeNavButtonsForRenderedCells(): void {
     btn.className = NAV_BTN_CLASS;
     btn.dataset.testid = 'cell-nav-button';
     btn.dataset.navKind = isFk ? 'fk' : 'pk';
-    btn.setAttribute('aria-label', isFk ? t('studio.grid.nav.goTo.aria') : t('studio.definition.constraint.type.referencedBy.label'));
+    btn.setAttribute(
+      'aria-label',
+      isFk
+        ? t('studio.grid.nav.goTo.aria')
+        : t('studio.definition.constraint.type.referencedBy.label'),
+    );
     const icon = document.createElement('span');
     icon.setAttribute('aria-hidden', 'true');
     icon.style.fontSize = '13px';
@@ -1357,7 +1372,11 @@ function onSelectAll(): void {
   if (displayRowCount <= 0 || colCount <= 0) return;
   // Clears the model's ranges, SlickGrid's fill hash and `rt().selection`; also resets the flag.
   selectionModel.setSelectedRanges([]);
-  const all = selectionFromRanges([new SlickRange(0, 1, displayRowCount - 1, colCount)], false, null);
+  const all = selectionFromRanges(
+    [new SlickRange(0, 1, displayRowCount - 1, colCount)],
+    false,
+    null,
+  );
   const entry = rt();
   if (!entry || !all) return;
   entry.selection = toPageRowSelection(all);
@@ -2304,7 +2323,9 @@ watch(
     lastAppliedOrderKey = orderKey;
     formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
     dataSource.setState(dataSourceState(p, order));
-    grid.setColumns(buildColumns(p, order, currentWidths(), settledWidthsFor(p), rt()?.meta ?? null));
+    grid.setColumns(
+      buildColumns(p, order, currentWidths(), settledWidthsFor(p), rt()?.meta ?? null),
+    );
     grid.updateRowCount();
     grid.invalidateAllRows();
     // C5 — the rendered band's own numbers can coincidentally match the pre-reload band (a page
@@ -2443,29 +2464,26 @@ watch(
 // toolbar's "masked" banner both already reflecting the change. `loadMaskRules` writes a fresh
 // array to the cache on every write, so watching the query's data ref (rather than deep-watching
 // its contents) is enough to catch every upsert/remove for the tab's current connection.
-watch(
-  [() => rt()?.maskPreview, () => maskRulesQuery.data.value],
-  async () => {
-    foldMaskRulesOnly();
-    try {
-      await refreshMaskTagCache();
-    } catch (err) {
-      // M7 finding #11: a correlation-key fetch failure must not leave the preview claiming "on"
-      // while the grid quietly never applied it (a fail-open) — turn it back off and surface why,
-      // then still fall through to the render below so that toggle-off state actually reaches the
-      // grid. setMaskPreview(false) is a no-op guard-wise (its pending-changes guard only blocks
-      // turning preview ON), and reassigning this watch's own `rt().maskPreview` dependency to the
-      // same false-vs-already-false value it may already hold means this fires at most once more.
-      gridViewStore.setMaskPreview(props.tabId, false);
-      gridViewStore.setActionError(props.tabId, errorText(err));
-    }
-    if (!grid || !dataSource) return;
-    const p = getPage(props.tabId);
-    dataSource.setState(dataSourceState(p, currentOrder()));
-    grid.invalidateAllRows();
-    grid.render();
-  },
-);
+watch([() => rt()?.maskPreview, () => maskRulesQuery.data.value], async () => {
+  foldMaskRulesOnly();
+  try {
+    await refreshMaskTagCache();
+  } catch (err) {
+    // M7 finding #11: a correlation-key fetch failure must not leave the preview claiming "on"
+    // while the grid quietly never applied it (a fail-open) — turn it back off and surface why,
+    // then still fall through to the render below so that toggle-off state actually reaches the
+    // grid. setMaskPreview(false) is a no-op guard-wise (its pending-changes guard only blocks
+    // turning preview ON), and reassigning this watch's own `rt().maskPreview` dependency to the
+    // same false-vs-already-false value it may already hold means this fires at most once more.
+    gridViewStore.setMaskPreview(props.tabId, false);
+    gridViewStore.setActionError(props.tabId, errorText(err));
+  }
+  if (!grid || !dataSource) return;
+  const p = getPage(props.tabId);
+  dataSource.setState(dataSourceState(p, currentOrder()));
+  grid.invalidateAllRows();
+  grid.render();
+});
 
 // P22 Pass B, C14 — DataGrid.vue's own `selectionTarget()`/publish watch (its own comment: "the
 // cell editor's target"), ported: `onSelectedRangesChanged`/`onGridActiveCellChanged` above already
@@ -2708,7 +2726,13 @@ defineExpose({
   >
     <div ref="rootRef" class="slick-grid-mount h-full w-full"></div>
     <AttributeTooltip :container="headerRowEls" />
-    <EmptyState v-if="showNoRows" class="no-rows absolute inset-0" data-testid="grid-no-rows" icon="table" :title="t('studio.common.noRows.empty')" />
+    <EmptyState
+      v-if="showNoRows"
+      class="no-rows absolute inset-0"
+      data-testid="grid-no-rows"
+      icon="table"
+      :title="t('studio.common.noRows.empty')"
+    />
     <SearchFilterNotice
       v-else-if="showNoMatchingRows"
       class="no-rows absolute inset-0"

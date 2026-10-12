@@ -34,7 +34,9 @@ const used = computed(() => parts.value.length > 1);
 
 <template>
   <Field>
-    <FieldLabel for="script-command">{{ isSmart ? t('common.prompt.label') : t('common.field.command.label') }}</FieldLabel>
+    <FieldLabel for="script-command">{{
+      isSmart ? t('common.prompt.label') : t('common.field.command.label')
+    }}</FieldLabel>
     <AutocompleteField
       id="script-command"
       v-model="body"
@@ -52,7 +54,9 @@ const used = computed(() => parts.value.length > 1);
       data-testid="script-dialog-command"
     />
     <FieldError v-if="error" data-testid="script-dialog-command-error">{{ error }}</FieldError>
-    <FieldDescription v-if="used" data-testid="script-dialog-uses"><VarText :parts="parts" /></FieldDescription>
+    <FieldDescription v-if="used" data-testid="script-dialog-uses"
+      ><VarText :parts="parts" /></FieldDescription
+    >
     <FieldDescription v-else-if="isSmart" data-testid="script-dialog-uses">
       <CatalogText k="automations.script.insertHint.hint" :params="{ token: '{name}' }">
         <template #chord><Kbd>{{ saveChord }}</Kbd></template>

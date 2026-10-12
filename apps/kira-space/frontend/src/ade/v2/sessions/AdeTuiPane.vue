@@ -58,26 +58,47 @@ async function show(): Promise<void> {
       :class="needsYou ? 'bg-tone-amber-solid/8 text-tone-amber' : 'text-muted-foreground'"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
-      <span class="truncate" data-testid="ade-tui-label">{{ t('space.ade.tui.status.label', { activity: activityLabel(view.kind), ago }) }}</span>
+      <span class="truncate" data-testid="ade-tui-label">{{
+        t('space.ade.tui.status.label', { activity: activityLabel(view.kind), ago })
+      }}</span>
       <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
     <div v-if="held" class="relative flex min-h-0 flex-1 flex-col">
-      <TerminalHostView :key="view.session.terminalId" class="min-h-0 flex-1" :tab="tab" :deps="terminal.host" />
+      <TerminalHostView
+        :key="view.session.terminalId"
+        class="min-h-0 flex-1"
+        :tab="tab"
+        :deps="terminal.host"
+      />
       <div
         v-if="hold"
         class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-bg/90 p-4 text-center text-kira-md"
         data-testid="ade-tui-phone-overlay"
       >
         <p class="m-0">{{ t('space.ade.tui.controlled.label', { device: hold.label }) }}</p>
-        <p v-if="!hold.connected" class="m-0 text-muted-foreground" data-testid="ade-tui-phone-offline">
+        <p
+          v-if="!hold.connected"
+          class="m-0 text-muted-foreground"
+          data-testid="ade-tui-phone-offline"
+        >
           {{ t('space.ade.tui.offline.status', { time: returnsAt }) }}
         </p>
-        <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-reconnect" @click="phones.reclaim(view.session.terminalId)">
+        <Button
+          variant="dialog"
+          size="kira"
+          class="px-2.5"
+          data-testid="ade-tui-reconnect"
+          @click="phones.reclaim(view.session.terminalId)"
+        >
           {{ t('space.ade.tui.reconnect.label') }}
         </Button>
       </div>
     </div>
-    <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-tui-elsewhere">
+    <div
+      v-else
+      class="flex flex-col items-start gap-2 p-3 text-kira-md"
+      data-testid="ade-tui-elsewhere"
+    >
       <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-show" @click="show">
         {{ t('common.action.show.label') }}
       </Button>

@@ -8,7 +8,14 @@ import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { useContainerAction, useContainers, useDockerStatus, useImages, useNetworks, useVolumes } from '../queries';
+import {
+  useContainerAction,
+  useContainers,
+  useDockerStatus,
+  useImages,
+  useNetworks,
+  useVolumes,
+} from '../queries';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { type DockerSection, useDockerUiStore } from '../state/dockerUi';
 import type { DockerStatsSample } from '../wire';
@@ -32,7 +39,8 @@ const actions = useContainerAction();
 const engine = computed(() => status.data.value?.engine);
 
 const runningIds = computed(
-  () => new Set((containers.data.value ?? []).filter((c) => c.state === 'running').map((c) => c.id)),
+  () =>
+    new Set((containers.data.value ?? []).filter((c) => c.state === 'running').map((c) => c.id)),
 );
 
 const totals = computed(() => {
@@ -48,7 +56,9 @@ const totals = computed(() => {
 
 // Per-container rings share one cadence, so aligning them on the newest sample sums them.
 function series(pick: (s: DockerStatsSample) => number): number[] {
-  const rings = [...stats.history].filter(([id]) => runningIds.value.has(id)).map(([, ring]) => ring);
+  const rings = [...stats.history]
+    .filter(([id]) => runningIds.value.has(id))
+    .map(([, ring]) => ring);
   const n = Math.max(0, ...rings.map((r) => r.length));
   const out = new Array<number>(n).fill(0);
   for (const ring of rings) {
@@ -80,17 +90,37 @@ const split = computed(() => {
   };
 });
 
-const links = computed<Array<{ section: DockerSection; label: MessageKey; icon: string; count: number }>>(() => [
-  { section: 'images', label: 'docker.section.images.label', icon: 'package', count: images.data.value?.length ?? engine.value?.images ?? 0 },
-  { section: 'volumes', label: 'docker.section.volumes.label', icon: 'database', count: volumes.data.value?.length ?? 0 },
-  { section: 'networks', label: 'docker.field.networks.label', icon: 'globe', count: networks.data.value?.length ?? 0 },
+const links = computed<
+  Array<{ section: DockerSection; label: MessageKey; icon: string; count: number }>
+>(() => [
+  {
+    section: 'images',
+    label: 'docker.section.images.label',
+    icon: 'package',
+    count: images.data.value?.length ?? engine.value?.images ?? 0,
+  },
+  {
+    section: 'volumes',
+    label: 'docker.section.volumes.label',
+    icon: 'database',
+    count: volumes.data.value?.length ?? 0,
+  },
+  {
+    section: 'networks',
+    label: 'docker.field.networks.label',
+    icon: 'globe',
+    count: networks.data.value?.length ?? 0,
+  },
 ]);
 
 const facts = computed<Array<[string, string]>>(() => {
   const e = engine.value;
   if (!e) return [];
   return [
-    [t('docker.engine.version.label'), t('docker.engine.versionApi.label', { version: e.version, api: e.apiVersion })],
+    [
+      t('docker.engine.version.label'),
+      t('docker.engine.versionApi.label', { version: e.version, api: e.apiVersion }),
+    ],
     [t('docker.engine.osArch.label'), `${e.operatingSystem || e.os} / ${e.arch}`],
     [t('docker.engine.kernel.label'), e.kernelVersion],
     [t('docker.edit.cpus.label'), String(e.cpus)],
@@ -99,8 +129,14 @@ const facts = computed<Array<[string, string]>>(() => {
   ];
 });
 
-const stoppedIds = computed(() => (containers.data.value ?? []).filter((c) => c.state !== 'running' && c.state !== 'paused').map((c) => c.id));
-const anyBusy = computed(() => [...runningIds.value, ...stoppedIds.value].some((id) => actions.isBusy(id)));
+const stoppedIds = computed(() =>
+  (containers.data.value ?? [])
+    .filter((c) => c.state !== 'running' && c.state !== 'paused')
+    .map((c) => c.id),
+);
+const anyBusy = computed(() =>
+  [...runningIds.value, ...stoppedIds.value].some((id) => actions.isBusy(id)),
+);
 
 function runAll(ids: Iterable<string>, action: 'start' | 'stop'): void {
   for (const id of ids) {
@@ -125,7 +161,9 @@ function refresh(): Promise<void> {
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 class="text-kira-lg font-medium">{{ t('docker.engine.title.title') }}</h2>
         <Badge variant="info">{{ engine.version }}</Badge>
-        <span class="inline-flex items-center gap-1 text-kira-sm text-muted-foreground"><EndpointChip /></span>
+        <span class="inline-flex items-center gap-1 text-kira-sm text-muted-foreground"
+          ><EndpointChip /></span
+        >
         <span class="ml-auto flex items-center gap-1">
           <Button
             size="kira"
@@ -134,7 +172,8 @@ function refresh(): Promise<void> {
             data-testid="docker-start-stopped"
             @click="runAll(stoppedIds, 'start')"
           >
-            <CodiconIcon name="play" :size="12" class="text-ok" />{{ t('docker.engine.startStopped.label') }}
+            <CodiconIcon name="play" :size="12" class="text-ok" />
+            {{ t('docker.engine.startStopped.label') }}
           </Button>
           <Button
             size="kira"
@@ -143,9 +182,15 @@ function refresh(): Promise<void> {
             data-testid="docker-stop-all"
             @click="runAll(runningIds, 'stop')"
           >
-            <CodiconIcon name="debug-stop" :size="12" class="text-error" />{{ t('common.action.stopAll.label') }}
+            <CodiconIcon name="debug-stop" :size="12" class="text-error" />
+            {{ t('common.action.stopAll.label') }}
           </Button>
-          <Button size="kira" variant="toolbar" data-testid="docker-overview-refresh" @click="refresh">
+          <Button
+            size="kira"
+            variant="toolbar"
+            data-testid="docker-overview-refresh"
+            @click="refresh"
+          >
             <CodiconIcon name="refresh" :size="12" />{{ t('common.action.refresh.label') }}
           </Button>
         </span>
@@ -155,7 +200,9 @@ function refresh(): Promise<void> {
         <div class="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-4">
           <DetailSection :title="t('common.field.status.label')">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-medium" data-testid="docker-engine-count">{{ engine.running }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-count">{{
+                engine.running
+              }}</span>
               <span class="text-muted-foreground">{{ t('common.state.running.status') }}</span>
             </div>
             <div class="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-field">
@@ -164,24 +211,46 @@ function refresh(): Promise<void> {
               <div class="bg-subtle" :style="{ width: `${split.stopped}%` }" />
             </div>
             <div class="mt-2 text-kira-sm text-muted-foreground" data-testid="docker-engine-counts">
-              {{ t('docker.engine.counts.label', { stopped: engine.stopped, paused: engine.paused }) }}
+              {{
+                t('docker.engine.counts.label', { stopped: engine.stopped, paused: engine.paused })
+              }}
             </div>
           </DetailSection>
           <DetailSection :title="t('docker.metric.cpu.label')">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-medium" data-testid="docker-engine-cpu">{{ formatPercent(totals.cpu) }}</span>
-              <span class="text-muted-foreground">{{ t('docker.engine.of.label', { total: `${engine.cpus * 100}%` }) }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-cpu">{{
+                formatPercent(totals.cpu)
+              }}</span>
+              <span class="text-muted-foreground">{{
+                t('docker.engine.of.label', { total: `${engine.cpus * 100}%` })
+              }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="cpuPercentOfCapacity" /></div>
-            <div class="mt-2"><StatsSparkline :values="cpuSeries" :max="cpuCapacity" height-class="h-[2rem]" /></div>
+            <div class="mt-2"
+              ><StatsSparkline
+                :values="cpuSeries"
+                :max="cpuCapacity"
+                height-class="h-[2rem]"
+              /></div
+            >
           </DetailSection>
           <DetailSection :title="t('common.module.memory.label')">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-medium" data-testid="docker-engine-mem">{{ formatBytes(totals.mem) }}</span>
-              <span class="text-muted-foreground">{{ t('docker.engine.of.label', { total: formatBytes(engine.memTotal) }) }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-mem">{{
+                formatBytes(totals.mem)
+              }}</span>
+              <span class="text-muted-foreground">{{
+                t('docker.engine.of.label', { total: formatBytes(engine.memTotal) })
+              }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="memPercentOfTotal" /></div>
-            <div class="mt-2"><StatsSparkline :values="memSeries" :max="engine.memTotal" height-class="h-[2rem]" /></div>
+            <div class="mt-2"
+              ><StatsSparkline
+                :values="memSeries"
+                :max="engine.memTotal"
+                height-class="h-[2rem]"
+              /></div
+            >
           </DetailSection>
           <DetailSection :title="t('docker.engine.resources.title')" flush>
             <button
@@ -210,7 +279,7 @@ function refresh(): Promise<void> {
       <DetailSection :title="t('docker.engine.engine.title')" class="shrink-0">
         <dl class="@container">
           <div class="grid grid-cols-1 gap-x-6 gap-y-2 @xl:grid-cols-2 @4xl:grid-cols-3">
-            <div v-for="[k, v] in facts" :key="k" class="min-w-0">
+            <div v-for="[ k, v ] in facts" :key="k" class="min-w-0">
               <dt class="text-kira-sm text-muted-foreground">{{ k }}</dt>
               <dd class="break-all font-data">{{ v }}</dd>
             </div>

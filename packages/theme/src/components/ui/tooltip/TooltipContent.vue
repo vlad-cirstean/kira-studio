@@ -1,23 +1,26 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { TooltipContentEmits, TooltipContentProps } from 'reka-ui'
-import { TooltipArrow, TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { TooltipContentEmits, TooltipContentProps } from 'reka-ui';
+import { TooltipArrow, TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
 defineOptions({
   inheritAttrs: false,
-})
+});
 
-const props = withDefaults(defineProps<TooltipContentProps & { class?: HTMLAttributes['class'] }>(), {
-  sideOffset: 0,
-  collisionPadding: 4,
-})
+const props = withDefaults(
+  defineProps<TooltipContentProps & { class?: HTMLAttributes['class'] }>(),
+  {
+    sideOffset: 0,
+    collisionPadding: 4,
+  },
+);
 
-const emits = defineEmits<TooltipContentEmits>()
+const emits = defineEmits<TooltipContentEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class')
-const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const delegatedProps = reactiveOmit(props, 'class');
+const forwarded = useForwardPropsEmits(delegatedProps, emits);
 </script>
 
 <template>

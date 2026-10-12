@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -57,7 +64,9 @@ onBeforeUnmount(() => setDebouncedDraft.cancel());
 
 const connectionId = computed(() => schemaDialogStore.connectionId);
 const connectionKind = computed(() => connectionsStore.connectionRecord(connectionId.value)?.kind);
-const connectionName = computed(() => connectionsStore.connectionRecord(connectionId.value)?.name ?? '');
+const connectionName = computed(
+  () => connectionsStore.connectionRecord(connectionId.value)?.name ?? '',
+);
 const dialect = computed(() => schemaDialectFor(connectionKind.value));
 // P60b §6.2: MonacoHost has no equivalent of CodeMirror's own implicit language-data keyword
 // source — `:autocomplete="true"` alone offered dialect-correct keyword/type completion before
@@ -134,47 +143,63 @@ async function onSave(): Promise<void> {
       </DialogHeader>
 
       <DialogBody class="h-[60vh] flex-none">
-      <span class="help text-subtle text-kira-sm leading-normal">
-        {{ t('studio.project.schemaDialog.intro.body') }}
-      </span>
-      <div class="flex-1 min-h-0 overflow-hidden rounded-kira-sm border border-border">
-        <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
+        <span class="help text-subtle text-kira-sm leading-normal">
+          {{ t('studio.project.schemaDialog.intro.body') }}
+        </span>
+        <div class="flex-1 min-h-0 overflow-hidden rounded-kira-sm border border-border">
+          <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
              dispatch, project/ may not import views/ per biome.json) gives dialect-correct
              keyword/type-name completion here — useful for hand-typing VARCHAR, NUMERIC(10,2),
              REFERENCES, NOT NULL. Relation/column completion from what's being typed in THIS
              document is a separate, larger piece of work and is left for a later phase. -->
-        <MonacoHost
-          :doc="draft"
-          language="sql"
-          :sql-dialect="dialect"
-          :read-only="false"
-          :autocomplete="true"
-          :completion-sources="completionSources"
-          @update:doc="onDocChange"
-        />
-      </div>
-      <Alert variant="info" data-testid="schema-parse-summary">
-        <AlertDescription>
-          <span v-if="parseSummary">{{ parseSummary }}</span>
-          <span v-else class="text-subtle text-kira-sm">
-            <CatalogText k="studio.project.schemaDialog.pasteHint.hint">
-              <template #pgDump><span class="font-data">{{ DDL_SOURCES.pgDump }}</span></template>
-              <template #showCreate><span class="font-data">{{ DDL_SOURCES.showCreate }}</span></template>
-              <template #sqliteSchema><span class="font-data">{{ DDL_SOURCES.sqliteSchema }}</span></template>
-            </CatalogText>
-          </span>
-        </AlertDescription>
-      </Alert>
+          <MonacoHost
+            :doc="draft"
+            language="sql"
+            :sql-dialect="dialect"
+            :read-only="false"
+            :autocomplete="true"
+            :completion-sources="completionSources"
+            @update:doc="onDocChange"
+          />
+        </div>
+        <Alert variant="info" data-testid="schema-parse-summary">
+          <AlertDescription>
+            <span v-if="parseSummary">{{ parseSummary }}</span>
+            <span v-else class="text-subtle text-kira-sm">
+              <CatalogText k="studio.project.schemaDialog.pasteHint.hint">
+                <template #pgDump><span class="font-data">{{ DDL_SOURCES.pgDump }}</span></template>
+                <template #showCreate
+                  ><span class="font-data">{{ DDL_SOURCES.showCreate }}</span></template
+                >
+                <template #sqliteSchema
+                  ><span class="font-data">{{ DDL_SOURCES.sqliteSchema }}</span></template
+                >
+              </CatalogText>
+            </span>
+          </AlertDescription>
+        </Alert>
       </DialogBody>
 
       <DialogFooter>
         <template #start>
           <FieldError v-if="saveError" data-testid="schema-save-error">{{ saveError }}</FieldError>
-          <span v-else class="help text-subtle text-kira-sm leading-normal"><CatalogText k="studio.project.connectionScope.hint">
-              <template #connectionName><span class="font-data">{{ connectionName }}</span></template>
-            </CatalogText></span>
+          <span v-else class="help text-subtle text-kira-sm leading-normal"
+            ><CatalogText k="studio.project.connectionScope.hint">
+              <template #connectionName
+                ><span class="font-data">{{ connectionName }}</span></template
+              >
+            </CatalogText></span
+          >
         </template>
-        <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">{{ t('common.action.cancel.label') }}</Button>
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          :disabled="saving"
+          @click="schemaDialogStore.closeSchemaDialog"
+          >{{
+            t('common.action.cancel.label')
+          }}</Button
+        >
         <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
           {{ t('common.action.save.label') }}
         </Button>
@@ -182,4 +207,3 @@ async function onSave(): Promise<void> {
     </DialogContent>
   </Dialog>
 </template>
-

@@ -123,7 +123,10 @@ const disableCookieJarId = useId();
 </script>
 
 <template>
-  <div class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5" data-testid="http-settings-pane">
+  <div
+    class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5"
+    data-testid="http-settings-pane"
+  >
     <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="httpVersionId">{{ t('studio.http.settings.version.label') }}</Label>
@@ -148,9 +151,13 @@ const disableCookieJarId = useId();
         :model-value="settings.httpVersion ?? global.httpVersion"
         @update:model-value="onHttpVersionChange"
       >
-        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">{{ t('studio.http.settings.versionOption.option', { version: v }) }}</option>
+        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">{{
+          t('studio.http.settings.versionOption.option', { version: v })
+        }}</option>
       </NativeSelect>
-      <FieldDescription>{{ t('studio.http.settings.global.status', { value: t('studio.http.settings.versionOption.option', { version: global.httpVersion }) }) }}</FieldDescription>
+      <FieldDescription>{{
+        t('studio.http.settings.global.status', { value: t('studio.http.settings.versionOption.option', { version: global.httpVersion }) })
+      }}</FieldDescription>
     </Field>
 
     <Field>
@@ -179,7 +186,9 @@ const disableCookieJarId = useId();
         @input="onRequestTimeoutMsInput"
       />
       <FieldDescription>
-        {{ global.requestTimeoutMs === 0 ? t('studio.http.settings.globalNoTimeout.status') : t('studio.http.settings.global.status', { value: formatDuration(global.requestTimeoutMs) }) }}
+        {{
+          global.requestTimeoutMs === 0 ? t('studio.http.settings.globalNoTimeout.status') : t('studio.http.settings.global.status', { value: formatDuration(global.requestTimeoutMs) })
+        }}
       </FieldDescription>
     </Field>
 
@@ -209,7 +218,9 @@ const disableCookieJarId = useId();
         @input="onMaxResponseMbInput"
       />
       <FieldDescription>
-        {{ global.maxResponseMb === 0 ? t('studio.http.settings.globalUnlimited.status') : t('studio.http.settings.global.status', { value: formatBytes(global.maxResponseMb * 1024 * 1024) }) }}
+        {{
+          global.maxResponseMb === 0 ? t('studio.http.settings.globalUnlimited.status') : t('studio.http.settings.global.status', { value: formatBytes(global.maxResponseMb * 1024 * 1024) })
+        }}
       </FieldDescription>
     </Field>
 
@@ -237,7 +248,9 @@ const disableCookieJarId = useId();
         {{ t('common.state.inherit.option') }}
       </Label>
     </FieldGroup>
-    <FieldDescription>{{ t(global.sslVerify ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status') }}</FieldDescription>
+    <FieldDescription>{{
+      t(global.sslVerify ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status')
+    }}</FieldDescription>
 
     <FieldGroup class="items-center">
       <Field orientation="horizontal">
@@ -250,7 +263,9 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        <Label :for="followRedirectsId">{{ t('studio.http.settings.followRedirects.label') }}</Label>
+        <Label :for="followRedirectsId">{{
+          t('studio.http.settings.followRedirects.label')
+        }}</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
@@ -263,7 +278,9 @@ const disableCookieJarId = useId();
         {{ t('common.state.inherit.option') }}
       </Label>
     </FieldGroup>
-    <FieldDescription>{{ t(global.followRedirects ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status') }}</FieldDescription>
+    <FieldDescription>{{
+      t(global.followRedirects ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status')
+    }}</FieldDescription>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
@@ -293,7 +310,9 @@ const disableCookieJarId = useId();
       <FieldDescription v-if="!effectiveFollowRedirects">
         {{ t('studio.http.settings.redirectsOff.description') }}
       </FieldDescription>
-      <FieldDescription v-else>{{ t('studio.http.settings.global.status', { value: global.maxRedirects }) }}</FieldDescription>
+      <FieldDescription v-else>{{
+        t('studio.http.settings.global.status', { value: global.maxRedirects })
+      }}</FieldDescription>
     </Field>
 
     <FieldGroup class="items-center">
@@ -320,9 +339,16 @@ const disableCookieJarId = useId();
         {{ t('common.state.inherit.option') }}
       </Label>
     </FieldGroup>
-    <FieldDescription>{{ t(global.disableCookieJar ? 'studio.http.settings.globalOff.status' : 'studio.http.settings.globalOn.status') }}</FieldDescription>
+    <FieldDescription>{{
+      t(global.disableCookieJar ? 'studio.http.settings.globalOff.status' : 'studio.http.settings.globalOn.status')
+    }}</FieldDescription>
 
-    <button type="button" class="self-start cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
+    <button
+      type="button"
+      class="self-start cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+      data-testid="http-settings-edit-global"
+      @click="onEditGlobalDefaults"
+    >
       {{ t('studio.http.settings.editGlobal.label') }}
     </button>
   </div>

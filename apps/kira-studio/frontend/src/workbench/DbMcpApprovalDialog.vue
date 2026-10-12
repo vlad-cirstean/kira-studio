@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { type MessageKey, t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
@@ -35,7 +42,8 @@ const CLASS_BODY_KEYS: Record<string, MessageKey> = {
 const classBody = computed(() => {
   const pending = dbMcpStore.approval.pending;
   if (!pending) return '';
-  const key = (pending.class && CLASS_BODY_KEYS[pending.class]) || 'studio.dbMcp.approval.other.body';
+  const key =
+    (pending.class && CLASS_BODY_KEYS[pending.class]) || 'studio.dbMcp.approval.other.body';
   return t(key, { connection: pending.connectionName, kind: pending.kind });
 });
 
@@ -104,7 +112,11 @@ const DETAIL_CLASS = 'm-0 text-subtle';
           dbMcpStore.approval.pending.statement
         }}</pre>
 
-        <div v-if="dbMcpStore.approval.pending.plan" class="flex flex-col gap-1" data-testid="db-mcp-approval-plan">
+        <div
+          v-if="dbMcpStore.approval.pending.plan"
+          class="flex flex-col gap-1"
+          data-testid="db-mcp-approval-plan"
+        >
           <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-plan-rows">
             <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
               {{
@@ -129,7 +141,9 @@ const DETAIL_CLASS = 'm-0 text-subtle';
           </p>
         </div>
 
-        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">{{ t('common.expiresIn.status', { seconds: remainingSeconds }) }}</p>
+        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">{{
+          t('common.expiresIn.status', { seconds: remainingSeconds })
+        }}</p>
         <p v-if="more > 0" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
           {{ t('common.moreWaiting.status', { count: more }) }}
         </p>

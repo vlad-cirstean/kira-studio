@@ -93,7 +93,11 @@ function commitOps(size: number): void {
           <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is
                the tab's own breathing room from this row's border-bottom, not a margin tacked
                on after it. -->
-          <div v-if="tabStripVisible" class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
+          <div
+            v-if="tabStripVisible"
+            class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome"
+            data-testid="tab-strip"
+          >
             <slot name="tab-strip"><TabStrip /></slot>
           </div>
           <div class="flex-1 min-h-0" data-testid="main-view">

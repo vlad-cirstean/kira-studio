@@ -121,7 +121,8 @@ async function confirmRemove(): Promise<void> {
         {{ t('git.worktree.create.label') }}
       </Button>
     </SectionHeading>
-    <div data-testid="branch-row"
+    <div
+      data-testid="branch-row"
       v-for="entry in section.visible"
       :key="entry.path"
       class="flex items-center gap-0.5 px-1"
@@ -129,16 +130,38 @@ async function confirmRemove(): Promise<void> {
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
       <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
-        <span v-if="entry.isCurrent" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.current.tooltip')">●</span>
-        <span v-if="entry.isMain" class="text-kira-sm text-subtle" :data-kira-tip="t('common.mainWorktree.tooltip')">{{ t('git.worktree.mainBadge.label') }}</span>
-        <span v-if="entry.locked" class="text-kira-sm text-subtle" :data-kira-tip="entry.locked.reason">
+        <span
+          v-if="entry.isCurrent"
+          class="text-kira-sm text-subtle"
+          :data-kira-tip="t('git.worktree.current.tooltip')"
+          >●</span
+        >
+        <span
+          v-if="entry.isMain"
+          class="text-kira-sm text-subtle"
+          :data-kira-tip="t('common.mainWorktree.tooltip')"
+          >{{
+            t('git.worktree.mainBadge.label')
+          }}</span
+        >
+        <span
+          v-if="entry.locked"
+          class="text-kira-sm text-subtle"
+          :data-kira-tip="entry.locked.reason"
+        >
           <CodiconIcon name="lock" :size="13" />
         </span>
-        <span v-if="entry.openElsewhere" class="text-kira-sm text-subtle" :data-kira-tip="t('common.openElsewhere.tooltip')">
+        <span
+          v-if="entry.openElsewhere"
+          class="text-kira-sm text-subtle"
+          :data-kira-tip="t('common.openElsewhere.tooltip')"
+        >
           <CodiconIcon name="window" :size="13" />
         </span>
         <span class="truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
-        <span class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground">{{ entry.path }}</span>
+        <span class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground">{{
+          entry.path
+        }}</span>
       </div>
       <TooltipIconButton
         v-if="!entry.isCurrent"
@@ -153,17 +176,18 @@ async function confirmRemove(): Promise<void> {
         @click="requestRemove(entry)"
       />
     </div>
-    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('git.worktree.list.empty') }}</div>
+    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
+      t('git.worktree.list.empty')
+    }}</div>
 
     <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
          modal content there prevents the panel dismissing under this nested Dialog. -->
     <Dialog :open="pendingRemove !== undefined" @update:open="(v) => !v && cancelRemove()">
-      <DialogContent
-        :aria-describedby="undefined"
-        size="md"
-      >
+      <DialogContent :aria-describedby="undefined" size="md">
         <DialogHeader>
-          <DialogTitle>{{ pendingRemove ? t('git.worktree.removeConfirm.title', { path: pendingRemove.entry.path }) : '' }}</DialogTitle>
+          <DialogTitle>{{
+            pendingRemove ? t('git.worktree.removeConfirm.title', { path: pendingRemove.entry.path }) : ''
+          }}</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
@@ -172,14 +196,25 @@ async function confirmRemove(): Promise<void> {
           <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
             <p>
               <CatalogText k="git.worktree.removeConfirm.body">
-                <template #token><code class="font-data">{{ pendingRemove.preflight.confirmToken }}</code></template>
+                <template #token
+                  ><code class="font-data">{{
+                    pendingRemove.preflight.confirmToken
+                  }}</code></template
+                >
               </CatalogText>
             </p>
-            <Input v-model="typedToken" size="kira-lg" class="w-full" :aria-label="t('git.common.confirmToken.aria')" />
+            <Input
+              v-model="typedToken"
+              size="kira-lg"
+              class="w-full"
+              :aria-label="t('git.common.confirmToken.aria')"
+            />
           </template>
         </DialogBody>
         <DialogFooter>
-          <Button variant="dialog" size="kira-lg" @click="cancelRemove">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelRemove">{{
+            t('common.action.cancel.label')
+          }}</Button>
           <Button
             v-if="pendingRemove?.preflight.verdict === 'dirty'"
             variant="dialog-primary"
@@ -194,4 +229,3 @@ async function confirmRemove(): Promise<void> {
     </Dialog>
   </section>
 </template>
-

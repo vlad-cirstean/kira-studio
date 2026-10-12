@@ -46,6 +46,8 @@ async function onEnter(): Promise<void> {
       data-testid="ade-capture"
       @keydown.enter="onEnter"
     />
-    <span v-if="note" class="text-kira-sm text-muted-foreground" data-testid="ade-capture-note">{{ note }}</span>
+    <span v-if="note" class="text-kira-sm text-muted-foreground" data-testid="ade-capture-note">{{
+      note
+    }}</span>
   </div>
 </template>

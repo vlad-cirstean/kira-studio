@@ -34,7 +34,9 @@ function setSources(ignore: boolean): void {
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
     >
-      <FieldDescription>{{ t('space.settings.advanced.gitLogLevel.description') }}</FieldDescription>
+      <FieldDescription>{{
+        t('space.settings.advanced.gitLogLevel.description')
+      }}</FieldDescription>
     </LogLevelField>
     <Field>
       <div class="flex items-center justify-between gap-1">
@@ -54,7 +56,9 @@ function setSources(ignore: boolean): void {
         data-testid="settings-ade-headless-sources"
         @update:model-value="(v) => setSources(v === true)"
       />
-      <FieldDescription>{{ t('space.settings.advanced.ignoreRepoSettings.description') }}</FieldDescription>
+      <FieldDescription>{{
+        t('space.settings.advanced.ignoreRepoSettings.description')
+      }}</FieldDescription>
     </Field>
     <NotifyPromptsField
       :advanced="draft.advanced"

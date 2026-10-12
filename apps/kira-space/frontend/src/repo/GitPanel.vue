@@ -121,7 +121,12 @@ const filteredRepos = computed<RepoSummary[]>(() => {
 
 // P107 T2-19: shared in-app substitute for window.prompt() (Electron's renderer doesn't implement
 // it) — see packages/workbench/src/prompt/useTextPrompt.ts.
-const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
+const {
+  prompt: textPrompt,
+  open: promptText,
+  submit: submitPrompt,
+  cancel: cancelPrompt,
+} = useTextPrompt();
 
 // A repo row renames inline; a worktree's record name is not shown in its row, so that rename keeps
 // the prompt.
@@ -169,10 +174,22 @@ function recordMenuItems(
   handlers: { rename: () => void; close: () => void; remove: () => void },
 ): MenuItem[] {
   const items: MenuItem[] = [
-    { type: 'item' as const, id: 'rename', label: t('common.action.rename.label'), icon: 'edit', run: handlers.rename },
+    {
+      type: 'item' as const,
+      id: 'rename',
+      label: t('common.action.rename.label'),
+      icon: 'edit',
+      run: handlers.rename,
+    },
   ];
   if (isOpen(record.id)) {
-    items.push({ type: 'item' as const, id: 'close', label: t('common.action.close.label'), icon: 'close', run: handlers.close });
+    items.push({
+      type: 'item' as const,
+      id: 'close',
+      label: t('common.action.close.label'),
+      icon: 'close',
+      run: handlers.close,
+    });
   }
   items.push({
     type: 'item' as const,
@@ -317,7 +334,9 @@ const navRows = computed<NavRow[]>(() =>
   filteredRepos.value.flatMap((repo): NavRow[] => [
     { key: repo.id, kind: 'repo', repo },
     ...(worktreesStore.isWorktreesExpanded(repo.id)
-      ? worktreesStore.worktreeEntries(repo.id).map((wt): NavRow => ({ key: wtKey(wt), kind: 'worktree', repo, wt }))
+      ? worktreesStore
+          .worktreeEntries(repo.id)
+          .map((wt): NavRow => ({ key: wtKey(wt), kind: 'worktree', repo, wt }))
       : []),
   ]),
 );
@@ -380,7 +399,11 @@ const view = computed({
 const panelTabItems = computed(() => [
   { value: 'repos', label: t('common.module.repositories.label'), testid: 'git-panel-tab-repos' },
   { value: 'files', label: t('common.module.files.label'), testid: 'git-panel-tab-files' },
-  { value: 'review', label: t('space.ade.board.branchTag.review.label'), testid: 'git-panel-tab-review' },
+  {
+    value: 'review',
+    label: t('space.ade.board.branchTag.review.label'),
+    testid: 'git-panel-tab-review',
+  },
 ]);
 const viewOptions = computed(() => [
   { value: 'files' as const, label: t('common.module.files.label'), testid: 'repo-view-files' },
@@ -511,112 +534,130 @@ onUnmounted(() => {
       </PanelBar>
       <div class="min-h-0 flex-1">
         <div class="h-full flex flex-col min-h-0">
-        <section v-if="tab === 'repos'" class="flex-1 min-h-0 overflow-y-auto" data-testid="repo-section">
-          <EmptyState
-            v-if="allHidden"
-            class="h-full"
-            icon="eye-closed"
-            :title="t('space.repo.panel.allHidden.title')"
-            :description="t('space.repo.panel.allHidden.description')"
-            data-testid="repos-all-hidden"
-          />
-          <div v-else ref="listEl" class="flex flex-col" role="listbox" :aria-label="t('common.module.repositories.label')">
-            <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
-              <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
-              <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
-              <div
-                :class="[
+          <section
+            v-if="tab === 'repos'"
+            class="flex-1 min-h-0 overflow-y-auto"
+            data-testid="repo-section"
+          >
+            <EmptyState
+              v-if="allHidden"
+              class="h-full"
+              icon="eye-closed"
+              :title="t('space.repo.panel.allHidden.title')"
+              :description="t('space.repo.panel.allHidden.description')"
+              data-testid="repos-all-hidden"
+            />
+            <div
+              v-else
+              ref="listEl"
+              class="flex flex-col"
+              role="listbox"
+              :aria-label="t('common.module.repositories.label')"
+            >
+              <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
+                <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
+                <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
+                <div
+                  :class="[
                   cn(rowVariants({ layout: 'tree', selected: isActive(repo.id), muted: repo.hidden }), 'h-row'),
                   { active: isActive(repo.id) },
                 ]"
-                :style="rowIndent(0)"
-                data-testid="repo-row"
-                :data-repo-id="repo.id"
-                role="option"
-                v-bind="nav.rowProps(repo.id)"
-                :aria-selected="isActive(repo.id)"
-                @click="onRowClick(repo.id)"
-                @contextmenu.prevent="onRowContextMenu($event, { key: repo.id, kind: 'repo', repo })"
-              >
-                <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-rail" aria-hidden="true" />
-                <!-- P110 I2-13: RepoTreeRow.vue's own twisty, shared via TreeTwisty. -->
-                <TreeTwisty
-                  :expanded="worktreesStore.isWorktreesExpanded(repo.id)"
-                  :has-children="true"
-                  :aria-expanded="worktreesStore.isWorktreesExpanded(repo.id)"
-                  testid="repo-row-expand"
-                  @toggle="worktreesStore.toggleRepoWorktrees(repo.id)"
-                />
-                <CodiconIcon
-                  name="source-control"
-                  :size="13"
-                  class="shrink-0"
-                  :class="repoIconClass(repo)"
-                />
-                <InlineEditInput
-                  v-if="renamingRepoId === repo.id"
-                  :name="repo.name"
-                  data-testid="repo-rename-input"
-                  @commit="(name) => commitRepoRename(repo.id, name)"
-                  @cancel="renamingRepoId = null"
-                />
-                <Tooltip v-else>
-                  <TooltipTrigger as-child>
-                    <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ repo.name }}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ repo.root }}</TooltipContent>
-                </Tooltip>
-                <!-- P83 plan §12.4: a repo row's checked-out branch. The name span's own flex-1
+                  :style="rowIndent(0)"
+                  data-testid="repo-row"
+                  :data-repo-id="repo.id"
+                  role="option"
+                  v-bind="nav.rowProps(repo.id)"
+                  :aria-selected="isActive(repo.id)"
+                  @click="onRowClick(repo.id)"
+                  @contextmenu.prevent="onRowContextMenu($event, { key: repo.id, kind: 'repo', repo })"
+                >
+                  <span
+                    :class="colorMarkClass('rail', repo.color)"
+                    data-testid="repo-rail"
+                    aria-hidden="true"
+                  />
+                  <!-- P110 I2-13: RepoTreeRow.vue's own twisty, shared via TreeTwisty. -->
+                  <TreeTwisty
+                    :expanded="worktreesStore.isWorktreesExpanded(repo.id)"
+                    :has-children="true"
+                    :aria-expanded="worktreesStore.isWorktreesExpanded(repo.id)"
+                    testid="repo-row-expand"
+                    @toggle="worktreesStore.toggleRepoWorktrees(repo.id)"
+                  />
+                  <CodiconIcon
+                    name="source-control"
+                    :size="13"
+                    class="shrink-0"
+                    :class="repoIconClass(repo)"
+                  />
+                  <InlineEditInput
+                    v-if="renamingRepoId === repo.id"
+                    :name="repo.name"
+                    data-testid="repo-rename-input"
+                    @commit="(name) => commitRepoRename(repo.id, name)"
+                    @cancel="renamingRepoId = null"
+                  />
+                  <Tooltip v-else>
+                    <TooltipTrigger as-child>
+                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                        repo.name
+                      }}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ repo.root }}</TooltipContent>
+                  </Tooltip>
+                  <!-- P83 plan §12.4: a repo row's checked-out branch. The name span's own flex-1
                      above keeps it yielding first, so this is what survives on a narrow panel. Same
                      size/colour
                      pair as `.worktree-badge` below, so a collapsed row's branch and its expanded
                      children's read as the same class of information. -->
-                <Tooltip v-if="repo.hidden">
-                  <TooltipTrigger as-child>
-                    <CodiconIcon
-                      name="eye-closed"
-                      :size="13"
-                      class="shrink-0 text-subtle"
-                      data-testid="repo-hidden-mark"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent>{{ t('space.common.hidden.status') }}</TooltipContent>
-                </Tooltip>
-                <Tooltip v-if="repoHeadsStore.repoHeadLabel(repo.id)">
-                  <TooltipTrigger as-child>
-                    <span class="repo-head flex-none min-w-0 max-w-5/12 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle">
-                      {{ repoHeadsStore.repoHeadLabel(repo.id) }}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ repoHeadsStore.repoHeadLabel(repo.id) }}</TooltipContent>
-                </Tooltip>
-                <Tooltip v-if="terminalsStore.terminalCountAtPath(repo.root) > 0">
-                  <TooltipTrigger as-child>
-                    <CodiconIcon
-                      name="terminal-bash"
-                      :size="12"
-                      class="shrink-0 text-subtle"
-                      data-testid="repo-terminal-indicator"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent>{{
-                    terminalTooltip(terminalsStore.terminalCountAtPath(repo.root))
-                  }}</TooltipContent>
-                </Tooltip>
-              </div>
-              <section
-                v-if="worktreesStore.isWorktreesExpanded(repo.id)"
-                class="flex flex-col"
-                data-testid="repo-worktrees"
-                :aria-label="t('common.module.worktrees.label')"
-              >
-                <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
-                <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
-                <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
-                <div
-                  v-for="wt in worktreesStore.worktreeEntries(repo.id)"
-                  :key="wt.path"
-                  :class="[
+                  <Tooltip v-if="repo.hidden">
+                    <TooltipTrigger as-child>
+                      <CodiconIcon
+                        name="eye-closed"
+                        :size="13"
+                        class="shrink-0 text-subtle"
+                        data-testid="repo-hidden-mark"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{{ t('space.common.hidden.status') }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip v-if="repoHeadsStore.repoHeadLabel(repo.id)">
+                    <TooltipTrigger as-child>
+                      <span
+                        class="repo-head flex-none min-w-0 max-w-5/12 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle"
+                      >
+                        {{ repoHeadsStore.repoHeadLabel(repo.id) }}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ repoHeadsStore.repoHeadLabel(repo.id) }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip v-if="terminalsStore.terminalCountAtPath(repo.root) > 0">
+                    <TooltipTrigger as-child>
+                      <CodiconIcon
+                        name="terminal-bash"
+                        :size="12"
+                        class="shrink-0 text-subtle"
+                        data-testid="repo-terminal-indicator"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{{
+                      terminalTooltip(terminalsStore.terminalCountAtPath(repo.root))
+                    }}</TooltipContent>
+                  </Tooltip>
+                </div>
+                <section
+                  v-if="worktreesStore.isWorktreesExpanded(repo.id)"
+                  class="flex flex-col"
+                  data-testid="repo-worktrees"
+                  :aria-label="t('common.module.worktrees.label')"
+                >
+                  <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
+                  <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
+                  <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
+                  <div
+                    v-for="wt in worktreesStore.worktreeEntries(repo.id)"
+                    :key="wt.path"
+                    :class="[
                     cn(
                       rowVariants({
                         layout: 'tree',
@@ -627,123 +668,155 @@ onUnmounted(() => {
                     ),
                     { active: isActive(worktreeRecordId(wt.path)) },
                   ]"
-                  :style="rowIndent(1)"
-                  data-testid="repo-worktree-row"
-                  :data-worktree-path="wt.path"
-                  role="option"
-                  v-bind="nav.rowProps(wtKey(wt))"
-                  :aria-selected="isActive(worktreeRecordId(wt.path))"
-                  @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
-                  @contextmenu.prevent.stop="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
-                >
-                  <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-worktree-rail" aria-hidden="true" />
-                  <CodiconIcon name="git-branch" :size="13" class="shrink-0" />
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ worktreeLabel(wt) }}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ wt.path }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip v-if="wt.isMain">
-                    <TooltipTrigger as-child>
-                      <span class="worktree-badge shrink-0 text-kira-sm text-subtle">{{ t('space.ade.basePicker.main.label') }}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t('common.mainWorktree.tooltip') }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
-                    <TooltipTrigger as-child>
-                      <CodiconIcon
-                        name="terminal-bash"
-                        :size="12"
-                        class="shrink-0 text-subtle"
-                        data-testid="repo-terminal-indicator"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent>{{
-                      terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))
-                    }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip v-if="wt.locked">
-                    <TooltipTrigger as-child>
-                      <CodiconIcon name="lock" :size="12" class="shrink-0 text-subtle" />
-                    </TooltipTrigger>
-                    <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
-                  </Tooltip>
-                </div>
-                <!-- Same indent as the worktree row above. -->
-                <InlineState
-                  v-if="worktreesStore.worktreesError(repo.id)"
-                  kind="error"
-                  :style="rowIndent(1)"
-                  data-testid="repo-worktree-error"
-                >
-                  {{ worktreesStore.worktreesError(repo.id) }}
-                </InlineState>
-                <InlineState
-                  v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
-                  kind="loading"
-                  :style="rowIndent(1)"
-                >
-                  {{ t('common.state.loading.loading') }}
-                </InlineState>
-                <InlineState v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" kind="empty" :style="rowIndent(1)">
-                  {{ t('space.repo.panel.noWorktrees.empty') }}
-                </InlineState>
-              </section>
+                    :style="rowIndent(1)"
+                    data-testid="repo-worktree-row"
+                    :data-worktree-path="wt.path"
+                    role="option"
+                    v-bind="nav.rowProps(wtKey(wt))"
+                    :aria-selected="isActive(worktreeRecordId(wt.path))"
+                    @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
+                    @contextmenu.prevent.stop="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
+                  >
+                    <span
+                      :class="colorMarkClass('rail', repo.color)"
+                      data-testid="repo-worktree-rail"
+                      aria-hidden="true"
+                    />
+                    <CodiconIcon name="git-branch" :size="13" class="shrink-0" />
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                          worktreeLabel(wt)
+                        }}</span>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ wt.path }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip v-if="wt.isMain">
+                      <TooltipTrigger as-child>
+                        <span class="worktree-badge shrink-0 text-kira-sm text-subtle">{{
+                          t('space.ade.basePicker.main.label')
+                        }}</span>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ t('common.mainWorktree.tooltip') }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
+                      <TooltipTrigger as-child>
+                        <CodiconIcon
+                          name="terminal-bash"
+                          :size="12"
+                          class="shrink-0 text-subtle"
+                          data-testid="repo-terminal-indicator"
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>{{
+                        terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))
+                      }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip v-if="wt.locked">
+                      <TooltipTrigger as-child>
+                        <CodiconIcon name="lock" :size="12" class="shrink-0 text-subtle" />
+                      </TooltipTrigger>
+                      <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <!-- Same indent as the worktree row above. -->
+                  <InlineState
+                    v-if="worktreesStore.worktreesError(repo.id)"
+                    kind="error"
+                    :style="rowIndent(1)"
+                    data-testid="repo-worktree-error"
+                  >
+                    {{ worktreesStore.worktreesError(repo.id) }}
+                  </InlineState>
+                  <InlineState
+                    v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
+                    kind="loading"
+                    :style="rowIndent(1)"
+                  >
+                    {{ t('common.state.loading.loading') }}
+                  </InlineState>
+                  <InlineState
+                    v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0"
+                    kind="empty"
+                    :style="rowIndent(1)"
+                  >
+                    {{ t('space.repo.panel.noWorktrees.empty') }}
+                  </InlineState>
+                </section>
+              </div>
             </div>
-          </div>
-        </section>
-        <template v-else>
-          <template v-if="repoId">
-            <template v-if="tab === 'files'">
-              <PanelBar>
-                <SecondaryTabs
-                  :model-value="view"
-                  :items="viewOptions"
-                  @update:model-value="(v) => (view = v as 'files' | 'search')"
-                />
-              </PanelBar>
-              <template v-if="view === 'files'">
-                <Alert
-                  v-if="fileTreeStore.repoTreeError(repoId)"
-                  variant="error"
-                  data-testid="repo-tree-error"
-                >
-                  <AlertDescription>{{ fileTreeStore.repoTreeError(repoId) }}</AlertDescription>
-                </Alert>
-                <Alert
-                  v-if="fileTreeStore.repoTreeTruncated(repoId)"
-                  variant="info"
-                  data-testid="repo-tree-truncated"
-                >
-                  <AlertDescription>{{ t('space.repo.panel.treeTruncated.hint') }}</AlertDescription>
-                </Alert>
-                <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted
+          </section>
+          <template v-else>
+            <template v-if="repoId">
+              <template v-if="tab === 'files'">
+                <PanelBar>
+                  <SecondaryTabs
+                    :model-value="view"
+                    :items="viewOptions"
+                    @update:model-value="(v) => (view = v as 'files' | 'search')"
+                  />
+                </PanelBar>
+                <template v-if="view === 'files'">
+                  <Alert
+                    v-if="fileTreeStore.repoTreeError(repoId)"
+                    variant="error"
+                    data-testid="repo-tree-error"
+                  >
+                    <AlertDescription>{{ fileTreeStore.repoTreeError(repoId) }}</AlertDescription>
+                  </Alert>
+                  <Alert
+                    v-if="fileTreeStore.repoTreeTruncated(repoId)"
+                    variant="info"
+                    data-testid="repo-tree-truncated"
+                  >
+                    <AlertDescription>{{
+                      t('space.repo.panel.treeTruncated.hint')
+                    }}</AlertDescription>
+                  </Alert>
+                  <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted
                      is what calls ensureRepoTreeLoaded in the first place; gating on the state it
                      sets would mean it never gets the chance to. Its own `rows` computed is empty
                      until the load resolves, then updates reactively — no separate loading
                      placeholder needed for a first open this fast. -->
-                <RepoFileTree class="flex-1 min-h-0" :repo-id="repoId" :search="local.fileSearch" />
+                  <RepoFileTree
+                    class="flex-1 min-h-0"
+                    :repo-id="repoId"
+                    :search="local.fileSearch"
+                  />
+                </template>
+                <RepoSearchView
+                  v-else-if="view === 'search'"
+                  class="flex-1 min-h-0"
+                  :repo-id="repoId"
+                />
               </template>
-              <RepoSearchView v-else-if="view === 'search'" class="flex-1 min-h-0" :repo-id="repoId" />
-            </template>
-            <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown,
+              <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown,
                  never destroyed, by a Files<->Review or Search<->Review switch within this same
                  repo. P92 item 6: gated on `tab`, Review's own top-level tab, not `view`. -->
-            <RepoReviewView
-              v-if="reviewActivatedRepoIds.has(repoId)"
-              v-show="tab === 'review'"
-              :key="repoId"
-              class="flex-1 min-h-0"
-              :repo-id="repoId"
+              <RepoReviewView
+                v-if="reviewActivatedRepoIds.has(repoId)"
+                v-show="tab === 'review'"
+                :key="repoId"
+                class="flex-1 min-h-0"
+                :repo-id="repoId"
+              />
+            </template>
+            <EmptyState
+              v-else
+              class="h-full"
+              icon="source-control"
+              :title="t('space.repo.noRepoOpen.empty')"
             />
           </template>
-          <EmptyState v-else class="h-full" icon="source-control" :title="t('space.repo.noRepoOpen.empty')" />
-        </template>
-      </div>
+        </div>
       </div>
     </template>
-    <EmptyState v-else class="h-full" icon="source-control" :title="t('space.repo.panel.importPrompt.emptyHint')" />
+    <EmptyState
+      v-else
+      class="h-full"
+      icon="source-control"
+      :title="t('space.repo.panel.importPrompt.emptyHint')"
+    />
   </div>
 
   <TextPromptDialog

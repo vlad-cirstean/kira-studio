@@ -51,8 +51,12 @@ const fieldId = useId();
       :model-value="appearance.dateFormat"
       @update:model-value="onDateFormatChange"
     >
-      <option value="relative">{{ t('space.settings.appearance.commitDate.relative.option') }}</option>
-      <option value="absolute">{{ t('space.settings.appearance.commitDate.absolute.option') }}</option>
+      <option value="relative">{{
+        t('space.settings.appearance.commitDate.relative.option')
+      }}</option>
+      <option value="absolute">{{
+        t('space.settings.appearance.commitDate.absolute.option')
+      }}</option>
     </NativeSelect>
     <FieldDescription>{{ t('space.settings.appearance.commitDate.description') }}</FieldDescription>
   </Field>

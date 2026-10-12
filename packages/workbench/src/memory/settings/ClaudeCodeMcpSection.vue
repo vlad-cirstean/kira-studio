@@ -45,16 +45,32 @@ const message = computed(() => {
         v-if="command"
         class="font-data whitespace-pre-wrap break-all select-all text-kira-sm leading-normal"
         data-testid="memory-mcp-command"
-      >{{ command }}</Card>
+        >{{
+          command
+        }}</Card
+      >
     </QueryState>
     <p v-if="command" class="m-0 text-kira-sm text-muted-foreground">
       <CatalogText k="memory.mcp.command.hint">
         <template #command><code class="font-data">memory-mcp</code></template>
       </CatalogText>
     </p>
-    <p v-if="message" class="m-0 text-kira-sm text-muted-foreground" data-testid="memory-mcp-install-outcome">{{ message }}</p>
+    <p
+      v-if="message"
+      class="m-0 text-kira-sm text-muted-foreground"
+      data-testid="memory-mcp-install-outcome"
+      >{{
+        message
+      }}</p
+    >
     <div class="flex items-center gap-1">
-      <Button variant="dialog" size="kira-lg" :disabled="!command" data-testid="memory-mcp-copy" @click="copy(command)">
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        :disabled="!command"
+        data-testid="memory-mcp-copy"
+        @click="copy(command)"
+      >
         {{ copied ? t('common.copy.copied.announce') : t('common.copyCommand.label') }}
       </Button>
       <Button

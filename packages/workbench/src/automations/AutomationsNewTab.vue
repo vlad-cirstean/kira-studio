@@ -35,5 +35,10 @@ function onClick(button: HTMLButtonElement): void {
 </script>
 
 <template>
-  <TabStripNewButton :label="t('workbench.tabStrip.newTab.label')" :tooltip="t('workbench.tabStrip.newTab.label')" has-popup @click="onClick" />
+  <TabStripNewButton
+    :label="t('workbench.tabStrip.newTab.label')"
+    :tooltip="t('workbench.tabStrip.newTab.label')"
+    has-popup
+    @click="onClick"
+  />
 </template>

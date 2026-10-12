@@ -50,7 +50,10 @@ const notice = computed(() => {
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-4 py-8" data-testid="pair-screen">
+  <main
+    class="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-4 py-8"
+    data-testid="pair-screen"
+  >
     <h1 class="m-0 text-kira-xl font-medium">{{ t('common.product.kiraSpace.label') }}</h1>
     <p class="m-0 text-muted-foreground">
       {{ t('mobile.pair.intro.description') }}
@@ -62,16 +65,32 @@ const notice = computed(() => {
     <template v-if="waiting">
       <Card class="flex flex-col gap-1" data-testid="pair-waiting">
         <span class="text-muted-foreground">{{ t('mobile.pair.waiting.hint') }}</span>
-        <span class="font-data text-kira-xl tracking-widest" data-testid="pair-code">{{ code }}</span>
+        <span class="font-data text-kira-xl tracking-widest" data-testid="pair-code">{{
+          code
+        }}</span>
       </Card>
-      <Button variant="dialog" size="kira-lg" data-testid="pair-cancel" @click="auth.cancelRequest()">{{ t('common.action.cancel.label') }}</Button>
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        data-testid="pair-cancel"
+        @click="auth.cancelRequest()"
+        >{{
+          t('common.action.cancel.label')
+        }}</Button
+      >
     </template>
 
     <template v-else>
       <Alert v-if="notice" variant="error" data-testid="pair-notice">{{ notice }}</Alert>
       <div class="flex flex-col gap-1">
         <Label :for="labelId">{{ t('mobile.pair.name.label') }}</Label>
-        <Input :id="labelId" v-model="label" maxlength="64" autocomplete="off" data-testid="pair-label" />
+        <Input
+          :id="labelId"
+          v-model="label"
+          maxlength="64"
+          autocomplete="off"
+          data-testid="pair-label"
+        />
       </div>
       <Button
         variant="dialog-primary"

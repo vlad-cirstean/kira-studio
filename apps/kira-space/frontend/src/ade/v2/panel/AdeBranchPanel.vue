@@ -57,7 +57,9 @@ const branch = computed(() => props.row.branch);
 const graph = computed(() => props.model.view.graph);
 const baseName = computed(() => baseNameOf(props.row, graph.value));
 const reviewChoice = computed(() => reviewCode.choiceOf(props.row));
-const reviewOff = computed(() => reviewCode.pending.value || !reviewChoice.value || reviewChoice.value.disabled);
+const reviewOff = computed(
+  () => reviewCode.pending.value || !reviewChoice.value || reviewChoice.value.disabled,
+);
 const facts = computed(() =>
   t('space.ade.branchPanel.facts.label', {
     repo: props.row.repo,
@@ -82,7 +84,8 @@ async function onRetrySetup(): Promise<void> {
 }
 const runs = computed(() => props.card.task.runs);
 const mainName = computed(
-  () => props.model.board.repos.find((r) => r.codeRepoId === branch.value.codeRepoId)?.mainName ?? '',
+  () =>
+    props.model.board.repos.find((r) => r.codeRepoId === branch.value.codeRepoId)?.mainName ?? '',
 );
 const actions = computed(() =>
   headerActions({
@@ -116,7 +119,8 @@ function run(a: HeaderAction, ev?: MouseEvent): void {
   else if (a.kind === 'start') dialogs.start(id);
   else if (a.kind === 'automation') {
     const r = (ev?.currentTarget as Element | null)?.getBoundingClientRect();
-    if (r) contextMenu.openContextMenuAt(r.left, r.bottom, automation.menuItems(props.card.task.id, id));
+    if (r)
+      contextMenu.openContextMenuAt(r.left, r.bottom, automation.menuItems(props.card.task.id, id));
   } else if (a.kind === 'review') {
     setupError.value = '';
     reviewCode.open(props.card.task.id, id, null, { onError: (msg) => (setupError.value = msg) });
@@ -139,14 +143,20 @@ const webUrl = computed(() => repoPrs.value?.webUrl ?? '');
 const branchUrl = computed(() =>
   webUrl.value && branch.value.name ? `${webUrl.value}/tree/${branch.value.name}` : '',
 );
-const PR_TONE: Record<string, Tone> = { open: 'green', merged: 'purple', closed: 'red', draft: 'grey' };
+const PR_TONE: Record<string, Tone> = {
+  open: 'green',
+  merged: 'purple',
+  closed: 'red',
+  draft: 'grey',
+};
 const PR_STATE = {
   open: 'common.action.open.label',
   merged: 'common.merged.status',
   closed: 'common.closed.status',
   draft: 'common.draft.status',
 } as const satisfies Record<string, MessageKey>;
-const prStateLabel = (state: string): string => (state in PR_STATE ? t(PR_STATE[state as keyof typeof PR_STATE]) : state);
+const prStateLabel = (state: string): string =>
+  state in PR_STATE ? t(PR_STATE[state as keyof typeof PR_STATE]) : state;
 const FORCE_PUSH_CMD = 'git push --force-with-lease';
 
 function copyLink(key: string, text: string): void {
@@ -194,7 +204,11 @@ const deployRows = computed((): Deployment[] => {
 /** Merging acts on a created branch of mine. */
 const canMerge = computed(() => branch.value.kind === 'mine' && branch.value.name !== '');
 
-const INTO_TONE: Record<Integration['status'], Tone> = { merged: 'green', stale: 'amber', 'not merged': 'grey' };
+const INTO_TONE: Record<Integration['status'], Tone> = {
+  merged: 'green',
+  stale: 'amber',
+  'not merged': 'grey',
+};
 const INTO_STATUS = {
   merged: 'common.merged.status',
   stale: 'common.stale.status',
@@ -203,7 +217,9 @@ const INTO_STATUS = {
 function intoNote(i: Integration): string {
   if (i.note) return i.note;
   if (i.status === 'merged') return t('space.ade.branchPanel.upToDate.status');
-  return i.status === 'stale' ? t('space.ade.branchPanel.hasChangesNotIn.status', { target: i.target }) : '';
+  return i.status === 'stale'
+    ? t('space.ade.branchPanel.hasChangesNotIn.status', { target: i.target })
+    : '';
 }
 
 const DEPLOY_TONE: Record<Deployment['status'], Tone> = {
@@ -219,8 +235,10 @@ const DEPLOY_STATUS = {
   unknown: 'space.ade.branchPanel.state.unknown.status',
 } as const satisfies Record<Deployment['status'], MessageKey>;
 function deployNote(d: Deployment): string {
-  if (d.status === 'deployed') return t('space.ade.branchPanel.runs.status', { sha: d.deployedSha });
-  if (d.status === 'stale') return d.note || t('space.ade.branchPanel.runsStale.status', { sha: d.deployedSha });
+  if (d.status === 'deployed')
+    return t('space.ade.branchPanel.runs.status', { sha: d.deployedSha });
+  if (d.status === 'stale')
+    return d.note || t('space.ade.branchPanel.runsStale.status', { sha: d.deployedSha });
   return d.status === 'unknown' ? d.error : '';
 }
 </script>
@@ -264,19 +282,25 @@ function deployNote(d: Deployment): string {
           class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-medium leading-4.5"
           data-testid="ade-panel-title"
         >
-          {{ row.draft ? t('space.ade.branchPanel.draftTitle.title', { repo: row.repo }) : branch.name }}
+          {{
+            row.draft ? t('space.ade.branchPanel.draftTitle.title', { repo: row.repo }) : branch.name
+          }}
         </h3>
       </div>
-      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
-      <FieldError v-if="setupError" data-testid="ade-panel-setup-error">{{ setupError }}</FieldError>
+      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{
+        facts
+      }}</div>
+      <FieldError v-if="setupError" data-testid="ade-panel-setup-error">{{
+        setupError
+      }}</FieldError>
       <FieldError v-if="ui.actionError[card.task.id]" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
       </FieldError>
       <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-1">
-        <Button variant="dialog"
+        <Button
+          variant="dialog"
           v-if="setupFailed"
           size="kira-lg"
-          
           :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-panel-retry-setup"
           @click="onRetrySetup"
@@ -284,9 +308,9 @@ function deployNote(d: Deployment): string {
           {{ t('space.ade.setup.retry.label') }}
         </Button>
         <AdeTip v-if="canForcePush" :text="FORCE_PUSH_CMD">
-          <Button variant="dialog"
+          <Button
+            variant="dialog"
             size="kira-lg"
-            
             :class="TONE_SOLID_CLASS.amber"
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
@@ -297,9 +321,9 @@ function deployNote(d: Deployment): string {
         <template v-for="a in actions" :key="(a.kind === 'rebase' ? a.act.id : a.kind) + a.label">
           <AdeTip v-if="a.kind === 'review'" :parts="reviewChoice?.tip ?? []">
             <TooltipDisabledTrigger :disabled="reviewOff">
-              <Button variant="dialog"
+              <Button
+                variant="dialog"
                 size="kira-lg"
-                
                 :class="actionClass(a)"
                 :disabled="reviewOff"
                 :data-testid="`ade-panel-action-${a.kind}`"
@@ -311,9 +335,9 @@ function deployNote(d: Deployment): string {
           </AdeTip>
           <AdeTip v-else-if="a.kind === 'rebase'" :parts="a.act.tip">
             <TooltipDisabledTrigger :disabled="a.act.disabled">
-              <Button variant="dialog"
+              <Button
+                variant="dialog"
                 size="kira-lg"
-                
                 :class="actionClass(a)"
                 :disabled="a.act.disabled"
                 :data-testid="`ade-panel-action-${a.act.id}`"
@@ -323,10 +347,10 @@ function deployNote(d: Deployment): string {
               </Button>
             </TooltipDisabledTrigger>
           </AdeTip>
-          <Button variant="dialog"
+          <Button
+            variant="dialog"
             v-else
             size="kira-lg"
-            
             :class="actionClass(a)"
             :disabled="a.kind === 'created'"
             :data-testid="`ade-panel-action-${a.kind}`"
@@ -353,7 +377,9 @@ function deployNote(d: Deployment): string {
               :href="branchUrl"
               class="min-w-0 max-w-1/2 truncate font-data text-kira-md text-info"
               @click="(e) => open(branchUrl, e)"
-              >{{ branch.name }}</a
+              >{{
+                branch.name
+              }}</a
             >
             <span v-else class="min-w-0 truncate font-data text-kira-md">{{ branch.name }}</span>
             <span class="flex-1" />
@@ -365,9 +391,15 @@ function deployNote(d: Deployment): string {
             />
           </template>
         </div>
-        <span class="text-kira-sm text-muted-foreground">{{ t('space.ade.branchPanel.pr.label') }}</span>
+        <span class="text-kira-sm text-muted-foreground">{{
+          t('space.ade.branchPanel.pr.label')
+        }}</span>
         <div class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
-          <AdeChip :label="pr ? prStateLabel(pr.state) : t('common.state.none.option')" :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'" wide />
+          <AdeChip
+            :label="pr ? prStateLabel(pr.state) : t('common.state.none.option')"
+            :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'"
+            wide
+          />
           <template v-if="pr">
             <a
               :href="pr.url"
@@ -388,10 +420,18 @@ function deployNote(d: Deployment): string {
 
       <AdeWorktreeSetup :row="row" />
 
-      <AdeRunOutcome v-if="lastRebase" :run="lastRebase" :title="t('space.ade.branchPanel.lastRebase.label')" :acts="outcomeActs" listen />
+      <AdeRunOutcome
+        v-if="lastRebase"
+        :run="lastRebase"
+        :title="t('space.ade.branchPanel.lastRebase.label')"
+        :acts="outcomeActs"
+        listen
+      />
 
       <div class="flex flex-col gap-0.5">
-        <div class="pb-0.5 text-kira-sm text-muted-foreground">{{ t('space.ade.branchPanel.mergedInto.label') }}</div>
+        <div class="pb-0.5 text-kira-sm text-muted-foreground">{{
+          t('space.ade.branchPanel.mergedInto.label')
+        }}</div>
         <div
           v-for="i in intoRows"
           :key="i.target"
@@ -401,8 +441,11 @@ function deployNote(d: Deployment): string {
         >
           <AdeChip :label="t(INTO_STATUS[i.status])" :tone="INTO_TONE[i.status]" wide />
           <span class="font-data text-kira-md">{{ i.target }}</span>
-          <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
-          <Button variant="dialog"
+          <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{
+            intoNote(i)
+          }}</span>
+          <Button
+            variant="dialog"
             v-if="canMerge && i.status !== 'merged'"
             size="kira"
             class="shrink-0 "
@@ -411,7 +454,9 @@ function deployNote(d: Deployment): string {
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"
           >
-            {{ i.status === 'stale' ? t('space.ade.needs.action.reMerge.label') : t('common.merge.label') }}
+            {{
+              i.status === 'stale' ? t('space.ade.needs.action.reMerge.label') : t('common.merge.label')
+            }}
           </Button>
         </div>
         <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">
@@ -420,7 +465,9 @@ function deployNote(d: Deployment): string {
       </div>
 
       <div class="flex flex-col gap-0.5">
-        <div class="pb-0.5 text-kira-sm text-muted-foreground">{{ t('space.ade.branchPanel.deployedTo.label') }}</div>
+        <div class="pb-0.5 text-kira-sm text-muted-foreground">{{
+          t('space.ade.branchPanel.deployedTo.label')
+        }}</div>
         <div
           v-for="d in deployRows"
           :key="d.env"
@@ -430,14 +477,20 @@ function deployNote(d: Deployment): string {
         >
           <AdeChip :label="t(DEPLOY_STATUS[d.status])" :tone="DEPLOY_TONE[d.status]" wide />
           <span class="font-data text-kira-md">{{ d.env }}</span>
-          <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{ deployNote(d) }}</span>
+          <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{
+            deployNote(d)
+          }}</span>
         </div>
         <div v-if="deployRows.length === 0" class="text-kira-md text-subtle">
           {{ t('space.ade.branchPanel.noEnvironments.emptyHint') }}
         </div>
       </div>
     </div>
-    <AdeSessionsTab v-else-if="ui.branchTab === 'sessions'" :task-id="card.task.id" :branch-id="branch.id" />
+    <AdeSessionsTab
+      v-else-if="ui.branchTab === 'sessions'"
+      :task-id="card.task.id"
+      :branch-id="branch.id"
+    />
     <AdeChangesTab v-else :branch="branch" :base="baseName" :shared="shared" />
 
     <AdeForcePushDialog

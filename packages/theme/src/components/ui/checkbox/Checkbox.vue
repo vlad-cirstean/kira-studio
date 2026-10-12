@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { CheckIcon } from '@lucide/vue'
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { CheckboxRootEmits, CheckboxRootProps } from 'reka-ui'
-import { CheckboxIndicator, CheckboxRoot, useForwardPropsEmits } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { CheckIcon } from '@lucide/vue';
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { CheckboxRootEmits, CheckboxRootProps } from 'reka-ui';
+import { CheckboxIndicator, CheckboxRoot, useForwardPropsEmits } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
-const props = defineProps<CheckboxRootProps & { class?: HTMLAttributes['class'] }>()
-const emits = defineEmits<CheckboxRootEmits>()
+const props = defineProps<CheckboxRootProps & { class?: HTMLAttributes['class'] }>();
+const emits = defineEmits<CheckboxRootEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class')
+const delegatedProps = reactiveOmit(props, 'class');
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const forwarded = useForwardPropsEmits(delegatedProps, emits);
 </script>
 
 <template>

@@ -5,7 +5,14 @@ import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
@@ -81,35 +88,52 @@ function close(): void {
         <DialogTitle>{{ t('studio.api.dynamicValues.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody class="gap-1.5">
-      <SearchField v-model="filterQuery" size="kira-lg" :placeholder="t('common.action.filter.label')" data-testid="dynamic-values-filter" />
-      <Alert v-if="error" variant="error" data-testid="dynamic-values-error">
-        <AlertDescription>{{ error }}</AlertDescription>
-      </Alert>
-      <EmptyState v-if="isFiltered && filteredEntries.length === 0" data-testid="dynamic-values-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
-      <Tooltip v-for="entry in filteredEntries" :key="entry.name">
-        <TooltipTrigger as-child>
-          <Button
-            variant="ghost"
-            size="kira"
-            class="h-auto min-h-6.5 w-full justify-between gap-1 rounded-kira-sm px-1.5 py-1 text-left text-kira-md font-normal"
-            data-testid="dynamic-values-fake-row"
-            :data-name="entry.name"
-            @click="onCopy(entry.name)"
-          >
-            <code class="shrink-0 text-fg font-data" data-testid="dynamic-values-reference">{{
-              reference(entry.name)
-            }}</code>
-            <Badge variant="info" class="min-w-0 overflow-hidden text-ellipsis" data-testid="dynamic-values-sample">{{
-              samples[entry.name] ?? ''
-            }}</Badge>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
-      </Tooltip>
+        <SearchField
+          v-model="filterQuery"
+          size="kira-lg"
+          :placeholder="t('common.action.filter.label')"
+          data-testid="dynamic-values-filter"
+        />
+        <Alert v-if="error" variant="error" data-testid="dynamic-values-error">
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
+        <EmptyState
+          v-if="isFiltered && filteredEntries.length === 0"
+          data-testid="dynamic-values-filter-empty"
+          :icon="ICON.search"
+          :title="t('common.state.noMatches.empty')"
+        />
+        <Tooltip v-for="entry in filteredEntries" :key="entry.name">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="kira"
+              class="h-auto min-h-6.5 w-full justify-between gap-1 rounded-kira-sm px-1.5 py-1 text-left text-kira-md font-normal"
+              data-testid="dynamic-values-fake-row"
+              :data-name="entry.name"
+              @click="onCopy(entry.name)"
+            >
+              <code class="shrink-0 text-fg font-data" data-testid="dynamic-values-reference">{{
+                reference(entry.name)
+              }}</code>
+              <Badge
+                variant="info"
+                class="min-w-0 overflow-hidden text-ellipsis"
+                data-testid="dynamic-values-sample"
+                >{{
+                  samples[entry.name] ?? ''
+                }}</Badge
+              >
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
+        </Tooltip>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">{{ t('common.action.close.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">{{
+          t('common.action.close.label')
+        }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

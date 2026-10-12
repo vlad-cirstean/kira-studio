@@ -13,6 +13,11 @@ defineProps<{ data: { w: number; h: number } }>();
     data-testid="ade-wf-end-node"
   >
     {{ t('space.ade.workflows.route.end.option') }}
-    <Handle id="in" type="target" :position="Position.Top" class="!size-2 !border-0 !bg-muted-foreground" />
+    <Handle
+      id="in"
+      type="target"
+      :position="Position.Top"
+      class="!size-2 !border-0 !bg-muted-foreground"
+    />
   </div>
 </template>

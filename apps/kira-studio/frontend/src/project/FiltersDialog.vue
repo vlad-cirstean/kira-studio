@@ -6,7 +6,14 @@ import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -174,7 +181,11 @@ const connectionName = computed(
 </script>
 
 <template>
-  <Dialog v-if="filtersDialogStore.open" :open="true" @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()">
+  <Dialog
+    v-if="filtersDialogStore.open"
+    :open="true"
+    @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()"
+  >
     <DialogContent size="lg" data-testid="filters-dialog">
       <DialogHeader icon="filter" close-testid="filters-dialog-close">
         <DialogTitle>{{
@@ -185,133 +196,188 @@ const connectionName = computed(
       </DialogHeader>
 
       <DialogBody>
-      <span class="help text-kira-sm leading-normal text-subtle">
-        {{ t('studio.project.filtersDialog.intro.body') }}
-      </span>
+        <span class="help text-kira-sm leading-normal text-subtle">
+          {{ t('studio.project.filtersDialog.intro.body') }}
+        </span>
 
-      <section class="flex flex-col gap-1">
-        <div class="flex items-center justify-between">
-          <span class="font-medium text-kira-lg text-fg">{{ t('studio.project.filtersDialog.kinds.heading.label') }}</span>
-          <span class="flex gap-1">
-            <Button variant="link" size="kira" class="h-auto p-0" @click="allKinds">{{ t('common.state.all.option') }}</Button>
-            <Button variant="link" size="kira" class="h-auto p-0" @click="noneKinds">{{ t('common.state.none.option') }}</Button>
-          </span>
-        </div>
-        <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-kind-list">
-          <Label
-            v-for="row in kinds"
-            :key="row.kind"
-            class="flex items-center cursor-default gap-1 h-6.5"
-            :data-testid="`filter-kind-row-${row.kind}`"
-            :data-state="row.hidden ? 'off' : 'on'"
-          >
-            <Checkbox
-              :model-value="!row.hidden"
-              class="size-3.5"
-              @update:model-value="onToggleKind(row.kind)"
-            >
-              <CodiconIcon name="check" :size="12" />
-            </Checkbox>
-            <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.label }}</span>
-            <span class="text-kira-sm text-subtle">{{ row.count }}</span>
-          </Label>
-          <span v-if="kinds.length === 0" class="text-kira-sm text-subtle p-1">{{ t('studio.project.filtersDialog.cache.empty') }}</span>
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-1">
-        <div class="flex items-center justify-between">
-          <span class="font-medium text-kira-lg text-fg">{{ t('studio.project.filtersDialog.objects.heading.label') }}</span>
-          <span class="flex gap-1">
-            <Button variant="link" size="kira" class="h-auto p-0" @click="allObjects">{{ t('common.state.all.option') }}</Button>
-            <Button variant="link" size="kira" class="h-auto p-0" @click="noneObjects">{{ t('common.state.none.option') }}</Button>
-          </span>
-        </div>
-        <SearchField
-          v-model="nameFilter"
-          size="kira-lg"
-          :placeholder="t('studio.project.filtersDialog.nameFilter.placeholder')"
-          data-testid="filter-name-input"
-        />
-        <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-object-list">
-          <div
-            v-for="row in objects.rows"
-            :key="row.path"
-            class="flex items-center cursor-default gap-1 h-6.5"
-            data-testid="filter-object-row"
-            :data-path="row.path"
-            :data-state="row.state"
-            :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-          >
-            <button
-              v-if="row.hasChildren"
-              type="button"
-              class="twisty-btn flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer text-muted-foreground"
-              :aria-label="expandedPaths.has(row.path) ? t('common.action.collapse.label') : t('common.action.expand.label')"
-              @click="onToggleExpand(row.path)"
-            >
-              <CodiconIcon :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'" :size="12" />
-            </button>
-            <span v-else class="w-4 shrink-0" />
-            <Tooltip :disabled="!row.disabledReason">
-              <TooltipTrigger as-child>
-                <Label class="object-checkbox-label flex items-center flex-1 min-w-0 cursor-pointer gap-1">
-                  <Checkbox
-                    :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
-                    :disabled="row.disabled"
-                    class="size-3.5"
-                    @update:model-value="onToggleNode(row)"
-                  >
-                    <template #default="{ state }">
-                      <CodiconIcon :name="state === 'indeterminate' ? 'dash' : 'check'" :size="12" />
-                    </template>
-                  </Checkbox>
-                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.name }}</span>
-                </Label>
-              </TooltipTrigger>
-              <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
-            </Tooltip>
-            <span v-if="row.hasChildren" class="text-kira-sm text-subtle">{{ row.childCount }}</span>
+        <section class="flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-kira-lg text-fg">{{
+              t('studio.project.filtersDialog.kinds.heading.label')
+            }}</span>
+            <span class="flex gap-1">
+              <Button variant="link" size="kira" class="h-auto p-0" @click="allKinds">{{
+                t('common.state.all.option')
+              }}</Button>
+              <Button variant="link" size="kira" class="h-auto p-0" @click="noneKinds">{{
+                t('common.state.none.option')
+              }}</Button>
+            </span>
           </div>
-          <span v-if="objects.rows.length === 0" class="text-kira-sm text-subtle p-1">{{ t('studio.project.filtersDialog.cache.empty') }}</span>
-          <span v-if="objects.truncated" class="text-kira-sm text-subtle p-1 italic" data-testid="filter-object-truncated">
-            {{ t('studio.project.filtersDialog.truncated.hint') }}
-          </span>
-        </div>
-      </section>
+          <div
+            class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1"
+            data-testid="filter-kind-list"
+          >
+            <Label
+              v-for="row in kinds"
+              :key="row.kind"
+              class="flex items-center cursor-default gap-1 h-6.5"
+              :data-testid="`filter-kind-row-${row.kind}`"
+              :data-state="row.hidden ? 'off' : 'on'"
+            >
+              <Checkbox
+                :model-value="!row.hidden"
+                class="size-3.5"
+                @update:model-value="onToggleKind(row.kind)"
+              >
+                <CodiconIcon name="check" :size="12" />
+              </Checkbox>
+              <span
+                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md"
+                >{{
+                  row.label
+                }}</span
+              >
+              <span class="text-kira-sm text-subtle">{{ row.count }}</span>
+            </Label>
+            <span v-if="kinds.length === 0" class="text-kira-sm text-subtle p-1">{{
+              t('studio.project.filtersDialog.cache.empty')
+            }}</span>
+          </div>
+        </section>
 
-      <Alert variant="info" data-testid="filters-preview">
-        <AlertDescription>
-          <CatalogText k="studio.project.filtersDialog.preview.body">
-            <template #shown><b>{{ preview.shown }}</b></template>
-            <template #total><b>{{ preview.total }}</b></template>
-          </CatalogText>
-        </AlertDescription>
-      </Alert>
+        <section class="flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-kira-lg text-fg">{{
+              t('studio.project.filtersDialog.objects.heading.label')
+            }}</span>
+            <span class="flex gap-1">
+              <Button variant="link" size="kira" class="h-auto p-0" @click="allObjects">{{
+                t('common.state.all.option')
+              }}</Button>
+              <Button variant="link" size="kira" class="h-auto p-0" @click="noneObjects">{{
+                t('common.state.none.option')
+              }}</Button>
+            </span>
+          </div>
+          <SearchField
+            v-model="nameFilter"
+            size="kira-lg"
+            :placeholder="t('studio.project.filtersDialog.nameFilter.placeholder')"
+            data-testid="filter-name-input"
+          />
+          <div
+            class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1"
+            data-testid="filter-object-list"
+          >
+            <div
+              v-for="row in objects.rows"
+              :key="row.path"
+              class="flex items-center cursor-default gap-1 h-6.5"
+              data-testid="filter-object-row"
+              :data-path="row.path"
+              :data-state="row.state"
+              :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+            >
+              <button
+                v-if="row.hasChildren"
+                type="button"
+                class="twisty-btn flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer text-muted-foreground"
+                :aria-label="expandedPaths.has(row.path) ? t('common.action.collapse.label') : t('common.action.expand.label')"
+                @click="onToggleExpand(row.path)"
+              >
+                <CodiconIcon
+                  :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'"
+                  :size="12"
+                />
+              </button>
+              <span v-else class="w-4 shrink-0" />
+              <Tooltip :disabled="!row.disabledReason">
+                <TooltipTrigger as-child>
+                  <Label
+                    class="object-checkbox-label flex items-center flex-1 min-w-0 cursor-pointer gap-1"
+                  >
+                    <Checkbox
+                      :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
+                      :disabled="row.disabled"
+                      class="size-3.5"
+                      @update:model-value="onToggleNode(row)"
+                    >
+                      <template #default="{ state }">
+                        <CodiconIcon
+                          :name="state === 'indeterminate' ? 'dash' : 'check'"
+                          :size="12"
+                        />
+                      </template>
+                    </Checkbox>
+                    <span
+                      class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md"
+                      >{{
+                        row.name
+                      }}</span
+                    >
+                  </Label>
+                </TooltipTrigger>
+                <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
+              </Tooltip>
+              <span v-if="row.hasChildren" class="text-kira-sm text-subtle">{{
+                row.childCount
+              }}</span>
+            </div>
+            <span v-if="objects.rows.length === 0" class="text-kira-sm text-subtle p-1">{{
+              t('studio.project.filtersDialog.cache.empty')
+            }}</span>
+            <span
+              v-if="objects.truncated"
+              class="text-kira-sm text-subtle p-1 italic"
+              data-testid="filter-object-truncated"
+            >
+              {{ t('studio.project.filtersDialog.truncated.hint') }}
+            </span>
+          </div>
+        </section>
 
-      <span class="help cached-note text-kira-sm leading-normal text-subtle self-start">
-        {{ t('studio.project.filtersDialog.cachedNote.hint') }}
-      </span>
+        <Alert variant="info" data-testid="filters-preview">
+          <AlertDescription>
+            <CatalogText k="studio.project.filtersDialog.preview.body">
+              <template #shown><b>{{ preview.shown }}</b></template>
+              <template #total><b>{{ preview.total }}</b></template>
+            </CatalogText>
+          </AlertDescription>
+        </Alert>
 
-      <Alert v-if="loadError || saveError" variant="error" data-testid="filters-error">
-        <AlertDescription>{{ loadError ?? saveError }}</AlertDescription>
-      </Alert>
+        <span class="help cached-note text-kira-sm leading-normal text-subtle self-start">
+          {{ t('studio.project.filtersDialog.cachedNote.hint') }}
+        </span>
+
+        <Alert v-if="loadError || saveError" variant="error" data-testid="filters-error">
+          <AlertDescription>{{ loadError ?? saveError }}</AlertDescription>
+        </Alert>
       </DialogBody>
 
       <DialogFooter>
         <template #start>
-          <span class="help text-kira-sm leading-normal text-subtle"><CatalogText k="studio.project.connectionScope.hint">
-              <template #connectionName><span class="font-data">{{ connectionName }}</span></template>
-            </CatalogText></span>
+          <span class="help text-kira-sm leading-normal text-subtle"
+            ><CatalogText k="studio.project.connectionScope.hint">
+              <template #connectionName
+                ><span class="font-data">{{ connectionName }}</span></template
+              >
+            </CatalogText></span
+          >
         </template>
-        <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
           data-testid="filters-save"
           :disabled="loading || !!loadError || saving"
           @click="onSave"
-        >{{ t('common.action.save.label') }}</Button>
+          >{{
+            t('common.action.save.label')
+          }}</Button
+        >
       </DialogFooter>
     </DialogContent>
   </Dialog>

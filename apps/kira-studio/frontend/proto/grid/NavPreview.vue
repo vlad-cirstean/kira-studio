@@ -32,7 +32,8 @@ const emit = defineEmits<{ close: [] }>();
     <PopoverContent align="start" side="bottom" data-testid="fk-preview" @open-auto-focus.prevent>
       <div v-if="target" class="flex flex-col gap-1">
         <div class="text-fg-muted">
-          {{ target.kind === 'fk' ? 'References' : 'Referenced by' }} {{ target.column }} = {{ target.value }}
+          {{ target.kind === 'fk' ? 'References' : 'Referenced by' }} {{ target.column }} =
+          {{ target.value }}
         </div>
         <div v-for="line in target.lines" :key="line" class="font-mono">{{ line }}</div>
       </div>

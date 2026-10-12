@@ -29,7 +29,9 @@ const stacks = computed(() => ({
 }));
 
 // A stored value outside FONT_CHOICES stays selectable as its own "Current" option.
-const currentIsListed = computed(() => FONT_CHOICES.some((f) => f.stack === props.appearance.fontFamily));
+const currentIsListed = computed(() =>
+  FONT_CHOICES.some((f) => f.stack === props.appearance.fontFamily),
+);
 
 function onChange(value: unknown): void {
   props.appearance.fontFamily = String(value);
@@ -64,12 +66,22 @@ const fieldId = useId();
         <option :value="appearance.fontFamily">{{ appearance.fontFamily }}</option>
       </optgroup>
       <optgroup :label="t('theme.fontFamily.installed.label')">
-        <option v-for="f in stacks.on" :key="f.stack" :value="f.stack" :style="{ fontFamily: f.stack }">
+        <option
+          v-for="f in stacks.on"
+          :key="f.stack"
+          :value="f.stack"
+          :style="{ fontFamily: f.stack }"
+        >
           {{ fontLabel(f) }}
         </option>
       </optgroup>
       <optgroup :label="t('theme.fontFamily.notInstalled.label')">
-        <option v-for="f in stacks.off" :key="f.stack" :value="f.stack" :style="{ fontFamily: f.stack }">
+        <option
+          v-for="f in stacks.off"
+          :key="f.stack"
+          :value="f.stack"
+          :style="{ fontFamily: f.stack }"
+        >
           {{ fontLabel(f) }}
         </option>
       </optgroup>
@@ -78,10 +90,14 @@ const fieldId = useId();
       class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-fg"
       data-testid="font-preview"
       :style="{ fontFamily: appearance.fontFamily }"
-      >{{ t('theme.fontFamily.preview.label') }}</span
+      >{{
+        t('theme.fontFamily.preview.label')
+      }}</span
     >
     <FieldError v-if="unavailable" data-testid="font-unavailable">
-      <template v-if="fallback">{{ t('theme.fontFamily.unavailable.fallback.error', { fallback }) }}</template>
+      <template v-if="fallback">{{
+        t('theme.fontFamily.unavailable.fallback.error', { fallback })
+      }}</template>
       <template v-else>{{ t('theme.fontFamily.unavailable.error') }}</template>
     </FieldError>
     <FieldDescription v-else>{{ t('theme.fontFamily.description') }}</FieldDescription>

@@ -528,7 +528,10 @@ function onCopy(): void {
   }
   if (sel.kind === 'range') {
     const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
-    void copyOrReportError(columnsToTsv(visibleRowsInSpan(sel.anchorRow, sel.row), cols, cellAt), onCopyError);
+    void copyOrReportError(
+      columnsToTsv(visibleRowsInSpan(sel.anchorRow, sel.row), cols, cellAt),
+      onCopyError,
+    );
     return;
   }
   if (sel.kind === 'row') {
@@ -558,7 +561,10 @@ function onGridContextMenu(e: SlickEventData): void {
     let cachedSnapshots: RowSnapshot[] | null = null;
     contextMenuStore.openContextMenu(
       nativeLike,
-      tabularRowMenu({ onError: onCopyError, snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)) }),
+      tabularRowMenu({
+        onError: onCopyError,
+        snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)),
+      }),
     );
     return;
   }
@@ -608,7 +614,12 @@ function onGridContextMenu(e: SlickEventData): void {
   const dc = cellAt(pageRow, pageCol);
   contextMenuStore.openContextMenu(
     nativeLike,
-    tabularCellMenu({ onError: onCopyError, columnName: column.name, isNull: dc.isNull, text: dc.text }),
+    tabularCellMenu({
+      onError: onCopyError,
+      columnName: column.name,
+      isNull: dc.isNull,
+      text: dc.text,
+    }),
   );
 }
 
@@ -628,7 +639,7 @@ function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }
   contextMenuStore.openContextMenu(
     e as unknown as MouseEvent,
     tabularColumnMenu({
-        onError: onCopyError,
+      onError: onCopyError,
       columnName: column.name,
       rows: rowsForColumnOps(),
       col: displayCol,

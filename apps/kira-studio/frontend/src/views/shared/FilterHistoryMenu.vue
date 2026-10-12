@@ -41,7 +41,12 @@ const historyEntries = computed<Entry[]>(() => history.value);
 
 // P107 T2-19: shared in-app substitute for window.prompt() (Electron's renderer doesn't implement
 // it) — see packages/workbench/src/prompt/useTextPrompt.ts.
-const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
+const {
+  prompt: textPrompt,
+  open: promptText,
+  submit: submitPrompt,
+  cancel: cancelPrompt,
+} = useTextPrompt();
 
 async function reload(): Promise<void> {
   if (!props.connectionId) return;
@@ -146,14 +151,19 @@ async function saveCurrent(): Promise<void> {
           }}</span>
         </TooltipTrigger>
         <TooltipContent class="whitespace-pre-wrap"
-          >{{ entry.name }}&#10;{{ summarize(entry.body.where, entry.body.orderBy) }}</TooltipContent
+          >{{ entry.name }}&#10;{{
+            summarize(entry.body.where, entry.body.orderBy)
+          }}</TooltipContent
         >
       </Tooltip>
       <Tooltip v-else>
         <TooltipTrigger as-child>
-          <span class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            summarize(entry.where, entry.orderBy)
-          }}</span>
+          <span
+            class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+            >{{
+              summarize(entry.where, entry.orderBy)
+            }}</span
+          >
         </TooltipTrigger>
         <TooltipContent>{{ summarize(entry.where, entry.orderBy) }}</TooltipContent>
       </Tooltip>
@@ -168,8 +178,15 @@ async function saveCurrent(): Promise<void> {
     </template>
     <template #footer>
       <Separator class="my-1" />
-      <button type="button" :class="cn(rowVariants(), 'w-full text-primary')" data-testid="save-current-filter" @click="saveCurrent">
-        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
+      <button
+        type="button"
+        :class="cn(rowVariants(), 'w-full text-primary')"
+        data-testid="save-current-filter"
+        @click="saveCurrent"
+      >
+        <span class="size-4 flex items-center justify-center shrink-0"
+          ><CodiconIcon name="add" :size="13" /></span
+        >
         {{ t('studio.filterHistory.saveCurrent.label') }}
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent

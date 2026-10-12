@@ -115,18 +115,21 @@ async function save(patch: SettingsPatch): Promise<void> {
 
     <template #footer="f">
       <span class="mr-auto min-w-0 flex items-center">
-        <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
-        <FieldDescription v-else data-testid="settings-footer-status"
-          >
+        <FieldError v-if="f.saveError" data-testid="settings-save-error">{{
+          f.saveError
+        }}</FieldError>
+        <FieldDescription v-else data-testid="settings-footer-status">
           <CatalogText k="studio.settings.footer.stored.status">
             <template #path><span class="font-data">{{ SETTINGS_DB_PATH }}</span></template>
           </CatalogText>
-          <template v-if="f.isDirty"> · {{ t('common.state.unsavedChanges.status') }}</template></FieldDescription
+          <template v-if="f.isDirty">
+            · {{ t('common.state.unsavedChanges.status') }}</template
+          ></FieldDescription
         >
       </span>
       <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">{{
-          t('common.action.cancel.label')
-        }}</Button>
+        t('common.action.cancel.label')
+      }}</Button>
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -139,4 +142,3 @@ async function save(patch: SettingsPatch): Promise<void> {
     </template>
   </SettingsShell>
 </template>
-

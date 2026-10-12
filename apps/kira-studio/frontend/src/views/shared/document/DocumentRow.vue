@@ -65,14 +65,26 @@ function onHeadKeydown(e: KeyboardEvent): void {
       >
         <CodiconIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
       </button>
-      <span class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-data" data-testid="document-id">{{ view.idLabel }}</span>
-      <Badge data-testid="document-field-count">{{ t('studio.documents.row.fieldCount.status', { count: view.fieldCount }) }}</Badge>
+      <span
+        class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-data"
+        data-testid="document-id"
+        >{{
+          view.idLabel
+        }}</span
+      >
+      <Badge data-testid="document-field-count">{{
+        t('studio.documents.row.fieldCount.status', { count: view.fieldCount })
+      }}</Badge>
       <Badge data data-testid="document-byte-badge">{{ view.byteLabel }}</Badge>
       <Tooltip v-if="view.isTruncated">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="document-truncated">{{ t('studio.common.truncated.status') }}</Badge>
+          <Badge variant="warn" data-testid="document-truncated">{{
+            t('studio.common.truncated.status')
+          }}</Badge>
         </TooltipTrigger>
-        <TooltipContent>{{ t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
+        <TooltipContent>{{
+          t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) })
+        }}</TooltipContent>
       </Tooltip>
       <slot name="actions" />
     </div>

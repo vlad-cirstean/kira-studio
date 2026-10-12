@@ -63,7 +63,9 @@ const expensiveQueryRowsId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="opLogRetentionDaysId">{{ t('studio.settings.advanced.opLogRetention.label') }}</Label>
+        <Label :for="opLogRetentionDaysId">{{
+          t('studio.settings.advanced.opLogRetention.label')
+        }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
@@ -90,7 +92,9 @@ const expensiveQueryRowsId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="expensiveQueryRowsId">{{ t('studio.settings.advanced.expensiveRows.label') }}</Label>
+        <Label :for="expensiveQueryRowsId">{{
+          t('studio.settings.advanced.expensiveRows.label')
+        }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
@@ -109,13 +113,12 @@ const expensiveQueryRowsId = useId();
         :model-value="String(draft.advanced.expensiveQueryRows)"
         @input="onExpensiveQueryRowsInput"
       />
-      <FieldError
-        v-if="expensiveQueryRowsError"
-        data-testid="settings-expensive-query-rows-error"
-      >
+      <FieldError v-if="expensiveQueryRowsError" data-testid="settings-expensive-query-rows-error">
         {{ expensiveQueryRowsError }}
       </FieldError>
-      <FieldDescription v-else>{{ t('studio.settings.advanced.expensiveRows.description') }}</FieldDescription>
+      <FieldDescription v-else>{{
+        t('studio.settings.advanced.expensiveRows.description')
+      }}</FieldDescription>
     </Field>
 
     <LogLevelField

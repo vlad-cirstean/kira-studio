@@ -46,10 +46,13 @@ const variant = computed(() => {
         <TooltipContent>{{ file.relPath }}</TooltipContent>
       </Tooltip>
       <span v-if="file.state === 'done'" class="shrink-0 text-kira-sm text-muted-foreground">
-        +{{ file.added }} ~{{ file.updated }} ={{ file.noop }}
+        +{{ file.added }}
+        ~{{ file.updated }}
+        ={{ file.noop }}
       </span>
       <span v-else-if="file.chunkCount > 0" class="shrink-0 text-kira-sm text-muted-foreground">
-        {{ file.chunksDone }} / {{ file.chunkCount }}
+        {{ file.chunksDone }}
+        / {{ file.chunkCount }}
       </span>
       <Badge :variant="variant">{{ t(FILE_STATE_LABEL[file.state]) }}</Badge>
     </button>

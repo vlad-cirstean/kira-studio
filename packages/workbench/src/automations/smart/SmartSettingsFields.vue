@@ -12,7 +12,13 @@ const smart = defineModel<SmartSettings>({ required: true });
   <div class="flex items-end gap-3" data-testid="smart-settings">
     <Field class="min-w-0 flex-1">
       <FieldLabel for="smart-model">{{ t('automations.smart.model.label') }}</FieldLabel>
-      <NativeSelect id="smart-model" v-model="smart.model" variant="bordered" size="kira-lg" data-testid="smart-model">
+      <NativeSelect
+        id="smart-model"
+        v-model="smart.model"
+        variant="bordered"
+        size="kira-lg"
+        data-testid="smart-model"
+      >
         <option v-for="m in SMART_MODELS" :key="m" :value="m">{{ m }}</option>
       </NativeSelect>
     </Field>
@@ -29,7 +35,13 @@ const smart = defineModel<SmartSettings>({ required: true });
     </Field>
     <Field class="w-28">
       <FieldLabel for="smart-timeout">{{ t('common.field.timeout.label') }}</FieldLabel>
-      <Input id="smart-timeout" v-model="smart.timeout" :placeholder="t('automations.smart.timeoutExample.example')" class="font-data" data-testid="smart-timeout" />
+      <Input
+        id="smart-timeout"
+        v-model="smart.timeout"
+        :placeholder="t('automations.smart.timeoutExample.example')"
+        class="font-data"
+        data-testid="smart-timeout"
+      />
     </Field>
   </div>
 </template>

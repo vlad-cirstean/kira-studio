@@ -5,7 +5,11 @@ import { useAutomationsModule } from '@workbench/automations/module';
 import RunElapsed from '@workbench/automations/runs/RunElapsed.vue';
 import RunOutcomeBlock from '@workbench/automations/runs/RunOutcomeBlock.vue';
 import RunStatusBadge from '@workbench/automations/runs/RunStatusBadge.vue';
-import { useSeenRuns, useStopScriptRun, useTaskScriptRuns } from '@workbench/automations/runs/runsQueries';
+import {
+  useSeenRuns,
+  useStopScriptRun,
+  useTaskScriptRuns,
+} from '@workbench/automations/runs/runsQueries';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { computed, ref } from 'vue';
 
@@ -24,9 +28,21 @@ function toggle(id: string): void {
 </script>
 
 <template>
-  <section v-if="rows.length > 0" class="flex max-h-48 flex-col gap-1 overflow-y-auto" data-testid="ade-automations">
-    <h4 class="m-0 text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{ t('common.module.automations.label') }}</h4>
-    <div v-for="run in rows" :key="run.id" class="flex flex-col" data-testid="ade-automation-row" :data-state="run.state">
+  <section
+    v-if="rows.length > 0"
+    class="flex max-h-48 flex-col gap-1 overflow-y-auto"
+    data-testid="ade-automations"
+  >
+    <h4 class="m-0 text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{
+      t('common.module.automations.label')
+    }}</h4>
+    <div
+      v-for="run in rows"
+      :key="run.id"
+      class="flex flex-col"
+      data-testid="ade-automation-row"
+      :data-state="run.state"
+    >
       <div class="flex items-center gap-1.5">
         <button
           type="button"
@@ -37,7 +53,13 @@ function toggle(id: string): void {
           <RunStatusBadge :state="run.state" />
           <SmartBadge v-if="run.kind === 'smart'" />
           <span class="min-w-0 truncate">{{ run.scriptName }}</span>
-          <span v-if="run.branchLabel" class="shrink-0 font-data text-kira-sm text-muted-foreground">{{ run.branchLabel }}</span>
+          <span
+            v-if="run.branchLabel"
+            class="shrink-0 font-data text-kira-sm text-muted-foreground"
+            >{{
+              run.branchLabel
+            }}</span
+          >
           <RunElapsed :run="run" class="ml-auto shrink-0 text-kira-sm text-muted-foreground" />
         </button>
         <Button
@@ -49,7 +71,13 @@ function toggle(id: string): void {
         >
           {{ t('common.action.open.label') }}
         </Button>
-        <Button v-if="run.state === 'running'" variant="dialog" size="kira-lg" data-testid="ade-automation-stop" @click="stop.mutate(run.id)">
+        <Button
+          v-if="run.state === 'running'"
+          variant="dialog"
+          size="kira-lg"
+          data-testid="ade-automation-stop"
+          @click="stop.mutate(run.id)"
+        >
           {{ t('common.action.stop.label') }}
         </Button>
       </div>

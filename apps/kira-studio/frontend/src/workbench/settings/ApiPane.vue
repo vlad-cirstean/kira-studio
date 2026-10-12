@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+} from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
@@ -60,7 +66,10 @@ const maxResponseMbError = computed<string | null>(() => {
   const v = props.draft.api.maxResponseMb;
   if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < MAX_RESPONSE_MB_RANGE.min || v > MAX_RESPONSE_MB_RANGE.max) {
-    return t('studio.settings.range.mb.status', { min: MAX_RESPONSE_MB_RANGE.min, max: MAX_RESPONSE_MB_RANGE.max });
+    return t('studio.settings.range.mb.status', {
+      min: MAX_RESPONSE_MB_RANGE.min,
+      max: MAX_RESPONSE_MB_RANGE.max,
+    });
   }
   return null;
 });
@@ -70,7 +79,10 @@ const maxRedirectsError = computed<string | null>(() => {
   const v = props.draft.api.maxRedirects;
   if (!Number.isInteger(v)) return t('common.enterWholeNumber.error');
   if (v < MAX_REDIRECTS_RANGE.min || v > MAX_REDIRECTS_RANGE.max) {
-    return t('studio.settings.range.plain.status', { min: MAX_REDIRECTS_RANGE.min, max: MAX_REDIRECTS_RANGE.max });
+    return t('studio.settings.range.plain.status', {
+      min: MAX_REDIRECTS_RANGE.min,
+      max: MAX_REDIRECTS_RANGE.max,
+    });
   }
   return null;
 });
@@ -99,7 +111,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'httpVersion')"
           :disabled="isAtDefault('api', 'httpVersion')"
           @click="resetLeaf('api', 'httpVersion')"
-       />
+        />
       </div>
       <NativeSelect
         :id="httpVersionId"
@@ -110,7 +122,9 @@ const disableCookieJarId = useId();
         :model-value="draft.api.httpVersion"
         @update:model-value="onHttpVersionChange"
       >
-        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">{{ t('studio.http.settings.versionOption.option', { version: v }) }}</option>
+        <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">{{
+          t('studio.http.settings.versionOption.option', { version: v })
+        }}</option>
       </NativeSelect>
     </Field>
 
@@ -124,7 +138,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'requestTimeoutMs')"
           :disabled="isAtDefault('api', 'requestTimeoutMs')"
           @click="resetLeaf('api', 'requestTimeoutMs')"
-       />
+        />
       </div>
       <NumberStepperInput
         :id="requestTimeoutMsId"
@@ -134,14 +148,13 @@ const disableCookieJarId = useId();
         data-testid="settings-api-requestTimeoutMs"
         :model-value="String(draft.api.requestTimeoutMs)"
         @input="onRequestTimeoutMsInput"
-     />
-      <FieldError
-        v-if="requestTimeoutMsError"
-        data-testid="settings-api-requestTimeoutMs-error"
-      >
+      />
+      <FieldError v-if="requestTimeoutMsError" data-testid="settings-api-requestTimeoutMs-error">
         {{ requestTimeoutMsError }}
       </FieldError>
-      <FieldDescription v-else>{{ t('studio.settings.api.requestTimeout.description') }}</FieldDescription>
+      <FieldDescription v-else>{{
+        t('studio.settings.api.requestTimeout.description')
+      }}</FieldDescription>
     </Field>
 
     <Field>
@@ -154,7 +167,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'maxResponseMb')"
           :disabled="isAtDefault('api', 'maxResponseMb')"
           @click="resetLeaf('api', 'maxResponseMb')"
-       />
+        />
       </div>
       <NumberStepperInput
         :id="maxResponseMbId"
@@ -164,14 +177,13 @@ const disableCookieJarId = useId();
         data-testid="settings-api-maxResponseMb"
         :model-value="String(draft.api.maxResponseMb)"
         @input="onMaxResponseMbInput"
-     />
-      <FieldError
-        v-if="maxResponseMbError"
-        data-testid="settings-api-maxResponseMb-error"
-      >
+      />
+      <FieldError v-if="maxResponseMbError" data-testid="settings-api-maxResponseMb-error">
         {{ maxResponseMbError }}
       </FieldError>
-      <FieldDescription v-else>{{ t('studio.settings.api.maxResponse.description') }}</FieldDescription>
+      <FieldDescription v-else>{{
+        t('studio.settings.api.maxResponse.description')
+      }}</FieldDescription>
     </Field>
 
     <FieldGroup>
@@ -192,9 +204,11 @@ const disableCookieJarId = useId();
         :disabled-trigger="isAtDefault('api', 'sslVerify')"
         :disabled="isAtDefault('api', 'sslVerify')"
         @click="resetLeaf('api', 'sslVerify')"
-     />
+      />
     </FieldGroup>
-    <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">{{ t('studio.settings.api.sslVerify.warning.error') }}</FieldError>
+    <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">{{
+      t('studio.settings.api.sslVerify.warning.error')
+    }}</FieldError>
 
     <FieldGroup>
       <Field orientation="horizontal">
@@ -204,7 +218,9 @@ const disableCookieJarId = useId();
           data-testid="settings-api-followRedirects"
           @update:model-value="(v) => onFollowRedirectsChange(v === true)"
         />
-        <Label :for="followRedirectsId">{{ t('studio.http.settings.followRedirects.label') }}</Label>
+        <Label :for="followRedirectsId">{{
+          t('studio.http.settings.followRedirects.label')
+        }}</Label>
       </Field>
       <TooltipIconButton
         icon="discard"
@@ -214,7 +230,7 @@ const disableCookieJarId = useId();
         :disabled-trigger="isAtDefault('api', 'followRedirects')"
         :disabled="isAtDefault('api', 'followRedirects')"
         @click="resetLeaf('api', 'followRedirects')"
-     />
+      />
     </FieldGroup>
 
     <Field>
@@ -227,7 +243,7 @@ const disableCookieJarId = useId();
           :disabled-trigger="isAtDefault('api', 'maxRedirects')"
           :disabled="isAtDefault('api', 'maxRedirects')"
           @click="resetLeaf('api', 'maxRedirects')"
-       />
+        />
       </div>
       <NumberStepperInput
         :id="maxRedirectsId"
@@ -238,14 +254,13 @@ const disableCookieJarId = useId();
         data-testid="settings-api-maxRedirects"
         :model-value="String(draft.api.maxRedirects)"
         @input="onMaxRedirectsInput"
-     />
-      <FieldError
-        v-if="maxRedirectsError"
-        data-testid="settings-api-maxRedirects-error"
-      >
+      />
+      <FieldError v-if="maxRedirectsError" data-testid="settings-api-maxRedirects-error">
         {{ maxRedirectsError }}
       </FieldError>
-      <FieldDescription v-else-if="!draft.api.followRedirects">{{ t('studio.http.settings.redirectsOff.description') }}</FieldDescription>
+      <FieldDescription v-else-if="!draft.api.followRedirects">{{
+        t('studio.http.settings.redirectsOff.description')
+      }}</FieldDescription>
     </Field>
 
     <FieldGroup>
@@ -269,7 +284,7 @@ const disableCookieJarId = useId();
         :disabled-trigger="isAtDefault('api', 'disableCookieJar')"
         :disabled="isAtDefault('api', 'disableCookieJar')"
         @click="resetLeaf('api', 'disableCookieJar')"
-     />
+      />
     </FieldGroup>
   </div>
 </template>

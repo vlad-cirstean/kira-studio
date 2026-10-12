@@ -228,7 +228,12 @@ if (moveTab) {
               @click="onClick(tab)"
               @contextmenu.prevent="onContextMenu($event, tab)"
             >
-              <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
+              <CodiconIcon
+                v-if="'codicon' in icon"
+                :name="icon.codicon"
+                :size="13"
+                class="shrink-0"
+              />
               <span
                 v-else
                 class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
@@ -285,7 +290,11 @@ if (moveTab) {
           <slot name="tab-leading" :tab="tab" />
           <Tooltip v-if="indicatorFor(tab)">
             <TooltipTrigger as-child>
-              <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="shrink-0 text-muted-foreground" />
+              <CodiconIcon
+                :name="indicatorFor(tab)!.icon"
+                :size="12"
+                class="shrink-0 text-muted-foreground"
+              />
             </TooltipTrigger>
             <TooltipContent>{{ indicatorFor(tab)!.tooltip }}</TooltipContent>
           </Tooltip>

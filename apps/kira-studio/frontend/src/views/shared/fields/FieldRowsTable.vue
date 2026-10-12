@@ -373,7 +373,12 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
            unlike showEnabled above, so it needs one stable cell to vary *inside* rather than
            shifting the grid's own column count. -->
       <div class="flex min-w-0 items-center gap-1">
-        <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
+        <slot
+          name="trailing"
+          :row="entry.row"
+          :index="entry.index"
+          :is-trailing="entry.index >= rows.length"
+        />
       </div>
       <TooltipIconButton
         :icon="ICON.close"
@@ -386,4 +391,3 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
     </div>
   </div>
 </template>
-

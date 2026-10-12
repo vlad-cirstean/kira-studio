@@ -89,7 +89,9 @@ const hitRateId = useId();
       </FieldError>
     </Field>
     <Field>
-      <Label :for="currentUsageId" class="text-muted-foreground">{{ t('studio.settings.cache.usage.label') }}</Label>
+      <Label :for="currentUsageId" class="text-muted-foreground">{{
+        t('studio.settings.cache.usage.label')
+      }}</Label>
       <Input
         :id="currentUsageId"
         type="text"
@@ -99,16 +101,18 @@ const hitRateId = useId();
       />
     </Field>
     <Field>
-      <Label :for="hitRateId" class="text-muted-foreground">{{ t('studio.settings.cache.hitRate.label') }}</Label>
-      <Input
-        :id="hitRateId"
-        type="text"
-        class="font-data"
-        :model-value="hitRateLabel"
-        disabled
-      />
+      <Label :for="hitRateId" class="text-muted-foreground">{{
+        t('studio.settings.cache.hitRate.label')
+      }}</Label>
+      <Input :id="hitRateId" type="text" class="font-data" :model-value="hitRateLabel" disabled />
     </Field>
-    <Button variant="dialog" size="kira-lg" class="self-start" data-testid="settings-clear-caches" @click="onClearCaches">
+    <Button
+      variant="dialog"
+      size="kira-lg"
+      class="self-start"
+      data-testid="settings-clear-caches"
+      @click="onClearCaches"
+    >
       {{ t('studio.settings.cache.clear.label') }}
     </Button>
   </div>

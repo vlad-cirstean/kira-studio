@@ -8,10 +8,13 @@ import type { ContainerOrigin } from '../wire';
 
 defineOptions({ inheritAttrs: false });
 
-const props = withDefaults(defineProps<{ origin: ContainerOrigin; name?: string; size?: number }>(), {
-  name: '',
-  size: 13,
-});
+const props = withDefaults(
+  defineProps<{ origin: ContainerOrigin; name?: string; size?: number }>(),
+  {
+    name: '',
+    size: 13,
+  },
+);
 
 const label = computed(() => {
   const n = props.name;
@@ -19,7 +22,9 @@ const label = computed(() => {
     case 'compose':
       return t('docker.origin.compose.tooltip', { tool: 'Compose' });
     case 'devcontainer':
-      return n ? t('docker.origin.devcontainerNamed.tooltip', { name: n }) : t('docker.origin.devcontainer.tooltip');
+      return n
+        ? t('docker.origin.devcontainerNamed.tooltip', { name: n })
+        : t('docker.origin.devcontainer.tooltip');
     case 'testcontainers':
       return 'Testcontainers';
     case 'kind':
@@ -46,8 +51,19 @@ const label = computed(() => {
         :aria-label="label"
         v-bind="$attrs"
       >
-        <CodiconIcon v-if="origin === 'compose'" name="layers" :size="size" style="color: #00b4ff" />
-        <svg v-else-if="origin === 'kubernetes' || origin === 'kind'" :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true">
+        <CodiconIcon
+          v-if="origin === 'compose'"
+          name="layers"
+          :size="size"
+          style="color: #00b4ff"
+        />
+        <svg
+          v-else-if="origin === 'kubernetes' || origin === 'kind'"
+          :width="size"
+          :height="size"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
           <path :fill="`#${siKubernetes.hex}`" :d="siKubernetes.path" />
         </svg>
         <CodiconIcon v-else-if="origin === 'swarm'" name="type-hierarchy" :size="size" />

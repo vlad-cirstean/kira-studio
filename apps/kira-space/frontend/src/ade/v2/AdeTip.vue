@@ -12,7 +12,8 @@ defineProps<{ text?: string; parts?: readonly TextPart[] }>();
       <slot />
     </TooltipTrigger>
     <TooltipContent
-      ><VarText v-if="parts?.length" :parts="parts" /><template v-else>{{ text }}</template></TooltipContent
+      ><VarText v-if="parts?.length" :parts="parts" />
+      <template v-else>{{ text }}</template></TooltipContent
     >
   </Tooltip>
   <slot v-else />

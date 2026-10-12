@@ -99,7 +99,8 @@ function onMenuSelect(id: string): void {
   const c = commit.value;
   if (!c) return;
   if (id === 'copySha') props.actions.copy(c.sha, t('git.copy.fullSha.announce'));
-  else if (id === 'copyMessage') props.actions.copy(c.subject, t('git.copy.commitMessage.announce'));
+  else if (id === 'copyMessage')
+    props.actions.copy(c.subject, t('git.copy.commitMessage.announce'));
 }
 
 // G14 D8 row action 1 / G21 D8c: "Open all changes" — one awaited `openAllChanges` call rather
@@ -185,7 +186,8 @@ function onOpenFile(index: number, pinned: boolean): void {
          diff-deleted-fg text drops below 4.5:1 contrast in the dark theme against the hover tint
          (axe caught it); the header's own background (`bg-bg`, unhovered) is what the body
          already sits on, and that combination passes. -->
-    <div data-testid="review-row-header"
+    <div
+      data-testid="review-row-header"
       ref="headerEl"
       :class="cn(rowVariants({ layout: 'tree' }), 'cursor-pointer py-1 px-2 min-w-0 font-ui')"
     >
@@ -201,7 +203,9 @@ function onOpenFile(index: number, pinned: boolean): void {
            below it. GitLens's own commit-node anatomy. -->
       <span class="flex flex-col gap-0.5 flex-1 min-w-0">
         <span class="truncate">{{ commit.subject }}</span>
-        <span class="flex items-center gap-0.5 text-muted-foreground text-graph-sm whitespace-nowrap overflow-hidden">
+        <span
+          class="flex items-center gap-0.5 text-muted-foreground text-graph-sm whitespace-nowrap overflow-hidden"
+        >
           <span class="overflow-hidden text-ellipsis">{{ commit.author.name }}</span>
           <span class="shrink-0" aria-hidden="true">·</span>
           <span class="overflow-hidden text-ellipsis">{{ dateText }}</span>
@@ -209,14 +213,20 @@ function onOpenFile(index: number, pinned: boolean): void {
           <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
                sha renders as plain text; the existing copySha context-menu item (buildReadOnlyRowMenu)
                already covers this, and F7 found these two affordances genuinely redundant with it. -->
-          <span class="font-data text-inherit shrink-0 bg-transparent border-0 cursor-pointer p-0">{{ sha7 }}</span>
+          <span
+            class="font-data text-inherit shrink-0 bg-transparent border-0 cursor-pointer p-0"
+            >{{
+              sha7
+            }}</span
+          >
         </span>
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
            (below) and always present for the roving-tabindex-focused row. GitLens's own
            row-action pattern. `data-testid="review-row-actions"` is also a script hook — `onRowClick`'s
            own `.closest('[data-testid="review-row-actions"]')` guard below reads it. -->
-      <span data-testid="review-row-actions"
+      <span
+        data-testid="review-row-actions"
         :class="[
           'flex items-center gap-0.5 shrink-0',
           focused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
@@ -259,7 +269,5 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
       <InlineState v-else kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
     </div>
-
   </div>
 </template>
-

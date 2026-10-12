@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { TooltipProviderProps } from 'reka-ui'
-import { TooltipProvider } from 'reka-ui'
+import type { TooltipProviderProps } from 'reka-ui';
+import { TooltipProvider } from 'reka-ui';
 
 const props = withDefaults(defineProps<TooltipProviderProps>(), {
   delayDuration: 400,
   skipDelayDuration: 300,
   disableHoverableContent: true,
-})
+});
 </script>
 
 <template>

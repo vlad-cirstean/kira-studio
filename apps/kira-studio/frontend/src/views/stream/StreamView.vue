@@ -307,27 +307,36 @@ function onAttrsCellClickFromEvent(e: MouseEvent): void {
 }
 function onBodyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
-  if (i !== null) onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated, rowAt(i)?.bodyBinary);
+  if (i !== null)
+    onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated, rowAt(i)?.bodyBinary);
 }
 // P105 §5.2(c): Enter/Space on a cell mirror clicking it.
-function onCellKeydownFromEvent(e: KeyboardEvent, column: 'key' | 'timestamp' | 'headers' | 'attrs' | 'body'): void {
+function onCellKeydownFromEvent(
+  e: KeyboardEvent,
+  column: 'key' | 'timestamp' | 'headers' | 'attrs' | 'body',
+): void {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   e.preventDefault();
   e.stopPropagation();
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i === null) return;
-  if (column === 'body') onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated, rowAt(i)?.bodyBinary);
-  else onCellClick(i, column, rowAt(i)?.[column] ?? null, false, column === 'key' && rowAt(i)?.keyBinary);
+  if (column === 'body')
+    onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated, rowAt(i)?.bodyBinary);
+  else
+    onCellClick(
+      i,
+      column,
+      rowAt(i)?.[column] ?? null,
+      false,
+      column === 'key' && rowAt(i)?.keyBinary,
+    );
 }
 
 // P43 iter2 F20/D27: rt.selectedRow is already reset to null on every load (state.ts's own
 // comment: "a fresh page invalidates whatever row index used to be selected") — the published
 // cell is the other half of the same idea and was left out of it, so a Poll cleared the row
 // highlight while the dock kept showing the previous batch's message body.
-watch(
-  page,
-  () => cellSelectionStore.clearSelectedCellFor(props.tab.id),
-);
+watch(page, () => cellSelectionStore.clearSelectedCellFor(props.tab.id));
 
 function onStop(): void {
   streamViewStore.stop(props.tab.id);
@@ -340,7 +349,9 @@ function onStop(): void {
 // which reaches onRefresh directly regardless of what's rendered.
 function onRefresh(): void {
   if (isBatch.value) return;
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => streamViewStore.reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
+    streamViewStore.reload(props.tab.id),
+  );
 }
 
 // A read-only SQS poll hides messages for the chosen time and raises their receive count; ask
@@ -391,7 +402,11 @@ const statusLine = computed(() => {
 // once caps has actually arrived for this tab's connection.
 const PAGE_SIZE_OPTIONS = computed(() => pageSizeOptions('stream-', caps.value?.maxPageSize));
 const PAGE_SIZE_ITEMS = computed(() =>
-  PAGE_SIZE_OPTIONS.value.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid })),
+  PAGE_SIZE_OPTIONS.value.map((o) => ({
+    value: String(o.value),
+    label: o.label,
+    testid: o.testid,
+  })),
 );
 function onPageSize(size: PageSize): void {
   void streamViewStore.setPageSize(props.tab.id, size);
@@ -476,7 +491,11 @@ async function onClearFilter(): Promise<void> {
   selectedPartitions.value = [];
   timestampText.value = '';
   timestampError.value = null;
-  await streamViewStore.applyStreamFilter(props.tab.id, { offset: null, partitions: [], timestamp: null });
+  await streamViewStore.applyStreamFilter(props.tab.id, {
+    offset: null,
+    partitions: [],
+    timestamp: null,
+  });
 }
 
 function onApplyFromHistory(
@@ -757,382 +776,451 @@ onUnmounted(() => {
 <template>
   <div class="h-full flex flex-col min-h-0" data-testid="stream-view" :data-path="tab.path">
     <div class="flex flex-1 min-h-0 flex-col">
-    <div class="flex min-h-0 flex-1 flex-col">
-    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore.
+      <div class="flex min-h-0 flex-1 flex-col">
+        <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore.
          Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
          `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
          made an absent can-refresh mean "always disabled" -- Refresh below carries the same
          `:disabled="isBatch"` this view's `can-refresh="!isBatch"` used to compute. -->
-    <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
-      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
-        <EngineIcon :kind="connRecord.kind" :size="13" />
-      </span>
-      <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass">
-        <CodiconIcon name="broadcast" :size="13" />
-      </span>
-      <span class="text-kira-md text-fg truncate"
-        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
-        ><span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span></span
-      >
-      <span class="ml-auto flex items-center gap-1">
-        <Badge
-          v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
-          data-testid="stream-visibility-timeout"
-        >
-          {{ t(isReadOnlyBatch ? 'studio.stream.visibilityQueue.status' : 'studio.stream.visibility.status', { time: t('format.duration.secondsCompact', { seconds: page.visibilityTimeoutSeconds }) }) }}
-        </Badge>
-      </span>
-    </ViewToolbar>
+        <ViewToolbar>
+          <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
+          <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
+            <EngineIcon :kind="connRecord.kind" :size="13" />
+          </span>
+          <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass">
+            <CodiconIcon name="broadcast" :size="13" />
+          </span>
+          <span class="text-kira-md text-fg truncate"
+            ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
+            ><span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span></span
+          >
+          <span class="ml-auto flex items-center gap-1">
+            <Badge
+              v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
+              data-testid="stream-visibility-timeout"
+            >
+              {{
+                t(isReadOnlyBatch ? 'studio.stream.visibilityQueue.status' : 'studio.stream.visibility.status', { time: t('format.duration.secondsCompact', { seconds: page.visibilityTimeoutSeconds }) })
+              }}
+            </Badge>
+          </span>
+        </ViewToolbar>
 
-    <div :class="colorMarkClass('band', railColor)" />
-    <ViewToolbar :border="isKafka ? 'bottom' : 'none'">
-      <div class="flex items-center gap-1.5 min-w-0">
-        <TooltipIconButton
-          :icon="ICON.refresh"
-          :label="t('common.action.refresh.label')"
-          disabled-trigger
-          data-testid="stream-refresh"
-          :disabled="isBatch"
-          @click="onRefresh"
-        />
-        <TooltipIconButton
-          :icon="ICON.stop"
-          :label="t('common.action.stop.label')"
-          disabled-trigger
-          :class="{ 'text-error': running }"
-          data-testid="stream-stop"
-          :disabled="!running"
-          @click="onStop"
-        />
-      </div>
-      <!-- Toolbar-consistency pass: a leading separator after the built-in refresh/stop group,
+        <div :class="colorMarkClass('band', railColor)" />
+        <ViewToolbar :border="isKafka ? 'bottom' : 'none'">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <TooltipIconButton
+              :icon="ICON.refresh"
+              :label="t('common.action.refresh.label')"
+              disabled-trigger
+              data-testid="stream-refresh"
+              :disabled="isBatch"
+              @click="onRefresh"
+            />
+            <TooltipIconButton
+              :icon="ICON.stop"
+              :label="t('common.action.stop.label')"
+              disabled-trigger
+              :class="{ 'text-error': running }"
+              data-testid="stream-stop"
+              :disabled="!running"
+              @click="onStop"
+            />
+          </div>
+          <!-- Toolbar-consistency pass: a leading separator after the built-in refresh/stop group,
            matching every other view's #toolbar slot (KeyValueView.vue, DocumentView.vue) and
            DataToolbar.vue's own canonical ordering. -->
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-      <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
+          <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
            in this same main toolbar (there is no separate DataToolbar-equivalent for streams). -->
-      <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="rt?.countError ? 'text-error' : ''"
-              :aria-label="t('studio.stream.count.label')"
-              data-testid="stream-count"
-              @click="streamViewStore.runCount(tab.id)"
-            >
-              <CodiconIcon name="symbol-number" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <!-- P108 Part 11 F15: mirrors grid/DataToolbar.vue's own count tooltip — a failed count
+          <div class="flex items-center gap-1.5 min-w-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  :class="rt?.countError ? 'text-error' : ''"
+                  :aria-label="t('studio.stream.count.label')"
+                  data-testid="stream-count"
+                  @click="streamViewStore.runCount(tab.id)"
+                >
+                  <CodiconIcon name="symbol-number" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <!-- P108 Part 11 F15: mirrors grid/DataToolbar.vue's own count tooltip — a failed count
                is no longer silent (applyStreamFilter now clears countError the same way it already
                clears count/countOpId, so a stale message never outlives the filter it was for). -->
-          <TooltipContent data-testid="stream-count-tooltip">{{
-            rt?.countError ? t('studio.common.countFailed.tooltip', { error: rt.countError }) : t('studio.stream.count.label')
-          }}</TooltipContent>
-        </Tooltip>
-        <span class="text-kira-sm text-muted-foreground" data-testid="stream-status">{{ statusLine }}</span>
-        <Tooltip v-if="isReadOnlyBatch">
-          <TooltipTrigger as-child>
-            <InputGroup variant="kira" class="flex w-24 shrink-0 font-data" :aria-invalid="!visibilityValid">
-              <span class="shrink-0 text-kira-sm text-muted-foreground">{{ t('common.action.hide.label') }}</span>
-              <InputGroupInput
-                :model-value="visibility.text.value"
-                type="number"
-                inputmode="numeric"
-                :min="SQS_MIN_VISIBILITY_TIMEOUT_SECONDS"
-                :max="SQS_MAX_VISIBILITY_TIMEOUT_SECONDS"
-                step="1"
-                class="h-full p-0 font-data"
-                data-testid="stream-poll-visibility"
-                @update:model-value="visibility.onInput"
-                @keydown="visibility.onKeydown"
-                @blur="visibility.onCommit"
-              />
-              <span class="shrink-0 text-kira-sm text-muted-foreground">{{ t('format.duration.secondsCompact', { seconds: '' }) }}</span>
-            </InputGroup>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.stream.hideDuration.description') }}</TooltipContent>
-        </Tooltip>
-        <FieldError v-if="isReadOnlyBatch && !visibilityValid" data-testid="stream-poll-visibility-error">{{
-          visibilityRangeHint
-        }}</FieldError>
-        <Tooltip v-if="isBatch">
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira"
-              class="bg-field text-fg"
-              data-testid="stream-poll"
-              :disabled="isReadOnlyBatch && !visibilityValid"
-              @click="onPoll"
-            >
-              <CodiconIcon name="arrow-swap" :size="13" />
-              {{ t('studio.stream.poll.label') }}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{
-            isReadOnlyBatch && !visibilityValid ? visibilityRangeHint : t('studio.stream.poll.tooltip')
-          }}</TooltipContent>
-        </Tooltip>
-        <TooltipIconButton
-          v-else
-          icon="arrow-right"
-          :label="t('common.action.nextPage.label')"
-          data-testid="stream-next"
-          disabled-trigger
-          :disabled="!rt?.hasMore"
-          @click="streamViewStore.goNext(tab.id)"
-        />
-      </div>
-
-      <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
-           (DataToolbar.vue, DocumentView.vue, KeyValueView.vue) — this one was missing its
-           leading sep. -->
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-
-      <SecondaryTabs variant="segmented" :model-value="String(tab.state.pageSize)" :items="PAGE_SIZE_ITEMS" data-testid="stream-page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
-
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-
-      <div class="flex items-center gap-1.5 min-w-0">
-        <div class="relative">
-          <TooltipIconButton
-            v-if="canInsert"
-            :icon="ICON.add"
-            :label="t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
-            :aria-label="t('studio.stream.addMessage.aria')"
-            ref="addMessageTriggerEl"
-            data-testid="stream-add-message"
-            @click="composeOpen = !composeOpen"
-          />
-          <Popover :open="composeOpen && canInsert" @update:open="(v) => (composeOpen = v)">
-            <PopoverAnchor :reference="(addMessageTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <PopoverContent align="end" class="w-96 p-0" data-testid="stream-add-message-panel">
-              <StreamComposeMessage
-                :tab-id="tab.id"
-                :kind="isKafka ? 'kafka' : 'sqs'"
-                @close="composeOpen = false"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <TooltipIconButton
-          v-if="canDelete"
-          :icon="ICON.delete"
-          :label="t(hasSelectedRow ? 'studio.stream.deleteSelected.tooltip' : 'studio.stream.selectFirst.tooltip')"
-          :aria-label="t('studio.stream.deleteMessage.aria')"
-          disabled-trigger
-          :disabled="!hasSelectedRow"
-          data-testid="stream-delete-message"
-          @click="onDeleteMessage"
-        />
-        <TooltipIconButton
-          :icon="ICON.search"
-          :label="t('studio.common.searchPage.label')"
-          :class="{ 'bg-field text-fg': rt?.searchOpen }"
-          data-testid="stream-search-toggle"
-          @click="onToggleSearch"
-        />
-      </div>
-      <span class="ml-auto" />
-      <Tooltip :disabled="true">
-        <TooltipTrigger as-child>
-          <RunState :state="runState" />
-        </TooltipTrigger>
-      </Tooltip>
-      <div class="flex items-center gap-1.5 min-w-0"></div>
-    </ViewToolbar>
-
-    <ViewToolbar v-if="isKafka" border="none">
-        <!-- Item 2: Kafka-only positioning filters — SQS shows none of this (no topic/partition/
-             offset concept, per connection.kind above). Applies only to a *fresh* browse
-             (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
-        <div class="relative">
-          <TooltipIconButton
-            :icon="ICON.history"
-            :label="t('studio.common.filterHistory.placeholder')"
-            data-testid="stream-filter-history-button"
-            @click="filterHistoryOpen = !filterHistoryOpen"
-          />
-          <StreamFilterHistoryMenu
-            v-if="filterHistoryOpen"
-            :tab-id="tab.id"
-            @apply="onApplyFromHistory"
-            @close="filterHistoryOpen = false"
-          />
-        </div>
-        <div class="w-40 shrink-0">
-          <InputGroup variant="kira" class="flex w-full font-data">
-            <span
-              class="shrink-0 text-kira-sm"
-              :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"
-              >{{ t('studio.stream.offset.label') }}</span
-            >
-            <InputGroupInput
-              :model-value="offsetText"
-              :placeholder="t('studio.stream.offset.placeholder')"
-              class="h-full p-0 font-data"
-              data-testid="stream-filter-offset"
-              @update:model-value="offsetEdit.onInput"
-              @keydown="offsetEdit.onKeydown"
-              @blur="offsetEdit.onCommit"
-            />
-          </InputGroup>
-        </div>
-        <div class="relative">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                ref="partitionTriggerEl"
-                variant="toolbar"
-                size="kira"
-                data-testid="stream-filter-partition"
-                :class="selectedPartitions.length ? 'text-state-on' : ''"
-                @click="onTogglePartitionMenu"
-              >
-                <CodiconIcon :name="ICON.filter" :size="13" />
-                {{ partitionButtonLabel }}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('studio.stream.partitionFilter.tooltip') }}</TooltipContent>
-          </Tooltip>
-          <Popover :open="partitionMenuOpen" @update:open="(v) => (partitionMenuOpen = v)">
-            <PopoverAnchor :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <PopoverContent align="start" class="w-56 p-0" data-testid="stream-partition-menu">
-              <!-- Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-
-                   PopoverPanel shape. -->
-              <div class="flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1">
-                <InlineState v-if="partitionOptionsLoading" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
-                <InlineState v-else-if="partitionOptions.length === 0" kind="empty">{{ t('studio.stream.noPartitions.empty') }}</InlineState>
-                <Label
-                  v-for="p in partitionOptions"
-                  :key="p"
-                  class="partition-option" :class="rowVariants()"
-                  :data-testid="`stream-filter-partition-option-${p}`"
-                >
-                  <Checkbox
-                    class="size-3.5"
-                    :model-value="isPartitionSelected(p)"
-                    @update:model-value="onTogglePartition(p)"
-                  >
-                    <CodiconIcon name="check" :size="12" />
-                  </Checkbox>
-                  <span>{{ t('studio.stream.partition.label', { id: p }) }}</span>
-                </Label>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <!-- P31 D12/D13: the "since" field's own wrapper — not the offset field's shrink-0 w-40
-             (that fixed 160px width and 100%-wide input are sized for a single bare TextField;
-             this one also carries a calendar trigger beside the input and an error line below it). -->
-        <div class="flex flex-col gap-0.5 shrink-0">
-          <div class="flex items-center gap-0.5">
-            <Tooltip :disabled="!timestampError">
+              <TooltipContent data-testid="stream-count-tooltip">{{
+                rt?.countError ? t('studio.common.countFailed.tooltip', { error: rt.countError }) : t('studio.stream.count.label')
+              }}</TooltipContent>
+            </Tooltip>
+            <span class="text-kira-sm text-muted-foreground" data-testid="stream-status">{{
+              statusLine
+            }}</span>
+            <Tooltip v-if="isReadOnlyBatch">
               <TooltipTrigger as-child>
                 <InputGroup
                   variant="kira"
-                  class="flex w-40 font-data"
-                  :aria-invalid="!!timestampError"
+                  class="flex w-24 shrink-0 font-data"
+                  :aria-invalid="!visibilityValid"
                 >
-                  <span
-                    class="shrink-0 text-kira-sm"
-                    :class="tab.state.timestampFilter ? 'text-state-on' : 'text-muted-foreground'"
-                    >{{ t('studio.stream.since.label') }}</span
-                  >
+                  <span class="shrink-0 text-kira-sm text-muted-foreground">{{
+                    t('common.action.hide.label')
+                  }}</span>
                   <InputGroupInput
-                    :model-value="timestampText"
-                    :placeholder="t('studio.cellEditor.detect.iso8601.status')"
+                    :model-value="visibility.text.value"
+                    type="number"
+                    inputmode="numeric"
+                    :min="SQS_MIN_VISIBILITY_TIMEOUT_SECONDS"
+                    :max="SQS_MAX_VISIBILITY_TIMEOUT_SECONDS"
+                    step="1"
                     class="h-full p-0 font-data"
-                    data-testid="stream-filter-timestamp"
-                    @update:model-value="timestampEdit.onInput"
-                    @keydown="timestampEdit.onKeydown"
-                    @blur="timestampEdit.onCommit"
+                    data-testid="stream-poll-visibility"
+                    @update:model-value="visibility.onInput"
+                    @keydown="visibility.onKeydown"
+                    @blur="visibility.onCommit"
                   />
+                  <span class="shrink-0 text-kira-sm text-muted-foreground">{{
+                    t('format.duration.secondsCompact', { seconds: '' })
+                  }}</span>
                 </InputGroup>
               </TooltipTrigger>
-              <TooltipContent>{{ timestampError }}</TooltipContent>
+              <TooltipContent>{{ t('studio.stream.hideDuration.description') }}</TooltipContent>
             </Tooltip>
-            <span class="relative shrink-0">
-              <TooltipIconButton
-                icon="calendar"
-                :label="t('studio.common.pickDateTime.tooltip')"
-                ref="timestampCalendarTriggerEl"
-                data-testid="stream-filter-timestamp-calendar"
-                @click="timestampCalendarOpen = !timestampCalendarOpen"
-              />
-              <Popover :open="timestampCalendarOpen" @update:open="(v) => (timestampCalendarOpen = v)">
-                <PopoverAnchor :reference="(timestampCalendarTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-                <PopoverContent
-                  align="start"
-                  class="w-56 p-0"
-                  data-testid="stream-filter-timestamp-calendar-popover"
+            <FieldError
+              v-if="isReadOnlyBatch && !visibilityValid"
+              data-testid="stream-poll-visibility-error"
+              >{{
+                visibilityRangeHint
+              }}</FieldError
+            >
+            <Tooltip v-if="isBatch">
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira"
+                  class="bg-field text-fg"
+                  data-testid="stream-poll"
+                  :disabled="isReadOnlyBatch && !visibilityValid"
+                  @click="onPoll"
                 >
-                  <DateTimePicker :model-value="timestampPickerDate" zone="local" @update:model-value="onPickTimestamp" />
+                  <CodiconIcon name="arrow-swap" :size="13" />
+                  {{ t('studio.stream.poll.label') }}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{
+                isReadOnlyBatch && !visibilityValid ? visibilityRangeHint : t('studio.stream.poll.tooltip')
+              }}</TooltipContent>
+            </Tooltip>
+            <TooltipIconButton
+              v-else
+              icon="arrow-right"
+              :label="t('common.action.nextPage.label')"
+              data-testid="stream-next"
+              disabled-trigger
+              :disabled="!rt?.hasMore"
+              @click="streamViewStore.goNext(tab.id)"
+            />
+          </div>
+
+          <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
+           (DataToolbar.vue, DocumentView.vue, KeyValueView.vue) — this one was missing its
+           leading sep. -->
+          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+
+          <SecondaryTabs
+            variant="segmented"
+            :model-value="String(tab.state.pageSize)"
+            :items="PAGE_SIZE_ITEMS"
+            data-testid="stream-page-size-picker"
+            @update:model-value="(v) => onPageSize(Number(v) as PageSize)"
+          />
+
+          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+
+          <div class="flex items-center gap-1.5 min-w-0">
+            <div class="relative">
+              <TooltipIconButton
+                v-if="canInsert"
+                :icon="ICON.add"
+                :label="t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
+                :aria-label="t('studio.stream.addMessage.aria')"
+                ref="addMessageTriggerEl"
+                data-testid="stream-add-message"
+                @click="composeOpen = !composeOpen"
+              />
+              <Popover :open="composeOpen && canInsert" @update:open="(v) => (composeOpen = v)">
+                <PopoverAnchor
+                  :reference="(addMessageTriggerEl?.$el as HTMLElement) ?? undefined"
+                  class="hidden"
+                />
+                <PopoverContent align="end" class="w-96 p-0" data-testid="stream-add-message-panel">
+                  <StreamComposeMessage
+                    :tab-id="tab.id"
+                    :kind="isKafka ? 'kafka' : 'sqs'"
+                    @close="composeOpen = false"
+                  />
                 </PopoverContent>
               </Popover>
-            </span>
+            </div>
+            <TooltipIconButton
+              v-if="canDelete"
+              :icon="ICON.delete"
+              :label="t(hasSelectedRow ? 'studio.stream.deleteSelected.tooltip' : 'studio.stream.selectFirst.tooltip')"
+              :aria-label="t('studio.stream.deleteMessage.aria')"
+              disabled-trigger
+              :disabled="!hasSelectedRow"
+              data-testid="stream-delete-message"
+              @click="onDeleteMessage"
+            />
+            <TooltipIconButton
+              :icon="ICON.search"
+              :label="t('studio.common.searchPage.label')"
+              :class="{ 'bg-field text-fg': rt?.searchOpen }"
+              data-testid="stream-search-toggle"
+              @click="onToggleSearch"
+            />
           </div>
-          <FieldError v-if="timestampError" class="whitespace-nowrap" data-testid="stream-filter-timestamp-error">{{
-            timestampError
-          }}</FieldError>
-        </div>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira" data-testid="stream-filter-clear" @click="onClearFilter">
-              {{ t('common.action.clear.label') }}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
-        </Tooltip>
-    </ViewToolbar>
+          <span class="ml-auto" />
+          <Tooltip :disabled="true">
+            <TooltipTrigger as-child>
+              <RunState :state="runState" />
+            </TooltipTrigger>
+          </Tooltip>
+          <div class="flex items-center gap-1.5 min-w-0"></div>
+        </ViewToolbar>
 
-    <!-- The one destructive truth of this view, stated once at the top. -->
-    <Alert v-if="isBatch" variant="warn" strip data-testid="stream-poll-warning">
-      <AlertDescription v-if="isReadOnlyBatch">
-        {{ t('studio.stream.pollWarningReadOnly.description', { duration: hideDuration }) }}
-        <template v-if="redriveLimit !== null">{{ redriveSentence(redriveLimit) }}</template>
-      </AlertDescription>
-      <AlertDescription v-else>
-        {{ t('studio.stream.pollWarningConsume.description') }}
-        <template v-if="redriveLimit !== null">{{ redriveSentence(redriveLimit) }}</template>
-      </AlertDescription>
-    </Alert>
+        <ViewToolbar v-if="isKafka" border="none">
+          <!-- Item 2: Kafka-only positioning filters — SQS shows none of this (no topic/partition/
+             offset concept, per connection.kind above). Applies only to a *fresh* browse
+             (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
+          <div class="relative">
+            <TooltipIconButton
+              :icon="ICON.history"
+              :label="t('studio.common.filterHistory.placeholder')"
+              data-testid="stream-filter-history-button"
+              @click="filterHistoryOpen = !filterHistoryOpen"
+            />
+            <StreamFilterHistoryMenu
+              v-if="filterHistoryOpen"
+              :tab-id="tab.id"
+              @apply="onApplyFromHistory"
+              @close="filterHistoryOpen = false"
+            />
+          </div>
+          <div class="w-40 shrink-0">
+            <InputGroup variant="kira" class="flex w-full font-data">
+              <span
+                class="shrink-0 text-kira-sm"
+                :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"
+                >{{
+                  t('studio.stream.offset.label')
+                }}</span
+              >
+              <InputGroupInput
+                :model-value="offsetText"
+                :placeholder="t('studio.stream.offset.placeholder')"
+                class="h-full p-0 font-data"
+                data-testid="stream-filter-offset"
+                @update:model-value="offsetEdit.onInput"
+                @keydown="offsetEdit.onKeydown"
+                @blur="offsetEdit.onCommit"
+              />
+            </InputGroup>
+          </div>
+          <div class="relative">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  ref="partitionTriggerEl"
+                  variant="toolbar"
+                  size="kira"
+                  data-testid="stream-filter-partition"
+                  :class="selectedPartitions.length ? 'text-state-on' : ''"
+                  @click="onTogglePartitionMenu"
+                >
+                  <CodiconIcon :name="ICON.filter" :size="13" />
+                  {{ partitionButtonLabel }}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ t('studio.stream.partitionFilter.tooltip') }}</TooltipContent>
+            </Tooltip>
+            <Popover :open="partitionMenuOpen" @update:open="(v) => (partitionMenuOpen = v)">
+              <PopoverAnchor
+                :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined"
+                class="hidden"
+              />
+              <PopoverContent align="start" class="w-56 p-0" data-testid="stream-partition-menu">
+                <!-- Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-
+                   PopoverPanel shape. -->
+                <div class="flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1">
+                  <InlineState v-if="partitionOptionsLoading" kind="loading">{{
+                    t('common.state.loading.loading')
+                  }}</InlineState>
+                  <InlineState v-else-if="partitionOptions.length === 0" kind="empty">{{
+                    t('studio.stream.noPartitions.empty')
+                  }}</InlineState>
+                  <Label
+                    v-for="p in partitionOptions"
+                    :key="p"
+                    class="partition-option"
+                    :class="rowVariants()"
+                    :data-testid="`stream-filter-partition-option-${p}`"
+                  >
+                    <Checkbox
+                      class="size-3.5"
+                      :model-value="isPartitionSelected(p)"
+                      @update:model-value="onTogglePartition(p)"
+                    >
+                      <CodiconIcon name="check" :size="12" />
+                    </Checkbox>
+                    <span>{{ t('studio.stream.partition.label', { id: p }) }}</span>
+                  </Label>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <!-- P31 D12/D13: the "since" field's own wrapper — not the offset field's shrink-0 w-40
+             (that fixed 160px width and 100%-wide input are sized for a single bare TextField;
+             this one also carries a calendar trigger beside the input and an error line below it). -->
+          <div class="flex flex-col gap-0.5 shrink-0">
+            <div class="flex items-center gap-0.5">
+              <Tooltip :disabled="!timestampError">
+                <TooltipTrigger as-child>
+                  <InputGroup
+                    variant="kira"
+                    class="flex w-40 font-data"
+                    :aria-invalid="!!timestampError"
+                  >
+                    <span
+                      class="shrink-0 text-kira-sm"
+                      :class="tab.state.timestampFilter ? 'text-state-on' : 'text-muted-foreground'"
+                      >{{
+                        t('studio.stream.since.label')
+                      }}</span
+                    >
+                    <InputGroupInput
+                      :model-value="timestampText"
+                      :placeholder="t('studio.cellEditor.detect.iso8601.status')"
+                      class="h-full p-0 font-data"
+                      data-testid="stream-filter-timestamp"
+                      @update:model-value="timestampEdit.onInput"
+                      @keydown="timestampEdit.onKeydown"
+                      @blur="timestampEdit.onCommit"
+                    />
+                  </InputGroup>
+                </TooltipTrigger>
+                <TooltipContent>{{ timestampError }}</TooltipContent>
+              </Tooltip>
+              <span class="relative shrink-0">
+                <TooltipIconButton
+                  icon="calendar"
+                  :label="t('studio.common.pickDateTime.tooltip')"
+                  ref="timestampCalendarTriggerEl"
+                  data-testid="stream-filter-timestamp-calendar"
+                  @click="timestampCalendarOpen = !timestampCalendarOpen"
+                />
+                <Popover
+                  :open="timestampCalendarOpen"
+                  @update:open="(v) => (timestampCalendarOpen = v)"
+                >
+                  <PopoverAnchor
+                    :reference="(timestampCalendarTriggerEl?.$el as HTMLElement) ?? undefined"
+                    class="hidden"
+                  />
+                  <PopoverContent
+                    align="start"
+                    class="w-56 p-0"
+                    data-testid="stream-filter-timestamp-calendar-popover"
+                  >
+                    <DateTimePicker
+                      :model-value="timestampPickerDate"
+                      zone="local"
+                      @update:model-value="onPickTimestamp"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </span>
+            </div>
+            <FieldError
+              v-if="timestampError"
+              class="whitespace-nowrap"
+              data-testid="stream-filter-timestamp-error"
+              >{{
+                timestampError
+              }}</FieldError
+            >
+          </div>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="stream-filter-clear"
+                @click="onClearFilter"
+              >
+                {{ t('common.action.clear.label') }}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
+          </Tooltip>
+        </ViewToolbar>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" strip data-testid="stream-error">
-      <AlertDescription>{{ rt.error.message }}</AlertDescription>
-    </Alert>
+        <!-- The one destructive truth of this view, stated once at the top. -->
+        <Alert v-if="isBatch" variant="warn" strip data-testid="stream-poll-warning">
+          <AlertDescription v-if="isReadOnlyBatch">
+            {{ t('studio.stream.pollWarningReadOnly.description', { duration: hideDuration }) }}
+            <template v-if="redriveLimit !== null">{{ redriveSentence(redriveLimit) }}</template>
+          </AlertDescription>
+          <AlertDescription v-else>
+            {{ t('studio.stream.pollWarningConsume.description') }}
+            <template v-if="redriveLimit !== null">{{ redriveSentence(redriveLimit) }}</template>
+          </AlertDescription>
+        </Alert>
 
-    <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
-    <Alert v-if="rt?.actionError" variant="error" strip data-testid="stream-action-error">
-      <AlertDescription>{{ rt.actionError }}</AlertDescription>
-    </Alert>
+        <Alert
+          v-if="rt?.status === 'error' && rt.error"
+          variant="error"
+          strip
+          data-testid="stream-error"
+        >
+          <AlertDescription>{{ rt.error.message }}</AlertDescription>
+        </Alert>
 
-    <StreamSearchToolbar
-      v-if="rt?.searchOpen"
-      :tab-id="tab.id"
-      @go-to-match="onGoToMatch"
-      @close="onCloseSearch"
-    />
+        <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
+        <Alert v-if="rt?.actionError" variant="error" strip data-testid="stream-action-error">
+          <AlertDescription>{{ rt.actionError }}</AlertDescription>
+        </Alert>
 
-    <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+        <StreamSearchToolbar
+          v-if="rt?.searchOpen"
+          :tab-id="tab.id"
+          @go-to-match="onGoToMatch"
+          @close="onCloseSearch"
+        />
+
+        <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that actually needs a live connection — swaps for the gate. -->
-    <EmptyState v-if="needsReconnect" data-testid="stream-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
-      <Button variant="dialog-primary" size="kira-lg" data-testid="stream-reconnect-load" @click="onReconnectAndLoad">
-        {{ t('studio.common.reconnectAndLoad.label') }}
-      </Button>
-    </EmptyState>
-    <template v-else>
-    <!-- Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
+        <EmptyState
+          v-if="needsReconnect"
+          data-testid="stream-reconnect"
+          icon="plug"
+          :title="t('studio.common.disconnected.empty')"
+        >
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="stream-reconnect-load"
+            @click="onReconnectAndLoad"
+          >
+            {{ t('studio.common.reconnectAndLoad.label') }}
+          </Button>
+        </EmptyState>
+        <template v-else>
+          <!-- Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
          unscoped `position: absolute; inset: 0` rule) — the `relative` utility already on this div
          gives inset:0 a positioned ancestor, so the placeholder stays scoped to this row list
          instead of covering the whole app window (intercepting pointer events app-wide, the tree
@@ -1140,203 +1228,259 @@ onUnmounted(() => {
          already applies to its own `.slick-grid-host` for the identical shared class. `.no-rows`
          stays a bare marker -- polled directly by interaction.spec.ts/sqs.frontend.spec.ts/
          kafka.frontend.spec.ts. -->
-    <div class="relative flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="stream-list">
-      <EmptyState v-if="isBatch && !rt?.polled" class="no-rows absolute inset-0" icon="arrow-swap" :title="t('studio.stream.pollPrompt.empty')" />
-      <EmptyState
-        v-else-if="!rt || rt.rowCount === 0"
-        class="no-rows absolute inset-0"
-        :icon="rt ? 'inbox' : undefined"
-        :title="rt ? t('studio.stream.noMessages.empty') : t('common.state.loading.loading')"
-      >
-        <template v-if="!rt" #media><Spinner :size="24" /></template>
-      </EmptyState>
-      <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
-           from "no messages loaded". -->
-      <SearchFilterNotice
-        v-else-if="displayRows && displayRows.length === 0"
-        class="no-rows absolute inset-0"
-        data-testid="stream-no-matching-rows"
-        :filter-key="tab.id"
-        show-all-testid="stream-show-all-rows"
-      />
-      <template v-else>
-          <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative w-10" />
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('key')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('key') }}</span>
-              <ResizeHandle
-                class="absolute inset-y-0 right-0 z-1"
-                draggable="false"
-                data-testid="stream-column-resize-key"
-                :label="resizeLabel('key')"
-                :size="widthFor('key')"
-                :min="40"
-                @live="(w) => onResizeLive('key', w)"
-                @commit="(w) => onResizeCommit('key', w)"
-                @cancel="() => onResizeCancel('key')"
-                @click.stop
-              />
-            </div>
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('timestamp')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('timestamp') }}</span>
-              <ResizeHandle
-                class="absolute inset-y-0 right-0 z-1"
-                draggable="false"
-                data-testid="stream-column-resize-timestamp"
-                :label="resizeLabel('timestamp')"
-                :size="widthFor('timestamp')"
-                :min="40"
-                @live="(w) => onResizeLive('timestamp', w)"
-                @commit="(w) => onResizeCommit('timestamp', w)"
-                @cancel="() => onResizeCancel('timestamp')"
-                @click.stop
-              />
-            </div>
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('headers')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('headers') }}</span>
-              <ResizeHandle
-                class="absolute inset-y-0 right-0 z-1"
-                draggable="false"
-                data-testid="stream-column-resize-headers"
-                :label="resizeLabel('headers')"
-                :size="widthFor('headers')"
-                :min="40"
-                @live="(w) => onResizeLive('headers', w)"
-                @commit="(w) => onResizeCommit('headers', w)"
-                @cancel="() => onResizeCancel('headers')"
-                @click.stop
-              />
-            </div>
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('attrs')}px` }">
-              <span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('attrs') }}</span>
-              <ResizeHandle
-                class="absolute inset-y-0 right-0 z-1"
-                draggable="false"
-                data-testid="stream-column-resize-attrs"
-                :label="resizeLabel('attrs')"
-                :size="widthFor('attrs')"
-                :min="40"
-                @live="(w) => onResizeLive('attrs', w)"
-                @commit="(w) => onResizeCommit('attrs', w)"
-                @cancel="() => onResizeCancel('attrs')"
-                @click.stop
-              />
-            </div>
-            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative flex-1"><span class="text-fg overflow-hidden text-ellipsis">{{ columnLabel('body') }}</span></div>
-          </div>
           <div
-            ref="scrollEl"
-            class="flex-1 min-h-0 overflow-auto"
-            data-testid="virtual-list"
-            role="listbox"
-            :aria-label="t('studio.stream.rows.aria')"
-            @scroll="onScroll"
+            class="relative flex-1 min-h-0 flex flex-col overflow-hidden"
+            data-testid="stream-list"
           >
-            <div class="relative" :style="{ height: `${totalSize}px` }">
-              <div
-                v-for="vi in virtualItems"
-                :key="String(vi.key)"
-                data-testid="stream-row"
-                :data-row-index="rowIndices[vi.index]"
-                :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-                :class="streamRowClass(rowIndices[vi.index])"
-              >
+            <EmptyState
+              v-if="isBatch && !rt?.polled"
+              class="no-rows absolute inset-0"
+              icon="arrow-swap"
+              :title="t('studio.stream.pollPrompt.empty')"
+            />
+            <EmptyState
+              v-else-if="!rt || rt.rowCount === 0"
+              class="no-rows absolute inset-0"
+              :icon="rt ? 'inbox' : undefined"
+              :title="rt ? t('studio.stream.noMessages.empty') : t('common.state.loading.loading')"
+            >
+              <template v-if="!rt" #media><Spinner :size="24" /></template>
+            </EmptyState>
+            <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+           from "no messages loaded". -->
+            <SearchFilterNotice
+              v-else-if="displayRows && displayRows.length === 0"
+              class="no-rows absolute inset-0"
+              data-testid="stream-no-matching-rows"
+              :filter-key="tab.id"
+              show-all-testid="stream-show-all-rows"
+            />
+            <template v-else>
+              <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
                 <div
-                  class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10"
-                  role="option"
-                  v-bind="nav.rowProps(String(rowIndices[vi.index]))"
-:tabindex="nav.tabindexFor(String(rowIndices[vi.index]))"
-                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
-                  @click="onRowClickFromEvent"
-                  @keydown="onRowKeydownFromEvent"
-                >
-                  {{ rowIndices[vi.index] + 1 }}
-                </div>
+                  class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative w-10"
+                />
                 <div
-                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate"
-                  :class="rowAt(rowIndices[vi.index])?.key === null ? 'italic text-subtle' : 'text-fg'"
+                  class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative"
                   :style="{ width: `${widthFor('key')}px` }"
-                  data-testid="stream-key"
-                  role="option"
-                  tabindex="0"
-                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
-                  @click="onKeyCellClickFromEvent"
-                  @keydown="onCellKeydownFromEvent($event, 'key')"
                 >
-                  <Badge data v-if="rowAt(rowIndices[vi.index])?.keyBinary" class="mr-1" data-testid="stream-key-binary">{{ t('studio.cellEditor.format.base64.label') }}</Badge>
-                  {{ rowAt(rowIndices[vi.index])?.key ?? t('common.state.none.option') }}
+                  <span class="text-fg overflow-hidden text-ellipsis">{{
+                    columnLabel('key')
+                  }}</span>
+                  <ResizeHandle
+                    class="absolute inset-y-0 right-0 z-1"
+                    draggable="false"
+                    data-testid="stream-column-resize-key"
+                    :label="resizeLabel('key')"
+                    :size="widthFor('key')"
+                    :min="40"
+                    @live="(w) => onResizeLive('key', w)"
+                    @commit="(w) => onResizeCommit('key', w)"
+                    @cancel="() => onResizeCancel('key')"
+                    @click.stop
+                  />
                 </div>
                 <div
-                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
+                  class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative"
                   :style="{ width: `${widthFor('timestamp')}px` }"
-                  data-testid="stream-timestamp"
-                  role="option"
-                  tabindex="0"
-                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
-                  @click="onTimestampCellClickFromEvent"
-                  @keydown="onCellKeydownFromEvent($event, 'timestamp')"
                 >
-                  {{ rowAt(rowIndices[vi.index])?.timestamp ?? '' }}
+                  <span class="text-fg overflow-hidden text-ellipsis">{{
+                    columnLabel('timestamp')
+                  }}</span>
+                  <ResizeHandle
+                    class="absolute inset-y-0 right-0 z-1"
+                    draggable="false"
+                    data-testid="stream-column-resize-timestamp"
+                    :label="resizeLabel('timestamp')"
+                    :size="widthFor('timestamp')"
+                    :min="40"
+                    @live="(w) => onResizeLive('timestamp', w)"
+                    @commit="(w) => onResizeCommit('timestamp', w)"
+                    @cancel="() => onResizeCancel('timestamp')"
+                    @click.stop
+                  />
                 </div>
                 <div
-                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
+                  class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative"
                   :style="{ width: `${widthFor('headers')}px` }"
-                  data-testid="stream-headers"
-                  role="option"
-                  tabindex="0"
-                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
-                  @click="onHeadersCellClickFromEvent"
-                  @keydown="onCellKeydownFromEvent($event, 'headers')"
                 >
-                  {{ rowAt(rowIndices[vi.index])?.headers }}
+                  <span class="text-fg overflow-hidden text-ellipsis">{{
+                    columnLabel('headers')
+                  }}</span>
+                  <ResizeHandle
+                    class="absolute inset-y-0 right-0 z-1"
+                    draggable="false"
+                    data-testid="stream-column-resize-headers"
+                    :label="resizeLabel('headers')"
+                    :size="widthFor('headers')"
+                    :min="40"
+                    @live="(w) => onResizeLive('headers', w)"
+                    @commit="(w) => onResizeCommit('headers', w)"
+                    @cancel="() => onResizeCancel('headers')"
+                    @click.stop
+                  />
                 </div>
                 <div
-                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
+                  class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative"
                   :style="{ width: `${widthFor('attrs')}px` }"
-                  data-testid="stream-attrs"
-                  role="option"
-                  tabindex="0"
-                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
-                  @click="onAttrsCellClickFromEvent"
-                  @keydown="onCellKeydownFromEvent($event, 'attrs')"
                 >
-                  {{ rowAt(rowIndices[vi.index])?.attrs }}
+                  <span class="text-fg overflow-hidden text-ellipsis">{{
+                    columnLabel('attrs')
+                  }}</span>
+                  <ResizeHandle
+                    class="absolute inset-y-0 right-0 z-1"
+                    draggable="false"
+                    data-testid="stream-column-resize-attrs"
+                    :label="resizeLabel('attrs')"
+                    :size="widthFor('attrs')"
+                    :min="40"
+                    @live="(w) => onResizeLive('attrs', w)"
+                    @commit="(w) => onResizeCommit('attrs', w)"
+                    @cancel="() => onResizeCancel('attrs')"
+                    @click.stop
+                  />
                 </div>
                 <div
-                  class="flex items-center px-2 border-r border-b border-border font-data truncate flex-1 text-muted-foreground text-kira-sm"
-                  data-testid="stream-body"
-                  role="option"
-                  :aria-label="rowAt(rowIndices[vi.index])?.body === null ? t('studio.stream.tombstone.tooltip') : undefined"
-                  tabindex="0"
-                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
-                  @click="onBodyCellClickFromEvent"
-                  @keydown="onCellKeydownFromEvent($event, 'body')"
+                  class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative flex-1"
+                  ><span class="text-fg overflow-hidden text-ellipsis">{{
+                    columnLabel('body')
+                  }}</span></div
                 >
-                  <Tooltip v-if="rowAt(rowIndices[vi.index])?.body === null">
-                    <TooltipTrigger as-child>
-                      <span class="text-subtle italic" data-testid="stream-body-null">{{ t('studio.common.nullValue.label') }}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t('studio.stream.tombstone.tooltip') }}</TooltipContent>
-                  </Tooltip>
-                  <template v-else>
-                    <Badge v-if="rowAt(rowIndices[vi.index])?.bodyBinary" class="mr-1" data-testid="stream-body-binary">{{ t('studio.cellEditor.format.base64.label') }}</Badge>
-                    {{ rowAt(rowIndices[vi.index])?.body }}
-                  </template>
-                  <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
-                    <TooltipTrigger as-child>
-                      <span class="text-kira-sm text-muted-foreground">{{ t('studio.common.truncated.status') }}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
-                  </Tooltip>
+              </div>
+              <div
+                ref="scrollEl"
+                class="flex-1 min-h-0 overflow-auto"
+                data-testid="virtual-list"
+                role="listbox"
+                :aria-label="t('studio.stream.rows.aria')"
+                @scroll="onScroll"
+              >
+                <div class="relative" :style="{ height: `${totalSize}px` }">
+                  <div
+                    v-for="vi in virtualItems"
+                    :key="String(vi.key)"
+                    data-testid="stream-row"
+                    :data-row-index="rowIndices[vi.index]"
+                    :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
+                    :class="streamRowClass(rowIndices[vi.index])"
+                  >
+                    <div
+                      class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-sm text-subtle truncate relative w-10"
+                      role="option"
+                      v-bind="nav.rowProps(String(rowIndices[vi.index]))"
+                      :tabindex="nav.tabindexFor(String(rowIndices[vi.index]))"
+                      :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                      @click="onRowClickFromEvent"
+                      @keydown="onRowKeydownFromEvent"
+                    >
+                      {{ rowIndices[vi.index] + 1 }}
+                    </div>
+                    <div
+                      class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate"
+                      :class="rowAt(rowIndices[vi.index])?.key === null ? 'italic text-subtle' : 'text-fg'"
+                      :style="{ width: `${widthFor('key')}px` }"
+                      data-testid="stream-key"
+                      role="option"
+                      tabindex="0"
+                      :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                      @click="onKeyCellClickFromEvent"
+                      @keydown="onCellKeydownFromEvent($event, 'key')"
+                    >
+                      <Badge
+                        data
+                        v-if="rowAt(rowIndices[vi.index])?.keyBinary"
+                        class="mr-1"
+                        data-testid="stream-key-binary"
+                        >{{
+                          t('studio.cellEditor.format.base64.label')
+                        }}</Badge
+                      >
+                      {{ rowAt(rowIndices[vi.index])?.key ?? t('common.state.none.option') }}
+                    </div>
+                    <div
+                      class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
+                      :style="{ width: `${widthFor('timestamp')}px` }"
+                      data-testid="stream-timestamp"
+                      role="option"
+                      tabindex="0"
+                      :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                      @click="onTimestampCellClickFromEvent"
+                      @keydown="onCellKeydownFromEvent($event, 'timestamp')"
+                    >
+                      {{ rowAt(rowIndices[vi.index])?.timestamp ?? '' }}
+                    </div>
+                    <div
+                      class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
+                      :style="{ width: `${widthFor('headers')}px` }"
+                      data-testid="stream-headers"
+                      role="option"
+                      tabindex="0"
+                      :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                      @click="onHeadersCellClickFromEvent"
+                      @keydown="onCellKeydownFromEvent($event, 'headers')"
+                    >
+                      {{ rowAt(rowIndices[vi.index])?.headers }}
+                    </div>
+                    <div
+                      class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
+                      :style="{ width: `${widthFor('attrs')}px` }"
+                      data-testid="stream-attrs"
+                      role="option"
+                      tabindex="0"
+                      :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                      @click="onAttrsCellClickFromEvent"
+                      @keydown="onCellKeydownFromEvent($event, 'attrs')"
+                    >
+                      {{ rowAt(rowIndices[vi.index])?.attrs }}
+                    </div>
+                    <div
+                      class="flex items-center px-2 border-r border-b border-border font-data truncate flex-1 text-muted-foreground text-kira-sm"
+                      data-testid="stream-body"
+                      role="option"
+                      :aria-label="rowAt(rowIndices[vi.index])?.body === null ? t('studio.stream.tombstone.tooltip') : undefined"
+                      tabindex="0"
+                      :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                      @click="onBodyCellClickFromEvent"
+                      @keydown="onCellKeydownFromEvent($event, 'body')"
+                    >
+                      <Tooltip v-if="rowAt(rowIndices[vi.index])?.body === null">
+                        <TooltipTrigger as-child>
+                          <span class="text-subtle italic" data-testid="stream-body-null">{{
+                            t('studio.common.nullValue.label')
+                          }}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{{ t('studio.stream.tombstone.tooltip') }}</TooltipContent>
+                      </Tooltip>
+                      <template v-else>
+                        <Badge
+                          v-if="rowAt(rowIndices[vi.index])?.bodyBinary"
+                          class="mr-1"
+                          data-testid="stream-body-binary"
+                          >{{
+                            t('studio.cellEditor.format.base64.label')
+                          }}</Badge
+                        >
+                        {{ rowAt(rowIndices[vi.index])?.body }}
+                      </template>
+                      <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
+                        <TooltipTrigger as-child>
+                          <span class="text-kira-sm text-muted-foreground">{{
+                            t('studio.common.truncated.status')
+                          }}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{{
+                          t('studio.common.cellTruncated.tooltip', { size: formatBytes(64 * 1024) })
+                        }}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
           </div>
         </template>
       </div>
-      </template>
-    </div>
-    <CellEditorDock :tab-id="tab.id" :read-only="true" />
+      <CellEditorDock :tab-id="tab.id" :read-only="true" />
     </div>
   </div>
 </template>

@@ -27,7 +27,10 @@ const fontSizeError = computed<string | null>(() => {
   const v = props.appearance.fontSize;
   if (!Number.isFinite(v)) return t('common.enterNumber.error');
   if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
-    return t('workbench.settings.fontSizeRange.label', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max });
+    return t('workbench.settings.fontSizeRange.label', {
+      min: FONT_SIZE_RANGE.min,
+      max: FONT_SIZE_RANGE.max,
+    });
   }
   return null;
 });
@@ -65,6 +68,8 @@ const fieldId = useId();
     <FieldError v-if="fontSizeError" data-testid="settings-font-size-error">
       {{ fontSizeError }}
     </FieldError>
-    <FieldDescription v-else>{{ t('workbench.settings.fontSizeRange.label', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max }) }}</FieldDescription>
+    <FieldDescription v-else>{{
+      t('workbench.settings.fontSizeRange.label', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max })
+    }}</FieldDescription>
   </Field>
 </template>

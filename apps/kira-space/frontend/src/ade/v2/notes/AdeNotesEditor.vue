@@ -48,7 +48,7 @@ const PROSE = [
   "[&_li[data-checked='true']>div]:text-subtle [&_li[data-checked='true']>div]:line-through",
   '[&_code]:rounded-kira-xs [&_code]:bg-field [&_code]:px-[0.3em] [&_code]:py-[0.1em] [&_code]:font-data [&_code]:text-kira-sm',
   '[&_a]:text-info',
-  "[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-subtle [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
+  '[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-subtle [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]',
 ].join(' ');
 
 const editor = useEditor({
@@ -115,7 +115,13 @@ const toolbar = computed<ToolbarButton[]>(() => {
   if (!ed) return [];
   const chain = () => ed.chain().focus();
   return [
-    { label: t('space.ade.notes.bold.tooltip'), icon: 'bold', glyph: 'B', active: ed.isActive('bold'), run: () => chain().toggleBold().run() },
+    {
+      label: t('space.ade.notes.bold.tooltip'),
+      icon: 'bold',
+      glyph: 'B',
+      active: ed.isActive('bold'),
+      run: () => chain().toggleBold().run(),
+    },
     {
       label: t('space.ade.notes.italic.tooltip'),
       icon: 'italic',
@@ -123,7 +129,13 @@ const toolbar = computed<ToolbarButton[]>(() => {
       active: ed.isActive('italic'),
       run: () => chain().toggleItalic().run(),
     },
-    { label: t('common.code.label'), icon: 'code', glyph: '</>', active: ed.isActive('code'), run: () => chain().toggleCode().run() },
+    {
+      label: t('common.code.label'),
+      icon: 'code',
+      glyph: '</>',
+      active: ed.isActive('code'),
+      run: () => chain().toggleCode().run(),
+    },
     {
       label: t('space.ade.notes.heading.tooltip'),
       icon: '',
@@ -152,7 +164,13 @@ const toolbar = computed<ToolbarButton[]>(() => {
       active: ed.isActive('taskList'),
       run: () => chain().toggleTaskList().run(),
     },
-    { label: t('space.ade.notes.link.tooltip'), icon: 'link', glyph: '🔗', active: ed.isActive('link'), run: openLink },
+    {
+      label: t('space.ade.notes.link.tooltip'),
+      icon: 'link',
+      glyph: '🔗',
+      active: ed.isActive('link'),
+      run: openLink,
+    },
   ];
 });
 
@@ -195,13 +213,17 @@ function keepFocus(e: MouseEvent): void {
 </script>
 
 <template>
-  <div class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-border-strong bg-bg">
+  <div
+    class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-border-strong bg-bg"
+  >
     <div
       role="toolbar"
       :aria-label="t('space.ade.notes.formatting.aria')"
       class="flex shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1.5 py-1"
     >
-      <span class="px-1.5 text-kira-sm text-muted-foreground">{{ t('space.common.notes.label') }}</span>
+      <span class="px-1.5 text-kira-sm text-muted-foreground">{{
+        t('space.common.notes.label')
+      }}</span>
       <Button
         v-for="btn in toolbar"
         :key="btn.label"
@@ -228,8 +250,15 @@ function keepFocus(e: MouseEvent): void {
           class="ml-1 w-42.5 font-data"
           @keydown="onLinkKey"
         />
-        <Button variant="dialog" size="kira" class="shrink-0" @mousedown="keepFocus" @click="applyLink"
-          >{{ t('common.action.add.label') }}</Button
+        <Button
+          variant="dialog"
+          size="kira"
+          class="shrink-0"
+          @mousedown="keepFocus"
+          @click="applyLink"
+          >{{
+            t('common.action.add.label')
+          }}</Button
         >
       </template>
     </div>

@@ -280,7 +280,9 @@ const title = computed(() => {
   if (mode.value === 'save') return t('git.dialog.stash.save.title');
   if (mode.value === 'popConfirm' && pending.value) {
     return t(
-      pending.value.verb === 'pop' ? 'git.dialog.stash.popConfirm.title' : 'git.dialog.stash.applyConfirm.title',
+      pending.value.verb === 'pop'
+        ? 'git.dialog.stash.popConfirm.title'
+        : 'git.dialog.stash.applyConfirm.title',
       { stash: stashRef(pending.value.preflight.stashIndex) },
     );
   }
@@ -303,10 +305,7 @@ function onClose(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && onClose()">
-    <DialogContent
-      :aria-describedby="undefined"
-      size="md"
-    >
+    <DialogContent :aria-describedby="undefined" size="md">
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
       </DialogHeader>
@@ -346,15 +345,28 @@ function onClose(): void {
 
         <template v-else-if="mode === 'branch'">
           <FieldDescription>
-            <CatalogText k="git.dialog.stash.from.label" :params="{ message: branchTarget?.message ?? '' }">
-              <template #stash><code class="font-data">{{ stashRef(branchTarget?.index ?? '') }}</code></template>
+            <CatalogText
+              k="git.dialog.stash.from.label"
+              :params="{ message: branchTarget?.message ?? '' }"
+            >
+              <template #stash
+                ><code class="font-data">{{ stashRef(branchTarget?.index ?? '') }}</code></template
+              >
             </CatalogText>
           </FieldDescription>
           <Field>
             <FieldLabel :for="branchNameId">{{ t('git.common.branchName.label') }}</FieldLabel>
-            <Input :id="branchNameId" v-model="branchName" type="text" size="kira-lg" class="w-full" />
+            <Input
+              :id="branchNameId"
+              v-model="branchName"
+              type="text"
+              size="kira-lg"
+              class="w-full"
+            />
             <FieldError v-if="branchNameLocalError">{{ branchNameLocalError }}</FieldError>
-            <FieldError v-else-if="branchPreflight?.name.error">{{ branchPreflight.name.error }}</FieldError>
+            <FieldError v-else-if="branchPreflight?.name.error">{{
+              branchPreflight.name.error
+            }}</FieldError>
           </Field>
           <Alert v-if="branchPreflight?.verdict === 'blocked'" variant="warn">
             <AlertDescription>
@@ -366,14 +378,22 @@ function onClose(): void {
         <template v-else-if="mode === 'save'">
           <Field>
             <FieldLabel :for="saveLabelId">{{ t('git.dialog.stash.saveLabel.label') }}</FieldLabel>
-            <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira-lg" class="w-full" />
+            <Input
+              :id="saveLabelId"
+              v-model="saveLabel"
+              type="text"
+              size="kira-lg"
+              class="w-full"
+            />
           </Field>
           <FieldSet>
             <FieldLegend>{{ t('common.field.source.label') }}</FieldLegend>
             <RadioGroup v-model="saveSource">
               <Field orientation="horizontal">
                 <RadioGroupItem :id="`${saveSourceId}-workingTree`" value="workingTree" />
-                <FieldLabel :for="`${saveSourceId}-workingTree`">{{ t('git.dialog.stash.workingTree.label') }}</FieldLabel>
+                <FieldLabel :for="`${saveSourceId}-workingTree`">{{
+                  t('git.dialog.stash.workingTree.label')
+                }}</FieldLabel>
               </Field>
               <Alert v-if="saveSource === 'workingTree' && saveHasUntracked" variant="warn">
                 <AlertDescription>
@@ -395,43 +415,54 @@ function onClose(): void {
 
         <template v-else-if="mode === 'popConfirm' && pending">
           <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
-            <Alert v-if="blocker.kind === 'untrackedCollision'" variant="warn"><AlertDescription>
-              <p>{{ t('git.dialog.stash.untrackedCollision.body') }}</p>
-              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
-              </ul>
-              <p>{{ t('git.dialog.stash.untrackedCollision.hint') }}</p>
-            </AlertDescription></Alert>
-            <Alert v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'" variant="warn"><AlertDescription>
-              <p>{{ t('git.dialog.stash.localChanges.body') }}</p>
-              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
-              </ul>
-              <p>{{ t('git.dialog.stash.localChanges.hint') }}</p>
-            </AlertDescription></Alert>
+            <Alert v-if="blocker.kind === 'untrackedCollision'" variant="warn"
+              ><AlertDescription>
+                <p>{{ t('git.dialog.stash.untrackedCollision.body') }}</p>
+                <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                  <li v-for="path in blocker.paths" :key="path"
+                    ><code class="font-data">{{ path }}</code></li
+                  >
+                </ul>
+                <p>{{ t('git.dialog.stash.untrackedCollision.hint') }}</p>
+              </AlertDescription></Alert
+            >
+            <Alert v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'" variant="warn"
+              ><AlertDescription>
+                <p>{{ t('git.dialog.stash.localChanges.body') }}</p>
+                <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                  <li v-for="path in blocker.paths" :key="path"
+                    ><code class="font-data">{{ path }}</code></li
+                  >
+                </ul>
+                <p>{{ t('git.dialog.stash.localChanges.hint') }}</p>
+              </AlertDescription></Alert
+            >
             <Alert v-else variant="warn">
               <AlertDescription>{{ t('git.common.operationInProgress.body') }}</AlertDescription>
             </Alert>
           </template>
 
           <template v-if="pending.preflight.blockers.length === 0">
-            <div
-              v-if="pending.preflight.prediction.kind === 'clean'"
-              class="text-ok"
-            >
+            <div v-if="pending.preflight.prediction.kind === 'clean'" class="text-ok">
               {{ t('git.dialog.preflight.clean.status') }}
             </div>
-            <Alert v-else-if="pending.preflight.prediction.kind === 'conflicts'" variant="warn"><AlertDescription>
-              <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
-              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in pending.preflight.prediction.paths" :key="path">
-                  <code class="font-data">{{ path }}</code>
-                </li>
-              </ul>
-              <p>{{ t(pending.verb === 'pop' ? 'git.dialog.stash.keptPop.hint' : 'git.dialog.stash.keptApply.hint') }}</p>
-            </AlertDescription></Alert>
+            <Alert v-else-if="pending.preflight.prediction.kind === 'conflicts'" variant="warn"
+              ><AlertDescription>
+                <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
+                <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                  <li v-for="path in pending.preflight.prediction.paths" :key="path">
+                    <code class="font-data">{{ path }}</code>
+                  </li>
+                </ul>
+                <p>{{
+                  t(pending.verb === 'pop' ? 'git.dialog.stash.keptPop.hint' : 'git.dialog.stash.keptApply.hint')
+                }}</p>
+              </AlertDescription></Alert
+            >
             <FieldDescription v-else>
-              {{ t('git.dialog.preflight.unknown.error', { reason: pending.preflight.prediction.reason }) }}
+              {{
+                t('git.dialog.preflight.unknown.error', { reason: pending.preflight.prediction.reason })
+              }}
             </FieldDescription>
           </template>
         </template>
@@ -439,11 +470,17 @@ function onClose(): void {
 
       <DialogFooter>
         <template v-if="mode === 'create'">
-          <Button variant="dialog" size="kira-lg" @click="cancelCreate">{{ t('common.action.cancel.label') }}</Button>
-          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">{{ t('git.toolbar.stash.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelCreate">{{
+            t('common.action.cancel.label')
+          }}</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">{{
+            t('git.toolbar.stash.label')
+          }}</Button>
         </template>
         <template v-else-if="mode === 'branch'">
-          <Button variant="dialog" size="kira-lg" @click="cancelBranch">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelBranch">{{
+            t('common.action.cancel.label')
+          }}</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -454,13 +491,22 @@ function onClose(): void {
           </Button>
         </template>
         <template v-else-if="mode === 'save'">
-          <Button variant="dialog" size="kira-lg" @click="cancelSave">{{ t('common.action.cancel.label') }}</Button>
-          <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitSave" @click="submitSave">
+          <Button variant="dialog" size="kira-lg" @click="cancelSave">{{
+            t('common.action.cancel.label')
+          }}</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            :disabled="!canSubmitSave"
+            @click="submitSave"
+          >
             {{ t('common.action.save.label') }}
           </Button>
         </template>
         <template v-else-if="mode === 'popConfirm' && pending">
-          <Button variant="dialog" size="kira-lg" @click="cancelPop">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelPop">{{
+            t('common.action.cancel.label')
+          }}</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="confirmPop">
             {{ popConfirmLabel }}
           </Button>

@@ -51,11 +51,7 @@ const resetTitle = computed<string>(
 
 <template>
   <span class="flex items-center shrink-0 gap-1.5">
-    <Badge
-      v-if="buffer.isDirty.value"
-      variant="warn"
-      :data-testid="`${testidPrefix}-modified`"
-    >
+    <Badge v-if="buffer.isDirty.value" variant="warn" :data-testid="`${testidPrefix}-modified`">
       {{ t('studio.editBuffer.modified.status') }}
     </Badge>
     <Badge data v-if="showBytes" :data-testid="`${testidPrefix}-byte-badge`">{{

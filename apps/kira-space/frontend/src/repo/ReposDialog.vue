@@ -50,10 +50,13 @@ const removeFolder = useRemoveFolder();
 const folders = computed(() => repos.data.value?.folders ?? []);
 const configs = computed(() => repos.data.value?.repos ?? []);
 const selected = computed(
-  () => codeRepos.records.find((r) => r.id === dialog.selectedRepoId) ?? codeRepos.records[0] ?? null,
+  () =>
+    codeRepos.records.find((r) => r.id === dialog.selectedRepoId) ?? codeRepos.records[0] ?? null,
 );
 const nickOf = (id: string) => configs.value.find((c) => c.codeRepoId === id)?.nickname ?? '';
-const selectedConfig = computed(() => configs.value.find((c) => c.codeRepoId === selected.value?.id) ?? null);
+const selectedConfig = computed(
+  () => configs.value.find((c) => c.codeRepoId === selected.value?.id) ?? null,
+);
 function pickRepo(id: string): void {
   dialog.selectedRepoId = id;
   dialog.tab = 'repos';
@@ -130,7 +133,8 @@ const onRemoveFolder = (path: string) =>
 const onHideFolder = (path: string, hidden: boolean) =>
   run(async () => void (await hideFolder.mutateAsync({ path, hidden })));
 
-const onHideRepo = (id: string, hidden: boolean) => run(() => codeRepos.setCodeRepoHidden(id, hidden));
+const onHideRepo = (id: string, hidden: boolean) =>
+  run(() => codeRepos.setCodeRepoHidden(id, hidden));
 
 const onRemoveRepo = (id: string, name: string) =>
   run(async () => void (await codeRepos.confirmRemoveCodeRepo(id, name)));
@@ -143,11 +147,20 @@ function parentDir(root: string): string {
 }
 
 function baseName(path: string): string {
-  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
+  return (
+    path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() ?? path
+  );
 }
 
 function repoRowClass(r: { id: string; hidden: boolean }): string {
-  return rowVariants({ layout: 'nav', selected: showRepos.value && selected.value?.id === r.id, muted: r.hidden });
+  return rowVariants({
+    layout: 'nav',
+    selected: showRepos.value && selected.value?.id === r.id,
+    muted: r.hidden,
+  });
 }
 </script>
 
@@ -156,13 +169,28 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
     <DialogContent size="xl" fixed-height data-testid="repos-dialog">
       <DialogHeader icon="repo" close-testid="repos-dialog-close">
         <DialogTitle>{{ t('common.module.repositories.label') }}</DialogTitle>
-        <DialogDescription class="sr-only">{{ t('space.repo.dialog.description.description') }}</DialogDescription>
+        <DialogDescription class="sr-only">{{
+          t('space.repo.dialog.description.description')
+        }}</DialogDescription>
       </DialogHeader>
 
       <DialogBody flush class="flex-row overflow-hidden">
         <nav class="flex w-44 shrink-0 flex-col border-r border-border">
-          <div ref="listEl" class="min-h-0 flex-1 overflow-y-auto px-1 py-1.5" role="listbox" :aria-label="t('common.module.repositories.label')" data-testid="repos-dialog-repos" @scroll.passive="onScroll">
-            <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">{{ t('space.repo.dialog.empty.empty') }}</p>
+          <div
+            ref="listEl"
+            class="min-h-0 flex-1 overflow-y-auto px-1 py-1.5"
+            role="listbox"
+            :aria-label="t('common.module.repositories.label')"
+            data-testid="repos-dialog-repos"
+            @scroll.passive="onScroll"
+          >
+            <p
+              v-if="codeRepos.records.length === 0"
+              class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground"
+              >{{
+                t('space.repo.dialog.empty.empty')
+              }}</p
+            >
             <div v-else class="relative w-full" :style="{ height: `${totalSize}px` }">
               <div
                 v-for="{ item, r } in windowRows"
@@ -186,9 +214,19 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                       :data-hidden="r.hidden"
                       @click="pickRepo(r.id)"
                     >
-                      <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
+                      <span
+                        :class="colorMarkClass('rail', r.color)"
+                        data-testid="repos-dialog-repo-rail"
+                        aria-hidden="true"
+                      />
                       <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
-                      <CodiconIcon v-if="r.hidden" name="eye-closed" :size="13" class="shrink-0" data-testid="repos-dialog-repo-hidden-mark" />
+                      <CodiconIcon
+                        v-if="r.hidden"
+                        name="eye-closed"
+                        :size="13"
+                        class="shrink-0"
+                        data-testid="repos-dialog-repo-hidden-mark"
+                      />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>{{ r.root }}</TooltipContent>
@@ -209,7 +247,13 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               {{ t('space.repo.dialog.scanFolders.label') }}
             </button>
           </div>
-          <Button variant="dialog" size="kira-lg" class="m-1.5" data-testid="repos-dialog-import" @click="onImport">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            class="m-1.5"
+            data-testid="repos-dialog-import"
+            @click="onImport"
+          >
             <CodiconIcon name="repo" :size="13" />
             {{ t('space.repo.dialog.import.label') }}
           </Button>
@@ -221,16 +265,25 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
           </Alert>
           <template v-if="showRepos">
             <template v-if="selected">
-              <ViewToolbar border="none" data-testid="repos-dialog-repo-head" :data-repo-id="selected.id">
+              <ViewToolbar
+                border="none"
+                data-testid="repos-dialog-repo-head"
+                :data-repo-id="selected.id"
+              >
                 <span :class="colorMarkClass('dot', selected.color)" />
-                <span class="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+                <span
+                  class="flex size-4 shrink-0 items-center justify-center text-muted-foreground"
+                >
                   <CodiconIcon name="repo" :size="13" />
                 </span>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <span class="min-w-0 truncate text-kira-md text-fg" data-testid="repos-dialog-selected"
-                      ><span v-if="parentDir(selected.root)" class="text-subtle">{{ parentDir(selected.root) }}</span
-                      >{{ selected.name }}</span
+                    <span
+                      class="min-w-0 truncate text-kira-md text-fg"
+                      data-testid="repos-dialog-selected"
+                      ><span v-if="parentDir(selected.root)" class="text-subtle">{{
+                        parentDir(selected.root)
+                      }}</span>{{ selected.name }}</span
                     >
                   </TooltipTrigger>
                   <TooltipContent>{{ selected.root }}</TooltipContent>
@@ -243,7 +296,15 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                   </TooltipTrigger>
                   <TooltipContent>{{ selectedConfig.source }}</TooltipContent>
                 </Tooltip>
-                <Badge v-if="selected.hidden" variant="warn" class="shrink-0" data-testid="repos-dialog-repo-hidden-badge">{{ t('space.common.hidden.status') }}</Badge>
+                <Badge
+                  v-if="selected.hidden"
+                  variant="warn"
+                  class="shrink-0"
+                  data-testid="repos-dialog-repo-hidden-badge"
+                  >{{
+                    t('space.common.hidden.status')
+                  }}</Badge
+                >
                 <div class="ml-auto flex shrink-0 items-center gap-1">
                   <TooltipIconButton
                     :icon="selected.hidden ? 'eye' : 'eye-closed'"
@@ -261,13 +322,22 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 </div>
               </ViewToolbar>
               <div :class="colorMarkClass('band', selected.color)" />
-              <RepoConfigForm v-if="selectedConfig" :key="selectedConfig.codeRepoId" class="m-3" :repo="selectedConfig" />
+              <RepoConfigForm
+                v-if="selectedConfig"
+                :key="selectedConfig.codeRepoId"
+                class="m-3"
+                :repo="selectedConfig"
+              />
             </template>
-            <p v-else class="m-3 text-muted-foreground">{{ t('space.repo.dialog.configureHint.emptyHint') }}</p>
+            <p v-else class="m-3 text-muted-foreground">{{
+              t('space.repo.dialog.configureHint.emptyHint')
+            }}</p>
           </template>
           <div v-else class="flex flex-col gap-2 p-3" data-testid="repos-dialog-folders">
             <div class="flex items-center gap-2">
-              <p class="m-0 flex-1 text-muted-foreground">{{ t('space.repo.dialog.foldersHint.hint') }}</p>
+              <p class="m-0 flex-1 text-muted-foreground">{{
+                t('space.repo.dialog.foldersHint.hint')
+              }}</p>
               <Button
                 variant="dialog"
                 size="kira-lg"
@@ -279,7 +349,9 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 {{ t('space.repo.dialog.addFolder.label') }}
               </Button>
             </div>
-            <p v-if="folders.length === 0" class="m-0 text-muted-foreground">{{ t('space.repo.dialog.noFolders.empty') }}</p>
+            <p v-if="folders.length === 0" class="m-0 text-muted-foreground">{{
+              t('space.repo.dialog.noFolders.empty')
+            }}</p>
             <div
               v-for="(f, i) in folders"
               :key="f.path"
@@ -293,14 +365,18 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 </TooltipTrigger>
                 <TooltipContent>{{ f.path }}</TooltipContent>
               </Tooltip>
-              <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-folder-count">{{
-                f.hiddenCount > 0
+              <span
+                class="shrink-0 text-kira-sm text-muted-foreground"
+                data-testid="repos-dialog-folder-count"
+                >{{
+                  f.hiddenCount > 0
                   ? t('common.dotPair.label', {
                       first: t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount }),
                       second: t('space.repo.dialog.folder.hiddenCount.label', { count: f.hiddenCount }),
                     })
                   : t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount })
-              }}</span>
+                }}</span
+              >
               <Tooltip>
                 <TooltipTrigger as-child>
                   <div class="flex shrink-0 items-center gap-1.5">
@@ -310,7 +386,13 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                       data-testid="repos-dialog-folder-watch"
                       @update:model-value="(v: boolean) => onWatch(f.path, v)"
                     />
-                    <Label :for="`repos-dialog-watch-${i}`" class="text-kira-sm text-muted-foreground">{{ t('space.repo.dialog.folder.watch.label') }}</Label>
+                    <Label
+                      :for="`repos-dialog-watch-${i}`"
+                      class="text-kira-sm text-muted-foreground"
+                      >{{
+                        t('space.repo.dialog.folder.watch.label')
+                      }}</Label
+                    >
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>{{ t('space.repo.dialog.folder.watch.tooltip') }}</TooltipContent>
@@ -335,10 +417,14 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
 
       <DialogFooter>
         <template v-if="!showRepos && note" #start>
-          <p class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
+          <p class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{
+            note
+          }}</p>
         </template>
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-footer-close">{{ t('common.action.close.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-footer-close">{{
+            t('common.action.close.label')
+          }}</Button>
         </DialogClose>
       </DialogFooter>
     </DialogContent>

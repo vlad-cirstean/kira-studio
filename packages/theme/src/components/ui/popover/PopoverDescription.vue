@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import type { HTMLAttributes } from 'vue'
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
 
 const props = defineProps<{
-  class?: HTMLAttributes['class']
-}>()
+  class?: HTMLAttributes['class'];
+}>();
 </script>
 
 <template>
-  <p
-    data-slot="popover-description"
-    :class="cn('text-muted-foreground', props.class)"
-  >
+  <p data-slot="popover-description" :class="cn('text-muted-foreground', props.class)">
     <slot />
   </p>
 </template>

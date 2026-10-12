@@ -1,39 +1,37 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { PopoverContentEmits, PopoverContentProps } from 'reka-ui'
-import {
-  PopoverContent,
-  PopoverPortal,
-  useForwardPropsEmits,
-} from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { PopoverContentEmits, PopoverContentProps } from 'reka-ui';
+import { PopoverContent, PopoverPortal, useForwardPropsEmits } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
 defineOptions({
   inheritAttrs: false,
-})
+});
 
 const props = withDefaults(
-  defineProps<PopoverContentProps & { class?: HTMLAttributes['class'], destructive?: boolean }>(),
+  defineProps<PopoverContentProps & { class?: HTMLAttributes['class']; destructive?: boolean }>(),
   {
     align: 'center',
     sideOffset: 4,
     destructive: false,
   },
-)
-const emits = defineEmits<PopoverContentEmits>()
+);
+const emits = defineEmits<PopoverContentEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class', 'destructive')
+const delegatedProps = reactiveOmit(props, 'class', 'destructive');
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
 // Same rule as DialogContent: a destructive popover opens with focus on `data-dialog-dismiss`.
 function onOpenAutoFocus(event: Event): void {
-  if (!props.destructive) return
-  const dismiss = (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>('[data-dialog-dismiss]')
-  if (!dismiss) return
-  event.preventDefault()
-  dismiss.focus()
+  if (!props.destructive) return;
+  const dismiss = (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>(
+    '[data-dialog-dismiss]',
+  );
+  if (!dismiss) return;
+  event.preventDefault();
+  dismiss.focus();
 }
 </script>
 

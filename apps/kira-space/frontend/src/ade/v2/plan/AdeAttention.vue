@@ -18,7 +18,8 @@ function onClick(): void {
 
 <template>
   <AdeTip :text="tip">
-    <Button size="kira"
+    <Button
+      size="kira"
       type="button"
       variant="ghost"
       :aria-label="t('common.needsYou.status')"

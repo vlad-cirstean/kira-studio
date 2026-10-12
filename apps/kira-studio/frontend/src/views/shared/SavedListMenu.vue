@@ -92,8 +92,15 @@ defineSlots<{
 <template>
   <PopoverContent align="start" class="w-80 gap-0 p-0" :data-testid="panelTestId">
     <div class="max-h-100 overflow-y-auto">
-      <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">{{ title }}</div>
-      <div v-if="saved.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptySavedText }}</div>
+      <div
+        class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
+        >{{
+          title
+        }}</div
+      >
+      <div v-if="saved.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
+        emptySavedText
+      }}</div>
       <div v-else ref="savedEl" role="listbox" :aria-label="title">
         <div
           v-for="entry in saved"
@@ -102,7 +109,7 @@ defineSlots<{
           :data-testid="savedEntryTestId"
           role="option"
           v-bind="savedNav.rowProps(entry.id)"
-:tabindex="savedNav.tabindexFor(entry.id)"
+          :tabindex="savedNav.tabindexFor(entry.id)"
           @click="emit('apply', entry)"
           @keydown="onRowKeydown($event, entry)"
         >
@@ -133,8 +140,15 @@ defineSlots<{
 
       <template v-if="recent">
         <Separator class="my-1" />
-        <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">{{ t('studio.savedList.recent.label') }}</div>
-        <div v-if="recent.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptyRecentText }}</div>
+        <div
+          class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
+          >{{
+            t('studio.savedList.recent.label')
+          }}</div
+        >
+        <div v-if="recent.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
+          emptyRecentText
+        }}</div>
         <div v-else ref="recentEl" role="listbox" :aria-label="t('studio.savedList.recent.label')">
           <div
             v-for="entry in recent"
@@ -143,7 +157,7 @@ defineSlots<{
             :data-testid="recentEntryTestId"
             role="option"
             v-bind="recentNav.rowProps(entry.id)"
-:tabindex="recentNav.tabindexFor(entry.id)"
+            :tabindex="recentNav.tabindexFor(entry.id)"
             @click="emit('apply', entry)"
             @keydown="onRowKeydown($event, entry)"
           >

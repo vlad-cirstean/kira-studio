@@ -98,8 +98,12 @@ onUnmounted(() => {
     @update:open="onOpenChange"
   >
     <div class="flex min-h-0 flex-col" data-testid="fk-preview">
-      <div class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5">
-        <span class="font-medium overflow-hidden text-ellipsis whitespace-nowrap">{{ tableLabel }}</span>
+      <div
+        class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5"
+      >
+        <span class="font-medium overflow-hidden text-ellipsis whitespace-nowrap">{{
+          tableLabel
+        }}</span>
         <Badge
           v-if="state.status === 'ready' && state.hasMore"
           variant="info"
@@ -119,31 +123,51 @@ onUnmounted(() => {
       <!-- flex-1 min-h-0 is load-bearing: without it a flex child refuses to shrink below its
            content height, and the panel overflows its own max-height instead of scrolling here. -->
       <div class="flex-1 min-h-0 overflow-y-auto p-1.5">
-        <div v-if="state.status === 'loading'" class="flex items-center justify-center py-2 text-muted-foreground">
+        <div
+          v-if="state.status === 'loading'"
+          class="flex items-center justify-center py-2 text-muted-foreground"
+        >
           <Spinner :size="13" />
         </div>
         <Badge v-else-if="state.status === 'error'" variant="error">{{ state.message }}</Badge>
-        <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="info" data-testid="fk-preview-empty">
-          <AlertDescription>{{ t('studio.grid.fkPreview.noMatch.empty', { table: tableLabel }) }}</AlertDescription>
+        <Alert
+          v-else-if="state.status === 'ready' && state.rows.length === 0"
+          variant="info"
+          data-testid="fk-preview-empty"
+        >
+          <AlertDescription>{{
+            t('studio.grid.fkPreview.noMatch.empty', { table: tableLabel })
+          }}</AlertDescription>
         </Alert>
         <!-- `header-key` marker; look matches SlickGridHost header badges. -->
         <Table v-else-if="state.status === 'ready'" columns>
           <TableBody>
             <TableRow v-for="(col, i) in state.columns" :key="col.name">
-              <TableCell class="whitespace-nowrap align-top font-medium" :class="typeClassTextClass(col.typeClass)">
+              <TableCell
+                class="whitespace-nowrap align-top font-medium"
+                :class="typeClassTextClass(col.typeClass)"
+              >
                 {{ col.name }}
-                <span v-if="col.isPrimaryKey" class="header-key ml-1 shrink-0 text-warn">{{ t('studio.definition.primaryKey.label') }}</span>
-                <span v-if="col.isTarget" class="header-key ml-1 shrink-0 text-info">{{ t('studio.definition.foreignKey.label') }}</span>
+                <span v-if="col.isPrimaryKey" class="header-key ml-1 shrink-0 text-warn">{{
+                  t('studio.definition.primaryKey.label')
+                }}</span>
+                <span v-if="col.isTarget" class="header-key ml-1 shrink-0 text-info">{{
+                  t('studio.definition.foreignKey.label')
+                }}</span>
               </TableCell>
               <TableCell class="break-words">
                 <Badge
                   v-if="state.rows[0]?.values[i]?.isNull"
                   variant="info"
                   data-testid="fk-preview-null"
-                  >{{ t('studio.common.nullValue.label') }}</Badge
+                  >{{
+                    t('studio.common.nullValue.label')
+                  }}</Badge
                 >
                 <span v-else>{{ state.rows[0]?.values[i]?.text }}</span>
-                <Badge v-if="state.rows[0]?.values[i]?.truncated" variant="warn">{{ t('studio.common.truncated.status') }}</Badge>
+                <Badge v-if="state.rows[0]?.values[i]?.truncated" variant="warn">{{
+                  t('studio.common.truncated.status')
+                }}</Badge>
               </TableCell>
             </TableRow>
           </TableBody>

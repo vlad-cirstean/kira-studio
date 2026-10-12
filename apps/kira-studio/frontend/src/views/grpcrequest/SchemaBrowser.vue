@@ -33,8 +33,16 @@ const props = defineProps<{
 const emit = defineEmits<{ reload: [] }>();
 
 const SOURCE_OPTIONS = computed(() => [
-  { value: 'reflection' as const, label: t('studio.grpc.schema.source.reflection.option'), testid: 'grpc-source-reflection' },
-  { value: 'proto' as const, label: t('studio.grpc.schema.source.proto.option'), testid: 'grpc-source-proto' },
+  {
+    value: 'reflection' as const,
+    label: t('studio.grpc.schema.source.reflection.option'),
+    testid: 'grpc-source-reflection',
+  },
+  {
+    value: 'proto' as const,
+    label: t('studio.grpc.schema.source.proto.option'),
+    testid: 'grpc-source-proto',
+  },
 ]);
 
 function setDescriptorMode(mode: 'reflection' | 'proto'): void {
@@ -73,7 +81,6 @@ function removeImportPath(i: number): void {
   });
 }
 
-
 // P16 D15: matches service name or method name — a service whose own name matches shows all its
 // methods; otherwise only the methods that themselves match, and a service with no match at all
 // (name or any method) drops out entirely.
@@ -106,7 +113,13 @@ function selectMethod(service: string, method: string): void {
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-auto" data-testid="grpc-schema-browser">
     <ViewToolbar>
-      <SecondaryTabs variant="segmented" :model-value="tab.state.descriptorMode" :items="SOURCE_OPTIONS" data-testid="grpc-source-toggle" @update:model-value="(v) => setDescriptorMode(v as 'reflection' | 'proto')" />
+      <SecondaryTabs
+        variant="segmented"
+        :model-value="tab.state.descriptorMode"
+        :items="SOURCE_OPTIONS"
+        data-testid="grpc-source-toggle"
+        @update:model-value="(v) => setDescriptorMode(v as 'reflection' | 'proto')"
+      />
       <template v-if="tab.state.descriptorMode === 'reflection'">
         <Input
           size="kira"
@@ -126,7 +139,12 @@ function selectMethod(service: string, method: string): void {
           class="flex-1"
           data-testid="grpc-proto-path"
         />
-        <Button variant="toolbar" size="kira" data-testid="grpc-choose-proto" @click="chooseProtoFile">
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="grpc-choose-proto"
+          @click="chooseProtoFile"
+        >
           {{ t('common.action.choose.label') }}
         </Button>
       </template>
@@ -142,15 +160,26 @@ function selectMethod(service: string, method: string): void {
       </Button>
     </ViewToolbar>
 
-    <div v-if="tab.state.descriptorMode === 'proto'" class="flex flex-col gap-0.5 border-b border-border px-1.5 py-1" data-testid="grpc-import-paths">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.grpc.schema.importPaths.label') }}</span>
+    <div
+      v-if="tab.state.descriptorMode === 'proto'"
+      class="flex flex-col gap-0.5 border-b border-border px-1.5 py-1"
+      data-testid="grpc-import-paths"
+    >
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
+        t('studio.grpc.schema.importPaths.label')
+      }}</span>
       <!-- D14: a real cap + scroll, so a large .proto tree's import list can never push the
            source row and the whole service browser off the pane. -->
       <div class="flex max-h-32 flex-col overflow-auto">
         <div v-for="(p, i) in tab.state.importPaths" :key="i" :class="rowVariants()">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-sm font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ p }}</span>
+              <span
+                class="text-kira-sm font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                >{{
+                  p
+                }}</span
+              >
             </TooltipTrigger>
             <TooltipContent>{{ p }}</TooltipContent>
           </Tooltip>
@@ -173,7 +202,12 @@ function selectMethod(service: string, method: string): void {
           data-testid="grpc-new-import-path"
           @keydown.enter="addImportPath"
         />
-        <Button variant="toolbar" size="kira" data-testid="grpc-add-import-path" @click="addImportPath">
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="grpc-add-import-path"
+          @click="addImportPath"
+        >
           {{ t('common.action.add.label') }}
         </Button>
       </div>
@@ -183,11 +217,22 @@ function selectMethod(service: string, method: string): void {
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
-    <SearchField v-if="schema && schema.services.length > 0" v-model="filterQuery" :placeholder="t('studio.grpc.schema.filter.placeholder')" data-testid="grpc-schema-filter" />
+    <SearchField
+      v-if="schema && schema.services.length > 0"
+      v-model="filterQuery"
+      :placeholder="t('studio.grpc.schema.filter.placeholder')"
+      data-testid="grpc-schema-filter"
+    />
     <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
       <template v-if="schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.fullName" class="mb-1.5">
-          <div class="text-kira-sm text-muted-foreground uppercase tracking-wider py-0.5" data-testid="grpc-service-name">{{ svc.name }}</div>
+          <div
+            class="text-kira-sm text-muted-foreground uppercase tracking-wider py-0.5"
+            data-testid="grpc-service-name"
+            >{{
+              svc.name
+            }}</div
+          >
           <!-- The row's own template class list (P110 B29) supplies height/display/align-items/
                gap/padding/border-radius/color/font-size/cursor and its own hover/selected
                background; the extra classes here only supply what that list does not. -->
@@ -207,7 +252,9 @@ function selectMethod(service: string, method: string): void {
             >
               {{ t('shared.grpc.streaming.stream.label') }}
             </Badge>
-            <Badge v-else variant="info" data-testid="grpc-method-streaming-badge">{{ t('shared.grpc.streaming.unary.label') }}</Badge>
+            <Badge v-else variant="info" data-testid="grpc-method-streaming-badge">{{
+              t('shared.grpc.streaming.unary.label')
+            }}</Badge>
           </button>
         </div>
       </template>
@@ -217,7 +264,11 @@ function selectMethod(service: string, method: string): void {
         :icon="ICON.search"
         :title="t('common.state.noMatches.empty')"
       />
-      <EmptyState v-else-if="!loading" icon="symbol-interface" :title="t('studio.grpc.schema.chooseSource.empty')" />
+      <EmptyState
+        v-else-if="!loading"
+        icon="symbol-interface"
+        :title="t('studio.grpc.schema.chooseSource.empty')"
+      />
     </div>
   </div>
 </template>

@@ -15,7 +15,11 @@ const open = ref(false);
 </script>
 
 <template>
-  <div class="flex items-center gap-2 text-kira-md" data-testid="ade-stopped-row" :data-session-id="view.session.id">
+  <div
+    class="flex items-center gap-2 text-kira-md"
+    data-testid="ade-stopped-row"
+    :data-session-id="view.session.id"
+  >
     <span class="size-1.5 shrink-0 rounded-kira-xs bg-disabled" />
     <span class="w-16 shrink-0 text-kira-sm text-muted-foreground">{{ ago }}</span>
     <Button

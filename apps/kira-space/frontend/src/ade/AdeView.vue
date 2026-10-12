@@ -20,7 +20,12 @@ const reposDialog = useReposDialogStore();
       :title="t('space.ade.view.empty.title')"
       :description="t('space.ade.view.empty.hint')"
     >
-      <Button variant="dialog-primary" size="kira-lg" data-testid="ade-import" @click="reposDialog.show()">
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        data-testid="ade-import"
+        @click="reposDialog.show()"
+      >
         <CodiconIcon name="repo" :size="13" />
         {{ t('space.ade.view.import.label') }}
       </Button>

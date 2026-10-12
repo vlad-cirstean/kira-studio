@@ -131,9 +131,21 @@ const hasCode = computed(() => !!liveResult.value || !!viewing.value);
 const codeHint = computed(() => (hasCode.value ? grpcCodeHint(code.value) : ''));
 
 const RESPONSE_PANE_OPTIONS = computed(() => [
-  { value: 'messages' as const, label: t('studio.grpc.response.pane.messages.option'), testid: 'grpc-response-pane-messages' },
-  { value: 'metadata' as const, label: t('studio.grpc.pane.metadata.option'), testid: 'grpc-response-pane-metadata' },
-  { value: 'history' as const, label: t('common.module.history.label'), testid: 'grpc-response-pane-history' },
+  {
+    value: 'messages' as const,
+    label: t('studio.grpc.response.pane.messages.option'),
+    testid: 'grpc-response-pane-messages',
+  },
+  {
+    value: 'metadata' as const,
+    label: t('studio.grpc.pane.metadata.option'),
+    testid: 'grpc-response-pane-metadata',
+  },
+  {
+    value: 'history' as const,
+    label: t('common.module.history.label'),
+    testid: 'grpc-response-pane-history',
+  },
 ]);
 
 function setResponsePane(pane: GrpcResponsePane): void {
@@ -167,10 +179,7 @@ const messageRowHeights = computed(() =>
 // P104 §3.4: useVirtualRows replaces VirtualList.vue at this call site. rowHeights carries the
 // actual per-row height (P27 D18's contract), so toggling one row's expanded state re-measures.
 const scrollRef = ref<HTMLElement | null>(null);
-const {
-  virtualItems: virtualMessages,
-  totalSize: totalMessagesSize,
-} = useVirtualRows({
+const { virtualItems: virtualMessages, totalSize: totalMessagesSize } = useVirtualRows({
   count: () => messages.value.length,
   rowHeight: () => MESSAGE_ROW_HEIGHT,
   rowHeights: () => messageRowHeights.value,
@@ -265,7 +274,8 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="grpc-response-pane">
-    <Alert strip
+    <Alert
+      strip
       v-if="rt?.status === 'error' && rt.error"
       variant="error"
       data-testid="grpc-call-error"
@@ -282,18 +292,24 @@ onUnmounted(() => {
         <Tooltip v-if="codeHint">
           <TooltipTrigger as-child>
             <Badge data :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
-              {{ codeName }} ({{ code }})
+              {{ codeName }}
+              ({{ code }})
             </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ codeHint }}</TooltipContent>
         </Tooltip>
         <Badge data v-else :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
-          {{ codeName }} ({{ code }})
+          {{ codeName }}
+          ({{ code }})
         </Badge>
         <span class="ml-auto" />
-        <span class="text-kira-sm text-subtle" data-testid="grpc-elapsed">{{ formatDuration(elapsedMs) }}</span>
+        <span class="text-kira-sm text-subtle" data-testid="grpc-elapsed">{{
+          formatDuration(elapsedMs)
+        }}</span>
         <span class="text-kira-sm text-subtle" data-testid="grpc-message-summary">
-          {{ t('studio.grpc.response.summary.status', { count: messageCount, size: formatBytes(messageBytes) }) }}
+          {{
+            t('studio.grpc.response.summary.status', { count: messageCount, size: formatBytes(messageBytes) })
+          }}
         </span>
       </template>
       <span v-else class="ml-auto" />
@@ -307,15 +323,29 @@ onUnmounted(() => {
         data-testid="grpc-find-toggle"
         @click="toggleFind"
       />
-      <SecondaryTabs :model-value="tab.state.responsePane" :items="RESPONSE_PANE_OPTIONS" data-testid="grpc-response-pane-toggle" @update:model-value="(v) => setResponsePane(v as GrpcResponsePane)" />
+      <SecondaryTabs
+        :model-value="tab.state.responsePane"
+        :items="RESPONSE_PANE_OPTIONS"
+        data-testid="grpc-response-pane-toggle"
+        @update:model-value="(v) => setResponsePane(v as GrpcResponsePane)"
+      />
     </ViewToolbar>
 
     <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
          restatement of the code, so it stays on its own line free to wrap. -->
-    <div v-if="statusMessage" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
+    <div
+      v-if="statusMessage"
+      class="text-kira-sm text-subtle px-1.5 pt-0 pb-1"
+      data-testid="grpc-status-message"
+      >{{
+        statusMessage
+      }}</div
+    >
 
     <Alert strip v-if="viewing" variant="info" data-testid="grpc-history-band">
-      <AlertDescription>{{ t('studio.grpc.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.method ?? '' }) }}</AlertDescription>
+      <AlertDescription>{{
+        t('studio.grpc.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.method ?? '' })
+      }}</AlertDescription>
       <AlertAction>
         <Button
           variant="toolbar"
@@ -323,7 +353,9 @@ onUnmounted(() => {
           data-testid="grpc-history-back"
           @click="onBackToLatest"
         >
-          {{ rt?.result ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label') }}
+          {{
+            rt?.result ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label')
+          }}
         </Button>
       </AlertAction>
     </Alert>
@@ -331,20 +363,24 @@ onUnmounted(() => {
     <!-- D11: a streaming call's history entry stores only the first maxGrpcStoredMessages
          (finding 8) — this is the one place that ever becomes visible now that ServerStream
          actually fills Messages/MessageCount in. -->
-    <Alert strip
+    <Alert
+      strip
       v-if="viewing?.snapshot.messagesElided"
       variant="info"
       data-testid="grpc-history-messages-elided"
     >
       <AlertDescription>
-        {{ t('studio.grpc.response.firstMessages.description', { shown: messages.length, total: viewing.snapshot.entry.messageCount }) }}
+        {{
+          t('studio.grpc.response.firstMessages.description', { shown: messages.length, total: viewing.snapshot.entry.messageCount })
+        }}
       </AlertDescription>
     </Alert>
 
     <!-- P108 F18: the stored request message was cut at the 256 KiB per-entry cap; this pane does
          not render the request body itself (see the computed above), so the note is the only
          surface for requestMessageTruncated. -->
-    <Alert strip
+    <Alert
+      strip
       v-if="requestMessageTruncated"
       variant="info"
       data-testid="grpc-request-message-truncated"
@@ -369,27 +405,41 @@ onUnmounted(() => {
     <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
     <Alert strip v-if="liveMessagesElided" variant="info" data-testid="grpc-live-messages-elided">
       <AlertDescription>
-        {{ t('studio.grpc.response.recentMessages.description', { shown: messages.length, total: rt?.trueMessageCount ?? 0 }) }}
+        {{
+          t('studio.grpc.response.recentMessages.description', { shown: messages.length, total: rt?.trueMessageCount ?? 0 })
+        }}
       </AlertDescription>
     </Alert>
 
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
-    <div v-else-if="tab.state.responsePane === 'metadata'" class="flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5" data-testid="grpc-response-metadata">
+    <div
+      v-else-if="tab.state.responsePane === 'metadata'"
+      class="flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5"
+      data-testid="grpc-response-metadata"
+    >
       <div class="metadata-group">
-        <div class="mb-0.5 text-kira-sm text-muted-foreground">{{ t('studio.grpc.response.header.label') }}</div>
+        <div class="mb-0.5 text-kira-sm text-muted-foreground">{{
+          t('studio.grpc.response.header.label')
+        }}</div>
         <div v-for="(h, i) in header" :key="`h${i}`" class="flex gap-1.5 text-kira-sm">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
           <span class="wrap-anywhere font-data">{{ h.value }}</span>
         </div>
-        <div v-if="header.length === 0" class="text-kira-sm text-subtle">{{ t('studio.grpc.response.noHeader.empty') }}</div>
+        <div v-if="header.length === 0" class="text-kira-sm text-subtle">{{
+          t('studio.grpc.response.noHeader.empty')
+        }}</div>
       </div>
       <div class="metadata-group">
-        <div class="mb-0.5 text-kira-sm text-muted-foreground">{{ t('studio.grpc.response.trailer.label') }}</div>
+        <div class="mb-0.5 text-kira-sm text-muted-foreground">{{
+          t('studio.grpc.response.trailer.label')
+        }}</div>
         <div v-for="(tr, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-sm">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ tr.name }}</span>
           <span class="wrap-anywhere font-data">{{ tr.value }}</span>
         </div>
-        <div v-if="trailer.length === 0" class="text-kira-sm text-subtle">{{ t('studio.grpc.response.noTrailer.empty') }}</div>
+        <div v-if="trailer.length === 0" class="text-kira-sm text-subtle">{{
+          t('studio.grpc.response.noTrailer.empty')
+        }}</div>
       </div>
     </div>
     <div v-else class="flex flex-1 min-h-0 flex-col" data-testid="grpc-message-list">
@@ -413,8 +463,14 @@ onUnmounted(() => {
                  MESSAGE_ROW_HEIGHT (22px, the script's own numeric constant, kept equal to
                  --kira-h-sm here) — VirtualList positions every row assuming that exact height,
                  border included via box-sizing. -->
-            <button type="button" :class="cn(rowVariants(), 'box-border h-5.5 w-full rounded-none border-0 border-b border-border bg-none px-1.5')" @click="toggleExpanded(entry.m.seq)">
-              <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">{{ t('studio.grpc.response.offset.status', { duration: formatDuration(entry.m.offsetMs) }) }}</span>
+            <button
+              type="button"
+              :class="cn(rowVariants(), 'box-border h-5.5 w-full rounded-none border-0 border-b border-border bg-none px-1.5')"
+              @click="toggleExpanded(entry.m.seq)"
+            >
+              <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">{{
+                t('studio.grpc.response.offset.status', { duration: formatDuration(entry.m.offsetMs) })
+              }}</span>
               <span class="text-kira-sm text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
                 <TooltipTrigger as-child>
@@ -424,7 +480,9 @@ onUnmounted(() => {
                     data-testid="grpc-message-truncated"
                   />
                 </TooltipTrigger>
-                <TooltipContent>{{ t('studio.grpc.response.messageCut.tooltip', { size: formatBytes(64 * 1024) }) }}</TooltipContent>
+                <TooltipContent>{{
+                  t('studio.grpc.response.messageCut.tooltip', { size: formatBytes(64 * 1024) })
+                }}</TooltipContent>
               </Tooltip>
               <span class="ml-auto" />
               <span class="text-kira-sm text-subtle">#{{ entry.m.seq }}</span>
@@ -433,7 +491,10 @@ onUnmounted(() => {
                  numerically equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON
                  document taller than this scrolls inside MonacoHost's own scroller instead of
                  growing the row. -->
-            <div v-if="expanded.has(entry.m.seq)" class="box-border h-50 overflow-auto border-b border-border">
+            <div
+              v-if="expanded.has(entry.m.seq)"
+              class="box-border h-50 overflow-auto border-b border-border"
+            >
               <MonacoHost
                 :ref="(el) => setMessageHost(entry.m.seq, el)"
                 :doc="entry.m.json"
@@ -445,7 +506,11 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      <EmptyState v-if="messages.length === 0" icon="arrow-right" :title="t('studio.grpc.response.empty')">
+      <EmptyState
+        v-if="messages.length === 0"
+        icon="arrow-right"
+        :title="t('studio.grpc.response.empty')"
+      >
         <button
           v-if="hasHistory"
           type="button"

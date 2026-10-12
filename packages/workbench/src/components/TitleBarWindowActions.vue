@@ -18,7 +18,8 @@ const emit = defineEmits<{ 'toggle-keep-awake': []; 'new-window': [] }>();
 // have — @vscode/codicons ships no such glyph, so the button can't also swap its icon the way the
 // Connections/Operations toggles do.
 const keepAwakeTooltip = computed(() => {
-  if (props.keepAwake.error) return t('workbench.titleBar.keepAwakeFailed.error', { error: props.keepAwake.error });
+  if (props.keepAwake.error)
+    return t('workbench.titleBar.keepAwakeFailed.error', { error: props.keepAwake.error });
   return props.keepAwake.manual
     ? t('workbench.titleBar.allowSleep.tooltip')
     : t('workbench.titleBar.keepAwake.tooltip');
@@ -38,7 +39,12 @@ const keepAwakeTooltip = computed(() => {
     data-testid="toggle-keep-awake"
     @click="emit('toggle-keep-awake')"
   />
-  <Button variant="title" size="title-labelled" data-testid="new-window" @click="emit('new-window')">
+  <Button
+    variant="title"
+    size="title-labelled"
+    data-testid="new-window"
+    @click="emit('new-window')"
+  >
     <CodiconIcon name="empty-window" :size="16" />
     <span>{{ t('workbench.titleBar.newWindow.label') }}</span>
   </Button>

@@ -162,9 +162,7 @@ async function save(): Promise<void> {
   if (draft['kiraSpace.stash.showInGraph'] !== current['kiraSpace.stash.showInGraph']) {
     patch['kiraSpace.stash.showInGraph'] = draft['kiraSpace.stash.showInGraph'];
   }
-  if (
-    draft['kiraSpace.stash.includeUntracked'] !== current['kiraSpace.stash.includeUntracked']
-  ) {
+  if (draft['kiraSpace.stash.includeUntracked'] !== current['kiraSpace.stash.includeUntracked']) {
     patch['kiraSpace.stash.includeUntracked'] = draft['kiraSpace.stash.includeUntracked'];
   }
   if (
@@ -193,10 +191,7 @@ async function save(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && close()">
-    <DialogContent
-      :aria-describedby="undefined"
-      size="md"
-    >
+    <DialogContent :aria-describedby="undefined" size="md">
       <DialogHeader>
         <DialogTitle>{{ t('git.toolbar.repoSettings.tooltip') }}</DialogTitle>
       </DialogHeader>
@@ -204,7 +199,9 @@ async function save(): Promise<void> {
         <FieldSet>
           <FieldLegend>{{ t('common.graph.label') }}</FieldLegend>
           <Field>
-            <FieldLabel :for="pageSizeId">{{ t('git.dialog.repoSettings.pageSize.label') }}</FieldLabel>
+            <FieldLabel :for="pageSizeId">{{
+              t('git.dialog.repoSettings.pageSize.label')
+            }}</FieldLabel>
             <NumberStepperInput
               :id="pageSizeId"
               :model-value="pageSizeText"
@@ -215,11 +212,15 @@ async function save(): Promise<void> {
               @update:model-value="onPageSizeChange"
             />
             <FieldError v-if="!pageSizeValid">
-              {{ t('git.dialog.repoSettings.pageSize.error', { min: SETTINGS['kiraSpace.graph.pageSize'].minimum, max: SETTINGS['kiraSpace.graph.pageSize'].maximum }) }}
+              {{
+                t('git.dialog.repoSettings.pageSize.error', { min: SETTINGS['kiraSpace.graph.pageSize'].minimum, max: SETTINGS['kiraSpace.graph.pageSize'].maximum })
+              }}
             </FieldError>
           </Field>
           <Field>
-            <FieldLabel :for="graphScopeId">{{ t('git.dialog.repoSettings.scope.label') }}</FieldLabel>
+            <FieldLabel :for="graphScopeId">{{
+              t('git.dialog.repoSettings.scope.label')
+            }}</FieldLabel>
             <NativeSelect
               :id="graphScopeId"
               :model-value="draft['kiraSpace.graph.scope']"
@@ -252,10 +253,15 @@ async function save(): Promise<void> {
           <FieldLegend>{{ t('git.toolbar.stash.label') }}</FieldLegend>
           <Field orientation="horizontal">
             <Checkbox :id="showInGraphId" v-model="draft['kiraSpace.stash.showInGraph']" />
-            <FieldLabel :for="showInGraphId">{{ t('git.dialog.repoSettings.showInGraph.label') }}</FieldLabel>
+            <FieldLabel :for="showInGraphId">{{
+              t('git.dialog.repoSettings.showInGraph.label')
+            }}</FieldLabel>
           </Field>
           <Field orientation="horizontal">
-            <Checkbox :id="includeUntrackedId" v-model="draft['kiraSpace.stash.includeUntracked']" />
+            <Checkbox
+              :id="includeUntrackedId"
+              v-model="draft['kiraSpace.stash.includeUntracked']"
+            />
             <FieldLabel :for="includeUntrackedId">
               {{ t('git.dialog.repoSettings.includeUntracked.label') }}
             </FieldLabel>
@@ -276,14 +282,18 @@ async function save(): Promise<void> {
           <FieldLegend>{{ t('common.product.github.label') }}</FieldLegend>
           <Field orientation="horizontal">
             <Checkbox :id="githubId" v-model="draft['kiraSpace.github.enabled']" />
-            <FieldLabel :for="githubId">{{ t('git.dialog.repoSettings.githubEnabled.label') }}</FieldLabel>
+            <FieldLabel :for="githubId">{{
+              t('git.dialog.repoSettings.githubEnabled.label')
+            }}</FieldLabel>
           </Field>
         </FieldSet>
 
         <FieldSet>
           <FieldLegend>{{ t('git.toolbar.pull.label') }}</FieldLegend>
           <Field>
-            <FieldLabel :for="pullStrategyId">{{ t('git.dialog.repoSettings.strategy.label') }}</FieldLabel>
+            <FieldLabel :for="pullStrategyId">{{
+              t('git.dialog.repoSettings.strategy.label')
+            }}</FieldLabel>
             <NativeSelect
               :id="pullStrategyId"
               :model-value="draft['kiraSpace.pull.strategy']"
@@ -300,12 +310,16 @@ async function save(): Promise<void> {
         </FieldSet>
 
         <Alert v-if="saveError" variant="error">
-          <AlertDescription>{{ t('git.dialog.repoSettings.saveError.error', { error: saveError }) }}</AlertDescription>
+          <AlertDescription>{{
+            t('git.dialog.repoSettings.saveError.error', { error: saveError })
+          }}</AlertDescription>
         </Alert>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="close">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" @click="close">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!pageSizeValid" @click="save">
           {{ t('common.action.save.label') }}
         </Button>

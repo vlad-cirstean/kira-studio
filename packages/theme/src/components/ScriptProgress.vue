@@ -48,14 +48,35 @@ const elapsed = computed(() => {
 </script>
 
 <template>
-  <Card :class="state === 'failed' && 'border-error'" :data-state="state" data-testid="script-progress">
+  <Card
+    :class="state === 'failed' && 'border-error'"
+    :data-state="state"
+    data-testid="script-progress"
+  >
     <div class="flex min-w-0 items-center gap-2 text-kira-md">
-      <Spinner v-if="state === 'running'" :size="12" class="text-info" :label="t('common.state.running.status')" />
-      <i v-else-if="state === 'ready'" class="codicon codicon-check shrink-0 text-ok" aria-hidden="true" />
+      <Spinner
+        v-if="state === 'running'"
+        :size="12"
+        class="text-info"
+        :label="t('common.state.running.status')"
+      />
+      <i
+        v-else-if="state === 'ready'"
+        class="codicon codicon-check shrink-0 text-ok"
+        aria-hidden="true"
+      />
       <i v-else class="codicon codicon-error shrink-0 text-error" aria-hidden="true" />
-      <span class="min-w-0 truncate font-medium" data-testid="script-progress-title">{{ title }}</span>
-      <span v-if="elapsed" class="shrink-0 font-data text-kira-sm text-muted-foreground" data-testid="script-progress-elapsed">
-        {{ state === 'running' && timeout ? t('theme.scriptProgress.elapsedOf.label', { elapsed, timeout }) : elapsed }}
+      <span class="min-w-0 truncate font-medium" data-testid="script-progress-title">{{
+        title
+      }}</span>
+      <span
+        v-if="elapsed"
+        class="shrink-0 font-data text-kira-sm text-muted-foreground"
+        data-testid="script-progress-elapsed"
+      >
+        {{
+          state === 'running' && timeout ? t('theme.scriptProgress.elapsedOf.label', { elapsed, timeout }) : elapsed
+        }}
       </span>
       <span class="flex-1" />
       <slot name="actions" />

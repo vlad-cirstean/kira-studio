@@ -9,7 +9,12 @@ const emit = defineEmits<{ add: []; remove: [index: number] }>();
 
 <template>
   <div class="flex flex-col gap-1.5" :data-testid="testid">
-    <div v-for="(item, index) in items" :key="index" class="flex items-center gap-1.5" data-testid="docker-edit-row">
+    <div
+      v-for="(item, index) in items"
+      :key="index"
+      class="flex items-center gap-1.5"
+      data-testid="docker-edit-row"
+    >
       <div class="flex min-w-0 flex-1 items-center gap-1.5">
         <slot name="row" :item="item" :index="index" />
       </div>

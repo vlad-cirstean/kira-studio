@@ -23,7 +23,8 @@ const WRAP_RENDER_LINES = 2_000;
 const ROW_HEIGHT = 18;
 const TAILS = [100, 1000, 5000, -1] as const;
 
-const tailLabel = (n: number): string => (n === -1 ? t('common.state.all.option') : t('docker.logs.tail.option', { count: n }));
+const tailLabel = (n: number): string =>
+  n === -1 ? t('common.state.all.option') : t('docker.logs.tail.option', { count: n });
 
 interface Line extends DockerLogLine {
   n: number;
@@ -54,7 +55,11 @@ const visible = computed(() => {
 const wrapped = computed(() => visible.value.slice(-WRAP_RENDER_LINES));
 
 const scrollEl = ref<HTMLElement | null>(null);
-const { virtualItems, totalSize, onScroll: onVirtualScroll } = useVirtualRows({
+const {
+  virtualItems,
+  totalSize,
+  onScroll: onVirtualScroll,
+} = useVirtualRows({
   count: () => visible.value.length,
   rowHeight: () => ROW_HEIGHT,
   scrollElement: scrollEl,
@@ -137,17 +142,65 @@ function clear(): void {
 <template>
   <div class="flex h-full flex-col" data-testid="docker-logs">
     <div class="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-1.5 py-1">
-      <Toggle v-model="follow" size="kira" data-testid="docker-logs-follow" :aria-label="t('docker.logs.follow.label')">{{ t('docker.logs.follow.label') }}</Toggle>
-      <Toggle v-model="timestamps" size="kira" data-testid="docker-logs-timestamps" :aria-label="t('docker.logs.timestamps.label')">{{ t('docker.logs.timestamps.label') }}</Toggle>
-      <Toggle v-model="wrap" size="kira" data-testid="docker-logs-wrap" :aria-label="t('docker.logs.wrap.label')">{{ t('docker.logs.wrap.label') }}</Toggle>
-      <NativeSelect v-model="tail" :aria-label="t('docker.logs.tail.aria')" data-testid="docker-logs-tail">
+      <Toggle
+        v-model="follow"
+        size="kira"
+        data-testid="docker-logs-follow"
+        :aria-label="t('docker.logs.follow.label')"
+        >{{
+          t('docker.logs.follow.label')
+        }}</Toggle
+      >
+      <Toggle
+        v-model="timestamps"
+        size="kira"
+        data-testid="docker-logs-timestamps"
+        :aria-label="t('docker.logs.timestamps.label')"
+        >{{
+          t('docker.logs.timestamps.label')
+        }}</Toggle
+      >
+      <Toggle
+        v-model="wrap"
+        size="kira"
+        data-testid="docker-logs-wrap"
+        :aria-label="t('docker.logs.wrap.label')"
+        >{{
+          t('docker.logs.wrap.label')
+        }}</Toggle
+      >
+      <NativeSelect
+        v-model="tail"
+        :aria-label="t('docker.logs.tail.aria')"
+        data-testid="docker-logs-tail"
+      >
         <option v-for="n in TAILS" :key="n" :value="n">{{ tailLabel(n) }}</option>
       </NativeSelect>
       <div class="w-56">
-        <SearchField v-model="filter" :placeholder="t('common.action.filter.label')" data-testid="docker-logs-filter" />
+        <SearchField
+          v-model="filter"
+          :placeholder="t('common.action.filter.label')"
+          data-testid="docker-logs-filter"
+        />
       </div>
-      <span v-if="needle" class="text-kira-sm text-muted-foreground" data-testid="docker-logs-count">{{ visible.length }}</span>
-      <Button variant="ghost" size="kira" class="ml-auto" data-testid="docker-logs-clear" @click="clear">{{ t('common.action.clear.label') }}</Button>
+      <span
+        v-if="needle"
+        class="text-kira-sm text-muted-foreground"
+        data-testid="docker-logs-count"
+        >{{
+          visible.length
+        }}</span
+      >
+      <Button
+        variant="ghost"
+        size="kira"
+        class="ml-auto"
+        data-testid="docker-logs-clear"
+        @click="clear"
+        >{{
+          t('common.action.clear.label')
+        }}</Button
+      >
     </div>
     <div class="relative min-h-0 flex-1">
       <div
@@ -157,12 +210,24 @@ function clear(): void {
         @scroll="onVirtualScroll"
       >
         <div v-if="wrap" class="px-2">
-          <div v-for="l in wrapped" :key="l.n" class="whitespace-pre-wrap break-all" :class="l.stream === 'stderr' ? 'text-error' : ''" data-testid="docker-log-line" :data-stream="l.stream">
+          <div
+            v-for="l in wrapped"
+            :key="l.n"
+            class="whitespace-pre-wrap break-all"
+            :class="l.stream === 'stderr' ? 'text-error' : ''"
+            data-testid="docker-log-line"
+            :data-stream="l.stream"
+          >
             <span v-if="timestamps && l.ts" class="mr-2 text-muted-foreground">{{ l.ts }}</span>
             <template v-for="(seg, i) in parseAnsi(l.text)" :key="i">
-              <span :style="{ color: seg.color, background: seg.background }" :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']">
+              <span
+                :style="{ color: seg.color, background: seg.background }"
+                :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']"
+              >
                 <template v-for="(part, j) in splitMatches(seg.text, needle)" :key="j">
-                  <mark v-if="part.match" class="bg-search-match text-inherit">{{ part.text }}</mark>
+                  <mark v-if="part.match" class="bg-search-match text-inherit">{{
+                    part.text
+                  }}</mark>
                   <template v-else>{{ part.text }}</template>
                 </template>
               </span>
@@ -179,11 +244,18 @@ function clear(): void {
             :data-stream="visible[vi.index]?.stream"
           >
             <template v-if="visible[vi.index]">
-              <span v-if="timestamps && visible[vi.index]!.ts" class="mr-2 text-muted-foreground">{{ visible[vi.index]!.ts }}</span>
+              <span v-if="timestamps && visible[vi.index]!.ts" class="mr-2 text-muted-foreground">{{
+                visible[vi.index]!.ts
+              }}</span>
               <template v-for="(seg, i) in parseAnsi(visible[vi.index]!.text)" :key="i">
-                <span :style="{ color: seg.color, background: seg.background }" :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']">
+                <span
+                  :style="{ color: seg.color, background: seg.background }"
+                  :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']"
+                >
                   <template v-for="(part, j) in splitMatches(seg.text, needle)" :key="j">
-                    <mark v-if="part.match" class="bg-search-match text-inherit">{{ part.text }}</mark>
+                    <mark v-if="part.match" class="bg-search-match text-inherit">{{
+                      part.text
+                    }}</mark>
                     <template v-else>{{ part.text }}</template>
                   </template>
                 </span>

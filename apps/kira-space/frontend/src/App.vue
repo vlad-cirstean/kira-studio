@@ -129,7 +129,10 @@ function onToggleKeepAwake(): void {
         @new-window="onNewWindow"
       >
         <template #settings>
-          <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
+          <SettingsDialog
+            v-if="settingsStore.settingsOpen"
+            @close="settingsStore.settingsOpen = false"
+          />
         </template>
       </WorkbenchTitleBar>
       <WorkbenchShell />

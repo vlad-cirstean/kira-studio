@@ -44,7 +44,8 @@ const data = computed(() => plan.data.value);
 const status = computed(() => data.value?.status);
 const loadFailed = computed(() => plan.isError.value && !data.value);
 const visible = computed(
-  () => loadFailed.value || (!!data.value && status.value !== 'disabled' && status.value !== 'noPr'),
+  () =>
+    loadFailed.value || (!!data.value && status.value !== 'disabled' && status.value !== 'noPr'),
 );
 const marks = computed(() => data.value?.files.filter((f) => f.action === 'mark') ?? []);
 const unmarks = computed(() => data.value?.files.filter((f) => f.action === 'unmark') ?? []);
@@ -59,7 +60,10 @@ const blockedMessage = computed(() => {
   }
   switch (status.value) {
     case 'prClosed':
-      return data.value?.message ?? t('space.ade.review.sync.prClosed.tooltip', { number: prNumber.value });
+      return (
+        data.value?.message ??
+        t('space.ade.review.sync.prClosed.tooltip', { number: prNumber.value })
+      );
     case 'ghMissing':
       return t('space.ade.review.sync.ghMissing.tooltip');
     case 'unauthenticated':
@@ -120,7 +124,9 @@ function onOpenChange(next: boolean): void {
         <span>
           <PopoverTrigger as-child>
             <Button variant="dialog" size="kira" :disabled="blocked" data-testid="ade-review-sync">
-              {{ loadFailed ? t('space.ade.review.sync.button.label') : t('space.ade.review.sync.buttonCount.label', { count }) }}
+              {{
+                loadFailed ? t('space.ade.review.sync.button.label') : t('space.ade.review.sync.buttonCount.label', { count })
+              }}
             </Button>
           </PopoverTrigger>
         </span>
@@ -129,11 +135,21 @@ function onOpenChange(next: boolean): void {
     </Tooltip>
     <PopoverContent class="w-96 text-kira-md" align="end" data-testid="ade-review-sync-popover">
       <div class="flex flex-col gap-2">
-        <p v-if="data?.account" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-account">
+        <p
+          v-if="data?.account"
+          class="m-0 text-kira-sm text-muted-foreground"
+          data-testid="ade-review-sync-account"
+        >
           {{ t('space.ade.review.sync.account.label', { account: data.account }) }}
         </p>
-        <p v-if="headDiffers && data" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-head">
-          {{ t('space.ade.review.sync.headDiffers.label', { head: shortSha(data.headSha), local: shortSha(data.localTip) }) }}
+        <p
+          v-if="headDiffers && data"
+          class="m-0 text-kira-sm text-muted-foreground"
+          data-testid="ade-review-sync-head"
+        >
+          {{
+            t('space.ade.review.sync.headDiffers.label', { head: shortSha(data.headSha), local: shortSha(data.localTip) })
+          }}
         </p>
 
         <template v-if="result">
@@ -159,14 +175,26 @@ function onOpenChange(next: boolean): void {
 
         <template v-else-if="status === 'headNotFetched'">
           <p class="m-0" data-testid="ade-review-sync-message">{{ data?.message }}</p>
-          <Button variant="dialog" size="kira" :disabled="refresh.isPending.value" data-testid="ade-review-sync-refresh" @click="refreshRepo">
+          <Button
+            variant="dialog"
+            size="kira"
+            :disabled="refresh.isPending.value"
+            data-testid="ade-review-sync-refresh"
+            @click="refreshRepo"
+          >
             {{ t('space.ade.review.sync.refreshRepo.label') }}
           </Button>
         </template>
 
         <template v-else>
-          <p v-if="count === 0" class="m-0" data-testid="ade-review-sync-nothing">{{ t('space.ade.review.sync.nothing.empty') }}</p>
-          <ul v-else class="m-0 flex max-h-40 list-none flex-col gap-0.5 overflow-auto p-0" data-testid="ade-review-sync-rows">
+          <p v-if="count === 0" class="m-0" data-testid="ade-review-sync-nothing">{{
+            t('space.ade.review.sync.nothing.empty')
+          }}</p>
+          <ul
+            v-else
+            class="m-0 flex max-h-40 list-none flex-col gap-0.5 overflow-auto p-0"
+            data-testid="ade-review-sync-rows"
+          >
             <li v-for="f in [...marks, ...unmarks]" :key="f.path" class="flex gap-2">
               <span class="shrink-0 text-muted-foreground">{{ actionText(f.action) }}</span>
               <Tooltip>
@@ -178,15 +206,19 @@ function onOpenChange(next: boolean): void {
             </li>
           </ul>
           <details v-if="skipped.length" data-testid="ade-review-sync-skipped">
-            <summary class="cursor-pointer text-kira-sm text-muted-foreground">{{ t('memory.import.totals.skipped.label', { count: skipped.length }) }}</summary>
-            <ul class="m-0 mt-1 flex max-h-32 list-none flex-col gap-0.5 overflow-auto p-0 text-kira-sm">
+            <summary class="cursor-pointer text-kira-sm text-muted-foreground">{{
+              t('memory.import.totals.skipped.label', { count: skipped.length })
+            }}</summary>
+            <ul
+              class="m-0 mt-1 flex max-h-32 list-none flex-col gap-0.5 overflow-auto p-0 text-kira-sm"
+            >
               <li v-for="f in skipped" :key="f.path" class="flex gap-2">
                 <Tooltip>
-                <TooltipTrigger as-child>
-                  <span class="truncate font-data">{{ f.path }}</span>
-                </TooltipTrigger>
-                <TooltipContent>{{ f.path }}</TooltipContent>
-              </Tooltip>
+                  <TooltipTrigger as-child>
+                    <span class="truncate font-data">{{ f.path }}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ f.path }}</TooltipContent>
+                </Tooltip>
                 <span class="shrink-0 text-muted-foreground">{{ reasonText(f.reason) }}</span>
               </li>
             </ul>

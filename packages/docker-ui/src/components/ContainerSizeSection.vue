@@ -40,14 +40,18 @@ const ago = useRelativeTime(takenAt);
       </span>
     </template>
 
-    <FieldError v-if="query.error.value" class="mb-2" data-testid="docker-size-error">{{ query.error.value.message }}</FieldError>
+    <FieldError v-if="query.error.value" class="mb-2" data-testid="docker-size-error">{{
+      query.error.value.message
+    }}</FieldError>
 
     <div v-if="measuring && !size" class="flex items-center gap-2 text-muted-foreground">
       <Spinner label="" />{{ t('docker.measuring.loading') }}
     </div>
     <div v-else-if="!size" class="flex flex-wrap items-center gap-3 text-muted-foreground">
       <span>{{ t('docker.size.notMeasured.body') }}</span>
-      <Button size="kira" variant="toolbar" data-testid="docker-size-measure" @click="refresh">{{ t('docker.measure.label') }}</Button>
+      <Button size="kira" variant="toolbar" data-testid="docker-size-measure" @click="refresh">{{
+        t('docker.measure.label')
+      }}</Button>
     </div>
     <dl v-else class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
       <dt class="text-muted-foreground">{{ t('docker.size.writableLayer.label') }}</dt>

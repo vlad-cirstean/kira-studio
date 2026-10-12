@@ -34,21 +34,33 @@ function envParts(e: ScriptRunPreview['env'][number]): TextPart[] {
   <Card class="text-kira-sm" data-testid="run-preview">
     <div data-testid="run-folder">
       <CatalogText :k="folderKey" :params="folderParams">
-        <template v-if="dir.mode === 'worktree'" #branch><VarText :parts="[{ name: 'branch', value: dir.branch }]" /></template>
+        <template v-if="dir.mode === 'worktree'" #branch
+          ><VarText :parts="[{ name: 'branch', value: dir.branch }]" /></template
+        >
         <template #folder><VarText :parts="[{ name: 'folder', value: dir.path }]" /></template>
       </CatalogText>
     </div>
     <template v-if="preview.kind === 'smart'">
       <div class="text-muted-foreground" data-testid="run-limits">
-        {{ t('automations.run.limits.label', { model: preview.model, budget: costText(preview.maxBudgetUsd), timeout: preview.timeout }) }}
+        {{
+          t('automations.run.limits.label', { model: preview.model, budget: costText(preview.maxBudgetUsd), timeout: preview.timeout })
+        }}
       </div>
       <div class="font-data" data-testid="run-tools">--tools {{ preview.tools.join(',') }}</div>
-      <div class="font-data break-words" data-testid="run-allowed-tools">--allowedTools {{ preview.allowedTools.join(' ') }}</div>
-      <div v-if="preview.mcpServers.length > 0" data-testid="run-mcp">{{ t('automations.run.mcpServers.label', { servers: preview.mcpServers.join(', ') }) }}</div>
+      <div class="font-data break-words" data-testid="run-allowed-tools"
+        >--allowedTools {{ preview.allowedTools.join(' ') }}</div
+      >
+      <div v-if="preview.mcpServers.length > 0" data-testid="run-mcp">{{
+        t('automations.run.mcpServers.label', { servers: preview.mcpServers.join(', ') })
+      }}</div>
     </template>
-    <div v-else class="font-data whitespace-pre-wrap break-words" data-testid="run-command">{{ preview.command }}</div>
+    <div v-else class="font-data whitespace-pre-wrap break-words" data-testid="run-command">{{
+      preview.command
+    }}</div>
     <div v-if="preview.env.length > 0" class="flex flex-col font-data" data-testid="run-env">
-      <div v-for="e in preview.env" :key="e.name" data-testid="run-env-row"><VarText :parts="envParts(e)" /></div>
+      <div v-for="e in preview.env" :key="e.name" data-testid="run-env-row"
+        ><VarText :parts="envParts(e)" /></div
+      >
     </div>
     <div v-if="preview.kind === 'smart'" class="text-muted-foreground" data-testid="run-isolated">
       {{ t('automations.run.isolated.body') }}

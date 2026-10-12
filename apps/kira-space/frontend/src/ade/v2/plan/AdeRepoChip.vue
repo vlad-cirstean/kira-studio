@@ -66,9 +66,13 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
       class="min-w-0 truncate text-kira-sm"
       :class="error ? 'text-tone-red' : 'text-subtle'"
       data-testid="ade-repo-note"
-      >{{ note }}</span
+      >{{
+        note
+      }}</span
     >
-    <AdeTip :text="remote === '' ? t('space.ade.plan.repoChip.rescan.tooltip', { label }) : t('common.fetchTarget.tooltip', { name: label })">
+    <AdeTip
+      :text="remote === '' ? t('space.ade.plan.repoChip.rescan.tooltip', { label }) : t('common.fetchTarget.tooltip', { name: label })"
+    >
       <Button
         variant="toolbar"
         size="kira-icon"

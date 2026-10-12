@@ -37,13 +37,24 @@ function onClearFile(): void {
 
 <template>
   <div class="flex items-center gap-1 p-1.5">
-    <Button variant="toolbar" size="kira" data-testid="http-binary-choose-file" @click="onChooseFile">
+    <Button
+      variant="toolbar"
+      size="kira"
+      data-testid="http-binary-choose-file"
+      @click="onChooseFile"
+    >
       {{ t('studio.http.body.chooseFile.label') }}
     </Button>
     <template v-if="tab.state.binaryFile">
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="text-kira-sm text-muted-foreground p-0" data-testid="http-binary-file-caption">{{ caption }}</span>
+          <span
+            class="text-kira-sm text-muted-foreground p-0"
+            data-testid="http-binary-file-caption"
+            >{{
+              caption
+            }}</span
+          >
         </TooltipTrigger>
         <TooltipContent>{{ tab.state.binaryFile.path }}</TooltipContent>
       </Tooltip>

@@ -1,21 +1,15 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { ProgressRootProps } from 'reka-ui'
-import {
-  ProgressIndicator,
-  ProgressRoot,
-} from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { ProgressRootProps } from 'reka-ui';
+import { ProgressIndicator, ProgressRoot } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
-const props = withDefaults(
-  defineProps<ProgressRootProps & { class?: HTMLAttributes['class'] }>(),
-  {
-    modelValue: 0,
-  },
-)
+const props = withDefaults(defineProps<ProgressRootProps & { class?: HTMLAttributes['class'] }>(), {
+  modelValue: 0,
+});
 
-const delegatedProps = reactiveOmit(props, 'class')
+const delegatedProps = reactiveOmit(props, 'class');
 </script>
 
 <template>

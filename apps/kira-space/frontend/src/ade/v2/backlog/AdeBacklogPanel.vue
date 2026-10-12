@@ -61,13 +61,21 @@ function saveNotes(_id: string, value: string): void {
     <header class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2">
       <div class="flex items-center gap-2">
         <AdeChip :label="t('space.ade.backlog.notPlanned.label')" tone="grey" />
-        <h3 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium" data-testid="ade-backlog-title">{{ item.text }}</h3>
+        <h3
+          class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium"
+          data-testid="ade-backlog-title"
+          >{{
+            item.text
+          }}</h3
+        >
       </div>
-      <div class="text-kira-sm text-muted-foreground">{{ t('space.ade.backlog.captured.label', { ago }) }}</div>
+      <div class="text-kira-sm text-muted-foreground">{{
+        t('space.ade.backlog.captured.label', { ago })
+      }}</div>
       <div class="flex gap-2">
-        <Button variant="dialog"
+        <Button
+          variant="dialog"
           size="kira-lg"
-          
           :class="TONE_SOLID_CLASS.amber"
           :title="t('space.ade.backlog.promotePanel.tooltip')"
           data-testid="ade-backlog-panel-promote"
@@ -85,8 +93,12 @@ function saveNotes(_id: string, value: string): void {
         </Button>
       </div>
     </header>
-    <div class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md">
-      <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">{{ t('common.field.title.label') }}</Label>
+    <div
+      class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md"
+    >
+      <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">{{
+        t('common.field.title.label')
+      }}</Label>
       <Input
         id="ade-backlog-title-input"
         :model-value="titleEdit.text.value"
@@ -118,7 +130,9 @@ function saveNotes(_id: string, value: string): void {
         @save="links.saveGithub"
         @clear="links.clearGithub"
       />
-      <FieldError v-if="error" class="col-span-2" data-testid="ade-backlog-error">{{ error }}</FieldError>
+      <FieldError v-if="error" class="col-span-2" data-testid="ade-backlog-error">{{
+        error
+      }}</FieldError>
     </div>
     <div class="flex min-h-0 flex-1 flex-col px-3 pb-3">
       <AdeNotesEditor :notes="item.notes" :item-id="item.id" @save="saveNotes" />

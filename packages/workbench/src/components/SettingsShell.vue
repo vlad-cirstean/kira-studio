@@ -147,7 +147,10 @@ function resetLeaf<S extends keyof T, K extends keyof T[S]>(s: S, k: K): void {
 // Field validity, up from the panes (see the file-level comment above for why every pane stays
 // mounted for this to be live regardless of the active tab).
 const fieldErrors = reactive(new Map<string, Ref<string | null> | ComputedRef<string | null>>());
-function registerFieldError(id: string, error: Ref<string | null> | ComputedRef<string | null>): void {
+function registerFieldError(
+  id: string,
+  error: Ref<string | null> | ComputedRef<string | null>,
+): void {
   fieldErrors.set(id, error);
 }
 const isValid = computed(() => {

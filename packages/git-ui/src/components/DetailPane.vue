@@ -100,7 +100,11 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <EmptyState v-else-if="!detailState.error.value" class="h-full p-6" :title="t('common.state.loading.loading')">
+    <EmptyState
+      v-else-if="!detailState.error.value"
+      class="h-full p-6"
+      :title="t('common.state.loading.loading')"
+    >
       <template #media><Spinner :size="24" label="" /></template>
     </EmptyState>
   </div>

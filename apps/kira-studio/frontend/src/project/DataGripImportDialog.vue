@@ -6,7 +6,14 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { computed } from 'vue';
@@ -59,7 +66,8 @@ const REASON_KEY: Record<string, MessageKey> = {
   'credential-store-not-found': 'studio.project.dataGripImport.reason.storeNotFound.label',
   'credential-store-unsupported': 'studio.project.dataGripImport.outlook.storeUnsupported.label',
   'credential-store-locked': 'studio.project.dataGripImport.reason.storeLocked.label',
-  'secret-storage-unavailable': 'studio.project.dataGripImport.reason.secretStorageUnavailable.label',
+  'secret-storage-unavailable':
+    'studio.project.dataGripImport.reason.secretStorageUnavailable.label',
 };
 
 const WARNING_KEY: Record<string, MessageKey> = {
@@ -140,7 +148,10 @@ function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'w
       tone: 'error',
     };
   if (row.passwordImported)
-    return { label: t('studio.project.dataGripImport.outcome.createdWithPassword.label'), tone: 'ok' };
+    return {
+      label: t('studio.project.dataGripImport.outcome.createdWithPassword.label'),
+      tone: 'ok',
+    };
   if (row.error)
     return {
       label: t('studio.project.dataGripImport.outcome.createdWithNote.label', {
@@ -160,125 +171,166 @@ async function onConfirm(): Promise<void> {
 </script>
 
 <template>
-  <Dialog v-if="datagripImportStore.open" :open="true" @update:open="(v) => !v && datagripImportStore.closeDataGripImportDialog()">
+  <Dialog
+    v-if="datagripImportStore.open"
+    :open="true"
+    @update:open="(v) => !v && datagripImportStore.closeDataGripImportDialog()"
+  >
     <DialogContent size="xl" fixed-height data-testid="datagrip-import-dialog">
       <DialogHeader icon="database" close-testid="datagrip-import-dialog-close">
-        <DialogTitle>{{ report ? t('studio.project.dataGripImport.report.title') : t('studio.project.dataGripImport.dialog.title') }}</DialogTitle>
+        <DialogTitle>{{
+          report ? t('studio.project.dataGripImport.report.title') : t('studio.project.dataGripImport.dialog.title')
+        }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody flush>
-    <div v-if="!report" class="flex flex-col gap-2 p-3">
-      <Alert
-        v-if="secretStatus && !secretStatus.available"
-        data-testid="datagrip-secrets-unavailable"
-        variant="warn"
-      >
-        <AlertDescription>
-          {{ secretStatus.reason ?? t('studio.project.dataGripImport.secretsUnavailable.body') }}
-        </AlertDescription>
-      </Alert>
-      <Alert v-if="datagripImportStore.error" variant="error" data-testid="datagrip-import-error">
-        <AlertDescription>{{ datagripImportStore.error }}</AlertDescription>
-      </Alert>
+        <div v-if="!report" class="flex flex-col gap-2 p-3">
+          <Alert
+            v-if="secretStatus && !secretStatus.available"
+            data-testid="datagrip-secrets-unavailable"
+            variant="warn"
+          >
+            <AlertDescription>
+              {{
+                secretStatus.reason ?? t('studio.project.dataGripImport.secretsUnavailable.body')
+              }}
+            </AlertDescription>
+          </Alert>
+          <Alert
+            v-if="datagripImportStore.error"
+            variant="error"
+            data-testid="datagrip-import-error"
+          >
+            <AlertDescription>{{ datagripImportStore.error }}</AlertDescription>
+          </Alert>
 
-      <div v-if="datagripImportStore.preview" class="flex flex-col py-1" data-testid="datagrip-preview-rows">
-        <div
-          v-for="row in rows"
-          :key="row.uuid"
-          class="flex items-center gap-1.5 h-6.5 px-3 border-b border-border text-kira-md"
-          :class="{ 'text-muted-foreground': !row.importable }"
-          :data-testid="`datagrip-row-${row.uuid}`"
-          :data-importable="row.importable"
-        >
-          <span class="w-4 shrink-0 flex justify-center">
-            <Checkbox
-              v-if="row.importable"
-              :model-value="datagripImportStore.selected.has(row.uuid)"
-              class="size-3.5"
-              @update:model-value="datagripImportStore.toggleDataGripRow(row.uuid)"
+          <div
+            v-if="datagripImportStore.preview"
+            class="flex flex-col py-1"
+            data-testid="datagrip-preview-rows"
+          >
+            <div
+              v-for="row in rows"
+              :key="row.uuid"
+              class="flex items-center gap-1.5 h-6.5 px-3 border-b border-border text-kira-md"
+              :class="{ 'text-muted-foreground': !row.importable }"
+              :data-testid="`datagrip-row-${row.uuid}`"
+              :data-importable="row.importable"
             >
-              <CodiconIcon name="check" :size="12" />
-            </Checkbox>
-          </span>
-          <span v-if="row.importable" class="shrink-0 flex" :class="KIND_ACCENT_CLASS[row.kind as ConnectionKind]">
-            <EngineIcon :kind="row.kind as ConnectionKind" :size="15" />
-          </span>
-          <span v-else class="shrink-0 flex text-subtle"><CodiconIcon name="circle-slash" :size="13" /></span>
+              <span class="w-4 shrink-0 flex justify-center">
+                <Checkbox
+                  v-if="row.importable"
+                  :model-value="datagripImportStore.selected.has(row.uuid)"
+                  class="size-3.5"
+                  @update:model-value="datagripImportStore.toggleDataGripRow(row.uuid)"
+                >
+                  <CodiconIcon name="check" :size="12" />
+                </Checkbox>
+              </span>
+              <span
+                v-if="row.importable"
+                class="shrink-0 flex"
+                :class="KIND_ACCENT_CLASS[row.kind as ConnectionKind]"
+              >
+                <EngineIcon :kind="row.kind as ConnectionKind" :size="15" />
+              </span>
+              <span v-else class="shrink-0 flex text-subtle"
+                ><CodiconIcon name="circle-slash" :size="13" /></span
+              >
 
-          <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.name }}</span>
+              <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                row.name
+              }}</span>
 
-          <template v-if="row.importable">
-            <span class="whitespace-nowrap text-kira-sm text-subtle">
-              {{ row.host ? `${row.host}:${row.port}` : '' }}<span v-if="row.database">/{{ row.database }}</span>
-            </span>
-            <span v-if="row.username" class="whitespace-nowrap text-kira-sm text-subtle">{{ row.username }}</span>
-            <Tooltip v-if="looksAlreadyImported(row)">
-              <TooltipTrigger as-child>
-                <Badge variant="warn" data-testid="datagrip-row-duplicate">
-                  {{ t('studio.project.dataGripImport.badge.duplicate.label') }}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>{{ t('studio.project.dataGripImport.badge.duplicate.tooltip') }}</TooltipContent>
-            </Tooltip>
-            <Badge
-              v-if="row.passwordOutlook"
-              class="ml-auto"
-              :variant="OUTLOOK_TONE[row.passwordOutlook]"
-              data-testid="datagrip-row-outlook"
-            >
-              {{ t(OUTLOOK_KEY[row.passwordOutlook] ?? 'studio.project.dataGripImport.outlook.notSaved.label') }}
-            </Badge>
-          </template>
-          <template v-else>
-            <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="datagrip-row-skip-reason">{{ skipLabel(row) }}</span>
-          </template>
-
-          <span v-if="row.warnings.length > 0" class="flex shrink-0 gap-0.5">
-            <Tooltip v-for="w in row.warnings" :key="w">
-              <TooltipTrigger as-child>
-                <span class="size-4 flex items-center justify-center shrink-0 text-subtle">
-                  <CodiconIcon name="warning" :size="12" />
+              <template v-if="row.importable">
+                <span class="whitespace-nowrap text-kira-sm text-subtle">
+                  {{ row.host ? `${row.host}:${row.port}` : ''
+                  }}<span v-if="row.database">/{{ row.database }}</span>
                 </span>
-              </TooltipTrigger>
-              <TooltipContent>{{ warningLabel(w) }}</TooltipContent>
-            </Tooltip>
-          </span>
-        </div>
-        <span v-if="rows.length === 0" class="text-center p-3 text-muted-foreground">{{ t('studio.project.dataGripImport.rows.empty') }}</span>
-      </div>
-    </div>
+                <span v-if="row.username" class="whitespace-nowrap text-kira-sm text-subtle">{{
+                  row.username
+                }}</span>
+                <Tooltip v-if="looksAlreadyImported(row)">
+                  <TooltipTrigger as-child>
+                    <Badge variant="warn" data-testid="datagrip-row-duplicate">
+                      {{ t('studio.project.dataGripImport.badge.duplicate.label') }}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>{{
+                    t('studio.project.dataGripImport.badge.duplicate.tooltip')
+                  }}</TooltipContent>
+                </Tooltip>
+                <Badge
+                  v-if="row.passwordOutlook"
+                  class="ml-auto"
+                  :variant="OUTLOOK_TONE[row.passwordOutlook]"
+                  data-testid="datagrip-row-outlook"
+                >
+                  {{
+                    t(OUTLOOK_KEY[row.passwordOutlook] ?? 'studio.project.dataGripImport.outlook.notSaved.label')
+                  }}
+                </Badge>
+              </template>
+              <template v-else>
+                <span
+                  class="text-kira-sm text-muted-foreground ml-auto"
+                  data-testid="datagrip-row-skip-reason"
+                  >{{
+                    skipLabel(row)
+                  }}</span
+                >
+              </template>
 
-    <!-- Review finding: the report Import returns used to be discarded on close with no display
+              <span v-if="row.warnings.length > 0" class="flex shrink-0 gap-0.5">
+                <Tooltip v-for="w in row.warnings" :key="w">
+                  <TooltipTrigger as-child>
+                    <span class="size-4 flex items-center justify-center shrink-0 text-subtle">
+                      <CodiconIcon name="warning" :size="12" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ warningLabel(w) }}</TooltipContent>
+                </Tooltip>
+              </span>
+            </div>
+            <span v-if="rows.length === 0" class="text-center p-3 text-muted-foreground">{{
+              t('studio.project.dataGripImport.rows.empty')
+            }}</span>
+          </div>
+        </div>
+
+        <!-- Review finding: the report Import returns used to be discarded on close with no display
          at all — every per-row outcome (created, password imported, or the specific reason it
          wasn't) is now shown here instead of auto-closing. -->
-    <div v-else class="flex flex-col gap-2 p-3">
-      <Alert data-testid="datagrip-report-summary" :variant="reportTone">
-        <AlertDescription>
-          {{ reportSummary }}
-        </AlertDescription>
-      </Alert>
+        <div v-else class="flex flex-col gap-2 p-3">
+          <Alert data-testid="datagrip-report-summary" :variant="reportTone">
+            <AlertDescription>
+              {{ reportSummary }}
+            </AlertDescription>
+          </Alert>
 
-      <div class="flex flex-col py-1" data-testid="datagrip-report-rows">
-        <div
-          v-for="row in report.rows"
-          :key="row.uuid"
-          class="flex items-center gap-1.5 h-6.5 px-3 border-b border-border text-kira-md"
-          :data-testid="`datagrip-report-row-${row.uuid}`"
-        >
-          <span class="shrink-0 flex" :class="row.created ? 'text-ok' : 'text-error'">
-            <CodiconIcon :name="row.created ? 'check' : 'error'" :size="13" />
-          </span>
-          <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.name }}</span>
-          <Badge
-            class="ml-auto"
-            :variant="reportOutcome(row).tone"
-            data-testid="datagrip-report-row-outcome"
-          >
-            {{ reportOutcome(row).label }}
-          </Badge>
+          <div class="flex flex-col py-1" data-testid="datagrip-report-rows">
+            <div
+              v-for="row in report.rows"
+              :key="row.uuid"
+              class="flex items-center gap-1.5 h-6.5 px-3 border-b border-border text-kira-md"
+              :data-testid="`datagrip-report-row-${row.uuid}`"
+            >
+              <span class="shrink-0 flex" :class="row.created ? 'text-ok' : 'text-error'">
+                <CodiconIcon :name="row.created ? 'check' : 'error'" :size="13" />
+              </span>
+              <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                row.name
+              }}</span>
+              <Badge
+                class="ml-auto"
+                :variant="reportOutcome(row).tone"
+                data-testid="datagrip-report-row-outcome"
+              >
+                {{ reportOutcome(row).label }}
+              </Badge>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
       </DialogBody>
 
       <DialogFooter>
@@ -296,7 +348,12 @@ async function onConfirm(): Promise<void> {
           >
             {{ t('studio.project.dataGripImport.chooseAnother.label') }}
           </Button>
-          <Button variant="dialog" size="kira-lg" data-testid="datagrip-import-cancel" @click="datagripImportStore.closeDataGripImportDialog">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="datagrip-import-cancel"
+            @click="datagripImportStore.closeDataGripImportDialog"
+          >
             {{ t('common.action.cancel.label') }}
           </Button>
           <Button

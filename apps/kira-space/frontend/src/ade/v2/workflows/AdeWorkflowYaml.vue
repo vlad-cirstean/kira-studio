@@ -127,12 +127,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    class="flex flex-col gap-1.5"
-    ref="root"
-    data-testid="ade-wf-yaml-pane"
-  >
-    <AdeWorkflowSaveBar :dirty="dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
+  <div class="flex flex-col gap-1.5" ref="root" data-testid="ade-wf-yaml-pane">
+    <AdeWorkflowSaveBar
+      :dirty="dirty"
+      :saving="save.isPending.value"
+      @save="saveNow"
+      @discard="discard"
+    />
     <Label for="ade-wf-yaml" class="sr-only">{{ t('space.ade.workflows.yaml.field.aria') }}</Label>
     <Textarea
       id="ade-wf-yaml"
@@ -149,10 +150,22 @@ onBeforeUnmount(() => {
     <FieldError v-if="saveError" data-testid="ade-wf-save-error">
       {{ saveError }}
       <template v-if="conflict">
-        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="reload">
+        <Button
+          variant="link"
+          size="kira"
+          class="px-1 text-kira-sm text-info"
+          data-testid="ade-wf-reload"
+          @click="reload"
+        >
           {{ t('common.action.refresh.label') }}
         </Button>
-        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-overwrite" @click="overwrite">
+        <Button
+          variant="link"
+          size="kira"
+          class="px-1 text-kira-sm text-info"
+          data-testid="ade-wf-overwrite"
+          @click="overwrite"
+        >
           {{ t('space.ade.workflows.conflict.overwrite.label') }}
         </Button>
       </template>

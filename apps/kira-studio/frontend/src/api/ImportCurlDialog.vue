@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { refDebounced } from '@vueuse/core';
@@ -52,45 +59,53 @@ useFocusOnMount(curlEl);
         <DialogTitle>{{ t('studio.api.importCurl.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-      <Textarea
-        ref="curlEl"
-        v-model="text"
-        class="font-data curl-textarea min-h-32"
-        rows="6"
-        :placeholder="curlExample"
-        data-testid="import-curl-textarea"
-      />
+        <Textarea
+          ref="curlEl"
+          v-model="text"
+          class="font-data curl-textarea min-h-32"
+          rows="6"
+          :placeholder="curlExample"
+          data-testid="import-curl-textarea"
+        />
 
-      <Alert v-if="preview.error" variant="error" data-testid="import-curl-error">
-        <AlertDescription>{{ preview.error }}</AlertDescription>
-      </Alert>
-      <template v-else-if="text.trim() !== ''">
-        <div class="text-kira-sm text-muted-foreground" data-testid="import-curl-summary">{{ preview.summary }}</div>
-        <!-- D12: the same `warn` variant + `<li :data-kind>` shape ImportReportStrip.vue
-             established — shown live, before Import is pressed, rather than as a post-hoc report. -->
-        <Alert v-if="preview.warnings.length > 0" variant="warn" data-testid="import-curl-warnings">
-          <AlertDescription>
-            <ul class="m-0 flex flex-col gap-0.5 pl-2">
-              <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
-                {{ t(warning.detail.key, warning.detail.params) }}
-              </li>
-            </ul>
-          </AlertDescription>
+        <Alert v-if="preview.error" variant="error" data-testid="import-curl-error">
+          <AlertDescription>{{ preview.error }}</AlertDescription>
         </Alert>
-      </template>
+        <template v-else-if="text.trim() !== ''">
+          <div class="text-kira-sm text-muted-foreground" data-testid="import-curl-summary">{{
+            preview.summary
+          }}</div>
+          <!-- D12: the same `warn` variant + `<li :data-kind>` shape ImportReportStrip.vue
+             established — shown live, before Import is pressed, rather than as a post-hoc report. -->
+          <Alert
+            v-if="preview.warnings.length > 0"
+            variant="warn"
+            data-testid="import-curl-warnings"
+          >
+            <AlertDescription>
+              <ul class="m-0 flex flex-col gap-0.5 pl-2">
+                <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
+                  {{ t(warning.detail.key, warning.detail.params) }}
+                </li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+        </template>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">{{ t('common.action.cancel.label') }}</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="import-curl-submit"
-            :disabled="text.trim() === '' || preview.error !== null"
-            @click="onImport"
-          >
-            {{ t('common.import.label') }}
-          </Button>
+        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">{{
+          t('common.action.cancel.label')
+        }}</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="import-curl-submit"
+          :disabled="text.trim() === '' || preview.error !== null"
+          @click="onImport"
+        >
+          {{ t('common.import.label') }}
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

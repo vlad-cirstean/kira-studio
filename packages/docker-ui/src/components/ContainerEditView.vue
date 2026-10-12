@@ -11,7 +11,13 @@ import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { fieldErrors, hasNowChanges, inPlaceForApply } from '../lib/editDiff';
-import { useContainerEditSpec, useDockerStatus, useNetworks, useRecreateContainer, useUpdateContainer } from '../queries';
+import {
+  useContainerEditSpec,
+  useDockerStatus,
+  useNetworks,
+  useRecreateContainer,
+  useUpdateContainer,
+} from '../queries';
 import { type EditFailure, useDockerEditStore } from '../state/dockerEdit';
 import { useDockerExecSessionsStore } from '../state/dockerExec';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -37,8 +43,16 @@ const recreate = useRecreateContainer();
 const confirming = ref(false);
 const tab = ref<'inPlace' | 'recreate'>('inPlace');
 const EDIT_TABS = computed(() => [
-  { value: 'inPlace', label: t('docker.edit.tab.inPlace.label'), testid: 'docker-edit-tab-inplace' },
-  { value: 'recreate', label: t('docker.edit.tab.recreate.label'), testid: 'docker-edit-tab-recreate' },
+  {
+    value: 'inPlace',
+    label: t('docker.edit.tab.inPlace.label'),
+    testid: 'docker-edit-tab-inplace',
+  },
+  {
+    value: 'recreate',
+    label: t('docker.edit.tab.recreate.label'),
+    testid: 'docker-edit-tab-recreate',
+  },
 ]);
 
 watch(
@@ -52,7 +66,9 @@ watch(
 const draft = computed(() => store.drafts[props.containerId]);
 const base = computed(() => draft.value?.base);
 const errors = computed(() => (draft.value ? fieldErrors(draft.value) : {}));
-const inPlaceErrors = computed(() => Object.keys(errors.value).some((k) => !k.startsWith('recreate.')));
+const inPlaceErrors = computed(() =>
+  Object.keys(errors.value).some((k) => !k.startsWith('recreate.')),
+);
 const anyErrors = computed(() => Object.keys(errors.value).length > 0);
 const changes = computed(() => store.pending(props.containerId));
 const inPlaceCount = computed(() => changes.value.filter((c) => c.section === 'inPlace').length);
@@ -64,10 +80,19 @@ const allNetworks = computed(() => (networks.data.value ?? []).map((n) => n.name
 const engineCpus = computed(() => status.data.value?.engine?.cpus);
 
 const canApplyNow = computed(
-  () => !!draft.value && !applying.value && !inPlaceErrors.value && hasNowChanges(draft.value.base, draft.value),
+  () =>
+    !!draft.value &&
+    !applying.value &&
+    !inPlaceErrors.value &&
+    hasNowChanges(draft.value.base, draft.value),
 );
 const canRecreate = computed(
-  () => !!base.value && !applying.value && !anyErrors.value && !base.value.autoRemove && changes.value.some((c) => c.mode === 'recreate'),
+  () =>
+    !!base.value &&
+    !applying.value &&
+    !anyErrors.value &&
+    !base.value.autoRemove &&
+    changes.value.some((c) => c.mode === 'recreate'),
 );
 
 const outcome = computed(() => store.outcome[props.containerId]);
@@ -75,7 +100,11 @@ const failure = computed(() => store.failure[props.containerId]);
 
 function toFailure(e: unknown): EditFailure {
   const err = e as Error & { code?: string; details?: { restored?: boolean } };
-  return { message: err.message, code: err.code ?? 'E_INTERNAL', restored: err.details?.restored === true };
+  return {
+    message: err.message,
+    code: err.code ?? 'E_INTERNAL',
+    restored: err.details?.restored === true,
+  };
 }
 
 function fail(e: unknown): void {
@@ -90,7 +119,11 @@ async function applyNow(): Promise<void> {
   const cid = props.containerId;
   store.begin(cid, 'inPlace');
   try {
-    const r = await update.mutateAsync({ id: cid, baseHash: d.base.baseHash, spec: inPlaceForApply(d.base.inPlace, d.inPlace) });
+    const r = await update.mutateAsync({
+      id: cid,
+      baseHash: d.base.baseHash,
+      spec: inPlaceForApply(d.base.inPlace, d.inPlace),
+    });
     store.outcome[cid] = { warnings: r.warnings };
     store.expectRebase(cid);
   } catch (e) {
@@ -108,7 +141,12 @@ async function confirmRecreate(): Promise<void> {
   confirming.value = false;
   store.begin(cid, 'recreate');
   try {
-    const r = await recreate.mutateAsync({ id: cid, baseHash: d.base.baseHash, inPlace: d.inPlace, recreate: d.recreate });
+    const r = await recreate.mutateAsync({
+      id: cid,
+      baseHash: d.base.baseHash,
+      inPlace: d.inPlace,
+      recreate: d.recreate,
+    });
     execSessions.closeForContainer(ctx, cid);
     store.discard(cid);
     store.outcome[r.id] = { warnings: r.warnings };
@@ -126,7 +164,9 @@ async function reload(): Promise<void> {
   if (fresh) store.ensure(fresh);
 }
 
-const orchestratorName = computed(() => (base.value?.managed === 'kubernetes' ? 'Kubernetes' : 'Swarm'));
+const orchestratorName = computed(() =>
+  base.value?.managed === 'kubernetes' ? 'Kubernetes' : 'Swarm',
+);
 
 const originNotice = computed(() => {
   const b = base.value;
@@ -174,14 +214,24 @@ const originNotice = computed(() => {
         <AlertDescription>
           <div class="flex items-center gap-2">
             {{ t('docker.edit.stale.body') }}
-            <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">{{ t('common.action.refresh.label') }}</Button>
+            <Button
+              size="kira"
+              variant="toolbar"
+              data-testid="docker-edit-reload"
+              @click="reload"
+              >{{
+                t('common.action.refresh.label')
+              }}</Button
+            >
           </div>
         </AlertDescription>
       </Alert>
       <Alert v-if="failure" variant="error" data-testid="docker-edit-error">
         <AlertDescription>
           {{ failure.message }}
-          <template v-if="failure.code === 'E_RECREATE_FAILED' && failure.restored"> {{ t('docker.edit.restored.body') }}</template>
+          <template v-if="failure.code === 'E_RECREATE_FAILED' && failure.restored">
+            {{ t('docker.edit.restored.body') }}</template
+          >
         </AlertDescription>
       </Alert>
       <Alert v-if="outcome?.warnings.length" variant="warn" data-testid="docker-edit-warnings">
@@ -211,22 +261,69 @@ const originNotice = computed(() => {
           </template>
         </SecondaryTabs>
 
-        <TabsContent value="inPlace" class="flex flex-col gap-3" data-testid="docker-edit-section-inplace">
-          <EditInPlaceSection :draft="draft" :errors="errors" :disabled="readOnly || !!applying" :network-locked="networkLocked" :engine-cpus="engineCpus" :all-networks="allNetworks" />
+        <TabsContent
+          value="inPlace"
+          class="flex flex-col gap-3"
+          data-testid="docker-edit-section-inplace"
+        >
+          <EditInPlaceSection
+            :draft="draft"
+            :errors="errors"
+            :disabled="readOnly || !!applying"
+            :network-locked="networkLocked"
+            :engine-cpus="engineCpus"
+            :all-networks="allNetworks"
+          />
           <div class="flex items-center justify-end gap-1">
-            <TooltipIconButton icon="discard" :label="t('common.action.reset.label')" :disabled="!inPlaceCount" data-testid="docker-edit-reset-inplace" @click="store.reset(containerId, 'inPlace')" />
-            <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canApplyNow" data-testid="docker-edit-apply-now" @click="applyNow">
+            <TooltipIconButton
+              icon="discard"
+              :label="t('common.action.reset.label')"
+              :disabled="!inPlaceCount"
+              data-testid="docker-edit-reset-inplace"
+              @click="store.reset(containerId, 'inPlace')"
+            />
+            <Button
+              v-if="!readOnly"
+              size="kira"
+              variant="toolbar"
+              :disabled="!canApplyNow"
+              data-testid="docker-edit-apply-now"
+              @click="applyNow"
+            >
               <Spinner v-if="applying === 'inPlace'" label="" />{{ t('common.action.apply.label') }}
             </Button>
           </div>
         </TabsContent>
 
-        <TabsContent value="recreate" class="flex flex-col gap-3" data-testid="docker-edit-section-recreate">
-          <EditRecreateSection :draft="draft" :errors="errors" :disabled="readOnly || !!applying" :preserved="base.preserved" />
+        <TabsContent
+          value="recreate"
+          class="flex flex-col gap-3"
+          data-testid="docker-edit-section-recreate"
+        >
+          <EditRecreateSection
+            :draft="draft"
+            :errors="errors"
+            :disabled="readOnly || !!applying"
+            :preserved="base.preserved"
+          />
           <div class="flex items-center justify-end gap-1">
-            <TooltipIconButton icon="discard" :label="t('common.action.reset.label')" :disabled="!recreateCount" data-testid="docker-edit-reset-recreate" @click="store.reset(containerId, 'recreate')" />
-            <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canRecreate" data-testid="docker-edit-apply-recreate" @click="confirming = true">
-              <Spinner v-if="applying === 'recreate'" label="" />{{ t('docker.edit.recreate.label') }}
+            <TooltipIconButton
+              icon="discard"
+              :label="t('common.action.reset.label')"
+              :disabled="!recreateCount"
+              data-testid="docker-edit-reset-recreate"
+              @click="store.reset(containerId, 'recreate')"
+            />
+            <Button
+              v-if="!readOnly"
+              size="kira"
+              variant="toolbar"
+              :disabled="!canRecreate"
+              data-testid="docker-edit-apply-recreate"
+              @click="confirming = true"
+            >
+              <Spinner v-if="applying === 'recreate'" label="" />
+              {{ t('docker.edit.recreate.label') }}
             </Button>
           </div>
         </TabsContent>

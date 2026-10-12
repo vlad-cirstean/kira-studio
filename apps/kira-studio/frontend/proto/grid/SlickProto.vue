@@ -38,11 +38,7 @@ const Hud = __KIRA_DEBUG_HOOKS__ ? defineAsyncComponent(() => import('./Hud.vue'
 const mountRef = ref<HTMLElement | null>(null);
 let grid: SlickGrid<RowHandle, KiraColumn> | null = null;
 
-function formatter(
-  _row: number,
-  _cell: number,
-  value: unknown,
-): string | FormatterResultWithText {
+function formatter(_row: number, _cell: number, value: unknown): string | FormatterResultWithText {
   const view = value as { text: string; isNull: boolean; truncated: boolean; masked?: boolean };
   if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
   const masked = view.masked ? 'cell-masked' : '';
@@ -56,7 +52,13 @@ function formatter(
   return masked ? { text: view.text, addClasses: masked } : view.text;
 }
 
-function gutterFormatter(_row: number, _cell: number, _value: unknown, _col: unknown, item: RowHandle): string {
+function gutterFormatter(
+  _row: number,
+  _cell: number,
+  _value: unknown,
+  _col: unknown,
+  item: RowHandle,
+): string {
   return String(item.row + 1);
 }
 
@@ -132,12 +134,10 @@ onMounted(() => {
       : {}),
   };
   const Grid = variant === 'kira' ? KiraSlickGrid : SlickGrid;
-  grid = new Grid(
-    el,
-    source as CustomDataView<RowHandle>,
-    buildColumns(),
-    options,
-  ) as SlickGrid<RowHandle, KiraColumn>;
+  grid = new Grid(el, source as CustomDataView<RowHandle>, buildColumns(), options) as SlickGrid<
+    RowHandle,
+    KiraColumn
+  >;
   if (variant === 'kira') {
     grid.setSelectionModel(
       new SlickHybridSelectionModel({

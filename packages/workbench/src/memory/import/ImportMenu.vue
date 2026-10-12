@@ -26,11 +26,20 @@ function pick(kind: 'files' | 'folder'): void {
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
-      <TooltipIconButton icon="cloud-upload" :label="t('memory.import.documents.label')" :disabled="choose.isPending.value" data-testid="memory-import" />
+      <TooltipIconButton
+        icon="cloud-upload"
+        :label="t('memory.import.documents.label')"
+        :disabled="choose.isPending.value"
+        data-testid="memory-import"
+      />
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
-      <DropdownMenuItem data-testid="memory-import-files" @select="pick('files')">{{ t('memory.import.files.label') }}</DropdownMenuItem>
-      <DropdownMenuItem data-testid="memory-import-folder" @select="pick('folder')">{{ t('memory.import.folder.label') }}</DropdownMenuItem>
+      <DropdownMenuItem data-testid="memory-import-files" @select="pick('files')">{{
+        t('memory.import.files.label')
+      }}</DropdownMenuItem>
+      <DropdownMenuItem data-testid="memory-import-folder" @select="pick('folder')">{{
+        t('memory.import.folder.label')
+      }}</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

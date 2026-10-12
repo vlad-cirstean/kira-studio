@@ -68,8 +68,16 @@ function openRecent(entry: RecentTableEntry): void {
     :description="t('studio.start.empty.body')"
     data-testid="first-run"
   >
-    <Button type="button" variant="dialog-primary" size="kira-lg" class="gap-1" @click="connectionDialogStore.openCreateDialog">
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon :name="ICON.add" :size="13" /></span>
+    <Button
+      type="button"
+      variant="dialog-primary"
+      size="kira-lg"
+      class="gap-1"
+      @click="connectionDialogStore.openCreateDialog"
+    >
+      <span class="size-4 flex items-center justify-center shrink-0"
+        ><CodiconIcon :name="ICON.add" :size="13" /></span
+      >
       {{ t('studio.project.connectionDialog.newConnection.title') }}
     </Button>
     <template #secondary>
@@ -81,7 +89,9 @@ function openRecent(entry: RecentTableEntry): void {
         data-testid="first-run-import-datagrip"
         @click="datagripImportStore.pickAndScanDataGripProject"
       >
-        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="cloud-download" :size="13" /></span>
+        <span class="size-4 flex items-center justify-center shrink-0"
+          ><CodiconIcon name="cloud-download" :size="13" /></span
+        >
         {{ t('studio.start.importDataGrip.label') }}
       </Button>
     </template>
@@ -96,7 +106,9 @@ function openRecent(entry: RecentTableEntry): void {
     data-testid="no-tab-open"
   >
     <template v-if="recentEntries.length > 0" #below>
-      <div class="uppercase tracking-wider text-kira-sm mb-1.5 text-subtle">{{ t('studio.start.recent.label') }}</div>
+      <div class="uppercase tracking-wider text-kira-sm mb-1.5 text-subtle">{{
+        t('studio.start.recent.label')
+      }}</div>
       <div class="flex flex-col">
         <button
           v-for="entry in recentEntries"
@@ -106,11 +118,17 @@ function openRecent(entry: RecentTableEntry): void {
           @click="openRecent(entry)"
         >
           <span :class="colorMarkClass('bar', connectionFor(entry)?.color)" />
-          <span class="size-4 flex items-center justify-center shrink-0" :class="iconColorClass(entry)">
+          <span
+            class="size-4 flex items-center justify-center shrink-0"
+            :class="iconColorClass(entry)"
+          >
             <CodiconIcon :name="iconFor(entry)" :size="13" />
           </span>
           <span class="truncate min-w-0">{{ entry.path }}</span>
-          <span class="ml-auto text-kira-sm text-subtle">{{ connectionFor(entry)?.name }} · {{ formatRelative(entry.openedAt) }}</span>
+          <span class="ml-auto text-kira-sm text-subtle"
+            >{{ connectionFor(entry)?.name }}
+            · {{ formatRelative(entry.openedAt) }}</span
+          >
         </button>
       </div>
     </template>

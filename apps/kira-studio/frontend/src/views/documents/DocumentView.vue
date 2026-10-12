@@ -151,7 +151,10 @@ function editGateFor(row: number): { editable: boolean; label: string } {
   }
   void pageVersion.n;
   if (documentRow(props.tab.id, row)?.isTruncated) {
-    return { editable: false, label: t('studio.documents.gate.truncated.tooltip', { size: formatBytes(64 * 1024) }) };
+    return {
+      editable: false,
+      label: t('studio.documents.gate.truncated.tooltip', { size: formatBytes(64 * 1024) }),
+    };
   }
   if (props.tab.state.projection !== null) {
     return {
@@ -166,7 +169,9 @@ function editGateFor(row: number): { editable: boolean; label: string } {
 // toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
 // No colour assigned leaves the rail slot unpainted rather than unrendered, so nothing shifts
 // when a colour is set later. Mirrors Toolbar.vue's `color`/`railStyle` computed pair.
-const connectionColor = computed(() => connectionsStore.connectionRecord(props.tab.connectionId)?.color);
+const connectionColor = computed(
+  () => connectionsStore.connectionRecord(props.tab.connectionId)?.color,
+);
 
 const iconClass = computed(() => connTextClass(connectionColor.value) ?? 'text-muted-foreground');
 
@@ -234,7 +239,11 @@ watch(
   () => [pageVersion.n, props.tab.connectionId, props.tab.path] as const,
   ([, connectionId, path]) => {
     if (!connectionId) return;
-    mongoFieldSampleStore.registerMongoFieldSample(connectionId, path, fieldNamesOnPage(props.tab.id));
+    mongoFieldSampleStore.registerMongoFieldSample(
+      connectionId,
+      path,
+      fieldNamesOnPage(props.tab.id),
+    );
   },
   { immediate: true },
 );
@@ -295,7 +304,11 @@ function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null):
 
 // P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('document-');
-const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid }));
+const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({
+  value: String(o.value),
+  label: o.label,
+  testid: o.testid,
+}));
 
 function onPageSize(size: PageSize): void {
   documentViewStore.setPageSize(props.tab.id, size);
@@ -587,7 +600,13 @@ function showRowTip(e: Event): void {
   const el = tipSource(e);
   if (!el) return;
   const r = el.getBoundingClientRect();
-  rowTip.value = { label: el.dataset.tip ?? '', left: r.left, top: r.top, width: r.width, height: r.height };
+  rowTip.value = {
+    label: el.dataset.tip ?? '',
+    left: r.left,
+    top: r.top,
+    width: r.width,
+    height: r.height,
+  };
 }
 function hideRowTip(e: PointerEvent | FocusEvent): void {
   const el = tipSource(e);
@@ -633,7 +652,8 @@ function onGoToMatch(match: Match): void {
   const row = match.row;
   const view = documentRowsStore.rowView(props.tab.id, row);
   if (!view) return;
-  if (!documentViewStore.isDocumentExpanded(props.tab.id, view.id)) documentViewStore.toggleExpanded(props.tab.id, view.id);
+  if (!documentViewStore.isDocumentExpanded(props.tab.id, view.id))
+    documentViewStore.toggleExpanded(props.tab.id, view.id);
   void nextTick(() => {
     const index = rows.value.indexOf(row);
     if (index >= 0) scrollToIndex(index);
@@ -660,15 +680,15 @@ const currentPage = computed(() => {
   return getPage(props.tab.id);
 });
 watch(currentPage, (page) => {
-    const id = editingId.value;
-    if (id === null || !page) return;
-    for (let i = 0; i < page.rowCount; i++) {
-      if (documentRow(props.tab.id, i)?.id === id) {
-        editingRow.value = i;
-        return;
-      }
+  const id = editingId.value;
+  if (id === null || !page) return;
+  for (let i = 0; i < page.rowCount; i++) {
+    if (documentRow(props.tab.id, i)?.id === id) {
+      editingRow.value = i;
+      return;
     }
-    cancelEdit();
+  }
+  cancelEdit();
 });
 
 async function commitEdit(): Promise<void> {
@@ -723,7 +743,9 @@ function onStop(): void {
 }
 
 function onRefresh(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => documentViewStore.reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
+    documentViewStore.reload(props.tab.id),
+  );
 }
 
 function onExpandAll(): void {
@@ -772,10 +794,7 @@ onUnmounted(() => {
          disabled binding at all now, since this view always passes the literal `true` ViewChrome
          used to receive. -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
       </span>
@@ -783,8 +802,8 @@ onUnmounted(() => {
         <CodiconIcon name="json" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="document-target"
-        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
-        >{{ targetTail?.name ?? tab.path }}</span
+        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>
+        {{ targetTail?.name ?? tab.path }}</span
       >
       <Badge>{{ nodeKindLabel('collection') }}</Badge>
       <span class="ml-auto flex items-center gap-1"></span>
@@ -834,7 +853,13 @@ onUnmounted(() => {
         @last="documentViewStore.goLast(tab.id)"
         @jump="onJump"
       />
-      <SecondaryTabs variant="segmented" :model-value="String(tab.state.pageSize)" :items="PAGE_SIZE_ITEMS" data-testid="document-page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
+      <SecondaryTabs
+        variant="segmented"
+        :model-value="String(tab.state.pageSize)"
+        :items="PAGE_SIZE_ITEMS"
+        data-testid="document-page-size-picker"
+        @update:model-value="(v) => onPageSize(Number(v) as PageSize)"
+      />
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
            the exact count, the fields/projection menu, and expand/collapse-all. -->
@@ -874,7 +899,11 @@ onUnmounted(() => {
                 @click="projectionOpen = !projectionOpen"
               >
                 <CodiconIcon name="list-selection" :size="13" />
-                <StatusDot v-if="tab.state.projection !== null" tone="state-on" class="absolute top-0.5 right-0.5" />
+                <StatusDot
+                  v-if="tab.state.projection !== null"
+                  tone="state-on"
+                  class="absolute top-0.5 right-0.5"
+                />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{
@@ -887,7 +916,10 @@ onUnmounted(() => {
                `:reference` uses the trigger Button's real DOM node directly, so its own render
                (hidden) never matters for positioning. -->
           <Popover :open="projectionOpen" @update:open="(v) => (projectionOpen = v)">
-            <PopoverAnchor :reference="(projectionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+            <PopoverAnchor
+              :reference="(projectionTriggerEl?.$el as HTMLElement) ?? undefined"
+              class="hidden"
+            />
             <PopoverContent align="end" class="w-56 p-0" data-testid="document-projection-menu">
               <ProjectionMenu :tab-id="tab.id" :caps="caps" />
             </PopoverContent>
@@ -951,7 +983,10 @@ onUnmounted(() => {
           @click="filterHistoryOpen = !filterHistoryOpen"
         />
         <Popover :open="filterHistoryOpen" @update:open="(v) => (filterHistoryOpen = v)">
-          <PopoverAnchor :reference="(filterHistoryTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+          <PopoverAnchor
+            :reference="(filterHistoryTriggerEl?.$el as HTMLElement) ?? undefined"
+            class="hidden"
+          />
           <FilterHistoryMenu
             v-if="filterHistoryOpen"
             :connection-id="tab.connectionId"
@@ -1005,15 +1040,26 @@ onUnmounted(() => {
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira" data-testid="document-filter-clear" @click="onClearFilter"
-            >{{ t('common.action.clear.label') }}</Button
+          <Button
+            variant="toolbar"
+            size="kira"
+            data-testid="document-filter-clear"
+            @click="onClearFilter"
+            >{{
+              t('common.action.clear.label')
+            }}</Button
           >
         </TooltipTrigger>
         <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
       </Tooltip>
     </ViewToolbar>
 
-    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="document-error">
+    <Alert
+      strip
+      v-if="rt?.status === 'error' && rt.error"
+      variant="error"
+      data-testid="document-error"
+    >
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
     <!-- P43 F6/D7: a failed insert/edit/delete, distinct from a failed load above — the list
@@ -1037,7 +1083,12 @@ onUnmounted(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that actually needs a live connection — swaps for the gate. -->
-    <EmptyState v-if="needsReconnect" data-testid="document-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
+    <EmptyState
+      v-if="needsReconnect"
+      data-testid="document-reconnect"
+      icon="plug"
+      :title="t('studio.common.disconnected.empty')"
+    >
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -1048,167 +1099,227 @@ onUnmounted(() => {
       </Button>
     </EmptyState>
     <template v-else>
-    <div v-if="creatingNew" class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated" data-testid="document-new">
-      <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
-      <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
-        <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
-        <span class="flex-1 min-w-0"></span>
-        <Button variant="toolbar-primary" size="kira" data-testid="document-new-save" :disabled="saving" @click="commitCreate"
-          >{{ t('common.action.save.label') }}</Button
-        >
-        <Button variant="toolbar" size="kira" data-testid="document-new-cancel" @click="cancelCreate"
-          >{{ t('common.action.cancel.label') }}</Button
-        >
-      </div>
-    </div>
-
-    <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
-      <EmptyState
-        v-if="!rt || rt.rowCount === 0"
-        class="h-full"
-        :icon="rt ? 'json' : undefined"
-        :title="rt ? t('studio.documents.empty') : t('common.state.loading.loading')"
+      <div
+        v-if="creatingNew"
+        class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated"
+        data-testid="document-new"
       >
-        <template v-if="!rt" #media><Spinner :size="24" /></template>
-      </EmptyState>
-      <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+        <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
+        <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
+          <EditBufferActions
+            :buffer="newBuffer"
+            testid-prefix="document-new"
+            :show-compact="false"
+          />
+          <span class="flex-1 min-w-0"></span>
+          <Button
+            variant="toolbar-primary"
+            size="kira"
+            data-testid="document-new-save"
+            :disabled="saving"
+            @click="commitCreate"
+            >{{
+              t('common.action.save.label')
+            }}</Button
+          >
+          <Button
+            variant="toolbar"
+            size="kira"
+            data-testid="document-new-cancel"
+            @click="cancelCreate"
+            >{{
+              t('common.action.cancel.label')
+            }}</Button
+          >
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
+        <EmptyState
+          v-if="!rt || rt.rowCount === 0"
+          class="h-full"
+          :icon="rt ? 'json' : undefined"
+          :title="rt ? t('studio.documents.empty') : t('common.state.loading.loading')"
+        >
+          <template v-if="!rt" #media><Spinner :size="24" /></template>
+        </EmptyState>
+        <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no documents loaded". -->
-      <SearchFilterNotice
-        v-else-if="displayRows && displayRows.length === 0"
-        class="h-full"
-        data-testid="document-no-matching-rows"
-        :filter-key="tab.id"
-        show-all-testid="document-show-all-rows"
-      />
-      <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
+        <SearchFilterNotice
+          v-else-if="displayRows && displayRows.length === 0"
+          class="h-full"
+          data-testid="document-no-matching-rows"
+          :filter-key="tab.id"
+          show-all-testid="document-show-all-rows"
+        />
+        <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
            the body — until expanded; an expanded document renders through DocumentTree.vue's
            flat line list, never a per-row CodeMirror instance, which is what makes "every
            document expanded by default" (D2) affordable at all. -->
-      <div
-        v-else
-        ref="scrollEl"
-        class="overflow-y-auto h-full"
-        data-testid="virtual-list"
-        role="listbox"
-        :aria-label="t('studio.common.documents.aria')"
-        @scroll="onListScroll"
-        @pointerover="showRowTip"
-        @pointerout="hideRowTip"
-        @focusin="showRowTip"
-        @focusout="hideRowTip"
-      >
-        <Tooltip :open="rowTip !== null" @update:open="(o) => { if (!o) rowTip = null; }">
-          <TooltipTrigger as-child>
-            <span aria-hidden="true" class="pointer-events-none fixed" :style="rowTipStyle"></span>
-          </TooltipTrigger>
-          <TooltipContent>{{ rowTip?.label }}</TooltipContent>
-        </Tooltip>
-        <!-- P5 C2: `rows[vi.index]` is a plain page-row number — `rowAt` (script above) resolves
+        <div
+          v-else
+          ref="scrollEl"
+          class="overflow-y-auto h-full"
+          data-testid="virtual-list"
+          role="listbox"
+          :aria-label="t('studio.common.documents.aria')"
+          @scroll="onListScroll"
+          @pointerover="showRowTip"
+          @pointerout="hideRowTip"
+          @focusin="showRowTip"
+          @focusout="hideRowTip"
+        >
+          <Tooltip :open="rowTip !== null" @update:open="(o) => { if (!o) rowTip = null; }">
+            <TooltipTrigger as-child>
+              <span
+                aria-hidden="true"
+                class="pointer-events-none fixed"
+                :style="rowTipStyle"
+              ></span>
+            </TooltipTrigger>
+            <TooltipContent>{{ rowTip?.label }}</TooltipContent>
+          </Tooltip>
+          <!-- P5 C2: `rows[vi.index]` is a plain page-row number — `rowAt` (script above) resolves
              it (id/body decode, body parse) only for the row the virtualizer is actually
              rendering. Guarded by `v-if="rowAt(rows[vi.index])"` (never false for a row the
              virtualizer hands back; page rows in range always resolve) so `rowAt(rows[vi.index])!`
              below can carry a definite, non-null DocumentRowView into DocumentRow's own required
              `view` prop. -->
-        <div class="relative" :style="{ height: `${totalSize}px` }">
-          <template v-for="vi in virtualItems" :key="String(vi.key)">
-            <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
+          <div class="relative" :style="{ height: `${totalSize}px` }">
+            <template v-for="vi in virtualItems" :key="String(vi.key)">
+              <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
                  selectRow) — this view mounts no cell editor dock to publish a selection into
                  (§8.7: a document's own row is already the read/write surface). The expand
                  toggle and the Edit/Delete buttons below are nested inside this same click
                  target — clicking any of them also reselects the row, which is harmless (selecting
                  the row you just acted on is never wrong), so their own handlers stop propagation
                  rather than double-firing selectRow with the same index. -->
-            <DocumentRow
-              v-if="rowAt(rows[vi.index])"
-              data-testid="document-row"
-              :class="VIRTUAL_ROW_CLASS"
-              :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-              @contextmenu="onRowContextMenu($event, rows[vi.index])"
-              :nav-props="nav.rowProps(String(rows[vi.index]))"
-              :view="rowAt(rows[vi.index])!.view"
-              :row-scope="tab.id"
-              :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-              :selected="rt?.selectedRow === vi.index"
-              :search-match="isSearchMatch(rows[vi.index])"
-              :search-match-current="isCurrentSearchMatch(rows[vi.index])"
-              @toggle="documentViewStore.toggleExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-              @select="onRowClick(vi.index)"
-            >
-              <template #actions>
-                <span class="flex-1 min-w-0"></span>
-                <div class="flex shrink-0 items-center gap-1">
-                  <Badge v-if="editingRow === rows[vi.index]" variant="warn">{{ t('studio.documents.editing.status') }}</Badge>
-                  <RowActionButton
-                    :icon="ICON.edit"
-                    :label="editGateFor(rows[vi.index]).label"
-                    :aria-label="t('common.action.edit.label')"
-                    :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
-                    :disabled="!editGateFor(rows[vi.index]).editable"
-                    data-testid="document-edit"
-                    @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
-                  />
-                  <RowActionButton
-                    :icon="ICON.delete"
-                    :label="deleteTitle"
-                    :aria-label="t('common.action.delete.label')"
-                    :disabled="!canDelete"
-                    data-testid="document-delete"
-                    @click.stop="onDeleteRow(rowAt(rows[vi.index])!.view.id)"
-                  />
-                </div>
-              </template>
-              <template #body>
-                <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
+              <DocumentRow
+                v-if="rowAt(rows[vi.index])"
+                data-testid="document-row"
+                :class="VIRTUAL_ROW_CLASS"
+                :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
+                @contextmenu="onRowContextMenu($event, rows[vi.index])"
+                :nav-props="nav.rowProps(String(rows[vi.index]))"
+                :view="rowAt(rows[vi.index])!.view"
+                :row-scope="tab.id"
+                :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                :selected="rt?.selectedRow === vi.index"
+                :search-match="isSearchMatch(rows[vi.index])"
+                :search-match-current="isCurrentSearchMatch(rows[vi.index])"
+                @toggle="documentViewStore.toggleExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                @select="onRowClick(vi.index)"
+              >
+                <template #actions>
+                  <span class="flex-1 min-w-0"></span>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <Badge v-if="editingRow === rows[vi.index]" variant="warn">{{
+                      t('studio.documents.editing.status')
+                    }}</Badge>
+                    <RowActionButton
+                      :icon="ICON.edit"
+                      :label="editGateFor(rows[vi.index]).label"
+                      :aria-label="t('common.action.edit.label')"
+                      :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
+                      :disabled="!editGateFor(rows[vi.index]).editable"
+                      data-testid="document-edit"
+                      @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
+                    />
+                    <RowActionButton
+                      :icon="ICON.delete"
+                      :label="deleteTitle"
+                      :aria-label="t('common.action.delete.label')"
+                      :disabled="!canDelete"
+                      data-testid="document-delete"
+                      @click.stop="onDeleteRow(rowAt(rows[vi.index])!.view.id)"
+                    />
+                  </div>
+                </template>
+                <template #body>
+                  <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
                      collapsed row otherwise shows only `_id`, per D1) — this wraps the matched
                      substring in <mark> inside the same string documents/search.ts's scanner matched
                      against, so it cannot disagree with the offsets. Only while collapsed: an
                      expanded document's own body is out of scope (§6). -->
-                <div
-                  v-if="isSearchMatch(rows[vi.index]) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-                  class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1 in-[.search-match-current]:text-bg"
-                  data-testid="document-search-preview"
-                >
-                  <template v-for="(seg, si) in previewSegments(rows[vi.index], rowAt(rows[vi.index])!.body)" :key="si">
-                    <mark v-if="seg.matched" class="rounded-kira-sm bg-warn text-bg">{{ seg.text }}</mark>
-                    <template v-else>{{ seg.text }}</template>
-                  </template>
-                </div>
-                <div
-                  v-if="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-                  class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-border bg-elevated"
-                  data-testid="document-body"
-                >
-                  <!-- The editor is the same code surface the definition view and the console views
+                  <div
+                    v-if="isSearchMatch(rows[vi.index]) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                    class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1 in-[.search-match-current]:text-bg"
+                    data-testid="document-search-preview"
+                  >
+                    <template
+                      v-for="(seg, si) in previewSegments(rows[vi.index], rowAt(rows[vi.index])!.body)"
+                      :key="si"
+                    >
+                      <mark v-if="seg.matched" class="rounded-kira-sm bg-warn text-bg">{{
+                        seg.text
+                      }}</mark>
+                      <template v-else>{{ seg.text }}</template>
+                    </template>
+                  </div>
+                  <div
+                    v-if="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                    class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-border bg-elevated"
+                    data-testid="document-body"
+                  >
+                    <!-- The editor is the same code surface the definition view and the console views
                        use — the only difference is the language. -->
-                  <template v-if="editingRow === rows[vi.index]">
-                    <MonacoHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
-                    <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
-                      <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
-                      <span class="flex-1 min-w-0"></span>
-                      <Button variant="toolbar-primary" size="kira" data-testid="document-edit-save" :disabled="saving" @click="commitEdit"
-                        >{{ t('common.action.save.label') }}</Button
+                    <template v-if="editingRow === rows[vi.index]">
+                      <MonacoHost
+                        v-model:doc="editBuffer.doc.value"
+                        language="json"
+                        :read-only="false"
+                      />
+                      <div
+                        class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2"
                       >
-                      <Button variant="toolbar" size="kira" data-testid="document-edit-cancel" @click="cancelEdit"
-                        >{{ t('common.action.cancel.label') }}</Button
-                      >
-                    </div>
-                  </template>
-                  <DocumentTree
-                    v-else-if="rowAt(rows[vi.index])!.view.root"
-                    :tab-id="tab.id"
-                    :row="rows[vi.index]"
-                    @toggle-path="(path) => documentRowsStore.togglePath(tab.id, rows[vi.index], path)"
-                  />
-                  <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
+                        <EditBufferActions
+                          :buffer="editBuffer"
+                          testid-prefix="document-edit"
+                          :show-compact="false"
+                        />
+                        <span class="flex-1 min-w-0"></span>
+                        <Button
+                          variant="toolbar-primary"
+                          size="kira"
+                          data-testid="document-edit-save"
+                          :disabled="saving"
+                          @click="commitEdit"
+                          >{{
+                            t('common.action.save.label')
+                          }}</Button
+                        >
+                        <Button
+                          variant="toolbar"
+                          size="kira"
+                          data-testid="document-edit-cancel"
+                          @click="cancelEdit"
+                          >{{
+                            t('common.action.cancel.label')
+                          }}</Button
+                        >
+                      </div>
+                    </template>
+                    <DocumentTree
+                      v-else-if="rowAt(rows[vi.index])!.view.root"
+                      :tab-id="tab.id"
+                      :row="rows[vi.index]"
+                      @toggle-path="(path) => documentRowsStore.togglePath(tab.id, rows[vi.index], path)"
+                    />
+                    <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
                        object) falls back to raw text rather than a tree that has nothing to walk. -->
-                  <MonacoHost v-else :doc="rowAt(rows[vi.index])!.body" language="json" :read-only="true" />
-                </div>
-              </template>
-            </DocumentRow>
-          </template>
+                    <MonacoHost
+                      v-else
+                      :doc="rowAt(rows[vi.index])!.body"
+                      language="json"
+                      :read-only="true"
+                    />
+                  </div>
+                </template>
+              </DocumentRow>
+            </template>
+          </div>
         </div>
       </div>
-    </div>
     </template>
   </div>
   <!-- P110 I2-16: `.doc-preview-match` (dropped, no other consumer) -- `:deep(.doc-row.search-

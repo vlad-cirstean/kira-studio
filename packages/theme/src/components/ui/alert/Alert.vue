@@ -27,7 +27,13 @@ const iconName = computed(() => {
     :class="cn(alertVariants({ variant, strip }), iconName === null && 'grid-cols-[minmax(0,1fr)] *:col-start-1', props.class)"
     role="alert"
   >
-    <CodiconIcon v-if="iconName !== null" data-slot="alert-icon" class="mt-px" :name="iconName" :size="13" />
+    <CodiconIcon
+      v-if="iconName !== null"
+      data-slot="alert-icon"
+      class="mt-px"
+      :name="iconName"
+      :size="13"
+    />
     <slot />
   </div>
 </template>

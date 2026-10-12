@@ -55,18 +55,25 @@ function onEscapeOrOutside(e: Event): void {
       <DialogBody>
         <template v-if="state === 'installing'">
           <p class="m-0">
-            {{ t('workbench.update.installing.body', { app: store.appName, version: store.latestVersion }) }}
+            {{
+              t('workbench.update.installing.body', { app: store.appName, version: store.latestVersion })
+            }}
           </p>
         </template>
         <template v-else>
           <p class="m-0" data-testid="update-dialog-versions">
-            {{ t('workbench.update.versions.body', { app: store.appName, latest: store.latestVersion, current: store.currentVersion }) }}
+            {{
+              t('workbench.update.versions.body', { app: store.appName, latest: store.latestVersion, current: store.currentVersion })
+            }}
           </p>
           <p class="m-0 text-subtle">
-            {{ t('workbench.update.explain.body', { app: store.appName, folder: '/Applications', log: store.installLogPath }) }}
+            {{
+              t('workbench.update.explain.body', { app: store.appName, folder: '/Applications', log: store.installLogPath })
+            }}
           </p>
           <FieldError v-if="state === 'error'" data-testid="update-dialog-error">
-            {{ store.installError }} {{ t('workbench.update.installDetails.error', { log: store.installLogPath }) }}
+            {{ store.installError }}
+            {{ t('workbench.update.installDetails.error', { log: store.installLogPath }) }}
           </FieldError>
         </template>
       </DialogBody>
@@ -97,7 +104,9 @@ function onEscapeOrOutside(e: Event): void {
             data-testid="update-dialog-install"
             @click="store.install()"
           >
-            {{ state === 'error' ? t('common.action.retry.label') : t('workbench.update.install.label') }}
+            {{
+              state === 'error' ? t('common.action.retry.label') : t('workbench.update.install.label')
+            }}
           </Button>
         </template>
       </DialogFooter>

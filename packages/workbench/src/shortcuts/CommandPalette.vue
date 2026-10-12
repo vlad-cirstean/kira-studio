@@ -30,9 +30,15 @@ function onOpenChange(open: boolean): void {
 
 <template>
   <CommandDialog :open="paletteStore.open" class="w-105" @update:open="onOpenChange">
-    <CommandInput data-testid="command-palette-input" :placeholder="placeholder" @keydown="wrapSelectionOnType" />
+    <CommandInput
+      data-testid="command-palette-input"
+      :placeholder="placeholder"
+      @keydown="wrapSelectionOnType"
+    />
     <CommandList class="max-h-72">
-      <CommandEmpty class="text-subtle" data-testid="command-palette-empty">{{ emptyLabel }}</CommandEmpty>
+      <CommandEmpty class="text-subtle" data-testid="command-palette-empty">{{
+        emptyLabel
+      }}</CommandEmpty>
       <CommandItem
         v-for="command in paletteStore.commands"
         :key="command.id"

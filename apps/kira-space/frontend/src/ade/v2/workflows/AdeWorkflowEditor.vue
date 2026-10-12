@@ -45,9 +45,13 @@ async function setMode(v: unknown): Promise<void> {
         @update:model-value="setMode"
       />
       <AdeTip :text="entry.path">
-        <span class="min-w-0 flex-1 truncate font-data text-kira-sm text-subtle" data-testid="ade-wf-path">{{
-          entry.path
-        }}</span>
+        <span
+          class="min-w-0 flex-1 truncate font-data text-kira-sm text-subtle"
+          data-testid="ade-wf-path"
+          >{{
+            entry.path
+          }}</span
+        >
       </AdeTip>
       <Button
         variant="dialog"
@@ -56,7 +60,9 @@ async function setMode(v: unknown): Promise<void> {
         data-testid="ade-wf-copy"
         @click="yaml.data.value && copy(yaml.data.value.yaml)"
       >
-        {{ copied ? t('common.copy.copied.announce') : t('space.ade.workflows.editor.copyYaml.label') }}
+        {{
+          copied ? t('common.copy.copied.announce') : t('space.ade.workflows.editor.copyYaml.label')
+        }}
       </Button>
     </div>
     <AdeWorkflowYaml v-if="wfUi.workflowMode === 'yaml'" :entry="entry" />

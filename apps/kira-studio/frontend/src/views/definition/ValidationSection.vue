@@ -24,7 +24,9 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-validation">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.definition.validation.heading.label') }}</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
+        t('studio.definition.validation.heading.label')
+      }}</span>
       <Badge v-if="documentSchema?.validationLevel" variant="chip" data>
         {{ documentSchema.validationLevel }}
       </Badge>
@@ -50,6 +52,9 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
       </TableBody>
     </Table>
 
-    <pre v-else-if="showRaw" class="m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2 font-data">{{ documentSchema?.validator }}</pre>
+    <pre
+      v-else-if="showRaw"
+      class="m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2 font-data"
+    >{{ documentSchema?.validator }}</pre>
   </section>
 </template>

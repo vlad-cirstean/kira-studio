@@ -264,7 +264,10 @@ defineExpose({ focusInput });
               @keydown="onKeydown"
             />
             <InputGroupAddon v-if="search.text.value" align="inline-end">
-              <InputGroupButton :aria-label="t('common.action.clearSearch.label')" @click="search.text.value = ''">
+              <InputGroupButton
+                :aria-label="t('common.action.clearSearch.label')"
+                @click="search.text.value = ''"
+              >
                 <CodiconIcon name="close" :size="12" />
               </InputGroupButton>
             </InputGroupAddon>
@@ -290,8 +293,20 @@ defineExpose({ focusInput });
             <option value="commits">{{ t('common.module.commits.label') }}</option>
             <option value="refs">{{ t('git.common.refs.label') }}</option>
           </NativeSelect>
-          <span v-if="countLabel" class="px-0.5 text-muted-foreground text-kira-sm whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
-          <TooltipIconButton icon="close" :label="t('common.action.closeSearch.label')" data-testid="search-close-button" @click="emit('close')" />
+          <span
+            v-if="countLabel"
+            class="px-0.5 text-muted-foreground text-kira-sm whitespace-nowrap"
+            data-testid="search-count"
+            >{{
+              countLabel
+            }}</span
+          >
+          <TooltipIconButton
+            icon="close"
+            :label="t('common.action.closeSearch.label')"
+            data-testid="search-close-button"
+            @click="emit('close')"
+          />
         </div>
       </div>
     </PopoverAnchor>
@@ -306,12 +321,7 @@ defineExpose({ focusInput });
       @interact-outside="ignoreOwnRow"
       @focus-outside="ignoreOwnRow"
     >
-      <InlineState
-        v-if="search.error.value"
-        :id="ERROR_ID"
-        kind="error"
-        data-testid="search-error"
-      >
+      <InlineState v-if="search.error.value" :id="ERROR_ID" kind="error" data-testid="search-error">
         {{ errorText }}
       </InlineState>
       <SearchResults
@@ -328,4 +338,3 @@ defineExpose({ focusInput });
     </PopoverContent>
   </Popover>
 </template>
-

@@ -16,18 +16,35 @@ import type { SettingsPaneProps } from './types';
 const props = defineProps<SettingsPaneProps>();
 const switchId = useId();
 
-type NotifyLeaf = Exclude<
-  keyof Settings['claudeCode'],
-  'keepAwakeWithAgents' | 'usageEnabled'
->;
+type NotifyLeaf = Exclude<keyof Settings['claudeCode'], 'keepAwakeWithAgents' | 'usageEnabled'>;
 
 // P238: master first; the rest are disabled while it is off.
 const notifyLeaves = computed<{ leaf: NotifyLeaf; testid: string; label: string }[]>(() => [
-  { leaf: 'notifyEnabled', testid: 'settings-claude-code-notify', label: t('space.settings.claudeCode.notify.label') },
-  { leaf: 'notifyOnFinished', testid: 'settings-claude-code-notify-finished', label: t('space.settings.claudeCode.notifyFinished.label') },
-  { leaf: 'notifyOnNeedsInput', testid: 'settings-claude-code-notify-needs-input', label: t('space.settings.claudeCode.notifyNeedsInput.label') },
-  { leaf: 'notifyOnRunEnded', testid: 'settings-claude-code-notify-run-ended', label: t('space.settings.claudeCode.notifyRunEnded.label') },
-  { leaf: 'notifyIncludeMessage', testid: 'settings-claude-code-notify-include-message', label: t('space.settings.claudeCode.notifyIncludeMessage.label') },
+  {
+    leaf: 'notifyEnabled',
+    testid: 'settings-claude-code-notify',
+    label: t('space.settings.claudeCode.notify.label'),
+  },
+  {
+    leaf: 'notifyOnFinished',
+    testid: 'settings-claude-code-notify-finished',
+    label: t('space.settings.claudeCode.notifyFinished.label'),
+  },
+  {
+    leaf: 'notifyOnNeedsInput',
+    testid: 'settings-claude-code-notify-needs-input',
+    label: t('space.settings.claudeCode.notifyNeedsInput.label'),
+  },
+  {
+    leaf: 'notifyOnRunEnded',
+    testid: 'settings-claude-code-notify-run-ended',
+    label: t('space.settings.claudeCode.notifyRunEnded.label'),
+  },
+  {
+    leaf: 'notifyIncludeMessage',
+    testid: 'settings-claude-code-notify-include-message',
+    label: t('space.settings.claudeCode.notifyIncludeMessage.label'),
+  },
 ]);
 
 function setNotify(leaf: NotifyLeaf, on: boolean): void {
@@ -74,7 +91,9 @@ function setKeepAwake(on: boolean): void {
 
     <Field v-for="n in notifyLeaves" :key="n.leaf">
       <div class="flex items-center justify-between gap-1">
-        <Label :for="`${switchId}-${n.leaf}`" :class="n.leaf === 'notifyEnabled' ? '' : 'pl-4'">{{ n.label }}</Label>
+        <Label :for="`${switchId}-${n.leaf}`" :class="n.leaf === 'notifyEnabled' ? '' : 'pl-4'">{{
+          n.label
+        }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"

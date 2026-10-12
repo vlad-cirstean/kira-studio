@@ -70,33 +70,58 @@ const summary = computed(() => {
     .filter((k) => counts.has(k))
     .map((k) => ({ kind: k, text: t(SUMMARY[k], { count: counts.get(k) ?? 0 }) }));
 });
-
 </script>
 
 <template>
   <div class="flex flex-col gap-4 p-3" data-testid="ade-all-sessions">
     <div class="flex items-center gap-3.5">
       <div class="flex gap-1">
-        <Button :variant="filter === 'running' ? 'dialog' : 'ghost'" size="kira-lg" data-testid="ade-all-running" @click="filter = 'running'">
+        <Button
+          :variant="filter === 'running' ? 'dialog' : 'ghost'"
+          size="kira-lg"
+          data-testid="ade-all-running"
+          @click="filter = 'running'"
+        >
           {{ t('space.ade.allSessions.running.label', { count: running }) }}
         </Button>
-        <Button :variant="filter === 'stopped' ? 'dialog' : 'ghost'" size="kira-lg" data-testid="ade-all-stopped" @click="filter = 'stopped'">
+        <Button
+          :variant="filter === 'stopped' ? 'dialog' : 'ghost'"
+          size="kira-lg"
+          data-testid="ade-all-stopped"
+          @click="filter = 'stopped'"
+        >
           {{ t('space.ade.allSessions.stopped.label', { count: stopped }) }}
         </Button>
       </div>
       <div class="flex gap-3">
-        <span v-for="a in summary" :key="a.kind" class="inline-flex items-center gap-1.25 text-kira-md">
+        <span
+          v-for="a in summary"
+          :key="a.kind"
+          class="inline-flex items-center gap-1.25 text-kira-md"
+        >
           <AdeActivityIcon :kind="a.kind" />{{ a.text }}
         </span>
       </div>
     </div>
-    <section v-for="g in groups" :key="g.taskId" class="flex flex-col gap-0.5" data-testid="ade-all-group">
+    <section
+      v-for="g in groups"
+      :key="g.taskId"
+      class="flex flex-col gap-0.5"
+      data-testid="ade-all-group"
+    >
       <div class="mb-1 flex items-center gap-2 border-b border-border px-3 pb-1.5">
         <span class="size-2.5 shrink-0 rounded-kira-xs" :style="{ background: g.color }" />
         <h3 class="m-0 truncate text-kira-lg font-medium">{{ g.title }}</h3>
       </div>
       <AdeAllSessionRow v-for="r in g.rows" :key="r.session.id" :view="r" :archived="g.archived" />
     </section>
-    <div v-if="groups.length === 0" class="p-3 text-kira-lg text-muted-foreground" data-testid="ade-all-empty">{{ t('space.ade.allSessions.empty.empty') }}</div>
+    <div
+      v-if="groups.length === 0"
+      class="p-3 text-kira-lg text-muted-foreground"
+      data-testid="ade-all-empty"
+      >{{
+        t('space.ade.allSessions.empty.empty')
+      }}</div
+    >
   </div>
 </template>

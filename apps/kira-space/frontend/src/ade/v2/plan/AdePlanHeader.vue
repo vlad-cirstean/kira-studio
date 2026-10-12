@@ -19,7 +19,11 @@ export interface RepoChipModel {
 }
 
 defineProps<{ repos: RepoChipModel[]; allBusy: boolean; ripple: Ripple | null }>();
-const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; toggle: [codeRepoId: string] }>();
+const emit = defineEmits<{
+  refreshAll: [];
+  refreshOne: [codeRepoId: string];
+  toggle: [codeRepoId: string];
+}>();
 </script>
 
 <template>
@@ -35,7 +39,9 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
           @click="emit('refreshAll')"
         >
           <CodiconIcon name="refresh" :size="12" />
-          {{ allBusy ? t('space.ade.plan.header.refreshing.loading') : t('common.refreshAll.label') }}
+          {{
+            allBusy ? t('space.ade.plan.header.refreshing.loading') : t('common.refreshAll.label')
+          }}
         </Button>
       </template>
     </PanelHeader>
@@ -49,10 +55,9 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
       />
       <span v-if="ripple" class="flex items-center gap-1.5 text-kira-sm" data-testid="ade-ripple">
         <span class="text-muted-foreground">{{ t('space.ade.plan.header.onMerge.label') }}</span>
-        <span
-:class="ripple.tone === 'amber' ? 'text-tone-amber' : 'text-subtle'"
-          >{{ ripple.text }}</span
-        >
+        <span :class="ripple.tone === 'amber' ? 'text-tone-amber' : 'text-subtle'">{{
+          ripple.text
+        }}</span>
       </span>
     </div>
   </div>

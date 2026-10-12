@@ -20,5 +20,7 @@ const variant = computed(() => VARIANT[props.state]);
 </script>
 
 <template>
-  <Badge :variant="variant" data-testid="run-status" :data-state="state">{{ stateLabel(state) }}</Badge>
+  <Badge :variant="variant" data-testid="run-status" :data-state="state">{{
+    stateLabel(state)
+  }}</Badge>
 </template>

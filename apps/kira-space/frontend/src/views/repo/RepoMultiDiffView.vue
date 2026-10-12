@@ -126,7 +126,11 @@ onUnmounted(() => {
     <EmptyState class="flex-1 min-h-0" icon="warning" :title="noRepositoryMessage()" />
   </div>
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
-    <div v-for="section in sections" :key="section.path" class="flex flex-none flex-col border-b border-border">
+    <div
+      v-for="section in sections"
+      :key="section.path"
+      class="flex flex-none flex-col border-b border-border"
+    >
       <ViewToolbar border="none">
         <TooltipIconButton
           :icon="section.expanded ? 'chevron-down' : 'chevron-right'"
@@ -136,13 +140,17 @@ onUnmounted(() => {
         />
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="shrink-0 text-kira-md text-fg whitespace-nowrap">{{ basename(section.path) }}</span>
+            <span class="shrink-0 text-kira-md text-fg whitespace-nowrap">{{
+              basename(section.path)
+            }}</span>
           </TooltipTrigger>
           <TooltipContent>{{ section.path }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="path-dir flex-auto min-w-0 truncate text-kira-md text-subtle">{{ section.path }}</span>
+            <span class="path-dir flex-auto min-w-0 truncate text-kira-md text-subtle">{{
+              section.path
+            }}</span>
           </TooltipTrigger>
           <TooltipContent>{{ section.path }}</TooltipContent>
         </Tooltip>
@@ -164,12 +172,37 @@ onUnmounted(() => {
           class="monaco-host flex-none h-[60vh] w-full"
           data-testid="repo-multi-diff-editor"
         />
-        <EmptyState v-else-if="sectionState[section.path] === 'binary'" class="p-4" icon="file-binary" :title="t('space.repo.view.binaryCompare.empty')" />
-        <EmptyState v-else-if="sectionState[section.path] === 'tooLarge'" class="p-4" icon="warning" :title="t('space.repo.view.tooLargeCompare.empty')" />
-        <EmptyState v-else-if="sectionState[section.path] === 'bothMissing'" class="p-4" icon="warning" :title="t('space.repo.view.missing.empty')" />
-        <EmptyState v-else class="p-4" icon="warning" :title="sectionError[section.path] || t('space.repo.view.openDiffFailed.error')" />
+        <EmptyState
+          v-else-if="sectionState[section.path] === 'binary'"
+          class="p-4"
+          icon="file-binary"
+          :title="t('space.repo.view.binaryCompare.empty')"
+        />
+        <EmptyState
+          v-else-if="sectionState[section.path] === 'tooLarge'"
+          class="p-4"
+          icon="warning"
+          :title="t('space.repo.view.tooLargeCompare.empty')"
+        />
+        <EmptyState
+          v-else-if="sectionState[section.path] === 'bothMissing'"
+          class="p-4"
+          icon="warning"
+          :title="t('space.repo.view.missing.empty')"
+        />
+        <EmptyState
+          v-else
+          class="p-4"
+          icon="warning"
+          :title="sectionError[section.path] || t('space.repo.view.openDiffFailed.error')"
+        />
       </template>
     </div>
-    <EmptyState v-if="sections.length === 0" class="flex-1 min-h-0" icon="git-compare" :title="t('space.repo.view.noChanges.empty')" />
+    <EmptyState
+      v-if="sections.length === 0"
+      class="flex-1 min-h-0"
+      icon="git-compare"
+      :title="t('space.repo.view.noChanges.empty')"
+    />
   </div>
 </template>

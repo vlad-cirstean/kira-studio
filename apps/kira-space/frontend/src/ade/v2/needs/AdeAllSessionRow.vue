@@ -54,7 +54,14 @@ function open(): void {
     @keydown.space.self.prevent="open"
   >
     <AdeActivityIcon :kind="view.kind" :size="14" class="w-5 shrink-0" />
-    <span class="w-32.5 shrink-0 truncate text-kira-md" :class="stateClass" data-testid="ade-all-state">{{ state }}</span>
+    <span
+      class="w-32.5 shrink-0 truncate text-kira-md"
+      :class="stateClass"
+      data-testid="ade-all-state"
+      >{{
+        state
+      }}</span
+    >
     <span class="w-19 shrink-0 text-kira-md text-muted-foreground">{{ ago }}</span>
     <Button
       v-if="!archived"
@@ -69,11 +76,17 @@ function open(): void {
       {{ opens ? t('common.action.open.label') : t('common.action.takeOver.label') }}
     </Button>
     <span v-else class="w-23 shrink-0" />
-    <span class="w-22.5 shrink-0 font-data text-kira-sm text-muted-foreground">{{ t('space.common.claudeSession.label', { id: shortId(view.session.id) }) }}</span>
-    <span class="w-16 shrink-0 truncate text-kira-sm text-subtle">{{ view.repo || t('space.ade.needs.scope.spec.label') }}</span>
+    <span class="w-22.5 shrink-0 font-data text-kira-sm text-muted-foreground">{{
+      t('space.common.claudeSession.label', { id: shortId(view.session.id) })
+    }}</span>
+    <span class="w-16 shrink-0 truncate text-kira-sm text-subtle">{{
+      view.repo || t('space.ade.needs.scope.spec.label')
+    }}</span>
     <div class="flex min-w-0 flex-1 flex-col">
       <span class="truncate text-kira-md">{{ view.allLabel }}</span>
-      <span class="truncate font-data text-kira-sm text-subtle">{{ view.branch }} {{ view.worktree }}</span>
+      <span class="truncate font-data text-kira-sm text-subtle"
+        >{{ view.branch }} {{ view.worktree }}</span
+      >
     </div>
   </div>
 </template>

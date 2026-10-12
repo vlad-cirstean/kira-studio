@@ -27,12 +27,18 @@ const text = computed(() => {
   const s = schedule.value;
   if (!s?.enabled) return t('common.off.status');
   const at = next.data.value?.[0];
-  return at === undefined ? '' : t('automations.schedule.next.label', { times: clockText(at, s.timezone) });
+  return at === undefined
+    ? ''
+    : t('automations.schedule.next.label', { times: clockText(at, s.timezone) });
 });
 </script>
 
 <template>
-  <span v-if="schedule" class="flex min-w-0 items-center gap-1 text-kira-sm text-muted-foreground" data-testid="script-schedule-line">
+  <span
+    v-if="schedule"
+    class="flex min-w-0 items-center gap-1 text-kira-sm text-muted-foreground"
+    data-testid="script-schedule-line"
+  >
     <CodiconIcon name="watch" :size="12" class="shrink-0" />
     <span data-testid="script-next">{{ text }}</span>
     <RunStatusBadge v-if="last" :state="last.state" />

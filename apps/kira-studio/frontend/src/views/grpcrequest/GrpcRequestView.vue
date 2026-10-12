@@ -12,7 +12,12 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
@@ -21,7 +26,7 @@ import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { templateToken } from '@workbench/editor/fieldCompletion';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref, } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useSavedGrpcRequest, useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
@@ -78,7 +83,11 @@ const { railColor, runState, incognito, toggleIncognito, envId } = useRequestChr
 
 const TLS_OPTIONS = computed(() => [
   { value: 'tls' as const, label: t('studio.common.tls.label'), testid: 'grpc-tls-tls' },
-  { value: 'plaintext' as const, label: t('studio.grpc.tls.plaintext.option'), testid: 'grpc-tls-plaintext' },
+  {
+    value: 'plaintext' as const,
+    label: t('studio.grpc.tls.plaintext.option'),
+    testid: 'grpc-tls-plaintext',
+  },
 ]);
 function setTlsMode(mode: 'plaintext' | 'tls'): void {
   patchGrpcRequestTabState(props.tab.id, { tlsMode: mode });
@@ -116,9 +125,12 @@ function onMethodSelect(rawValue: unknown): void {
 
 // D4/P175: the schema is fetched once a reflection target (or a .proto path) exists, debounced like
 // a fast typist (150ms) — see schemaQuery.ts.
-const { schema, loading: schemaLoading, error: schemaError, reload: reloadSchema } = useGrpcSchema(
-  () => props.tab,
-);
+const {
+  schema,
+  loading: schemaLoading,
+  error: schemaError,
+  reload: reloadSchema,
+} = useGrpcSchema(() => props.tab);
 
 // P112: HttpRequestView.vue's own useSavedRequest rewrite, mirrored — see its comment for the full
 // rationale (§3.5's reactive-reader rule; subsumes the old ensureSavedGrpcRequestLoaded watch).
@@ -193,18 +205,36 @@ const unresolvedRefs = computed(() => {
 const saveTooltip = computed(() => {
   if (incognito.value) return t('studio.api.common.save.incognito.tooltip');
   if (unresolved.value) return t('studio.api.common.save.checking.tooltip');
-  return t(canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip');
+  return t(
+    canSave.value ? 'studio.api.saveRequest.title' : 'studio.api.common.save.toCollection.tooltip',
+  );
 });
 const unresolvedTooltip = computed(() =>
   unresolvedRefs.value
-    .map((r) => (r.kind === 'dynamic' ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name }) : r.name))
+    .map((r) =>
+      r.kind === 'dynamic'
+        ? t('studio.api.common.unknownDynamic.tooltip', { name: r.name })
+        : r.name,
+    )
     .join(', '),
 );
 
 const REQUEST_PANE_OPTIONS = computed(() => [
-  { value: 'message' as const, label: t('common.message.label'), testid: 'grpc-request-pane-message' },
-  { value: 'metadata' as const, label: t('studio.grpc.pane.metadata.option'), testid: 'grpc-request-pane-metadata' },
-  { value: 'schema' as const, label: t('studio.common.nodeKind.schema.label'), testid: 'grpc-request-pane-schema' },
+  {
+    value: 'message' as const,
+    label: t('common.message.label'),
+    testid: 'grpc-request-pane-message',
+  },
+  {
+    value: 'metadata' as const,
+    label: t('studio.grpc.pane.metadata.option'),
+    testid: 'grpc-request-pane-metadata',
+  },
+  {
+    value: 'schema' as const,
+    label: t('studio.common.nodeKind.schema.label'),
+    testid: 'grpc-request-pane-schema',
+  },
 ]);
 function setRequestPane(pane: 'message' | 'metadata' | 'schema'): void {
   patchGrpcRequestTabState(props.tab.id, { requestPane: pane });
@@ -283,31 +313,47 @@ onUnmounted(() => {
   <div class="flex h-full min-h-0 flex-col" data-testid="grpc-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="symbol-interface" :size="13" /></span>
-      <span class="text-kira-md text-fg truncate" data-testid="grpc-request-target">{{ title }}</span>
-      <Badge data v-if="tab.state.service && tab.state.method" variant="info" data-testid="grpc-method-chip">
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
+      <span class="size-4 flex items-center justify-center shrink-0"
+        ><CodiconIcon name="symbol-interface" :size="13" /></span
+      >
+      <span class="text-kira-md text-fg truncate" data-testid="grpc-request-target">{{
+        title
+      }}</span>
+      <Badge
+        data
+        v-if="tab.state.service && tab.state.method"
+        variant="info"
+        data-testid="grpc-method-chip"
+      >
         {{ tab.state.service }}/{{ tab.state.method }}
       </Badge>
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="grpc-dirty" :aria-label="t('common.state.unsavedChanges.status')">•</span>
+          <span
+            class="text-warn text-kira-lg leading-none"
+            role="img"
+            data-testid="grpc-dirty"
+            :aria-label="t('common.state.unsavedChanges.status')"
+            >•</span
+          >
         </TooltipTrigger>
         <TooltipContent>{{ t('common.state.unsavedChanges.status') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{ t('common.unresolved.label', { count: unresolvedRefs.length }) }}</Badge>
+          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{
+            t('common.unresolved.label', { count: unresolvedRefs.length })
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
-          <Badge variant="chip" data-testid="grpc-incognito-chip">{{ t('studio.tabs.incognito.label') }}</Badge>
+          <Badge variant="chip" data-testid="grpc-incognito-chip">{{
+            t('studio.tabs.incognito.label')
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ t('studio.api.common.incognitoChip.tooltip') }}</TooltipContent>
       </Tooltip>
@@ -374,7 +420,13 @@ onUnmounted(() => {
           @enter="onCall"
         />
       </div>
-      <SecondaryTabs variant="segmented" :model-value="tab.state.tlsMode" :items="TLS_OPTIONS" data-testid="grpc-tls-toggle" @update:model-value="(v) => setTlsMode(v as 'plaintext' | 'tls')" />
+      <SecondaryTabs
+        variant="segmented"
+        :model-value="tab.state.tlsMode"
+        :items="TLS_OPTIONS"
+        data-testid="grpc-tls-toggle"
+        @update:model-value="(v) => setTlsMode(v as 'plaintext' | 'tls')"
+      />
       <!-- P22b D10: the same wrapper idiom .grpc-target-field uses above, for the identical reason
            — a bare native select has no width rule of its own, so it shrinks to its widest option
            label (P110 B24: now a class="w-full" passed straight to NativeSelect, not a scoped
@@ -390,7 +442,9 @@ onUnmounted(() => {
           @update:model-value="onMethodSelect"
         >
           <option value="" disabled>{{ t('studio.grpc.method.choose.placeholder') }}</option>
-          <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{
+            opt.label
+          }}</option>
         </NativeSelect>
       </div>
       <Tooltip>
@@ -408,7 +462,9 @@ onUnmounted(() => {
             </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>
-        <TooltipContent>{{ !running && tab.state.service && tab.state.method && !methodResolved ? t('studio.grpc.call.waitingSchema.tooltip') : t('studio.grpc.call.label') }}</TooltipContent>
+        <TooltipContent>{{
+          !running && tab.state.service && tab.state.method && !methodResolved ? t('studio.grpc.call.waitingSchema.tooltip') : t('studio.grpc.call.label')
+        }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto" />
       <RunState :state="runState" />
@@ -427,7 +483,12 @@ onUnmounted(() => {
     </ViewToolbar>
 
     <ViewToolbar border="none">
-      <SecondaryTabs :model-value="tab.state.requestPane" :items="REQUEST_PANE_OPTIONS" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => setRequestPane(v as 'message' | 'metadata' | 'schema')" />
+      <SecondaryTabs
+        :model-value="tab.state.requestPane"
+        :items="REQUEST_PANE_OPTIONS"
+        data-testid="grpc-request-pane-toggle"
+        @update:model-value="(v) => setRequestPane(v as 'message' | 'metadata' | 'schema')"
+      />
       <TooltipIconButton
         v-if="tab.state.requestPane === 'message'"
         icon="expand-all"
@@ -480,7 +541,12 @@ onUnmounted(() => {
         data-testid="grpc-request-pane"
         :style="{ flex: `0 1 ${requestPane.size.value}px` }"
       >
-        <Alert strip v-if="beautifyError && tab.state.requestPane === 'message'" variant="error" data-testid="grpc-beautify-error">
+        <Alert
+          strip
+          v-if="beautifyError && tab.state.requestPane === 'message'"
+          variant="error"
+          data-testid="grpc-beautify-error"
+        >
           <AlertDescription>{{ beautifyError }}</AlertDescription>
         </Alert>
         <MonacoHost
@@ -497,7 +563,12 @@ onUnmounted(() => {
           @update:doc="onMessageInput"
         />
         <template v-else-if="tab.state.requestPane === 'metadata'">
-          <SearchField v-if="fieldFilterOpen" v-model="fieldFilterQuery" :placeholder="t('common.action.filter.label')" data-testid="grpc-field-filter" />
+          <SearchField
+            v-if="fieldFilterOpen"
+            v-model="fieldFilterQuery"
+            :placeholder="t('common.action.filter.label')"
+            data-testid="grpc-field-filter"
+          />
           <GrpcMetadataTable
             :tab="tab"
             :filter-query="fieldFilterQuery"
@@ -505,7 +576,14 @@ onUnmounted(() => {
             :show-descriptions="tab.state.fieldDescriptions"
           />
         </template>
-        <SchemaBrowser v-else :tab="tab" :schema="schema" :loading="schemaLoading" :error="schemaError" @reload="reloadSchema" />
+        <SchemaBrowser
+          v-else
+          :tab="tab"
+          :schema="schema"
+          :loading="schemaLoading"
+          :error="schemaError"
+          @reload="reloadSchema"
+        />
       </div>
 
       <ResizeHandle

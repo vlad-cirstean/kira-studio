@@ -88,10 +88,7 @@ function confirm(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      size="md"
-      destructive
-    >
+    <DialogContent size="md" destructive>
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.cherryPick.title') }}</DialogTitle>
       </DialogHeader>
@@ -113,29 +110,37 @@ function confirm(): void {
         </Alert>
 
         <template v-if="hasBlocker">
-          <Alert v-for="(blocker, i) in blockers" :key="i" variant="warn"><AlertDescription>
-            <template v-if="blocker.kind === 'inProgressOperation'">
-              <p>{{ t('git.common.operationInProgress.body') }}</p>
-            </template>
-            <template v-else-if="blocker.kind === 'stagedChanges'">
-              <p>{{ t('git.dialog.cherryPick.stagedChanges.body') }}</p>
-              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
-              </ul>
-            </template>
-            <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
-              <p>{{ t('git.dialog.cherryPick.localChanges.body') }}</p>
-              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
-              </ul>
-            </template>
-            <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
-              <p>{{ t('git.dialog.cherryPick.untracked.body') }}</p>
-              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
-              </ul>
-            </template>
-          </AlertDescription></Alert>
+          <Alert v-for="(blocker, i) in blockers" :key="i" variant="warn"
+            ><AlertDescription>
+              <template v-if="blocker.kind === 'inProgressOperation'">
+                <p>{{ t('git.common.operationInProgress.body') }}</p>
+              </template>
+              <template v-else-if="blocker.kind === 'stagedChanges'">
+                <p>{{ t('git.dialog.cherryPick.stagedChanges.body') }}</p>
+                <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                  <li v-for="path in blocker.paths" :key="path"
+                    ><code class="font-data">{{ path }}</code></li
+                  >
+                </ul>
+              </template>
+              <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
+                <p>{{ t('git.dialog.cherryPick.localChanges.body') }}</p>
+                <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                  <li v-for="path in blocker.paths" :key="path"
+                    ><code class="font-data">{{ path }}</code></li
+                  >
+                </ul>
+              </template>
+              <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
+                <p>{{ t('git.dialog.cherryPick.untracked.body') }}</p>
+                <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                  <li v-for="path in blocker.paths" :key="path"
+                    ><code class="font-data">{{ path }}</code></li
+                  >
+                </ul>
+              </template>
+            </AlertDescription></Alert
+          >
         </template>
 
         <template v-if="!hasBlocker && needsMainline">
@@ -147,11 +152,19 @@ function confirm(): void {
               orientation="horizontal"
               class="py-0.5"
             >
-              <RadioGroupItem :id="`${mainlineId}-${entry.parentNumber}`" :value="entry.parentNumber" />
+              <RadioGroupItem
+                :id="`${mainlineId}-${entry.parentNumber}`"
+                :value="entry.parentNumber"
+              />
               <FieldLabel :for="`${mainlineId}-${entry.parentNumber}`">
                 <span>
-                  <CatalogText k="git.common.mergeParent.option" :params="{ number: entry.parentNumber, subject: entry.subject }">
-                    <template #sha><code class="font-data">{{ shortSha(entry.sha) }}</code></template>
+                  <CatalogText
+                    k="git.common.mergeParent.option"
+                    :params="{ number: entry.parentNumber, subject: entry.subject }"
+                  >
+                    <template #sha
+                      ><code class="font-data">{{ shortSha(entry.sha) }}</code></template
+                    >
                   </CatalogText>
                 </span>
               </FieldLabel>
@@ -169,7 +182,9 @@ function confirm(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"

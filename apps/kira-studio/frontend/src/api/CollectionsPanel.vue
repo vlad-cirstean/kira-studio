@@ -130,38 +130,38 @@ onUnmounted(() => {
     <PanelHeader>
       {{ t('studio.api.collections.title') }}
       <template #actions>
-      <TooltipIconButton
-        :icon="ICON.search"
-        :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
-        :aria-label="t('common.action.search.label')"
-        :pressed="showSearch"
-        data-testid="toggle-search"
-        @click="toggleSearch"
-      />
-      <TooltipIconButton
-        :icon="ICON.add"
-        :label="t('studio.api.common.newRequest.label')"
-        data-testid="new-request"
-        @click="openApiRequestTab"
-      />
-      <TooltipIconButton
-        :icon="ICON.newCollection"
-        :label="t('common.newCollection.label')"
-        data-testid="new-collection"
-        @click="onNewCollection"
-      />
-      <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
+        <TooltipIconButton
+          :icon="ICON.search"
+          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
+          :aria-label="t('common.action.search.label')"
+          :pressed="showSearch"
+          data-testid="toggle-search"
+          @click="toggleSearch"
+        />
+        <TooltipIconButton
+          :icon="ICON.add"
+          :label="t('studio.api.common.newRequest.label')"
+          data-testid="new-request"
+          @click="openApiRequestTab"
+        />
+        <TooltipIconButton
+          :icon="ICON.newCollection"
+          :label="t('common.newCollection.label')"
+          data-testid="new-collection"
+          @click="onNewCollection"
+        />
+        <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
            and to the command palette entry it already had. D11's spinner-on-the-action reasoning
            went with the button; collectionsState.busy still gates re-entry inside
            importCollection() itself, so a second import cannot start while one is running. -->
-      <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
+        <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
-      <TooltipIconButton
-        :icon="ICON.environments"
-        :label="t('studio.api.common.environments.label')"
-        data-testid="api-environments"
-        @click="onEnvironments"
-      />
+        <TooltipIconButton
+          :icon="ICON.environments"
+          :label="t('studio.api.common.environments.label')"
+          data-testid="api-environments"
+          @click="onEnvironments"
+        />
       </template>
     </PanelHeader>
     <template v-if="!empty">

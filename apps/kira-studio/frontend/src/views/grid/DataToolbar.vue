@@ -38,7 +38,11 @@ const props = defineProps<{ tab: DataTabRecord }>();
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
 // (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('');
-const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid }));
+const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({
+  value: String(o.value),
+  label: o.label,
+  testid: o.testid,
+}));
 
 const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 
@@ -161,8 +165,10 @@ const deleteRowTooltip = computed(() => {
 // named ahead of every reason that predicate itself covers.
 const canGenerateData = computed(
   () =>
-    canGenerateDataFor(caps.value, connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly) &&
-    !rt.value?.maskPreview,
+    canGenerateDataFor(
+      caps.value,
+      connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly,
+    ) && !rt.value?.maskPreview,
 );
 const generateDataTooltip = computed(() => {
   if (canGenerateData.value) return t('studio.shortcuts.palette.generateData.label');
@@ -293,7 +299,13 @@ function onDeleteRow(): void {
     @jump="onJump"
   />
 
-  <SecondaryTabs variant="segmented" :model-value="String(tab.state.pageSize)" :items="PAGE_SIZE_ITEMS" data-testid="page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
+  <SecondaryTabs
+    variant="segmented"
+    :model-value="String(tab.state.pageSize)"
+    :items="PAGE_SIZE_ITEMS"
+    data-testid="page-size-picker"
+    @update:model-value="(v) => onPageSize(Number(v) as PageSize)"
+  />
 
   <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
@@ -336,10 +348,16 @@ function onDeleteRow(): void {
               @click="columnsOpen = !columnsOpen"
             >
               <CodiconIcon name="list-selection" :size="13" />
-              <StatusDot v-if="columnsIndicator" tone="state-on" class="absolute top-0.5 right-0.5" />
+              <StatusDot
+                v-if="columnsIndicator"
+                tone="state-on"
+                class="absolute top-0.5 right-0.5"
+              />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{{ columnCount ? t('studio.grid.columns.shown.tooltip', columnCount) : t('studio.common.columns.label') }}</TooltipContent>
+          <TooltipContent>{{
+            columnCount ? t('studio.grid.columns.shown.tooltip', columnCount) : t('studio.common.columns.label')
+          }}</TooltipContent>
         </Tooltip>
         <PopoverAnchor :reference="columnsAnchorRef ?? undefined" />
       </div>
@@ -352,7 +370,7 @@ function onDeleteRow(): void {
   <div class="flex items-center gap-1.5 min-w-0">
     <TooltipIconButton
       icon="add"
-:label="addRowTooltip"
+      :label="addRowTooltip"
       :aria-label="t('studio.grid.addRow.label')"
       disabled-trigger
       data-testid="toolbar-add-row"

@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import type { IndexMeta } from '@shared/domain/tree';
 import { Badge } from '@theme/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@theme/components/ui/table';
 import { t } from '@theme/i18n';
 
 defineProps<{
@@ -12,7 +19,9 @@ defineProps<{
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-indexes">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.definition.indexes.heading.label') }}</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
+        t('studio.definition.indexes.heading.label')
+      }}</span>
       <Badge>{{ indexes.length }}</Badge>
     </header>
     <Table columns>
@@ -32,7 +41,9 @@ defineProps<{
             <Badge v-else-if="idx.unique">{{ t('studio.definition.unique.label') }}</Badge>
           </TableCell>
           <TableCell class="def-idx-method font-data">{{ idx.method ?? '' }}</TableCell>
-          <TableCell class="font-data text-muted-foreground">({{ idx.columns.join(', ') }})</TableCell>
+          <TableCell class="font-data text-muted-foreground"
+            >({{ idx.columns.join(', ') }})</TableCell
+          >
         </TableRow>
       </TableBody>
     </Table>

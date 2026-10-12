@@ -24,7 +24,11 @@ const KIND_LABELS: Record<InspectKind, MessageKey> = {
   network: 'docker.resource.network.label',
 };
 
-const ICONS: Record<InspectKind, string> = { image: 'package', volume: 'database', network: 'globe' };
+const ICONS: Record<InspectKind, string> = {
+  image: 'package',
+  volume: 'database',
+  network: 'globe',
+};
 
 const ui = useDockerUiStore();
 const docker = useDocker();
@@ -47,7 +51,9 @@ const title = computed(() => {
   return network.value?.name ?? shortId(props.id);
 });
 
-const registryUrl = computed(() => (props.kind === 'image' ? (image.value?.registryUrl ?? '') : ''));
+const registryUrl = computed(() =>
+  props.kind === 'image' ? (image.value?.registryUrl ?? '') : '',
+);
 
 function openRegistry(): void {
   void docker.openExternal(registryUrl.value);
@@ -70,7 +76,10 @@ const facts = computed<Array<[string, string]>>(() => {
       [t('docker.resource.mountPoint.label'), v.mountpoint],
       [t('docker.resource.scope.label'), v.scope],
       [t('common.created.label'), displayValue(v.created)],
-      ...Object.entries(v.labels).map(([k, val]): [string, string] => [t('docker.resource.labelKey.label', { key: k }), val]),
+      ...Object.entries(v.labels).map(([k, val]): [string, string] => [
+        t('docker.resource.labelKey.label', { key: k }),
+        val,
+      ]),
     ];
   }
   if (props.kind === 'network' && network.value) {
@@ -79,7 +88,10 @@ const facts = computed<Array<[string, string]>>(() => {
       [t('docker.resource.driver.label'), n.driver],
       [t('docker.resource.scope.label'), n.scope],
       [t('docker.resource.subnets.label'), displayValue(n.subnets.join(', '))],
-      [t('docker.resource.internal.label'), n.internal ? t('docker.resource.yes.option') : t('docker.resource.no.option')],
+      [
+        t('docker.resource.internal.label'),
+        n.internal ? t('docker.resource.yes.option') : t('docker.resource.no.option'),
+      ],
     ];
   }
   return [];
@@ -101,10 +113,16 @@ const usedByRows = computed(() =>
 </script>
 
 <template>
-  <div class="flex h-full flex-col overflow-auto" data-testid="docker-resource-detail" :data-kind="kind">
+  <div
+    class="flex h-full flex-col overflow-auto"
+    data-testid="docker-resource-detail"
+    :data-kind="kind"
+  >
     <div class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
       <CodiconIcon :name="ICONS[kind]" :size="16" class="text-muted-foreground" />
-      <span class="min-w-0 truncate text-kira-lg font-medium" data-testid="docker-resource-title">{{ title }}</span>
+      <span class="min-w-0 truncate text-kira-lg font-medium" data-testid="docker-resource-title">{{
+        title
+      }}</span>
       <TooltipIconButton
         v-if="registryUrl"
         icon="link-external"
@@ -118,14 +136,21 @@ const usedByRows = computed(() =>
       <div class="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2">
         <DetailSection :title="t('common.details.title')">
           <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-            <template v-for="[k, v] in facts" :key="k">
+            <template v-for="[ k, v ] in facts" :key="k">
               <dt class="text-muted-foreground">{{ k }}</dt>
               <dd class="break-all font-data">{{ v }}</dd>
             </template>
           </dl>
         </DetailSection>
         <DetailSection :title="t('docker.resource.usedBy.title')" flush>
-          <p v-if="usedByRows.length === 0" class="px-3 py-2 text-muted-foreground" data-testid="docker-used-by-empty">{{ t('docker.resource.noContainers.emptyHint') }}</p>
+          <p
+            v-if="usedByRows.length === 0"
+            class="px-3 py-2 text-muted-foreground"
+            data-testid="docker-used-by-empty"
+            >{{
+              t('docker.resource.noContainers.emptyHint')
+            }}</p
+          >
           <button
             v-for="row in usedByRows"
             :key="row.id"

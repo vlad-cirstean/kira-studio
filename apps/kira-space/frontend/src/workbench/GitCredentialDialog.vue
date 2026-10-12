@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
@@ -66,7 +73,12 @@ function onCancel(): void {
             {{ t('common.moreWaiting.status', { count: more }) }}
           </span>
         </template>
-        <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          data-testid="git-credential-cancel"
+          @click="onCancel"
+        >
           {{ t('common.action.cancel.label') }}
         </Button>
         <Button

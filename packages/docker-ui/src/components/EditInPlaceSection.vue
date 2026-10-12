@@ -33,15 +33,27 @@ const mode = (k: keyof DockerResources) => resourceMode(baseRes.value, res.value
 const changed = (k: keyof DockerResources): boolean => baseRes.value[k] !== res.value[k];
 const err = (k: keyof DockerResources): string | undefined => props.errors[`resources.${k}`];
 
-const quotaMode = computed(() => res.value.cpuQuota !== 0 || res.value.cpuPeriod !== 0 || baseRes.value.cpuQuota !== 0);
+const quotaMode = computed(
+  () => res.value.cpuQuota !== 0 || res.value.cpuPeriod !== 0 || baseRes.value.cpuQuota !== 0,
+);
 const cpusText = computed(() => (res.value.nanoCpus > 0 ? String(res.value.nanoCpus / 1e9) : ''));
-const cpuChanged = computed(() => changed('nanoCpus') || changed('cpuQuota') || changed('cpuPeriod'));
-const cpuHint = computed(() => (props.engineCpus ? t('docker.edit.engineCpus.hint', { count: props.engineCpus }) : ''));
-const cpusetHint = computed(() => (props.engineCpus ? t('docker.edit.engineCpuset.hint', { count: props.engineCpus, last: props.engineCpus - 1 }) : ''));
+const cpuChanged = computed(
+  () => changed('nanoCpus') || changed('cpuQuota') || changed('cpuPeriod'),
+);
+const cpuHint = computed(() =>
+  props.engineCpus ? t('docker.edit.engineCpus.hint', { count: props.engineCpus }) : '',
+);
+const cpusetHint = computed(() =>
+  props.engineCpus
+    ? t('docker.edit.engineCpuset.hint', { count: props.engineCpus, last: props.engineCpus - 1 })
+    : '',
+);
 
 const RESTARTS: RestartPolicyName[] = ['no', 'always', 'on-failure', 'unless-stopped'];
 const restartChanged = computed(
-  () => ip.value.restart.name !== baseIp.value.restart.name || ip.value.restart.maxRetries !== baseIp.value.restart.maxRetries,
+  () =>
+    ip.value.restart.name !== baseIp.value.restart.name ||
+    ip.value.restart.maxRetries !== baseIp.value.restart.maxRetries,
 );
 
 function setCpus(v: string | number): void {
@@ -54,7 +66,9 @@ function setRestart(v: unknown): void {
   if (ip.value.restart.name !== 'on-failure') ip.value.restart.maxRetries = 0;
 }
 
-const available = computed(() => props.allNetworks.filter((n) => !ip.value.networks.some((x) => x.name === n)));
+const available = computed(() =>
+  props.allNetworks.filter((n) => !ip.value.networks.some((x) => x.name === n)),
+);
 const toAdd = ref('');
 
 function addNetwork(): void {
@@ -69,10 +83,15 @@ function removeNetwork(name: string): void {
 
 function setAliases(name: string, text: string): void {
   const n = ip.value.networks.find((x) => x.name === name);
-  if (n) n.aliases = text.split(',').map((a) => a.trim()).filter(Boolean);
+  if (n)
+    n.aliases = text
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean);
 }
 
-const noAliases = (name: string): boolean => name === 'bridge' || name === 'host' || name === 'none';
+const noAliases = (name: string): boolean =>
+  name === 'bridge' || name === 'host' || name === 'none';
 const netChanged = (name: string): boolean => {
   const b = baseIp.value.networks.find((n) => n.name === name);
   const d = ip.value.networks.find((n) => n.name === name);
@@ -82,13 +101,30 @@ const netChanged = (name: string): boolean => {
 
 <template>
   <div class="grid grid-cols-1 gap-3 @2xl:grid-cols-2" data-testid="docker-edit-inplace">
-    <EditField field="name" :label="t('common.field.name.label')" mode="now" :changed="ip.name !== baseIp.name" :error="errors.name">
+    <EditField
+      field="name"
+      :label="t('common.field.name.label')"
+      mode="now"
+      :changed="ip.name !== baseIp.name"
+      :error="errors.name"
+    >
       <Input v-model="ip.name" :disabled="disabled" data-testid="docker-edit-name" />
     </EditField>
 
-    <EditField field="restart" :label="t('docker.field.restartPolicy.label')" mode="now" :changed="restartChanged" :error="errors.restart">
+    <EditField
+      field="restart"
+      :label="t('docker.field.restartPolicy.label')"
+      mode="now"
+      :changed="restartChanged"
+      :error="errors.restart"
+    >
       <div class="flex items-center gap-2">
-        <NativeSelect :model-value="ip.restart.name" :disabled="disabled" data-testid="docker-edit-restart" @update:model-value="setRestart">
+        <NativeSelect
+          :model-value="ip.restart.name"
+          :disabled="disabled"
+          data-testid="docker-edit-restart"
+          @update:model-value="setRestart"
+        >
           <option v-for="r in RESTARTS" :key="r" :value="r">{{ r }}</option>
         </NativeSelect>
         <Input
@@ -114,47 +150,175 @@ const netChanged = (name: string): boolean => {
       :error="err('nanoCpus')"
       :hint="cpuHint"
     >
-      <Input type="number" min="0" step="0.1" :placeholder="t('docker.edit.noLimit.placeholder')" :model-value="cpusText" :disabled="disabled" data-testid="docker-edit-cpus" @update:model-value="setCpus" />
+      <Input
+        type="number"
+        min="0"
+        step="0.1"
+        :placeholder="t('docker.edit.noLimit.placeholder')"
+        :model-value="cpusText"
+        :disabled="disabled"
+        data-testid="docker-edit-cpus"
+        @update:model-value="setCpus"
+      />
     </EditField>
     <template v-else>
-      <EditField field="cpuQuota" :label="t('docker.edit.cpuQuota.label')" :mode="mode('cpuQuota')" :changed="changed('cpuQuota')" :error="err('cpuQuota')">
-        <Input type="number" min="0" :model-value="res.cpuQuota" :disabled="disabled" data-testid="docker-edit-cpu-quota" @update:model-value="res.cpuQuota = toNumber($event)" />
+      <EditField
+        field="cpuQuota"
+        :label="t('docker.edit.cpuQuota.label')"
+        :mode="mode('cpuQuota')"
+        :changed="changed('cpuQuota')"
+        :error="err('cpuQuota')"
+      >
+        <Input
+          type="number"
+          min="0"
+          :model-value="res.cpuQuota"
+          :disabled="disabled"
+          data-testid="docker-edit-cpu-quota"
+          @update:model-value="res.cpuQuota = toNumber($event)"
+        />
       </EditField>
-      <EditField field="cpuPeriod" :label="t('docker.edit.cpuPeriod.label')" :mode="mode('cpuPeriod')" :changed="changed('cpuPeriod')" :error="err('cpuPeriod')">
-        <Input type="number" min="0" :model-value="res.cpuPeriod" :disabled="disabled" data-testid="docker-edit-cpu-period" @update:model-value="res.cpuPeriod = toNumber($event)" />
+      <EditField
+        field="cpuPeriod"
+        :label="t('docker.edit.cpuPeriod.label')"
+        :mode="mode('cpuPeriod')"
+        :changed="changed('cpuPeriod')"
+        :error="err('cpuPeriod')"
+      >
+        <Input
+          type="number"
+          min="0"
+          :model-value="res.cpuPeriod"
+          :disabled="disabled"
+          data-testid="docker-edit-cpu-period"
+          @update:model-value="res.cpuPeriod = toNumber($event)"
+        />
       </EditField>
     </template>
 
-    <EditField field="cpuShares" :label="t('docker.edit.cpuShares.label')" :mode="mode('cpuShares')" :changed="changed('cpuShares')" :error="err('cpuShares')">
-      <Input type="number" min="0" :placeholder="t('common.state.default.option')" :model-value="res.cpuShares || ''" :disabled="disabled" data-testid="docker-edit-cpu-shares" @update:model-value="res.cpuShares = toNumber($event)" />
+    <EditField
+      field="cpuShares"
+      :label="t('docker.edit.cpuShares.label')"
+      :mode="mode('cpuShares')"
+      :changed="changed('cpuShares')"
+      :error="err('cpuShares')"
+    >
+      <Input
+        type="number"
+        min="0"
+        :placeholder="t('common.state.default.option')"
+        :model-value="res.cpuShares || ''"
+        :disabled="disabled"
+        data-testid="docker-edit-cpu-shares"
+        @update:model-value="res.cpuShares = toNumber($event)"
+      />
     </EditField>
 
-    <EditField field="cpusetCpus" :label="t('docker.edit.cpuset.label')" :mode="mode('cpusetCpus')" :changed="changed('cpusetCpus')" :error="err('cpusetCpus')" :hint="cpusetHint">
-      <Input v-model="res.cpusetCpus" :placeholder="t('docker.edit.cpusetCpus.example')" :disabled="disabled" data-testid="docker-edit-cpuset-cpus" />
+    <EditField
+      field="cpusetCpus"
+      :label="t('docker.edit.cpuset.label')"
+      :mode="mode('cpusetCpus')"
+      :changed="changed('cpusetCpus')"
+      :error="err('cpusetCpus')"
+      :hint="cpusetHint"
+    >
+      <Input
+        v-model="res.cpusetCpus"
+        :placeholder="t('docker.edit.cpusetCpus.example')"
+        :disabled="disabled"
+        data-testid="docker-edit-cpuset-cpus"
+      />
     </EditField>
 
-    <EditField field="cpusetMems" :label="t('docker.edit.cpusetMems.label')" :mode="mode('cpusetMems')" :changed="changed('cpusetMems')" :error="err('cpusetMems')">
-      <Input v-model="res.cpusetMems" :placeholder="t('docker.edit.cpusetMems.example')" :disabled="disabled" data-testid="docker-edit-cpuset-mems" />
+    <EditField
+      field="cpusetMems"
+      :label="t('docker.edit.cpusetMems.label')"
+      :mode="mode('cpusetMems')"
+      :changed="changed('cpusetMems')"
+      :error="err('cpusetMems')"
+    >
+      <Input
+        v-model="res.cpusetMems"
+        :placeholder="t('docker.edit.cpusetMems.example')"
+        :disabled="disabled"
+        data-testid="docker-edit-cpuset-mems"
+      />
     </EditField>
 
-    <EditField field="memory" :label="t('common.module.memory.label')" :mode="mode('memory')" :changed="changed('memory')" :error="err('memory')">
+    <EditField
+      field="memory"
+      :label="t('common.module.memory.label')"
+      :mode="mode('memory')"
+      :changed="changed('memory')"
+      :error="err('memory')"
+    >
       <EditSize v-model="res.memory" :disabled="disabled" testid="docker-edit-memory" />
     </EditField>
 
-    <EditField field="memoryReservation" :label="t('docker.edit.memoryReservation.label')" :mode="mode('memoryReservation')" :changed="changed('memoryReservation')" :error="err('memoryReservation')">
-      <EditSize v-model="res.memoryReservation" :disabled="disabled" testid="docker-edit-reservation" />
+    <EditField
+      field="memoryReservation"
+      :label="t('docker.edit.memoryReservation.label')"
+      :mode="mode('memoryReservation')"
+      :changed="changed('memoryReservation')"
+      :error="err('memoryReservation')"
+    >
+      <EditSize
+        v-model="res.memoryReservation"
+        :disabled="disabled"
+        testid="docker-edit-reservation"
+      />
     </EditField>
 
-    <EditField field="memorySwap" :label="t('docker.edit.swap.label')" :mode="mode('memorySwap')" :changed="changed('memorySwap')" :error="err('memorySwap')" :hint="t('docker.edit.swap.hint')">
-      <EditSize v-model="res.memorySwap" allow-unlimited :disabled="disabled" testid="docker-edit-swap" />
+    <EditField
+      field="memorySwap"
+      :label="t('docker.edit.swap.label')"
+      :mode="mode('memorySwap')"
+      :changed="changed('memorySwap')"
+      :error="err('memorySwap')"
+      :hint="t('docker.edit.swap.hint')"
+    >
+      <EditSize
+        v-model="res.memorySwap"
+        allow-unlimited
+        :disabled="disabled"
+        testid="docker-edit-swap"
+      />
     </EditField>
 
-    <EditField field="blkioWeight" :label="t('docker.edit.blkio.label')" :mode="mode('blkioWeight')" :changed="changed('blkioWeight')" :error="err('blkioWeight')">
-      <Input type="number" min="0" :placeholder="t('common.state.default.option')" :model-value="res.blkioWeight || ''" :disabled="disabled" data-testid="docker-edit-blkio" @update:model-value="res.blkioWeight = toNumber($event)" />
+    <EditField
+      field="blkioWeight"
+      :label="t('docker.edit.blkio.label')"
+      :mode="mode('blkioWeight')"
+      :changed="changed('blkioWeight')"
+      :error="err('blkioWeight')"
+    >
+      <Input
+        type="number"
+        min="0"
+        :placeholder="t('common.state.default.option')"
+        :model-value="res.blkioWeight || ''"
+        :disabled="disabled"
+        data-testid="docker-edit-blkio"
+        @update:model-value="res.blkioWeight = toNumber($event)"
+      />
     </EditField>
 
-    <EditField field="pidsLimit" :label="t('docker.edit.pids.label')" :mode="mode('pidsLimit')" :changed="changed('pidsLimit')" :error="err('pidsLimit')">
-      <Input type="number" min="0" :placeholder="t('docker.edit.unlimited.label')" :model-value="res.pidsLimit || ''" :disabled="disabled" data-testid="docker-edit-pids" @update:model-value="res.pidsLimit = toNumber($event)" />
+    <EditField
+      field="pidsLimit"
+      :label="t('docker.edit.pids.label')"
+      :mode="mode('pidsLimit')"
+      :changed="changed('pidsLimit')"
+      :error="err('pidsLimit')"
+    >
+      <Input
+        type="number"
+        min="0"
+        :placeholder="t('docker.edit.unlimited.label')"
+        :model-value="res.pidsLimit || ''"
+        :disabled="disabled"
+        data-testid="docker-edit-pids"
+        @update:model-value="res.pidsLimit = toNumber($event)"
+      />
     </EditField>
 
     <EditField
@@ -167,7 +331,13 @@ const netChanged = (name: string): boolean => {
       class="@2xl:col-span-2"
     >
       <div class="flex flex-col gap-1.5" data-testid="docker-edit-networks">
-        <div v-for="n in ip.networks" :key="n.name" class="flex items-center gap-2" data-testid="docker-edit-network" :data-name="n.name">
+        <div
+          v-for="n in ip.networks"
+          :key="n.name"
+          class="flex items-center gap-2"
+          data-testid="docker-edit-network"
+          :data-name="n.name"
+        >
           <span class="w-40 shrink-0 truncate font-data">{{ n.name }}</span>
           <Input
             class="min-w-0 flex-1"
@@ -183,14 +353,34 @@ const netChanged = (name: string): boolean => {
             </TooltipTrigger>
             <TooltipContent>{{ t('docker.edit.staticAddress.tooltip') }}</TooltipContent>
           </Tooltip>
-          <TooltipIconButton icon="trash" :label="t('docker.edit.detach.tooltip')" :disabled="disabled || networkLocked" data-testid="docker-edit-network-remove" @click="removeNetwork(n.name)" />
+          <TooltipIconButton
+            icon="trash"
+            :label="t('docker.edit.detach.tooltip')"
+            :disabled="disabled || networkLocked"
+            data-testid="docker-edit-network-remove"
+            @click="removeNetwork(n.name)"
+          />
         </div>
         <div class="flex items-center gap-2">
-          <NativeSelect v-model="toAdd" class="w-48" :disabled="disabled || networkLocked" data-testid="docker-edit-network-select">
+          <NativeSelect
+            v-model="toAdd"
+            class="w-48"
+            :disabled="disabled || networkLocked"
+            data-testid="docker-edit-network-select"
+          >
             <option value="">{{ t('docker.edit.attachNetwork.option') }}</option>
             <option v-for="n in available" :key="n" :value="n">{{ n }}</option>
           </NativeSelect>
-          <Button size="kira" variant="toolbar" :disabled="disabled || networkLocked || !toAdd" data-testid="docker-edit-network-add" @click="addNetwork">{{ t('docker.edit.attach.label') }}</Button>
+          <Button
+            size="kira"
+            variant="toolbar"
+            :disabled="disabled || networkLocked || !toAdd"
+            data-testid="docker-edit-network-add"
+            @click="addNetwork"
+            >{{
+              t('docker.edit.attach.label')
+            }}</Button
+          >
         </div>
       </div>
     </EditField>

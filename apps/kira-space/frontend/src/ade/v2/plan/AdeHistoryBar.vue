@@ -19,7 +19,9 @@ function onDate(e: Event): void {
     data-testid="ade-history-bar"
   >
     <span class="font-medium">{{ t('common.module.history.label') }}</span>
-    <Label for="ade-go-to-date" class="text-muted-foreground">{{ t('space.ade.plan.history.goTo.label') }}</Label>
+    <Label for="ade-go-to-date" class="text-muted-foreground">{{
+      t('space.ade.plan.history.goTo.label')
+    }}</Label>
     <Input
       id="ade-go-to-date"
       type="date"
@@ -32,7 +34,12 @@ function onDate(e: Event): void {
     <Button variant="dialog" size="kira-lg" data-testid="ade-hide-history" @click="emit('hide')">
       {{ t('space.ade.plan.history.hide.label') }}
     </Button>
-    <Button variant="dialog-primary" size="kira-lg" data-testid="ade-current-work" @click="emit('current')">
+    <Button
+      variant="dialog-primary"
+      size="kira-lg"
+      data-testid="ade-current-work"
+      @click="emit('current')"
+    >
       {{ t('space.ade.plan.history.current.label') }}
     </Button>
   </div>

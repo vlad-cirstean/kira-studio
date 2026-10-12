@@ -50,37 +50,49 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
     data-testid="text-prompt"
   >
     <FocusScope as-child trapped loop>
-    <div
-      role="dialog"
-      aria-modal="true"
-      :aria-labelledby="titleId"
-      class="w-100 max-w-[90vw] flex flex-col overflow-hidden rounded-kira-pill bg-elevated text-fg text-kira-md ring-1 ring-fg/10"
-    >
-      <div :class="dialogHeaderClass">
-        <div :id="titleId" class="text-kira-lg">{{ title }}</div>
-      </div>
-      <div :class="dialogBodyClass">
-      <Input
-        ref="inputRef"
-        :model-value="modelValue"
-        size="kira-lg"
+      <div
+        role="dialog"
+        aria-modal="true"
         :aria-labelledby="titleId"
-        data-testid="text-prompt-input"
-        @update:model-value="emit('update:modelValue', String($event))"
-        @keydown="wrapSelectionOnType"
-        @keydown.enter="(e: KeyboardEvent) => !e.isComposing && emit('submit')"
-        @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('cancel')"
-      />
+        class="w-100 max-w-[90vw] flex flex-col overflow-hidden rounded-kira-pill bg-elevated text-fg text-kira-md ring-1 ring-fg/10"
+      >
+        <div :class="dialogHeaderClass">
+          <div :id="titleId" class="text-kira-lg">{{ title }}</div>
+        </div>
+        <div :class="dialogBodyClass">
+          <Input
+            ref="inputRef"
+            :model-value="modelValue"
+            size="kira-lg"
+            :aria-labelledby="titleId"
+            data-testid="text-prompt-input"
+            @update:model-value="emit('update:modelValue', String($event))"
+            @keydown="wrapSelectionOnType"
+            @keydown.enter="(e: KeyboardEvent) => !e.isComposing && emit('submit')"
+            @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('cancel')"
+          />
+        </div>
+        <div :class="dialogFooterClass">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="text-prompt-cancel"
+            @click="emit('cancel')"
+            >{{
+              t('common.action.cancel.label')
+            }}</Button
+          >
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="text-prompt-ok"
+            @click="emit('submit')"
+            >{{
+              t('common.action.save.label')
+            }}</Button
+          >
+        </div>
       </div>
-      <div :class="dialogFooterClass">
-        <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="emit('cancel')"
-          >{{ t('common.action.cancel.label') }}</Button
-        >
-        <Button variant="dialog-primary" size="kira-lg" data-testid="text-prompt-ok" @click="emit('submit')"
-          >{{ t('common.action.save.label') }}</Button
-        >
-      </div>
-    </div>
     </FocusScope>
   </div>
 </template>

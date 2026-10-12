@@ -62,10 +62,14 @@ function stashRowModel(entry: StashEntry): StashRowModel {
   const origin = originLabel(entry, props.currentBranch);
   return {
     id: `stash:${entry.sha}`,
-    rowTooltip: t('git.stash.base.tooltip', { sha: shortSha(entry.baseSha), subject: entry.baseSubject }),
+    rowTooltip: t('git.stash.base.tooltip', {
+      sha: shortSha(entry.baseSha),
+      subject: entry.baseSubject,
+    }),
     badge: `stash@{${entry.index}}`,
     origin,
-    originTooltip: origin === undefined ? undefined : t('git.stash.stashedFrom.tooltip', { origin }),
+    originTooltip:
+      origin === undefined ? undefined : t('git.stash.stashedFrom.tooltip', { origin }),
     auto: isAutoStash(entry),
     message: stashLabel(entry),
     messageTooltip: entry.message,
@@ -118,4 +122,3 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
     />
   </section>
 </template>
-

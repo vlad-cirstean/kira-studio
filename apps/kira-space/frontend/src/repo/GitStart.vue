@@ -9,8 +9,17 @@ const reposDialog = useReposDialogStore();
 </script>
 
 <template>
-  <ModuleStart icon="source-control" :title="t('space.repo.noRepoOpen.empty')" data-testid="git-start">
-    <Button variant="dialog-primary" size="kira-lg" data-testid="git-start-import" @click="reposDialog.show()">
+  <ModuleStart
+    icon="source-control"
+    :title="t('space.repo.noRepoOpen.empty')"
+    data-testid="git-start"
+  >
+    <Button
+      variant="dialog-primary"
+      size="kira-lg"
+      data-testid="git-start-import"
+      @click="reposDialog.show()"
+    >
       <CodiconIcon name="repo" :size="13" />
       {{ t('space.repo.manage.label') }}
     </Button>

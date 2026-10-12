@@ -1,51 +1,54 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue'
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from '@theme/components/ui/input-group'
-import { t } from '@theme/i18n'
-import { useTemplateRef } from 'vue'
+} from '@theme/components/ui/input-group';
+import { t } from '@theme/i18n';
+import { useTemplateRef } from 'vue';
 
 // P262 §2.5: the one search/filter text box. Attrs (data-testid, @keydown, @keydown.enter, ...) land
 // on the <input>. Esc clears a non-empty value and stops there; an empty field lets Esc bubble so
 // the surrounding surface (dialog, popover, find bar) still closes. Callers focus via the exposed
 // focus() (biome noAutofocus forbids the attribute).
-defineOptions({ inheritAttrs: false })
+defineOptions({ inheritAttrs: false });
 
-const props = withDefaults(defineProps<{
-  modelValue: string
-  placeholder?: string
-  ariaLabel?: string
-  size?: 'kira' | 'kira-lg'
-}>(), {
-  placeholder: () => t('common.action.search.label'),
-  ariaLabel: undefined,
-  size: 'kira',
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    placeholder?: string;
+    ariaLabel?: string;
+    size?: 'kira' | 'kira-lg';
+  }>(),
+  {
+    placeholder: () => t('common.action.search.label'),
+    ariaLabel: undefined,
+    size: 'kira',
+  },
+);
 
-const emit = defineEmits<(e: 'update:modelValue', value: string) => void>()
+const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
 
-const input = useTemplateRef<{ $el: HTMLInputElement }>('input')
+const input = useTemplateRef<{ $el: HTMLInputElement }>('input');
 
 function focus(): void {
-  input.value?.$el.focus()
+  input.value?.$el.focus();
 }
 
 function onEscape(e: KeyboardEvent): void {
-  if (e.isComposing || props.modelValue === '') return
-  e.stopPropagation()
-  emit('update:modelValue', '')
+  if (e.isComposing || props.modelValue === '') return;
+  e.stopPropagation();
+  emit('update:modelValue', '');
 }
 
 function clear(): void {
-  emit('update:modelValue', '')
-  focus()
+  emit('update:modelValue', '');
+  focus();
 }
 
-defineExpose({ focus })
+defineExpose({ focus });
 </script>
 
 <template>
@@ -64,7 +67,12 @@ defineExpose({ focus })
       @keydown.escape="onEscape"
     />
     <InputGroupAddon v-if="modelValue !== ''" align="inline-end">
-      <InputGroupButton size="icon-xs" class="size-4" :aria-label="t('common.action.clearSearch.label')" @click="clear">
+      <InputGroupButton
+        size="icon-xs"
+        class="size-4"
+        :aria-label="t('common.action.clearSearch.label')"
+        @click="clear"
+      >
         <CodiconIcon name="close" :size="12" />
       </InputGroupButton>
     </InputGroupAddon>

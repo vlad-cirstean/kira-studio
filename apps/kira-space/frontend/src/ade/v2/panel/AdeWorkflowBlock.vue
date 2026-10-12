@@ -23,7 +23,9 @@ const setWorkflow = useSetTaskWorkflow();
 const error = ref('');
 
 const valid = computed(() =>
-  (workflows.data.value?.workflows ?? []).flatMap((e) => (e.workflow ? [{ file: e.fileName, wf: e.workflow }] : [])),
+  (workflows.data.value?.workflows ?? []).flatMap((e) =>
+    e.workflow ? [{ file: e.fileName, wf: e.workflow }] : [],
+  ),
 );
 const spaceTools = useSpaceTools(() => props.card.task.workflowId);
 
@@ -46,7 +48,9 @@ function edit(): void {
   <div class="flex flex-col gap-1.5" data-testid="ade-workflow-block">
     <div class="flex items-center gap-2">
       <span class="text-kira-sm text-muted-foreground">{{ t('space.common.workflow.label') }}</span>
-      <Label for="ade-workflow-select" class="sr-only">{{ t('space.common.workflow.label') }}</Label>
+      <Label for="ade-workflow-select" class="sr-only">{{
+        t('space.common.workflow.label')
+      }}</Label>
       <NativeSelect
         id="ade-workflow-select"
         variant="bordered"
@@ -54,18 +58,24 @@ function edit(): void {
         data-testid="ade-workflow-select"
         @update:model-value="pick"
       >
-        <option v-if="card.task.workflowId === ''" value="">{{ t('space.ade.workflowBlock.choose.option') }}</option>
+        <option v-if="card.task.workflowId === ''" value="">{{
+          t('space.ade.workflowBlock.choose.option')
+        }}</option>
         <option v-for="v in valid" :key="v.wf.id" :value="v.wf.id">{{ v.wf.name }}</option>
       </NativeSelect>
       <Tooltip v-if="card.task.workflowOutdated">
         <TooltipTrigger as-child>
-          <Badge variant="warn" data-testid="ade-workflow-outdated">{{ t('space.ade.workflowBlock.outdated.status') }}</Badge>
+          <Badge variant="warn" data-testid="ade-workflow-outdated">{{
+            t('space.ade.workflowBlock.outdated.status')
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ t('space.ade.workflowBlock.outdatedHint.hint') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="spaceTools">
         <TooltipTrigger as-child>
-          <Badge variant="info" data-testid="ade-workflow-space">{{ t('space.ade.workflowBlock.spaceTools.label') }}</Badge>
+          <Badge variant="info" data-testid="ade-workflow-space">{{
+            t('space.ade.workflowBlock.spaceTools.label')
+          }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ t('space.ade.workflowBlock.spaceToolsHint.hint') }}</TooltipContent>
       </Tooltip>

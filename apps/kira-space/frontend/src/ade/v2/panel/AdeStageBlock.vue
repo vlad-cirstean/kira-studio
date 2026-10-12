@@ -43,7 +43,12 @@ const mainNameOf = (codeRepoId: string): string =>
 const error = ref('');
 const openLog = ref<string | null>(null);
 
-const STATE_TONE: Record<StageBlock['state'], Tone> = { done: 'green', now: 'amber', next: 'grey', skipped: 'grey' };
+const STATE_TONE: Record<StageBlock['state'], Tone> = {
+  done: 'green',
+  now: 'amber',
+  next: 'grey',
+  skipped: 'grey',
+};
 const current = computed(() => props.block.state === 'now');
 const skipped = computed(() => props.block.state === 'skipped');
 
@@ -93,7 +98,9 @@ const reportRun = (runId: string) => {
   return r?.outcome?.report && (r.state === 'failed' || r.state === 'stuck') ? r : undefined;
 };
 const heldRow = (rl: { run: { branchId: string }; note: string }) =>
-  WAITING_SETUP_NOTES.includes(rl.note) ? props.card.rows.find((r) => r.id === rl.run.branchId) : undefined;
+  WAITING_SETUP_NOTES.includes(rl.note)
+    ? props.card.rows.find((r) => r.id === rl.run.branchId)
+    : undefined;
 const STATE_LABEL = {
   done: 'common.done.status',
   now: 'common.now.status',
@@ -109,7 +116,13 @@ const GLYPH_BOX: Record<string, string> = {
   running: 'border border-tone-amber-solid text-tone-amber-solid',
   pending: 'border border-border-strong text-subtle',
 };
-const STEP_GLYPH: Record<string, string> = { done: '✓', running: '●', stuck: '!', failed: '✕', pending: '' };
+const STEP_GLYPH: Record<string, string> = {
+  done: '✓',
+  running: '●',
+  stuck: '!',
+  failed: '✕',
+  pending: '',
+};
 const glyphClass = (state: string): string => GLYPH_BOX[state] ?? GLYPH_BOX.pending ?? '';
 const TEXT_TONE: Record<string, string> = {
   stuck: 'text-tone-red',
@@ -128,7 +141,9 @@ async function run(fn: () => Promise<unknown>): Promise<void> {
   }
 }
 const onApprove = (stepId: string): Promise<void> =>
-  run(() => approve.mutateAsync({ taskId: props.card.task.id, stageId: props.block.stage.id, stepId }));
+  run(() =>
+    approve.mutateAsync({ taskId: props.card.task.id, stageId: props.block.stage.id, stepId }),
+  );
 const onRetry = (runId: string): Promise<void> => run(() => retry.mutateAsync({ runId }));
 
 const canTakeOver = (r: StepRun): boolean =>
@@ -137,9 +152,7 @@ const canTakeOver = (r: StepRun): boolean =>
   (r.state === 'stuck' || r.state === 'failed' || r.state === 'running');
 
 const released = computed(() =>
-  props.block.release
-    ? props.card.rows.filter((r) => r.branch.kind === 'mine' && !r.draft)
-    : [],
+  props.block.release ? props.card.rows.filter((r) => r.branch.kind === 'mine' && !r.draft) : [],
 );
 const reviewRows = computed(() =>
   props.block.stage.id === 'review' ? props.card.rows.filter((r) => r.branch.kind === 'mine') : [],
@@ -158,11 +171,14 @@ const mainBadge = (b: CardModel['rows'][number]['branch']): string => {
     ? t('space.ade.progress.stageDone.label', { name: main })
     : t('space.ade.stageBlock.mainOpen.status', { main });
 };
-const chipClass = (tone: 'muted' | 'stale' | 'unknown'): string => (tone === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
+const chipClass = (tone: 'muted' | 'stale' | 'unknown'): string =>
+  tone === 'stale' ? 'text-tone-amber' : 'text-muted-foreground';
 function logToggleLabel(runId: string): string {
   const open = openLog.value === runId;
   if (props.block.stage.kind === 'script') {
-    return open ? t('space.ade.stageBlock.hideOutput.label') : t('space.ade.stageBlock.output.label');
+    return open
+      ? t('space.ade.stageBlock.hideOutput.label')
+      : t('space.ade.stageBlock.output.label');
   }
   return open ? t('space.common.hideLog.label') : t('space.ade.needsPage.log.label');
 }
@@ -178,12 +194,30 @@ function logToggleLabel(runId: string): string {
     :data-state="block.state"
   >
     <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header holds nested interactive controls. -->
-    <div class="flex min-h-6 items-center gap-2" data-testid="ade-stage-block-head" @contextmenu="onMenu">
-      <AdeChip :label="stateLabel(block.state)" :tone="STATE_TONE[block.state]" class="min-w-10 text-center" />
+    <div
+      class="flex min-h-6 items-center gap-2"
+      data-testid="ade-stage-block-head"
+      @contextmenu="onMenu"
+    >
+      <AdeChip
+        :label="stateLabel(block.state)"
+        :tone="STATE_TONE[block.state]"
+        class="min-w-10 text-center"
+      />
       <slot name="action" />
-      <span class="text-kira-lg font-medium" data-testid="ade-stage-block-name">{{ block.stage.name }}</span>
-      <span class="font-data text-kira-md font-medium text-tone-amber" data-testid="ade-stage-block-count">{{ block.count }}</span>
-      <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-stage-block-mode">{{ block.mode }}</span>
+      <span class="text-kira-lg font-medium" data-testid="ade-stage-block-name">{{
+        block.stage.name
+      }}</span>
+      <span
+        class="font-data text-kira-md font-medium text-tone-amber"
+        data-testid="ade-stage-block-count"
+        >{{
+          block.count
+        }}</span
+      >
+      <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-stage-block-mode">{{
+        block.mode
+      }}</span>
     </div>
 
     <div
@@ -197,12 +231,20 @@ function logToggleLabel(runId: string): string {
         <span
           class="box-border flex size-4 shrink-0 items-center justify-center rounded-kira-sm text-kira-sm font-extrabold"
           :class="glyphClass(sv.step.state)"
-          >{{ STEP_GLYPH[sv.step.state] }}</span
+          >{{
+            STEP_GLYPH[sv.step.state]
+          }}</span
         >
-        <span class="shrink-0 whitespace-nowrap text-kira-sm" :class="statusClass(sv.step.state)" data-testid="ade-step-status">{{
-          sv.statusText
-        }}</span>
-        <Button variant="dialog"
+        <span
+          class="shrink-0 whitespace-nowrap text-kira-sm"
+          :class="statusClass(sv.step.state)"
+          data-testid="ade-step-status"
+          >{{
+            sv.statusText
+          }}</span
+        >
+        <Button
+          variant="dialog"
           v-if="sv.step.approval"
           size="kira"
           class="shrink-0 "
@@ -217,28 +259,59 @@ function logToggleLabel(runId: string): string {
           class="min-w-0 flex-1 truncate text-kira-md font-medium"
           :class="sv.step.state === 'done' ? 'text-subtle' : 'text-fg'"
           data-testid="ade-step-name"
-          >{{ sv.step.name }}</span
+          >{{
+            sv.step.name
+          }}</span
         >
         <SmartBadge v-if="sv.step.smartScript" />
-        <span v-if="sv.routeText" data-testid="ade-step-route" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue">{{ sv.routeText }}</span>
-        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">{{ t('space.ade.stageBlock.needsApproval.status') }}</span>
+        <span
+          v-if="sv.routeText"
+          data-testid="ade-step-route"
+          class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue"
+          >{{
+            sv.routeText
+          }}</span
+        >
+        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">{{
+          t('space.ade.stageBlock.needsApproval.status')
+        }}</span>
         <AdeTip :text="sv.scope">
           <span
             class="min-w-0 shrink truncate text-kira-sm text-subtle"
             :class="block.stage.kind === 'script' ? 'font-data' : ''"
             data-testid="ade-step-scope"
-            >{{ sv.scope }}</span
+            >{{
+              sv.scope
+            }}</span
           >
         </AdeTip>
       </div>
       <template v-for="rl in sv.runs" :key="rl.run.branchId">
-        <div class="flex min-h-control items-center gap-1.75 pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
-          <span class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold" :class="TONE_TEXT_CLASS[rl.tone]" data-testid="ade-run-glyph">{{ rl.glyph }}</span>
+        <div
+          class="flex min-h-control items-center gap-1.75 pl-6"
+          data-testid="ade-run-line"
+          :data-branch-id="rl.run.branchId"
+        >
+          <span
+            class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold"
+            :class="TONE_TEXT_CLASS[rl.tone]"
+            data-testid="ade-run-glyph"
+            >{{
+              rl.glyph
+            }}</span
+          >
           <AdeRepoTag
             :code-repo-id="card.rows.find((r) => r.id === rl.run.branchId)?.branch.codeRepoId ?? ''"
             :label="card.rows.find((r) => r.id === rl.run.branchId)?.repo ?? ''"
           />
-          <span class="w-16 shrink-0 whitespace-nowrap text-kira-sm" :class="TONE_TEXT_CLASS[rl.tone]" data-testid="ade-run-status">{{ rl.status }}</span>
+          <span
+            class="w-16 shrink-0 whitespace-nowrap text-kira-sm"
+            :class="TONE_TEXT_CLASS[rl.tone]"
+            data-testid="ade-run-status"
+            >{{
+              rl.status
+            }}</span
+          >
           <Button
             v-if="rl.hasLog"
             variant="dialog"
@@ -249,7 +322,8 @@ function logToggleLabel(runId: string): string {
           >
             {{ logToggleLabel(rl.run.runId) }}
           </Button>
-          <Button variant="dialog"
+          <Button
+            variant="dialog"
             v-if="canTakeOver(rl.run)"
             size="kira"
             class="shrink-0 "
@@ -260,7 +334,8 @@ function logToggleLabel(runId: string): string {
           >
             {{ t('common.action.takeOver.label') }}
           </Button>
-          <Button variant="dialog"
+          <Button
+            variant="dialog"
             v-if="rl.canRetry"
             size="kira"
             class="shrink-0 "
@@ -271,7 +346,13 @@ function logToggleLabel(runId: string): string {
             {{ t('common.action.retry.label') }}
           </Button>
           <AdeTip v-if="rl.note" :text="rl.note">
-            <span class="min-w-0 truncate text-kira-sm text-muted-foreground" data-testid="ade-run-note">{{ rl.note }}</span>
+            <span
+              class="min-w-0 truncate text-kira-sm text-muted-foreground"
+              data-testid="ade-run-note"
+              >{{
+                rl.note
+              }}</span
+            >
           </AdeTip>
         </div>
         <AdeSetupProgress
@@ -303,9 +384,17 @@ function logToggleLabel(runId: string): string {
       :data-branch-id="row.id"
       @click="ui.selectBranch(card.task.id, row.id)"
     >
-      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-medium" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{ mainBadge(row.branch) }}</span>
+      <span
+        class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-medium"
+        :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']"
+        >{{
+          mainBadge(row.branch)
+        }}</span
+      >
       <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-        <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{ c.label }}</span>
+        <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
+          c.label
+        }}</span>
       </AdeTip>
       <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
       <span class="min-w-0 truncate font-data text-kira-md">{{ row.name }}</span>

@@ -68,7 +68,8 @@ function onMenuSelect(entry: StashEntry, id: string): void {
 </script>
 
 <template>
-  <div data-testid="branch-row"
+  <div
+    data-testid="branch-row"
     v-for="entry in section.visible"
     :key="entry.sha"
     class="flex items-center gap-0.5 px-1"
@@ -76,26 +77,49 @@ function onMenuSelect(entry: StashEntry, id: string): void {
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
-    <button data-testid="branch-row-main"
+    <button
+      data-testid="branch-row-main"
       type="button"
       :class="cn(rowVariants({ selected: stash.selectedSha.value === entry.sha }), 'flex-1 min-w-0 text-left')"
       @click="select(entry)"
     >
       <CodiconIcon name="archive" :size="13" />
-      <span v-if="rowModel(entry).badge" class="whitespace-nowrap font-data">{{ rowModel(entry).badge }}</span>
+      <span v-if="rowModel(entry).badge" class="whitespace-nowrap font-data">{{
+        rowModel(entry).badge
+      }}</span>
       <Badge
         v-if="rowModel(entry).origin"
         variant="info"
         :data-kira-tip="rowModel(entry).originTooltip"
-        >{{ rowModel(entry).origin }}</Badge
+        >{{
+          rowModel(entry).origin
+        }}</Badge
       >
-      <Badge v-if="rowModel(entry).auto" :data-kira-tip="t('git.stash.auto.hint')"
-        >{{ t('git.stash.auto.label') }}</Badge
+      <Badge v-if="rowModel(entry).auto" :data-kira-tip="t('git.stash.auto.hint')">{{
+        t('git.stash.auto.label')
+      }}</Badge>
+      <span
+        data-testid="stash-message"
+        class="flex-1 min-w-0 truncate"
+        :data-kira-tip="rowModel(entry).messageTooltip"
+        >{{
+          rowModel(entry).message
+        }}</span
       >
-      <span data-testid="stash-message" class="flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" :data-kira-tip="t('git.stash.untracked.hint')">{{ UNTRACKED_FLAG }}</span>
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ t('common.fileCount.label', { count: entry.fileCount }) }}</span>
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatAgeCompact(entry.timestamp) }}</span>
+      <span
+        v-if="entry.includedUntracked"
+        class="font-data text-kira-sm text-subtle"
+        :data-kira-tip="t('git.stash.untracked.hint')"
+        >{{
+          UNTRACKED_FLAG
+        }}</span
+      >
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{
+        t('common.fileCount.label', { count: entry.fileCount })
+      }}</span>
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{
+        formatAgeCompact(entry.timestamp)
+      }}</span>
     </button>
     <RowActionsButton
       @click="rowMenu.openFromButton($event, menuFor(entry), (id) => onMenuSelect(entry, id))"
@@ -103,5 +127,4 @@ function onMenuSelect(entry: StashEntry, id: string): void {
     />
   </div>
   <InlineState v-if="section.visible.length === 0" kind="empty">{{ emptyMessage }}</InlineState>
-
 </template>

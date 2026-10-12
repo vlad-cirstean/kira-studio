@@ -36,31 +36,39 @@ function open(row: { volume: { name: string } }): void {
         :hint="ui.search.trim() ? t('docker.volume.noMatches.emptyHint') : t('docker.volume.none.emptyHint')"
       />
     </template>
-  <VirtualList :rows="rows" testid="docker-volume-list" :open="open">
-    <template #row="{ row, nav }">
-      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
-      <div
-        :class="
+    <VirtualList :rows="rows" testid="docker-volume-list" :open="open">
+      <template #row="{ row, nav }">
+        <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+        <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
+        <div
+          :class="
           cn(
             rowVariants({ layout: 'tree', selected: ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name }),
             'group/row h-full gap-1.5',
           )
         "
-        :style="rowIndent(0)"
-        data-testid="docker-row"
-        :data-id="row.volume.name"
-        role="option"
-        :aria-selected="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name"
-        v-bind="nav"
-        @click="open(row)"
-      >
-        <CodiconIcon name="database" :size="13" class="shrink-0 text-muted-foreground" />
-        <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.volume.name }}</span>
-        <span class="flex w-6 shrink-0 justify-center"><Badge v-if="row.volume.usedBy.length > 0" variant="count">{{ row.volume.usedBy.length }}</Badge></span>
-        <span class="w-14 shrink-0 truncate text-right text-kira-sm text-muted-foreground">{{ row.volume.driver }}</span>
-      </div>
-    </template>
-  </VirtualList>
+          :style="rowIndent(0)"
+          data-testid="docker-row"
+          :data-id="row.volume.name"
+          role="option"
+          :aria-selected="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name"
+          v-bind="nav"
+          @click="open(row)"
+        >
+          <CodiconIcon name="database" :size="13" class="shrink-0 text-muted-foreground" />
+          <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            row.volume.name
+          }}</span>
+          <span class="flex w-6 shrink-0 justify-center"
+            ><Badge v-if="row.volume.usedBy.length > 0" variant="count">{{
+              row.volume.usedBy.length
+            }}</Badge></span
+          >
+          <span class="w-14 shrink-0 truncate text-right text-kira-sm text-muted-foreground">{{
+            row.volume.driver
+          }}</span>
+        </div>
+      </template>
+    </VirtualList>
   </QueryState>
 </template>

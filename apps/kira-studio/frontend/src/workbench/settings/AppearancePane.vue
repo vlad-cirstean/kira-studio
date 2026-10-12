@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLegend,
+} from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
@@ -29,7 +35,9 @@ const PREVIEW = {
   ],
 };
 
-const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowPreviewHeight = computed(() =>
+  props.draft.appearance.rowDensity === 'compact' ? 22 : 28,
+);
 
 // P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
@@ -39,17 +47,27 @@ const rowColoringId = useId();
 <template>
   <div class="contents" v-show="active">
     <FieldLegend class="pt-0">{{ t('common.typography.label') }}</FieldLegend>
-    <FontFamilyField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
+    <FontFamilyField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    />
 
     <FontSizeField
       :appearance="draft.appearance"
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
       :register-field-error="registerFieldError"
-   />
+    />
 
-    <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>{{ t('studio.settings.appearance.rowDensity.description') }}</FieldDescription>
+    <RowDensityField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    >
+      <FieldDescription>{{
+        t('studio.settings.appearance.rowDensity.description')
+      }}</FieldDescription>
       <!-- P110 B36: every cell below carries the full computed style of the old shared
            .row-preview-cell/.row-preview-gutter/.row-preview-grow/.row-preview-head rules, resolved
            per-instance rather than stacking conflicting same-property utilities (§1.3) -- the head
@@ -64,45 +82,69 @@ const rowColoringId = useId();
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-muted-foreground text-kira-sm bg-elevated"
             :style="{ height: `${rowPreviewHeight}px` }"
-         />
+          />
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
-            >{{ PREVIEW.idColumn }}</span
+            >{{
+              PREVIEW.idColumn
+            }}</span
           >
           <span
             class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-muted-foreground text-kira-sm"
             :style="{ height: `${rowPreviewHeight}px` }"
-            >{{ PREVIEW.emailColumn }}</span
+            >{{
+              PREVIEW.emailColumn
+            }}</span
           >
         </div>
         <div class="flex" :style="{ height: `${rowPreviewHeight}px` }">
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
             >1</span
           >
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
-            >{{ PREVIEW.rows[0].id }}</span
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
+            >{{
+              PREVIEW.rows[0].id
+            }}</span
           >
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
-            >{{ PREVIEW.rows[0].email }}</span
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
+            >{{
+              PREVIEW.rows[0].email
+            }}</span
           >
         </div>
         <div class="flex border-t border-border" :style="{ height: `${rowPreviewHeight}px` }">
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-sm bg-elevated font-data"
             >2</span
           >
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
-            >{{ PREVIEW.rows[1].id }}</span
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
+            >{{
+              PREVIEW.rows[1].id
+            }}</span
           >
-          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
-            >{{ PREVIEW.rows[1].email }}</span
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
+            >{{
+              PREVIEW.rows[1].email
+            }}</span
           >
         </div>
       </div>
     </RowDensityField>
 
-    <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>{{ t('studio.settings.appearance.wordWrap.description') }}</FieldDescription>
+    <WordWrapField
+      :appearance="draft.appearance"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    >
+      <FieldDescription>{{
+        t('studio.settings.appearance.wordWrap.description')
+      }}</FieldDescription>
     </WordWrapField>
 
     <FieldGroup>
@@ -114,8 +156,12 @@ const rowColoringId = useId();
           @update:model-value="(v) => onRowColoringChange(v === true)"
         />
         <FieldContent>
-          <Label :for="rowColoringId">{{ t('studio.settings.appearance.rowColoring.label') }}</Label>
-          <FieldDescription>{{ t('studio.settings.appearance.rowColoring.description') }}</FieldDescription>
+          <Label :for="rowColoringId">{{
+            t('studio.settings.appearance.rowColoring.label')
+          }}</Label>
+          <FieldDescription>{{
+            t('studio.settings.appearance.rowColoring.description')
+          }}</FieldDescription>
         </FieldContent>
       </Field>
       <TooltipIconButton
@@ -126,7 +172,7 @@ const rowColoringId = useId();
         :disabled-trigger="isAtDefault('appearance', 'rowColoring')"
         :disabled="isAtDefault('appearance', 'rowColoring')"
         @click="resetLeaf('appearance', 'rowColoring')"
-     />
+      />
     </FieldGroup>
   </div>
 </template>

@@ -45,17 +45,28 @@ useStatsSubscription(runningIds);
 const ok = computed(() => status.data.value?.state === 'ok');
 
 const sections = computed<{ id: DockerSection; label: MessageKey; count: number }[]>(() => [
-  { id: 'containers', label: 'docker.section.containers.label', count: containers.data.value?.length ?? 0 },
+  {
+    id: 'containers',
+    label: 'docker.section.containers.label',
+    count: containers.data.value?.length ?? 0,
+  },
   { id: 'images', label: 'docker.section.images.label', count: images.data.value?.length ?? 0 },
   { id: 'volumes', label: 'docker.section.volumes.label', count: volumes.data.value?.length ?? 0 },
   { id: 'networks', label: 'docker.field.networks.label', count: networks.data.value?.length ?? 0 },
 ]);
 
 const sectionItems = computed(() =>
-  sections.value.map((x) => ({ value: x.id, label: t(x.label), count: x.count, testid: `docker-section-${x.id}` })),
+  sections.value.map((x) => ({
+    value: x.id,
+    label: t(x.label),
+    count: x.count,
+    testid: `docker-section-${x.id}`,
+  })),
 );
 
-const running = computed(() => (containers.data.value ?? []).filter((c) => c.state === 'running').length);
+const running = computed(
+  () => (containers.data.value ?? []).filter((c) => c.state === 'running').length,
+);
 const stopped = computed(() => (containers.data.value?.length ?? 0) - running.value);
 
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
@@ -99,7 +110,13 @@ async function refresh(): Promise<void> {
           data-testid="docker-overview-home"
           @click="ui.select(null)"
         />
-        <TooltipIconButton icon="refresh" :label="t('common.action.refresh.label')" data-testid="docker-refresh" :disabled="refreshing" @click="refresh" />
+        <TooltipIconButton
+          icon="refresh"
+          :label="t('common.action.refresh.label')"
+          data-testid="docker-refresh"
+          :disabled="refreshing"
+          @click="refresh"
+        />
       </template>
     </PanelHeader>
     <PanelBar v-if="ok && showSearch">
@@ -115,7 +132,9 @@ async function refresh(): Promise<void> {
         >
           <template #item="{ item }">
             {{ item.label }}
-            <span class="text-kira-sm text-muted-foreground" data-testid="docker-section-count">{{ item.count }}</span>
+            <span class="text-kira-sm text-muted-foreground" data-testid="docker-section-count">{{
+              item.count
+            }}</span>
           </template>
         </SecondaryTabs>
       </PanelBar>
@@ -123,9 +142,17 @@ async function refresh(): Promise<void> {
         v-if="ui.section === 'containers'"
         class="flex h-control shrink-0 cursor-default items-center gap-1.5 border-b border-border px-1.5 text-kira-sm text-muted-foreground"
       >
-        <Checkbox id="docker-show-stopped" v-model="ui.showStopped" data-testid="docker-show-stopped" />
-        <Label for="docker-show-stopped" class="cursor-default">{{ t('docker.panel.showStopped.label') }}</Label>
-        <span class="ml-auto" data-testid="docker-summary">{{ stopped ? t('docker.panel.summaryStopped.label', { running, stopped }) : t('docker.panel.summary.label', { running }) }}</span>
+        <Checkbox
+          id="docker-show-stopped"
+          v-model="ui.showStopped"
+          data-testid="docker-show-stopped"
+        />
+        <Label for="docker-show-stopped" class="cursor-default">{{
+          t('docker.panel.showStopped.label')
+        }}</Label>
+        <span class="ml-auto" data-testid="docker-summary">{{
+          stopped ? t('docker.panel.summaryStopped.label', { running, stopped }) : t('docker.panel.summary.label', { running })
+        }}</span>
       </div>
       <ContainerList v-if="ui.section === 'containers'" />
       <ImageList v-else-if="ui.section === 'images'" />

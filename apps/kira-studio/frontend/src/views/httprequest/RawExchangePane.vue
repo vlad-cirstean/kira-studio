@@ -105,9 +105,7 @@ const maskingNote = computed(() => {
 });
 
 const elisionNote = computed(() =>
-  wire.value?.requestBodyElided
-    ? t('studio.http.raw.elided.description')
-    : '',
+  wire.value?.requestBodyElided ? t('studio.http.raw.elided.description') : '',
 );
 
 // D7/D8: a live dump failure is this send's own — the only case left with no raw view at all,
@@ -196,9 +194,7 @@ const rawSections = computed<RawSection[]>(() => [
     highlights: props.responseHighlights,
     editorTestid: 'http-wire-response-editor',
     noteBefore: '',
-    noteAfter: wire.value
-      ? t('studio.http.raw.headerOrder.description')
-      : '',
+    noteAfter: wire.value ? t('studio.http.raw.headerOrder.description') : '',
     noteAfterTestid: 'http-wire-order-note',
   },
 ]);
@@ -231,12 +227,20 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
             {{ t('studio.http.raw.reconstructed.description') }}
           </AlertDescription>
         </Alert>
-        <Alert v-if="requestBodyStorageTruncated" variant="info" data-testid="http-history-request-truncated">
+        <Alert
+          v-if="requestBodyStorageTruncated"
+          variant="info"
+          data-testid="http-history-request-truncated"
+        >
           <AlertDescription>
             {{ t('studio.http.raw.bodyKept.description', { size: formatBytes(256 * 1024) }) }}
           </AlertDescription>
         </Alert>
-        <Alert v-if="requestFieldsElided" variant="info" data-testid="http-history-request-fields-elided">
+        <Alert
+          v-if="requestFieldsElided"
+          variant="info"
+          data-testid="http-history-request-fields-elided"
+        >
           <AlertDescription>
             {{ t('studio.http.history.fieldsElided.description') }}
           </AlertDescription>
@@ -246,7 +250,10 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
       <template v-for="section in rawSections" :key="section.key">
         <div class="flex min-h-52 flex-col gap-0.5">
           <div class="flex items-center gap-1">
-            <span class="text-kira-sm text-subtle font-data overflow-hidden text-ellipsis whitespace-nowrap" :data-testid="section.captionTestid">
+            <span
+              class="text-kira-sm text-subtle font-data overflow-hidden text-ellipsis whitespace-nowrap"
+              :data-testid="section.captionTestid"
+            >
               {{ section.caption }}
             </span>
             <span class="ml-auto" />

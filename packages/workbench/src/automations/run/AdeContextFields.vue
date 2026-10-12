@@ -26,7 +26,8 @@ const idBase = useId();
 const taskOpen = ref(false);
 
 const taskTitle = computed(
-  () => props.needs.tasks.find((task) => task.id === taskId.value)?.title ?? props.ade?.taskTitle ?? '',
+  () =>
+    props.needs.tasks.find((task) => task.id === taskId.value)?.title ?? props.ade?.taskTitle ?? '',
 );
 
 function pickTask(id: string): void {
@@ -39,11 +40,21 @@ function pickTask(id: string): void {
 <template>
   <div class="flex flex-col gap-3" data-testid="run-ade">
     <Field v-if="needs.tasks.length > 0">
-      <FieldLabel :for="`${idBase}-task`">{{ t('common.task.label') }} <span class="text-error">*</span></FieldLabel>
+      <FieldLabel :for="`${idBase}-task`"
+        >{{ t('common.task.label') }} <span class="text-error">*</span></FieldLabel
+      >
       <Popover v-model:open="taskOpen">
         <PopoverTrigger as-child>
-          <Button :id="`${idBase}-task`" variant="dialog" size="kira-lg" class="justify-between" data-testid="run-task">
-            <span class="truncate">{{ taskTitle || t('automations.run.chooseTask.placeholder') }}</span>
+          <Button
+            :id="`${idBase}-task`"
+            variant="dialog"
+            size="kira-lg"
+            class="justify-between"
+            data-testid="run-task"
+          >
+            <span class="truncate">{{
+              taskTitle || t('automations.run.chooseTask.placeholder')
+            }}</span>
             <CodiconIcon name="chevron-down" :size="12" />
           </Button>
         </PopoverTrigger>
@@ -70,7 +81,9 @@ function pickTask(id: string): void {
     </Field>
 
     <Field v-if="needs.branches.length > 0">
-      <FieldLabel>{{ t('common.field.branch.label') }} <span class="text-error">*</span></FieldLabel>
+      <FieldLabel
+        >{{ t('common.field.branch.label') }} <span class="text-error">*</span></FieldLabel
+      >
       <RadioGroup
         :model-value="branchId"
         class="gap-1.5"
@@ -85,17 +98,30 @@ function pickTask(id: string): void {
               :disabled="b.disabled"
               :data-testid="`run-branch-${b.id}`"
             />
-            <Label :for="`${idBase}-${b.id}`" :class="b.disabled && 'text-muted-foreground'">{{ b.label }}</Label>
+            <Label :for="`${idBase}-${b.id}`" :class="b.disabled && 'text-muted-foreground'">{{
+              b.label
+            }}</Label>
           </div>
-          <FieldDescription v-if="b.disabled" class="pl-6" :data-testid="`run-branch-why-${b.id}`">{{ b.why }}</FieldDescription>
+          <FieldDescription
+            v-if="b.disabled"
+            class="pl-6"
+            :data-testid="`run-branch-why-${b.id}`"
+            >{{
+              b.why
+            }}</FieldDescription
+          >
         </div>
       </RadioGroup>
     </Field>
 
     <div v-if="ade" class="text-kira-sm text-muted-foreground" data-testid="run-ade-context">
-      <CatalogText :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'">
+      <CatalogText
+        :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'"
+      >
         <template #task><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template>
-        <template #branch><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template>
+        <template #branch
+          ><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template
+        >
       </CatalogText>
     </div>
   </div>

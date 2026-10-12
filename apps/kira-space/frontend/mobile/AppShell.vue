@@ -42,10 +42,22 @@ const DOT_LABEL = {
   <div class="flex h-full flex-col pt-[env(safe-area-inset-top)]" data-testid="app-shell">
     <header class="flex items-center gap-2 border-b border-border bg-chrome px-3 py-2">
       <h1 class="m-0 flex-1 text-kira-lg font-medium">{{ t('mobile.shell.heading.title') }}</h1>
-      <Button variant="ghost" size="kira-icon" class="size-touch" :aria-label="t('common.action.refresh.label')" data-testid="refresh" @click="refresh">
+      <Button
+        variant="ghost"
+        size="kira-icon"
+        class="size-touch"
+        :aria-label="t('common.action.refresh.label')"
+        data-testid="refresh"
+        @click="refresh"
+      >
         <CodiconIcon name="refresh" :size="13" />
       </Button>
-      <StatusDot :tone="DOT[connection]" role="status" :label="t(DOT_LABEL[connection])" data-testid="connection-dot" />
+      <StatusDot
+        :tone="DOT[connection]"
+        role="status"
+        :label="t(DOT_LABEL[connection])"
+        data-testid="connection-dot"
+      />
     </header>
     <Alert v-if="!online" variant="warn" strip data-testid="offline-banner">
       <AlertDescription>{{ t('mobile.shell.offline.description') }}</AlertDescription>

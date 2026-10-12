@@ -43,9 +43,21 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <Badge variant="chip" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ statusLabel(card.status) }}</Badge>
-          <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{ card.progress.label }}</span>
-          <Badge v-for="repo in card.repos" :key="repo" variant="chip" class="bg-field text-muted-foreground">{{ repo }}</Badge>
+          <Badge variant="chip" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{
+            statusLabel(card.status)
+          }}</Badge>
+          <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{
+            card.progress.label
+          }}</span>
+          <Badge
+            v-for="repo in card.repos"
+            :key="repo"
+            variant="chip"
+            class="bg-field text-muted-foreground"
+            >{{
+              repo
+            }}</Badge
+          >
         </span>
         <span
           v-if="card.progress.showBar"
@@ -57,21 +69,45 @@ const stopFirst = computed(() => props.card.moves.live);
         >
           <span class="block h-full bg-primary" :style="{ width: `${card.progress.percent}%` }" />
         </span>
-        <span v-if="card.attention" class="text-kira-sm text-warn" data-testid="plan-attention">{{ card.attention }}</span>
+        <span v-if="card.attention" class="text-kira-sm text-warn" data-testid="plan-attention">{{
+          card.attention
+        }}</span>
       </span>
     </button>
 
-    <ol v-if="open" class="m-0 flex list-none flex-col gap-2 px-3 pb-3 pl-8" data-testid="plan-stages">
-      <li v-if="!card.blocks.length" class="text-kira-sm text-subtle">{{ t('mobile.plan.noWorkflow.empty') }}</li>
-      <li v-for="block in card.blocks" :key="block.stage.id" class="flex flex-col gap-0.5" :data-state="block.state">
-        <span class="flex items-center gap-2 text-kira-md" :class="block.state === 'now' ? 'font-medium text-fg' : 'text-muted-foreground'">
-          <span aria-hidden="true">{{ block.state === 'done' ? '✓' : block.state === 'now' ? '▸' : '○' }}</span>
+    <ol
+      v-if="open"
+      class="m-0 flex list-none flex-col gap-2 px-3 pb-3 pl-8"
+      data-testid="plan-stages"
+    >
+      <li v-if="!card.blocks.length" class="text-kira-sm text-subtle">{{
+        t('mobile.plan.noWorkflow.empty')
+      }}</li>
+      <li
+        v-for="block in card.blocks"
+        :key="block.stage.id"
+        class="flex flex-col gap-0.5"
+        :data-state="block.state"
+      >
+        <span
+          class="flex items-center gap-2 text-kira-md"
+          :class="block.state === 'now' ? 'font-medium text-fg' : 'text-muted-foreground'"
+        >
+          <span aria-hidden="true">{{
+            block.state === 'done' ? '✓' : block.state === 'now' ? '▸' : '○'
+          }}</span>
           {{ block.stage.name }}
           <span v-if="block.count" class="text-kira-sm text-subtle">{{ block.count }}</span>
-          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">{{ t('common.skipped.status') }}</span>
+          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">{{
+            t('common.skipped.status')
+          }}</span>
         </span>
         <ul v-if="block.steps.length" class="m-0 flex list-none flex-col gap-0.5 p-0 pl-5">
-          <li v-for="view in block.steps" :key="view.step.id" class="flex items-center gap-2 text-kira-sm">
+          <li
+            v-for="view in block.steps"
+            :key="view.step.id"
+            class="flex items-center gap-2 text-kira-sm"
+          >
             <StatusDot :color="`var(--color-tone-${view.tone}-solid)`" />
             <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ view.step.name }}</span>
             <span class="text-subtle">{{ view.statusText }}</span>
@@ -80,8 +116,13 @@ const stopFirst = computed(() => props.card.moves.live);
       </li>
     </ol>
 
-    <div v-if="open && canMove" class="flex flex-wrap gap-2 px-3 pb-3 pl-8" data-testid="plan-actions">
-      <Button size="kira"
+    <div
+      v-if="open && canMove"
+      class="flex flex-wrap gap-2 px-3 pb-3 pl-8"
+      data-testid="plan-actions"
+    >
+      <Button
+        size="kira"
         variant="dialog"
         class="h-touch px-4"
         :disabled="stopFirst || !card.moves.prev"
@@ -90,7 +131,8 @@ const stopFirst = computed(() => props.card.moves.live);
       >
         {{ t('common.action.back.label') }}
       </Button>
-      <Button size="kira"
+      <Button
+        size="kira"
         variant="dialog"
         class="h-touch px-4"
         :disabled="stopFirst || !card.moves.next"
@@ -99,7 +141,8 @@ const stopFirst = computed(() => props.card.moves.live);
       >
         {{ t('common.action.next.label') }}
       </Button>
-      <Button size="kira"
+      <Button
+        size="kira"
         v-if="actions.startKind.value"
         variant="dialog-primary"
         class="h-touch px-4"
@@ -108,12 +151,30 @@ const stopFirst = computed(() => props.card.moves.live);
       >
         {{ t('common.action.start.label') }}
       </Button>
-      <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">{{ t('mobile.plan.stopFirst.hint') }}</p>
+      <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">{{
+        t('mobile.plan.stopFirst.hint')
+      }}</p>
     </div>
 
-    <div v-if="open && permissions.agentInput && card.tuiSessions.length" class="flex flex-col gap-1 px-3 pb-3 pl-8">
-      <Button v-for="session in card.tuiSessions" :key="session.id" as-child size="kira" variant="dialog" class="h-touch px-3 no-underline">
-        <RouterLink :to="{ name: 'terminal', params: { sessionId: session.id } }" data-testid="plan-terminal">{{ t('common.module.terminal.label') }}</RouterLink>
+    <div
+      v-if="open && permissions.agentInput && card.tuiSessions.length"
+      class="flex flex-col gap-1 px-3 pb-3 pl-8"
+    >
+      <Button
+        v-for="session in card.tuiSessions"
+        :key="session.id"
+        as-child
+        size="kira"
+        variant="dialog"
+        class="h-touch px-3 no-underline"
+      >
+        <RouterLink
+          :to="{ name: 'terminal', params: { sessionId: session.id } }"
+          data-testid="plan-terminal"
+          >{{
+            t('common.module.terminal.label')
+          }}</RouterLink
+        >
       </Button>
     </div>
     <ConfirmDialogView

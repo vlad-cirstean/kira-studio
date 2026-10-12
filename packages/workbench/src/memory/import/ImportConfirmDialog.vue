@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
@@ -60,7 +67,9 @@ async function dismiss(): Promise<void> {
         <Alert v-if="actError" variant="error" data-testid="import-confirm-error">
           <AlertDescription>{{ actError }}</AlertDescription>
         </Alert>
-        <p v-if="scanning" class="m-0 text-muted-foreground" data-testid="import-scanning">{{ t('memory.import.confirm.scanning.loading') }}</p>
+        <p v-if="scanning" class="m-0 text-muted-foreground" data-testid="import-scanning">{{
+          t('memory.import.confirm.scanning.loading')
+        }}</p>
         <Alert v-else-if="failed" variant="error">
           <AlertDescription>{{ job?.reason }}</AlertDescription>
         </Alert>
@@ -96,8 +105,22 @@ async function dismiss(): Promise<void> {
         </template>
       </DialogBody>
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="import-confirm-cancel" @click="dismiss">{{ t('common.action.cancel.label') }}</Button>
-        <Button variant="dialog-primary" size="kira-lg" :disabled="!ready || act.isPending.value" data-testid="import-confirm-start" @click="start">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          data-testid="import-confirm-cancel"
+          @click="dismiss"
+          >{{
+            t('common.action.cancel.label')
+          }}</Button
+        >
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :disabled="!ready || act.isPending.value"
+          data-testid="import-confirm-start"
+          @click="start"
+        >
           {{ t('memory.import.start.label') }}
         </Button>
       </DialogFooter>

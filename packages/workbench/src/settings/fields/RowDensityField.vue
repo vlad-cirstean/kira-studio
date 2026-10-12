@@ -16,8 +16,16 @@ const props = defineProps<{
 }>();
 
 const DENSITY_ITEMS = computed(() => [
-  { value: 'compact', label: t('workbench.settings.rowCompact.option'), testid: 'settings-appearance-rowDensity-compact' },
-  { value: 'comfortable', label: t('workbench.settings.rowComfortable.option'), testid: 'settings-appearance-rowDensity-comfortable' },
+  {
+    value: 'compact',
+    label: t('workbench.settings.rowCompact.option'),
+    testid: 'settings-appearance-rowDensity-compact',
+  },
+  {
+    value: 'comfortable',
+    label: t('workbench.settings.rowComfortable.option'),
+    testid: 'settings-appearance-rowDensity-comfortable',
+  },
 ]);
 
 function setRowDensity(density: RowDensity): void {

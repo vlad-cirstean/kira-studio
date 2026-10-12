@@ -18,7 +18,8 @@ const { sessions, view } = useSessionViews();
 
 const scoped = computed(() =>
   sessions.value.filter(
-    (s) => s.taskId === props.taskId && (props.branchId === undefined || s.branchId === props.branchId),
+    (s) =>
+      s.taskId === props.taskId && (props.branchId === undefined || s.branchId === props.branchId),
   ),
 );
 const running = computed(() =>
@@ -33,7 +34,9 @@ const stopped = computed(() =>
     .sort(byRecent)
     .map(view),
 );
-const current = computed(() => running.value.find((v) => v.session.id === ui.sessionId) ?? running.value[0]);
+const current = computed(
+  () => running.value.find((v) => v.session.id === ui.sessionId) ?? running.value[0],
+);
 </script>
 
 <template>
@@ -45,10 +48,22 @@ const current = computed(() => running.value.find((v) => v.session.id === ui.ses
       @pick="(id) => (ui.sessionId = id)"
     />
     <template v-if="current">
-      <AdeHeadlessPane v-if="current.headless" :key="current.session.id" :view="current" :archived="archived" />
+      <AdeHeadlessPane
+        v-if="current.headless"
+        :key="current.session.id"
+        :view="current"
+        :archived="archived"
+      />
       <AdeTuiPane v-else :key="current.session.id" :view="current" />
     </template>
-    <div v-else class="flex-1 p-3.5 text-kira-md text-muted-foreground" data-testid="ade-sessions-empty">{{ t('space.ade.sessionList.empty.empty') }}</div>
+    <div
+      v-else
+      class="flex-1 p-3.5 text-kira-md text-muted-foreground"
+      data-testid="ade-sessions-empty"
+      >{{
+        t('space.ade.sessionList.empty.empty')
+      }}</div
+    >
     <AdeStoppedList :views="stopped" :archived="archived" />
   </div>
 </template>

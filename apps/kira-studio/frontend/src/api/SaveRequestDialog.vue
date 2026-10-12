@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
@@ -79,44 +86,61 @@ function splitTarget(value: string): [string, string | null] {
         <DialogTitle>{{ t('studio.api.saveRequest.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-      <Field>
-        <Label class="text-muted-foreground">{{ t('common.field.name.label') }}</Label>
-        <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
-      </Field>
+        <Field>
+          <Label class="text-muted-foreground">{{ t('common.field.name.label') }}</Label>
+          <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
+        </Field>
 
-      <Field>
-        <Label class="text-muted-foreground">{{ t('studio.api.saveRequest.target.label') }}</Label>
-        <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
-          <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
-            <option :value="`${c.id}:`">{{ t('studio.api.saveRequest.collectionRoot.option') }}</option>
-            <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{ f.label }}</option>
-          </optgroup>
-        </NativeSelect>
-      </Field>
+        <Field>
+          <Label class="text-muted-foreground">{{
+            t('studio.api.saveRequest.target.label')
+          }}</Label>
+          <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
+            <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
+              <option :value="`${c.id}:`">{{
+                t('studio.api.saveRequest.collectionRoot.option')
+              }}</option>
+              <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{
+                f.label
+              }}</option>
+            </optgroup>
+          </NativeSelect>
+        </Field>
 
-      <Alert v-if="collectionTargets.length === 0" variant="warn" data-testid="save-request-no-target">
-        <AlertDescription>
-          {{ t('studio.api.saveRequest.noTarget.body') }}
-        </AlertDescription>
-      </Alert>
-      <Alert v-if="error" variant="error" data-testid="save-request-error">
-        <AlertDescription>{{ error }}</AlertDescription>
-      </Alert>
+        <Alert
+          v-if="collectionTargets.length === 0"
+          variant="warn"
+          data-testid="save-request-no-target"
+        >
+          <AlertDescription>
+            {{ t('studio.api.saveRequest.noTarget.body') }}
+          </AlertDescription>
+        </Alert>
+        <Alert v-if="error" variant="error" data-testid="save-request-error">
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">{{ t('common.action.cancel.label') }}</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="save-request-submit"
-            :disabled="!name.trim() || !target || saving"
-            @click="onSave"
-          >
-            {{ t('common.action.save.label') }}
-          </Button>
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          data-testid="save-request-cancel"
+          @click="saveDialogStore.closeSaveDialog"
+          >{{
+            t('common.action.cancel.label')
+          }}</Button
+        >
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="save-request-submit"
+          :disabled="!name.trim() || !target || saving"
+          @click="onSave"
+        >
+          {{ t('common.action.save.label') }}
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
-

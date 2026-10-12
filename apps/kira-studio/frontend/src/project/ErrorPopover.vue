@@ -43,15 +43,24 @@ function onCopy(): void {
         class="border border-border-strong shadow-kira-dialog overflow-hidden w-80 max-h-60 gap-0 p-0 z-(--kira-z-menu) max-w-[calc(100vw-8px)]"
         data-testid="error-popover"
       >
-        <FieldError class="overflow-auto whitespace-pre-wrap break-words p-2 font-data text-kira-md">{{ props.message }}</FieldError>
+        <FieldError
+          class="overflow-auto whitespace-pre-wrap break-words p-2 font-data text-kira-md"
+          >{{
+            props.message
+          }}</FieldError
+        >
         <FieldError v-if="copyError" class="px-2 pb-1" data-testid="error-popover-copy-error">
           {{ t('common.copy.failed.error', { error: copyError }) }}
         </FieldError>
         <!-- Footer is the same 28px band used everywhere a toolbar sits at the edge of a floating
              surface, with the border on top since this one closes the popover. -->
         <ViewToolbar border="top">
-          <Button variant="toolbar" size="kira" class="ml-auto" @click="onCopy">{{ t('common.action.copy.label') }}</Button>
-          <Button variant="toolbar" size="kira" @click="open = false">{{ t('common.action.close.label') }}</Button>
+          <Button variant="toolbar" size="kira" class="ml-auto" @click="onCopy">{{
+            t('common.action.copy.label')
+          }}</Button>
+          <Button variant="toolbar" size="kira" @click="open = false">{{
+            t('common.action.close.label')
+          }}</Button>
         </ViewToolbar>
       </PopoverContent>
     </Popover>

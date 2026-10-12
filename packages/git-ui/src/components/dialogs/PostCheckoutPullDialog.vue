@@ -39,26 +39,39 @@ function pullNow(): void {
 
 <template>
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && notNow()">
-    <DialogContent
-      size="md"
-    >
+    <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.postCheckoutPullConfirm.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          <CatalogText k="git.dialog.postCheckoutPullConfirm.body" :params="{ count: pending.behind }">
+          <CatalogText
+            k="git.dialog.postCheckoutPullConfirm.body"
+            :params="{ count: pending.behind }"
+          >
             <template #branch><strong>{{ pending.branch }}</strong></template>
-            <template #upstream><code class="font-data">{{ pending.upstreamShortName }}</code></template>
+            <template #upstream
+              ><code class="font-data">{{ pending.upstreamShortName }}</code></template
+            >
           </CatalogText>
         </DialogDescription>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="post-checkout-pull-not-now" @click="notNow">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          data-testid="post-checkout-pull-not-now"
+          @click="notNow"
+        >
           {{ t('git.dialog.postCheckoutPullConfirm.notNow.label') }}
         </Button>
-        <Button variant="dialog-primary" size="kira-lg" data-testid="post-checkout-pull-now" @click="pullNow">
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="post-checkout-pull-now"
+          @click="pullNow"
+        >
           {{ t('git.dialog.postCheckoutPullConfirm.confirm') }}
         </Button>
       </DialogFooter>

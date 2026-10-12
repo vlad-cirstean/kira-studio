@@ -67,10 +67,7 @@ async function submit(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      :aria-describedby="undefined"
-      size="md"
-    >
+    <DialogContent :aria-describedby="undefined" size="md">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.rename.title') }}</DialogTitle>
       </DialogHeader>
@@ -89,7 +86,9 @@ async function submit(): Promise<void> {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
           {{ t('common.action.rename.label') }}
         </Button>

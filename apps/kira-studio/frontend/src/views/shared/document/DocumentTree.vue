@@ -71,7 +71,9 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
         <CodiconIcon :name="line.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
       </button>
       <span v-else class="shrink-0 w-3.5"></span>
-      <span v-if="line.node.key !== ''" class="shrink-0 text-syntax-property">{{ line.node.key }}:</span>
+      <span v-if="line.node.key !== ''" class="shrink-0 text-syntax-property"
+        >{{ line.node.key }}:</span
+      >
       <!-- P43 iter3 D42: no longer clipped — the row's own max-content width lets this grow past
            the panel instead, reachable by scrolling the tree sideways. -->
       <span
@@ -79,7 +81,9 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
         class="shrink-0"
         :class="TOKEN_CLASS[line.node.token]"
         data-testid="document-tree-value"
-        >{{ line.node.text }}</span
+        >{{
+          line.node.text
+        }}</span
       >
       <span v-else class="shrink-0 text-muted-foreground" data-testid="document-tree-summary">{{
         line.node.summary
@@ -87,4 +91,3 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
     </div>
   </div>
 </template>
-

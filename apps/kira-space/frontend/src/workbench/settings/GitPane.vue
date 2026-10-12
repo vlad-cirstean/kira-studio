@@ -70,7 +70,10 @@ const graphFontSizeError = computed<string | null>(() => {
   if (!Number.isFinite(v)) return t('common.enterNumber.error');
   if (v === 0) return null;
   if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
-    return t('space.settings.git.graphFont.range.error', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max });
+    return t('space.settings.git.graphFont.range.error', {
+      min: FONT_SIZE_RANGE.min,
+      max: FONT_SIZE_RANGE.max,
+    });
   }
   return null;
 });
@@ -114,7 +117,9 @@ const graphFontSizeId = useId();
     </Field>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="fetchAutoIntervalMinutesId">{{ t('space.settings.git.fetchInterval.label') }}</Label>
+        <Label :for="fetchAutoIntervalMinutesId">{{
+          t('space.settings.git.fetchInterval.label')
+        }}</Label>
         <TooltipIconButton
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
@@ -139,7 +144,9 @@ const graphFontSizeId = useId();
       >
         {{ fetchAutoIntervalError }}
       </FieldError>
-      <FieldDescription v-else>{{ t('space.settings.git.fetchInterval.description') }}</FieldDescription>
+      <FieldDescription v-else>{{
+        t('space.settings.git.fetchInterval.description')
+      }}</FieldDescription>
     </Field>
     <Field>
       <div class="flex items-center justify-between gap-1">
@@ -187,7 +194,9 @@ const graphFontSizeId = useId();
       <FieldError v-if="graphFontSizeError" data-testid="settings-git-graphFontSize-error">
         {{ graphFontSizeError }}
       </FieldError>
-      <FieldDescription v-else>{{ t('space.settings.git.graphFont.description') }}</FieldDescription>
+      <FieldDescription v-else>{{
+        t('space.settings.git.graphFont.description')
+      }}</FieldDescription>
     </Field>
   </div>
 </template>

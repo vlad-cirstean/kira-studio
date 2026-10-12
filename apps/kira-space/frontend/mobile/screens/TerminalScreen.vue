@@ -36,7 +36,9 @@ type Attached = ReturnType<Renderer['getOrCreateTerminal']>;
 const router = useRouter();
 const { permissions } = storeToRefs(useAuthStore());
 const container = ref<HTMLElement | null>(null);
-const fontSize = usePersistedState('kira.mobileTerminal.fontSize', 12, { migrateFrom: 'kira-mobile-terminal-font' });
+const fontSize = usePersistedState('kira.mobileTerminal.fontSize', 12, {
+  migrateFrom: 'kira-mobile-terminal-font',
+});
 const compose = ref('');
 const ctrl = ref(false);
 const appCursor = ref(false);
@@ -136,16 +138,56 @@ function leave(): void {
     data-testid="terminal-screen"
   >
     <header class="flex items-center gap-2 border-b border-border bg-chrome px-2 py-1">
-      <Button variant="ghost" size="kira-icon" class="size-touch" :aria-label="t('common.action.back.label')" data-testid="term-back" @click="leave">
+      <Button
+        variant="ghost"
+        size="kira-icon"
+        class="size-touch"
+        :aria-label="t('common.action.back.label')"
+        data-testid="term-back"
+        @click="leave"
+      >
         <CodiconIcon name="chevron-left" :size="16" />
       </Button>
-      <h1 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium">{{ t('common.module.terminal.label') }}</h1>
+      <h1 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium">{{
+        t('common.module.terminal.label')
+      }}</h1>
       <span class="text-kira-sm text-muted-foreground" role="status" data-testid="term-status">
         {{ t(STATUS_LABEL[remote.status.value]) }}
       </span>
-      <Button variant="ghost" size="kira-icon" class="size-touch" :aria-label="t('mobile.terminal.fontDown.aria')" data-testid="term-font-down" :disabled="fontSize <= FONT_MIN" @click="step(-1)">{{ t('mobile.terminal.fontDown.label') }}</Button>
-      <Button variant="ghost" size="kira-icon" class="size-touch" :aria-label="t('mobile.terminal.fontUp.aria')" data-testid="term-font-up" :disabled="fontSize >= FONT_MAX" @click="step(1)">{{ t('mobile.terminal.fontUp.label') }}</Button>
-      <Button size="kira" variant="dialog" class="h-touch px-3" data-testid="term-release" @click="leave">{{ t('mobile.terminal.release.label') }}</Button>
+      <Button
+        variant="ghost"
+        size="kira-icon"
+        class="size-touch"
+        :aria-label="t('mobile.terminal.fontDown.aria')"
+        data-testid="term-font-down"
+        :disabled="fontSize <= FONT_MIN"
+        @click="step(-1)"
+        >{{
+          t('mobile.terminal.fontDown.label')
+        }}</Button
+      >
+      <Button
+        variant="ghost"
+        size="kira-icon"
+        class="size-touch"
+        :aria-label="t('mobile.terminal.fontUp.aria')"
+        data-testid="term-font-up"
+        :disabled="fontSize >= FONT_MAX"
+        @click="step(1)"
+        >{{
+          t('mobile.terminal.fontUp.label')
+        }}</Button
+      >
+      <Button
+        size="kira"
+        variant="dialog"
+        class="h-touch px-3"
+        data-testid="term-release"
+        @click="leave"
+        >{{
+          t('mobile.terminal.release.label')
+        }}</Button
+      >
     </header>
 
     <PermissionHint v-if="!permissions.agentInput" :what="t('mobile.terminal.controlOff.hint')" />
@@ -153,14 +195,20 @@ function leave(): void {
       <Alert v-if="remote.status.value === 'ended'" variant="info" strip data-testid="term-ended">
         <AlertDescription>{{ remote.endReason.value }}</AlertDescription>
       </Alert>
-      <p v-if="remote.notice.value" class="m-0 px-3 py-1 text-kira-sm text-warn" data-testid="term-notice">{{ remote.notice.value }}</p>
+      <p
+        v-if="remote.notice.value"
+        class="m-0 px-3 py-1 text-kira-sm text-warn"
+        data-testid="term-notice"
+        >{{
+          remote.notice.value
+        }}</p
+      >
       <div ref="container" class="min-h-0 flex-1 overflow-hidden" data-testid="term-host" />
-      <KeyBar
-        v-model:ctrl="ctrl"
-        :app-cursor="appCursor"
-        @key="(seq) => remote.sendText(seq)"
-      />
-      <form class="flex gap-2 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" @submit.prevent="sendCompose">
+      <KeyBar v-model:ctrl="ctrl" :app-cursor="appCursor" @key="(seq) => remote.sendText(seq)" />
+      <form
+        class="flex gap-2 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        @submit.prevent="sendCompose"
+      >
         <Input
           :model-value="compose"
           class="h-touch flex-1 text-kira-touch"
@@ -171,7 +219,17 @@ function leave(): void {
           data-testid="term-compose"
           @update:model-value="(v) => (compose = String(v))"
         />
-        <Button size="kira" type="submit" variant="dialog-primary" class="h-touch px-4" :disabled="!compose" data-testid="term-compose-send">{{ t('common.action.send.label') }}</Button>
+        <Button
+          size="kira"
+          type="submit"
+          variant="dialog-primary"
+          class="h-touch px-4"
+          :disabled="!compose"
+          data-testid="term-compose-send"
+          >{{
+            t('common.action.send.label')
+          }}</Button
+        >
       </form>
     </template>
   </section>

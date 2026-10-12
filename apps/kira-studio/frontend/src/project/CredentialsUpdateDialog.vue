@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -41,7 +47,9 @@ function onOpenChange(open: boolean): void {
   <Dialog :open="true" @update:open="onOpenChange">
     <DialogContent size="md" data-testid="credentials-update-dialog">
       <DialogHeader>
-        <DialogTitle>{{ t('studio.project.credentialsDialog.title', { name: record?.name ?? '' }) }}</DialogTitle>
+        <DialogTitle>{{
+          t('studio.project.credentialsDialog.title', { name: record?.name ?? '' })
+        }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <CredentialPastePanel
@@ -52,7 +60,11 @@ function onOpenChange(open: boolean): void {
           @apply="(values) => update.mutate(values)"
           @cancel="dialogStore.close()"
         />
-        <p v-if="live" class="m-0 text-kira-sm text-muted-foreground" data-testid="credentials-update-live-note">
+        <p
+          v-if="live"
+          class="m-0 text-kira-sm text-muted-foreground"
+          data-testid="credentials-update-live-note"
+        >
           {{ t('studio.project.credentialsDialog.liveNote.hint') }}
         </p>
         <Alert v-if="update.error.value" variant="error" data-testid="credentials-update-error">

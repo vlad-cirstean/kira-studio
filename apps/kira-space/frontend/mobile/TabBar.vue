@@ -13,7 +13,10 @@ const TABS = [
 </script>
 
 <template>
-  <nav class="flex border-t border-border bg-chrome pb-[env(safe-area-inset-bottom)]" :aria-label="t('mobile.tabs.nav.aria')">
+  <nav
+    class="flex border-t border-border bg-chrome pb-[env(safe-area-inset-bottom)]"
+    :aria-label="t('mobile.tabs.nav.aria')"
+  >
     <RouterLink
       v-for="tab in TABS"
       :key="tab.id"
@@ -22,7 +25,14 @@ const TABS = [
       :data-testid="`tab-${tab.id}`"
     >
       {{ t(tab.label) }}
-      <Badge v-if="tab.id === 'needs' && model && model.needs.badge > 0" variant="count" data-testid="tab-needs-badge">{{ model.needs.badge }}</Badge>
+      <Badge
+        v-if="tab.id === 'needs' && model && model.needs.badge > 0"
+        variant="count"
+        data-testid="tab-needs-badge"
+        >{{
+          model.needs.badge
+        }}</Badge
+      >
     </RouterLink>
   </nav>
 </template>

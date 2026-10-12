@@ -61,7 +61,6 @@ function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
-
 const query = ref('');
 const matchCase = ref(false);
 const wholeWord = ref(false);
@@ -246,13 +245,15 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
 <template>
   <!-- LAW 03 / README: docks at the bottom of the result it searches (never floating over it),
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
-  <ViewToolbar
-    ref="rootEl"
-    class="bg-elevated"
-    :data-testid="`${testidPrefix}search-toolbar`"
-  >
+  <ViewToolbar ref="rootEl" class="bg-elevated" :data-testid="`${testidPrefix}search-toolbar`">
     <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField v-model="query" @keydown.escape.stop="close" :placeholder="t('common.action.find.label')" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
+      <SearchField
+        v-model="query"
+        @keydown.escape.stop="close"
+        :placeholder="t('common.action.find.label')"
+        :data-testid="`${testidPrefix}search-input`"
+        :aria-invalid="!!errorMessage"
+      />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
          single-value picker, so each is its own icon button rather than a <SegmentedControl> (which
@@ -289,7 +290,9 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
       v-if="errorMessage"
       class="text-kira-sm whitespace-nowrap overflow-hidden text-ellipsis text-error"
       :data-testid="`${testidPrefix}search-error`"
-      >{{ errorMessage }}</span
+      >{{
+        errorMessage
+      }}</span
     >
     <template v-else>
       <!-- P42 D38: `scanning` now wins over a non-empty `entry` — a scan in progress publishes
@@ -300,12 +303,21 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
            used to set `scanning` false while a newer scan was still genuinely running, falling
            through to this same branch with a partial `index: -1` entry underneath it; that path is
            closed by `startSearch`'s own handle-identity check, not by this template. -->
-      <span class="text-kira-sm text-muted-foreground whitespace-nowrap" :data-testid="`${testidPrefix}search-count`">
-        <template v-if="scanning">{{ t('studio.search.scanning.loading', { count: foundSoFar }) }}</template>
+      <span
+        class="text-kira-sm text-muted-foreground whitespace-nowrap"
+        :data-testid="`${testidPrefix}search-count`"
+      >
+        <template v-if="scanning">{{
+          t('studio.search.scanning.loading', { count: foundSoFar })
+        }}</template>
         <template v-else-if="entry && entry.matches.length > 0">
           <CatalogText k="common.matchPosition.status">
             <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
-            <template #total><b class="font-data">{{ formatCount(entry.found ?? entry.matches.length) }}</b></template>
+            <template #total
+              ><b class="font-data">{{
+                formatCount(entry.found ?? entry.matches.length)
+              }}</b></template
+            >
           </CatalogText>
           <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —
                a user cannot act on the un-shown remainder, so this says plainly that only the
@@ -341,7 +353,11 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
       <!-- M5 §6.6: search stays over raw stored values even while the grid's own preview shows
            masked ones — a surprising mismatch otherwise ("why did my search for a real name match
            a row showing buckets"), named here rather than left implicit. -->
-      <span v-if="maskPreviewOn" class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-mask-note`">
+      <span
+        v-if="maskPreviewOn"
+        class="text-kira-sm text-subtle"
+        :data-testid="`${testidPrefix}search-mask-note`"
+      >
         {{ t('studio.search.maskNote.status') }}
       </span>
     </template>

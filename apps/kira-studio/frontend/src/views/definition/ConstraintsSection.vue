@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { Badge } from '@theme/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { useTabsStore } from '../../state/tabs';
@@ -46,7 +53,9 @@ function onNavigate(c: ConstraintRow): void {
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-constraints">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.definition.constraints.heading.label') }}</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{
+        t('studio.definition.constraints.heading.label')
+      }}</span>
       <Badge>{{ constraints.length }}</Badge>
     </header>
     <Table columns>
@@ -59,14 +68,27 @@ function onNavigate(c: ConstraintRow): void {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="c in constraints" :key="`${c.type}:${c.name}`" data-testid="definition-row">
+        <TableRow
+          v-for="c in constraints"
+          :key="`${c.type}:${c.name}`"
+          data-testid="definition-row"
+        >
           <TableCell class="def-con-name">{{ c.name }}</TableCell>
           <TableCell class="def-con-type">
-            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-sm">{{ t('studio.definition.primaryKey.label') }}</span>
-            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-sm">{{ t('studio.definition.foreignKey.label') }}</span>
+            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-sm">{{
+              t('studio.definition.primaryKey.label')
+            }}</span>
+            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-sm">{{
+              t('studio.definition.foreignKey.label')
+            }}</span>
             <Badge v-else>{{ t(TYPE_LABEL_KEY[c.type]) }}</Badge>
           </TableCell>
-          <TableCell class="overflow-hidden text-ellipsis whitespace-nowrap font-data text-muted-foreground">{{ c.detail }}</TableCell>
+          <TableCell
+            class="overflow-hidden text-ellipsis whitespace-nowrap font-data text-muted-foreground"
+            >{{
+              c.detail
+            }}</TableCell
+          >
           <TableCell class="def-con-table">
             <Tooltip v-if="c.referencedPath">
               <TooltipTrigger as-child>
@@ -78,7 +100,9 @@ function onNavigate(c: ConstraintRow): void {
                   {{ referencedTableName(c) }}
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ t('studio.definition.constraint.openReferenced.tooltip', { table: referencedTableName(c) ?? '' }) }}</TooltipContent>
+              <TooltipContent>{{
+                t('studio.definition.constraint.openReferenced.tooltip', { table: referencedTableName(c) ?? '' })
+              }}</TooltipContent>
             </Tooltip>
           </TableCell>
         </TableRow>

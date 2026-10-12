@@ -126,14 +126,26 @@ onBeforeUnmount(() => {
   <PopoverContent align="end" class="w-56 gap-0 p-0" data-testid="columns-menu">
     <div class="max-h-80 flex flex-col">
       <div class="flex border-b border-border gap-1 p-1">
-        <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">{{ t('common.state.all.option') }}</Button>
-        <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">{{ t('common.state.none.option') }}</Button>
+        <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">{{
+          t('common.state.all.option')
+        }}</Button>
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="columns-select-none"
+          @click="selectNone"
+          >{{
+            t('common.state.none.option')
+          }}</Button
+        >
       </div>
       <!-- Drag a row to reorder — the same order the grid renders columns in
            (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked.
            The container is always mounted: the sortable binds to it once, at mount. -->
       <div ref="listEl" class="overflow-y-auto p-0.5">
-        <InlineState v-if="!meta" kind="loading">{{ t('studio.grid.columns.loading.loading') }}</InlineState>
+        <InlineState v-if="!meta" kind="loading">{{
+          t('studio.grid.columns.loading.loading')
+        }}</InlineState>
         <Label
           v-for="name in order"
           :key="name"
@@ -141,7 +153,9 @@ onBeforeUnmount(() => {
           data-testid="columns-menu-row"
           :data-name="name"
         >
-          <span class="flex items-center shrink-0 text-subtle cursor-grab" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
+          <span class="flex items-center shrink-0 text-subtle cursor-grab" aria-hidden="true"
+            ><CodiconIcon name="gripper" :size="13" /></span
+          >
           <Tooltip v-if="pkNames.has(name)">
             <TooltipTrigger as-child>
               <Checkbox
@@ -168,7 +182,9 @@ onBeforeUnmount(() => {
       </div>
       <Separator class="my-1" />
       <div class="px-1.5 pb-1.5 text-kira-sm text-subtle" data-testid="columns-menu-footer">
-        {{ t(caps?.projection ? 'studio.grid.columns.footerServer.hint' : 'studio.grid.columns.footerClient.hint') }}
+        {{
+          t(caps?.projection ? 'studio.grid.columns.footerServer.hint' : 'studio.grid.columns.footerClient.hint')
+        }}
       </div>
     </div>
   </PopoverContent>

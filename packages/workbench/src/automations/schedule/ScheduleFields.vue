@@ -75,7 +75,9 @@ const secrets = computed(() => props.params.filter((p) => p.secret));
 const plain = computed(() => props.params.filter((p) => !p.secret));
 const values = computed({
   get: () =>
-    Object.fromEntries(plain.value.map((p) => [p.name, schedule.value.params[p.name] ?? [...p.default]])),
+    Object.fromEntries(
+      plain.value.map((p) => [p.name, schedule.value.params[p.name] ?? [...p.default]]),
+    ),
   set: (v: Record<string, string[]>) => patch({ params: v }),
 });
 
@@ -127,7 +129,9 @@ const branchId = computed({
   get: () => schedule.value.branchId,
   set: (v: string) => patch({ branchId: v }),
 });
-const appName = computed(() => (ctx.ade ? t('common.product.kiraSpace.label') : t('common.product.kiraStudio.label')));
+const appName = computed(() =>
+  ctx.ade ? t('common.product.kiraSpace.label') : t('common.product.kiraStudio.label'),
+);
 </script>
 
 <template>
@@ -157,12 +161,16 @@ const appName = computed(() => (ctx.ade ? t('common.product.kiraSpace.label') : 
         </NativeSelect>
       </div>
       <FieldError v-if="cronError" data-testid="schedule-cron-error">{{ cronError }}</FieldError>
-      <FieldDescription v-else-if="nextText" data-testid="schedule-next">{{ t('automations.schedule.next.label', { times: nextText }) }}</FieldDescription>
+      <FieldDescription v-else-if="nextText" data-testid="schedule-next">{{
+        t('automations.schedule.next.label', { times: nextText })
+      }}</FieldDescription>
       <FieldDescription v-else>{{ t('automations.schedule.cronHint.hint') }}</FieldDescription>
     </Field>
 
     <Field>
-      <FieldLabel :for="`${idBase}-zone`">{{ t('automations.schedule.timezone.label') }}</FieldLabel>
+      <FieldLabel :for="`${idBase}-zone`">{{
+        t('automations.schedule.timezone.label')
+      }}</FieldLabel>
       <Popover v-model:open="zoneOpen">
         <PopoverTrigger as-child>
           <Button
@@ -177,12 +185,23 @@ const appName = computed(() => (ctx.ade ? t('common.product.kiraSpace.label') : 
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-96 max-w-[80vw] p-0">
-          <Command :model-value="schedule.timezone" @update:model-value="(v) => pickZone(String(v))">
+          <Command
+            :model-value="schedule.timezone"
+            @update:model-value="(v) => pickZone(String(v))"
+          >
             <CommandInput :placeholder="t('automations.schedule.findTimezone.placeholder')" />
             <CommandList>
               <CommandEmpty>{{ t('automations.schedule.noTimezone.empty') }}</CommandEmpty>
               <CommandGroup>
-                <CommandItem v-for="z in zones" :key="z" :value="z" :data-testid="`schedule-zone-${z}`">{{ z }}</CommandItem>
+                <CommandItem
+                  v-for="z in zones"
+                  :key="z"
+                  :value="z"
+                  :data-testid="`schedule-zone-${z}`"
+                  >{{
+                    z
+                  }}</CommandItem
+                >
               </CommandGroup>
             </CommandList>
           </Command>
@@ -214,7 +233,9 @@ const appName = computed(() => (ctx.ade ? t('common.product.kiraSpace.label') : 
       <FieldDescription v-if="askLocked" data-testid="schedule-quiet-why">
         {{ t('automations.schedule.askLocked.hint') }}
       </FieldDescription>
-      <FieldDescription v-else-if="schedule.confirm">{{ t('automations.schedule.askEach.hint') }}</FieldDescription>
+      <FieldDescription v-else-if="schedule.confirm">{{
+        t('automations.schedule.askEach.hint')
+      }}</FieldDescription>
       <FieldDescription v-else>{{ t('automations.schedule.quietWhy.hint') }}</FieldDescription>
     </Field>
 
@@ -242,7 +263,11 @@ const appName = computed(() => (ctx.ade ? t('common.product.kiraSpace.label') : 
         @update:model-value="(v) => setWhere(v === 'task' ? 'task' : 'folder')"
       >
         <div class="flex items-center gap-2">
-          <RadioGroupItem :id="`${idBase}-folder`" value="folder" data-testid="schedule-where-folder" />
+          <RadioGroupItem
+            :id="`${idBase}-folder`"
+            value="folder"
+            data-testid="schedule-where-folder"
+          />
           <Label :for="`${idBase}-folder`">{{ t('automations.schedule.whereFolder.label') }}</Label>
         </div>
         <div class="flex items-center gap-2">

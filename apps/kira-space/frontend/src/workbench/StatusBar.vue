@@ -61,7 +61,9 @@ function onRevealBlameCommit(): void {
               @click="onRevealBlameCommit"
             >
               <CodiconIcon name="git-commit" :size="13" />
-              <span class="max-w-80 overflow-hidden text-ellipsis whitespace-nowrap">{{ blameText }}</span>
+              <span class="max-w-80 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                blameText
+              }}</span>
             </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>

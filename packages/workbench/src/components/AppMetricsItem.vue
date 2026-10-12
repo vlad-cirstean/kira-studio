@@ -42,10 +42,18 @@ const metricsTooltip = computed(() => {
 <template>
   <Tooltip v-if="sample">
     <TooltipTrigger as-child>
-      <Button as="span" variant="toolbar" size="kira" class="h-control-sm gap-1 px-1.5 text-fg text-kira-sm font-normal" data-testid="app-metrics">
+      <Button
+        as="span"
+        variant="toolbar"
+        size="kira"
+        class="h-control-sm gap-1 px-1.5 text-fg text-kira-sm font-normal"
+        data-testid="app-metrics"
+      >
         <CodiconIcon name="pulse" :size="13" />
         <!-- "100%" -->
-        <span class="inline-block text-right min-w-[4ch] font-data" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
+        <span class="inline-block text-right min-w-[4ch] font-data" data-testid="app-metrics-cpu">{{
+          cpuLabel
+        }}</span>
         <span class="text-subtle">·</span>
         <!-- "1234.5 MB" -->
         <span class="inline-block text-right min-w-[9ch] font-data" data-testid="app-metrics-mem">{{

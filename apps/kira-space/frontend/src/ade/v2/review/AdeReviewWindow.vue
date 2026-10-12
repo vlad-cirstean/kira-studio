@@ -58,7 +58,9 @@ const right = useLiveSize(
 <template>
   <div v-if="target" class="flex h-full flex-col" data-testid="ade-review-window">
     <TitleBarBase>
-      <span class="truncate text-kira-md text-muted-foreground">{{ t('space.ade.review.window.title.title', { branch: target.branch }) }}</span>
+      <span class="truncate text-kira-md text-muted-foreground">{{
+        t('space.ade.review.window.title.title', { branch: target.branch })
+      }}</span>
     </TitleBarBase>
     <AdeReviewHeader :target="target" />
     <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
@@ -77,14 +79,23 @@ const right = useLiveSize(
         :max="LEFT_MAX"
         v-bind="left.bind"
       />
-      <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" :aria-label="t('space.ade.review.window.diffs.aria')" data-testid="ade-review-centre">
-        <div class="h-tabbar min-h-0 shrink-0 overflow-hidden border-b border-border bg-chrome" data-testid="ade-review-tabs">
+      <section
+        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg"
+        :aria-label="t('space.ade.review.window.diffs.aria')"
+        data-testid="ade-review-centre"
+      >
+        <div
+          class="h-tabbar min-h-0 shrink-0 overflow-hidden border-b border-border bg-chrome"
+          data-testid="ade-review-tabs"
+        >
           <TabStrip />
         </div>
         <div class="min-h-0 flex-1">
           <MainView>
             <template #empty>
-              <p class="m-0 p-4 text-muted-foreground" data-testid="ade-review-empty">{{ t('space.ade.review.window.emptyHint.emptyHint') }}</p>
+              <p class="m-0 p-4 text-muted-foreground" data-testid="ade-review-empty">{{
+                t('space.ade.review.window.emptyHint.emptyHint')
+              }}</p>
             </template>
           </MainView>
         </div>

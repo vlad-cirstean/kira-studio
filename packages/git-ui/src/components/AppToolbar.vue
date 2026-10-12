@@ -339,7 +339,9 @@ const stashDisabled = computed(
             {{ t('git.toolbar.fetch.label') }}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ t('common.fetchTarget.tooltip', { name: defaultRemote ?? '' }) }}</TooltipContent>
+        <TooltipContent>{{
+          t('common.fetchTarget.tooltip', { name: defaultRemote ?? '' })
+        }}</TooltipContent>
       </Tooltip>
 
       <PullStrategyPicker
@@ -366,7 +368,9 @@ const stashDisabled = computed(
               {{ t('git.toolbar.push.label') }}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{{ t('git.toolbar.push.tooltip', { remote: defaultRemote ?? '' }) }}</TooltipContent>
+          <TooltipContent>{{
+            t('git.toolbar.push.tooltip', { remote: defaultRemote ?? '' })
+          }}</TooltipContent>
         </Tooltip>
         <DropdownMenu v-model:open="isForcePushMenuOpen">
           <DropdownMenuTrigger as-child>
@@ -453,7 +457,9 @@ const stashDisabled = computed(
       data-testid="remote-progress"
     >
       <Spinner label="" />
-      <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65">{{ progressText }}</span>
+      <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65">{{
+        progressText
+      }}</span>
       <TooltipIconButton
         icon="close"
         :label="cancellable ? t('common.action.cancel.label') : (cancelDisabledReason ?? '')"
@@ -464,9 +470,6 @@ const stashDisabled = computed(
       />
     </div>
 
-    <UndoButton
-      :ops="opsState"
-      :copy="copy"
-    />
+    <UndoButton :ops="opsState" :copy="copy" />
   </ViewToolbar>
 </template>

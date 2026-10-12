@@ -20,7 +20,10 @@ const ctx = useAutomationsModule();
 const { run, query } = useScriptRun(() => props.tab.state.runId);
 const stop = useStopScriptRun();
 const decline = useMutation(
-  { mutationKey: ['scriptRuns', 'decline'], mutationFn: (id: string) => ctx.runs.confirmDecline(id) },
+  {
+    mutationKey: ['scriptRuns', 'decline'],
+    mutationFn: (id: string) => ctx.runs.confirmDecline(id),
+  },
   queryClient,
 );
 const rerunRun = useRerun();
@@ -65,7 +68,9 @@ async function rerun(): Promise<void> {
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-2 p-3" data-testid="script-run-view">
     <div v-if="!run" class="text-kira-sm text-muted-foreground" data-testid="script-run-missing">
-      {{ query.isPending.value ? t('common.state.loading.loading') : t('automations.run.missing.emptyHint') }}
+      {{
+        query.isPending.value ? t('common.state.loading.loading') : t('automations.run.missing.emptyHint')
+      }}
     </div>
     <template v-else>
       <div class="flex items-center gap-2" data-testid="script-run-header">
@@ -73,7 +78,9 @@ async function rerun(): Promise<void> {
         <span class="min-w-0 truncate font-medium">{{ run.scriptName }}</span>
         <RunStatusBadge :state="run.state" />
         <RunElapsed :run="run" class="text-kira-sm text-muted-foreground" />
-        <span v-if="isSmart" class="font-data text-kira-sm text-muted-foreground">{{ run.model }}</span>
+        <span v-if="isSmart" class="font-data text-kira-sm text-muted-foreground">{{
+          run.model
+        }}</span>
         <Button
           v-if="run.state === 'waiting'"
           variant="dialog-primary"
@@ -118,11 +125,17 @@ async function rerun(): Promise<void> {
         </Button>
         <span v-if="error" class="text-kira-sm text-error">{{ error }}</span>
       </div>
-      <div v-if="!isSmart" class="font-data text-kira-sm whitespace-pre-wrap break-words" data-testid="script-run-command">
+      <div
+        v-if="!isSmart"
+        class="font-data text-kira-sm whitespace-pre-wrap break-words"
+        data-testid="script-run-command"
+      >
         {{ run.command }}
       </div>
       <details v-if="isSmart" class="text-kira-sm" data-testid="script-run-prompt">
-        <summary class="cursor-default text-muted-foreground">{{ t('automations.run.promptSent.label') }}</summary>
+        <summary class="cursor-default text-muted-foreground">{{
+          t('automations.run.promptSent.label')
+        }}</summary>
         <pre class="mt-1 whitespace-pre-wrap break-words font-data">{{ run.prompt }}</pre>
       </details>
       <RunLog v-if="run.state !== 'waiting' && run.state !== 'skipped'" :run-id="run.id" />

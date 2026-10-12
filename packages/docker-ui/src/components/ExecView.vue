@@ -17,7 +17,9 @@ const store = useDockerExecSessionsStore();
 const sessions = computed(() => store.forContainer(props.containerId));
 const activeId = ref('');
 const shownId = computed(() =>
-  sessions.value.some((s) => s.id === activeId.value) ? activeId.value : (sessions.value[0]?.id ?? ''),
+  sessions.value.some((s) => s.id === activeId.value)
+    ? activeId.value
+    : (sessions.value[0]?.id ?? ''),
 );
 
 function openSession(): void {
@@ -37,7 +39,10 @@ watch(
 );
 
 // TerminalHostView needs a tab-shaped state; exec sessions have no cwd.
-const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command: '', launchKind: 'shell' as const } });
+const hostTab = (id: string) => ({
+  id,
+  state: { cwd: '', codeRepoId: '', command: '', launchKind: 'shell' as const },
+});
 </script>
 
 <template>
@@ -56,38 +61,40 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
       </Button>
     </EmptyState>
     <template v-else>
-    <div class="flex shrink-0 items-center gap-0.5 border-b border-border px-1.5 py-1">
-      <span
-        v-for="s in sessions"
-        :key="s.id"
-        :class="tabChipVariants({ active: s.id === shownId })"
-        data-testid="docker-exec-chip"
-      >
-        <button type="button" class="cursor-default" @click="activeId = s.id">{{ s.title }}</button>
-        <TooltipIconButton
-          icon="close"
-          :icon-size="12"
-          :label="t('docker.exec.close.tooltip', { title: s.title })"
-          data-testid="docker-exec-close"
-          @click="closeSession(s.id)"
-        />
-      </span>
-      <Button variant="toolbar" size="kira" data-testid="docker-exec-new" @click="openSession">
-        <CodiconIcon name="add" :size="12" />
-        {{ t('common.newSession.label') }}
-      </Button>
-    </div>
-    <div class="relative min-h-0 flex-1">
-      <div
-        v-for="s in sessions"
-        :key="s.id"
-        v-show="s.id === shownId"
-        class="absolute inset-0"
-        :data-testid="`docker-exec-pane`"
-      >
-        <TerminalHostView :tab="hostTab(s.id)" :deps="ctx.execHostDeps" />
+      <div class="flex shrink-0 items-center gap-0.5 border-b border-border px-1.5 py-1">
+        <span
+          v-for="s in sessions"
+          :key="s.id"
+          :class="tabChipVariants({ active: s.id === shownId })"
+          data-testid="docker-exec-chip"
+        >
+          <button type="button" class="cursor-default" @click="activeId = s.id">{{
+            s.title
+          }}</button>
+          <TooltipIconButton
+            icon="close"
+            :icon-size="12"
+            :label="t('docker.exec.close.tooltip', { title: s.title })"
+            data-testid="docker-exec-close"
+            @click="closeSession(s.id)"
+          />
+        </span>
+        <Button variant="toolbar" size="kira" data-testid="docker-exec-new" @click="openSession">
+          <CodiconIcon name="add" :size="12" />
+          {{ t('common.newSession.label') }}
+        </Button>
       </div>
-    </div>
+      <div class="relative min-h-0 flex-1">
+        <div
+          v-for="s in sessions"
+          :key="s.id"
+          v-show="s.id === shownId"
+          class="absolute inset-0"
+          :data-testid="`docker-exec-pane`"
+        >
+          <TerminalHostView :tab="hostTab(s.id)" :deps="ctx.execHostDeps" />
+        </div>
+      </div>
     </template>
   </div>
 </template>

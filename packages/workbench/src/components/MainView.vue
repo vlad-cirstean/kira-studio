@@ -19,6 +19,11 @@ const activeTab = computed(() => {
 </script>
 
 <template>
-  <component :is="host.views[activeTab.kind]" v-if="activeTab" :key="activeTab.id" :tab="activeTab" />
+  <component
+    :is="host.views[activeTab.kind]"
+    v-if="activeTab"
+    :key="activeTab.id"
+    :tab="activeTab"
+  />
   <slot v-else name="empty" />
 </template>

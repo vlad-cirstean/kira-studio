@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { SwitchRootEmits, SwitchRootProps } from 'reka-ui'
-import { SwitchRoot, SwitchThumb, useForwardPropsEmits } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { SwitchRootEmits, SwitchRootProps } from 'reka-ui';
+import { SwitchRoot, SwitchThumb, useForwardPropsEmits } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
 // reka-ui emits `data-state="checked"|"unchecked"` (never a bare `data-checked`), so the variants
 // below target `data-[state=...]`.
-const props = defineProps<SwitchRootProps & { class?: HTMLAttributes['class'] }>()
-const emits = defineEmits<SwitchRootEmits>()
+const props = defineProps<SwitchRootProps & { class?: HTMLAttributes['class'] }>();
+const emits = defineEmits<SwitchRootEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class')
-const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const delegatedProps = reactiveOmit(props, 'class');
+const forwarded = useForwardPropsEmits(delegatedProps, emits);
 </script>
 
 <template>

@@ -46,14 +46,20 @@ const state = computed<'loading' | 'error' | 'empty' | 'data'>(() => {
   const { isPending, isError, data } = props.query;
   if (isError.value) return 'error';
   if (isPending.value || data.value === undefined) return 'loading';
-  const empty = props.isEmpty ? props.isEmpty(data.value) : Array.isArray(data.value) && data.value.length === 0;
+  const empty = props.isEmpty
+    ? props.isEmpty(data.value)
+    : Array.isArray(data.value) && data.value.length === 0;
   return empty ? 'empty' : 'data';
 });
 
-const canRetry = computed(() => state.value === 'error' && isRetryable(toCodedError(props.query.error.value).code));
+const canRetry = computed(
+  () => state.value === 'error' && isRetryable(toCodedError(props.query.error.value).code),
+);
 
 // A fast load never flashes the default spinner; a caller's own loading slot shows at once.
-const { ready: spinnerReady, start: startSpinnerDelay } = useTimeout(TIMING.spinnerDelay, { controls: true });
+const { ready: spinnerReady, start: startSpinnerDelay } = useTimeout(TIMING.spinnerDelay, {
+  controls: true,
+});
 watch(
   () => state.value === 'loading',
   (loading) => {
@@ -70,10 +76,17 @@ function retry(): void {
   <template v-if="state === 'loading'">
     <slot name="loading">
       <template v-if="spinnerReady">
-        <EmptyState v-if="variant === 'pane'" class="h-full" data-testid="query-loading" :title="loadingLabel">
+        <EmptyState
+          v-if="variant === 'pane'"
+          class="h-full"
+          data-testid="query-loading"
+          :title="loadingLabel"
+        >
           <template #media><Spinner :size="24" /></template>
         </EmptyState>
-        <InlineState v-else kind="loading" data-testid="query-loading">{{ loadingLabel }}</InlineState>
+        <InlineState v-else kind="loading" data-testid="query-loading">{{
+          loadingLabel
+        }}</InlineState>
       </template>
     </slot>
   </template>
@@ -87,7 +100,16 @@ function retry(): void {
         :description="message"
       >
         <template #media><CodiconIcon name="error" :size="24" class="text-error" /></template>
-        <Button v-if="canRetry" size="kira" variant="toolbar" data-testid="query-retry" @click="retry">{{ t('common.action.retry.label') }}</Button>
+        <Button
+          v-if="canRetry"
+          size="kira"
+          variant="toolbar"
+          data-testid="query-retry"
+          @click="retry"
+          >{{
+            t('common.action.retry.label')
+          }}</Button
+        >
       </EmptyState>
       <InlineState v-else kind="error" data-testid="query-error">{{ message }}</InlineState>
     </slot>

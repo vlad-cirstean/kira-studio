@@ -14,7 +14,9 @@ const { copy, copied } = useCopy();
     <template v-if="id">
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="min-w-0 truncate font-data text-kira-sm" data-testid="ade-session-id-text">{{ id }}</span>
+          <span class="min-w-0 truncate font-data text-kira-sm" data-testid="ade-session-id-text">{{
+            id
+          }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ id }}</TooltipContent>
       </Tooltip>
@@ -25,6 +27,8 @@ const { copy, copied } = useCopy();
         @click="copy(props.id)"
       />
     </template>
-    <span v-else class="text-kira-sm text-subtle">{{ t('space.ade.sessionList.waitingId.status') }}</span>
+    <span v-else class="text-kira-sm text-subtle">{{
+      t('space.ade.sessionList.waitingId.status')
+    }}</span>
   </span>
 </template>

@@ -29,9 +29,7 @@ const loadedRowCount = computed(() => page.value?.rowCount ?? 0);
 
 // P31 D17: the same filter-mode toggle views/shared/page/SearchToolbar.vue has (P24 D1/D9).
 const filtering = computed(() => pageSearchFilterStore.isSearchFiltering(props.tabId));
-const filteredRowCount = computed(
-  () => streamSearchStore.matchedRows(props.tabId)?.length ?? null,
-);
+const filteredRowCount = computed(() => streamSearchStore.matchedRows(props.tabId)?.length ?? null);
 function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
@@ -52,12 +50,9 @@ function searchNow(q: string): void {
 // P31 D22/D23/F23: a Fetch more/poll/page change calls setPage and bumps pageVersion.n —
 // re-scan against the new page (runSearch already resets index to the first match, or -1,
 // per D23) without auto-scrolling; a background poll must not move the viewport under the user.
-watch(
-  page,
-  () => {
-    if (query.value !== '') streamSearchStore.runSearch(props.tabId, query.value);
-  },
-);
+watch(page, () => {
+  if (query.value !== '') streamSearchStore.runSearch(props.tabId, query.value);
+});
 
 function next(): void {
   const row = streamSearchStore.goToNextMatch(props.tabId);
@@ -97,9 +92,17 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="stream-search-toolbar">
     <div ref="fieldWrap" class="w-52 shrink-0">
-      <SearchField v-model="query" @keydown.escape.stop="close" :placeholder="t('common.action.find.label')" data-testid="stream-search-input" />
+      <SearchField
+        v-model="query"
+        @keydown.escape.stop="close"
+        :placeholder="t('common.action.find.label')"
+        data-testid="stream-search-input"
+      />
     </div>
-    <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
+    <span
+      class="text-kira-sm text-muted-foreground whitespace-nowrap"
+      data-testid="stream-search-count"
+    >
       <template v-if="entry && entry.matches.length > 0">
         <CatalogText k="common.matchPosition.status">
           <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
@@ -136,9 +139,13 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
       <template v-if="filtering && filteredRowCount !== null">
-        {{ t('studio.search.scopeFilteredRows.status', { shown: formatCount(filteredRowCount), count: loadedRowCount }) }}
+        {{
+          t('studio.search.scopeFilteredRows.status', { shown: formatCount(filteredRowCount), count: loadedRowCount })
+        }}
       </template>
-      <template v-else>{{ t('studio.search.scopeRows.status', { count: loadedRowCount }) }}</template>
+      <template v-else>{{
+        t('studio.search.scopeRows.status', { count: loadedRowCount })
+      }}</template>
     </span>
     <TooltipIconButton
       icon="close"
@@ -149,4 +156,3 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     />
   </ViewToolbar>
 </template>
-

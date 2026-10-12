@@ -17,7 +17,14 @@ const props = defineProps<{
   band: TimelineBand;
   cards: CardModel[];
   /** Continuation rows: task title plus the span facts. */
-  spans: { taskId: string; title: string; color: string; note: string; merges: boolean; tip: string }[];
+  spans: {
+    taskId: string;
+    title: string;
+    color: string;
+    note: string;
+    merges: boolean;
+    tip: string;
+  }[];
   history: { key: string; how: string; repos: string; title: string }[];
   overdueNote: string;
   overflowNote: string;
@@ -83,15 +90,15 @@ const labelClass = computed(() => {
 });
 const subClass = computed(() => {
   if (greyed.value) return 'text-disabled';
-  return props.band.overflowHours > 0 && !props.band.isLater ? 'text-tone-red' : 'text-muted-foreground';
+  return props.band.overflowHours > 0 && !props.band.isLater
+    ? 'text-tone-red'
+    : 'text-muted-foreground';
 });
 const sub = computed(() => {
   if (props.band.dayOff) return t('common.off.status');
   return props.band.hours ? t('format.relative.unitHour', { count: props.band.hours }) : '';
 });
-const solidBorder = computed(
-  () => props.band.isMonday || props.band.isLater || props.band.isToday,
-);
+const solidBorder = computed(() => props.band.isMonday || props.band.isLater || props.band.isToday);
 </script>
 
 <template>
@@ -130,7 +137,8 @@ const solidBorder = computed(
       ref="dropEl"
       data-testid="ade-band-drop"
     >
-      <Button size="kira"
+      <Button
+        size="kira"
         v-for="h in history"
         :key="h.key"
         variant="ghost"
@@ -141,17 +149,16 @@ const solidBorder = computed(
       >
         <span class="font-medium text-tone-purple">✓</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-tone-purple">{{ h.how }}</span>
-        <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{ h.repos }}</span>
+        <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{
+          h.repos
+        }}</span>
         <span class="min-w-0 truncate font-medium text-fg">{{ h.title }}</span>
       </Button>
-      <div
-        v-if="overdue"
-        class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-amber"
-      >
+      <div v-if="overdue" class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-amber">
         <span>{{ overdueNote }}</span>
-        <Button variant="dialog"
+        <Button
+          variant="dialog"
           size="kira"
-          
           :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
@@ -178,7 +185,8 @@ const solidBorder = computed(
         @select="emit('select', card.task.id)"
         @force-push="(row) => emit('forcePush', row)"
       />
-      <Button size="kira"
+      <Button
+        size="kira"
         v-for="s in spans"
         :key="s.taskId"
         variant="ghost"
@@ -192,7 +200,9 @@ const solidBorder = computed(
         <span
           class="shrink-0 whitespace-nowrap text-kira-sm"
           :class="s.merges ? 'text-tone-amber' : 'text-subtle'"
-          >{{ s.note }}</span
+          >{{
+            s.note
+          }}</span
         >
         <span class="min-w-0 truncate font-medium text-fg">{{ s.title }}</span>
       </Button>

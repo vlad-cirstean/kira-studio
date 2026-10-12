@@ -40,10 +40,14 @@ const savedEntries = computed<StreamFilterHistoryEntry[]>(() => entries.value);
 
 function summarize(entry: StreamFilterHistoryEntry): string {
   const parts: string[] = [];
-  if (entry.offset !== null) parts.push(t('studio.stream.history.offset.label', { value: entry.offset }));
-  if (entry.partitions.length === 1) parts.push(t('studio.stream.partition.label', { id: entry.partitions[0] }));
-  else if (entry.partitions.length > 1) parts.push(t('studio.stream.history.partitions.label', { list: entry.partitions.join(', ') }));
-  if (entry.timestamp !== null) parts.push(t('studio.stream.history.since.label', { value: entry.timestamp }));
+  if (entry.offset !== null)
+    parts.push(t('studio.stream.history.offset.label', { value: entry.offset }));
+  if (entry.partitions.length === 1)
+    parts.push(t('studio.stream.partition.label', { id: entry.partitions[0] }));
+  else if (entry.partitions.length > 1)
+    parts.push(t('studio.stream.history.partitions.label', { list: entry.partitions.join(', ') }));
+  if (entry.timestamp !== null)
+    parts.push(t('studio.stream.history.since.label', { value: entry.timestamp }));
   return parts.length > 0 ? parts.join(' · ') : t('studio.stream.emptyFilter.label');
 }
 
@@ -86,9 +90,12 @@ function remove(entry: StreamFilterHistoryEntry): void {
            own note (the 320px popover is structurally too narrow for a long summary). -->
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            summarize(entry)
-          }}</span>
+          <span
+            class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+            >{{
+              summarize(entry)
+            }}</span
+          >
         </TooltipTrigger>
         <TooltipContent>{{ summarize(entry) }}</TooltipContent>
       </Tooltip>

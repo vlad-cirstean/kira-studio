@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
@@ -20,9 +27,7 @@ const maskedNames = computed(() =>
     (name) => copyAsCurlStore.revealedSecretValues[name] === undefined,
   ),
 );
-const hasRevealedAny = computed(
-  () => Object.keys(copyAsCurlStore.revealedSecretValues).length > 0,
-);
+const hasRevealedAny = computed(() => Object.keys(copyAsCurlStore.revealedSecretValues).length > 0);
 
 const stripTone = computed<'info' | 'warn'>(() => (hasRevealedAny.value ? 'warn' : 'info'));
 // D10 step 5: "the strip says which names are still masked" — true whether nothing has been
@@ -32,7 +37,9 @@ const stripText = computed(() => {
   if (masked.length === 0) return t('studio.api.curl.realSecrets.body');
   const names = masked.join(', ');
   return t(
-    hasRevealedAny.value ? 'studio.api.curl.secretsStillHidden.body' : 'studio.api.curl.secretsHidden.body',
+    hasRevealedAny.value
+      ? 'studio.api.curl.secretsStillHidden.body'
+      : 'studio.api.curl.secretsHidden.body',
     { count: masked.length, names },
   );
 });
@@ -66,54 +73,59 @@ function close(): void {
         <DialogTitle>{{ t('studio.api.copyAsCurl.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-      <Textarea
-        class="font-data min-h-44"
-        :model-value="command"
-        readonly
-        rows="10"
-        data-testid="copy-as-curl-command"
-      />
+        <Textarea
+          class="font-data min-h-44"
+          :model-value="command"
+          readonly
+          rows="10"
+          data-testid="copy-as-curl-command"
+        />
 
-      <Alert
-        v-if="copyAsCurlStore.deferredNames.length > 0"
-        :variant="stripTone"
-        data-testid="copy-as-curl-strip"
-      >
-        <AlertDescription>{{ stripText }}</AlertDescription>
-        <AlertAction v-if="maskedNames.length > 0">
-          <Button
-            variant="dialog"
-            size="kira"
-            :disabled="copyAsCurlStore.revealing"
-            data-testid="copy-as-curl-reveal"
-            @click="onReveal"
-          >
-            {{ t('studio.api.copyAsCurl.reveal.label') }}
-          </Button>
-        </AlertAction>
-      </Alert>
+        <Alert
+          v-if="copyAsCurlStore.deferredNames.length > 0"
+          :variant="stripTone"
+          data-testid="copy-as-curl-strip"
+        >
+          <AlertDescription>{{ stripText }}</AlertDescription>
+          <AlertAction v-if="maskedNames.length > 0">
+            <Button
+              variant="dialog"
+              size="kira"
+              :disabled="copyAsCurlStore.revealing"
+              data-testid="copy-as-curl-reveal"
+              @click="onReveal"
+            >
+              {{ t('studio.api.copyAsCurl.reveal.label') }}
+            </Button>
+          </AlertAction>
+        </Alert>
 
-      <div v-if="hasDynamicValue" class="text-kira-sm text-muted-foreground" data-testid="copy-as-curl-dynamic-note">
-        {{ t('studio.api.curl.dynamicValues.hint') }}
-      </div>
+        <div
+          v-if="hasDynamicValue"
+          class="text-kira-sm text-muted-foreground"
+          data-testid="copy-as-curl-dynamic-note"
+        >
+          {{ t('studio.api.curl.dynamicValues.hint') }}
+        </div>
 
-      <Alert v-if="copyAsCurlStore.error" variant="error" data-testid="copy-as-curl-error">
-        <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>
-      </Alert>
+        <Alert v-if="copyAsCurlStore.error" variant="error" data-testid="copy-as-curl-error">
+          <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>
+        </Alert>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">{{ t('common.action.close.label') }}</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="copy-as-curl-copy"
-            @click="onCopy"
-          >
-            {{ t('common.action.copy.label') }}
-          </Button>
+        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">{{
+          t('common.action.close.label')
+        }}</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="copy-as-curl-copy"
+          @click="onCopy"
+        >
+          {{ t('common.action.copy.label') }}
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
-

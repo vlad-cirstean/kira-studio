@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import type { HTMLAttributes } from 'vue'
-import type { FieldVariants } from '.'
-import { fieldVariants } from '.'
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
+import type { FieldVariants } from '.';
+import { fieldVariants } from '.';
 
-const props = withDefaults(defineProps<{
-  class?: HTMLAttributes['class']
-  orientation?: FieldVariants['orientation']
-}>(), {
-  orientation: 'vertical',
-})
+const props = withDefaults(
+  defineProps<{
+    class?: HTMLAttributes['class'];
+    orientation?: FieldVariants['orientation'];
+  }>(),
+  {
+    orientation: 'vertical',
+  },
+);
 </script>
 
 <template>

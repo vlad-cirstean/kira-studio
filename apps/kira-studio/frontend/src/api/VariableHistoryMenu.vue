@@ -35,7 +35,12 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
 <template>
   <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="variable-history">
     <div class="flex max-h-80 flex-col overflow-auto p-1">
-      <EmptyState v-if="variableSetStore.entries.length === 0" data-testid="variable-history-empty" :icon="ICON.history" :title="t('studio.api.variableHistory.empty')" />
+      <EmptyState
+        v-if="variableSetStore.entries.length === 0"
+        data-testid="variable-history-empty"
+        :icon="ICON.history"
+        :title="t('studio.api.variableHistory.empty')"
+      />
       <div
         v-for="entry in variableSetStore.entries"
         :key="entry.id"
@@ -53,9 +58,14 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
           >
             ••••••••
           </span>
-          <span v-else class="overflow-hidden text-ellipsis whitespace-nowrap font-data" data-testid="variable-history-value">{{
-            displayValue(entry)
-          }}</span>
+          <span
+            v-else
+            class="overflow-hidden text-ellipsis whitespace-nowrap font-data"
+            data-testid="variable-history-value"
+            >{{
+              displayValue(entry)
+            }}</span
+          >
         </div>
         <TooltipIconButton
           v-if="notYetRevealed(entry)"

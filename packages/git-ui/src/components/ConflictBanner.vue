@@ -144,11 +144,10 @@ const PATH_DISPLAY_CAP = 20;
       <li v-for="path in inProgress.conflictedPaths.slice(0, PATH_DISPLAY_CAP)" :key="path">
         <code class="font-data">{{ path }}</code>
       </li>
-      <li
-        v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"
-        class="text-muted-foreground"
-      >
-        {{ t('common.more.label', { count: inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }) }}
+      <li v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP" class="text-muted-foreground">
+        {{
+          t('common.more.label', { count: inProgress.conflictedPaths.length - PATH_DISPLAY_CAP })
+        }}
       </li>
     </ul>
   </Alert>

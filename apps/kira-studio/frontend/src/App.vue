@@ -83,7 +83,10 @@ function onNewWindow(): void {
 }
 
 function onToggleKeepAwake(): void {
-  fireAndForget(keepAwakeStore.setKeepAwakeManual(!keepAwakeStore.status.manual), 'toggle keep-awake');
+  fireAndForget(
+    keepAwakeStore.setKeepAwakeManual(!keepAwakeStore.status.manual),
+    'toggle keep-awake',
+  );
 }
 
 function closeActiveTab(): void {
@@ -151,7 +154,10 @@ onUnmounted(() => {
         @new-window="onNewWindow"
       >
         <template #settings>
-          <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
+          <SettingsDialog
+            v-if="settingsStore.settingsOpen"
+            @close="settingsStore.settingsOpen = false"
+          />
         </template>
       </WorkbenchTitleBar>
       <WorkbenchShell />
@@ -166,6 +172,9 @@ onUnmounted(() => {
     <AppLiveRegion />
     <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />
-    <CommandPalette :placeholder="t('studio.shortcuts.palette.placeholder')" :empty-label="t('studio.shortcuts.palette.empty')" />
+    <CommandPalette
+      :placeholder="t('studio.shortcuts.palette.placeholder')"
+      :empty-label="t('studio.shortcuts.palette.empty')"
+    />
   </TooltipProvider>
 </template>

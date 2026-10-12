@@ -13,7 +13,9 @@ const props = defineProps<{ data: StageNodeData }>();
 const KIND_TONE: Record<StageKind, Tone> = { user: 'blue', agent: 'amber', script: 'green' };
 const stage = computed(() => props.data.stage);
 const agent = computed(() => stage.value.kind === 'agent');
-const handleStyle = computed(() => (props.data.spineX === undefined ? {} : { left: `${props.data.spineX}px` }));
+const handleStyle = computed(() =>
+  props.data.spineX === undefined ? {} : { left: `${props.data.spineX}px` },
+);
 const detail = computed(() => {
   const s = stage.value;
   if (s.kind === 'script') {
@@ -22,7 +24,9 @@ const detail = computed(() => {
       ? t('common.dotPair.label', { first: command, second: failureLabel(s.onFailure) })
       : command;
   }
-  return s.session ? t('space.ade.workflows.stageNode.session.label') : t('space.ade.workflows.stageNode.manual.label');
+  return s.session
+    ? t('space.ade.workflows.stageNode.session.label')
+    : t('space.ade.workflows.stageNode.manual.label');
 });
 </script>
 
@@ -49,10 +53,19 @@ const detail = computed(() => {
     />
     <div class="flex items-center gap-1.5 px-3" :class="agent ? 'h-row' : 'pt-2'">
       <span class="font-medium">{{ data.index + 1 }}.</span>
-      <span class="min-w-0 flex-1 truncate font-medium" :class="stage.skip ? 'line-through' : ''">{{ stage.name }}</span>
+      <span class="min-w-0 flex-1 truncate font-medium" :class="stage.skip ? 'line-through' : ''">{{
+        stage.name
+      }}</span>
       <AdeChip :label="kindLabel(stage.kind)" :tone="KIND_TONE[stage.kind]" />
     </div>
-    <div v-if="!agent" class="truncate px-3 text-kira-sm text-subtle" data-testid="ade-wf-stage-node-detail">{{ detail }}</div>
+    <div
+      v-if="!agent"
+      class="truncate px-3 text-kira-sm text-subtle"
+      data-testid="ade-wf-stage-node-detail"
+      >{{
+        detail
+      }}</div
+    >
     <Handle
       id="out"
       type="source"

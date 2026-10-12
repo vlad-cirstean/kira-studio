@@ -133,8 +133,8 @@ function onDblClick(): void {
     <span class="text-kira-sm text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
     <span class="overflow-hidden text-ellipsis"
       >{{ previewParts.before
-      }}<span class="rounded-kira-xs bg-search-match">{{ previewParts.match }}</span
-      >{{ previewParts.after }}</span
+      }}<span class="rounded-kira-xs bg-search-match">{{ previewParts.match }}</span>
+      {{ previewParts.after }}</span
     >
   </div>
   <!-- Row state and indent come from `rowVariants`/`rowIndent` (match rows sit one level in). -->

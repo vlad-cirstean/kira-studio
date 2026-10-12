@@ -7,8 +7,16 @@ import type { PendingChange } from '../lib/editDiff';
 const props = defineProps<{ changes: PendingChange[] }>();
 
 const groups = computed(() => [
-  { mode: 'now' as const, title: t('docker.edit.appliesNow.title'), rows: props.changes.filter((c) => c.mode === 'now') },
-  { mode: 'recreate' as const, title: t('docker.edit.recreates.title'), rows: props.changes.filter((c) => c.mode === 'recreate') },
+  {
+    mode: 'now' as const,
+    title: t('docker.edit.appliesNow.title'),
+    rows: props.changes.filter((c) => c.mode === 'now'),
+  },
+  {
+    mode: 'recreate' as const,
+    title: t('docker.edit.recreates.title'),
+    rows: props.changes.filter((c) => c.mode === 'recreate'),
+  },
 ]);
 </script>
 

@@ -58,14 +58,22 @@ async function onSelect(value: unknown): Promise<void> {
           data-testid="docker-status-dot"
           :data-state="ok ? 'ok' : 'unavailable'"
         />
-        <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ endpoint?.context ?? 'docker' }}</span>
+        <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
+          endpoint?.context ?? 'docker'
+        }}</span>
         <CodiconIcon name="chevron-down" :size="12" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" data-testid="docker-context-menu">
       <DropdownMenuRadioGroup :model-value="selected" @update:model-value="onSelect">
-        <DropdownMenuRadioItem :value="AUTOMATIC" class="h-auto min-h-control py-1" data-testid="docker-context-automatic">
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('docker.endpoint.automatic.option') }}</span>
+        <DropdownMenuRadioItem
+          :value="AUTOMATIC"
+          class="h-auto min-h-control py-1"
+          data-testid="docker-context-automatic"
+        >
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            t('docker.endpoint.automatic.option')
+          }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
         <DropdownMenuSeparator />
@@ -79,7 +87,12 @@ async function onSelect(value: unknown): Promise<void> {
         >
           <span class="flex min-w-0 flex-1 flex-col">
             <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ c.name }}</span>
-            <span class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-muted-foreground">{{ c.host }}</span>
+            <span
+              class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-muted-foreground"
+              >{{
+                c.host
+              }}</span
+            >
           </span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>

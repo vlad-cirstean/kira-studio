@@ -28,6 +28,8 @@ const copy = computed(() => {
     :title="copy.title"
     :description="copy.detail"
   >
-    <template #media><CodiconIcon :name="STATE_ICONS.warning" :size="24" class="text-error" /></template>
+    <template #media
+      ><CodiconIcon :name="STATE_ICONS.warning" :size="24" class="text-error" /></template
+    >
   </EmptyState>
 </template>

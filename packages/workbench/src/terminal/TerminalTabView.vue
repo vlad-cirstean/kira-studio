@@ -44,12 +44,7 @@ async function tail(): Promise<string> {
     </div>
     <template v-if="scriptRun && ended" #outcome>
       <div class="shrink-0 bg-chrome px-1 py-1" data-testid="script-run-outcome">
-        <RunOutcomeBlock
-          :run="scriptRun"
-          compact
-          :tail="tail"
-          @rerun="rerun(scriptRun)"
-        />
+        <RunOutcomeBlock :run="scriptRun" compact :tail="tail" @rerun="rerun(scriptRun)" />
         <FieldError v-if="rerunError" data-testid="script-run-error">{{ rerunError }}</FieldError>
       </div>
     </template>

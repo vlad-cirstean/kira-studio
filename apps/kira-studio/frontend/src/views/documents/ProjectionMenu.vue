@@ -81,16 +81,28 @@ onUnmounted(() => {
 <template>
   <div class="max-h-80 flex flex-col">
     <div class="flex border-b border-border gap-1 p-1">
-      <Button variant="toolbar" size="kira" data-testid="document-projection-select-all" @click="selectAll"
-        
-        >{{ t('common.state.all.option') }}</Button
+      <Button
+        variant="toolbar"
+        size="kira"
+        data-testid="document-projection-select-all"
+        @click="selectAll"
+        >{{
+          t('common.state.all.option')
+        }}</Button
       >
-      <Button variant="toolbar" size="kira" data-testid="document-projection-select-none" @click="selectNone"
-        
-        >{{ t('common.state.none.option') }}</Button
+      <Button
+        variant="toolbar"
+        size="kira"
+        data-testid="document-projection-select-none"
+        @click="selectNone"
+        >{{
+          t('common.state.none.option')
+        }}</Button
       >
     </div>
-    <InlineState v-if="fieldNames.length === 0" kind="empty">{{ t('studio.documents.projection.empty') }}</InlineState>
+    <InlineState v-if="fieldNames.length === 0" kind="empty">{{
+      t('studio.documents.projection.empty')
+    }}</InlineState>
     <div v-else class="overflow-y-auto p-0.5">
       <Label v-for="name in fieldNames" :key="name" :class="rowVariants()">
         <Checkbox
@@ -105,8 +117,13 @@ onUnmounted(() => {
       </Label>
     </div>
     <Separator class="my-1" />
-    <div class="px-1.5 pb-1.5 text-kira-sm text-subtle" data-testid="document-projection-menu-footer">
-      {{ t(caps?.projection ? 'studio.documents.projection.footerServer.hint' : 'studio.documents.projection.footerClient.hint') }}
+    <div
+      class="px-1.5 pb-1.5 text-kira-sm text-subtle"
+      data-testid="document-projection-menu-footer"
+    >
+      {{
+        t(caps?.projection ? 'studio.documents.projection.footerServer.hint' : 'studio.documents.projection.footerClient.hint')
+      }}
     </div>
   </div>
 </template>

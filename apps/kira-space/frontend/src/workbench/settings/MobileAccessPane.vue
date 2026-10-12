@@ -52,7 +52,10 @@ const portError = computed(() => {
   const port = parseIntField(portDraft.value);
   if (!Number.isInteger(port)) return t('common.enterWholeNumber.error');
   if (port < MOBILE_PORT_RANGE.min || port > MOBILE_PORT_RANGE.max) {
-    return t('space.settings.mobileAccess.port.range.error', { min: MOBILE_PORT_RANGE.min, max: MOBILE_PORT_RANGE.max });
+    return t('space.settings.mobileAccess.port.range.error', {
+      min: MOBILE_PORT_RANGE.min,
+      max: MOBILE_PORT_RANGE.max,
+    });
   }
   return null;
 });
@@ -91,7 +94,10 @@ async function onTrust(): Promise<void> {
   if (!now) return;
   const ok = await confirmDialogStore.confirm({
     title: t('space.settings.mobileAccess.trustConfirm.title'),
-    message: t('space.settings.mobileAccess.trustConfirm.body', { subnet: now.subnet, mac: now.routerMac }),
+    message: t('space.settings.mobileAccess.trustConfirm.body', {
+      subnet: now.subnet,
+      mac: now.routerMac,
+    }),
     confirmLabel: t('space.settings.mobileAccess.network.trustVerb.label'),
     tone: 'danger',
   });
@@ -122,9 +128,17 @@ const trustedText = computed(() => {
   const net = trusted.value;
   if (!net) return '';
   const at = store.status.trustedAt;
-  const params = { subnet: net.subnet, router: net.routerIp, mac: net.routerMac, interface: net.interface };
+  const params = {
+    subnet: net.subnet,
+    router: net.routerIp,
+    mac: net.routerMac,
+    interface: net.interface,
+  };
   return at
-    ? t('space.settings.mobileAccess.network.trustedAt.status', { ...params, date: formatDateTime(at) })
+    ? t('space.settings.mobileAccess.network.trustedAt.status', {
+        ...params,
+        date: formatDateTime(at),
+      })
     : t('space.settings.mobileAccess.network.trusted.status', params);
 });
 
@@ -166,7 +180,9 @@ const activeDevices = computed(() =>
     </Alert>
 
     <section class="flex flex-col gap-1" data-testid="mobile-access-network">
-      <h3 class="m-0 text-kira-md font-medium">{{ t('space.settings.mobileAccess.network.title') }}</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{
+        t('space.settings.mobileAccess.network.title')
+      }}</h3>
       <p v-if="trusted" class="m-0 text-kira-sm" data-testid="mobile-access-trusted">
         {{ trustedText }}
       </p>
@@ -215,11 +231,19 @@ const activeDevices = computed(() =>
       </p>
     </section>
 
-    <section v-if="store.status.running" class="flex flex-col gap-1" data-testid="mobile-access-step-app">
-      <h3 class="m-0 text-kira-md font-medium">{{ t('space.settings.mobileAccess.openApp.title') }}</h3>
+    <section
+      v-if="store.status.running"
+      class="flex flex-col gap-1"
+      data-testid="mobile-access-step-app"
+    >
+      <h3 class="m-0 text-kira-md font-medium">{{
+        t('space.settings.mobileAccess.openApp.title')
+      }}</h3>
       <figure class="m-0 flex flex-col gap-0.5">
         <MobileQr :url="store.status.appUrl" />
-        <figcaption class="font-data text-kira-sm break-all select-all">{{ store.status.appUrl }}</figcaption>
+        <figcaption class="font-data text-kira-sm break-all select-all">{{
+          store.status.appUrl
+        }}</figcaption>
       </figure>
     </section>
 
@@ -249,7 +273,9 @@ const activeDevices = computed(() =>
         :model-value="portDraft"
         @input="(e: Event) => (portDraft = (e.target as HTMLInputElement).value)"
       />
-      <FieldError v-if="portError" data-testid="mobile-access-port-error">{{ portError }}</FieldError>
+      <FieldError v-if="portError" data-testid="mobile-access-port-error">{{
+        portError
+      }}</FieldError>
       <Button
         variant="dialog"
         size="kira-lg"
@@ -263,8 +289,14 @@ const activeDevices = computed(() =>
     </Field>
 
     <section class="flex flex-col gap-1">
-      <h3 class="m-0 text-kira-md font-medium">{{ t('space.settings.mobileAccess.devices.title') }}</h3>
-      <p v-if="activeDevices.length === 0" class="text-subtle text-kira-sm" data-testid="mobile-devices-empty">
+      <h3 class="m-0 text-kira-md font-medium">{{
+        t('space.settings.mobileAccess.devices.title')
+      }}</h3>
+      <p
+        v-if="activeDevices.length === 0"
+        class="text-subtle text-kira-sm"
+        data-testid="mobile-devices-empty"
+      >
         {{ t('space.settings.mobileAccess.devices.none.empty') }}
       </p>
       <ul v-else class="m-0 flex list-none flex-col gap-1 p-0">
@@ -292,7 +324,9 @@ const activeDevices = computed(() =>
               class="text-kira-sm leading-normal"
               :data-testid="`mobile-device-terminals-${device.id}`"
             >
-              {{ t('space.settings.mobileAccess.devices.terminals.status', { count: phones.countFor(device.id) }) }}
+              {{
+                t('space.settings.mobileAccess.devices.terminals.status', { count: phones.countFor(device.id) })
+              }}
             </span>
           </span>
           <span class="flex shrink-0 items-center gap-2">

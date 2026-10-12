@@ -58,66 +58,111 @@ const nav = useListNavigation<DockerContainer>({
 <template>
   <QueryState :query="containers" :is-empty="() => rows.length === 0">
     <template #empty>
-      <ListState icon="server" :title="t('docker.container.none.empty')" :hint="t('docker.container.none.emptyHint')" />
+      <ListState
+        icon="server"
+        :title="t('docker.container.none.empty')"
+        :hint="t('docker.container.none.emptyHint')"
+      />
     </template>
-  <div ref="tableEl" class="@container" role="listbox" data-testid="docker-table">
-    <div :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-x-3 px-3', COLUMNS)">
-      <span />
-      <span>{{ t('common.field.name.label') }}</span>
-      <span class="hidden @4xl:block">{{ t('docker.field.image.label') }}</span>
-      <span class="hidden @4xl:block">{{ t('docker.field.ports.label') }}</span>
-      <span class="text-right">{{ t('docker.metric.cpu.label') }}</span>
-      <span class="text-right">{{ t('common.module.memory.label') }}</span>
-      <span />
+    <div ref="tableEl" class="@container" role="listbox" data-testid="docker-table">
+      <div
+        :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-x-3 px-3', COLUMNS)"
+      >
+        <span />
+        <span>{{ t('common.field.name.label') }}</span>
+        <span class="hidden @4xl:block">{{ t('docker.field.image.label') }}</span>
+        <span class="hidden @4xl:block">{{ t('docker.field.ports.label') }}</span>
+        <span class="text-right">{{ t('docker.metric.cpu.label') }}</span>
+        <span class="text-right">{{ t('common.module.memory.label') }}</span>
+        <span />
+      </div>
+      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
+      <div
+        v-for="c in rows"
+        :key="c.id"
+        :class="cn(tableRowClass, 'group/row grid h-auto min-h-row cursor-default select-none items-center gap-x-3 px-3 py-1 last:border-b-0', COLUMNS)"
+        data-testid="docker-table-row"
+        :data-name="c.name"
+        :data-state="c.state"
+        role="option"
+        :aria-selected="false"
+        v-bind="nav.rowProps(c.id)"
+        @click="open(c)"
+        @dblclick="open(c, 'logs')"
+      >
+        <StatusDot :tone="stateDotTone(c.state)" />
+        <span class="flex min-w-0 flex-col">
+          <span class="flex min-w-0 items-baseline gap-1.5">
+            <span
+              class="truncate"
+              :class="c.state === 'running' ? 'font-medium' : 'text-muted-foreground'"
+              >{{
+                c.name
+              }}</span
+            >
+            <span v-if="c.composeProject" class="shrink-0 text-kira-sm text-muted-foreground">{{
+              c.composeProject
+            }}</span>
+          </span>
+          <span class="truncate text-kira-sm text-muted-foreground @4xl:hidden">{{ c.image }}</span>
+        </span>
+        <span class="hidden truncate text-muted-foreground @4xl:block">{{ c.image }}</span>
+        <span class="hidden truncate font-data text-kira-sm text-muted-foreground @4xl:block">{{
+          displayValue(publishedPorts(c.ports).join(' '))
+        }}</span>
+        <template v-if="c.state === 'running' && stats.latest.get(c.id)">
+          <span class="flex flex-col items-end gap-0.5">
+            <span class="font-data text-kira-sm">{{
+              formatPercent(stats.latest.get(c.id)!.cpuPercent)
+            }}</span>
+            <UsageBar :percent="stats.latest.get(c.id)!.cpuPercent" />
+          </span>
+          <span class="flex flex-col items-end gap-0.5">
+            <span class="font-data text-kira-sm">{{
+              formatBytes(stats.latest.get(c.id)!.memUsage)
+            }}</span>
+            <UsageBar :percent="stats.latest.get(c.id)!.memPercent" />
+          </span>
+        </template>
+        <template v-else>
+          <span class="text-right text-muted-foreground">{{
+            c.state === 'running' ? '…' : displayValue(null)
+          }}</span>
+          <span class="text-right text-muted-foreground">{{
+            c.state === 'running' ? '…' : displayValue(null)
+          }}</span>
+        </template>
+        <span class="flex items-center justify-end">
+          <Spinner v-if="actions.isBusy(c.id)" label="" />
+          <span
+            v-else
+            class="invisible flex group-hover/row:visible group-focus-within/row:visible"
+          >
+            <TooltipIconButton
+              icon="output"
+              :label="t('docker.tab.logs.label')"
+              @click.stop="open(c, 'logs')"
+            />
+            <TooltipIconButton
+              v-if="c.state === 'running'"
+              icon="debug-stop"
+              :label="t('common.action.stop.label')"
+              class="text-error hover:text-error"
+              data-testid="docker-table-stop"
+              @click.stop="act(c, 'stop')"
+            />
+            <TooltipIconButton
+              v-else
+              icon="play"
+              :label="t('common.action.start.label')"
+              class="text-ok hover:text-ok"
+              data-testid="docker-table-start"
+              @click.stop="act(c, 'start')"
+            />
+          </span>
+        </span>
+      </div>
     </div>
-    <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-    <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
-    <div
-      v-for="c in rows"
-      :key="c.id"
-:class="cn(tableRowClass, 'group/row grid h-auto min-h-row cursor-default select-none items-center gap-x-3 px-3 py-1 last:border-b-0', COLUMNS)"
-      data-testid="docker-table-row"
-      :data-name="c.name"
-      :data-state="c.state"
-      role="option"
-      :aria-selected="false"
-      v-bind="nav.rowProps(c.id)"
-      @click="open(c)"
-      @dblclick="open(c, 'logs')"
-    >
-      <StatusDot :tone="stateDotTone(c.state)" />
-      <span class="flex min-w-0 flex-col">
-        <span class="flex min-w-0 items-baseline gap-1.5">
-          <span class="truncate" :class="c.state === 'running' ? 'font-medium' : 'text-muted-foreground'">{{ c.name }}</span>
-          <span v-if="c.composeProject" class="shrink-0 text-kira-sm text-muted-foreground">{{ c.composeProject }}</span>
-        </span>
-        <span class="truncate text-kira-sm text-muted-foreground @4xl:hidden">{{ c.image }}</span>
-      </span>
-      <span class="hidden truncate text-muted-foreground @4xl:block">{{ c.image }}</span>
-      <span class="hidden truncate font-data text-kira-sm text-muted-foreground @4xl:block">{{ displayValue(publishedPorts(c.ports).join(' ')) }}</span>
-      <template v-if="c.state === 'running' && stats.latest.get(c.id)">
-        <span class="flex flex-col items-end gap-0.5">
-          <span class="font-data text-kira-sm">{{ formatPercent(stats.latest.get(c.id)!.cpuPercent) }}</span>
-          <UsageBar :percent="stats.latest.get(c.id)!.cpuPercent" />
-        </span>
-        <span class="flex flex-col items-end gap-0.5">
-          <span class="font-data text-kira-sm">{{ formatBytes(stats.latest.get(c.id)!.memUsage) }}</span>
-          <UsageBar :percent="stats.latest.get(c.id)!.memPercent" />
-        </span>
-      </template>
-      <template v-else>
-        <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : displayValue(null) }}</span>
-        <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : displayValue(null) }}</span>
-      </template>
-      <span class="flex items-center justify-end">
-        <Spinner v-if="actions.isBusy(c.id)" label="" />
-        <span v-else class="invisible flex group-hover/row:visible group-focus-within/row:visible">
-          <TooltipIconButton icon="output" :label="t('docker.tab.logs.label')" @click.stop="open(c, 'logs')" />
-          <TooltipIconButton v-if="c.state === 'running'" icon="debug-stop" :label="t('common.action.stop.label')" class="text-error hover:text-error" data-testid="docker-table-stop" @click.stop="act(c, 'stop')" />
-          <TooltipIconButton v-else icon="play" :label="t('common.action.start.label')" class="text-ok hover:text-ok" data-testid="docker-table-start" @click.stop="act(c, 'start')" />
-        </span>
-      </span>
-    </div>
-  </div>
   </QueryState>
 </template>

@@ -16,7 +16,10 @@ const tab = defineModel<string>({ required: true });
       {{ title }}
       <template #actions><slot name="actions" /></template>
     </PanelHeader>
-    <div class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2" data-testid="ade-panel-head">
+    <div
+      class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2"
+      data-testid="ade-panel-head"
+    >
       <slot name="header" />
     </div>
     <PanelBar>

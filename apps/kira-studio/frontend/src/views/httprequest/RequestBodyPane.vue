@@ -223,7 +223,11 @@ const BODY_MODE_ITEMS = computed(() =>
       />
     </ViewToolbar>
 
-    <div v-if="caption" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="http-body-content-type-caption">
+    <div
+      v-if="caption"
+      class="text-kira-sm text-subtle px-1.5 pt-0 pb-1"
+      data-testid="http-body-content-type-caption"
+    >
       {{ caption }}
     </div>
 

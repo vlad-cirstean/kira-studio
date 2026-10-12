@@ -60,7 +60,6 @@ watch(
 const isBusy = computed(() => props.graphView.loading.value !== 'idle');
 const isRefreshing = computed(() => props.graphView.loading.value === 'refreshing');
 
-
 async function doRefresh(): Promise<void> {
   if (isBusy.value) return;
   try {
@@ -94,7 +93,11 @@ defineExpose({ refresh: doRefresh });
         />
       </Button>
     </TooltipTrigger>
-    <TooltipContent v-if="hasPendingChange">{{ t('git.toolbar.refreshPending.hint') }}</TooltipContent>
-    <TooltipContent v-else>{{ t('common.action.refresh.label') }} <Kbd>{{ REFRESH_CHORD }}</Kbd></TooltipContent>
+    <TooltipContent v-if="hasPendingChange">{{
+      t('git.toolbar.refreshPending.hint')
+    }}</TooltipContent>
+    <TooltipContent v-else
+      >{{ t('common.action.refresh.label') }} <Kbd>{{ REFRESH_CHORD }}</Kbd></TooltipContent
+    >
   </Tooltip>
 </template>

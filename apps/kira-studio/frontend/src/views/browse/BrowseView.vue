@@ -312,13 +312,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col min-h-0" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
+  <div
+    class="h-full flex flex-col min-h-0"
+    data-testid="browse-view"
+    :data-path="tab.path"
+    :data-level="currentLevelPath"
+  >
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
       </span>
@@ -326,8 +328,7 @@ onMounted(() => {
         <CodiconIcon :name="headerIcon" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="browse-target"
-        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
-        >{{ targetName }}</span
+        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>{{ targetName }}</span
       >
       <span class="ml-auto flex items-center gap-1"></span>
     </ViewToolbar>
@@ -342,23 +343,23 @@ onMounted(() => {
           @click="onReload"
         />
       </div>
-        <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
+      <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
              pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps
              only what is view-scoped: filter, upload, and the refresh/stop group above. -->
-        <TooltipIconButton
-          :icon="ICON.search"
-          :label="t('common.action.filter.label')"
-          :class="{ 'bg-field text-fg': filterOpen }"
-          data-testid="browse-filter-toggle"
-          @click="toggleFilter"
-        />
-        <TooltipIconButton
-          v-if="canUpload"
-          icon="cloud-upload"
-          :label="t('studio.browse.upload.label')"
-          data-testid="browse-upload"
-          @click="onUploadClick"
-        />
+      <TooltipIconButton
+        :icon="ICON.search"
+        :label="t('common.action.filter.label')"
+        :class="{ 'bg-field text-fg': filterOpen }"
+        data-testid="browse-filter-toggle"
+        @click="toggleFilter"
+      />
+      <TooltipIconButton
+        v-if="canUpload"
+        icon="cloud-upload"
+        :label="t('studio.browse.upload.label')"
+        data-testid="browse-upload"
+        @click="onUploadClick"
+      />
       <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
@@ -368,162 +369,209 @@ onMounted(() => {
       <div class="flex items-center gap-1.5 min-w-0"></div>
     </ViewToolbar>
 
-        <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
-          <div class="flex w-full font-ui"><SearchField :model-value="filterText" :placeholder="t('studio.browse.filter.placeholder')" data-testid="browse-filter" @update:model-value="(v: string | number) => (filterText = String(v))" /></div>
-        </div>
-        <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="browse-error">
-          <AlertDescription>{{ rt.error.message }}</AlertDescription>
-        </Alert>
-        <!-- P43 F6/D7: a failed delete from this level, distinct from a failed load above. -->
-        <Alert strip v-if="rt?.actionError" variant="error" data-testid="browse-action-error">
-          <AlertDescription>{{ rt.actionError }}</AlertDescription>
-        </Alert>
-        <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —
+    <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
+      <div class="flex w-full font-ui"
+        ><SearchField
+          :model-value="filterText"
+          :placeholder="t('studio.browse.filter.placeholder')"
+          data-testid="browse-filter"
+          @update:model-value="(v: string | number) => (filterText = String(v))"
+        /></div
+      >
+    </div>
+    <Alert
+      strip
+      v-if="rt?.status === 'error' && rt.error"
+      variant="error"
+      data-testid="browse-error"
+    >
+      <AlertDescription>{{ rt.error.message }}</AlertDescription>
+    </Alert>
+    <!-- P43 F6/D7: a failed delete from this level, distinct from a failed load above. -->
+    <Alert strip v-if="rt?.actionError" variant="error" data-testid="browse-action-error">
+      <AlertDescription>{{ rt.actionError }}</AlertDescription>
+    </Alert>
+    <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —
              nothing failed, the listing is real, it's just incomplete. -->
-        <Alert strip v-if="rt?.truncated" variant="warn" data-testid="browse-truncated">
-          <AlertDescription>
-            {{ t('studio.browse.truncated.body') }}
-          </AlertDescription>
-        </Alert>
+    <Alert strip v-if="rt?.truncated" variant="warn" data-testid="browse-truncated">
+      <AlertDescription>
+        {{ t('studio.browse.truncated.body') }}
+      </AlertDescription>
+    </Alert>
 
-      <!-- Item 4: the reconnect gate used to replace this whole chrome (header, toolbar and
+    <!-- Item 4: the reconnect gate used to replace this whole chrome (header, toolbar and
            all) — every other view but the grid's DataView.vue did the same, the one inconsistency
            this fixes. The chrome above (and so its toolbar rows) now always renders; only
            the body — the part that actually needs a live connection — swaps for the gate.
            P63 §2.1: "the body" is now the whole split (list pane + splitter + detail pane), never
            just the list — a disconnected connection means neither side has anything live to show. -->
-      <EmptyState v-if="needsReconnect" data-testid="browse-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
-        <Button variant="dialog-primary" size="kira-lg" data-testid="browse-reconnect-load" @click="onReconnectAndLoad">
-          {{ t('studio.common.reconnectAndLoad.label') }}
-        </Button>
-      </EmptyState>
-      <div v-else class="flex flex-row flex-1 min-h-0">
-        <div class="min-w-0 flex flex-col min-h-0" :style="{ flex: `0 1 ${listPane.size.value}px` }">
-          <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
+    <EmptyState
+      v-if="needsReconnect"
+      data-testid="browse-reconnect"
+      icon="plug"
+      :title="t('studio.common.disconnected.empty')"
+    >
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        data-testid="browse-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
+        {{ t('studio.common.reconnectAndLoad.label') }}
+      </Button>
+    </EmptyState>
+    <div v-else class="flex flex-row flex-1 min-h-0">
+      <div class="min-w-0 flex flex-col min-h-0" :style="{ flex: `0 1 ${listPane.size.value}px` }">
+        <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
                ViewChrome's own toolbar into the pane whose list they act on. Reuses the same
                toolbar utility band (the same 26px in-view band every other toolbar already is)
                rather than inventing a header. -->
-          <ViewToolbar data-testid="browse-list-head">
-            <TooltipIconButton
-              :icon="ICON.back"
-              :label="t('common.action.back.label')"
-              disabled-trigger
-              :disabled="atRoot"
-              data-testid="browse-up"
-              @click="onUp"
-            />
-            <span class="flex items-center min-w-0 overflow-hidden gap-0.5">
-              <template v-for="(crumb, i) in crumbs" :key="crumb.path">
-                <span v-if="i > 0" class="text-subtle">/</span>
-                <button
-                  type="button"
-                  class="overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-kira-md px-0.5"
-                  :class="
+        <ViewToolbar data-testid="browse-list-head">
+          <TooltipIconButton
+            :icon="ICON.back"
+            :label="t('common.action.back.label')"
+            disabled-trigger
+            :disabled="atRoot"
+            data-testid="browse-up"
+            @click="onUp"
+          />
+          <span class="flex items-center min-w-0 overflow-hidden gap-0.5">
+            <template v-for="(crumb, i) in crumbs" :key="crumb.path">
+              <span v-if="i > 0" class="text-subtle">/</span>
+              <button
+                type="button"
+                class="overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-kira-md px-0.5"
+                :class="
                     i === crumbs.length - 1
                       ? 'text-fg cursor-default'
                       : 'text-muted-foreground cursor-pointer hover:text-fg hover:underline'
                   "
-                  data-testid="browse-crumb"
-                  @click="onCrumbClick(crumb.path)"
-                >
-                  {{ crumb.name }}
-                </button>
-              </template>
-            </span>
-            <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
-          </ViewToolbar>
-          <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
-            <EmptyState v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full" :title="t('common.state.loading.loading')">
-              <template #media><Spinner :size="24" /></template>
-            </EmptyState>
-            <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-md text-muted-foreground" data-testid="browse-empty">
-              {{ t('studio.browse.items.empty') }}
-            </div>
-            <div
-              v-else-if="filteredNodes.length === 0"
-              class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
-              data-testid="browse-empty"
-            >
-              {{ t('common.state.noMatches.empty') }}
-            </div>
-            <div
-              v-else
-              ref="scrollEl"
-              class="h-full overflow-auto"
-              data-testid="virtual-list"
-              role="listbox"
-              :aria-label="t('studio.browse.list.aria')"
-              @scroll="onScroll"
-            >
-              <div class="relative" :style="{ height: `${totalSize}px` }">
-                <!-- P110 I2-15/I2-17: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/
+                data-testid="browse-crumb"
+                @click="onCrumbClick(crumb.path)"
+              >
+                {{ crumb.name }}
+              </button>
+            </template>
+          </span>
+          <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{
+            countText
+          }}</span>
+        </ViewToolbar>
+        <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
+          <EmptyState
+            v-if="!rt || (loading && rt.nodes.length === 0)"
+            class="h-full"
+            :title="t('common.state.loading.loading')"
+          >
+            <template #media><Spinner :size="24" /></template>
+          </EmptyState>
+          <div
+            v-else-if="rt.nodes.length === 0"
+            class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
+            data-testid="browse-empty"
+          >
+            {{ t('studio.browse.items.empty') }}
+          </div>
+          <div
+            v-else-if="filteredNodes.length === 0"
+            class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
+            data-testid="browse-empty"
+          >
+            {{ t('common.state.noMatches.empty') }}
+          </div>
+          <div
+            v-else
+            ref="scrollEl"
+            class="h-full overflow-auto"
+            data-testid="virtual-list"
+            role="listbox"
+            :aria-label="t('studio.browse.list.aria')"
+            @scroll="onScroll"
+          >
+            <div class="relative" :style="{ height: `${totalSize}px` }">
+              <!-- P110 I2-15/I2-17: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/
                      src/util/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
-                <div
-                  v-for="vi in virtualItems"
-                  :key="String(vi.key)"
-                  data-testid="browse-row"
-                  :data-path="filteredNodes[vi.index]?.path"
-                  :data-kind="filteredNodes[vi.index]?.kind"
-                  :class="
+              <div
+                v-for="vi in virtualItems"
+                :key="String(vi.key)"
+                data-testid="browse-row"
+                :data-path="filteredNodes[vi.index]?.path"
+                :data-kind="filteredNodes[vi.index]?.kind"
+                :class="
                     cn(
                       rowVariants({ layout: 'tree', selected: rt?.selected === filteredNodes[vi.index]?.path }),
                       'border-b border-border px-2',
                       VIRTUAL_ROW_CLASS,
                     )
                   "
-                  :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
-                  role="option"
-                  v-bind="nav.rowProps(filteredNodes[vi.index]!.path)"
-:tabindex="nav.tabindexFor(filteredNodes[vi.index]!.path)"
-                  :aria-selected="rt?.selected === filteredNodes[vi.index]?.path"
-                  @click="onRowClick(filteredNodes[vi.index]!)"
-                  @dblclick="onRowOpen(filteredNodes[vi.index]!)"
-                  @keydown="onRowKeydown($event, filteredNodes[vi.index]!)"
-                  @contextmenu.prevent="onRowContextMenu($event, filteredNodes[vi.index]!)"
-                >
-                  <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE
+                :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
+                role="option"
+                v-bind="nav.rowProps(filteredNodes[vi.index]!.path)"
+                :tabindex="nav.tabindexFor(filteredNodes[vi.index]!.path)"
+                :aria-selected="rt?.selected === filteredNodes[vi.index]?.path"
+                @click="onRowClick(filteredNodes[vi.index]!)"
+                @dblclick="onRowOpen(filteredNodes[vi.index]!)"
+                @keydown="onRowKeydown($event, filteredNodes[vi.index]!)"
+                @contextmenu.prevent="onRowContextMenu($event, filteredNodes[vi.index]!)"
+              >
+                <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE
                        has arrived (redisTypeIcon falls back to the generic key glyph otherwise —
                        never a wrong type). S3 objects and every container kind are unaffected. -->
-                  <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"
-                    ><CodiconIcon
-                      :name="
+                <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"
+                  ><CodiconIcon
+                    :name="
                         filteredNodes[vi.index]?.kind === 'key'
                           ? redisTypeIcon(keyType(filteredNodes[vi.index]!.path))
                           : nodeIcon(filteredNodes[vi.index]!.kind)
                       "
-                      :size="13"
-                  /></span>
-                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ filteredNodes[vi.index]?.name }}</span>
-                  <Badge
-                    data
-                    v-if="
+                    :size="13"
+                  /></span
+                >
+                <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                  filteredNodes[vi.index]?.name
+                }}</span>
+                <Badge
+                  data
+                  v-if="
                       filteredNodes[vi.index]?.kind === 'key' &&
                       redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
                     "
-                    data-testid="browse-key-type"
-                    >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</Badge
-                  >
-                  <span v-if="filteredNodes[vi.index]?.detail" class="shrink-0 text-kira-sm text-muted-foreground">{{
+                  data-testid="browse-key-type"
+                  >{{
+                    redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
+                  }}</Badge
+                >
+                <span
+                  v-if="filteredNodes[vi.index]?.detail"
+                  class="shrink-0 text-kira-sm text-muted-foreground"
+                  >{{
                     filteredNodes[vi.index]?.detail
-                  }}</span>
-                </div>
+                  }}</span
+                >
               </div>
             </div>
           </div>
         </div>
-
-        <ResizeHandle
-          :label="t('studio.common.resizeList.aria')"
-          line
-          :min="220"
-          :max="900"
-          v-bind="listPane.bind"
-        />
-
-        <div class="min-w-0 flex flex-1 flex-col min-h-0" data-testid="browse-detail-pane">
-          <KeyValuePane v-if="previewable" :view-key="previewKey" />
-          <EmptyState v-else class="min-h-0 flex-1" data-testid="browse-preview-empty" :icon="emptyPreviewIcon" :title="emptyPreviewLabel" />
-        </div>
       </div>
+
+      <ResizeHandle
+        :label="t('studio.common.resizeList.aria')"
+        line
+        :min="220"
+        :max="900"
+        v-bind="listPane.bind"
+      />
+
+      <div class="min-w-0 flex flex-1 flex-col min-h-0" data-testid="browse-detail-pane">
+        <KeyValuePane v-if="previewable" :view-key="previewKey" />
+        <EmptyState
+          v-else
+          class="min-h-0 flex-1"
+          data-testid="browse-preview-empty"
+          :icon="emptyPreviewIcon"
+          :title="emptyPreviewLabel"
+        />
+      </div>
+    </div>
   </div>
 </template>

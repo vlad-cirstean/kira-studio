@@ -6,7 +6,9 @@ import { useForcePush } from './queries';
 import { useConfirmRun } from './useConfirmRun';
 
 // Force push with lease for one branch; the backend refuses a stale lease and the message shows here.
-const props = defineProps<{ target: { branchId: string; branchName: string; repo: string } | null }>();
+const props = defineProps<{
+  target: { branchId: string; branchName: string; repo: string } | null;
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const forcePush = useForcePush();

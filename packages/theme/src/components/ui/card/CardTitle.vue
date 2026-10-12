@@ -2,7 +2,9 @@
 import { cn } from '@theme/lib/utils';
 import type { HTMLAttributes } from 'vue';
 
-const props = withDefaults(defineProps<{ class?: HTMLAttributes['class']; as?: string }>(), { as: 'div' });
+const props = withDefaults(defineProps<{ class?: HTMLAttributes['class']; as?: string }>(), {
+  as: 'div',
+});
 </script>
 
 <template>

@@ -82,7 +82,9 @@ function onJump(e: Event): void {
       :disabled="pageIndex === 0"
       @click="emit('prev')"
     />
-    <span class="inline-flex items-center whitespace-nowrap gap-0.5 text-kira-sm text-muted-foreground">
+    <span
+      class="inline-flex items-center whitespace-nowrap gap-0.5 text-kira-sm text-muted-foreground"
+    >
       <CatalogText
         :k="pageCount ? 'studio.pager.positionOf.label' : 'studio.pager.position.label'"
         :params="{ total: pageCount ?? 0 }"

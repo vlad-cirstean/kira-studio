@@ -26,7 +26,12 @@ import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
@@ -252,7 +257,9 @@ const activeRowId = computed<string | undefined>(() => {
 });
 
 function rowEl(id: string): HTMLElement | null {
-  return rowsScrollEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`) ?? null;
+  return (
+    rowsScrollEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`) ?? null
+  );
 }
 
 const nav = useListNavigation<PickerRow>({
@@ -263,8 +270,10 @@ const nav = useListNavigation<PickerRow>({
   activeKey: focusedRowId,
   rowSelector: (key) => `[data-row-id="${CSS.escape(key)}"]`,
   // Worktree/stack rows have no main button, so Enter does nothing there.
-  onOpen: (row) => rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="branch-row-main"]')?.click(),
-  onMenu: (row) => rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="row-actions"]')?.click(),
+  onOpen: (row) =>
+    rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="branch-row-main"]')?.click(),
+  onMenu: (row) =>
+    rowEl(row.id)?.querySelector<HTMLElement>('[data-testid="row-actions"]')?.click(),
   onExitTop: () => focusFilter(),
 });
 
@@ -297,7 +306,12 @@ const tabOptions = computed<readonly PickerTabOption[]>(() => [
     label: t(TAB_LABELS.branches),
     badge: model.value.counts.branches,
   },
-  { id: 'tags', icon: PICKER_TAB_ICONS.tags, label: t(TAB_LABELS.tags), badge: model.value.counts.tags },
+  {
+    id: 'tags',
+    icon: PICKER_TAB_ICONS.tags,
+    label: t(TAB_LABELS.tags),
+    badge: model.value.counts.tags,
+  },
   {
     id: 'stashes',
     icon: PICKER_TAB_ICONS.stashes,
@@ -566,7 +580,13 @@ watch(visibleBranchNames, (names) => {
         <Tooltip>
           <TooltipTrigger as-child>
             <PopoverTrigger as-child>
-              <Button data-testid="branch-trigger" ref="triggerEl" variant="toolbar" size="kira" class="max-w-50">
+              <Button
+                data-testid="branch-trigger"
+                ref="triggerEl"
+                variant="toolbar"
+                size="kira"
+                class="max-w-50"
+              >
                 <CodiconIcon name="git-branch" :size="13" />
                 <span class="truncate">{{ triggerLabel }}</span>
                 <CodiconIcon :name="STATE_ICONS.chevronDown" :size="13" />
@@ -619,164 +639,224 @@ watch(visibleBranchNames, (names) => {
           >
             <AttributeTooltip :container="rowsScrollEl" />
             <template v-if="activeTab === 'branches'">
-        <section :aria-label="t('common.module.branches.label')">
-          <SectionHeading :label="t('common.module.branches.label')" />
-          <div data-testid="branch-row"
-            v-for="row in model.branchesLocal.visible"
-            :key="row.refname"
-            class="flex items-center gap-0.5 px-1"
-            :data-row-id="`branch:${row.refname}`"
-            :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
-          >
-            <InlineEditInput
-              v-if="renaming === row.shortName"
-              data-testid="branch-rename-input"
-              :aria-label="t('git.dialog.rename.title')"
-              :name="row.shortName"
-              @commit="(to) => submitRename(row.shortName, to)"
-              @cancel="renaming = undefined"
-            />
-            <template v-else>
-              <button data-testid="branch-row-main"
-                type="button"
-                :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
-                @click="checkoutBranch(row)"
-              >
-                <span
-                  class="w-2.5 text-focus"
-                  :role="row.isHead ? 'img' : undefined"
-                  :aria-label="row.isHead ? t('git.common.currentBranch.tooltip') : undefined"
-                  :aria-hidden="!row.isHead"
-                  >{{ row.isHead ? "●" : "" }}</span
+              <section :aria-label="t('common.module.branches.label')">
+                <SectionHeading :label="t('common.module.branches.label')" />
+                <div
+                  data-testid="branch-row"
+                  v-for="row in model.branchesLocal.visible"
+                  :key="row.refname"
+                  class="flex items-center gap-0.5 px-1"
+                  :data-row-id="`branch:${row.refname}`"
+                  :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
                 >
-                <span class="truncate">{{ row.shortName }}</span>
-                <Badge v-if="row.checkedOutIn" :data-kira-tip="t('git.picker.checkedOutIn.tooltip', { path: row.checkedOutIn })">{{ t('common.worktree.label') }}</Badge>
-                <span v-if="formatTrack(row.track)" class="text-kira-sm text-muted-foreground">{{ formatTrack(row.track) }}</span>
-              </button>
-              <button
-                v-if="prFor(row.shortName)"
-                type="button"
-                :class="prBadgeClass(prFor(row.shortName)!.state)"
-                :data-kira-tip="prTooltip(row.shortName)"
-                @click.stop="openPullRequest(prFor(row.shortName)!.number)"
-              >#{{ prFor(row.shortName)!.number }}</button>
-              <RowActionsButton
-                @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-                @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                  <InlineEditInput
+                    v-if="renaming === row.shortName"
+                    data-testid="branch-rename-input"
+                    :aria-label="t('git.dialog.rename.title')"
+                    :name="row.shortName"
+                    @commit="(to) => submitRename(row.shortName, to)"
+                    @cancel="renaming = undefined"
+                  />
+                  <template v-else>
+                    <button
+                      data-testid="branch-row-main"
+                      type="button"
+                      :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
+                      @click="checkoutBranch(row)"
+                    >
+                      <span
+                        class="w-2.5 text-focus"
+                        :role="row.isHead ? 'img' : undefined"
+                        :aria-label="row.isHead ? t('git.common.currentBranch.tooltip') : undefined"
+                        :aria-hidden="!row.isHead"
+                        >{{
+                          row.isHead ? "●" : ""
+                        }}</span
+                      >
+                      <span class="truncate">{{ row.shortName }}</span>
+                      <Badge
+                        v-if="row.checkedOutIn"
+                        :data-kira-tip="t('git.picker.checkedOutIn.tooltip', { path: row.checkedOutIn })"
+                        >{{
+                          t('common.worktree.label')
+                        }}</Badge
+                      >
+                      <span
+                        v-if="formatTrack(row.track)"
+                        class="text-kira-sm text-muted-foreground"
+                        >{{
+                          formatTrack(row.track)
+                        }}</span
+                      >
+                    </button>
+                    <button
+                      v-if="prFor(row.shortName)"
+                      type="button"
+                      :class="prBadgeClass(prFor(row.shortName)!.state)"
+                      :data-kira-tip="prTooltip(row.shortName)"
+                      @click.stop="openPullRequest(prFor(row.shortName)!.number)"
+                      >#{{ prFor(row.shortName)!.number }}</button
+                    >
+                    <RowActionsButton
+                      @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                      @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                    />
+                  </template>
+                </div>
+                <Alert v-if="forceDeleteCandidate" variant="warn" strip>
+                  <AlertDescription>{{
+                    t('git.common.forceDelete.body', { name: forceDeleteCandidate })
+                  }}</AlertDescription>
+                  <div class="flex items-center gap-1">
+                    <Button variant="danger" size="kira" @click="confirmForceDelete">{{
+                      t('git.common.forceDelete.confirm')
+                    }}</Button>
+                    <Button
+                      variant="toolbar"
+                      size="kira"
+                      @click="forceDeleteCandidate = undefined"
+                      >{{
+                        t('common.action.cancel.label')
+                      }}</Button
+                    >
+                  </div>
+                </Alert>
+                <ShowMoreButton
+                  :step="REF_LIST_SECTION_CAP"
+                  :hidden-count="model.branchesLocal.hiddenCount"
+                  @click="caps.branchesLocal.showMore()"
+                />
+                <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">{{
+                  t('git.picker.branches.empty')
+                }}</InlineState>
+              </section>
+
+              <section :aria-label="t('git.picker.remoteBranches.label')">
+                <SectionHeading :label="t('git.picker.remoteBranches.label')" />
+                <div
+                  data-testid="branch-row"
+                  v-for="row in model.branchesRemote.visible"
+                  :key="row.refname"
+                  class="flex items-center gap-0.5 px-1"
+                  :data-row-id="`remote:${row.refname}`"
+                  :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
+                >
+                  <button
+                    data-testid="branch-row-main"
+                    type="button"
+                    :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
+                    @click="checkoutRemote(row)"
+                  >
+                    <CodiconIcon name="cloud" :size="13" />
+                    <span class="truncate">{{ row.shortName }}</span>
+                    <span class="text-kira-sm text-muted-foreground">{{
+                      remoteCheckoutLabel(row, refs.branches.value)
+                    }}</span>
+                  </button>
+                  <RowActionsButton
+                    @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                    @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
+                  />
+                </div>
+                <ShowMoreButton
+                  :step="REF_LIST_SECTION_CAP"
+                  :hidden-count="model.branchesRemote.hiddenCount"
+                  @click="caps.branchesRemote.showMore()"
+                />
+                <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
+                  {{ t('git.picker.remoteBranches.empty') }}
+                </InlineState>
+              </section>
+            </template>
+
+            <template v-else-if="activeTab === 'tags'">
+              <TagList
+                :section="model.tags"
+                :ops="ops"
+                :known-remotes="knownRemotes"
+                :in-progress="ops.statusSummary.value?.inProgress ?? null"
+                :focused-row-id="activeRowId"
+                @checked-out="close"
+              />
+              <ShowMoreButton
+                :step="REF_LIST_SECTION_CAP"
+                :hidden-count="model.tags.hiddenCount"
+                @click="caps.tags.showMore()"
               />
             </template>
-          </div>
-          <Alert v-if="forceDeleteCandidate" variant="warn" strip>
-            <AlertDescription>{{ t('git.common.forceDelete.body', { name: forceDeleteCandidate }) }}</AlertDescription>
-            <div class="flex items-center gap-1">
-              <Button variant="danger" size="kira" @click="confirmForceDelete">{{ t('git.common.forceDelete.confirm') }}</Button>
-              <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">{{ t('common.action.cancel.label') }}</Button>
-            </div>
-          </Alert>
-          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesLocal.hiddenCount" @click="caps.branchesLocal.showMore()" />
-          <InlineState v-if="model.branchesLocal.visible.length === 0" kind="empty">{{ t('git.picker.branches.empty') }}</InlineState>
-        </section>
 
-        <section :aria-label="t('git.picker.remoteBranches.label')">
-          <SectionHeading :label="t('git.picker.remoteBranches.label')" />
-          <div data-testid="branch-row"
-            v-for="row in model.branchesRemote.visible"
-            :key="row.refname"
-            class="flex items-center gap-0.5 px-1"
-            :data-row-id="`remote:${row.refname}`"
-            :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
-          >
-            <button data-testid="branch-row-main"
-              type="button"
-              :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
-              @click="checkoutRemote(row)"
-            >
-              <CodiconIcon name="cloud" :size="13" />
-              <span class="truncate">{{ row.shortName }}</span>
-              <span class="text-kira-sm text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
-            </button>
-            <RowActionsButton
-              @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-              @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
-            />
-          </div>
-          <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.branchesRemote.hiddenCount" @click="caps.branchesRemote.showMore()" />
-          <InlineState v-if="model.branchesRemote.visible.length === 0" kind="empty">
-            {{ t('git.picker.remoteBranches.empty') }}
-          </InlineState>
-        </section>
-        </template>
+            <template v-else-if="activeTab === 'stashes'">
+              <StashList
+                :section="model.stashStack"
+                :stash="stash"
+                :ops="ops"
+                :in-progress="ops.statusSummary.value?.inProgress ?? null"
+                :current-branch="refs.currentBranchName.value ?? null"
+                :focused-row-id="activeRowId"
+                @branch-from-stash="(entry) => emit('branchFromStash', entry)"
+                @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
+                @selected="closeForCheckout"
+              />
+              <ShowMoreButton
+                :step="REF_LIST_SECTION_CAP"
+                :hidden-count="model.stashStack.hiddenCount"
+                @click="caps.stashStack.showMore()"
+              />
 
-        <template v-else-if="activeTab === 'tags'">
-        <TagList
-          :section="model.tags"
-          :ops="ops"
-          :known-remotes="knownRemotes"
-          :in-progress="ops.statusSummary.value?.inProgress ?? null"
-          :focused-row-id="activeRowId"
-          @checked-out="close"
-        />
-        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.tags.hiddenCount" @click="caps.tags.showMore()" />
-        </template>
+              <GlobalStashList
+                :section="model.stashGlobal"
+                :stash="stash"
+                :ops="ops"
+                :in-progress="ops.statusSummary.value?.inProgress ?? null"
+                :current-branch="refs.currentBranchName.value ?? null"
+                :focused-row-id="activeRowId"
+                @branch-from-stash="(entry) => emit('branchFromStash', entry)"
+                @save-global-stash="emit('saveGlobalStash')"
+                @selected="closeForCheckout"
+              />
+              <ShowMoreButton
+                :step="REF_LIST_SECTION_CAP"
+                :hidden-count="model.stashGlobal.hiddenCount"
+                @click="caps.stashGlobal.showMore()"
+              />
+            </template>
 
-        <template v-else-if="activeTab === 'stashes'">
-        <StashList
-          :section="model.stashStack"
-          :stash="stash"
-          :ops="ops"
-          :in-progress="ops.statusSummary.value?.inProgress ?? null"
-          :current-branch="refs.currentBranchName.value ?? null"
-          :focused-row-id="activeRowId"
-          @branch-from-stash="(entry) => emit('branchFromStash', entry)"
-          @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
-          @selected="closeForCheckout"
-        />
-        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.stashStack.hiddenCount" @click="caps.stashStack.showMore()" />
+            <template v-else-if="activeTab === 'worktrees'">
+              <WorktreeList
+                :section="model.worktrees"
+                :worktrees="worktrees"
+                :ops="ops"
+                :focused-row-id="activeRowId"
+                @switch-worktree="(path) => emit('switchWorktree', path)"
+                @create-worktree="emit('createWorktree')"
+              />
+              <ShowMoreButton
+                :step="REF_LIST_SECTION_CAP"
+                :hidden-count="model.worktrees.hiddenCount"
+                @click="caps.worktrees.showMore()"
+              />
+            </template>
 
-        <GlobalStashList
-          :section="model.stashGlobal"
-          :stash="stash"
-          :ops="ops"
-          :in-progress="ops.statusSummary.value?.inProgress ?? null"
-          :current-branch="refs.currentBranchName.value ?? null"
-          :focused-row-id="activeRowId"
-          @branch-from-stash="(entry) => emit('branchFromStash', entry)"
-          @save-global-stash="emit('saveGlobalStash')"
-          @selected="closeForCheckout"
-        />
-        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.stashGlobal.hiddenCount" @click="caps.stashGlobal.showMore()" />
-        </template>
-
-        <template v-else-if="activeTab === 'worktrees'">
-        <WorktreeList
-          :section="model.worktrees"
-          :worktrees="worktrees"
-          :ops="ops"
-          :focused-row-id="activeRowId"
-          @switch-worktree="(path) => emit('switchWorktree', path)"
-          @create-worktree="emit('createWorktree')"
-        />
-        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.worktrees.hiddenCount" @click="caps.worktrees.showMore()" />
-        </template>
-
-        <template v-else-if="activeTab === 'stacks'">
-        <StackList
-          :stacks="model.stacks"
-          :orphans="model.orphans"
-          :ops="ops"
-          :pr="pr"
-          :open-pull-request="openPullRequest"
-          :focused-row-id="activeRowId"
-          @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
-          @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
-        />
-        <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="model.stacks.hiddenCount + model.orphans.hiddenCount" @click="showMoreStacks" />
-        </template>
+            <template v-else-if="activeTab === 'stacks'">
+              <StackList
+                :stacks="model.stacks"
+                :orphans="model.orphans"
+                :ops="ops"
+                :pr="pr"
+                :open-pull-request="openPullRequest"
+                :focused-row-id="activeRowId"
+                @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
+                @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
+              />
+              <ShowMoreButton
+                :step="REF_LIST_SECTION_CAP"
+                :hidden-count="model.stacks.hiddenCount + model.orphans.hiddenCount"
+                @click="showMoreStacks"
+              />
+            </template>
           </div>
         </div>
       </PopoverContent>
     </Popover>
-
   </div>
 </template>
-

@@ -15,7 +15,10 @@ const phones = useMobileTerminalsStore();
 </script>
 
 <template>
-  <div class="flex shrink-0 items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-border bg-chrome px-1.5 py-1" data-testid="ade-session-strip">
+  <div
+    class="flex shrink-0 items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-border bg-chrome px-1.5 py-1"
+    data-testid="ade-session-strip"
+  >
     <Button
       v-for="v in views"
       :key="v.session.id"
@@ -33,7 +36,9 @@ const phones = useMobileTerminalsStore();
         class="shrink-0 rounded-kira-xs px-1 text-kira-sm"
         :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ACTION_CLASS.claude"
         data-testid="ade-session-badge"
-        >{{ v.badge }}</span
+        >{{
+          v.badge
+        }}</span
       >
       <span class="min-w-0 truncate">{{ v.tabName }}</span>
       <CodiconIcon

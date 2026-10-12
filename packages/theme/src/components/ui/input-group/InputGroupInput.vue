@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Input } from '@theme/components/ui/input'
-import { cn } from '@theme/lib/utils'
-import type { HTMLAttributes } from 'vue'
+import { Input } from '@theme/components/ui/input';
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
 
 const props = defineProps<{
-  class?: HTMLAttributes['class']
-}>()
+  class?: HTMLAttributes['class'];
+}>();
 </script>
 
 <template>

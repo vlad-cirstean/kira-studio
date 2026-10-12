@@ -133,13 +133,22 @@ function onClearFile(index: number): void {
         <option value="file">{{ t('common.field.file.label') }}</option>
       </NativeSelect>
       <template v-if="row.kind === 'file'">
-        <Button variant="toolbar" size="kira" data-testid="http-formdata-choose-file" @click="onChooseFile(index)">
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="http-formdata-choose-file"
+          @click="onChooseFile(index)"
+        >
           {{ t('studio.http.body.chooseFile.label') }}
         </Button>
         <Tooltip v-if="row.fileName">
           <TooltipTrigger as-child>
-            <span class="text-kira-sm text-muted-foreground whitespace-nowrap p-0" data-testid="http-formdata-file-caption">
-              {{ row.fileName }} ({{ formatBytes(row.fileSize) }})
+            <span
+              class="text-kira-sm text-muted-foreground whitespace-nowrap p-0"
+              data-testid="http-formdata-file-caption"
+            >
+              {{ row.fileName }}
+              ({{ formatBytes(row.fileSize) }})
             </span>
           </TooltipTrigger>
           <TooltipContent>{{ row.path }}</TooltipContent>

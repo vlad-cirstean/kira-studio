@@ -69,8 +69,18 @@ async function send(): Promise<void> {
         </Alert>
       </DialogBody>
       <DialogFooter>
-        <Button size="kira" variant="dialog" class="h-touch flex-1" data-testid="reply-cancel" @click="emit('close')">{{ t('common.action.cancel.label') }}</Button>
-        <Button size="kira"
+        <Button
+          size="kira"
+          variant="dialog"
+          class="h-touch flex-1"
+          data-testid="reply-cancel"
+          @click="emit('close')"
+          >{{
+            t('common.action.cancel.label')
+          }}</Button
+        >
+        <Button
+          size="kira"
           variant="dialog-primary"
           class="h-touch flex-1"
           :disabled="!message.trim() || writes.sendReply.isPending.value"

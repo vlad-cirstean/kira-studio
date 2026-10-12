@@ -4,7 +4,14 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { FieldLabel } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -55,7 +62,7 @@ const view = computed(() => {
 
 const previewError = computed(() => {
   const e = preview.error.value;
-  return e ? (errorText(e)) : '';
+  return e ? errorText(e) : '';
 });
 
 // Change base: the branch being rebased, for the picker's repo and the base it shows now.
@@ -127,7 +134,9 @@ async function discard(): Promise<void> {
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
           </svg>
-          <span class="text-kira-lg font-medium" data-testid="ade-dialog-title">{{ view.title }}</span>
+          <span class="text-kira-lg font-medium" data-testid="ade-dialog-title">{{
+            view.title
+          }}</span>
         </DialogTitle>
       </DialogHeader>
 
@@ -140,7 +149,12 @@ async function discard(): Promise<void> {
             <div class="flex items-start gap-2.5">
               <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <span class="font-medium">{{ view.busyTitle }}</span>
-                <div v-for="row in view.busy" :key="row.text" class="flex items-center gap-1.5 text-kira-sm" data-testid="ade-dialog-busy-row">
+                <div
+                  v-for="row in view.busy"
+                  :key="row.text"
+                  class="flex items-center gap-1.5 text-kira-sm"
+                  data-testid="ade-dialog-busy-row"
+                >
                   <AdeActivityIcon :kind="row.kind" />
                   <span>{{ row.text }}</span>
                 </div>
@@ -178,22 +192,45 @@ async function discard(): Promise<void> {
           />
         </div>
 
-        <Alert v-for="b in view.blockers" :key="b.branchId + b.kind" variant="error" data-testid="ade-dialog-blocker" :data-kind="b.kind">
+        <Alert
+          v-for="b in view.blockers"
+          :key="b.branchId + b.kind"
+          variant="error"
+          data-testid="ade-dialog-blocker"
+          :data-kind="b.kind"
+        >
           <AlertDescription>{{ b.text }}</AlertDescription>
         </Alert>
         <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm">
-          <Checkbox id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
+          <Checkbox
+            id="ade-dialog-autostash"
+            v-model="dialogs.autostash"
+            data-testid="ade-dialog-autostash"
+          />
           <span>{{ t('space.ade.claudeDialog.autostash.label') }}</span>
         </Label>
-        <p v-if="view.noOp" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-dialog-noop">
+        <p
+          v-if="view.noOp"
+          class="m-0 text-kira-sm text-muted-foreground"
+          data-testid="ade-dialog-noop"
+        >
           {{ t('space.ade.claudeDialog.noOp.hint') }}
         </p>
 
-        <div v-if="view.isArchive" class="text-kira-md text-tone-amber" data-testid="ade-dialog-risk">
+        <div
+          v-if="view.isArchive"
+          class="text-kira-md text-tone-amber"
+          data-testid="ade-dialog-risk"
+        >
           {{ t('space.ade.claudeDialog.risk.body', { risk: view.riskText }) }}
         </div>
 
-        <div v-for="(tg, i) in view.targets" :key="tg.branchId" class="flex flex-col gap-1.5" data-testid="ade-dialog-target">
+        <div
+          v-for="(tg, i) in view.targets"
+          :key="tg.branchId"
+          class="flex flex-col gap-1.5"
+          data-testid="ade-dialog-target"
+        >
           <div class="flex items-center gap-2">
             <AdeRepoTag :code-repo-id="tg.repoId" :label="tg.repo" />
             <span class="min-w-0 flex-1 truncate font-data text-kira-sm">{{ tg.branch }}</span>
@@ -212,13 +249,17 @@ async function discard(): Promise<void> {
           <Checkbox id="ade-dialog-push" v-model="dialogs.push" data-testid="ade-dialog-push" />
           <span>
             <span data-testid="ade-dialog-push-label">{{ view.pushLabel }}</span>
-            <span v-if="!dialogs.push" class="text-subtle"> {{ t('space.ade.claudeDialog.pushOff.hint') }}</span>
+            <span v-if="!dialogs.push" class="text-subtle">
+              {{ t('space.ade.claudeDialog.pushOff.hint') }}</span
+            >
           </span>
         </Label>
 
         <div v-if="view.showMessage" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <FieldLabel for="ade-dialog-message" class="flex-1">{{ t('space.ade.claudeDialog.message.label') }}</FieldLabel>
+            <FieldLabel for="ade-dialog-message" class="flex-1">{{
+              t('space.ade.claudeDialog.message.label')
+            }}</FieldLabel>
             <Button
               v-if="view.edited"
               variant="toolbar"
@@ -241,7 +282,9 @@ async function discard(): Promise<void> {
             v-if="view.suffix"
             class="whitespace-pre-wrap font-data text-kira-sm text-muted-foreground"
             data-testid="ade-dialog-suffix"
-            >{{ view.suffix }}</Card
+            >{{
+              view.suffix
+            }}</Card
           >
         </div>
 
@@ -255,7 +298,15 @@ async function discard(): Promise<void> {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="ade-dialog-cancel" @click="dialogs.close()">{{ t('common.action.cancel.label') }}</Button>
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          data-testid="ade-dialog-cancel"
+          @click="dialogs.close()"
+          >{{
+            t('common.action.cancel.label')
+          }}</Button
+        >
         <AdeTip v-if="view.isArchive" :text="t('space.ade.claudeDialog.deleteAnyway.tooltip')">
           <Button
             variant="dialog"
@@ -276,7 +327,9 @@ async function discard(): Promise<void> {
           data-testid="ade-dialog-send"
           @click="send"
         >
-          {{ dialogs.waitingSetup ? t('space.ade.claudeDialog.startsWhenReady.loading') : view.sendLabel }}
+          {{
+            dialogs.waitingSetup ? t('space.ade.claudeDialog.startsWhenReady.loading') : view.sendLabel
+          }}
         </Button>
       </DialogFooter>
     </DialogContent>

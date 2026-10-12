@@ -16,7 +16,15 @@ import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { ICON } from '@theme/icons';
 import { statusLabel } from '../board/actions';
-import { FAILURE_OPTIONS, failureLabel, kindLabel, PLACEHOLDER_TOKENS, runsOnLabel, STATUS_OPTIONS, withKind } from '../board/workflowForm';
+import {
+  FAILURE_OPTIONS,
+  failureLabel,
+  kindLabel,
+  PLACEHOLDER_TOKENS,
+  runsOnLabel,
+  STATUS_OPTIONS,
+  withKind,
+} from '../board/workflowForm';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { OnFailure, Stage, StageKind } from '../wire';
 
@@ -28,9 +36,16 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
 </script>
 
 <template>
-  <div class="flex flex-col gap-2.5" data-testid="ade-wf-stage" :data-stage-id="stage.id" :data-skipped="stage.skip">
+  <div
+    class="flex flex-col gap-2.5"
+    data-testid="ade-wf-stage"
+    :data-stage-id="stage.id"
+    :data-skipped="stage.skip"
+  >
     <div class="flex items-center gap-2">
-      <Label :for="n('name')" class="sr-only">{{ t('space.ade.workflows.stageInspector.name.aria') }}</Label>
+      <Label :for="n('name')" class="sr-only">{{
+        t('space.ade.workflows.stageInspector.name.aria')
+      }}</Label>
       <Input
         :id="n('name')"
         :model-value="stage.name"
@@ -41,7 +56,12 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
       />
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" :aria-label="t('space.ade.workflows.stageInspector.actions.aria')" data-testid="ade-wf-stage-menu">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :aria-label="t('space.ade.workflows.stageInspector.actions.aria')"
+            data-testid="ade-wf-stage-menu"
+          >
             <CodiconIcon :name="ICON.moreActions" :size="13" />
           </Button>
         </DropdownMenuTrigger>
@@ -51,9 +71,15 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
             data-testid="ade-wf-stage-skip"
             @select="patch({ skip: !stage.skip })"
           >
-            {{ stage.skip ? t('space.ade.workflows.stageInspector.unskip.label') : t('space.ade.workflows.stageInspector.skip.label') }}
+            {{
+              stage.skip ? t('space.ade.workflows.stageInspector.unskip.label') : t('space.ade.workflows.stageInspector.skip.label')
+            }}
           </DropdownMenuItem>
-          <DropdownMenuItem class="text-error" data-testid="ade-wf-stage-remove" @select="draft.removeStage(stage.id)">
+          <DropdownMenuItem
+            class="text-error"
+            data-testid="ade-wf-stage-remove"
+            @select="draft.removeStage(stage.id)"
+          >
             {{ t('space.ade.workflows.stageInspector.remove.label') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -95,10 +121,14 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
           data-testid="ade-wf-stage-session"
           @update:model-value="(v) => patch({ session: v === true, prompt: v === true ? stage.prompt : '' })"
         />
-        <Label :for="n('session')">{{ t('space.ade.workflows.stageInspector.session.label') }}</Label>
+        <Label :for="n('session')">{{
+          t('space.ade.workflows.stageInspector.session.label')
+        }}</Label>
       </div>
       <template v-if="stage.session">
-        <Label :for="n('prompt')" class="sr-only">{{ t('space.ade.workflows.stageInspector.prompt.aria') }}</Label>
+        <Label :for="n('prompt')" class="sr-only">{{
+          t('space.ade.workflows.stageInspector.prompt.aria')
+        }}</Label>
         <Textarea
           :id="n('prompt')"
           :model-value="stage.prompt"

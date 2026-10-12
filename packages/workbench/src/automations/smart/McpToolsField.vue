@@ -56,7 +56,9 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
     <QueryState :query="servers" variant="inline">
       <template #loading />
       <template #empty>
-        <span class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">{{ t('automations.smart.mcpNone.emptyHint') }}</span>
+        <span class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">{{
+          t('automations.smart.mcpNone.emptyHint')
+        }}</span>
       </template>
       <template #error="{ message }">
         <Alert variant="error">
@@ -64,7 +66,13 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
         </Alert>
       </template>
       <template #default="{ data }">
-        <div v-for="s in data" :key="s.name" class="flex flex-col gap-1" data-testid="smart-mcp-server" :data-server="s.name">
+        <div
+          v-for="s in data"
+          :key="s.name"
+          class="flex flex-col gap-1"
+          data-testid="smart-mcp-server"
+          :data-server="s.name"
+        >
           <div class="flex items-center gap-2">
             <Checkbox
               :id="`${idBase}-${s.name}`"
@@ -73,7 +81,9 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
               @update:model-value="(v) => setServer(s.name, v === true)"
             />
             <Label :for="`${idBase}-${s.name}`">{{ s.name }}</Label>
-            <span class="truncate font-data text-kira-sm text-muted-foreground">{{ s.transport }} {{ s.target }}</span>
+            <span class="truncate font-data text-kira-sm text-muted-foreground"
+              >{{ s.transport }} {{ s.target }}</span
+            >
           </div>
           <McpServerTools
             v-if="enabled.includes(s.name)"

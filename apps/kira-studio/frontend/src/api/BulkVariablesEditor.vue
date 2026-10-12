@@ -61,11 +61,14 @@ const diff = computed(() => {
 const summary = computed(() => {
   const d = diff.value;
   if (!d) return '';
-  return t(d.reordered ? 'studio.api.bulk.summaryReordered.status' : 'studio.api.bulk.summary.status', {
-    added: d.added.length,
-    updated: d.updated.length,
-    removed: d.removed.length,
-  });
+  return t(
+    d.reordered ? 'studio.api.bulk.summaryReordered.status' : 'studio.api.bulk.summary.status',
+    {
+      added: d.added.length,
+      updated: d.updated.length,
+      removed: d.removed.length,
+    },
+  );
 });
 
 const applying = ref(false);
@@ -175,7 +178,9 @@ function onCancel(): void {
     </div>
 
     <Alert v-if="parseError" variant="error" data-testid="variables-bulk-error">
-      <AlertDescription>{{ t(parseError.message.key, parseError.message.params) }}</AlertDescription>
+      <AlertDescription>{{
+        t(parseError.message.key, parseError.message.params)
+      }}</AlertDescription>
     </Alert>
     <template v-else-if="diff">
       <div class="text-subtle text-kira-sm" data-testid="variables-bulk-summary">{{ summary }}</div>
@@ -191,7 +196,9 @@ function onCancel(): void {
     </Alert>
 
     <div class="flex justify-end gap-1">
-      <Button variant="toolbar" size="kira" data-testid="variables-bulk-cancel" @click="onCancel">{{ t('common.action.cancel.label') }}</Button>
+      <Button variant="toolbar" size="kira" data-testid="variables-bulk-cancel" @click="onCancel">{{
+        t('common.action.cancel.label')
+      }}</Button>
       <Button
         variant="toolbar-primary"
         size="kira"

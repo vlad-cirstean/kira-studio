@@ -113,7 +113,9 @@ const monthNames = computed(() =>
 );
 const monthShortNames = computed(() =>
   MONTH_KEYS.map((m) =>
-    m === 'may' ? t('studio.dateTimePicker.month.may.label') : t(`studio.dateTimePicker.monthShort.${m}.label`),
+    m === 'may'
+      ? t('studio.dateTimePicker.month.may.label')
+      : t(`studio.dateTimePicker.monthShort.${m}.label`),
   ),
 );
 const weekdayLabels = computed(() =>
@@ -289,7 +291,14 @@ const secondText = computed<string>({
     <div data-testid="datetime-picker-mode" :data-mode="mode">
       <template v-if="mode === 'days'">
         <div class="grid grid-cols-7 gap-0.5">
-          <span v-for="w in weekdayLabels" :key="w" class="flex items-center justify-center text-subtle text-kira-sm h-4.5">{{ w }}</span>
+          <span
+            v-for="w in weekdayLabels"
+            :key="w"
+            class="flex items-center justify-center text-subtle text-kira-sm h-4.5"
+            >{{
+              w
+            }}</span
+          >
         </div>
         <div class="grid grid-cols-7 gap-0.5">
           <Button

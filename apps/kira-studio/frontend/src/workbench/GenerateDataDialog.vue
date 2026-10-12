@@ -3,7 +3,14 @@ import InlineState from '@theme/components/InlineState.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -54,7 +61,6 @@ const meta = computed(() =>
 const rowCount = ref(100);
 const seed = ref(0);
 const plans = ref<ColumnPlan[]>([]);
-
 
 const previewOpen = ref(false);
 const previewStatements = ref<string[]>([]);
@@ -187,7 +193,8 @@ async function onGenerate(): Promise<void> {
 
 function onStop(): void {
   abortController?.abort();
-  if (currentOpId.value) fireAndForget(control.opsCancel(currentOpId.value), 'cancel generate data');
+  if (currentOpId.value)
+    fireAndForget(control.opsCancel(currentOpId.value), 'cancel generate data');
 }
 
 type RecipeSelectValue = 'skip' | 'null' | 'constant' | 'sequence' | GeneratorId;
@@ -229,128 +236,151 @@ function onSequenceStartChange(index: number, start: number): void {
       </DialogHeader>
 
       <DialogBody>
-      <div class="flex items-center gap-1.5">
-        <Label class="p-0 text-muted-foreground">{{ t('studio.keyValue.rows.aria') }}</Label>
-        <NumberStepperInput
-          :model-value="String(rowCount)"
-          group-class="h-control-lg"
-          data-testid="generate-data-row-count"
-          :disabled="running"
-          @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
-        />
-        <Label class="p-0 text-muted-foreground">{{ t('studio.generateData.seed.label') }}</Label>
-        <NumberStepperInput
-          :model-value="String(seed)"
-          group-class="h-control-lg"
-          data-testid="generate-data-seed"
-          :disabled="running"
-          @update:model-value="(v: string | number) => (seed = Math.trunc(Number(v)) || 0)"
-        />
-        <span v-if="rowCount > BATCH_SIZE" class="text-kira-sm text-muted-foreground" data-testid="generate-data-batch-note">
-          {{ t('studio.generateData.batches.status', { count: Math.ceil(rowCount / BATCH_SIZE), size: BATCH_SIZE }) }}
-        </span>
-      </div>
-
-      <div class="flex flex-col overflow-y-auto max-h-64 gap-0.5">
-        <!-- grid-cols-[...] is a pre-existing arbitrary-value class already, not a raw
-             declaration -- untouched (P110 B37/B39). -->
-        <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1 p-0 text-kira-sm text-muted-foreground">
-          <span>{{ t('studio.project.connectionDialog.column.placeholder') }}</span>
-          <span>{{ t('common.field.type.label') }}</span>
-          <span>{{ t('studio.generateData.recipe.label') }}</span>
-          <span>{{ t('common.field.value.label') }}</span>
-        </div>
-        <div
-          v-for="(plan, index) in plans"
-          :key="plan.column.name"
-          class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1"
-          data-testid="generate-data-column-row"
-          :data-column="plan.column.name"
-        >
-          <span class="col-name">{{ plan.column.name }}</span>
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{{ plan.column.dataType }}</span>
-          <NativeSelect
-            variant="bordered"
-            :data-testid="`generate-data-recipe-${plan.column.name}`"
-            :model-value="recipeSelectValue(plan.recipe)"
-            :disabled="running"
-            @update:model-value="(v) => onRecipeChange(index, String(v))"
-          >
-            <option value="skip">{{ t('common.skip.label') }}</option>
-            <option value="null">{{ t('studio.common.nullValue.label') }}</option>
-            <option value="constant">{{ t('studio.generateData.recipe.constant.label') }}</option>
-            <option v-if="plan.column.typeClass === 'number'" value="sequence">{{ t('studio.common.nodeKind.sequence.label') }}</option>
-            <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
-              {{ t(opt.labelKey) }}
-            </option>
-          </NativeSelect>
-          <Input
-            v-if="plan.recipe.kind === 'constant'"
-            :model-value="plan.recipe.value"
-            class="w-full font-data"
-            :data-testid="`generate-data-constant-${plan.column.name}`"
-            :disabled="running"
-            @update:model-value="(v) => onConstantChange(index, String(v))"
-          />
+        <div class="flex items-center gap-1.5">
+          <Label class="p-0 text-muted-foreground">{{ t('studio.keyValue.rows.aria') }}</Label>
           <NumberStepperInput
-            v-else-if="plan.recipe.kind === 'sequence'"
-            :model-value="String(plan.recipe.start)"
+            :model-value="String(rowCount)"
             group-class="h-control-lg"
-            :data-testid="`generate-data-sequence-start-${plan.column.name}`"
+            data-testid="generate-data-row-count"
             :disabled="running"
-            @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
+            @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
           />
-          <span v-else class="text-muted-foreground"></span>
-        </div>
-      </div>
-
-      <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
-        <AlertDescription>
-          {{ t('studio.generateData.noColumns.body') }}
-        </AlertDescription>
-      </Alert>
-      <Alert v-else-if="allColumnsSkipped" variant="warn" data-testid="generate-data-no-columns">
-        <AlertDescription>
-          {{ t('studio.generateData.allSkipped.body') }}
-        </AlertDescription>
-      </Alert>
-
-      <Alert v-if="warnings.length" variant="warn" data-testid="generate-data-warnings">
-        <AlertDescription>
-          <ul class="m-0 pl-2">
-            <li v-for="w in warnings" :key="w">{{ w }}</li>
-          </ul>
-        </AlertDescription>
-      </Alert>
-
-      <div class="preview-section">
-        <Button
-          type="button"
-          variant="link"
-          size="kira"
-          class="h-auto p-0 disabled:text-muted-foreground"
-          data-testid="generate-data-preview-toggle"
-          :disabled="noUsableColumns"
-          @click="onTogglePreview"
-        >
-          {{ previewOpen ? t('studio.generateData.hidePreview.label') : t('studio.grid.previewCommand.title') }}
-        </Button>
-        <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">
-          <InlineState v-if="previewLoading" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
-          <InlineState v-else-if="previewError" kind="error" data-testid="generate-data-preview-error">{{ previewError }}</InlineState>
-          <MonacoHost
-            v-else
-            :doc="previewDoc"
-            language="sql"
-            :sql-dialect="sqlDialect"
-            :read-only="true"
+          <Label class="p-0 text-muted-foreground">{{ t('studio.generateData.seed.label') }}</Label>
+          <NumberStepperInput
+            :model-value="String(seed)"
+            group-class="h-control-lg"
+            data-testid="generate-data-seed"
+            :disabled="running"
+            @update:model-value="(v: string | number) => (seed = Math.trunc(Number(v)) || 0)"
           />
+          <span
+            v-if="rowCount > BATCH_SIZE"
+            class="text-kira-sm text-muted-foreground"
+            data-testid="generate-data-batch-note"
+          >
+            {{
+              t('studio.generateData.batches.status', { count: Math.ceil(rowCount / BATCH_SIZE), size: BATCH_SIZE })
+            }}
+          </span>
         </div>
-      </div>
 
-      <Alert v-if="runError" variant="error" data-testid="generate-data-error">
-        <AlertDescription>{{ runError }}</AlertDescription>
-      </Alert>
+        <div class="flex flex-col overflow-y-auto max-h-64 gap-0.5">
+          <!-- grid-cols-[...] is a pre-existing arbitrary-value class already, not a raw
+             declaration -- untouched (P110 B37/B39). -->
+          <div
+            class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1 p-0 text-kira-sm text-muted-foreground"
+          >
+            <span>{{ t('studio.project.connectionDialog.column.placeholder') }}</span>
+            <span>{{ t('common.field.type.label') }}</span>
+            <span>{{ t('studio.generateData.recipe.label') }}</span>
+            <span>{{ t('common.field.value.label') }}</span>
+          </div>
+          <div
+            v-for="(plan, index) in plans"
+            :key="plan.column.name"
+            class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1"
+            data-testid="generate-data-column-row"
+            :data-column="plan.column.name"
+          >
+            <span class="col-name">{{ plan.column.name }}</span>
+            <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{{
+              plan.column.dataType
+            }}</span>
+            <NativeSelect
+              variant="bordered"
+              :data-testid="`generate-data-recipe-${plan.column.name}`"
+              :model-value="recipeSelectValue(plan.recipe)"
+              :disabled="running"
+              @update:model-value="(v) => onRecipeChange(index, String(v))"
+            >
+              <option value="skip">{{ t('common.skip.label') }}</option>
+              <option value="null">{{ t('studio.common.nullValue.label') }}</option>
+              <option value="constant">{{ t('studio.generateData.recipe.constant.label') }}</option>
+              <option v-if="plan.column.typeClass === 'number'" value="sequence">{{
+                t('studio.common.nodeKind.sequence.label')
+              }}</option>
+              <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
+                {{ t(opt.labelKey) }}
+              </option>
+            </NativeSelect>
+            <Input
+              v-if="plan.recipe.kind === 'constant'"
+              :model-value="plan.recipe.value"
+              class="w-full font-data"
+              :data-testid="`generate-data-constant-${plan.column.name}`"
+              :disabled="running"
+              @update:model-value="(v) => onConstantChange(index, String(v))"
+            />
+            <NumberStepperInput
+              v-else-if="plan.recipe.kind === 'sequence'"
+              :model-value="String(plan.recipe.start)"
+              group-class="h-control-lg"
+              :data-testid="`generate-data-sequence-start-${plan.column.name}`"
+              :disabled="running"
+              @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
+            />
+            <span v-else class="text-muted-foreground"></span>
+          </div>
+        </div>
+
+        <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
+          <AlertDescription>
+            {{ t('studio.generateData.noColumns.body') }}
+          </AlertDescription>
+        </Alert>
+        <Alert v-else-if="allColumnsSkipped" variant="warn" data-testid="generate-data-no-columns">
+          <AlertDescription>
+            {{ t('studio.generateData.allSkipped.body') }}
+          </AlertDescription>
+        </Alert>
+
+        <Alert v-if="warnings.length" variant="warn" data-testid="generate-data-warnings">
+          <AlertDescription>
+            <ul class="m-0 pl-2">
+              <li v-for="w in warnings" :key="w">{{ w }}</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+
+        <div class="preview-section">
+          <Button
+            type="button"
+            variant="link"
+            size="kira"
+            class="h-auto p-0 disabled:text-muted-foreground"
+            data-testid="generate-data-preview-toggle"
+            :disabled="noUsableColumns"
+            @click="onTogglePreview"
+          >
+            {{
+              previewOpen ? t('studio.generateData.hidePreview.label') : t('studio.grid.previewCommand.title')
+            }}
+          </Button>
+          <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">
+            <InlineState v-if="previewLoading" kind="loading">{{
+              t('common.state.loading.loading')
+            }}</InlineState>
+            <InlineState
+              v-else-if="previewError"
+              kind="error"
+              data-testid="generate-data-preview-error"
+              >{{
+                previewError
+              }}</InlineState
+            >
+            <MonacoHost
+              v-else
+              :doc="previewDoc"
+              language="sql"
+              :sql-dialect="sqlDialect"
+              :read-only="true"
+            />
+          </div>
+        </div>
+
+        <Alert v-if="runError" variant="error" data-testid="generate-data-error">
+          <AlertDescription>{{ runError }}</AlertDescription>
+        </Alert>
       </DialogBody>
 
       <DialogFooter>
@@ -363,13 +393,26 @@ function onSequenceStartChange(index: number, start: number): void {
               <Spinner :size="12" label="" />
             </span>
           </TooltipTrigger>
-          <TooltipContent>{{ t('studio.generateData.progress.tooltip', { committed: committedRows, count: rowCount }) }}</TooltipContent>
+          <TooltipContent>{{
+            t('studio.generateData.progress.tooltip', { committed: committedRows, count: rowCount })
+          }}</TooltipContent>
         </Tooltip>
-        <Button v-if="running" variant="dialog" size="kira-lg" data-testid="generate-data-stop" @click="onStop">
+        <Button
+          v-if="running"
+          variant="dialog"
+          size="kira-lg"
+          data-testid="generate-data-stop"
+          @click="onStop"
+        >
           {{ t('common.action.stop.label') }}
         </Button>
         <template v-else>
-          <Button variant="dialog" size="kira-lg" data-testid="generate-data-cancel" @click="onClose">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="generate-data-cancel"
+            @click="onClose"
+          >
             {{ t('common.action.cancel.label') }}
           </Button>
           <Button

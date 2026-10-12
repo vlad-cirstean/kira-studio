@@ -65,9 +65,7 @@ const nameEdit = useInlineEdit({
 });
 
 // ---- status
-const statusTone = computed(() =>
-  props.card.parked ? 'grey' : STATUS_TONE[props.card.status],
-);
+const statusTone = computed(() => (props.card.parked ? 'grey' : STATUS_TONE[props.card.status]));
 const statusLabel = computed(() =>
   props.card.parked ? t('space.ade.board.notMerging.label') : statusText(props.card.status),
 );
@@ -114,7 +112,8 @@ function branchLabel(row: CardModel['rows'][number]): string {
   return row.draft ? row.context : row.name;
 }
 
-const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
+const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
+  t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground';
 </script>
 
 <template>
@@ -123,12 +122,15 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     data-testid="ade-task-tab"
   >
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-      <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">{{ t('common.field.name.label') }}</Label>
+      <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">{{
+        t('common.field.name.label')
+      }}</Label>
       <Input
         id="ade-task-name"
         :model-value="nameEdit.text.value"
         :placeholder="card.defaultTitle"
-        size="kira-lg" class="font-medium"
+        size="kira-lg"
+        class="font-medium"
         data-testid="ade-task-name"
         @update:model-value="nameEdit.onInput"
         @blur="nameEdit.onCommit"
@@ -161,7 +163,9 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         @save="links.saveGithub"
         @clear="links.clearGithub"
       />
-      <span class="text-kira-sm text-muted-foreground">{{ t('space.ade.estimate.field.label') }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{
+        t('space.ade.estimate.field.label')
+      }}</span>
       <AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" />
       <template v-if="!review">
         <span />
@@ -172,7 +176,9 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-task-parked"
             @update:model-value="(v: boolean) => write({ kind: v ? 'parked' : 'task' })"
           />
-          <Label for="ade-task-parked" class="text-kira-md">{{ t('space.ade.board.notMerging.label') }}</Label>
+          <Label for="ade-task-parked" class="text-kira-md">{{
+            t('space.ade.board.notMerging.label')
+          }}</Label>
           <span class="text-kira-sm text-subtle">{{ t('space.ade.taskTab.notMerging.hint') }}</span>
         </div>
       </template>
@@ -183,10 +189,14 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
 
     <div class="flex flex-col gap-0.5">
       <div class="flex items-center gap-2 pb-0.5">
-        <span class="text-kira-sm text-muted-foreground">{{ t('common.module.branches.label') }}</span>
+        <span class="text-kira-sm text-muted-foreground">{{
+          t('common.module.branches.label')
+        }}</span>
         <span class="flex-1" />
         <template v-if="!review">
-          <Label for="ade-add-repo" class="sr-only">{{ t('space.ade.taskTab.addRepo.aria') }}</Label>
+          <Label for="ade-add-repo" class="sr-only">{{
+            t('space.ade.taskTab.addRepo.aria')
+          }}</Label>
           <NativeSelect
             id="ade-add-repo"
             :model-value="addRepoValue"
@@ -198,7 +208,8 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           >
             <option value="">{{ t('space.ade.taskTab.addRepo.option') }}</option>
             <option v-for="r in lackedRepos" :key="r.codeRepoId" :value="r.codeRepoId">
-              {{ r.nickname || r.name }} · {{ r.name }}
+              {{ r.nickname || r.name }}
+              · {{ r.name }}
             </option>
           </NativeSelect>
         </template>
@@ -211,7 +222,8 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           {{ t('space.ade.taskTab.addBranch.label') }}
         </Button>
       </div>
-      <Button size="kira"
+      <Button
+        size="kira"
         v-for="row in card.rows"
         :key="row.id"
         variant="ghost"
@@ -225,15 +237,21 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-medium"
           :class="tintOf(row.branch.codeRepoId).class"
           :style="tintOf(row.branch.codeRepoId).style"
-          >{{ row.repo }}</span
+          >{{
+            row.repo
+          }}</span
         >
         <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-          <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{ c.label }}</span>
+          <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
+            c.label
+          }}</span>
         </AdeTip>
         <span
           class="min-w-0 flex-1 truncate font-data text-kira-md"
           :class="row.draft ? 'italic text-muted-foreground' : ''"
-          >{{ branchLabel(row) }}</span
+          >{{
+            branchLabel(row)
+          }}</span
         >
       </Button>
     </div>

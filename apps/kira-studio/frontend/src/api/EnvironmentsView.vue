@@ -170,7 +170,9 @@ function onEditVariables(id: string, name: string): void {
 
 // The group is controlled by the store's active row, so a failed activation leaves the radio on
 // the previous environment.
-const activeEnvironmentId = computed(() => variablesStore.environments.find((e) => e.isActive)?.id ?? '');
+const activeEnvironmentId = computed(
+  () => variablesStore.environments.find((e) => e.isActive)?.id ?? '',
+);
 async function onSetActive(id: string): Promise<void> {
   await variablesStore.setActiveEnvironment(id);
 }
@@ -178,7 +180,10 @@ async function onSetActive(id: string): Promise<void> {
 async function onDelete(id: string, name: string): Promise<void> {
   const confirmed = await confirmDialogStore.confirm({
     title: t('studio.api.environments.deleteConfirm.title'),
-    message: [t('studio.api.environments.deleteConfirm.body', { name }), t('common.confirm.irreversible.body')].join(' '),
+    message: [
+      t('studio.api.environments.deleteConfirm.body', { name }),
+      t('common.confirm.irreversible.body'),
+    ].join(' '),
     confirmLabel: t('common.action.delete.label'),
     tone: 'danger',
   });
@@ -219,8 +224,10 @@ function onKeydown(e: KeyboardEvent, id: string): void {
 // P105 §5.1: the row divs carry no interactive role of their own, so the keydown listener binds
 // once on the list container and resolves back to a row via its own data-id.
 function rowIdFromEvent(e: Event): string | null {
-  return (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="environment-row"]')
-    ?.dataset.id ?? null;
+  return (
+    (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="environment-row"]')
+      ?.dataset.id ?? null
+  );
 }
 useEventListener(listEl, 'keydown', (e) => {
   const id = rowIdFromEvent(e);
@@ -232,21 +239,33 @@ useEventListener(listEl, 'keydown', (e) => {
   <div class="flex h-full min-h-0 flex-col" data-testid="environments-dialog">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon :name="ICON.environments" :size="13" /></span>
-      <span class="text-kira-md text-fg truncate" data-testid="environments-target">{{ t('studio.api.common.environments.label') }}</span>
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
+      <span class="size-4 flex items-center justify-center shrink-0"
+        ><CodiconIcon :name="ICON.environments" :size="13" /></span
+      >
+      <span class="text-kira-md text-fg truncate" data-testid="environments-target">{{
+        t('studio.api.common.environments.label')
+      }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
     <ViewToolbar border="none">
-      <div v-if="variablesStore.environments.length > 0" class="w-64"><SearchField v-model="filterQuery" :placeholder="t('studio.api.common.filterByName.placeholder')" data-testid="environments-filter" /></div>
+      <div v-if="variablesStore.environments.length > 0" class="w-64"
+        ><SearchField
+          v-model="filterQuery"
+          :placeholder="t('studio.api.common.filterByName.placeholder')"
+          data-testid="environments-filter"
+        /></div
+      >
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 shrink-0">
-        <Button variant="toolbar-primary" size="kira" data-testid="new-environment" @click="onNewEnvironment">
+        <Button
+          variant="toolbar-primary"
+          size="kira"
+          data-testid="new-environment"
+          @click="onNewEnvironment"
+        >
           {{ t('studio.api.environments.new.label') }}
         </Button>
       </div>
@@ -281,19 +300,25 @@ useEventListener(listEl, 'keydown', (e) => {
           data-testid="environment-row"
           :data-id="env.id"
         >
-          <span
-            :class="colorMarkClass('dot', env.color)"
-            data-testid="environment-color-dot"
-          />
+          <span :class="colorMarkClass('dot', env.color)" data-testid="environment-color-dot" />
           <Tooltip v-if="isFiltered">
             <TooltipTrigger as-child>
-              <span class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="environment-grip">
+              <span
+                class="flex cursor-grab items-center text-subtle"
+                aria-hidden="true"
+                data-testid="environment-grip"
+              >
                 <CodiconIcon name="gripper" :size="13" />
               </span>
             </TooltipTrigger>
             <TooltipContent>{{ t('studio.api.common.reorderBlocked.hint') }}</TooltipContent>
           </Tooltip>
-          <span v-else class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="environment-grip">
+          <span
+            v-else
+            class="flex cursor-grab items-center text-subtle"
+            aria-hidden="true"
+            data-testid="environment-grip"
+          >
             <CodiconIcon name="gripper" :size="13" />
           </span>
           <Tooltip>
@@ -346,8 +371,18 @@ useEventListener(listEl, 'keydown', (e) => {
             @click="onDelete(env.id, env.name)"
           />
         </div>
-        <EmptyState v-if="variablesStore.environments.length === 0" data-testid="environments-empty" :icon="ICON.environments" :title="t('common.noEnvironments.empty')" />
-        <EmptyState v-else-if="isFiltered && displayEnvironments.length === 0" data-testid="environments-filter-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
+        <EmptyState
+          v-if="variablesStore.environments.length === 0"
+          data-testid="environments-empty"
+          :icon="ICON.environments"
+          :title="t('common.noEnvironments.empty')"
+        />
+        <EmptyState
+          v-else-if="isFiltered && displayEnvironments.length === 0"
+          data-testid="environments-filter-empty"
+          :icon="ICON.search"
+          :title="t('common.state.noMatches.empty')"
+        />
       </div>
     </RadioGroup>
   </div>

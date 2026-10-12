@@ -3,7 +3,14 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
@@ -47,7 +54,8 @@ const preview = useQuery(
 watch(debounced, () => void preview.refetch());
 const pv = computed(() => preview.data.value ?? null);
 const settled = computed(
-  () => JSON.stringify(debounced.value) === JSON.stringify(secrets.value) && !preview.isFetching.value,
+  () =>
+    JSON.stringify(debounced.value) === JSON.stringify(secrets.value) && !preview.isFetching.value,
 );
 
 const { data: runs } = useScriptRuns();
@@ -55,7 +63,9 @@ const waitingRun = computed(() => runs.value?.find((r) => r.id === props.runId) 
 const due = computed(() => {
   const at = waitingRun.value?.createdAt;
   const tz = script.value?.schedule?.timezone ?? 'UTC';
-  return at === undefined ? t('common.now.status') : t('automations.schedule.due.status', { time: clockText(at, tz) });
+  return at === undefined
+    ? t('common.now.status')
+    : t('automations.schedule.due.status', { time: clockText(at, tz) });
 });
 
 const error = ref<string | null>(null);
@@ -130,7 +140,9 @@ useShortcut(window, ['form.submit'], run);
             : t('automations.dialog.scheduleConfirm.untitledConfirm.title')
         }}</DialogTitle>
         <SmartBadge v-if="script?.kind === 'smart'" />
-        <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-due">{{ due }}</span>
+        <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-due">{{
+          due
+        }}</span>
       </DialogHeader>
 
       <DialogBody>
@@ -138,10 +150,20 @@ useShortcut(window, ['form.submit'], run);
           <AlertDescription>{{ t('automations.script.gone.error') }}</AlertDescription>
         </Alert>
         <template v-else>
-          <div v-if="ade" class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-ade">
-            <CatalogText :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'">
-              <template #task><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template>
-              <template #branch><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template>
+          <div
+            v-if="ade"
+            class="text-kira-sm text-muted-foreground"
+            data-testid="schedule-confirm-ade"
+          >
+            <CatalogText
+              :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'"
+            >
+              <template #task
+                ><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template
+              >
+              <template #branch
+                ><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template
+              >
             </CatalogText>
           </div>
           <Field v-if="script.kind === 'smart' && pv" data-testid="schedule-confirm-prompt">
@@ -166,7 +188,9 @@ useShortcut(window, ['form.submit'], run);
           <FieldError v-if="pv && pv.missing.length > 0" data-testid="schedule-confirm-missing">
             {{ t('automations.run.fillIn.error', { names: pv.missing.join(', ') }) }}
           </FieldError>
-          <FieldError v-if="pv?.blocker" data-testid="schedule-confirm-blocker">{{ pv.blocker }}</FieldError>
+          <FieldError v-if="pv?.blocker" data-testid="schedule-confirm-blocker">{{
+            pv.blocker
+          }}</FieldError>
           <Alert v-if="error" variant="error" data-testid="schedule-confirm-error">
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
@@ -175,7 +199,9 @@ useShortcut(window, ['form.submit'], run);
 
       <DialogFooter>
         <template v-if="more > 0" #start>
-          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{ t('common.moreWaiting.status', { count: more }) }}</span>
+          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{
+            t('common.moreWaiting.status', { count: more })
+          }}</span>
         </template>
         <Button
           variant="dialog"
@@ -186,7 +212,13 @@ useShortcut(window, ['form.submit'], run);
         >
           {{ t('git.dialog.postCheckoutPullConfirm.notNow.label') }}
         </Button>
-        <Button variant="dialog-primary" size="kira-lg" :disabled="!canRun" data-testid="schedule-confirm-run" @click="run">
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :disabled="!canRun"
+          data-testid="schedule-confirm-run"
+          @click="run"
+        >
           {{ t('common.action.run.label') }}
         </Button>
       </DialogFooter>

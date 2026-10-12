@@ -16,7 +16,12 @@ import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { tabChipVariants } from '@theme/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
@@ -169,7 +174,11 @@ watch(
 // relation names as a distinct fallback layer — but this is the one place lint/hover read, so
 // they can never disagree with completion about what the console knows.
 const ddlSchema = computed(() =>
-  schemaColumnsStore.effectiveSchema(props.tab.connectionId ?? '', containerPath.value ?? '', documentDdlSchema.value),
+  schemaColumnsStore.effectiveSchema(
+    props.tab.connectionId ?? '',
+    containerPath.value ?? '',
+    documentDdlSchema.value,
+  ),
 );
 
 // D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
@@ -379,7 +388,8 @@ async function ensureConnectedForRun(): Promise<boolean> {
     if (await onReconnectAndLoad()) return true;
     const id = props.tab.connectionId;
     connectError.value =
-      (id ? connectionsStore.states[id]?.error : undefined) ?? t('studio.console.connectFailed.error');
+      (id ? connectionsStore.states[id]?.error : undefined) ??
+      t('studio.console.connectFailed.error');
   } catch (e) {
     connectError.value = errorText(e);
   }
@@ -463,7 +473,8 @@ function onFormat(): void {
     } catch (e) {
       // AbortError: the view unmounted mid-run.
       if (!(e instanceof DOMException && e.name === 'AbortError')) {
-        formatError.value = e instanceof Error ? e.message : t('studio.console.format.failed.error');
+        formatError.value =
+          e instanceof Error ? e.message : t('studio.console.format.failed.error');
       }
       return;
     } finally {
@@ -485,7 +496,9 @@ function onFormat(): void {
     // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
     resetStalePreviewState();
     if (!result.ok) {
-      formatError.value = result.reason ? reasonText(result.reason) : t('studio.console.format.failed.error');
+      formatError.value = result.reason
+        ? reasonText(result.reason)
+        : t('studio.console.format.failed.error');
       return;
     }
     setText(props.tab.id, result.text);
@@ -680,10 +693,7 @@ const statusLine = computed(() => {
   <div class="h-full flex flex-col min-h-0" data-testid="console-view" :data-path="tab.path">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connectionKind" :size="13" />
       </span>
@@ -724,127 +734,130 @@ const statusLine = computed(() => {
           @click="onStop"
         />
       </div>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar-primary"
-                size="kira"
-                data-testid="console-run-statement"
-                :disabled="running || starting"
-                @click="runStatement"
-              >
-                <CodiconIcon name="play" :size="13" />
-                {{ t('common.action.run.label') }}
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.console.run.tooltip') }}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira"
-                data-testid="console-run-all"
-                :disabled="running || starting"
-                @click="runAll"
-              >
-                <CodiconIcon name="run-all" :size="13" />
-                {{ t('common.action.runAll.label') }}
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.console.runAll.tooltip') }}</TooltipContent>
-        </Tooltip>
-        <Tooltip v-if="canFormat">
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira"
-                data-testid="console-format"
-                :disabled="!tab.state.text.trim()"
-                @click="onFormat"
-              >
-                <CodiconIcon name="indent" :size="13" />
-                {{ t('studio.console.format.label') }}
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('studio.console.format.tooltip') }}</TooltipContent>
-        </Tooltip>
-        <!-- P18 D12: SQL-only (unlike Format, which also covers the Mongo console) — absent, not
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <TooltipDisabledTrigger>
+            <Button
+              variant="toolbar-primary"
+              size="kira"
+              data-testid="console-run-statement"
+              :disabled="running || starting"
+              @click="runStatement"
+            >
+              <CodiconIcon name="play" :size="13" />
+              {{ t('common.action.run.label') }}
+            </Button>
+          </TooltipDisabledTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{{ t('studio.console.run.tooltip') }}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <TooltipDisabledTrigger>
+            <Button
+              variant="toolbar"
+              size="kira"
+              data-testid="console-run-all"
+              :disabled="running || starting"
+              @click="runAll"
+            >
+              <CodiconIcon name="run-all" :size="13" />
+              {{ t('common.action.runAll.label') }}
+            </Button>
+          </TooltipDisabledTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{{ t('studio.console.runAll.tooltip') }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="canFormat">
+        <TooltipTrigger as-child>
+          <TooltipDisabledTrigger>
+            <Button
+              variant="toolbar"
+              size="kira"
+              data-testid="console-format"
+              :disabled="!tab.state.text.trim()"
+              @click="onFormat"
+            >
+              <CodiconIcon name="indent" :size="13" />
+              {{ t('studio.console.format.label') }}
+            </Button>
+          </TooltipDisabledTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{{ t('studio.console.format.tooltip') }}</TooltipContent>
+      </Tooltip>
+      <!-- P18 D12: SQL-only (unlike Format, which also covers the Mongo console) — absent, not
              disabled, on a non-SQL console; disabled-with-tooltip (not hidden) on a SQL console
              whose statement at the cursor isn't a SELECT/WITH, since Explain applies to this
              console and just not to this particular statement. -->
-        <Tooltip v-if="dialect">
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira"
-                data-testid="console-explain"
-                :disabled="!canExplain || starting"
-                @click="onExplain"
-              >
-                <CodiconIcon name="list-tree" :size="13" />
-                {{ t('studio.console.explain.label') }}
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{ explainTooltip }}</TooltipContent>
-        </Tooltip>
-        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-        <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
+      <Tooltip v-if="dialect">
+        <TooltipTrigger as-child>
+          <TooltipDisabledTrigger>
+            <Button
+              variant="toolbar"
+              size="kira"
+              data-testid="console-explain"
+              :disabled="!canExplain || starting"
+              @click="onExplain"
+            >
+              <CodiconIcon name="list-tree" :size="13" />
+              {{ t('studio.console.explain.label') }}
+            </Button>
+          </TooltipDisabledTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{{ explainTooltip }}</TooltipContent>
+      </Tooltip>
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+      <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
              the current ones. On (appending) by default and per-tab, shown unpressed — pressing
              this is what makes a run replace the last result set instead of stacking a new one,
              so the pressed/"active" look tracks *replace* mode, the inverse of the stored flag. -->
-        <TooltipIconButton
-          icon="layers"
-          :label="tab.state.newResultSet
+      <TooltipIconButton
+        icon="layers"
+        :label="tab.state.newResultSet
               ? t('studio.console.newResultSet.add.tooltip')
               : t('studio.console.newResultSet.replace.tooltip')"
-          :aria-label="t('studio.console.newResultSet.toggle.aria')"
-          :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
-          data-testid="console-new-result-toggle"
-          @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
-        />
-        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-        <div class="relative">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                ref="savedMenuTriggerEl"
-                variant="toolbar"
-                size="kira"
-                data-testid="console-saved-toggle"
-                @click="savedMenuOpen = !savedMenuOpen"
-              >
-                <CodiconIcon name="bookmark" :size="13" />
-                {{ t('studio.console.savedMenu.title') }}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('studio.console.savedMenu.title') }}</TooltipContent>
-          </Tooltip>
-          <Popover :open="savedMenuOpen" @update:open="(v) => (savedMenuOpen = v)">
-            <PopoverAnchor :reference="(savedMenuTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
-          </Popover>
-        </div>
-        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-        <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
+        :aria-label="t('studio.console.newResultSet.toggle.aria')"
+        :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
+        data-testid="console-new-result-toggle"
+        @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
+      />
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+      <div class="relative">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              ref="savedMenuTriggerEl"
+              variant="toolbar"
+              size="kira"
+              data-testid="console-saved-toggle"
+              @click="savedMenuOpen = !savedMenuOpen"
+            >
+              <CodiconIcon name="bookmark" :size="13" />
+              {{ t('studio.console.savedMenu.title') }}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('studio.console.savedMenu.title') }}</TooltipContent>
+        </Tooltip>
+        <Popover :open="savedMenuOpen" @update:open="(v) => (savedMenuOpen = v)">
+          <PopoverAnchor
+            :reference="(savedMenuTriggerEl?.$el as HTMLElement) ?? undefined"
+            class="hidden"
+          />
+          <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
+        </Popover>
+      </div>
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+      <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
              is gated off the same way expand/collapse-all above is gated on document-ness. -->
-        <TooltipIconButton
-          v-if="!activeResultIsPlan"
-          icon="search"
-          :label="t('studio.console.findInResult.label')"
-          :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
-          data-testid="console-search"
-          @click="onToggleSearch"
-        />
-        <!-- The autocommit/transaction segmented control from Console.html needs a per-console
+      <TooltipIconButton
+        v-if="!activeResultIsPlan"
+        icon="search"
+        :label="t('studio.console.findInResult.label')"
+        :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
+        data-testid="console-search"
+        @click="onToggleSearch"
+      />
+      <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
       <span class="ml-auto" />
@@ -856,7 +869,12 @@ const statusLine = computed(() => {
       <div class="flex items-center gap-1.5 min-w-0"></div>
     </ViewToolbar>
 
-    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="console-error">
+    <Alert
+      strip
+      v-if="rt?.status === 'error' && rt.error"
+      variant="error"
+      data-testid="console-error"
+    >
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
     <Alert strip v-if="formatError" variant="error" data-testid="console-format-error">
@@ -890,7 +908,7 @@ const statusLine = computed(() => {
       </AlertAction>
     </Alert>
 
-      <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
+    <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
            whole ViewChrome (header, toolbar and all) with the reconnect gate — item 4 fixed that
            inconsistency for them, and the console never had a Refresh button to carry the same
            reconnect-or-continue job, only Run/Run all (see runStatement/runAll above). With those
@@ -898,126 +916,138 @@ const statusLine = computed(() => {
            nothing left to gate — the editor already stayed visible behind it (item 2), and running
            a restored tab's query now reconnects itself, so the button was just a second, redundant
            way to do what pressing Run already does. Removed rather than kept as a no-op. -->
-      <div class="flex flex-1 min-h-0 flex-col">
+    <div class="flex flex-1 min-h-0 flex-col">
       <div class="flex min-h-0 flex-1 flex-col">
-      <div class="flex-1 basis-2/5 min-h-0 border-b border-border">
-        <MonacoHost
-          ref="editorHost"
-          :doc="localDoc"
-          :language="language"
-          :sql-dialect="dialect"
-          :read-only="false"
-          :autocomplete="language !== 'plain'"
-          :completion-sources="completionSources"
-          :lint-source="lintSource"
-          :hover-source="hoverSource"
-          keep-selection-on-external-sync
-          @update:doc="onDocChange"
-          @update:cursor="cursorPos = $event"
-        />
-      </div>
+        <div class="flex-1 basis-2/5 min-h-0 border-b border-border">
+          <MonacoHost
+            ref="editorHost"
+            :doc="localDoc"
+            :language="language"
+            :sql-dialect="dialect"
+            :read-only="false"
+            :autocomplete="language !== 'plain'"
+            :completion-sources="completionSources"
+            :lint-source="lintSource"
+            :hover-source="hoverSource"
+            keep-selection-on-external-sync
+            @update:doc="onDocChange"
+            @update:cursor="cursorPos = $event"
+          />
+        </div>
 
-      <div v-if="rt && rt.results.length > 0" class="flex-1 basis-3/5 min-h-0 flex flex-col" data-testid="console-results">
-        <!-- Console.html's own console body shows one result at a time behind a strip, rather
+        <div
+          v-if="rt && rt.results.length > 0"
+          class="flex-1 basis-3/5 min-h-0 flex flex-col"
+          data-testid="console-results"
+        >
+          <!-- Console.html's own console body shows one result at a time behind a strip, rather
              than stacking every statement's page — D2. Each chip is a result *set*, addressed by
              its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
              doesn't re-key its siblings. -->
-        <ViewToolbar>
-          <div
-            ref="resultStripRef"
-            class="flex items-center flex-1 min-w-0 overflow-x-auto gap-0.5 scrollbar-none"
-            data-testid="console-result-strip"
-            @wheel="onResultStripWheel"
-          >
+          <ViewToolbar>
             <div
-              v-for="(result, i) in rt.results"
-              :key="result.key"
-              class="group/tab"
-              :class="cn(tabChipVariants({ active: result.key === rt.activeKey }), 'max-w-36')"
-              data-testid="console-result-tab"
-              :data-active="result.key === rt.activeKey"
+              ref="resultStripRef"
+              class="flex items-center flex-1 min-w-0 overflow-x-auto gap-0.5 scrollbar-none"
+              data-testid="console-result-strip"
+              @wheel="onResultStripWheel"
             >
-              <!-- P105 §11: a focusable close control nested inside the tab's own <button> is
+              <div
+                v-for="(result, i) in rt.results"
+                :key="result.key"
+                class="group/tab"
+                :class="cn(tabChipVariants({ active: result.key === rt.activeKey }), 'max-w-36')"
+                data-testid="console-result-tab"
+                :data-active="result.key === rt.activeKey"
+              >
+                <!-- P105 §11: a focusable close control nested inside the tab's own <button> is
                    invalid HTML and unreachable by keyboard — the close button is this tab's
                    sibling now, not its child. -->
-              <button
-                type="button"
-                class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
-                @click="consoleViewStore.setActiveResult(tab.id, result.key)"
-                @auxclick.middle="onResultMiddleClick(result.key)"
-                @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
-              >
-                <CodiconIcon :name="iconForResult(result.key)" :size="13" class="shrink-0" />
-                <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">{{ t('studio.console.result.tab.label', { n: i + 1 }) }}</span>
-              </button>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                class="size-4"
-                :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
-                :aria-label="t('studio.console.result.close.aria')"
-                data-testid="console-result-close"
-                @click="consoleViewStore.closeResult(tab.id, result.key)"
-              >
-                <CodiconIcon name="close" :size="13" />
-              </Button>
+                <button
+                  type="button"
+                  class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
+                  @click="consoleViewStore.setActiveResult(tab.id, result.key)"
+                  @auxclick.middle="onResultMiddleClick(result.key)"
+                  @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
+                >
+                  <CodiconIcon :name="iconForResult(result.key)" :size="13" class="shrink-0" />
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">{{
+                    t('studio.console.result.tab.label', { n: i + 1 })
+                  }}</span>
+                </button>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  class="size-4"
+                  :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
+                  :aria-label="t('studio.console.result.close.aria')"
+                  data-testid="console-result-close"
+                  @click="consoleViewStore.closeResult(tab.id, result.key)"
+                >
+                  <CodiconIcon name="close" :size="13" />
+                </Button>
+              </div>
             </div>
-          </div>
-          <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="console-status">{{ statusLine }}</span>
-          <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
+            <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="console-status">{{
+              statusLine
+            }}</span>
+            <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
                result — DocumentView.vue's own expand-all/collapse-all pair, needed here now that
                a document row's only other way to reveal its full body (the cell editor dock) is
                gone as a redundant second copy of this same DocumentTree (P42 D11). -->
-          <template v-if="activeResultIsDocument">
-            <TooltipIconButton
-              icon="expand-all"
-              :label="t('common.action.expandAll.label')"
-              data-testid="console-expand-all"
-              @click="onExpandAllResults"
-            />
-            <TooltipIconButton
-              icon="collapse-all"
-              :label="t('common.action.collapseAll.label')"
-              data-testid="console-collapse-all"
-              @click="onCollapseAllResults"
-            />
-          </template>
-        </ViewToolbar>
-        <SearchToolbar
-          v-if="rt.searchOpen && !activeResultIsPlan"
-          :tab-id="tab.id"
-          testid-prefix="console-"
-          kind="rows"
-          :api="pageSearchApi"
-          @go-to-match="onGoToMatch"
-          @close="onCloseSearch"
-        />
-        <Alert strip v-if="activeResultTruncated?.truncated" variant="warn" data-testid="console-result-truncated">
-          <AlertDescription>
-            {{ t('studio.console.result.truncated.body', { count: activeResultTruncated.rows }) }}
-          </AlertDescription>
-        </Alert>
-        <div class="flex-1 min-h-0">
-          <!-- D17: a plan result set renders through its own view — reusing the strip/close/
+            <template v-if="activeResultIsDocument">
+              <TooltipIconButton
+                icon="expand-all"
+                :label="t('common.action.expandAll.label')"
+                data-testid="console-expand-all"
+                @click="onExpandAllResults"
+              />
+              <TooltipIconButton
+                icon="collapse-all"
+                :label="t('common.action.collapseAll.label')"
+                data-testid="console-collapse-all"
+                @click="onCollapseAllResults"
+              />
+            </template>
+          </ViewToolbar>
+          <SearchToolbar
+            v-if="rt.searchOpen && !activeResultIsPlan"
+            :tab-id="tab.id"
+            testid-prefix="console-"
+            kind="rows"
+            :api="pageSearchApi"
+            @go-to-match="onGoToMatch"
+            @close="onCloseSearch"
+          />
+          <Alert
+            strip
+            v-if="activeResultTruncated?.truncated"
+            variant="warn"
+            data-testid="console-result-truncated"
+          >
+            <AlertDescription>
+              {{ t('studio.console.result.truncated.body', { count: activeResultTruncated.rows }) }}
+            </AlertDescription>
+          </Alert>
+          <div class="flex-1 min-h-0">
+            <!-- D17: a plan result set renders through its own view — reusing the strip/close/
                eviction machinery above, but never ConsoleResultGrid, which resolves a Page that a
                plan result set does not have. -->
-          <ExplainResultView v-if="rt.activeKey && activeResultIsPlan" :page-key="rt.activeKey" />
-          <ConsoleResultGrid
-            v-else-if="rt.activeKey"
-            ref="resultGridRef"
-            :page-key="rt.activeKey"
-            :tab-id="tab.id"
-            :connection-id="tab.connectionId"
-            :path="tab.path"
-          />
+            <ExplainResultView v-if="rt.activeKey && activeResultIsPlan" :page-key="rt.activeKey" />
+            <ConsoleResultGrid
+              v-else-if="rt.activeKey"
+              ref="resultGridRef"
+              :page-key="rt.activeKey"
+              :tab-id="tab.id"
+              :connection-id="tab.connectionId"
+              :path="tab.path"
+            />
+          </div>
         </div>
-      </div>
-
       </div>
       <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
            viewer, not an editor refusing this particular cell (F12/F13). -->
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
-      </div>
+    </div>
   </div>
   <!-- P110 I2-16: `.result-tab`/`.result-close`'s own hover/active rules moved onto the template --
        `group/tab` on the tab, its own ternary for the inactive-hover background (`is-active` stays

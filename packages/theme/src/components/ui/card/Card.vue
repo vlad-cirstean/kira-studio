@@ -8,7 +8,11 @@ const props = defineProps<{ class?: HTMLAttributes['class']; variant?: CardVaria
 </script>
 
 <template>
-  <div data-slot="card" :data-variant="variant ?? 'inset'" :class="cn(cardVariants({ variant }), props.class)">
+  <div
+    data-slot="card"
+    :data-variant="variant ?? 'inset'"
+    :class="cn(cardVariants({ variant }), props.class)"
+  >
     <slot />
   </div>
 </template>

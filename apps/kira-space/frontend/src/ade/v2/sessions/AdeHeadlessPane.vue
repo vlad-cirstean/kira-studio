@@ -26,14 +26,19 @@ const error = ref('');
 const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 
 const runState = computed(() => props.view.run?.state ?? '');
-const needsYou = computed(() => runState.value === 'stuck' || props.view.session.activity === 'input');
+const needsYou = computed(
+  () => runState.value === 'stuck' || props.view.session.activity === 'input',
+);
 const running = computed(() => runState.value === 'running');
 const status = computed(() =>
-  t(needsYou.value ? 'space.ade.headless.statusNeedsYou.label' : 'space.ade.headless.status.label', {
-    step: props.view.step,
-    state: runState.value ? runStateLabel(runState.value) : activityLabel(props.view.kind),
-    ago: ago.value,
-  }),
+  t(
+    needsYou.value ? 'space.ade.headless.statusNeedsYou.label' : 'space.ade.headless.status.label',
+    {
+      step: props.view.step,
+      state: runState.value ? runStateLabel(runState.value) : activityLabel(props.view.kind),
+      ago: ago.value,
+    },
+  ),
 );
 
 async function onStop(): Promise<void> {
@@ -54,7 +59,8 @@ async function onStop(): Promise<void> {
       data-testid="ade-headless-status"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
-      <Button variant="dialog"
+      <Button
+        variant="dialog"
         v-if="!archived"
         size="kira"
         class="shrink-0 rounded-kira-sm px-2.5 "
@@ -81,7 +87,9 @@ async function onStop(): Promise<void> {
       <span class="min-w-0 truncate" data-testid="ade-headless-label">{{ status }}</span>
       <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
-    <FieldError v-if="error" class="px-3 py-1" data-testid="ade-session-error">{{ error }}</FieldError>
+    <FieldError v-if="error" class="px-3 py-1" data-testid="ade-session-error">{{
+      error
+    }}</FieldError>
     <div class="min-h-0 flex-1 overflow-auto p-2">
       <AdeRunLog v-if="view.session.runId" kind="run" :id="view.session.runId" max-height="100%" />
     </div>

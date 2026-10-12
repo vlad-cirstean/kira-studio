@@ -61,7 +61,7 @@
   },
   "html": {
     "experimentalFullSupportEnabled": true,
-    "formatter": { "enabled": false }
+    "formatter": { "enabled": true, "whitespaceSensitivity": "strict" }
   },
   "assist": {
     "enabled": true,
@@ -72,6 +72,10 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["**/*.html", "**/*.svg"],
+      "html": { "formatter": { "enabled": false } }
+    },
     {
       "includes": [
         "apps/kira-space/frontend/src/main.ts",

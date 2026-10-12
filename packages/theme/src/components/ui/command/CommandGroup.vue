@@ -1,32 +1,33 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import type { ListboxGroupProps } from 'reka-ui'
-import { ListboxGroup, ListboxGroupLabel, useId } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
-import { computed, onMounted, onUnmounted } from 'vue'
-import { provideCommandGroupContext, useCommand } from '.'
+import { cn } from '@theme/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import type { ListboxGroupProps } from 'reka-ui';
+import { ListboxGroup, ListboxGroupLabel, useId } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
+import { provideCommandGroupContext, useCommand } from '.';
 
-const props = defineProps<ListboxGroupProps & {
-  class?: HTMLAttributes['class']
-  heading?: string
-}>()
+const props = defineProps<
+  ListboxGroupProps & {
+    class?: HTMLAttributes['class'];
+    heading?: string;
+  }
+>();
 
-const delegatedProps = reactiveOmit(props, 'class')
+const delegatedProps = reactiveOmit(props, 'class');
 
-const { allGroups, filterState } = useCommand()
-const id = useId()
+const { allGroups, filterState } = useCommand();
+const id = useId();
 
-const isRender = computed(() => !filterState.search ? true : filterState.filtered.groups.has(id))
+const isRender = computed(() => (!filterState.search ? true : filterState.filtered.groups.has(id)));
 
-provideCommandGroupContext({ id })
+provideCommandGroupContext({ id });
 onMounted(() => {
-  if (!allGroups.value.has(id))
-    allGroups.value.set(id, new Set())
-})
+  if (!allGroups.value.has(id)) allGroups.value.set(id, new Set());
+});
 onUnmounted(() => {
-  allGroups.value.delete(id)
-})
+  allGroups.value.delete(id);
+});
 </script>
 
 <template>

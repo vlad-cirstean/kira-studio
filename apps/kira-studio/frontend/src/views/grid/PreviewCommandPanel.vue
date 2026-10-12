@@ -50,7 +50,9 @@ const errorMessage = computed(() => {
 const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
 
 const sqlDialect = computed(() =>
-  sqlDialectFor(connectionsStore.connectionRecord(tabsStore.findDataTab(props.tabId)?.connectionId)?.kind),
+  sqlDialectFor(
+    connectionsStore.connectionRecord(tabsStore.findDataTab(props.tabId)?.connectionId)?.kind,
+  ),
 );
 
 function close(): void {
@@ -61,8 +63,12 @@ function close(): void {
 <template>
   <PopoverContent align="end" class="w-120 gap-0 p-0" data-testid="preview-command-panel">
     <div class="max-h-96 flex flex-col">
-      <div class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground">
-        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
+      <div
+        class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground"
+      >
+        <span class="size-4 flex items-center justify-center shrink-0"
+          ><CodiconIcon name="code" :size="13" /></span
+        >
         <span>{{ t('studio.grid.previewCommand.title') }}</span>
         <TooltipIconButton
           icon="close"
@@ -72,11 +78,15 @@ function close(): void {
           @click="close"
         />
       </div>
-      <InlineState v-if="isLoading" kind="loading">{{ t('common.state.loading.loading') }}</InlineState>
+      <InlineState v-if="isLoading" kind="loading">{{
+        t('common.state.loading.loading')
+      }}</InlineState>
       <InlineState v-else-if="errorMessage" kind="error" data-testid="preview-command-error">
         {{ errorMessage }}
       </InlineState>
-      <InlineState v-else-if="statements.length === 0" kind="empty">{{ t('studio.grid.previewCommand.empty') }}</InlineState>
+      <InlineState v-else-if="statements.length === 0" kind="empty">{{
+        t('studio.grid.previewCommand.empty')
+      }}</InlineState>
       <div v-else class="h-60">
         <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>

@@ -85,12 +85,18 @@ async function onRemove(c: HttpCookieWire): Promise<void> {
 }
 async function onClearAll(): Promise<void> {
   // Go's jar is process-wide: this empties every host, not just this request's URL.
-  if (!(await confirmDialogStore.confirm({
+  if (
+    !(await confirmDialogStore.confirm({
       title: t('studio.http.cookies.clearConfirm.title'),
-      message: [t('studio.http.cookies.clearConfirm.body'), t('common.confirm.irreversible.body')].join(' '),
+      message: [
+        t('studio.http.cookies.clearConfirm.body'),
+        t('common.confirm.irreversible.body'),
+      ].join(' '),
       confirmLabel: t('common.action.clear.label'),
       tone: 'danger',
-    }))) return;
+    }))
+  )
+    return;
   removeMutation.reset();
   await clearMutation.mutateAsync().catch(() => {
     // shown through requestError
@@ -109,15 +115,33 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 </script>
 
 <template>
-  <div v-if="mode === 'request'" class="flex flex-1 min-h-0 flex-col overflow-auto" data-testid="http-request-cookies">
-    <EmptyState v-if="disableCookieJar" data-testid="http-cookies-jar-off" icon="circle-slash" :title="t('studio.http.cookies.jarOff.empty')">
-      <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
+  <div
+    v-if="mode === 'request'"
+    class="flex flex-1 min-h-0 flex-col overflow-auto"
+    data-testid="http-request-cookies"
+  >
+    <EmptyState
+      v-if="disableCookieJar"
+      data-testid="http-cookies-jar-off"
+      icon="circle-slash"
+      :title="t('studio.http.cookies.jarOff.empty')"
+    >
+      <button
+        type="button"
+        class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+        data-testid="http-cookies-edit-defaults"
+        @click="onEditGlobalDefaults"
+      >
         {{ t('studio.http.settings.editGlobal.label') }}
       </button>
     </EmptyState>
     <template v-else>
       <div class="flex items-center gap-1">
-        <SearchField v-model="filter" :placeholder="t('studio.http.cookies.filter.placeholder')" data-testid="http-cookies-filter" />
+        <SearchField
+          v-model="filter"
+          :placeholder="t('studio.http.cookies.filter.placeholder')"
+          data-testid="http-cookies-filter"
+        />
         <Button
           variant="dialog"
           size="kira"
@@ -134,17 +158,28 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         class="text-kira-sm subtle px-1.5 pt-1 pb-0"
         data-testid="http-cookies-filtered-count"
       >
-        {{ t('studio.http.cookies.count.status', { shown: filteredRequestCookies.length, count: requestCookies.length }) }}
+        {{
+          t('studio.http.cookies.count.status', { shown: filteredRequestCookies.length, count: requestCookies.length })
+        }}
       </span>
       <Alert strip v-if="requestError" variant="error" data-testid="http-cookies-error">
         <AlertDescription>{{ requestError }}</AlertDescription>
       </Alert>
-      <div v-if="requestCookies.length > 0" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
-        <div v-for="(c, i) in filteredRequestCookies" :key="`${c.name}|${c.domain}|${c.path}|${i}`" class="flex text-kira-sm items-start justify-between gap-1">
+      <div
+        v-if="requestCookies.length > 0"
+        class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5"
+      >
+        <div
+          v-for="(c, i) in filteredRequestCookies"
+          :key="`${c.name}|${c.domain}|${c.path}|${i}`"
+          class="flex text-kira-sm items-start justify-between gap-1"
+        >
           <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
             <span class="wrap-anywhere font-data">{{ c.value }}</span>
-            <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-sm font-data">{{ attributeLine(c) }}</span>
+            <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-sm font-data">{{
+              attributeLine(c)
+            }}</span>
           </div>
           <TooltipIconButton
             :icon="ICON.close"
@@ -155,24 +190,49 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           />
         </div>
       </div>
-      <EmptyState v-else data-testid="http-cookies-empty" icon="symbol-key" :title="t('studio.http.cookies.none.empty')">
-        <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-cookies-retry" @click="emit('refresh')">{{ t('common.action.refresh.label') }}</button>
+      <EmptyState
+        v-else
+        data-testid="http-cookies-empty"
+        icon="symbol-key"
+        :title="t('studio.http.cookies.none.empty')"
+      >
+        <button
+          type="button"
+          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
+          data-testid="http-cookies-retry"
+          @click="emit('refresh')"
+          >{{
+            t('common.action.refresh.label')
+          }}</button
+        >
       </EmptyState>
     </template>
   </div>
 
-  <div v-else class="flex flex-1 min-h-0 flex-col overflow-auto" data-testid="http-response-cookies">
+  <div
+    v-else
+    class="flex flex-1 min-h-0 flex-col overflow-auto"
+    data-testid="http-response-cookies"
+  >
     <template v-if="response">
       <template v-if="sentCookies.length > 0 || receivedCookies.length > 0">
         <div v-if="sentCookies.length > 0" class="pt-1.5">
-          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">{{ t('common.sent.status') }}</h3>
+          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">{{
+            t('common.sent.status')
+          }}</h3>
           <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
-            <div v-for="(c, i) in sentCookies" :key="`sent-${i}`" class="flex text-kira-sm items-start justify-between gap-1">
+            <div
+              v-for="(c, i) in sentCookies"
+              :key="`sent-${i}`"
+              class="flex text-kira-sm items-start justify-between gap-1"
+            >
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
                 <span class="wrap-anywhere font-data">{{ c.value }}</span>
                 <span class="text-muted-foreground text-kira-sm font-data">
-                  <template v-if="showHopIndex">{{ t('studio.http.cookies.hop.label', { hop: c.hop }) }}</template>
+                  <template v-if="showHopIndex">{{
+                    t('studio.http.cookies.hop.label', { hop: c.hop })
+                  }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
                   {{ attributeLine(c) }}
                 </span>
@@ -181,14 +241,22 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </div>
         </div>
         <div v-if="receivedCookies.length > 0" class="pt-1.5">
-          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">{{ t('studio.http.cookies.received.label') }}</h3>
+          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">{{
+            t('studio.http.cookies.received.label')
+          }}</h3>
           <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
-            <div v-for="(c, i) in receivedCookies" :key="`received-${i}`" class="flex text-kira-sm items-start justify-between gap-1">
+            <div
+              v-for="(c, i) in receivedCookies"
+              :key="`received-${i}`"
+              class="flex text-kira-sm items-start justify-between gap-1"
+            >
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
                 <span class="wrap-anywhere font-data">{{ c.value }}</span>
                 <span class="text-muted-foreground text-kira-sm font-data">
-                  <template v-if="showHopIndex">{{ t('studio.http.cookies.hop.label', { hop: c.hop }) }}</template>
+                  <template v-if="showHopIndex">{{
+                    t('studio.http.cookies.hop.label', { hop: c.hop })
+                  }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
                   {{ attributeLine(c) }}
                 </span>
@@ -197,7 +265,12 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </div>
         </div>
       </template>
-      <EmptyState v-else data-testid="http-response-cookies-empty" icon="symbol-key" :title="t('studio.http.cookies.noneReceived.empty')" />
+      <EmptyState
+        v-else
+        data-testid="http-response-cookies-empty"
+        icon="symbol-key"
+        :title="t('studio.http.cookies.noneReceived.empty')"
+      />
     </template>
     <EmptyState v-else icon="arrow-right" :title="t('studio.common.responseEmpty.empty')" />
   </div>

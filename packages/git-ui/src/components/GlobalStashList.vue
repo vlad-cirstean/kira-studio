@@ -49,7 +49,10 @@ function globalStashRowModel(entry: StashEntry): StashRowModel {
   return {
     id: `global:${entry.sha}`,
     origin: model.origin,
-    originTooltip: model.origin === undefined ? undefined : t('git.stash.savedFrom.tooltip', { origin: model.origin }),
+    originTooltip:
+      model.origin === undefined
+        ? undefined
+        : t('git.stash.savedFrom.tooltip', { origin: model.origin }),
     auto: model.auto,
     message: model.label,
     messageTooltip: entry.message,
@@ -84,7 +87,11 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 <template>
   <section :aria-label="t('git.stash.global.label')">
     <SectionHeading :label="t('git.stash.global.label')">
-      <TooltipIconButton icon="add" :label="t('git.stash.saveGlobal.tooltip')" @click="emit('saveGlobalStash')" />
+      <TooltipIconButton
+        icon="add"
+        :label="t('git.stash.saveGlobal.tooltip')"
+        @click="emit('saveGlobalStash')"
+      />
     </SectionHeading>
     <StashRows
       :section="section"
@@ -98,4 +105,3 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
     />
   </section>
 </template>
-

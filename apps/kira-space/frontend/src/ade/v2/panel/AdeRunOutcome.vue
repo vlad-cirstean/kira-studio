@@ -46,7 +46,10 @@ watch(
 const outcome = computed(() => props.run.outcome);
 const rebase = computed(() => outcome.value?.rebase ?? null);
 const files = computed(() => [
-  ...new Set([...(rebase.value?.conflictedFiles ?? []), ...(outcome.value?.report?.conflictedFiles ?? [])]),
+  ...new Set([
+    ...(rebase.value?.conflictedFiles ?? []),
+    ...(outcome.value?.report?.conflictedFiles ?? []),
+  ]),
 ]);
 
 const STATE_TONE: Record<string, Tone> = {
@@ -94,7 +97,6 @@ const endedBy = computed(() => {
   ].join(' · ');
 });
 
-
 function text(): string {
   const o = outcome.value;
   const head = { title: props.title, state: state.value };
@@ -105,26 +107,40 @@ function text(): string {
   ];
   if (o) {
     lines.push(
-      t(o.reported ? 'space.ade.outcome.endedByReported.label' : 'space.ade.outcome.endedBy.label', { source: o.source }),
+      t(
+        o.reported ? 'space.ade.outcome.endedByReported.label' : 'space.ade.outcome.endedBy.label',
+        { source: o.source },
+      ),
     );
   }
   if (rebase.value) {
     lines.push(
-      t(rebase.value.verified ? 'space.ade.outcome.copy.verified.label' : 'space.ade.outcome.copy.notVerified.label'),
+      t(
+        rebase.value.verified
+          ? 'space.ade.outcome.copy.verified.label'
+          : 'space.ade.outcome.copy.notVerified.label',
+      ),
     );
     if (rebase.value.aborted) lines.push(t('space.ade.outcome.copy.aborted.body'));
     if (rebase.value.inProgress) lines.push(t('space.ade.outcome.copy.inProgress.body'));
   }
-  if (files.value.length) lines.push(t('space.ade.outcome.copy.conflicted.label', { files: files.value.join(', ') }));
-  if (o?.report?.lastGitError) lines.push(t('space.ade.outcome.copy.gitError.label', { error: o.report.lastGitError }));
+  if (files.value.length)
+    lines.push(t('space.ade.outcome.copy.conflicted.label', { files: files.value.join(', ') }));
+  if (o?.report?.lastGitError)
+    lines.push(t('space.ade.outcome.copy.gitError.label', { error: o.report.lastGitError }));
   if (o?.report?.tried) lines.push(t('space.ade.outcome.tried.label', { tried: o.report.tried }));
   for (const b of rebase.value?.branches ?? []) {
     lines.push(
-      t(b.onBase ? 'space.ade.outcome.copy.branch.label' : 'space.ade.outcome.copy.branchOffBase.label', {
-        name: b.name,
-        before: shortSha(b.before),
-        after: shortSha(b.after),
-      }),
+      t(
+        b.onBase
+          ? 'space.ade.outcome.copy.branch.label'
+          : 'space.ade.outcome.copy.branchOffBase.label',
+        {
+          name: b.name,
+          before: shortSha(b.before),
+          after: shortSha(b.after),
+        },
+      ),
     );
   }
   return lines.join('\n');
@@ -136,46 +152,84 @@ function copy(): void {
 </script>
 
 <template>
-  <div class="flex flex-col gap-1.5 rounded-kira bg-elevated p-2" data-testid="ade-run-outcome" :data-run-id="run.id">
+  <div
+    class="flex flex-col gap-1.5 rounded-kira bg-elevated p-2"
+    data-testid="ade-run-outcome"
+    :data-run-id="run.id"
+  >
     <div class="flex items-center gap-2">
       <span class="text-kira-sm text-muted-foreground">{{ title }}</span>
       <AdeChip :label="state" :tone="STATE_TONE[run.state] ?? 'grey'" />
-      <span v-if="result" data-testid="ade-outcome-result"><AdeChip :label="result" :tone="resultTone" /></span>
-      <span v-if="route" class="text-kira-sm text-muted-foreground" data-testid="ade-outcome-route">{{ route }}</span>
+      <span v-if="result" data-testid="ade-outcome-result"
+        ><AdeChip :label="result" :tone="resultTone" /></span
+      >
+      <span
+        v-if="route"
+        class="text-kira-sm text-muted-foreground"
+        data-testid="ade-outcome-route"
+        >{{
+          route
+        }}</span
+      >
       <AdeChip
         v-if="rebase"
         :label="rebase.verified ? t('space.ade.outcome.verified.status') : t('space.ade.outcome.notVerified.status')"
         :tone="rebase.verified ? 'green' : 'amber'"
       />
       <span class="flex-1" />
-      <Button size="kira" variant="ghost" class="text-muted-foreground" data-testid="ade-outcome-copy" @click="copy">
+      <Button
+        size="kira"
+        variant="ghost"
+        class="text-muted-foreground"
+        data-testid="ade-outcome-copy"
+        @click="copy"
+      >
         {{ copied ? t('common.copy.copied.announce') : t('common.copyForAgent.label') }}
       </Button>
     </div>
-    <p v-if="outcome?.reason" class="m-0 text-kira-md" data-testid="ade-outcome-reason">{{ outcome.reason }}</p>
+    <p v-if="outcome?.reason" class="m-0 text-kira-md" data-testid="ade-outcome-reason">{{
+      outcome.reason
+    }}</p>
     <p v-if="outcome" class="m-0 text-kira-sm text-subtle" data-testid="ade-outcome-source">
       {{ endedBy }}
     </p>
-    <ul v-if="files.length" class="m-0 flex list-none flex-col gap-0.5 p-0 font-data text-kira-sm" data-testid="ade-outcome-files">
+    <ul
+      v-if="files.length"
+      class="m-0 flex list-none flex-col gap-0.5 p-0 font-data text-kira-sm"
+      data-testid="ade-outcome-files"
+    >
       <li v-for="f in files" :key="f" class="truncate text-tone-red">{{ f }}</li>
     </ul>
     <Card v-if="outcome?.report?.lastGitError" data-testid="ade-outcome-git-error">
-      <FieldError class="whitespace-pre-wrap font-data">{{ outcome.report.lastGitError }}</FieldError>
+      <FieldError class="whitespace-pre-wrap font-data">{{
+        outcome.report.lastGitError
+      }}</FieldError>
     </Card>
-    <p v-if="outcome?.report?.tried" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-outcome-tried">
+    <p
+      v-if="outcome?.report?.tried"
+      class="m-0 text-kira-sm text-muted-foreground"
+      data-testid="ade-outcome-tried"
+    >
       {{ t('space.ade.outcome.tried.label', { tried: outcome.report.tried }) }}
     </p>
-    <div v-for="b in rebase?.branches ?? []" :key="b.branchId" class="flex items-center gap-1.5 font-data text-kira-sm" data-testid="ade-outcome-branch">
+    <div
+      v-for="b in rebase?.branches ?? []"
+      :key="b.branchId"
+      class="flex items-center gap-1.5 font-data text-kira-sm"
+      data-testid="ade-outcome-branch"
+    >
       <span class="min-w-0 truncate">{{ b.name }}</span>
       <span class="text-subtle">{{ shortSha(b.before) }} → {{ shortSha(b.after) }}</span>
-      <span v-if="!b.onBase" class="text-tone-amber">{{ t('space.ade.outcome.notOnBase.status') }}</span>
+      <span v-if="!b.onBase" class="text-tone-amber">{{
+        t('space.ade.outcome.notOnBase.status')
+      }}</span>
     </div>
     <FieldError v-if="copyError">{{ copyError }}</FieldError>
     <div v-if="acts?.length" class="flex flex-wrap gap-1.5">
       <AdeTip v-for="a in acts" :key="a.id" :parts="a.tip">
-        <Button variant="dialog"
+        <Button
+          variant="dialog"
           size="kira"
-          
           :class="ACTION_CLASS[a.kind === 'abortRebase' ? 'red' : 'amber']"
           :disabled="a.disabled"
           :data-testid="`ade-outcome-act-${a.id}`"
@@ -185,7 +239,13 @@ function copy(): void {
         </Button>
       </AdeTip>
     </div>
-    <Button size="kira" variant="ghost" class="self-start text-muted-foreground" data-testid="ade-outcome-log-toggle" @click="showLog = !showLog">
+    <Button
+      size="kira"
+      variant="ghost"
+      class="self-start text-muted-foreground"
+      data-testid="ade-outcome-log-toggle"
+      @click="showLog = !showLog"
+    >
       {{ showLog ? t('space.common.hideLog.label') : t('space.common.showLog.label') }}
     </Button>
     <AdeRunLog v-if="showLog" kind="run" :id="run.id" />

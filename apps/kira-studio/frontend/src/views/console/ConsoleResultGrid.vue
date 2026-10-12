@@ -390,14 +390,27 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 </script>
 
 <template>
-  <div class="h-full min-h-0 flex flex-col text-kira-md font-data" data-testid="console-result-grid">
+  <div
+    class="h-full min-h-0 flex flex-col text-kira-md font-data"
+    data-testid="console-result-grid"
+  >
     <Alert strip v-if="copyError" variant="error" data-testid="console-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
-    <div v-if="!page || page.rowCount === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? t('studio.common.noRows.empty') : '' }}</div>
+    <div
+      v-if="!page || page.rowCount === 0"
+      class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm"
+      >{{
+        page ? t('studio.common.noRows.empty') : ''
+      }}</div
+    >
     <!-- P31 D19/P24 D8 precedent: filtering to zero matches is a distinct empty state from "no
          data loaded" — same discipline as KeyValueView.vue's own EmptyState pair. -->
-    <div v-else-if="rowIndices.length === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm" data-testid="console-no-matching-rows">
+    <div
+      v-else-if="rowIndices.length === 0"
+      class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm"
+      data-testid="console-no-matching-rows"
+    >
       {{ t('studio.common.noMatchingRows.empty') }}
     </div>
     <ConsoleSlickGrid
@@ -453,7 +466,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
                 :row="documentRows[vi.index]!.index"
                 @toggle-path="(path) => documentRowsStore.togglePath(pageKey, documentRows[vi.index]!.index, path)"
               />
-              <pre v-else class="m-0 whitespace-pre-wrap break-words font-data py-1 px-2">{{ documentRow(pageKey, documentRows[vi.index]!.index)?.body }}</pre>
+              <pre
+                v-else
+                class="m-0 whitespace-pre-wrap break-words font-data py-1 px-2"
+              >{{ documentRow(pageKey, documentRows[vi.index]!.index)?.body }}</pre>
             </div>
           </template>
         </DocumentRow>
@@ -479,7 +495,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
           role="option"
           v-bind="kvNav.rowProps(String(rowIndices[vi.index]))"
-:tabindex="kvNav.tabindexFor(String(rowIndices[vi.index]))"
+          :tabindex="kvNav.tabindexFor(String(rowIndices[vi.index]))"
           :aria-selected="isSelected(rowIndices[vi.index]!, 0)"
           @click="selectKeyValueRowFromEvent"
           @keydown="selectKeyValueRowFromKeydown"

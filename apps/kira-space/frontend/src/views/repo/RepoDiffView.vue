@@ -140,9 +140,29 @@ onUnmounted(() => {
       class="monaco-host flex-auto min-h-0 w-full"
       data-testid="repo-diff-editor"
     />
-    <EmptyState v-else-if="state === 'binary'" class="flex-1 min-h-0" icon="file-binary" :title="t('space.repo.view.binaryCompare.empty')" />
-    <EmptyState v-else-if="state === 'tooLarge'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.tooLargeCompare.empty')" />
-    <EmptyState v-else-if="state === 'bothMissing'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.missing.empty')" />
-    <EmptyState v-else class="flex-1 min-h-0" icon="warning" :title="errorMessage || t('space.repo.view.openDiffFailed.error')" />
+    <EmptyState
+      v-else-if="state === 'binary'"
+      class="flex-1 min-h-0"
+      icon="file-binary"
+      :title="t('space.repo.view.binaryCompare.empty')"
+    />
+    <EmptyState
+      v-else-if="state === 'tooLarge'"
+      class="flex-1 min-h-0"
+      icon="warning"
+      :title="t('space.repo.view.tooLargeCompare.empty')"
+    />
+    <EmptyState
+      v-else-if="state === 'bothMissing'"
+      class="flex-1 min-h-0"
+      icon="warning"
+      :title="t('space.repo.view.missing.empty')"
+    />
+    <EmptyState
+      v-else
+      class="flex-1 min-h-0"
+      icon="warning"
+      :title="errorMessage || t('space.repo.view.openDiffFailed.error')"
+    />
   </div>
 </template>

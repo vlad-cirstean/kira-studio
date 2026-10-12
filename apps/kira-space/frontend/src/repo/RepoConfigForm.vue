@@ -84,7 +84,9 @@ const source = computed(() =>
       props.repo.source === 'added'
         ? t('space.repo.config.source.added.status')
         : t('space.repo.config.source.imported.status', { source: props.repo.source }),
-    second: props.repo.usedByTasks ? t('space.repo.config.source.usedOnPlan.status') : t('space.repo.config.source.notOnPlan.status'),
+    second: props.repo.usedByTasks
+      ? t('space.repo.config.source.usedOnPlan.status')
+      : t('space.repo.config.source.notOnPlan.status'),
   }),
 );
 const SETUP_EXAMPLE = 'pnpm install';
@@ -209,7 +211,9 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           @keydown="nick.onKeydown"
         />
         <FieldDescription>{{ t('space.repo.config.nickname.description') }}</FieldDescription>
-        <FieldError v-if="nick.error.value" data-testid="repo-nick-error">{{ nick.error.value }}</FieldError>
+        <FieldError v-if="nick.error.value" data-testid="repo-nick-error">{{
+          nick.error.value
+        }}</FieldError>
       </Field>
       <Field>
         <span class="text-muted-foreground">{{ t('common.field.colour.label') }}</span>
@@ -277,7 +281,9 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           @update:model-value="prepare.onInput"
           @blur="prepare.onCommit"
         />
-        <FieldError v-if="prepare.error.value" data-testid="repo-prepare-error">{{ prepare.error.value }}</FieldError>
+        <FieldError v-if="prepare.error.value" data-testid="repo-prepare-error">{{
+          prepare.error.value
+        }}</FieldError>
       </Field>
       <Field orientation="horizontal">
         <FieldLabel for="repo-timeout">{{ t('common.field.timeout.label') }}</FieldLabel>
@@ -290,7 +296,9 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           @blur="timeout.onCommit"
           @keydown="timeout.onKeydown"
         />
-        <FieldError v-if="timeout.error.value" data-testid="repo-timeout-error">{{ timeout.error.value }}</FieldError>
+        <FieldError v-if="timeout.error.value" data-testid="repo-timeout-error">{{
+          timeout.error.value
+        }}</FieldError>
       </Field>
       <Field>
         <FieldLabel for="repo-base-path">{{ t('space.repo.config.basePath.label') }}</FieldLabel>
@@ -306,11 +314,18 @@ async function chooseColor(next: PaletteColor): Promise<void> {
             @blur="basePath.onCommit"
             @keydown="basePath.onKeydown"
           />
-          <Button variant="dialog" size="kira-lg" data-testid="repo-base-path-choose" @click="chooseBasePath">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="repo-base-path-choose"
+            @click="chooseBasePath"
+          >
             {{ t('common.action.choose.label') }}
           </Button>
         </div>
-        <FieldError v-if="basePath.error.value" data-testid="repo-base-path-error">{{ basePath.error.value }}</FieldError>
+        <FieldError v-if="basePath.error.value" data-testid="repo-base-path-error">{{
+          basePath.error.value
+        }}</FieldError>
       </Field>
     </section>
 
@@ -329,7 +344,9 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           @blur="targets.onCommit"
           @keydown="targets.onKeydown"
         />
-        <FieldError v-if="targets.error.value" data-testid="repo-targets-error">{{ targets.error.value }}</FieldError>
+        <FieldError v-if="targets.error.value" data-testid="repo-targets-error">{{
+          targets.error.value
+        }}</FieldError>
       </Field>
     </section>
 
@@ -340,11 +357,18 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           <template #command><code class="font-data">{{ VERSION_EXAMPLE }}</code></template>
         </CatalogText>
       </p>
-      <p v-if="envRows.length === 0" class="m-0 text-kira-md text-muted-foreground" data-testid="repo-env-empty">
+      <p
+        v-if="envRows.length === 0"
+        class="m-0 text-kira-md text-muted-foreground"
+        data-testid="repo-env-empty"
+      >
         {{ t('common.noEnvironments.empty') }}
       </p>
       <div v-else class="flex flex-col gap-1.5">
-        <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground" aria-hidden="true">
+        <div
+          class="flex items-center gap-1.5 text-kira-sm text-muted-foreground"
+          aria-hidden="true"
+        >
           <span class="w-32 shrink-0">{{ t('common.field.name.label') }}</span>
           <span class="min-w-0 flex-1">{{ t('space.repo.env.command.label') }}</span>
           <span class="size-6 shrink-0" />

@@ -38,7 +38,14 @@ const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recr
     </div>
     <slot />
     <FieldError v-if="error" data-testid="docker-edit-field-error">{{ error }}</FieldError>
-    <p v-else-if="needsRecreate" class="text-muted-foreground" data-testid="docker-edit-field-recreate-hint">{{ t('docker.edit.needsRecreate.hint') }}</p>
+    <p
+      v-else-if="needsRecreate"
+      class="text-muted-foreground"
+      data-testid="docker-edit-field-recreate-hint"
+      >{{
+        t('docker.edit.needsRecreate.hint')
+      }}</p
+    >
     <p v-else-if="hint" class="text-muted-foreground">{{ hint }}</p>
   </fieldset>
 </template>

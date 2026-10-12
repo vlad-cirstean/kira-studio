@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { cn } from '@theme/lib/utils'
-import type { HTMLAttributes } from 'vue'
-import type { EmptyMediaVariants } from '.'
-import { emptyMediaVariants } from '.'
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
+import type { EmptyMediaVariants } from '.';
+import { emptyMediaVariants } from '.';
 
-const props = withDefaults(defineProps<{
-  class?: HTMLAttributes['class']
-  variant?: EmptyMediaVariants['variant']
-}>(), {
-  variant: 'default',
-})
+const props = withDefaults(
+  defineProps<{
+    class?: HTMLAttributes['class'];
+    variant?: EmptyMediaVariants['variant'];
+  }>(),
+  {
+    variant: 'default',
+  },
+);
 </script>
 
 <template>

@@ -83,10 +83,7 @@ async function submit(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      :aria-describedby="undefined"
-      size="md"
-    >
+    <DialogContent :aria-describedby="undefined" size="md">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.tag.title') }}</DialogTitle>
       </DialogHeader>
@@ -106,7 +103,9 @@ async function submit(): Promise<void> {
         <template v-if="state.verdict === 'blockedByExisting'">
           <Alert variant="warn">
             <AlertDescription>
-              {{ t(state.existingIsAnnotated ? 'git.dialog.tag.existsAnnotated.hint' : 'git.dialog.tag.exists.hint', { name }) }}
+              {{
+                t(state.existingIsAnnotated ? 'git.dialog.tag.existsAnnotated.hint' : 'git.dialog.tag.exists.hint', { name })
+              }}
             </AlertDescription>
           </Alert>
           <Field orientation="horizontal">
@@ -115,7 +114,10 @@ async function submit(): Promise<void> {
           </Field>
         </template>
 
-        <Alert v-if="state.verdict === 'movesWithForce' && state.requiresAnnotationToPreserve" variant="warn">
+        <Alert
+          v-if="state.verdict === 'movesWithForce' && state.requiresAnnotationToPreserve"
+          variant="warn"
+        >
           <AlertDescription>
             {{ t('git.dialog.tag.downgrade.hint') }}
           </AlertDescription>
@@ -132,7 +134,9 @@ async function submit(): Promise<void> {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
           {{ t('common.action.create.label') }}
         </Button>

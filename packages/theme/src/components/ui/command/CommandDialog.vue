@@ -1,22 +1,30 @@
 <script setup lang="ts">
-import Command from '@theme/components/ui/command/Command.vue'
-import { Dialog, DialogDescription, DialogHeader, DialogOverlay, DialogTitle } from '@theme/components/ui/dialog'
-import { t } from '@theme/i18n'
-import { cn } from '@theme/lib/utils'
-import type { DialogRootEmits, DialogRootProps } from 'reka-ui'
-import { DialogContent, DialogPortal, useForwardPropsEmits } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
+import Command from '@theme/components/ui/command/Command.vue';
+import {
+  Dialog,
+  DialogDescription,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
+import { t } from '@theme/i18n';
+import { cn } from '@theme/lib/utils';
+import type { DialogRootEmits, DialogRootProps } from 'reka-ui';
+import { DialogContent, DialogPortal, useForwardPropsEmits } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
 
 // P262 §2.2 exempt: the command surface keeps its own top-anchored, header-less box, so it renders
 // reka's content directly instead of the sized DialogContent.
-const props = defineProps<DialogRootProps & {
-  title?: string
-  description?: string
-  class?: HTMLAttributes['class']
-}>()
-const emits = defineEmits<DialogRootEmits>()
+const props = defineProps<
+  DialogRootProps & {
+    title?: string;
+    description?: string;
+    class?: HTMLAttributes['class'];
+  }
+>();
+const emits = defineEmits<DialogRootEmits>();
 
-const forwarded = useForwardPropsEmits(props, emits)
+const forwarded = useForwardPropsEmits(props, emits);
 </script>
 
 <template>
@@ -29,7 +37,9 @@ const forwarded = useForwardPropsEmits(props, emits)
       >
         <DialogHeader class="sr-only" :closable="false">
           <DialogTitle>{{ title ?? t('theme.commandDialog.title') }}</DialogTitle>
-          <DialogDescription>{{ description ?? t('theme.commandDialog.description') }}</DialogDescription>
+          <DialogDescription>{{
+            description ?? t('theme.commandDialog.description')
+          }}</DialogDescription>
         </DialogHeader>
         <Command>
           <slot v-bind="slotProps" />

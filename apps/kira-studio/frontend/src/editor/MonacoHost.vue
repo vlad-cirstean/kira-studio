@@ -21,11 +21,7 @@ import type { SqlDialect } from '../views/shared/sqlIdent';
 import { pumpChunks, textChunks } from './chunkedText';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
 import type { ConsoleDiagnostic } from './diagnostics';
-import {
-  type ConsoleHoverInfo,
-  escapeMarkdownSyntaxTokens,
-  fenceMarkdownValue,
-} from './hoverInfo';
+import { type ConsoleHoverInfo, escapeMarkdownSyntaxTokens, fenceMarkdownValue } from './hoverInfo';
 
 // `import('monaco-editor').X` inline type references, not a static `import type {...}` — this
 // ambient module's own established style for its types.

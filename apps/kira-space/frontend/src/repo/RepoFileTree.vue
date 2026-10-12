@@ -172,4 +172,3 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
        (packages/workbench/src/lib/virtualRows.ts) -- see kira-studio's ProjectTree.vue's
        identical note. -->
 </template>
-

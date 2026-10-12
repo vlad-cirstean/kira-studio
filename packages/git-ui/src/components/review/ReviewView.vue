@@ -47,7 +47,16 @@ import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
@@ -248,7 +257,9 @@ function scheduleSessionSave(): void {
   sessionSaveScheduled = true;
   queueMicrotask(() => {
     sessionSaveScheduled = false;
-    persistSession().catch((err: unknown) => reportAsyncError(err, 'git.review.async.saveSession.error'));
+    persistSession().catch((err: unknown) =>
+      reportAsyncError(err, 'git.review.async.saveSession.error'),
+    );
   });
 }
 
@@ -587,9 +598,24 @@ interface ReviewToggleOption {
 
 // G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged section nodes.
 const panelOptions = computed<readonly ReviewToggleOption[]>(() => [
-  { id: 'commits', icon: ACTION_ICONS.commits, label: 'common.module.commits.label', badge: commitsCount.value },
-  { id: 'files', icon: ACTION_ICONS.files, label: 'common.module.files.label', badge: filesChangedCount.value },
-  { id: 'comments', icon: ACTION_ICONS.comments, label: 'git.review.pane.comments.label', badge: commentsCount.value },
+  {
+    id: 'commits',
+    icon: ACTION_ICONS.commits,
+    label: 'common.module.commits.label',
+    badge: commitsCount.value,
+  },
+  {
+    id: 'files',
+    icon: ACTION_ICONS.files,
+    label: 'common.module.files.label',
+    badge: filesChangedCount.value,
+  },
+  {
+    id: 'comments',
+    icon: ACTION_ICONS.comments,
+    label: 'git.review.pane.comments.label',
+    badge: commentsCount.value,
+  },
 ]);
 
 const listModeOptions: readonly ReviewToggleOption[] = [
@@ -627,7 +653,10 @@ const comparisonSummaryLabel = computed(() => {
   const commits = commitCountLabel.value;
   if (!commits) return '';
   const files = filesChangedCount.value;
-  return t('common.dotPair.label', { first: commits, second: t('git.review.filesChanged.label', { count: files }) });
+  return t('common.dotPair.label', {
+    first: commits,
+    second: t('git.review.filesChanged.label', { count: files }),
+  });
 });
 
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
@@ -757,7 +786,9 @@ watch(
         announce(t('git.review.phase.empty.announce', { branch, base }));
         break;
       case 'listing':
-        announce(t('git.review.phase.listing.announce', { branch, base, summary: commitCountLabel.value }));
+        announce(
+          t('git.review.phase.listing.announce', { branch, base, summary: commitCountLabel.value }),
+        );
         break;
       case 'error':
         announce(t('git.review.phase.error.error', { branch, error: r.resolveError.value ?? '' }));
@@ -785,8 +816,16 @@ watch(
 
     <template v-if="bootError">
       <div class="flex flex-col gap-2 p-3" data-testid="boot-error">
-        <p class=" text-muted-foreground">{{ t('git.app.bootError.error', { error: bootError }) }}</p>
-        <Button variant="dialog" size="kira" class="self-start" data-testid="boot-retry" @click="retryBootstrap">
+        <p class=" text-muted-foreground">{{
+          t('git.app.bootError.error', { error: bootError })
+        }}</p>
+        <Button
+          variant="dialog"
+          size="kira"
+          class="self-start"
+          data-testid="boot-retry"
+          @click="retryBootstrap"
+        >
           {{ t('common.action.retry.label') }}
         </Button>
       </div>
@@ -794,8 +833,8 @@ watch(
 
     <template v-else-if="!review">
       <EmptyState class="h-full" :title="t('git.review.loading.loading')">
-      <template #media><Spinner :size="24" label="" /></template>
-    </EmptyState>
+        <template #media><Spinner :size="24" label="" /></template>
+      </EmptyState>
     </template>
 
     <template v-else-if="noActiveRepo">
@@ -806,10 +845,7 @@ watch(
     </template>
 
     <template v-else-if="!review.branch.value">
-      <div
-        class="flex flex-col gap-1 p-3 min-h-0 h-full"
-        data-testid="review-no-branch"
-      >
+      <div class="flex flex-col gap-1 p-3 min-h-0 h-full" data-testid="review-no-branch">
         <h2 class="text-kira-md text-fg">{{ t('git.review.start.title') }}</h2>
         <p class=" text-muted-foreground">
           {{ t('git.review.noBranch.emptyHint') }}
@@ -874,7 +910,9 @@ watch(
         <span
           class="min-w-0 truncate font-data text-kira-md text-fg"
           data-testid="review-branch-name"
-          >{{ review.branch.value }}</span
+          >{{
+            review.branch.value
+          }}</span
         >
         <span class="text-muted-foreground shrink-0" aria-hidden="true">↔</span>
         <BaseSelector
@@ -953,11 +991,10 @@ watch(
           {{ t('git.review.resolving.loading') }}
         </p>
 
-        <div
-          v-else-if="review.phase.value === 'error'"
-          class="flex flex-col items-start gap-1 p-3"
-        >
-          <FieldError>{{ t('git.review.async.compare.error', { error: review.resolveError.value ?? '' }) }}</FieldError>
+        <div v-else-if="review.phase.value === 'error'" class="flex flex-col items-start gap-1 p-3">
+          <FieldError>{{
+            t('git.review.async.compare.error', { error: review.resolveError.value ?? '' })
+          }}</FieldError>
           <Button variant="dialog" size="kira" data-testid="review-retry" @click="retryCompare">
             {{ t('common.action.retry.label') }}
           </Button>
@@ -980,7 +1017,9 @@ watch(
           class=" p-3 text-muted-foreground"
           data-testid="review-unrelated"
         >
-          {{ t('git.review.unrelated.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' }) }}
+          {{
+            t('git.review.unrelated.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' })
+          }}
         </p>
 
         <p
@@ -988,7 +1027,9 @@ watch(
           class=" p-3 text-muted-foreground"
           data-testid="review-empty"
         >
-          {{ t('git.review.empty.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' }) }}
+          {{
+            t('git.review.empty.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' })
+          }}
         </p>
 
         <template
@@ -1054,10 +1095,10 @@ watch(
             v-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
             class="flex justify-center py-1 px-1.5 shrink-0"
           >
-            <Button data-testid="review-load-more-button"
+            <Button
+              data-testid="review-load-more-button"
               variant="toolbar"
               size="kira"
-             
               :disabled="review.isLoadingMore.value"
               @click="handleLoadMore"
             >
@@ -1094,4 +1135,3 @@ watch(
     </template>
   </div>
 </template>
-

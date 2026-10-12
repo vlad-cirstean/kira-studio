@@ -25,7 +25,13 @@ function toLines(chunks: readonly LogChunk[]): LogLine[] {
 <template>
   <QueryState :query="log" variant="inline" :is-empty="() => false">
     <template #error="{ message }">
-      <LogLines :lines="[]" :error="message" testid="ade-run-log" :max-height="maxHeight" :data-log-id="id" />
+      <LogLines
+        :lines="[]"
+        :error="message"
+        testid="ade-run-log"
+        :max-height="maxHeight"
+        :data-log-id="id"
+      />
     </template>
     <template #default="{ data }">
       <LogLines

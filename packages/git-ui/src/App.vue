@@ -60,11 +60,7 @@ import GitViewHead, { type RepoHead } from './components/GitViewHead.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
 import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
 import { localNameForRemoteBranch, remoteCheckoutTarget } from './components/refListModel.ts';
-import {
-  buildRefMenu,
-  buildRowMenu,
-  buildStashMenu,
-} from './components/rowMenuModel.ts';
+import { buildRefMenu, buildRowMenu, buildStashMenu } from './components/rowMenuModel.ts';
 // The template instantiates this (InstanceType<typeof SearchBox> is the script's only other
 // reference) — see AppToolbar.vue's own note on this exact pattern; `biome.json`'s own `**/*.vue`
 // override turns `useImportType` off for exactly this class of false positive (P96 §5.2).
@@ -217,8 +213,7 @@ const stashIncludeUntrackedDefault = computed(
 const FALLBACK_WORKTREE_BASE_PATH = SETTINGS['kiraSpace.worktree.basePath'].default;
 const worktreeBasePathDefault = computed(
   () =>
-    repoSettingsState.settings.value['kiraSpace.worktree.basePath'] ??
-    FALLBACK_WORKTREE_BASE_PATH,
+    repoSettingsState.settings.value['kiraSpace.worktree.basePath'] ?? FALLBACK_WORKTREE_BASE_PATH,
 );
 const commitGridRef = ref<InstanceType<typeof CommitGrid> | null>(null);
 const toolbarRef = ref<InstanceType<typeof AppToolbar> | null>(null);
@@ -1173,9 +1168,11 @@ onMounted(() => {
   // applied and the rows it covers re-rendered with their lanes, not merely that the shell
   // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
   // it, once, the first time that happens; nothing here needs to know when that is.
-  void bootstrap().then(onBootstrapSuccess).catch((err: unknown) => {
-    bootError.value = errorText(err);
-  });
+  void bootstrap()
+    .then(onBootstrapSuccess)
+    .catch((err: unknown) => {
+      bootError.value = errorText(err);
+    });
 });
 
 // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a live
@@ -1664,12 +1661,7 @@ onBeforeUnmount(() => {
     <!-- W14's one polite live region (see the `liveAnnouncement` watch above) — unconditional and
          present from first paint, same as connection-state above, since Load-more/Refresh can
          both complete while this file's own v-if chain is on any branch that renders the toolbar. -->
-    <div
-      class="sr-only"
-      role="status"
-      aria-live="polite"
-      data-testid="live-announcements"
-    >
+    <div class="sr-only" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
     <!-- P173: the visible half of every failure the live region announces — outside the v-if chain
@@ -1688,7 +1680,9 @@ onBeforeUnmount(() => {
       class="flex flex-col items-center justify-center gap-2 h-full p-4 text-center text-fg"
       data-testid="boot-error"
     >
-      <p class=" max-w-120 text-muted-foreground">{{ t('git.app.bootError.error', { error: bootError }) }}</p>
+      <p class=" max-w-120 text-muted-foreground">{{
+        t('git.app.bootError.error', { error: bootError })
+      }}</p>
       <Button variant="dialog" size="kira" data-testid="boot-retry" @click="retryBootstrap">
         {{ t('common.action.retry.label') }}
       </Button>
@@ -1707,7 +1701,9 @@ onBeforeUnmount(() => {
         role="status"
         data-testid="boot-error-banner"
       >
-        <AlertDescription>{{ t('git.app.bootError.error', { error: bootError }) }}</AlertDescription>
+        <AlertDescription>{{
+          t('git.app.bootError.error', { error: bootError })
+        }}</AlertDescription>
         <AlertAction class="top-1/2 -translate-y-1/2">
           <Button
             variant="dialog"
@@ -1720,10 +1716,7 @@ onBeforeUnmount(() => {
         </AlertAction>
       </Alert>
 
-      <GitBlockedPanel
-        v-if="repoState.git.value.kind !== 'ok'"
-        :status="repoState.git.value"
-      />
+      <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
 
       <NoRepositoryPanel
         v-else-if="!repoState.activeRepo.value"
@@ -1734,7 +1727,11 @@ onBeforeUnmount(() => {
       <template v-else-if="repoState.activeRepo.value.head.kind === 'unborn'">
         <GitViewHead v-if="repoHead" :repo="repoHead" v-bind="viewHeadBindings" />
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
-        <div v-if="searchOpen" ref="searchRowEl" class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0">
+        <div
+          v-if="searchOpen"
+          ref="searchRowEl"
+          class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0"
+        >
           <SearchBox
             ref="searchBoxRef"
             :search="searchState"
@@ -1749,7 +1746,11 @@ onBeforeUnmount(() => {
       <template v-else>
         <GitViewHead v-if="repoHead" :repo="repoHead" v-bind="viewHeadBindings" />
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
-        <div v-if="searchOpen" ref="searchRowEl" class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0">
+        <div
+          v-if="searchOpen"
+          ref="searchRowEl"
+          class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0"
+        >
           <SearchBox
             ref="searchBoxRef"
             :search="searchState"
@@ -1760,7 +1761,11 @@ onBeforeUnmount(() => {
         </div>
         <ConflictBanner :ops="opsState" />
         <main class="flex flex-1 min-h-0 min-w-0">
-          <section class="relative flex-1 min-w-0 flex flex-col bg-bg" data-testid="graph-region" :aria-label="t('git.graph.region.aria')">
+          <section
+            class="relative flex-1 min-w-0 flex flex-col bg-bg"
+            data-testid="graph-region"
+            :aria-label="t('git.graph.region.aria')"
+          >
             <UncommittedChangesStrip
               :graph-view="graphView"
               :ops-state="opsState"
@@ -1792,7 +1797,11 @@ onBeforeUnmount(() => {
               @stash-context-menu="handleStashContextMenu"
               @open-pull-request="handleGridOpenPullRequest"
             />
-            <LoadMoreButton :graph-view="graphView" :page-size="pageSize" :report-error="reportAsyncError" />
+            <LoadMoreButton
+              :graph-view="graphView"
+              :page-size="pageSize"
+              :report-error="reportAsyncError"
+            />
             <span class="sr-only" data-testid="chunk-source">{{
               graphView.lastChunkSource.value ?? ""
             }}</span>
@@ -1816,7 +1825,12 @@ onBeforeUnmount(() => {
               @live="setDetailWidth"
               @commit="setDetailWidth"
             />
-            <EmptyState v-if="!hasSelection" class="h-full p-6" icon="git-commit" :title="t('git.detail.noSelection.emptyHint')" />
+            <EmptyState
+              v-if="!hasSelection"
+              class="h-full p-6"
+              icon="git-commit"
+              :title="t('git.detail.noSelection.emptyHint')"
+            />
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1850,7 +1864,12 @@ onBeforeUnmount(() => {
             data-testid="detail-region"
             :aria-label="t('git.detail.region.aria')"
           >
-            <EmptyState v-if="!hasSelection" class="h-full p-6" icon="git-commit" :title="t('git.detail.noSelection.emptyHint')" />
+            <EmptyState
+              v-if="!hasSelection"
+              class="h-full p-6"
+              icon="git-commit"
+              :title="t('git.detail.noSelection.emptyHint')"
+            />
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1874,94 +1893,98 @@ onBeforeUnmount(() => {
           </aside>
         </div>
 
-          <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
+        <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
                (G20 D4) — reka's own flip/shift positioning, plus outside-click and Escape
                dismissal it did not have before. Open auto-focus lands on Cancel, never on the
                destructive button. Behaviour change, disclosed (plan §0 table). -->
-          <Popover
-            :open="!!forceDeleteRefCandidate"
-            @update:open="(v) => !v && (forceDeleteRefCandidate = undefined)"
+        <Popover
+          :open="!!forceDeleteRefCandidate"
+          @update:open="(v) => !v && (forceDeleteRefCandidate = undefined)"
+        >
+          <PopoverAnchor as-child>
+            <span
+              class="fixed size-0"
+              aria-hidden="true"
+              :style="{ left: `${forceDeleteRefCandidate?.x ?? 0}px`, top: `${forceDeleteRefCandidate?.y ?? 0}px` }"
+            />
+          </PopoverAnchor>
+          <PopoverContent
+            align="start"
+            :side-offset="0"
+            class="w-auto flex-row items-center gap-1 px-2 py-1"
+            destructive
           >
-            <PopoverAnchor as-child>
-              <span
-                class="fixed size-0"
-                aria-hidden="true"
-                :style="{ left: `${forceDeleteRefCandidate?.x ?? 0}px`, top: `${forceDeleteRefCandidate?.y ?? 0}px` }"
-              />
-            </PopoverAnchor>
-            <PopoverContent
-              align="start"
-              :side-offset="0"
-              class="w-auto flex-row items-center gap-1 px-2 py-1"
-              destructive
+            <span>{{
+              t('git.common.forceDelete.body', { name: forceDeleteRefCandidate?.name ?? '' })
+            }}</span>
+            <Button variant="danger" size="kira" @click="confirmForceDeleteRef">{{
+              t('git.common.forceDelete.confirm')
+            }}</Button>
+            <Button
+              data-dialog-dismiss
+              variant="toolbar"
+              size="kira"
+              @click="forceDeleteRefCandidate = undefined"
             >
-              <span>{{ t('git.common.forceDelete.body', { name: forceDeleteRefCandidate?.name ?? '' }) }}</span>
-              <Button variant="danger" size="kira" @click="confirmForceDeleteRef">{{ t('git.common.forceDelete.confirm') }}</Button>
-              <Button
-                data-dialog-dismiss
-                variant="toolbar"
-                size="kira"
-                @click="forceDeleteRefCandidate = undefined"
-              >
-                {{ t('common.action.cancel.label') }}
-              </Button>
-            </PopoverContent>
-          </Popover>
-          <RenameRefDialog
-            :open="renameRefDialogState.open"
-            :current-name="renameRefDialogState.currentName"
-            :ops="opsState"
-            @close="renameRefDialogState = { open: false, currentName: '' }"
-          />
-          <BranchDialog
-            :open="branchDialogState.open"
-            :start-point="branchDialogState.startPoint"
-            :ops="opsState"
-            @close="branchDialogState = { open: false, startPoint: '' }"
-          />
-          <TagDialog
-            :open="tagDialogState.open"
-            :target="tagDialogState.target"
-            :existing-tags="refsState.tags.value"
-            :ops="opsState"
-            @close="tagDialogState = { open: false, target: '' }"
-          />
-          <CheckoutDialog :ops="opsState" />
-          <RevertDialog :ops="opsState" />
-          <ResetDialog :ops="opsState" />
-          <CherryPickDialog :ops="opsState" />
-          <ForcePushDialog :ops="opsState" />
-          <PullDialog :ops="opsState" />
-          <PostCheckoutPullDialog :ops="opsState" />
-          <StashDialog
-            :ops="opsState"
-            :create-open="stashCreateOpen"
-            :include-untracked-default="stashIncludeUntrackedDefault"
-            :branch-target="stashBranchTarget"
-            :save-open="globalStashSaveOpen"
-            :save-source-entry="globalStashSaveSourceEntry"
-            @close-create="stashCreateOpen = false"
-            @close-branch="stashBranchTarget = undefined"
-            @close-save="
+              {{ t('common.action.cancel.label') }}
+            </Button>
+          </PopoverContent>
+        </Popover>
+        <RenameRefDialog
+          :open="renameRefDialogState.open"
+          :current-name="renameRefDialogState.currentName"
+          :ops="opsState"
+          @close="renameRefDialogState = { open: false, currentName: '' }"
+        />
+        <BranchDialog
+          :open="branchDialogState.open"
+          :start-point="branchDialogState.startPoint"
+          :ops="opsState"
+          @close="branchDialogState = { open: false, startPoint: '' }"
+        />
+        <TagDialog
+          :open="tagDialogState.open"
+          :target="tagDialogState.target"
+          :existing-tags="refsState.tags.value"
+          :ops="opsState"
+          @close="tagDialogState = { open: false, target: '' }"
+        />
+        <CheckoutDialog :ops="opsState" />
+        <RevertDialog :ops="opsState" />
+        <ResetDialog :ops="opsState" />
+        <CherryPickDialog :ops="opsState" />
+        <ForcePushDialog :ops="opsState" />
+        <PullDialog :ops="opsState" />
+        <PostCheckoutPullDialog :ops="opsState" />
+        <StashDialog
+          :ops="opsState"
+          :create-open="stashCreateOpen"
+          :include-untracked-default="stashIncludeUntrackedDefault"
+          :branch-target="stashBranchTarget"
+          :save-open="globalStashSaveOpen"
+          :save-source-entry="globalStashSaveSourceEntry"
+          @close-create="stashCreateOpen = false"
+          @close-branch="stashBranchTarget = undefined"
+          @close-save="
               globalStashSaveOpen = false;
               globalStashSaveSourceEntry = undefined;
             "
-          />
-          <WorktreeDialog
-            :worktrees="worktreeState"
-            :ops="opsState"
-            :refs="refsState"
-            :create-request="worktreeCreateRequest"
-            :base-path-default="worktreeBasePathDefault"
-            @close-create="worktreeCreateRequest = undefined"
-          />
-          <StackDialog
-            :stack="stackState"
-            :ops="opsState"
-            :refs="refsState"
-            :target="stackDialogTarget"
-            @close="stackDialogTarget = undefined"
-          />
+        />
+        <WorktreeDialog
+          :worktrees="worktreeState"
+          :ops="opsState"
+          :refs="refsState"
+          :create-request="worktreeCreateRequest"
+          :base-path-default="worktreeBasePathDefault"
+          @close-create="worktreeCreateRequest = undefined"
+        />
+        <StackDialog
+          :stack="stackState"
+          :ops="opsState"
+          :refs="refsState"
+          :target="stackDialogTarget"
+          @close="stackDialogTarget = undefined"
+        />
         <RepoSettingsDialog
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"

@@ -13,7 +13,8 @@ const { action, perform, busy } = useTaskAction(() => props.card);
 
 <template>
   <AdeTip v-if="action" :text="action.tip">
-    <Button variant="dialog"
+    <Button
+      variant="dialog"
       size="kira-lg"
       class="shrink-0 "
       :class="ACTION_CLASS[action.tone]"

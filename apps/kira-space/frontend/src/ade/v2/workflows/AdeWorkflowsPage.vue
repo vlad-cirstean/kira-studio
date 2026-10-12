@@ -96,80 +96,104 @@ async function createNew(): Promise<void> {
       <PanelHeader>
         {{ t('space.common.workflows.label') }}
         <template #actions>
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          data-testid="ade-wf-import"
-          @click="importOpen = !importOpen"
-        >
-          {{ t('space.ade.workflows.page.import.label') }}
-        </Button>
-        <Button variant="dialog" size="kira-lg" data-testid="ade-wf-new" @click="createNew">
-          {{ t('space.ade.workflows.page.new.label') }}
-        </Button>
-        </template>
-      </PanelHeader>
-      <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto p-2">
-      <div v-if="importOpen" class="flex flex-col gap-1 pb-2" data-testid="ade-wf-import-row">
-        <div class="flex gap-1.5">
-          <Label for="ade-wf-import-path" class="sr-only">{{ t('space.ade.workflows.page.importPath.aria') }}</Label>
-          <Input
-            id="ade-wf-import-path"
-            v-model="importPath"
-            :placeholder="t('space.ade.workflows.page.importPath.example')"
-            size="kira-lg"
-            class="min-w-0 flex-1 font-data"
-            data-testid="ade-wf-import-path"
-            @keydown.enter="runImport"
-          />
           <Button
             variant="dialog"
             size="kira-lg"
-            :disabled="importWf.isPending.value"
-            data-testid="ade-wf-import-go"
-            @click="runImport"
+            data-testid="ade-wf-import"
+            @click="importOpen = !importOpen"
           >
-            {{ t('common.import.label') }}
+            {{ t('space.ade.workflows.page.import.label') }}
           </Button>
+          <Button variant="dialog" size="kira-lg" data-testid="ade-wf-new" @click="createNew">
+            {{ t('space.ade.workflows.page.new.label') }}
+          </Button>
+        </template>
+      </PanelHeader>
+      <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto p-2">
+        <div v-if="importOpen" class="flex flex-col gap-1 pb-2" data-testid="ade-wf-import-row">
+          <div class="flex gap-1.5">
+            <Label for="ade-wf-import-path" class="sr-only">{{
+              t('space.ade.workflows.page.importPath.aria')
+            }}</Label>
+            <Input
+              id="ade-wf-import-path"
+              v-model="importPath"
+              :placeholder="t('space.ade.workflows.page.importPath.example')"
+              size="kira-lg"
+              class="min-w-0 flex-1 font-data"
+              data-testid="ade-wf-import-path"
+              @keydown.enter="runImport"
+            />
+            <Button
+              variant="dialog"
+              size="kira-lg"
+              :disabled="importWf.isPending.value"
+              data-testid="ade-wf-import-go"
+              @click="runImport"
+            >
+              {{ t('common.import.label') }}
+            </Button>
+          </div>
+        </div>
+        <FieldError v-if="listError" class="px-1 pb-1" data-testid="ade-wf-error">{{
+          listError
+        }}</FieldError>
+        <p
+          v-if="workflows.isSuccess.value && entries.length === 0"
+          class="m-0 px-1 py-2 text-kira-sm text-subtle"
+          data-testid="ade-wf-empty"
+        >
+          {{ t('space.ade.workflows.page.empty.emptyHint', { dir }) }}
+        </p>
+        <button
+          v-for="e in entries"
+          :key="e.fileName"
+          type="button"
+          :class="rowClass(current?.fileName === e.fileName)"
+          data-testid="ade-wf-row"
+          :data-file="e.fileName"
+          @click="pick(e.fileName)"
+        >
+          <span class="flex w-full items-center gap-1.5">
+            <span
+              class="min-w-0 flex-1 truncate text-kira-lg font-medium"
+              data-testid="ade-wf-row-name"
+              >{{
+                e.workflow?.name ?? e.fileName
+              }}</span
+            >
+            <AdeTip v-if="e.error" :text="e.error.message">
+              <span
+                class="shrink-0 text-kira-sm font-medium text-tone-red"
+                data-testid="ade-wf-row-error"
+                >✕</span
+              >
+            </AdeTip>
+          </span>
+          <span
+            class="max-w-full truncate text-kira-sm text-muted-foreground"
+            data-testid="ade-wf-row-stages"
+            >{{
+              stages(e)
+            }}</span
+          >
+          <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">{{
+            t('space.ade.workflows.page.usedBy.label', { count: e.usedBy })
+          }}</span>
+        </button>
+        <div class="px-1 pt-3 text-kira-sm leading-normal text-subtle">
+          <CatalogText k="space.ade.workflows.page.intro.body">
+            <template #command><span class="font-data">{{ CLAUDE_CMD }}</span></template>
+          </CatalogText>
         </div>
       </div>
-      <FieldError v-if="listError" class="px-1 pb-1" data-testid="ade-wf-error">{{ listError }}</FieldError>
-      <p
-        v-if="workflows.isSuccess.value && entries.length === 0"
-        class="m-0 px-1 py-2 text-kira-sm text-subtle"
-        data-testid="ade-wf-empty"
-      >
-        {{ t('space.ade.workflows.page.empty.emptyHint', { dir }) }}
-      </p>
-      <button
-        v-for="e in entries"
-        :key="e.fileName"
-        type="button"
-        :class="rowClass(current?.fileName === e.fileName)"
-        data-testid="ade-wf-row"
-        :data-file="e.fileName"
-        @click="pick(e.fileName)"
-      >
-        <span class="flex w-full items-center gap-1.5">
-          <span class="min-w-0 flex-1 truncate text-kira-lg font-medium" data-testid="ade-wf-row-name">{{
-            e.workflow?.name ?? e.fileName
-          }}</span>
-          <AdeTip v-if="e.error" :text="e.error.message">
-            <span class="shrink-0 text-kira-sm font-medium text-tone-red" data-testid="ade-wf-row-error">✕</span>
-          </AdeTip>
-        </span>
-        <span class="max-w-full truncate text-kira-sm text-muted-foreground" data-testid="ade-wf-row-stages">{{ stages(e) }}</span>
-        <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">{{ t('space.ade.workflows.page.usedBy.label', { count: e.usedBy }) }}</span>
-      </button>
-      <div class="px-1 pt-3 text-kira-sm leading-normal text-subtle">
-        <CatalogText k="space.ade.workflows.page.intro.body">
-          <template #command><span class="font-data">{{ CLAUDE_CMD }}</span></template>
-        </CatalogText>
-      </div>
-      </div>
     </div>
-    <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg">
-      <PanelHeader>{{ current?.workflow?.name ?? current?.fileName ?? t('space.common.workflow.label') }}</PanelHeader>
+    <div
+      class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg"
+    >
+      <PanelHeader>{{
+        current?.workflow?.name ?? current?.fileName ?? t('space.common.workflow.label')
+      }}</PanelHeader>
       <div class="min-h-0 flex-1 overflow-auto p-4">
         <AdeWorkflowEditor v-if="current" :key="current.fileName" :entry="current" />
       </div>

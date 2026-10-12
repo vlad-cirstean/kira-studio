@@ -46,7 +46,9 @@ const searching = computed(() => ui.search.trim() !== '');
 const visible = computed(() => {
   return (containers.data.value ?? []).filter((c) => {
     if (!ui.showStopped && !isActiveState(c.state)) return false;
-    return [c.name, c.image, c.composeProject, c.composeService].some((v) => matchesQuery(v, ui.search));
+    return [c.name, c.image, c.composeProject, c.composeService].some((v) =>
+      matchesQuery(v, ui.search),
+    );
   });
 });
 
@@ -75,12 +77,21 @@ const rows = computed<Row[]>(() => {
   return out;
 });
 
-const rowHeights = computed(() => rows.value.map((r) => (r.kind === 'group' ? groupRowHeight.value : containerRowHeight.value)));
+const rowHeights = computed(() =>
+  rows.value.map((r) => (r.kind === 'group' ? groupRowHeight.value : containerRowHeight.value)),
+);
 
 const emptyCopy = computed(() => {
-  if (searching.value) return { title: t('common.state.noMatches.empty'), hint: t('docker.container.noMatches.emptyHint') };
+  if (searching.value)
+    return {
+      title: t('common.state.noMatches.empty'),
+      hint: t('docker.container.noMatches.emptyHint'),
+    };
   if ((containers.data.value ?? []).length > 0 && !ui.showStopped) {
-    return { title: t('docker.container.noRunning.empty'), hint: t('docker.container.noRunning.emptyHint') };
+    return {
+      title: t('docker.container.noRunning.empty'),
+      hint: t('docker.container.noRunning.emptyHint'),
+    };
   }
   return { title: t('docker.container.none.empty'), hint: t('docker.container.none.emptyHint') };
 });
@@ -109,22 +120,72 @@ function act(c: DockerContainer, action: 'start' | 'stop' | 'restart'): void {
 }
 
 function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
-  const targets = g.members.filter((c) => (action === 'start' ? c.state !== 'running' : isActiveState(c.state)));
+  const targets = g.members.filter((c) =>
+    action === 'start' ? c.state !== 'running' : isActiveState(c.state),
+  );
   for (const c of targets) act(c, action);
 }
 
 function menuItems(c: DockerContainer): MenuItem[] {
   const running = c.state === 'running';
   const items: MenuItem[] = [
-    { type: 'item', id: 'start', label: t('common.action.start.label'), icon: 'play', iconClass: 'text-ok', disabled: running, run: () => act(c, 'start') },
-    { type: 'item', id: 'stop', label: t('common.action.stop.label'), icon: 'debug-stop', iconClass: 'text-error', disabled: !isActiveState(c.state), run: () => act(c, 'stop') },
-    { type: 'item', id: 'restart', label: t('docker.action.restart.label'), icon: 'debug-restart', disabled: !running, run: () => act(c, 'restart') },
+    {
+      type: 'item',
+      id: 'start',
+      label: t('common.action.start.label'),
+      icon: 'play',
+      iconClass: 'text-ok',
+      disabled: running,
+      run: () => act(c, 'start'),
+    },
+    {
+      type: 'item',
+      id: 'stop',
+      label: t('common.action.stop.label'),
+      icon: 'debug-stop',
+      iconClass: 'text-error',
+      disabled: !isActiveState(c.state),
+      run: () => act(c, 'stop'),
+    },
+    {
+      type: 'item',
+      id: 'restart',
+      label: t('docker.action.restart.label'),
+      icon: 'debug-restart',
+      disabled: !running,
+      run: () => act(c, 'restart'),
+    },
     { type: 'separator' },
-    { type: 'item', id: 'logs', label: t('docker.tab.logs.label'), icon: 'output', run: () => ui.select({ kind: 'container', id: c.id }, 'logs') },
-    { type: 'item', id: 'terminal', label: t('common.action.openTerminal.label'), icon: 'terminal', disabled: !running, run: () => ui.select({ kind: 'container', id: c.id }, 'terminal') },
+    {
+      type: 'item',
+      id: 'logs',
+      label: t('docker.tab.logs.label'),
+      icon: 'output',
+      run: () => ui.select({ kind: 'container', id: c.id }, 'logs'),
+    },
+    {
+      type: 'item',
+      id: 'terminal',
+      label: t('common.action.openTerminal.label'),
+      icon: 'terminal',
+      disabled: !running,
+      run: () => ui.select({ kind: 'container', id: c.id }, 'terminal'),
+    },
     { type: 'separator' },
-    { type: 'item', id: 'copy-id', label: t('common.action.copyId.label'), icon: 'copy', run: () => copyText(c.id) },
-    { type: 'item', id: 'copy-name', label: t('common.action.copyName.label'), icon: 'copy', run: () => copyText(c.name) },
+    {
+      type: 'item',
+      id: 'copy-id',
+      label: t('common.action.copyId.label'),
+      icon: 'copy',
+      run: () => copyText(c.id),
+    },
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: t('common.action.copyName.label'),
+      icon: 'copy',
+      run: () => copyText(c.name),
+    },
   ];
   return items;
 }
@@ -161,102 +222,142 @@ const groupTree = {
     <template #empty>
       <ListState icon="server" :title="emptyCopy.title" :hint="emptyCopy.hint" />
     </template>
-  <VirtualList
-    :rows="rows"
-    :row-heights="rowHeights"
-    testid="docker-container-list"
-    :open="openRow"
-    :menu="onKeyMenu"
-    :tree="groupTree"
-  >
-    <template #row="{ row, nav }">
-      <div
-        v-if="row.kind === 'group'"
-        v-bind="nav"
-        :class="cn(rowVariants({ layout: 'tree' }), 'group/row h-full')"
-        :style="rowIndent(0)"
-        data-testid="docker-group"
-        :data-project="row.name"
-      >
-        <TreeTwisty :expanded="isOpen(row.name)" :has-children="true" @toggle="ui.toggleGroup(row.name)" />
-        <OriginIcon origin="compose" data-testid="docker-group-icon" />
-        <button
-          type="button"
-          class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
-          :aria-expanded="isOpen(row.name)"
-          @click="ui.toggleGroup(row.name)"
-        >{{ row.name }}</button>
-        <span class="text-kira-sm text-muted-foreground group-hover/row:hidden">{{ runningCount(row) }}/{{ row.members.length }}</span>
-        <span class="hidden items-center group-hover/row:flex">
-          <TooltipIconButton icon="play" :label="t('common.action.startAll.label')" class="text-ok hover:text-ok" data-testid="docker-group-start" @click="groupAction(row, 'start')" />
-          <TooltipIconButton icon="debug-stop" :label="t('common.action.stopAll.label')" class="text-error hover:text-error" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
-        </span>
-      </div>
-      <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
-      <div
-        v-else
-        :class="
+    <VirtualList
+      :rows="rows"
+      :row-heights="rowHeights"
+      testid="docker-container-list"
+      :open="openRow"
+      :menu="onKeyMenu"
+      :tree="groupTree"
+    >
+      <template #row="{ row, nav }">
+        <div
+          v-if="row.kind === 'group'"
+          v-bind="nav"
+          :class="cn(rowVariants({ layout: 'tree' }), 'group/row h-full')"
+          :style="rowIndent(0)"
+          data-testid="docker-group"
+          :data-project="row.name"
+        >
+          <TreeTwisty
+            :expanded="isOpen(row.name)"
+            :has-children="true"
+            @toggle="ui.toggleGroup(row.name)"
+          />
+          <OriginIcon origin="compose" data-testid="docker-group-icon" />
+          <button
+            type="button"
+            class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
+            :aria-expanded="isOpen(row.name)"
+            @click="ui.toggleGroup(row.name)"
+            >{{
+              row.name
+            }}</button
+          >
+          <span class="text-kira-sm text-muted-foreground group-hover/row:hidden"
+            >{{ runningCount(row) }}/{{ row.members.length }}</span
+          >
+          <span class="hidden items-center group-hover/row:flex">
+            <TooltipIconButton
+              icon="play"
+              :label="t('common.action.startAll.label')"
+              class="text-ok hover:text-ok"
+              data-testid="docker-group-start"
+              @click="groupAction(row, 'start')"
+            />
+            <TooltipIconButton
+              icon="debug-stop"
+              :label="t('common.action.stopAll.label')"
+              class="text-error hover:text-error"
+              data-testid="docker-group-stop"
+              @click="groupAction(row, 'stop')"
+            />
+          </span>
+        </div>
+        <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+        <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
+        <div
+          v-else
+          :class="
           cn(
             rowVariants({ layout: 'double', selected: isSelected(row.container) }),
             'group/row grid h-full grid-cols-[0.5rem_minmax(0,1fr)_auto_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5',
           )
         "
-        :style="rowIndent(row.grouped ? 1 : 0)"
-        data-testid="docker-row"
-        :data-id="row.container.id"
-        :data-name="row.container.name"
-        :data-state="row.container.state"
-        role="option"
-        :aria-selected="isSelected(row.container)"
-        v-bind="nav"
-        @click="ui.select({ kind: 'container', id: row.container.id })"
-        @dblclick="ui.select({ kind: 'container', id: row.container.id }, 'logs')"
-        @contextmenu.prevent="onContextMenu($event, row.container)"
-      >
-        <StatusDot :tone="stateDotTone(row.container.state)" data-testid="docker-state-dot" />
-        <span class="flex min-w-0 items-center gap-1.5">
-          <span
-            class="truncate"
-            :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
-            data-testid="docker-row-name"
-          >{{ row.container.name }}</span>
-          <OriginIcon
-            v-if="row.container.origin !== '' && !(row.container.origin === 'compose' && row.grouped)"
-            :origin="row.container.origin"
-            :name="row.container.originName"
-          />
-        </span>
-        <span v-if="row.container.state !== 'running'" class="text-right text-kira-sm text-muted-foreground" data-testid="docker-row-state">{{ row.container.state }}</span>
-        <span v-else />
-        <span class="row-span-2 flex items-center justify-end">
-          <Spinner v-if="actions.isBusy(row.container.id)" label="" />
-          <span v-else class="hidden group-hover/row:flex group-focus-within/row:flex">
-            <TooltipIconButton
-              v-if="row.container.state !== 'running'"
-              icon="play"
-              :label="t('common.action.start.label')"
-              class="text-ok hover:text-ok"
-              data-testid="docker-row-start"
-              @click.stop="act(row.container, 'start')"
-            />
-            <TooltipIconButton
-              v-else
-              icon="debug-stop"
-              :label="t('common.action.stop.label')"
-              class="text-error hover:text-error"
-              data-testid="docker-row-stop"
-              @click.stop="act(row.container, 'stop')"
+          :style="rowIndent(row.grouped ? 1 : 0)"
+          data-testid="docker-row"
+          :data-id="row.container.id"
+          :data-name="row.container.name"
+          :data-state="row.container.state"
+          role="option"
+          :aria-selected="isSelected(row.container)"
+          v-bind="nav"
+          @click="ui.select({ kind: 'container', id: row.container.id })"
+          @dblclick="ui.select({ kind: 'container', id: row.container.id }, 'logs')"
+          @contextmenu.prevent="onContextMenu($event, row.container)"
+        >
+          <StatusDot :tone="stateDotTone(row.container.state)" data-testid="docker-state-dot" />
+          <span class="flex min-w-0 items-center gap-1.5">
+            <span
+              class="truncate"
+              :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
+              data-testid="docker-row-name"
+              >{{
+                row.container.name
+              }}</span
+            >
+            <OriginIcon
+              v-if="row.container.origin !== '' && !(row.container.origin === 'compose' && row.grouped)"
+              :origin="row.container.origin"
+              :name="row.container.originName"
             />
           </span>
-        </span>
-        <span />
-        <span class="col-span-2 flex min-w-0 items-baseline gap-1.5 text-kira-sm text-muted-foreground">
-          <span class="truncate" data-testid="docker-row-image">{{ row.container.image }}</span>
-          <span v-if="portLabel(row.container)" class="max-w-[40%] shrink-0 truncate font-data" data-testid="docker-row-ports">{{ portLabel(row.container) }}</span>
-        </span>
-      </div>
-    </template>
-  </VirtualList>
+          <span
+            v-if="row.container.state !== 'running'"
+            class="text-right text-kira-sm text-muted-foreground"
+            data-testid="docker-row-state"
+            >{{
+              row.container.state
+            }}</span
+          >
+          <span v-else />
+          <span class="row-span-2 flex items-center justify-end">
+            <Spinner v-if="actions.isBusy(row.container.id)" label="" />
+            <span v-else class="hidden group-hover/row:flex group-focus-within/row:flex">
+              <TooltipIconButton
+                v-if="row.container.state !== 'running'"
+                icon="play"
+                :label="t('common.action.start.label')"
+                class="text-ok hover:text-ok"
+                data-testid="docker-row-start"
+                @click.stop="act(row.container, 'start')"
+              />
+              <TooltipIconButton
+                v-else
+                icon="debug-stop"
+                :label="t('common.action.stop.label')"
+                class="text-error hover:text-error"
+                data-testid="docker-row-stop"
+                @click.stop="act(row.container, 'stop')"
+              />
+            </span>
+          </span>
+          <span />
+          <span
+            class="col-span-2 flex min-w-0 items-baseline gap-1.5 text-kira-sm text-muted-foreground"
+          >
+            <span class="truncate" data-testid="docker-row-image">{{ row.container.image }}</span>
+            <span
+              v-if="portLabel(row.container)"
+              class="max-w-[40%] shrink-0 truncate font-data"
+              data-testid="docker-row-ports"
+              >{{
+                portLabel(row.container)
+              }}</span
+            >
+          </span>
+        </div>
+      </template>
+    </VirtualList>
   </QueryState>
 </template>

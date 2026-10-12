@@ -36,7 +36,9 @@ const script = useInlineEdit({
 <template>
   <div class="flex flex-col gap-1" data-testid="repo-env">
     <div class="flex items-center gap-1.5">
-      <Label :for="`repo-env-name-${index}`" class="sr-only">{{ t('common.environmentName.aria') }}</Label>
+      <Label :for="`repo-env-name-${index}`" class="sr-only">{{
+        t('common.environmentName.aria')
+      }}</Label>
       <Input
         :id="`repo-env-name-${index}`"
         ref="nameInput"
@@ -48,7 +50,9 @@ const script = useInlineEdit({
         @blur="name.onCommit"
         @keydown="name.onKeydown"
       />
-      <Label :for="`repo-env-script-${index}`" class="sr-only">{{ t('space.repo.env.script.aria') }}</Label>
+      <Label :for="`repo-env-script-${index}`" class="sr-only">{{
+        t('space.repo.env.script.aria')
+      }}</Label>
       <Input
         :id="`repo-env-script-${index}`"
         :model-value="script.text.value"

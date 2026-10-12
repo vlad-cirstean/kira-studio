@@ -79,14 +79,16 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
 <template>
   <section :aria-label="t('git.tag.list.label')">
     <SectionHeading :label="t('git.tag.list.label')" />
-    <div data-testid="branch-row"
+    <div
+      data-testid="branch-row"
       v-for="row in section.visible"
       :key="row.refname"
       class="flex items-center gap-0.5 px-1"
       :data-row-id="`tag:${row.refname}`"
       :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
     >
-      <button data-testid="branch-row-main"
+      <button
+        data-testid="branch-row-main"
         type="button"
         :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
         @click="checkout(row)"
@@ -97,7 +99,9 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
           aria-hidden="true"
         ></span>
         <span class="truncate">{{ row.shortName }}</span>
-        <span class="text-kira-sm text-muted-foreground">{{ row.annotation ? t('git.tag.annotated.status') : t('git.tag.lightweight.status') }}</span>
+        <span class="text-kira-sm text-muted-foreground">{{
+          row.annotation ? t('git.tag.annotated.status') : t('git.tag.lightweight.status')
+        }}</span>
         <span
           v-if="row.annotation"
           class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground"
@@ -112,8 +116,8 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
         @contextmenu="rowMenu.openAt($event, menuFor(row), (id) => onRefMenuSelect(row, id))"
       />
     </div>
-    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('git.tag.list.empty') }}</div>
-
+    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
+      t('git.tag.list.empty')
+    }}</div>
   </section>
 </template>
-

@@ -60,12 +60,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-if="!errorMessage"
-    ref="container"
-    class="h-full w-full"
-    data-testid="repo-review-host"
-  />
+  <div v-if="!errorMessage" ref="container" class="h-full w-full" data-testid="repo-review-host" />
   <Alert v-else variant="error">
     <AlertDescription>{{ errorMessage }}</AlertDescription>
   </Alert>

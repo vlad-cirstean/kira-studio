@@ -68,9 +68,12 @@ async function onOpen(row: CollectionRowVm): Promise<void> {
 // of both the store's mutation half and the tab-opening path.
 const actions: CollectionMenuActions = {
   open: (row) => void onOpen(row),
-  newRequest: (row) => void collectionsStore.createItem(row.collectionId, folderTarget(row), 'request'),
-  newGrpcRequest: (row) => void collectionsStore.createGrpcItem(row.collectionId, folderTarget(row)),
-  newFolder: (row) => void collectionsStore.createItem(row.collectionId, folderTarget(row), 'folder'),
+  newRequest: (row) =>
+    void collectionsStore.createItem(row.collectionId, folderTarget(row), 'request'),
+  newGrpcRequest: (row) =>
+    void collectionsStore.createGrpcItem(row.collectionId, folderTarget(row)),
+  newFolder: (row) =>
+    void collectionsStore.createItem(row.collectionId, folderTarget(row), 'folder'),
   newCollection: () => void collectionsStore.createCollection(),
   rename: (row) => contextMenuStore.afterClose(() => collectionsStore.beginRename(row)),
   collections: () => collectionsStore.collections,
@@ -252,4 +255,3 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
   <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
        (packages/workbench/src/lib/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
 </template>
-

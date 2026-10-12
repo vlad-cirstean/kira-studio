@@ -22,7 +22,9 @@ const error = ref('');
 const status = computed(() => {
   const setup = props.branch.setup;
   if (!setup) return null;
-  const timeout = repos.data.value?.repos.find((r) => r.codeRepoId === props.branch.codeRepoId)?.prepareTimeout ?? '';
+  const timeout =
+    repos.data.value?.repos.find((r) => r.codeRepoId === props.branch.codeRepoId)?.prepareTimeout ??
+    '';
   return setupStatus(setup, props.repo, props.branch.name, timeout);
 });
 
@@ -37,10 +39,16 @@ async function onRetry(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="status" class="flex flex-col gap-1" data-testid="ade-setup-progress" :data-branch-id="branch.id">
+  <div
+    v-if="status"
+    class="flex flex-col gap-1"
+    data-testid="ade-setup-progress"
+    :data-branch-id="branch.id"
+  >
     <ScriptProgress v-bind="status">
       <template #actions>
-        <Button variant="dialog"
+        <Button
+          variant="dialog"
           v-if="status.state === 'failed'"
           size="kira"
           class="shrink-0 rounded-kira-xs px-2 "

@@ -100,7 +100,10 @@ const layout = computed(() =>
 );
 const edgeSel = ref('');
 
-function nodeData(n: GraphNode, wf: Workflow): StepNodeData | StageNodeData | { w: number; h: number } {
+function nodeData(
+  n: GraphNode,
+  wf: Workflow,
+): StepNodeData | StageNodeData | { w: number; h: number } {
   const stage = wf.stages.find((s) => s.id === n.stageId);
   const sel = draft.selection;
   const base = { w: n.w, h: n.h };
@@ -169,21 +172,30 @@ const byId = (id: string): GraphNode | undefined => layout.value.nodes.find((n) 
 function validConnection(c: Connection): boolean {
   const s = byId(c.source);
   const t = byId(c.target);
-  return !!s && !!t && s.kind === 'step' && (t.kind === 'step' || t.kind === 'end') && s.stageId === t.stageId;
+  return (
+    !!s &&
+    !!t &&
+    s.kind === 'step' &&
+    (t.kind === 'step' || t.kind === 'end') &&
+    s.stageId === t.stageId
+  );
 }
 function onConnect(c: Connection): void {
   if (!validConnection(c)) return;
   const s = byId(c.source) as GraphNode;
   const t = byId(c.target) as GraphNode;
   const resultId = (c.sourceHandle ?? '').replace(/^r:/, '');
-  if (s.stepId && resultId) draft.route(s.stageId, s.stepId, resultId, t.kind === 'end' ? 'end' : (t.stepId ?? 'end'));
+  if (s.stepId && resultId)
+    draft.route(s.stageId, s.stepId, resultId, t.kind === 'end' ? 'end' : (t.stepId ?? 'end'));
 }
 function onNodeClick({ node }: { node: Node }): void {
   const n = byId(node.id);
   edgeSel.value = '';
   if (!n) return;
-  if (n.kind === 'step' && n.stepId) draft.select({ kind: 'step', stageId: n.stageId, stepId: n.stepId });
-  else if (n.kind === 'stage' || n.kind === 'leaf') draft.select({ kind: 'stage', stageId: n.stageId });
+  if (n.kind === 'step' && n.stepId)
+    draft.select({ kind: 'step', stageId: n.stageId, stepId: n.stepId });
+  else if (n.kind === 'stage' || n.kind === 'leaf')
+    draft.select({ kind: 'stage', stageId: n.stageId });
 }
 function onEdgeClick({ edge }: { edge: Edge }): void {
   const e = layout.value.edges.find((x) => x.id === edge.id);
@@ -212,7 +224,9 @@ useShortcut(root, ['form.save'], () => void saveNow());
 
 const PAD = 24;
 const { width: paneW } = useElementSize(scroller);
-const zoom = computed(() => (paneW.value > 0 ? Math.min(1, paneW.value / (layout.value.width + PAD * 2)) : 1));
+const zoom = computed(() =>
+  paneW.value > 0 ? Math.min(1, paneW.value / (layout.value.width + PAD * 2)) : 1,
+);
 const viewport = computed(() => ({
   x: Math.max(0, (paneW.value - layout.value.width * zoom.value) / 2),
   y: PAD * zoom.value,
@@ -234,7 +248,9 @@ onKeyStroke(
     } else if (sel?.kind === 'step') {
       const ok = await confirm.confirm({
         title: t('space.ade.workflows.graph.removeStepConfirm.title'),
-        message: t('space.ade.workflows.graph.removeStepConfirm.body', { name: draft.step?.name ?? '' }),
+        message: t('space.ade.workflows.graph.removeStepConfirm.body', {
+          name: draft.step?.name ?? '',
+        }),
         confirmLabel: t('common.action.remove.label'),
         tone: 'danger',
       });
@@ -262,10 +278,22 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="draft.draft" ref="root" class="flex h-full min-h-0 flex-col gap-3" data-testid="ade-wf-form">
-    <AdeWorkflowSaveBar :dirty="draft.dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
+  <div
+    v-if="draft.draft"
+    ref="root"
+    class="flex h-full min-h-0 flex-col gap-3"
+    data-testid="ade-wf-form"
+  >
+    <AdeWorkflowSaveBar
+      :dirty="draft.dirty"
+      :saving="save.isPending.value"
+      @save="saveNow"
+      @discard="discard"
+    />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">{{ t('common.field.name.label') }}</Label>
+      <Label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">{{
+        t('common.field.name.label')
+      }}</Label>
       <Input
         id="ade-wf-form-name"
         :model-value="draft.draft.name"
@@ -282,12 +310,18 @@ onBeforeUnmount(() => {
           @update:model-value="(v) => draft.patchWorkflow({ kiraSpaceMcp: v === true })"
         />
         <AdeTip :text="t('space.ade.workflows.graph.spaceTools.tooltip')">
-          <Label for="ade-wf-form-space">{{ t('space.ade.workflows.graph.spaceTools.label') }}</Label>
+          <Label for="ade-wf-form-space">{{
+            t('space.ade.workflows.graph.spaceTools.label')
+          }}</Label>
         </AdeTip>
       </div>
     </div>
     <div class="flex items-center gap-2" data-testid="ade-wf-strip-row">
-      <div ref="stripEl" class="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="ade-wf-strip">
+      <div
+        ref="stripEl"
+        class="flex min-w-0 flex-wrap items-center gap-1.5"
+        data-testid="ade-wf-strip"
+      >
         <Button
           v-for="(s, i) in strip"
           :key="s.id"
@@ -321,58 +355,62 @@ onBeforeUnmount(() => {
     </div>
     <div ref="split" class="flex min-h-96 flex-1 rounded-kira border border-border bg-bg">
       <div class="relative min-w-0" :style="{ flex: `0 0 ${graphPane.size.value}%` }">
-        <div ref="scroller" class="absolute inset-0 overflow-y-auto overflow-x-hidden" data-testid="ade-wf-graph">
+        <div
+          ref="scroller"
+          class="absolute inset-0 overflow-y-auto overflow-x-hidden"
+          data-testid="ade-wf-graph"
+        >
           <div class="relative min-h-full w-full" :style="{ height: `${contentH}px` }">
-          <svg class="absolute size-0" aria-hidden="true">
-            <defs>
-              <marker
-                v-for="m in [
+            <svg class="absolute size-0" aria-hidden="true">
+              <defs>
+                <marker
+                  v-for="m in [
                   ['ade-arrow-ok', 'fill-tone-green-solid'],
                   ['ade-arrow-fail', 'fill-tone-red-solid'],
                   ['ade-arrow-neutral', 'fill-muted-foreground'],
                 ]"
-                :id="m[0]"
-                :key="m[0]"
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="9"
-                markerHeight="9"
-                orient="auto-start-reverse"
-                markerUnits="userSpaceOnUse"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" :class="m[1]" />
-              </marker>
-            </defs>
-          </svg>
-          <VueFlow
-            :nodes="flowNodes"
-            :edges="flowEdges"
-            :nodes-draggable="false"
-            :delete-key-code="null"
-            :min-zoom="0.1"
-            :max-zoom="1"
-            :default-viewport="viewport"
-            :zoom-on-scroll="false"
-            :zoom-on-pinch="false"
-            :zoom-on-double-click="false"
-            :pan-on-drag="false"
-            :pan-on-scroll="false"
-            :prevent-scrolling="false"
-            :auto-pan-on-connect="false"
-            :auto-pan-on-node-drag="false"
-            :is-valid-connection="validConnection"
-            @connect="onConnect"
-            @node-click="onNodeClick"
-            @edge-click="onEdgeClick"
-            @pane-click="onPaneClick"
-          >
-            <template #node-step="p"><AdeStepNode :data="p.data" /></template>
-            <template #node-stage="p"><AdeStageGroupNode :data="p.data" /></template>
-            <template #node-leaf="p"><AdeStageGroupNode :data="p.data" /></template>
-            <template #node-end="p"><AdeEndNode :data="p.data" /></template>
-            <template #edge-result="p"><AdeResultEdge v-bind="p" /></template>
-          </VueFlow>
+                  :id="m[0]"
+                  :key="m[0]"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="9"
+                  markerHeight="9"
+                  orient="auto-start-reverse"
+                  markerUnits="userSpaceOnUse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" :class="m[1]" />
+                </marker>
+              </defs>
+            </svg>
+            <VueFlow
+              :nodes="flowNodes"
+              :edges="flowEdges"
+              :nodes-draggable="false"
+              :delete-key-code="null"
+              :min-zoom="0.1"
+              :max-zoom="1"
+              :default-viewport="viewport"
+              :zoom-on-scroll="false"
+              :zoom-on-pinch="false"
+              :zoom-on-double-click="false"
+              :pan-on-drag="false"
+              :pan-on-scroll="false"
+              :prevent-scrolling="false"
+              :auto-pan-on-connect="false"
+              :auto-pan-on-node-drag="false"
+              :is-valid-connection="validConnection"
+              @connect="onConnect"
+              @node-click="onNodeClick"
+              @edge-click="onEdgeClick"
+              @pane-click="onPaneClick"
+            >
+              <template #node-step="p"><AdeStepNode :data="p.data" /></template>
+              <template #node-stage="p"><AdeStageGroupNode :data="p.data" /></template>
+              <template #node-leaf="p"><AdeStageGroupNode :data="p.data" /></template>
+              <template #node-end="p"><AdeEndNode :data="p.data" /></template>
+              <template #edge-result="p"><AdeResultEdge v-bind="p" /></template>
+            </VueFlow>
           </div>
         </div>
       </div>
@@ -395,7 +433,12 @@ onBeforeUnmount(() => {
             :steps="draft.stage.steps"
             :scopes="scopes"
           />
-          <AdeStageInspector v-else-if="draft.stage" :key="draft.stage.id" :stage="draft.stage" :scopes="scopes" />
+          <AdeStageInspector
+            v-else-if="draft.stage"
+            :key="draft.stage.id"
+            :stage="draft.stage"
+            :scopes="scopes"
+          />
           <p v-else class="m-0 text-kira-sm text-subtle" data-testid="ade-wf-inspector-empty">
             <CatalogText k="space.ade.workflows.graph.inspectorEmpty.emptyHint">
               <template #tokens><span class="font-data">{{ PLACEHOLDER_TOKENS }}</span></template>
@@ -407,10 +450,22 @@ onBeforeUnmount(() => {
     <FieldError v-if="draft.error" data-testid="ade-wf-save-error">
       {{ draft.error }}
       <template v-if="draft.conflict">
-        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="discard">
+        <Button
+          variant="link"
+          size="kira"
+          class="px-1 text-kira-sm text-info"
+          data-testid="ade-wf-reload"
+          @click="discard"
+        >
           {{ t('common.action.refresh.label') }}
         </Button>
-        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-overwrite" @click="overwrite">
+        <Button
+          variant="link"
+          size="kira"
+          class="px-1 text-kira-sm text-info"
+          data-testid="ade-wf-overwrite"
+          @click="overwrite"
+        >
           {{ t('space.ade.workflows.conflict.overwrite.label') }}
         </Button>
       </template>

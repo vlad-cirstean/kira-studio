@@ -7,7 +7,14 @@ import { InputGroup } from '@theme/components/ui/input-group';
 import { autoClosePairsOnType, wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { loadMonaco, type MonacoModule } from '@workbench/editor/monaco';
-import { AutocompleteRoot, ComboboxAnchor, ComboboxContent, ComboboxItem, ComboboxPortal, ComboboxViewport } from 'reka-ui';
+import {
+  AutocompleteRoot,
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxPortal,
+  ComboboxViewport,
+} from 'reka-ui';
 import { computed, type HTMLAttributes, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../editor/fieldCompletion';
 import { monacoLanguageIdFor } from '../editor/monacoLanguages';
@@ -610,7 +617,7 @@ const fieldAttrs = computed(
           ref="inputRef"
           class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-md outline-none placeholder:text-muted-foreground [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
           v-bind="{ ...$attrs, ...fieldAttrs }"
-        />
+        >
         <ComboboxAnchor :reference="inputRef ?? undefined" />
       </span>
     </InputGroup>
@@ -633,13 +640,24 @@ const fieldAttrs = computed(
             :key="c.label"
             as="li"
             :value="i"
-:class="rowVariants({ layout: 'menu', selected: i === activeIndex })"
+            :class="rowVariants({ layout: 'menu', selected: i === activeIndex })"
             @mouseenter="activeIndex = i"
             @mousedown.prevent="accept(c)"
           >
-            <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="shrink-0 text-muted-foreground" />
+            <CodiconIcon
+              v-if="c.icon"
+              :name="c.icon"
+              :size="13"
+              class="shrink-0 text-muted-foreground"
+            />
             <span class="overflow-hidden text-ellipsis">{{ c.label }}</span>
-            <span v-if="c.detail" class="ml-auto pl-1.5 text-muted-foreground text-kira-sm shrink-0">{{ c.detail }}</span>
+            <span
+              v-if="c.detail"
+              class="ml-auto pl-1.5 text-muted-foreground text-kira-sm shrink-0"
+              >{{
+                c.detail
+              }}</span
+            >
           </ComboboxItem>
         </ComboboxViewport>
       </ComboboxContent>
@@ -657,7 +675,9 @@ const fieldAttrs = computed(
         :key="i"
         class="hover-line whitespace-pre-wrap wrap-anywhere"
         :class="{ 'mt-0.5 text-muted-foreground': i > 0 }"
-        >{{ line }}</div
+        >{{
+          line
+        }}</div
       >
     </div>
     <!-- P110 I2-18: `.highlight-overlay`/`.autocomplete-field.is-grow .highlight-overlay` compounds

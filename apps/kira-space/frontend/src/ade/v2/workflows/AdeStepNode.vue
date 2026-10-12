@@ -13,12 +13,16 @@ import { resultHandleId, type StepNodeData } from '../board/workflowGraph';
 // text lives in the inspector.
 const props = defineProps<{ data: StepNodeData }>();
 const step = computed(() => props.data.step);
-const body = computed(() => (step.value.smartScript ? `✦ ${step.value.smartScript}` : step.value.prompt));
+const body = computed(() =>
+  step.value.smartScript ? `✦ ${step.value.smartScript}` : step.value.prompt,
+);
 const parts = computed(() => promptParts(body.value));
 const LABEL_MAX = 4;
 const labelled = computed(() => step.value.results.length <= LABEL_MAX);
 const tip = (r: StepNodeData['step']['results'][number]): string => {
-  const outcome = t(r.ok ? 'space.ade.workflows.results.ok.label' : 'space.ade.workflows.results.notOk.label');
+  const outcome = t(
+    r.ok ? 'space.ade.workflows.results.ok.label' : 'space.ade.workflows.results.notOk.label',
+  );
   return r.next === 'stop'
     ? t('space.ade.workflows.stepNode.resultStops.tooltip', { id: r.id, outcome })
     : t('space.ade.workflows.stepNode.resultGoes.tooltip', { id: r.id, outcome, next: r.next });
@@ -35,16 +39,46 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
     :data-start="data.start"
     :data-selected="data.selected"
   >
-    <Handle id="in" type="target" :position="Position.Top" class="!size-2.5 !border-0 !bg-muted-foreground" />
-    <Handle id="loop-in" type="target" :position="Position.Top" class="!size-2 !border-0 !bg-muted-foreground !left-5" />
+    <Handle
+      id="in"
+      type="target"
+      :position="Position.Top"
+      class="!size-2.5 !border-0 !bg-muted-foreground"
+    />
+    <Handle
+      id="loop-in"
+      type="target"
+      :position="Position.Top"
+      class="!size-2 !border-0 !bg-muted-foreground !left-5"
+    />
     <div class="flex items-center gap-1.5 px-2.5 pt-2">
-      <AdeTip v-if="data.start" :text="t('common.action.start.label')"><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip>
-      <span class="min-w-0 flex-1 truncate text-kira-md font-medium" data-testid="ade-wf-node-name">{{ step.name }}</span>
-      <span v-if="step.before === 'approval'" class="shrink-0 text-warn-text" data-testid="ade-wf-node-gate">{{ t('space.ade.needs.kind.approval.label') }}</span>
-      <span v-if="step.smartScript" class="shrink-0 text-info">{{ t('space.ade.workflows.stepNode.smart.label') }}</span>
+      <AdeTip v-if="data.start" :text="t('common.action.start.label')"
+        ><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip
+      >
+      <span
+        class="min-w-0 flex-1 truncate text-kira-md font-medium"
+        data-testid="ade-wf-node-name"
+        >{{
+          step.name
+        }}</span
+      >
+      <span
+        v-if="step.before === 'approval'"
+        class="shrink-0 text-warn-text"
+        data-testid="ade-wf-node-gate"
+        >{{
+          t('space.ade.needs.kind.approval.label')
+        }}</span
+      >
+      <span v-if="step.smartScript" class="shrink-0 text-info">{{
+        t('space.ade.workflows.stepNode.smart.label')
+      }}</span>
     </div>
     <div class="truncate px-2.5 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
-    <div class="truncate px-2.5 text-muted-foreground [&>span]:whitespace-nowrap" data-testid="ade-wf-node-prompt">
+    <div
+      class="truncate px-2.5 text-muted-foreground [&>span]:whitespace-nowrap"
+      data-testid="ade-wf-node-prompt"
+    >
       <VarText :parts="parts" />
     </div>
     <div class="mt-auto flex border-t border-border">
@@ -55,7 +89,9 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
           :data-result="r.id"
           :data-ok="r.ok"
         >
-          <StatusDot :color="r.ok ? 'var(--color-tone-green-solid)' : 'var(--color-tone-red-solid)'" />
+          <StatusDot
+            :color="r.ok ? 'var(--color-tone-green-solid)' : 'var(--color-tone-red-solid)'"
+          />
           <span v-if="labelled" class="truncate">{{ r.id }}</span>
           <Handle
             :id="resultHandleId(r.id)"

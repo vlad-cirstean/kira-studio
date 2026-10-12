@@ -91,20 +91,25 @@ function confirmPlain(): void {
 
 <template>
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      size="md"
-      destructive
-    >
+    <DialogContent size="md" destructive>
       <DialogHeader>
-        <DialogTitle>{{ t('git.dialog.forcePushConfirm.title', { branch: pending.branch, remote: pending.remote }) }}</DialogTitle>
+        <DialogTitle>{{
+          t('git.dialog.forcePushConfirm.title', { branch: pending.branch, remote: pending.remote })
+        }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
           <CatalogText
             :k="pending.preflight.remoteTip === null ? 'git.dialog.forcePushConfirm.bodyNew.body' : 'git.dialog.forcePushConfirm.body'"
           >
-            <template #ref><code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code></template>
-            <template #sha><code class="font-data">{{ shortSha(pending.preflight.remoteTip ?? '') }}</code></template>
+            <template #ref
+              ><code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code></template
+            >
+            <template #sha
+              ><code class="font-data">{{
+                shortSha(pending.preflight.remoteTip ?? '')
+              }}</code></template
+            >
           </CatalogText>
           <template v-if="pending.preflight.behind > 0">
             {{ t('git.dialog.forcePushConfirm.ahead.hint', { count: pending.preflight.behind }) }}
@@ -133,9 +138,11 @@ function confirmPlain(): void {
         </Field>
 
         <details class="pt-2 border-t border-border text-kira-md">
-          <summary class="cursor-pointer text-muted-foreground"><CatalogText k="git.dialog.forcePushConfirm.plain.label">
+          <summary class="cursor-pointer text-muted-foreground"
+            ><CatalogText k="git.dialog.forcePushConfirm.plain.label">
               <template #flag><code class="font-data">--force</code></template>
-            </CatalogText></summary>
+            </CatalogText></summary
+          >
           <div class="mt-3">
             <Alert variant="warn">
               <AlertDescription>
@@ -144,7 +151,11 @@ function confirmPlain(): void {
             </Alert>
           </div>
           <Field orientation="horizontal" class="mt-3">
-            <Checkbox :id="plainAckId" v-model="understandPlain" data-testid="force-push-plain-ack" />
+            <Checkbox
+              :id="plainAckId"
+              v-model="understandPlain"
+              data-testid="force-push-plain-ack"
+            />
             <FieldLabel :for="plainAckId">
               {{ t('git.dialog.forcePushConfirm.plainAck.label') }}
             </FieldLabel>
@@ -164,7 +175,9 @@ function confirmPlain(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"

@@ -321,7 +321,10 @@ function openMenu(ev: MouseEvent, record: number, displayCol: number, header: bo
       setSelection(selectRows(state.selection, record, { shift: false, toggle: false }));
       focusNative(record, 0);
     }
-    contextMenu.openContextMenu(ev, rowMenu(actions, selectedRows(state.selection.sel, state.rowCount())));
+    contextMenu.openContextMenu(
+      ev,
+      rowMenu(actions, selectedRows(state.selection.sel, state.rowCount())),
+    );
     return;
   }
   const { sel } = state.selection;
@@ -345,7 +348,12 @@ type HeaderZone = 'resize' | 'sort' | 'body';
 // header border has to fall through to it. The library's own hit width is 5 px.
 const RESIZE_EDGE = 5;
 
-function headerZone(grid: ListGrid<unknown>, col: number, row: number, event: MouseEvent): HeaderZone {
+function headerZone(
+  grid: ListGrid<unknown>,
+  col: number,
+  row: number,
+  event: MouseEvent,
+): HeaderZone {
   const origin = grid.getElement().getBoundingClientRect();
   const cell = grid.getCellRelativeRect(col, row);
   const x = event.clientX - origin.left - cell.left;
@@ -376,7 +384,9 @@ function bindGrid(grid: ListGrid<unknown>): void {
         applyOrder();
         return false;
       }
-      setSelection(e.col === 0 ? selectAll() : selectColumns(state.selection, e.col - 1, mods(e.event)));
+      setSelection(
+        e.col === 0 ? selectAll() : selectColumns(state.selection, e.col - 1, mods(e.event)),
+      );
       // The browser's own mousedown default parks focus on the body after this handler returns.
       requestAnimationFrame(() => grid.focus());
       return false;
@@ -407,7 +417,8 @@ function bindGrid(grid: ListGrid<unknown>): void {
     const last = grid.colCount - 1;
     grid.invalidateGridRect(0, e.row, last, e.row);
     const prevRecord = previous < 0 ? -1 : recordOf(state, previous);
-    if (prevRecord >= 0) grid.invalidateGridRect(0, prevRecord + HEADER_ROWS, last, prevRecord + HEADER_ROWS);
+    if (prevRecord >= 0)
+      grid.invalidateGridRect(0, prevRecord + HEADER_ROWS, last, prevRecord + HEADER_ROWS);
   });
   grid.listen('mouseleave_cell', (e) => {
     tip.value?.hide();
@@ -516,7 +527,8 @@ function onLeave(): void {
   const previous = state.hoverRow;
   state.hoverRow = -1;
   const record = recordOf(state, previous);
-  if (record >= 0) raw.invalidateGridRect(0, record + HEADER_ROWS, raw.colCount - 1, record + HEADER_ROWS);
+  if (record >= 0)
+    raw.invalidateGridRect(0, record + HEADER_ROWS, raw.colCount - 1, record + HEADER_ROWS);
 }
 
 onMounted(async () => {
@@ -525,7 +537,8 @@ onMounted(async () => {
   if (!raw) return;
   state.invalidateRow = (pageRow) => {
     const record = recordOf(state, pageRow);
-    if (record >= 0) raw?.invalidateGridRect(0, record + HEADER_ROWS, raw.colCount - 1, record + HEADER_ROWS);
+    if (record >= 0)
+      raw?.invalidateGridRect(0, record + HEADER_ROWS, raw.colCount - 1, record + HEADER_ROWS);
   };
   state.refreshSource = () => {
     if (raw) raw.dataSource = makeSource() as never;
@@ -554,13 +567,24 @@ onMounted(async () => {
         @keydown.enter="find"
       />
       <Button size="kira" variant="toolbar" data-testid="find-run" @click="find">Find</Button>
-      <Button size="kira" variant="toolbar" data-testid="find-prev" @click="goToMatch(-1)">Prev</Button>
-      <Button size="kira" variant="toolbar" data-testid="find-next" @click="goToMatch(1)">Next</Button>
+      <Button size="kira" variant="toolbar" data-testid="find-prev" @click="goToMatch(-1)"
+        >Prev</Button
+      >
+      <Button size="kira" variant="toolbar" data-testid="find-next" @click="goToMatch(1)"
+        >Next</Button
+      >
       <span class="text-fg-muted" data-testid="find-count">{{ matchCount }}</span>
-      <Button size="kira" variant="toolbar" data-testid="find-hide" @click="setHideNonMatching(!hideNonMatching)">
+      <Button
+        size="kira"
+        variant="toolbar"
+        data-testid="find-hide"
+        @click="setHideNonMatching(!hideNonMatching)"
+      >
         {{ hideNonMatching ? 'Show all' : 'Hide others' }}
       </Button>
-      <Button size="kira" variant="toolbar" data-testid="add-row" @click="actions.insertRow()">Add row</Button>
+      <Button size="kira" variant="toolbar" data-testid="add-row" @click="actions.insertRow()"
+        >Add row</Button
+      >
     </div>
     <div
       ref="rootRef"

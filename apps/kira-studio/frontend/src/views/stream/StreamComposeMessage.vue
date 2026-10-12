@@ -51,8 +51,12 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="flex flex-col">
-    <div class="flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground normal-case tracking-normal">
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
+    <div
+      class="flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground normal-case tracking-normal"
+    >
+      <span class="size-4 flex items-center justify-center shrink-0"
+        ><CodiconIcon name="add" :size="13" /></span
+      >
       <span>{{ t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label') }}</span>
       <TooltipIconButton
         icon="close"
@@ -64,7 +68,9 @@ async function submit(): Promise<void> {
 
     <div class="flex flex-col gap-1.5 p-2">
       <Label v-if="isKafka" class="flex flex-col gap-0.5">
-        <span class="text-kira-md text-muted-foreground">{{ t('studio.stream.compose.key.label') }}</span>
+        <span class="text-kira-md text-muted-foreground">{{
+          t('studio.stream.compose.key.label')
+        }}</span>
         <Input
           :model-value="key"
           :placeholder="t('common.state.none.option')"
@@ -88,7 +94,9 @@ async function submit(): Promise<void> {
       </Label>
 
       <Label class="flex flex-col gap-0.5">
-        <span class="text-kira-md text-muted-foreground">{{ t('studio.stream.compose.headers.label') }}</span>
+        <span class="text-kira-md text-muted-foreground">{{
+          t('studio.stream.compose.headers.label')
+        }}</span>
         <Textarea
           v-model="headers"
           class="font-data"
@@ -103,7 +111,9 @@ async function submit(): Promise<void> {
     </div>
 
     <div class="flex justify-end gap-1.5 border-t border-border py-1.5 px-2">
-      <Button variant="dialog" size="kira-lg" @click="emit('close')">{{ t('common.action.cancel.label') }}</Button>
+      <Button variant="dialog" size="kira-lg" @click="emit('close')">{{
+        t('common.action.cancel.label')
+      }}</Button>
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -116,4 +126,3 @@ async function submit(): Promise<void> {
     </div>
   </div>
 </template>
-

@@ -70,8 +70,16 @@ const view = ref<'source' | 'reading'>(props.tab.state.markdownReading ? 'readin
 const fileText = ref('');
 const renderedHtml = ref<string | null>(null);
 const viewOptions = computed(() => [
-  { value: 'source' as const, label: t('common.field.source.label'), testid: 'repo-file-view-source' },
-  { value: 'reading' as const, label: t('space.repo.view.reading.label'), testid: 'repo-file-view-reading' },
+  {
+    value: 'source' as const,
+    label: t('common.field.source.label'),
+    testid: 'repo-file-view-source',
+  },
+  {
+    value: 'reading' as const,
+    label: t('space.repo.view.reading.label'),
+    testid: 'repo-file-view-reading',
+  },
 ]);
 
 // D11: rendered lazily on first switch to Reading, then cached — a markdown file opened and never
@@ -284,7 +292,12 @@ onUnmounted(() => {
            toggle, only hidden, so scroll position/selection/find state survive a round trip.
            flex-1/min-h-0 (not h-full/w-full, the standalone-mount branch below) since this is
            nested in the markdown toolbar's own flex column. -->
-      <div v-show="view === 'source'" ref="container" class="monaco-host flex-1 min-h-0" data-testid="repo-file-editor" />
+      <div
+        v-show="view === 'source'"
+        ref="container"
+        class="monaco-host flex-1 min-h-0"
+        data-testid="repo-file-editor"
+      />
       <!-- D11: `markdown-it`'s `html: false` (markdownReading.ts) escapes any literal HTML tag in
            the source, so this is the one `v-html` in this view that's safe. -->
       <div
@@ -297,10 +310,30 @@ onUnmounted(() => {
     </div>
     <div v-else ref="container" class="monaco-host h-full w-full" data-testid="repo-file-editor" />
   </template>
-  <EmptyState v-else-if="state === 'binary'" class="flex-1 min-h-0" icon="file-binary" :title="t('space.repo.view.binaryPreview.empty')" />
-  <EmptyState v-else-if="state === 'tooLarge'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.tooLargePreview.empty')" />
-  <EmptyState v-else-if="state === 'missing'" class="flex-1 min-h-0" icon="warning" :title="t('space.repo.view.missing.empty')" />
-  <EmptyState v-else class="flex-1 min-h-0" icon="warning" :title="errorMessage || t('space.repo.view.openFileFailed.error')" />
+  <EmptyState
+    v-else-if="state === 'binary'"
+    class="flex-1 min-h-0"
+    icon="file-binary"
+    :title="t('space.repo.view.binaryPreview.empty')"
+  />
+  <EmptyState
+    v-else-if="state === 'tooLarge'"
+    class="flex-1 min-h-0"
+    icon="warning"
+    :title="t('space.repo.view.tooLargePreview.empty')"
+  />
+  <EmptyState
+    v-else-if="state === 'missing'"
+    class="flex-1 min-h-0"
+    icon="warning"
+    :title="t('space.repo.view.missing.empty')"
+  />
+  <EmptyState
+    v-else
+    class="flex-1 min-h-0"
+    icon="warning"
+    :title="errorMessage || t('space.repo.view.openFileFailed.error')"
+  />
 </template>
 
 <style scoped>

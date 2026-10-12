@@ -30,7 +30,9 @@ const at = computed(() => moves.value.at);
 const prev = computed(() => moves.value.prev);
 const next = computed(() => moves.value.next);
 const live = computed(() => moves.value.live);
-const reason = computed(() => (live.value ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : ''));
+const reason = computed(() =>
+  live.value ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : '',
+);
 
 async function move(stageId: string): Promise<void> {
   error.value = '';
@@ -70,7 +72,8 @@ async function move(stageId: string): Promise<void> {
             :disabled="o.skipped"
             @select="move(o.id)"
           >
-            {{ o.name }}<span v-if="o.skipped" class="text-subtle"> {{ t('common.skipped.status') }}</span>
+            {{ o.name
+            }}<span v-if="o.skipped" class="text-subtle"> {{ t('common.skipped.status') }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

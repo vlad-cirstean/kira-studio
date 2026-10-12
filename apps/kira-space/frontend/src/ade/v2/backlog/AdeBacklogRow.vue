@@ -79,7 +79,8 @@ const facts = computed(() => {
       </Button>
     </AdeTip>
     <AdeTip :text="t('space.ade.backlog.promoteRow.tooltip')">
-      <Button variant="dialog"
+      <Button
+        variant="dialog"
         size="kira"
         class="shrink-0 "
         :class="TONE_SOLID_CLASS.amber"
@@ -101,8 +102,12 @@ const facts = computed(() => {
         ✕
       </Button>
     </AdeTip>
-    <span class="w-16 shrink-0 text-kira-sm text-subtle" data-testid="ade-backlog-ago">{{ ago }}</span>
-    <Label :for="`ade-backlog-${item.id}`" class="sr-only">{{ t('space.ade.backlog.item.label') }}</Label>
+    <span class="w-16 shrink-0 text-kira-sm text-subtle" data-testid="ade-backlog-ago">{{
+      ago
+    }}</span>
+    <Label :for="`ade-backlog-${item.id}`" class="sr-only">{{
+      t('space.ade.backlog.item.label')
+    }}</Label>
     <Input
       :id="`ade-backlog-${item.id}`"
       :model-value="edit.text.value"
@@ -112,6 +117,13 @@ const facts = computed(() => {
       @blur="edit.onCommit"
       @keydown="edit.onKeydown"
     />
-    <span v-if="facts" class="max-w-2/5 shrink-0 truncate text-kira-sm text-subtle" data-testid="ade-backlog-facts">{{ facts }}</span>
+    <span
+      v-if="facts"
+      class="max-w-2/5 shrink-0 truncate text-kira-sm text-subtle"
+      data-testid="ade-backlog-facts"
+      >{{
+        facts
+      }}</span
+    >
   </div>
 </template>

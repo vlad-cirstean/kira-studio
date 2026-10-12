@@ -4,7 +4,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 // P262 §2.6/§2.7: panel/picker/list section heading. Successor of git-ui's RefSectionHeader;
 // `justify-between` is unconditional, so a trailing action in the default slot needs no variant.
 // `collapsible` renders a full-width toggle button with a leading chevron; `count` trails the label.
-defineProps<{ label: string; collapsible?: boolean; expanded?: boolean; count?: number | string }>();
+defineProps<{
+  label: string;
+  collapsible?: boolean;
+  expanded?: boolean;
+  count?: number | string;
+}>();
 const emit = defineEmits<(e: 'toggle') => void>();
 </script>
 

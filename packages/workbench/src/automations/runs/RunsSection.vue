@@ -35,7 +35,8 @@ const stop = useStopScriptRun();
 const rows = computed(() => {
   const all = data.value ?? [];
   if (filter.value === 'running') return all.filter((r) => r.state === 'running');
-  if (filter.value === 'failed') return all.filter((r) => r.state === 'failed' || r.state === 'blocked');
+  if (filter.value === 'failed')
+    return all.filter((r) => r.state === 'failed' || r.state === 'blocked');
   return all;
 });
 
@@ -71,7 +72,13 @@ function toggle(run: ScriptRun): void {
       <InlineState v-if="rows.length === 0" kind="empty" data-testid="runs-empty">
         {{ t('automations.runs.none.emptyHint') }}
       </InlineState>
-      <div v-for="run in rows" :key="run.id" class="flex flex-col" data-testid="run-row" :data-state="run.state">
+      <div
+        v-for="run in rows"
+        :key="run.id"
+        class="flex flex-col"
+        data-testid="run-row"
+        :data-state="run.state"
+      >
         <div :class="cn(rowVariants({ layout: 'tree' }), 'py-1 pl-1.5')">
           <button
             type="button"
@@ -83,10 +90,18 @@ function toggle(run: ScriptRun): void {
             <SmartBadge v-if="run.kind === 'smart'" />
             <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
               {{ run.scriptName }}
-              <span v-if="run.trigger === 'ade'" class="text-muted-foreground" data-testid="run-trigger">
+              <span
+                v-if="run.trigger === 'ade'"
+                class="text-muted-foreground"
+                data-testid="run-trigger"
+              >
                 · {{ t('automations.run.triggerAde.label', { task: run.taskTitle }) }}
               </span>
-              <span v-else-if="run.trigger === 'scheduled'" class="text-muted-foreground" data-testid="run-trigger">
+              <span
+                v-else-if="run.trigger === 'scheduled'"
+                class="text-muted-foreground"
+                data-testid="run-trigger"
+              >
                 · {{ t('automations.run.triggerScheduled.label') }}
               </span>
             </span>

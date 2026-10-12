@@ -146,7 +146,9 @@ const signatureText = computed<string | undefined>(() => {
   if (!signature || signature.status === 'N') return undefined;
   const key = SIGNATURE_TEXT[signature.status];
   const text = key === undefined ? signature.status : t(key);
-  return signature.signer ? t('git.signature.bySigner.status', { status: text, signer: signature.signer }) : text;
+  return signature.signer
+    ? t('git.signature.bySigner.status', { status: text, signer: signature.signer })
+    : text;
 });
 
 /** G24 D12: the one "Pull request" row — resolved with a PR (one line per associated PR),
@@ -160,8 +162,7 @@ const signatureText = computed<string | undefined>(() => {
 // Tailwind must scan appears as a complete literal below. Replaces the old dynamic
 // `meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
 // Inline link: no button chrome, ambient colour, graph font.
-const LINK_BUTTON_CLASS =
-  'h-auto p-0 border-0 font-normal text-inherit text-graph-sm';
+const LINK_BUTTON_CLASS = 'h-auto p-0 border-0 font-normal text-inherit text-graph-sm';
 
 const PR_ICON_CLASS: Readonly<Record<string, string>> = {
   open: 'text-ok',
@@ -261,7 +262,10 @@ function copySha(): void {
 async function openAllChanges(): Promise<void> {
   const detail = props.detail;
   if (!detail) return;
-  await openAllChangesAnnounced(props.actions, { sha: detail.sha, parentIndex: detail.parentIndex });
+  await openAllChangesAnnounced(props.actions, {
+    sha: detail.sha,
+    parentIndex: detail.parentIndex,
+  });
 }
 
 /** P74 §3.3: the "Pull request" row's own external-open action, and (§4.3) the facts-row icon's
@@ -309,7 +313,9 @@ const prIcon = computed(() => {
     <ViewToolbar data-testid="detail-head">
       <Tooltip>
         <TooltipTrigger as-child>
-          <span data-testid="meta-subject" class="min-w-0 truncate text-kira-md text-fg">{{ detail.subject }}</span>
+          <span data-testid="meta-subject" class="min-w-0 truncate text-kira-md text-fg">{{
+            detail.subject
+          }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ detail.subject }}</TooltipContent>
       </Tooltip>
@@ -337,77 +343,82 @@ const prIcon = computed(() => {
     </ViewToolbar>
 
     <div :class="['flex min-h-0 flex-col gap-1 overflow-auto px-3', expanded ? 'py-2' : '']">
-    <p data-testid="meta-body"
-      v-if="bodyParagraphs.length > 0"
-      ref="bodyEl"
-      v-show="expanded"
-      class="mt-1 whitespace-normal break-words"
-    ></p>
+      <p
+        data-testid="meta-body"
+        v-if="bodyParagraphs.length > 0"
+        ref="bodyEl"
+        v-show="expanded"
+        class="mt-1 whitespace-normal break-words"
+      ></p>
 
-    <div v-if="expanded" class="flex flex-col gap-1 mt-1">
-      <p data-testid="meta-identity" class="text-graph-sm text-muted-foreground">
-        {{ detail.author.name }} &lt;{{ detail.author.email }}&gt;
-      </p>
-      <p data-testid="meta-identity" v-if="committerDiffersFromAuthor" class="text-graph-sm text-muted-foreground">
-        {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
-        <span class="text-graph-sm">{{ t('git.commit.committer.label') }}</span>
-      </p>
-      <dl data-testid="meta-trailers"
-        v-if="trailerRows.length > 0"
-        class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
-      >
-        <template v-for="(row, index) in trailerRows" :key="index">
-          <dt class="text-muted-foreground">{{ row.token }}</dt>
-          <dd v-if="row.name !== undefined">
-            {{ row.name }} <span class="text-muted-foreground">&lt;{{ row.email }}&gt;</span>
-          </dd>
-          <dd v-else>{{ row.raw }}</dd>
-        </template>
-      </dl>
-      <dl
-        v-if="hasDetails"
-        class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
-      >
-        <template v-if="detail.decoration.length > 0">
-          <dt class="text-muted-foreground">{{ t('git.common.refs.label') }}</dt>
-          <dd data-testid="meta-refs" ref="decorationEl" class="flex flex-wrap gap-0.5"></dd>
-        </template>
-        <template v-if="signatureText">
-          <dt class="text-muted-foreground">{{ t('git.commit.signature.label') }}</dt>
-          <dd>{{ signatureText }}</dd>
-        </template>
-        <template v-if="prDetail">
-          <dt class="text-muted-foreground">{{ t('git.commit.pullRequest.label') }}</dt>
-          <dd v-if="prDetail.kind === 'prs'" class="flex flex-col gap-0.5">
-            <div
-              v-for="pr in prDetail.prs"
-              :key="pr.number"
-              class="flex items-center gap-0.5"
-            >
-              <span :class="prBadgeClass(pr.state)">
-                {{ pr.stateLabel }}
-              </span>
-              <Button
-                variant="link"
-                size="kira"
-                :class="cn(LINK_BUTTON_CLASS, 'justify-start text-left whitespace-normal')"
-                @click="openPullRequest(pr.number)"
-              >
-                #{{ pr.number }} {{ pr.title }}
-              </Button>
-            </div>
-          </dd>
-          <dd v-else-if="prDetail.kind === 'none'">{{ t('git.commit.noPullRequest.empty') }}</dd>
-          <dd v-else class="text-muted-foreground" data-testid="pr-unavailable">
-            {{ prDetail.reason }}
-          </dd>
-        </template>
-      </dl>
-    </div>
+      <div v-if="expanded" class="flex flex-col gap-1 mt-1">
+        <p data-testid="meta-identity" class="text-graph-sm text-muted-foreground">
+          {{ detail.author.name }}
+          &lt;{{ detail.author.email }}&gt;
+        </p>
+        <p
+          data-testid="meta-identity"
+          v-if="committerDiffersFromAuthor"
+          class="text-graph-sm text-muted-foreground"
+        >
+          {{ detail.committer.name }}
+          &lt;{{ detail.committer.email }}&gt;
+          <span class="text-graph-sm">{{ t('git.commit.committer.label') }}</span>
+        </p>
+        <dl
+          data-testid="meta-trailers"
+          v-if="trailerRows.length > 0"
+          class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
+        >
+          <template v-for="(row, index) in trailerRows" :key="index">
+            <dt class="text-muted-foreground">{{ row.token }}</dt>
+            <dd v-if="row.name !== undefined">
+              {{ row.name }} <span class="text-muted-foreground">&lt;{{ row.email }}&gt;</span>
+            </dd>
+            <dd v-else>{{ row.raw }}</dd>
+          </template>
+        </dl>
+        <dl
+          v-if="hasDetails"
+          class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
+        >
+          <template v-if="detail.decoration.length > 0">
+            <dt class="text-muted-foreground">{{ t('git.common.refs.label') }}</dt>
+            <dd data-testid="meta-refs" ref="decorationEl" class="flex flex-wrap gap-0.5"></dd>
+          </template>
+          <template v-if="signatureText">
+            <dt class="text-muted-foreground">{{ t('git.commit.signature.label') }}</dt>
+            <dd>{{ signatureText }}</dd>
+          </template>
+          <template v-if="prDetail">
+            <dt class="text-muted-foreground">{{ t('git.commit.pullRequest.label') }}</dt>
+            <dd v-if="prDetail.kind === 'prs'" class="flex flex-col gap-0.5">
+              <div v-for="pr in prDetail.prs" :key="pr.number" class="flex items-center gap-0.5">
+                <span :class="prBadgeClass(pr.state)">
+                  {{ pr.stateLabel }}
+                </span>
+                <Button
+                  variant="link"
+                  size="kira"
+                  :class="cn(LINK_BUTTON_CLASS, 'justify-start text-left whitespace-normal')"
+                  @click="openPullRequest(pr.number)"
+                >
+                  #{{ pr.number }} {{ pr.title }}
+                </Button>
+              </div>
+            </dd>
+            <dd v-else-if="prDetail.kind === 'none'">{{ t('git.commit.noPullRequest.empty') }}</dd>
+            <dd v-else class="text-muted-foreground" data-testid="pr-unavailable">
+              {{ prDetail.reason }}
+            </dd>
+          </template>
+        </dl>
+      </div>
     </div>
 
     <div class="flex shrink-0 items-center gap-2 px-3 py-2">
-      <Button data-testid="meta-body-toggle"
+      <Button
+        data-testid="meta-body-toggle"
         variant="link"
         size="kira"
         class="h-auto p-0 justify-start text-muted-foreground hover:text-fg"
@@ -433,7 +444,9 @@ const prIcon = computed(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="shrink-0 text-kira-sm text-subtle">{{ formatAgeCompact(detail.committer.timestamp) }}</span>
+            <span class="shrink-0 text-kira-sm text-subtle">{{
+              formatAgeCompact(detail.committer.timestamp)
+            }}</span>
           </TooltipTrigger>
           <TooltipContent>{{ formatAbsoluteUtc(detail.committer.timestamp) }}</TooltipContent>
         </Tooltip>

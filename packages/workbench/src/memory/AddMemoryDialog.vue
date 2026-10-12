@@ -3,7 +3,14 @@ import type { MemoryClarification, MemoryStoreResult } from '@shared/domain/memo
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
@@ -99,14 +106,23 @@ function select(id: string): void {
           <ul class="m-0 flex list-none flex-col gap-1 p-0" data-testid="add-memory-outcomes">
             <li v-for="(o, i) in result.outcomes" :key="i">
               <Card class="gap-0.5">
-              <span class="text-kira-sm text-muted-foreground" :data-testid="`add-memory-outcome-${i}`">{{ actionLabel(o) }}</span>
-              <button
-                v-if="o.action !== 'failed'"
-                type="button"
-                class="cursor-default border-0 bg-transparent p-0 text-left text-kira-md hover:underline"
-                @click="select(o.id)"
-              >{{ o.fact }}</button>
-              <span v-else class="text-kira-md">{{ o.fact }}</span>
+                <span
+                  class="text-kira-sm text-muted-foreground"
+                  :data-testid="`add-memory-outcome-${i}`"
+                  >{{
+                    actionLabel(o)
+                  }}</span
+                >
+                <button
+                  v-if="o.action !== 'failed'"
+                  type="button"
+                  class="cursor-default border-0 bg-transparent p-0 text-left text-kira-md hover:underline"
+                  @click="select(o.id)"
+                  >{{
+                    o.fact
+                  }}</button
+                >
+                <span v-else class="text-kira-md">{{ o.fact }}</span>
               </Card>
             </li>
           </ul>
@@ -123,7 +139,10 @@ function select(id: string): void {
               :placeholder="t('memory.add.text.placeholder')"
               data-testid="add-memory-text"
             />
-            <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count">{{ text.length }} / {{ MAX_TEXT }}</span>
+            <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count"
+              >{{ text.length }}
+              / {{ MAX_TEXT }}</span
+            >
             <template v-if="challenged">
               <Alert
                 v-for="c in result?.challenges.filter((x) => x.index === 0)"
@@ -134,22 +153,60 @@ function select(id: string): void {
               >
                 <div v-for="(question, q) in c.questions" :key="q" class="flex flex-col gap-0.5">
                   <Label :for="`memory-answer-${q}`">{{ question }}</Label>
-                  <Textarea :id="`memory-answer-${q}`" v-model="answers[answerKey(c.index, q)]" :disabled="busy" :placeholder="t('memory.add.answer.placeholder')" data-testid="add-memory-answer" />
+                  <Textarea
+                    :id="`memory-answer-${q}`"
+                    v-model="answers[answerKey(c.index, q)]"
+                    :disabled="busy"
+                    :placeholder="t('memory.add.answer.placeholder')"
+                    data-testid="add-memory-answer"
+                  />
                 </div>
               </Alert>
             </template>
           </div>
-          <p v-if="busy" class="m-0 text-kira-sm text-muted-foreground" data-testid="add-memory-busy">{{ t('memory.add.checking.loading') }}</p>
+          <p
+            v-if="busy"
+            class="m-0 text-kira-sm text-muted-foreground"
+            data-testid="add-memory-busy"
+            >{{
+              t('memory.add.checking.loading')
+            }}</p
+          >
         </template>
       </DialogBody>
       <DialogFooter>
         <template v-if="stored">
-          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">{{ t('common.done.status') }}</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="add-memory-done"
+            @click="emit('close')"
+            >{{
+              t('common.done.status')
+            }}</Button
+          >
         </template>
         <template v-else>
-          <Button v-if="busy" variant="dialog" size="kira-lg" data-testid="add-memory-cancel" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
-          <Button v-else variant="dialog" size="kira-lg" @click="emit('close')">{{ t('common.action.close.label') }}</Button>
-          <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" data-testid="add-memory-submit" @click="submit">
+          <Button
+            v-if="busy"
+            variant="dialog"
+            size="kira-lg"
+            data-testid="add-memory-cancel"
+            @click="cancel"
+            >{{
+              t('common.action.cancel.label')
+            }}</Button
+          >
+          <Button v-else variant="dialog" size="kira-lg" @click="emit('close')">{{
+            t('common.action.close.label')
+          }}</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            :disabled="!canSubmit"
+            data-testid="add-memory-submit"
+            @click="submit"
+          >
             {{ challenged ? t('memory.add.resubmit.label') : t('common.action.add.label') }}
           </Button>
         </template>

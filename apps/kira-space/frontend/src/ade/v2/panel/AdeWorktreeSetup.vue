@@ -36,8 +36,15 @@ watch(
 </script>
 
 <template>
-  <div v-if="row.branch.setup" ref="root" class="flex flex-col gap-0.5" data-testid="ade-worktree-setup">
-    <div class="pb-0.5 text-kira-sm text-muted-foreground">{{ t('space.ade.setup.title.label') }}</div>
+  <div
+    v-if="row.branch.setup"
+    ref="root"
+    class="flex flex-col gap-0.5"
+    data-testid="ade-worktree-setup"
+  >
+    <div class="pb-0.5 text-kira-sm text-muted-foreground">{{
+      t('space.ade.setup.title.label')
+    }}</div>
     <AdeSetupProgress :branch="row.branch" :repo="row.repo" />
   </div>
 </template>

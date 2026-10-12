@@ -32,7 +32,9 @@ const emit = defineEmits<{ 'update:modelValue': [choice: BaseChoice] }>();
 
 const open = ref(false);
 const branches = useRepoBranches(() =>
-  open.value || props.modelValue !== null ? { codeRepoId: props.codeRepoId, branchId: props.branchId ?? '' } : null,
+  open.value || props.modelValue !== null
+    ? { codeRepoId: props.codeRepoId, branchId: props.branchId ?? '' }
+    : null,
 );
 const data = computed(() => branches.data.value);
 
@@ -45,7 +47,8 @@ const plain = computed(() =>
 const shown = computed(() => {
   const m = props.modelValue;
   if (m === null) return props.current ?? data.value?.mainName ?? 'main';
-  if (m.branchId) return data.value?.branches.find((b) => b.branchId === m.branchId)?.name || m.branchId;
+  if (m.branchId)
+    return data.value?.branches.find((b) => b.branchId === m.branchId)?.name || m.branchId;
   return m.ref || data.value?.mainName || 'main';
 });
 const parts = computed((): TextPart[] => [{ name: 'base', value: shown.value }]);
@@ -64,16 +67,26 @@ const pickOf = (b: BasePick): BaseChoice =>
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button variant="dialog" size="kira" class="max-w-full justify-start gap-1.5" data-testid="ade-base-picker">
+      <Button
+        variant="dialog"
+        size="kira"
+        class="max-w-full justify-start gap-1.5"
+        data-testid="ade-base-picker"
+      >
         <CodiconIcon name="git-branch" :size="12" />
         <VarText :parts="parts" />
       </Button>
     </PopoverTrigger>
     <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="ade-base-popover">
       <Command>
-        <CommandInput :placeholder="t('space.ade.basePicker.search.placeholder')" data-testid="ade-base-search" />
+        <CommandInput
+          :placeholder="t('space.ade.basePicker.search.placeholder')"
+          data-testid="ade-base-search"
+        />
         <CommandList class="max-h-72">
-          <CommandEmpty>{{ branches.isPending.value ? t('common.state.loading.loading') : t('space.common.noBranches.empty') }}</CommandEmpty>
+          <CommandEmpty>{{
+            branches.isPending.value ? t('common.state.loading.loading') : t('space.common.noBranches.empty')
+          }}</CommandEmpty>
           <CommandGroup v-if="data?.previous" :heading="t('space.ade.basePicker.previous.label')">
             <CommandItem
               :value="`previous ${data.previous}`"
@@ -101,9 +114,12 @@ const pickOf = (b: BasePick): BaseChoice =>
                 @select="choose(pickOf(b))"
               >
                 <span class="min-w-0 flex-1 truncate">
-                  {{ b.taskTitle }} ·
+                  {{ b.taskTitle }}
+                  ·
                   <VarText v-if="b.name" :parts="[{ name: 'base', value: b.name }]" />
-                  <span v-else class="text-subtle">{{ t('space.ade.board.branchTag.notCreated.label') }}</span>
+                  <span v-else class="text-subtle">{{
+                    t('space.ade.board.branchTag.notCreated.label')
+                  }}</span>
                 </span>
               </CommandItem>
             </AdeTip>
@@ -117,7 +133,9 @@ const pickOf = (b: BasePick): BaseChoice =>
                 @select="choose(pickOf(b))"
               >
                 <VarText :parts="[{ name: 'base', value: b.name }]" />
-                <span v-if="!b.local" class="ml-auto text-kira-sm text-subtle">{{ t('space.ade.basePicker.remote.status') }}</span>
+                <span v-if="!b.local" class="ml-auto text-kira-sm text-subtle">{{
+                  t('space.ade.basePicker.remote.status')
+                }}</span>
               </CommandItem>
             </AdeTip>
           </CommandGroup>

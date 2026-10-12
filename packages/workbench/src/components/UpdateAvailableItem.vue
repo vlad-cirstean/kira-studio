@@ -14,7 +14,10 @@ const props = defineProps<{ latestVersion: string; currentVersion: string }>();
 const emit = defineEmits<(e: 'open') => void>();
 
 const tooltip = computed(() =>
-  t('workbench.update.available.tooltip', { latest: props.latestVersion, current: props.currentVersion }),
+  t('workbench.update.available.tooltip', {
+    latest: props.latestVersion,
+    current: props.currentVersion,
+  }),
 );
 </script>
 

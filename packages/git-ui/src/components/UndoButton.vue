@@ -55,7 +55,9 @@ async function undo(): Promise<void> {
           {{ shortSha(ops.undoSlot.value.recoverySha) }}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ t('git.undo.copyRecovery.tooltip', { sha: ops.undoSlot.value.recoverySha }) }}</TooltipContent>
+      <TooltipContent>{{
+        t('git.undo.copyRecovery.tooltip', { sha: ops.undoSlot.value.recoverySha })
+      }}</TooltipContent>
     </Tooltip>
   </div>
 </template>

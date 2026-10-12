@@ -41,7 +41,8 @@ function hintParts(hint: string | readonly TextPart[] | undefined): readonly Tex
 // it instead, unless the chosen item already moved focus into a dialog.
 function onCloseAutoFocus(event: Event): void {
   event.preventDefault();
-  if (!document.activeElement?.closest('[data-slot="dialog-content"]')) contextMenuStore.restoreFocus();
+  if (!document.activeElement?.closest('[data-slot="dialog-content"]'))
+    contextMenuStore.restoreFocus();
   contextMenuStore.runAfterClose();
 }
 
@@ -80,7 +81,12 @@ async function onItemClick(item: MenuItem): Promise<void> {
         <DropdownMenuSub v-else-if="item.type === 'submenu'">
           <DropdownMenuSubTrigger :data-testid="`menu-item-${item.id}`">
             <span class="flex items-center justify-center shrink-0 size-4">
-              <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" class="text-muted-foreground" />
+              <CodiconIcon
+                v-if="item.icon"
+                :name="item.icon"
+                :size="13"
+                class="text-muted-foreground"
+              />
             </span>
             <span class="flex-1 overflow-hidden text-ellipsis">{{ item.label }}</span>
           </DropdownMenuSubTrigger>
@@ -91,7 +97,9 @@ async function onItemClick(item: MenuItem): Promise<void> {
                 :key="sub.type === 'separator' || sub.type === 'label' ? `${sub.type}-${subIdx}` : sub.id"
               >
                 <DropdownMenuSeparator v-if="sub.type === 'separator'" />
-                <DropdownMenuLabel v-else-if="sub.type === 'label'">{{ sub.label }}</DropdownMenuLabel>
+                <DropdownMenuLabel v-else-if="sub.type === 'label'">{{
+                  sub.label
+                }}</DropdownMenuLabel>
                 <Tooltip v-else :disabled="sub.type !== 'item' || !sub.hint">
                   <TooltipTrigger as-child>
                     <DropdownMenuItem
@@ -118,7 +126,9 @@ async function onItemClick(item: MenuItem): Promise<void> {
                       <DropdownMenuShortcut
                         v-if="sub.type === 'item' && sub.shortcut"
                         :data-testid="`menu-item-${sub.id}-shortcut`"
-                        >{{ formatShortcut(sub.shortcut) }}</DropdownMenuShortcut
+                        >{{
+                          formatShortcut(sub.shortcut)
+                        }}</DropdownMenuShortcut
                       >
                       <span
                         v-if="sub.type === 'item' && sub.checked"
@@ -129,8 +139,8 @@ async function onItemClick(item: MenuItem): Promise<void> {
                     </DropdownMenuItem>
                   </TooltipTrigger>
                   <TooltipContent v-if="sub.type === 'item' && sub.hint"
-                    ><VarText :parts="hintParts(sub.hint)"
-                  /></TooltipContent>
+                    ><VarText :parts="hintParts(sub.hint)" /></TooltipContent
+                  >
                 </Tooltip>
               </template>
             </DropdownMenuSubContent>
@@ -152,20 +162,29 @@ async function onItemClick(item: MenuItem): Promise<void> {
                   class="w-2.5 h-2.5 rounded-full shrink-0"
                   :class="item.swatch === 'none' ? 'border border-disabled' : connBgClass(item.swatch)"
                 />
-                <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="13" :class="item.iconClass ?? 'text-muted-foreground'" />
+                <CodiconIcon
+                  v-else-if="item.icon"
+                  :name="item.icon"
+                  :size="13"
+                  :class="item.iconClass ?? 'text-muted-foreground'"
+                />
               </span>
               <span class="flex-1 overflow-hidden text-ellipsis">{{ item.label }}</span>
-              <DropdownMenuShortcut v-if="item.shortcut" :data-testid="`menu-item-${item.id}-shortcut`">{{
-                formatShortcut(item.shortcut)
-              }}</DropdownMenuShortcut>
+              <DropdownMenuShortcut
+                v-if="item.shortcut"
+                :data-testid="`menu-item-${item.id}-shortcut`"
+                >{{
+                  formatShortcut(item.shortcut)
+                }}</DropdownMenuShortcut
+              >
               <span v-if="item.checked" class="flex items-center justify-center shrink-0 size-4">
                 <CodiconIcon name="check" :size="13" />
               </span>
             </DropdownMenuItem>
           </TooltipTrigger>
           <TooltipContent v-if="item.hint"
-            ><VarText :parts="hintParts(item.hint)"
-          /></TooltipContent>
+            ><VarText :parts="hintParts(item.hint)" /></TooltipContent
+          >
         </Tooltip>
       </template>
     </DropdownMenuContent>

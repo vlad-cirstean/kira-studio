@@ -36,15 +36,12 @@ const emit = defineEmits<(e: 'select', id: string) => void>();
       <!-- KuiMenuList's own G34 D9 rule: the icon box is unconditional so every row's label
            starts at the same x position whether or not that particular item carries an icon. -->
       <span class="flex items-center justify-center shrink-0 size-4">
-        <CodiconIcon
-          v-if="item.icon"
-          :name="item.icon"
-          :size="13"
-          class="text-muted-foreground"
-        />
+        <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" class="text-muted-foreground" />
       </span>
       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ item.label }}</span>
-      <DropdownMenuShortcut v-if="item.detail" class="whitespace-nowrap">{{ item.detail }}</DropdownMenuShortcut>
+      <DropdownMenuShortcut v-if="item.detail" class="whitespace-nowrap">{{
+        item.detail
+      }}</DropdownMenuShortcut>
       <span v-if="item.disabled && item.disabledReason" :id="`${item.id}-reason`" class="sr-only">
         {{ item.disabledReason }}
       </span>

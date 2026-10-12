@@ -21,7 +21,9 @@
        bar -- dragging it moves the window, double-clicking it zooms/minimises per System Settings,
        both for free. Inert (ordinary DOM) on Linux dev builds and under tests/ui (a static file
        server, no Wails window at all). -->
-  <div class="relative flex items-center shrink-0 wails-drag h-titlebar min-h-titlebar pl-titlebar-inset pr-1.5 bg-chrome">
+  <div
+    class="relative flex items-center shrink-0 wails-drag h-titlebar min-h-titlebar pl-titlebar-inset pr-1.5 bg-chrome"
+  >
     <slot />
   </div>
   <Teleport to="body">

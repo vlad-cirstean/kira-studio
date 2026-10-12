@@ -63,7 +63,10 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
     const row = card?.rows.find((r) => r.id === target.branchId);
     const choice = row ? reviewCode.choiceOf(row) : null;
     const anchor =
-      target.el ?? document.querySelector<HTMLElement>(`[data-testid="ade-branch-row"][data-branch-id="${target.branchId}"]`);
+      target.el ??
+      document.querySelector<HTMLElement>(
+        `[data-testid="ade-branch-row"][data-branch-id="${target.branchId}"]`,
+      );
     if (card && choice && !choice.disabled) reviewCode.open(card.task.id, target.branchId, anchor);
     return;
   }
@@ -71,13 +74,20 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
   if (!card) return;
   const head =
     target.el ??
-    document.querySelector<HTMLElement>(`[data-testid="ade-card"][data-task-id="${card.task.id}"] [data-testid="ade-card-head"]`);
+    document.querySelector<HTMLElement>(
+      `[data-testid="ade-card"][data-task-id="${card.task.id}"] [data-testid="ade-card-head"]`,
+    );
   reviewCode.openTask(card, head);
 });
 </script>
 
 <template>
-  <Tabs :model-value="ui.view" class="flex min-h-0 flex-1 flex-col gap-0" data-testid="ade-shell" @update:model-value="onView">
+  <Tabs
+    :model-value="ui.view"
+    class="flex min-h-0 flex-1 flex-col gap-0"
+    data-testid="ade-shell"
+    @update:model-value="onView"
+  >
     <nav class="flex h-tabbar shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1">
       <TabsList>
         <TabsTrigger
@@ -86,7 +96,13 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           data-testid="ade-tab-backlog"
         >
           {{ t('space.common.backlog.label') }}
-          <span class="text-kira-sm tabular-nums text-muted-foreground" data-testid="ade-backlog-count">{{ count }}</span>
+          <span
+            class="text-kira-sm tabular-nums text-muted-foreground"
+            data-testid="ade-backlog-count"
+            >{{
+              count
+            }}</span
+          >
         </TabsTrigger>
         <TabsTrigger
           value="needs"
@@ -94,7 +110,9 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           data-testid="ade-tab-needs"
         >
           {{ t('common.needsYou.status') }}
-          <Badge v-if="needsCount > 0" variant="count" data-testid="ade-needs-count">{{ needsCount }}</Badge>
+          <Badge v-if="needsCount > 0" variant="count" data-testid="ade-needs-count">{{
+            needsCount
+          }}</Badge>
         </TabsTrigger>
         <TabsTrigger
           value="plan"

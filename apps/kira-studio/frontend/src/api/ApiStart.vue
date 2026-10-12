@@ -36,16 +36,31 @@ function onImportCurl(): void {
     :description="t('studio.api.start.emptyHint')"
     data-testid="api-start"
   >
-    <Button variant="dialog-primary" size="kira-lg" data-testid="new-request-start" @click="openApiRequestTab">
+    <Button
+      variant="dialog-primary"
+      size="kira-lg"
+      data-testid="new-request-start"
+      @click="openApiRequestTab"
+    >
       <CodiconIcon :name="ICON.add" :size="13" />
       {{ t('studio.api.common.newRequest.label') }}
     </Button>
     <template #secondary>
-      <Button variant="dialog" size="kira-lg" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        data-testid="new-grpc-request-start"
+        @click="openGrpcRequestTab"
+      >
         <CodiconIcon name="symbol-interface" :size="13" />
         {{ t('shared.grpc.newRequest.title') }}
       </Button>
-      <Button variant="dialog" size="kira-lg" data-testid="import-collection-start" @click="onImport">
+      <Button
+        variant="dialog"
+        size="kira-lg"
+        data-testid="import-collection-start"
+        @click="onImport"
+      >
         <CodiconIcon name="cloud-download" :size="13" />
         {{ t('studio.api.common.importCollection.label') }}
       </Button>

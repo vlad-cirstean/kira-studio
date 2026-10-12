@@ -16,7 +16,8 @@ const { retrying, retry } = useRetryStatus();
 const COPY: Record<UnavailableReason, { title: () => string; hint: () => string }> = {
   'not-installed': {
     title: () => t('docker.unavailable.notInstalled.title'),
-    hint: () => t('docker.unavailable.notInstalled.hint', { engines: 'Docker Desktop, Colima or Podman' }),
+    hint: () =>
+      t('docker.unavailable.notInstalled.hint', { engines: 'Docker Desktop, Colima or Podman' }),
   },
   'daemon-down': {
     title: () => t('docker.unavailable.daemonDown.title'),
@@ -53,15 +54,32 @@ const copy = computed(() => {
     :title="copy.title"
     :description="copy.hint"
   >
-    <template #media><CodiconIcon name="debug-disconnect" :size="24" class="text-error" /></template>
-      <code class="font-data text-kira-sm text-muted-foreground" data-testid="docker-unavailable-endpoint">{{ status.endpoint.host }}</code>
-      <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{ status.message }}</p>
-      <div class="flex items-center gap-2">
-        <Button size="kira" variant="toolbar" :disabled="retrying" data-testid="docker-retry" @click="retry">
-          <Spinner v-if="retrying" label="" /><CodiconIcon v-else name="refresh" :size="12" />{{ t('common.action.retry.label') }}
-        </Button>
-        <EndpointChip />
-      </div>
-      <p class="text-kira-sm text-muted-foreground">{{ t('docker.unavailable.recheck.hint') }}</p>
+    <template #media
+      ><CodiconIcon name="debug-disconnect" :size="24" class="text-error" /></template
+    >
+    <code
+      class="font-data text-kira-sm text-muted-foreground"
+      data-testid="docker-unavailable-endpoint"
+      >{{
+        status.endpoint.host
+      }}</code
+    >
+    <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{
+      status.message
+    }}</p>
+    <div class="flex items-center gap-2">
+      <Button
+        size="kira"
+        variant="toolbar"
+        :disabled="retrying"
+        data-testid="docker-retry"
+        @click="retry"
+      >
+        <Spinner v-if="retrying" label="" /><CodiconIcon v-else name="refresh" :size="12" />
+        {{ t('common.action.retry.label') }}
+      </Button>
+      <EndpointChip />
+    </div>
+    <p class="text-kira-sm text-muted-foreground">{{ t('docker.unavailable.recheck.hint') }}</p>
   </EmptyState>
 </template>

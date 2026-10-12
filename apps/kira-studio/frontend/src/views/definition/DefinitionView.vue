@@ -109,8 +109,16 @@ const document = computed(() => (definition.value ? definitionText(definition.va
 // a tab saved under the pre-P19 empty `{}` shape restorable.
 const pane = computed(() => props.tab.state.pane);
 const PANE_OPTIONS = [
-  { value: 'structure' as const, label: t('studio.definition.pane.structure.option'), testid: 'definition-pane-structure' },
-  { value: 'source' as const, label: t('common.field.source.label'), testid: 'definition-pane-source' },
+  {
+    value: 'structure' as const,
+    label: t('studio.definition.pane.structure.option'),
+    testid: 'definition-pane-structure',
+  },
+  {
+    value: 'source' as const,
+    label: t('common.field.source.label'),
+    testid: 'definition-pane-source',
+  },
 ];
 function setPane(value: 'structure' | 'source'): void {
   tabsStore.patchDefinitionTabState(props.tab.id, { pane: value });
@@ -156,8 +164,7 @@ const filteredIndexes = computed(() => {
   if (!structureFilterActive.value) return meta.value?.indexes ?? [];
   const q = structureFilterQuery.value;
   return (meta.value?.indexes ?? []).filter(
-    (i) =>
-      matchesQuery(i.name, q) || (i.columns ?? []).some((c) => matchesQuery(c, q)),
+    (i) => matchesQuery(i.name, q) || (i.columns ?? []).some((c) => matchesQuery(c, q)),
   );
 });
 const filteredConstraintRows = computed(() => {
@@ -183,7 +190,9 @@ const docHighlights = computed(() => {
   return (doc: string) => findRanges(doc, query, currentGlobal);
 });
 
-const dialect = computed(() => sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind));
+const dialect = computed(() =>
+  sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind),
+);
 
 const readOnlyLabel = computed(() =>
   definition.value?.origin === 'server'
@@ -233,12 +242,13 @@ const breadcrumb = computed(() => {
          components/ui parts, the same view-head/toolbar chrome utility set every other view uses
          (P110 B28). -->
     <ViewToolbar>
-      <span
-        v-if="railColor !== undefined"
-        :class="colorMarkClass('dot', railColor)"
-      />
-      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
+      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"
+        ><EngineIcon :kind="connRecord.kind" :size="13" /></span
+      >
+      <span class="size-4 flex items-center justify-center shrink-0"
+        ><CodiconIcon name="code" :size="13" /></span
+      >
       <span class="text-kira-md text-fg truncate" data-testid="definition-target">
         <span v-if="breadcrumb" class="text-subtle">{{ breadcrumb }}</span>{{ targetLabel }}
       </span>
@@ -263,7 +273,12 @@ const breadcrumb = computed(() => {
       </div>
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <div class="flex items-center gap-1.5 min-w-0">
-        <SecondaryTabs :model-value="pane" :items="PANE_OPTIONS" data-testid="definition-pane" @update:model-value="(v) => setPane(v as 'structure' | 'source')" />
+        <SecondaryTabs
+          :model-value="pane"
+          :items="PANE_OPTIONS"
+          data-testid="definition-pane"
+          @update:model-value="(v) => setPane(v as 'structure' | 'source')"
+        />
       </div>
       <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
            all — a find-in-document bar for Source, a plain substring filter for Structure. -->
@@ -294,7 +309,12 @@ const breadcrumb = computed(() => {
         </template>
         <Tooltip v-if="canOpenConsole">
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira" data-testid="definition-open-console" @click="onOpenConsole">
+            <Button
+              variant="toolbar"
+              size="kira"
+              data-testid="definition-open-console"
+              @click="onOpenConsole"
+            >
               <CodiconIcon name="terminal" :size="13" />
               {{ t('studio.definition.openConsole.label') }}
             </Button>
@@ -304,8 +324,15 @@ const breadcrumb = computed(() => {
       </div>
     </ViewToolbar>
 
-    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="definition-error">
-      <AlertDescription><span class="whitespace-pre-wrap font-data">{{ rt.error }}</span></AlertDescription>
+    <Alert
+      strip
+      v-if="rt?.status === 'error' && rt.error"
+      variant="error"
+      data-testid="definition-error"
+    >
+      <AlertDescription
+        ><span class="whitespace-pre-wrap font-data">{{ rt.error }}</span></AlertDescription
+      >
     </Alert>
     <Alert strip v-if="copyError" variant="error" data-testid="definition-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
@@ -322,63 +349,82 @@ const breadcrumb = computed(() => {
         </ul>
       </AlertDescription>
     </Alert>
-    <SearchField v-if="searchOpen && pane === 'structure'" v-model="structureFilterQuery" :placeholder="t('studio.definition.structureFilter.placeholder')" data-testid="definition-structure-filter" />
+    <SearchField
+      v-if="searchOpen && pane === 'structure'"
+      v-model="structureFilterQuery"
+      :placeholder="t('studio.definition.structureFilter.placeholder')"
+      data-testid="definition-structure-filter"
+    />
 
     <!-- Item 4: the reconnect gate used to replace this whole view chrome (header, toolbar and
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above always renders; only the body — the part that actually needs
          a live connection — swaps for the gate. -->
-    <EmptyState v-if="needsReconnect" data-testid="definition-reconnect" icon="plug" :title="t('studio.common.disconnected.empty')">
-      <Button variant="dialog-primary" size="kira-lg" data-testid="definition-reconnect-load" @click="onReconnectAndLoad">
+    <EmptyState
+      v-if="needsReconnect"
+      data-testid="definition-reconnect"
+      icon="plug"
+      :title="t('studio.common.disconnected.empty')"
+    >
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        data-testid="definition-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
         {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
     </EmptyState>
     <template v-else>
-    <div v-if="pane === 'source'" class="flex-1 min-h-0">
-      <MonacoHost
-        ref="docHostRef"
-        :doc="document"
-        :language="definition?.language === 'json' ? 'json' : 'sql'"
-        :sql-dialect="dialect"
-        :read-only="true"
-        :range-highlights="docHighlights"
-      />
-    </div>
-    <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
+      <div v-if="pane === 'source'" class="flex-1 min-h-0">
+        <MonacoHost
+          ref="docHostRef"
+          :doc="document"
+          :language="definition?.language === 'json' ? 'json' : 'sql'"
+          :sql-dialect="dialect"
+          :read-only="true"
+          :range-highlights="docHighlights"
+        />
+      </div>
+      <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
          describe() (F7), so a definition can arrive with meta still null. PropertiesSection
          renders regardless; everything below it stays conditional on the data it needs, exactly
          as before. P22b D14: Columns/Indexes/Constraints get the filtered arrays (computed
          above) instead of meta's own raw ones — filtering lives here, once, not in each
          section. -->
-    <div v-else-if="definition" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3">
-      <PropertiesSection v-for="section in definition.sections" :key="section.title" :section="section" />
-      <template v-if="meta">
-        <ColumnsSection
-          v-if="!isCollection"
-          :columns="filteredColumns"
-          :foreign-key-column-names="foreignKeyColumnNames"
-          :connection-id="tab.connectionId ?? ''"
-          :table-path="tab.path"
-          @copy-error="(m: string) => (copyError = m)"
+      <div v-else-if="definition" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3">
+        <PropertiesSection
+          v-for="section in definition.sections"
+          :key="section.title"
+          :section="section"
         />
-        <IndexesSection :indexes="filteredIndexes" />
-        <ConstraintsSection
-          v-if="!isCollection"
-          :connection-id="tab.connectionId ?? ''"
-          :constraints="filteredConstraintRows"
-        />
-      </template>
-      <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
-    </div>
-    <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring HTTP's own
+        <template v-if="meta">
+          <ColumnsSection
+            v-if="!isCollection"
+            :columns="filteredColumns"
+            :foreign-key-column-names="foreignKeyColumnNames"
+            :connection-id="tab.connectionId ?? ''"
+            :table-path="tab.path"
+            @copy-error="(m: string) => (copyError = m)"
+          />
+          <IndexesSection :indexes="filteredIndexes" />
+          <ConstraintsSection
+            v-if="!isCollection"
+            :connection-id="tab.connectionId ?? ''"
+            :constraints="filteredConstraintRows"
+          />
+        </template>
+        <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
+      </div>
+      <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring HTTP's own
          ResponsePane.vue — only shown over the Source pane's single document. -->
-    <ResponseFindBar
-      v-if="searchOpen && pane === 'source'"
-      ref="findBarRef"
-      :targets="findTargets"
-      @close="closeSearch"
-    />
-    <!-- LAW — there is no editor status line: identity moved to the view header above,
+      <ResponseFindBar
+        v-if="searchOpen && pane === 'source'"
+        ref="findBarRef"
+        :targets="findTargets"
+        @close="closeSearch"
+      />
+      <!-- LAW — there is no editor status line: identity moved to the view header above,
          duration to the toolbar's run-state, and this tab has no pending edits to report. -->
     </template>
   </div>

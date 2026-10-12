@@ -20,60 +20,89 @@ const imports = useImportUiStore();
 const { selectedId } = storeToRefs(ui);
 const history = useMemoryHistory(selectedId);
 
-const selected = computed(() => history.data.value?.memories.find((m) => m.id === selectedId.value));
+const selected = computed(() =>
+  history.data.value?.memories.find((m) => m.id === selectedId.value),
+);
 const trail = computed(() => [...(history.data.value?.memories ?? [])].reverse());
 
 function eventsFor(id: string) {
   return (history.data.value?.events ?? []).filter((e) => e.memoryId === id);
 }
-
 </script>
 
 <template>
   <ImportView v-if="imports.view === 'imports'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
-    <ModuleStart v-if="!selectedId" class="h-full" data-testid="memory-detail-empty" icon="book" :title="t('memory.start.empty')" :description="t('memory.start.emptyHint')" />
+    <ModuleStart
+      v-if="!selectedId"
+      class="h-full"
+      data-testid="memory-detail-empty"
+      icon="book"
+      :title="t('memory.start.empty')"
+      :description="t('memory.start.emptyHint')"
+    />
     <QueryState v-else :query="history" :is-empty="() => false">
       <template #error="{ message }">
         <Alert variant="error" strip>
           <AlertDescription>{{ message }}</AlertDescription>
         </Alert>
       </template>
-    <div v-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
-      <div class="flex flex-col gap-1.5">
-        <div class="flex items-center gap-1">
-          <Badge :variant="selected.author === 'user' ? 'info' : 'default'">{{ t(AUTHOR_LABEL[selected.author]) }}</Badge>
-          <Badge v-if="selected.historical" variant="warn">{{ t('memory.common.historical.status') }}</Badge>
-          <span class="text-kira-sm text-muted-foreground">{{ t('memory.common.version.label', { version: selected.version }) }} · {{ when(selected.createdAt) }}</span>
-        </div>
-        <p class="m-0 text-kira-md whitespace-pre-wrap" data-testid="memory-detail-fact">{{ selected.fact }}</p>
-        <p class="m-0 text-kira-md text-muted-foreground whitespace-pre-wrap">
-          <span class="font-medium">{{ t('memory.start.reason.label') }}</span> {{ selected.reason }}
-        </p>
-        <div v-if="selected.keywords.length" class="flex flex-wrap gap-1">
-          <Badge v-for="k in selected.keywords" :key="k">{{ k }}</Badge>
-        </div>
-      </div>
-      <div v-if="trail.length > 1" class="flex flex-col gap-1.5" data-testid="memory-trail">
-        <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{ t('memory.start.versions.label') }}</span>
-        <Card
-          v-for="version in trail"
-          :key="version.id"
-          class="gap-0.5"
-          :class="{ 'opacity-70': version.historical }"
-          :data-testid="`memory-version-${version.version}`"
-        >
+      <div v-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
+        <div class="flex flex-col gap-1.5">
           <div class="flex items-center gap-1">
-            <span class="text-kira-sm text-muted-foreground">{{ t('memory.common.version.label', { version: version.version }) }} · {{ when(version.createdAt) }}</span>
-            <Badge v-if="version.historical" variant="warn">{{ t('memory.common.historical.status') }}</Badge>
+            <Badge :variant="selected.author === 'user' ? 'info' : 'default'">{{
+              t(AUTHOR_LABEL[selected.author])
+            }}</Badge>
+            <Badge v-if="selected.historical" variant="warn">{{
+              t('memory.common.historical.status')
+            }}</Badge>
+            <span class="text-kira-sm text-muted-foreground"
+              >{{ t('memory.common.version.label', { version: selected.version }) }}
+              · {{ when(selected.createdAt) }}</span
+            >
           </div>
-          <span class="text-kira-md whitespace-pre-wrap">{{ version.fact }}</span>
-          <span v-for="event in eventsFor(version.id)" :key="event.seq" class="text-kira-sm text-muted-foreground">
-            {{ eventText(event) }}
-          </span>
-        </Card>
+          <p class="m-0 text-kira-md whitespace-pre-wrap" data-testid="memory-detail-fact">{{
+            selected.fact
+          }}</p>
+          <p class="m-0 text-kira-md text-muted-foreground whitespace-pre-wrap">
+            <span class="font-medium">{{ t('memory.start.reason.label') }}</span>
+            {{ selected.reason }}
+          </p>
+          <div v-if="selected.keywords.length" class="flex flex-wrap gap-1">
+            <Badge v-for="k in selected.keywords" :key="k">{{ k }}</Badge>
+          </div>
+        </div>
+        <div v-if="trail.length > 1" class="flex flex-col gap-1.5" data-testid="memory-trail">
+          <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{
+            t('memory.start.versions.label')
+          }}</span>
+          <Card
+            v-for="version in trail"
+            :key="version.id"
+            class="gap-0.5"
+            :class="{ 'opacity-70': version.historical }"
+            :data-testid="`memory-version-${version.version}`"
+          >
+            <div class="flex items-center gap-1">
+              <span class="text-kira-sm text-muted-foreground"
+                >{{ t('memory.common.version.label', { version: version.version }) }}
+                · {{ when(version.createdAt) }}</span
+              >
+              <Badge v-if="version.historical" variant="warn">{{
+                t('memory.common.historical.status')
+              }}</Badge>
+            </div>
+            <span class="text-kira-md whitespace-pre-wrap">{{ version.fact }}</span>
+            <span
+              v-for="event in eventsFor(version.id)"
+              :key="event.seq"
+              class="text-kira-sm text-muted-foreground"
+            >
+              {{ eventText(event) }}
+            </span>
+          </Card>
+        </div>
       </div>
-    </div>
     </QueryState>
   </div>
 </template>

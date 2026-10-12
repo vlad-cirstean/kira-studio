@@ -36,7 +36,12 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
   >
     <AlertTitle>{{ notice.title }}</AlertTitle>
     <AlertDescription v-if="detail" class="whitespace-pre-wrap">{{ detail }}</AlertDescription>
-    <AlertDescription data-testid="failure-banner-hint">{{ notice.hint }}<template v-if="showLogHint"> {{ t('git.failure.hintLogged.hint') }}</template></AlertDescription>
+    <AlertDescription data-testid="failure-banner-hint"
+      >{{ notice.hint
+      }}<template v-if="showLogHint">
+        {{ t('git.failure.hintLogged.hint') }}</template
+      ></AlertDescription
+    >
     <AlertAction class="flex items-center gap-1">
       <Button
         v-if="notice.retryGraph"

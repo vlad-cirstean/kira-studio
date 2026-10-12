@@ -28,7 +28,7 @@ onMounted(async () => {
     handle = mount(container.value, {
       transport,
       viewState: new NullViewStateStore(),
-        view: 'review',
+      view: 'review',
       target: {
         repoId: props.target.gitRepoId,
         branch: props.target.branch,

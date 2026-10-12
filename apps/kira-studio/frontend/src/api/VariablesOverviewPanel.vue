@@ -66,7 +66,9 @@ function onCopy(name: string): void {
   });
 }
 
-const collectionName = computed(() => collectionsStore.collectionRecord(props.collectionId)?.name ?? '');
+const collectionName = computed(
+  () => collectionsStore.collectionRecord(props.collectionId)?.name ?? '',
+);
 const environmentName = computed(
   () => variablesStore.environments.find((e) => e.id === props.environmentId)?.name ?? '',
 );
@@ -95,15 +97,29 @@ function editEnvironmentVariables(): void {
 <template>
   <PopoverContent align="start" class="w-96 gap-0 p-0" data-testid="variables-overview">
     <div class="flex max-h-105 flex-col">
-      <SearchField v-model="filterQuery" :placeholder="t('studio.api.common.filterByName.placeholder')" data-testid="variables-overview-filter" />
+      <SearchField
+        v-model="filterQuery"
+        :placeholder="t('studio.api.common.filterByName.placeholder')"
+        data-testid="variables-overview-filter"
+      />
 
       <Alert v-if="copyError" variant="error" data-testid="variables-overview-copy-error">
         <AlertDescription>{{ copyError }}</AlertDescription>
       </Alert>
 
       <div class="flex flex-col gap-0.5 overflow-y-auto p-1">
-        <EmptyState v-if="isFiltered && filteredRows.length === 0" data-testid="variables-overview-empty" :icon="ICON.search" :title="t('common.state.noMatches.empty')" />
-        <EmptyState v-else-if="rows.length === 0" data-testid="variables-overview-empty" :icon="ICON.variables" :title="t('studio.api.variablesOverview.empty')" />
+        <EmptyState
+          v-if="isFiltered && filteredRows.length === 0"
+          data-testid="variables-overview-empty"
+          :icon="ICON.search"
+          :title="t('common.state.noMatches.empty')"
+        />
+        <EmptyState
+          v-else-if="rows.length === 0"
+          data-testid="variables-overview-empty"
+          :icon="ICON.variables"
+          :title="t('studio.api.variablesOverview.empty')"
+        />
         <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
              has no use for (handle, secret toggle, history, remove) -- name, value, scope,
              description, in the DOM order below. `description` is the last column specifically
@@ -126,24 +142,38 @@ function editEnvironmentVariables(): void {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="ghost" size="kira"
+                variant="ghost"
+                size="kira"
                 class="h-auto min-w-0 justify-start overflow-hidden text-ellipsis rounded-none p-0 text-left font-data font-normal hover:bg-transparent"
                 data-testid="variables-overview-name"
                 @click="onCopy(row.name)"
-                >{{ reference(row.name) }}</Button
+                >{{
+                  reference(row.name)
+                }}</Button
               >
             </TooltipTrigger>
             <TooltipContent>{{ t('common.action.copy.label') }}</TooltipContent>
           </Tooltip>
-          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">{{ t('common.secret.label') }}</Badge>
-          <span v-else class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle" data-testid="variables-overview-value">{{ row.value }}</span>
+          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">{{
+            t('common.secret.label')
+          }}</Badge>
+          <span
+            v-else
+            class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle"
+            data-testid="variables-overview-value"
+            >{{
+              row.value
+            }}</span
+          >
           <Tooltip v-if="row.shadowed">
             <TooltipTrigger as-child>
               <Badge
                 class="justify-self-start"
                 :variant="row.scope === 'environment' ? 'info' : 'default'"
                 data-testid="variables-overview-scope"
-                >{{ row.scope }}</Badge
+                >{{
+                  row.scope
+                }}</Badge
               >
             </TooltipTrigger>
             <TooltipContent>{{ t('studio.api.variablesOverview.shadowed.hint') }}</TooltipContent>
@@ -153,18 +183,26 @@ function editEnvironmentVariables(): void {
             class="justify-self-start"
             :variant="row.scope === 'environment' ? 'info' : 'default'"
             data-testid="variables-overview-scope"
-            >{{ row.scope }}</Badge
+            >{{
+              row.scope
+            }}</Badge
           >
-          <span v-if="row.description" class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-sm" data-testid="variables-overview-description">{{
-            row.description
-          }}</span>
+          <span
+            v-if="row.description"
+            class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-sm"
+            data-testid="variables-overview-description"
+            >{{
+              row.description
+            }}</span
+          >
         </div>
       </div>
 
       <div class="flex flex-col gap-0.5 border-t border-border p-1">
         <Button
           v-if="canEdit"
-          variant="link" size="kira"
+          variant="link"
+          size="kira"
           class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
@@ -174,7 +212,8 @@ function editEnvironmentVariables(): void {
         </Button>
         <Button
           v-if="canEdit"
-          variant="link" size="kira"
+          variant="link"
+          size="kira"
           class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"

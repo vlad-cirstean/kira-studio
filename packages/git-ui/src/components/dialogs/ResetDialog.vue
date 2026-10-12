@@ -29,7 +29,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
@@ -93,17 +99,16 @@ function confirm(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      size="md"
-      destructive
-    >
+    <DialogContent size="md" destructive>
       <DialogHeader>
         <DialogTitle>
           <CatalogText k="git.dialog.reset.title">
             <template #ref><code class="font-data">{{ refName }}</code></template>
             <template #sha><code class="font-data">{{ shortTarget }}</code></template>
           </CatalogText>
-          <span v-if="preflight?.targetSubject" class="ml-1 font-normal text-muted-foreground">{{ preflight.targetSubject }}</span>
+          <span v-if="preflight?.targetSubject" class="ml-1 font-normal text-muted-foreground">{{
+            preflight.targetSubject
+          }}</span>
         </DialogTitle>
       </DialogHeader>
       <DialogBody>
@@ -125,10 +130,14 @@ function confirm(): void {
               <code class="font-data">{{ shortSha(c.sha) }}</code> {{ c.subject }}
             </li>
           </ul>
-          <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">{{ t('git.dialog.reset.more.status') }}</p>
+          <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">{{
+            t('git.dialog.reset.more.status')
+          }}</p>
         </template>
         <DialogDescription v-else-if="preflight">
-          {{ t('git.dialog.reset.diverged.body', { leaving: preflight.leaving, gaining: preflight.gaining }) }}
+          {{
+            t('git.dialog.reset.diverged.body', { leaving: preflight.leaving, gaining: preflight.gaining })
+          }}
         </DialogDescription>
 
         <FieldSet>
@@ -138,7 +147,8 @@ function confirm(): void {
               <RadioGroupItem :id="`${modeId}-soft`" value="soft" class="mt-0.5" />
               <FieldLabel :for="`${modeId}-soft`">
                 <span>
-                  <strong>{{ t('git.dialog.reset.soft.label') }}</strong> {{ t('git.dialog.reset.soft.description') }}
+                  <strong>{{ t('git.dialog.reset.soft.label') }}</strong>
+                  {{ t('git.dialog.reset.soft.description') }}
                 </span>
               </FieldLabel>
             </Field>
@@ -146,7 +156,8 @@ function confirm(): void {
               <RadioGroupItem :id="`${modeId}-mixed`" value="mixed" class="mt-0.5" />
               <FieldLabel :for="`${modeId}-mixed`">
                 <span>
-                  <strong>{{ t('git.dialog.reset.mixed.label') }}</strong> {{ t('git.dialog.reset.mixed.description') }}
+                  <strong>{{ t('git.dialog.reset.mixed.label') }}</strong>
+                  {{ t('git.dialog.reset.mixed.description') }}
                 </span>
               </FieldLabel>
             </Field>
@@ -154,7 +165,8 @@ function confirm(): void {
               <RadioGroupItem :id="`${modeId}-hard`" value="hard" class="mt-0.5" />
               <FieldLabel :for="`${modeId}-hard`">
                 <span>
-                  <strong>{{ t('git.dialog.reset.hard.label') }}</strong> {{ t('git.dialog.reset.hard.description') }}
+                  <strong>{{ t('git.dialog.reset.hard.label') }}</strong>
+                  {{ t('git.dialog.reset.hard.description') }}
                   <strong>{{ t('git.dialog.reset.hard.hint') }}</strong>
                 </span>
               </FieldLabel>
@@ -167,7 +179,9 @@ function confirm(): void {
             <AlertDescription>
               <p>{{ t('git.dialog.reset.discard.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in destroys" :key="path"><code class="font-data">{{ path }}</code></li>
+                <li v-for="path in destroys" :key="path"
+                  ><code class="font-data">{{ path }}</code></li
+                >
               </ul>
             </AlertDescription>
           </Alert>
@@ -177,7 +191,9 @@ function confirm(): void {
 
           <Field v-if="canStashFirst" orientation="horizontal">
             <Checkbox :id="stashFirstId" v-model="stashFirst" />
-            <FieldLabel :for="stashFirstId">{{ t('git.dialog.reset.stashFirst.label') }}</FieldLabel>
+            <FieldLabel :for="stashFirstId">{{
+              t('git.dialog.reset.stashFirst.label')
+            }}</FieldLabel>
           </Field>
 
           <Field v-if="!stashFirst">
@@ -199,7 +215,9 @@ function confirm(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
         <Button
           v-if="isHardDestructive && canStashFirst"
           variant="dialog-primary"
@@ -208,7 +226,9 @@ function confirm(): void {
           data-testid="reset-confirm"
           @click="confirm"
         >
-          {{ stashFirst ? t('git.dialog.reset.stashAndReset.confirm') : t('git.dialog.reset.discardAndReset.confirm') }}
+          {{
+            stashFirst ? t('git.dialog.reset.stashAndReset.confirm') : t('git.dialog.reset.discardAndReset.confirm')
+          }}
         </Button>
         <Button
           v-else

@@ -101,9 +101,13 @@ const listEl = useTemplateRef<HTMLElement>('list');
       />
       <div v-else class="flex items-center gap-1 ml-auto text-graph-md">
         <Button variant="toolbar" size="kira" @click="reviewComments.clear()">
-          {{ t('git.review.comments.confirmClear.label', { count: reviewComments.comments.value.length }) }}
+          {{
+            t('git.review.comments.confirmClear.label', { count: reviewComments.comments.value.length })
+          }}
         </Button>
-        <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">{{ t('common.action.cancel.label') }}</Button>
+        <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">{{
+          t('common.action.cancel.label')
+        }}</Button>
       </div>
     </ViewToolbar>
 
@@ -113,57 +117,58 @@ const listEl = useTemplateRef<HTMLElement>('list');
 
     <template v-else>
       <template v-if="groups.length > 0">
-      <section ref="list" class="flex-1 min-h-0 overflow-auto" :aria-label="t('git.review.pane.comments.label')">
         <section
-          v-for="group in groups"
-          :key="group.path"
-          :aria-label="group.path"
-          class="border-t border-border first:border-t-0"
+          ref="list"
+          class="flex-1 min-h-0 overflow-auto"
+          :aria-label="t('git.review.pane.comments.label')"
         >
-          <div
-            class="pt-1 px-2 pb-0.5 font-data text-fg"
-            aria-hidden="true"
+          <section
+            v-for="group in groups"
+            :key="group.path"
+            :aria-label="group.path"
+            class="border-t border-border first:border-t-0"
           >
-            {{ group.path }}
-          </div>
-          <ul class="m-0 p-0 list-none">
-            <li
-              v-for="c in group.comments"
-              :key="c.id"
-              :class="rowVariants({ layout: 'double' })"
-              class="flex-col items-stretch gap-0.5 pt-0.5 px-2 pb-1"
-            >
-              <div class="flex items-center gap-1">
-                <Button
-                  variant="link"
-                  size="kira"
-                  class="h-auto p-0 border-0 font-data font-normal text-muted-foreground text-graph-sm after:absolute after:inset-0"
-                  :aria-label="t('git.review.comments.open.aria', { path: group.path, line: lineLabel(c.range) })"
-                  @click="emit('select-comment', group.path)"
-                >
-                  {{ lineLabel(c.range) }}
-                </Button>
-                <span
-                  v-if="anchorTitle(c)"
-                  class="codicon codicon-warning text-warn"
-                  role="img"
-                  :data-kira-tip="anchorTitle(c)"
-                  :aria-label="anchorTitle(c)"
-                ></span>
-                <TooltipIconButton
-                  icon="trash"
-                  :label="t('git.review.comments.delete.tooltip')"
-                  class="relative z-10 ml-auto"
-                  :disabled="reviewComments.pending.value"
-                  @click="reviewComments.remove(c.id)"
-                />
-              </div>
-              <p class="m-0 pl-2.5 whitespace-pre-wrap text-fg text-graph-md">{{ c.body }}</p>
-            </li>
-          </ul>
+            <div class="pt-1 px-2 pb-0.5 font-data text-fg" aria-hidden="true">
+              {{ group.path }}
+            </div>
+            <ul class="m-0 p-0 list-none">
+              <li
+                v-for="c in group.comments"
+                :key="c.id"
+                :class="rowVariants({ layout: 'double' })"
+                class="flex-col items-stretch gap-0.5 pt-0.5 px-2 pb-1"
+              >
+                <div class="flex items-center gap-1">
+                  <Button
+                    variant="link"
+                    size="kira"
+                    class="h-auto p-0 border-0 font-data font-normal text-muted-foreground text-graph-sm after:absolute after:inset-0"
+                    :aria-label="t('git.review.comments.open.aria', { path: group.path, line: lineLabel(c.range) })"
+                    @click="emit('select-comment', group.path)"
+                  >
+                    {{ lineLabel(c.range) }}
+                  </Button>
+                  <span
+                    v-if="anchorTitle(c)"
+                    class="codicon codicon-warning text-warn"
+                    role="img"
+                    :data-kira-tip="anchorTitle(c)"
+                    :aria-label="anchorTitle(c)"
+                  ></span>
+                  <TooltipIconButton
+                    icon="trash"
+                    :label="t('git.review.comments.delete.tooltip')"
+                    class="relative z-10 ml-auto"
+                    :disabled="reviewComments.pending.value"
+                    @click="reviewComments.remove(c.id)"
+                  />
+                </div>
+                <p class="m-0 pl-2.5 whitespace-pre-wrap text-fg text-graph-md">{{ c.body }}</p>
+              </li>
+            </ul>
+          </section>
         </section>
-      </section>
-      <AttributeTooltip :container="listEl" />
+        <AttributeTooltip :container="listEl" />
       </template>
 
       <p v-else-if="!reviewComments.loading.value" class="m-0 p-3 text-muted-foreground">
@@ -176,4 +181,3 @@ const listEl = useTemplateRef<HTMLElement>('list');
     </template>
   </div>
 </template>
-

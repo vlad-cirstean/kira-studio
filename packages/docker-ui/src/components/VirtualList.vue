@@ -20,7 +20,12 @@ const props = withDefaults(
   { testid: 'docker-list' },
 );
 
-defineSlots<{ row(props: { row: T; nav: { 'data-nav-key': string; tabindex: 0 | -1; onFocus: () => void } }): unknown }>();
+defineSlots<{
+  row(props: {
+    row: T;
+    nav: { 'data-nav-key': string; tabindex: 0 | -1; onFocus: () => void };
+  }): unknown;
+}>();
 
 const { single: defaultRowHeight } = useRowHeight();
 const scrollEl = ref<HTMLElement | null>(null);
@@ -55,7 +60,13 @@ const nav = useListNavigation<T>({
 </script>
 
 <template>
-  <div ref="scrollEl" role="listbox" class="min-h-0 flex-1 overflow-auto" :data-testid="testid" @scroll="onScroll">
+  <div
+    ref="scrollEl"
+    role="listbox"
+    class="min-h-0 flex-1 overflow-auto"
+    :data-testid="testid"
+    @scroll="onScroll"
+  >
     <div class="relative" :style="{ height: `${totalSize}px` }">
       <div
         v-for="vi in virtualItems"

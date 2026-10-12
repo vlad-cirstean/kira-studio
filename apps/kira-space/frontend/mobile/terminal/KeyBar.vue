@@ -15,16 +15,32 @@ const KEYS: { id: string; label: MessageKey; icon?: string; seq: () => string }[
   { id: 'shift-tab', label: 'mobile.terminal.keys.shiftTab.label', seq: () => '\x1b[Z' },
   { id: 'ctrl-c', label: 'mobile.terminal.keys.ctrlC.label', seq: () => '\x03' },
   { id: 'up', label: 'mobile.terminal.keys.up.label', icon: 'arrow-up', seq: () => arrow('A') },
-  { id: 'down', label: 'mobile.terminal.keys.down.label', icon: 'arrow-down', seq: () => arrow('B') },
-  { id: 'left', label: 'mobile.terminal.keys.left.label', icon: 'arrow-left', seq: () => arrow('D') },
-  { id: 'right', label: 'mobile.terminal.keys.right.label', icon: 'arrow-right', seq: () => arrow('C') },
+  {
+    id: 'down',
+    label: 'mobile.terminal.keys.down.label',
+    icon: 'arrow-down',
+    seq: () => arrow('B'),
+  },
+  {
+    id: 'left',
+    label: 'mobile.terminal.keys.left.label',
+    icon: 'arrow-left',
+    seq: () => arrow('D'),
+  },
+  {
+    id: 'right',
+    label: 'mobile.terminal.keys.right.label',
+    icon: 'arrow-right',
+    seq: () => arrow('C'),
+  },
   { id: 'enter', label: 'common.key.enter.label', seq: () => '\r' },
 ];
 </script>
 
 <template>
   <div class="flex gap-1 overflow-x-auto px-2 py-1 scrollbar-none" data-testid="term-keybar">
-    <Button size="kira"
+    <Button
+      size="kira"
       variant="dialog"
       class="h-touch shrink-0 px-3"
       :class="ctrl ? 'bg-primary text-primary-foreground' : ''"
@@ -34,7 +50,8 @@ const KEYS: { id: string; label: MessageKey; icon?: string; seq: () => string }[
     >
       {{ t('mobile.terminal.keys.ctrl.label') }}
     </Button>
-    <Button size="kira"
+    <Button
+      size="kira"
       v-for="key in KEYS"
       :key="key.id"
       variant="dialog"

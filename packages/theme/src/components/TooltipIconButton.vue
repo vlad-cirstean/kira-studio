@@ -3,7 +3,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import type { ButtonVariants } from '@theme/components/ui/button';
 import { Button } from '@theme/components/ui/button';
 import { Kbd } from '@theme/components/ui/kbd';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { computed, useTemplateRef } from 'vue';
 
 // P113 F2: 152 call sites across 52 files repeated this exact
@@ -57,12 +62,32 @@ defineExpose({ $el: computed(() => buttonRef.value?.$el) });
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <TooltipDisabledTrigger v-if="disabledTrigger" :disabled="$attrs.disabled !== undefined && $attrs.disabled !== false">
-        <Button ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" :aria-pressed="pressed" :class="pressedClass" v-bind="$attrs">
+      <TooltipDisabledTrigger
+        v-if="disabledTrigger"
+        :disabled="$attrs.disabled !== undefined && $attrs.disabled !== false"
+      >
+        <Button
+          ref="buttonRef"
+          :variant="variant"
+          :size="size"
+          :aria-label="ariaLabel ?? label"
+          :aria-pressed="pressed"
+          :class="pressedClass"
+          v-bind="$attrs"
+        >
           <CodiconIcon :name="icon" :size="iconSize" />
         </Button>
       </TooltipDisabledTrigger>
-      <Button v-else ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" :aria-pressed="pressed" :class="pressedClass" v-bind="$attrs">
+      <Button
+        v-else
+        ref="buttonRef"
+        :variant="variant"
+        :size="size"
+        :aria-label="ariaLabel ?? label"
+        :aria-pressed="pressed"
+        :class="pressedClass"
+        v-bind="$attrs"
+      >
         <CodiconIcon :name="icon" :size="iconSize" />
       </Button>
     </TooltipTrigger>

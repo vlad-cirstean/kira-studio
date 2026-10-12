@@ -81,7 +81,9 @@ function onOpenFile(index: number, pinned: boolean): void {
         <Badge v-if="entry.includedUntracked">{{ t('git.stash.untracked.example') }}</Badge>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="shrink-0 text-kira-sm text-subtle">{{ formatAgeCompact(entry.timestamp) }}</span>
+            <span class="shrink-0 text-kira-sm text-subtle">{{
+              formatAgeCompact(entry.timestamp)
+            }}</span>
           </TooltipTrigger>
           <TooltipContent>{{ formatAbsoluteUtc(entry.timestamp) }}</TooltipContent>
         </Tooltip>
@@ -103,7 +105,11 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <EmptyState v-else-if="!stash.error.value" class="p-6" :title="t('common.state.loading.loading')">
+    <EmptyState
+      v-else-if="!stash.error.value"
+      class="p-6"
+      :title="t('common.state.loading.loading')"
+    >
       <template #media><Spinner :size="24" label="" /></template>
     </EmptyState>
   </div>

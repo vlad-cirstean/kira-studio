@@ -18,10 +18,18 @@ function onDate(e: Event): void {
   <div class="flex">
     <div class="w-15 shrink-0 border-r-2 border-border-strong" />
     <div class="flex items-center gap-2 pb-2 pl-2 pt-1">
-      <Button variant="dialog" size="kira" class="border-dashed" data-testid="ade-more-week" @click="emit('moreWeek')">
+      <Button
+        variant="dialog"
+        size="kira"
+        class="border-dashed"
+        data-testid="ade-more-week"
+        @click="emit('moreWeek')"
+      >
         {{ t('space.ade.plan.dayControls.moreWeek.label') }}
       </Button>
-      <Label for="ade-add-day" class="text-kira-sm text-muted-foreground">{{ t('space.ade.plan.dayControls.addDay.label') }}</Label>
+      <Label for="ade-add-day" class="text-kira-sm text-muted-foreground">{{
+        t('space.ade.plan.dayControls.addDay.label')
+      }}</Label>
       <Input
         id="ade-add-day"
         type="date"

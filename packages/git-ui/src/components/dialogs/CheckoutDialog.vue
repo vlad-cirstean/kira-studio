@@ -81,11 +81,11 @@ function stashAndCarry(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent
-      size="md"
-    >
+    <DialogContent size="md">
       <DialogHeader>
-        <DialogTitle>{{ t('git.dialog.checkout.title', { name: preflight?.target.name ?? '' }) }}</DialogTitle>
+        <DialogTitle>{{
+          t('git.dialog.checkout.title', { name: preflight?.target.name ?? '' })
+        }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <template v-if="headline?.kind === 'inProgressOperation'">
@@ -104,7 +104,9 @@ function stashAndCarry(): void {
         <template v-else-if="headline?.kind === 'blockedByUntracked'">
           <DialogDescription>{{ t('git.dialog.checkout.untracked.body') }}</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in headline.paths" :key="path"><code class="font-data">{{ path }}</code></li>
+            <li v-for="path in headline.paths" :key="path"
+              ><code class="font-data">{{ path }}</code></li
+            >
           </ul>
           <p>{{ t('git.dialog.checkout.untracked.hint') }}</p>
         </template>
@@ -112,20 +114,31 @@ function stashAndCarry(): void {
         <template v-else-if="trackedBlocker">
           <DialogDescription>{{ t('git.dialog.checkout.localChanges.body') }}</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in trackedBlocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
+            <li v-for="path in trackedBlocker.paths" :key="path"
+              ><code class="font-data">{{ path }}</code></li
+            >
           </ul>
           <Alert v-if="canDiscard" variant="warn">
             <AlertDescription>
               {{ t('git.dialog.checkout.discard.hint') }}
-              <template v-if="canStashAndCarry">{{ t('git.dialog.checkout.stashInstead.hint') }}</template>
+              <template v-if="canStashAndCarry">{{
+                t('git.dialog.checkout.stashInstead.hint')
+              }}</template>
             </AlertDescription>
           </Alert>
         </template>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
-        <Button v-if="canStashAndCarry" variant="dialog-primary" size="kira-lg" @click="stashAndCarry">
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{
+          t('common.action.cancel.label')
+        }}</Button>
+        <Button
+          v-if="canStashAndCarry"
+          variant="dialog-primary"
+          size="kira-lg"
+          @click="stashAndCarry"
+        >
           {{ t('git.dialog.checkout.stashAndCheckOut.confirm') }}
         </Button>
         <Button v-if="canDiscard" variant="dialog-danger" size="kira-lg" @click="discard">

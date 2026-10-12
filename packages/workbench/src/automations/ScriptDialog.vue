@@ -15,7 +15,15 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
@@ -33,7 +41,15 @@ import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { queryClient } from '@workbench/state/queryClient';
-import { type ComponentPublicInstance, computed, reactive, ref, toRaw, useTemplateRef, watch } from 'vue';
+import {
+  type ComponentPublicInstance,
+  computed,
+  reactive,
+  ref,
+  toRaw,
+  useTemplateRef,
+  watch,
+} from 'vue';
 import { errorText } from '../bridge/codedError';
 import type { ScriptsSeam } from './module';
 import ParamsEditor from './ParamsEditor.vue';
@@ -67,7 +83,12 @@ const emit = defineEmits<{ close: [] }>();
 
 const colors = PALETTE_COLOR_CHOICES;
 const title = computed(() => {
-  if (props.script) return t(isSmart ? 'automations.dialog.script.editSmart.title' : 'automations.dialog.script.edit.title');
+  if (props.script)
+    return t(
+      isSmart
+        ? 'automations.dialog.script.editSmart.title'
+        : 'automations.dialog.script.edit.title',
+    );
   return t(isSmart ? 'automations.script.newSmart.label' : 'automations.script.new.label');
 });
 
@@ -75,13 +96,9 @@ const kind: ScriptKind = props.script?.kind ?? props.kind ?? 'script';
 const isSmart = kind === 'smart';
 const name = ref(props.script?.name ?? '');
 const params = ref<ScriptParam[]>(structuredClone(toRaw(props.script?.params ?? [])));
-const smart = ref<SmartSettings>(
-  structuredClone(toRaw(props.script?.smart ?? defaultSmart())),
-);
+const smart = ref<SmartSettings>(structuredClone(toRaw(props.script?.smart ?? defaultSmart())));
 // null: not recurring. Turning the switch off keeps the edits until Save.
-const schedule = ref<ScriptSchedule | null>(
-  structuredClone(toRaw(props.script?.schedule ?? null)),
-);
+const schedule = ref<ScriptSchedule | null>(structuredClone(toRaw(props.script?.schedule ?? null)));
 const scheduleOk = ref(true);
 const scheduleOn = computed({
   get: () => schedule.value !== null,
@@ -102,7 +119,9 @@ const dir = useQuery(
   },
   queryClient,
 );
-const blocker = computed(() => (dirMode.value === props.script?.dirMode ? (dir.data.value?.blocker ?? '') : ''));
+const blocker = computed(() =>
+  dirMode.value === props.script?.dirMode ? (dir.data.value?.blocker ?? '') : '',
+);
 const folderParts = computed<TextPart[]>(() => [
   { name: t('automations.dialog.script.kiraHome.label'), value: dir.data.value?.base ?? '…' },
   '/automations/',
@@ -111,7 +130,9 @@ const folderParts = computed<TextPart[]>(() => [
     value: props.script?.id ?? t('automations.dialog.script.setOnSave.status'),
   },
 ]);
-const homeParts = computed<TextPart[]>(() => [{ name: 'HOME', value: dir.data.value?.base ?? '…' }]);
+const homeParts = computed<TextPart[]>(() => [
+  { name: 'HOME', value: dir.data.value?.base ?? '…' },
+]);
 // '' is the select's "No collection" sentinel; the payload sends null.
 const collection = ref(props.script?.collectionId ?? props.collectionId ?? '');
 const color = ref<PaletteColor>((props.script?.color as PaletteColor | undefined) ?? 'none');
@@ -125,7 +146,11 @@ const TAB_LABEL_KEYS = {
 } as const satisfies Record<EditorTab, MessageKey>;
 const tab = ref<EditorTab>(props.initialTab ?? 'script');
 const tabItems = computed(() =>
-  TAB_IDS.map((id) => ({ value: id, label: t(TAB_LABEL_KEYS[id]), testid: `script-dialog-tab-${id}` })),
+  TAB_IDS.map((id) => ({
+    value: id,
+    label: t(TAB_LABEL_KEYS[id]),
+    testid: `script-dialog-tab-${id}`,
+  })),
 );
 
 // Empty-field errors show once the field was edited; Save stays disabled until none remain.
@@ -200,11 +225,7 @@ useShortcut(window, ['form.submit'], () => void save());
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent
-      size="lg"
-      data-testid="script-dialog"
-      @open-auto-focus="onOpenAutoFocus"
-    >
+    <DialogContent size="lg" data-testid="script-dialog" @open-auto-focus="onOpenAutoFocus">
       <DialogHeader close-testid="script-dialog-close">
         <DialogTitle>{{ title }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
@@ -224,14 +245,20 @@ useShortcut(window, ['form.submit'], () => void save());
                 v-if="tabErrorCount(errors, item.value as EditorTab) > 0"
                 variant="error"
                 :data-testid="`script-dialog-tab-${item.value}-errors`"
-                >{{ tabErrorCount(errors, item.value as EditorTab) }}</Badge
+                >{{
+                  tabErrorCount(errors, item.value as EditorTab)
+                }}</Badge
               >
             </template>
           </SecondaryTabs>
         </ViewToolbar>
 
         <DialogBody class="min-h-80">
-          <TabsContent value="script" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
+          <TabsContent
+            value="script"
+            force-mount
+            class="flex flex-col gap-3 data-[state=inactive]:hidden"
+          >
             <Field>
               <FieldLabel for="script-name">{{ t('common.field.name.label') }}</FieldLabel>
               <Input
@@ -242,7 +269,9 @@ useShortcut(window, ['form.submit'], () => void save());
                 :aria-invalid="!!errors.name"
                 data-testid="script-dialog-name"
               />
-              <FieldError v-if="errors.name" data-testid="script-dialog-name-error">{{ errors.name }}</FieldError>
+              <FieldError v-if="errors.name" data-testid="script-dialog-name-error">{{
+                errors.name
+              }}</FieldError>
             </Field>
 
             <div class="flex items-end gap-3">
@@ -256,7 +285,9 @@ useShortcut(window, ['form.submit'], () => void save());
                   data-testid="script-dialog-collection"
                 >
                   <option value="">{{ t('automations.dialog.script.noCollection.option') }}</option>
-                  <option v-for="c in scripts.collections()" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  <option v-for="c in scripts.collections()" :key="c.id" :value="c.id">{{
+                    c.name
+                  }}</option>
                 </NativeSelect>
               </Field>
               <fieldset
@@ -273,16 +304,26 @@ useShortcut(window, ['form.submit'], () => void save());
                       @change="color = swatch"
                     />
                   </TooltipTrigger>
-                  <TooltipContent>{{ swatch === 'none' ? t('common.field.noColour.label') : swatch }}</TooltipContent>
+                  <TooltipContent>{{
+                    swatch === 'none' ? t('common.field.noColour.label') : swatch
+                  }}</TooltipContent>
                 </Tooltip>
               </fieldset>
             </div>
 
-            <ScriptBodyField v-model="command" :kind="kind" :params="params" :ade="!!ade" :error="errors.body" />
+            <ScriptBodyField
+              v-model="command"
+              :kind="kind"
+              :params="params"
+              :ade="!!ade"
+              :error="errors.body"
+            />
 
             <template v-if="isSmart">
               <SmartSettingsFields v-model="smart" />
-              <FieldError v-if="errors.budget" data-testid="script-dialog-budget-error">{{ errors.budget }}</FieldError>
+              <FieldError v-if="errors.budget" data-testid="script-dialog-budget-error">{{
+                errors.budget
+              }}</FieldError>
               <ToolsField v-model="smart" />
               <McpToolsField v-model="smart" />
             </template>
@@ -296,24 +337,48 @@ useShortcut(window, ['form.submit'], () => void save());
                 @update:model-value="(v) => (dirMode = v === 'fixed' ? 'fixed' : 'kira')"
               >
                 <div class="flex items-center gap-2">
-                  <RadioGroupItem id="script-dir-kira" value="kira" data-testid="script-dialog-dir-kira" />
+                  <RadioGroupItem
+                    id="script-dir-kira"
+                    value="kira"
+                    data-testid="script-dialog-dir-kira"
+                  />
                   <Label for="script-dir-kira">{{ t('automations.dir.kira.label') }}</Label>
                 </div>
                 <div class="flex items-center gap-2">
-                  <RadioGroupItem id="script-dir-fixed" value="fixed" data-testid="script-dialog-dir-fixed" />
-                  <Label for="script-dir-fixed">{{ t('automations.dialog.script.chooseFolder.label') }}</Label>
+                  <RadioGroupItem
+                    id="script-dir-fixed"
+                    value="fixed"
+                    data-testid="script-dialog-dir-fixed"
+                  />
+                  <Label for="script-dir-fixed">{{
+                    t('automations.dialog.script.chooseFolder.label')
+                  }}</Label>
                 </div>
               </RadioGroup>
               <div v-if="dirMode === 'fixed'" class="flex items-center gap-1.5">
-                <span class="min-w-0 flex-1 truncate font-data" data-testid="script-dialog-workingdir">
+                <span
+                  class="min-w-0 flex-1 truncate font-data"
+                  data-testid="script-dialog-workingdir"
+                >
                   {{ workingDir || t('automations.dialog.script.noFolder.status') }}
                 </span>
-                <Button variant="dialog" size="kira-lg" data-testid="script-dialog-workingdir-choose" @click="chooseWorkingDir">
+                <Button
+                  variant="dialog"
+                  size="kira-lg"
+                  data-testid="script-dialog-workingdir-choose"
+                  @click="chooseWorkingDir"
+                >
                   {{ t('common.action.choose.label') }}
                 </Button>
               </div>
-              <FieldDescription v-else-if="dirMode === 'home'" data-testid="script-dialog-home-notice">
-                <CatalogText k="automations.dialog.script.homeNotice.description" :params="{ home: '' }">
+              <FieldDescription
+                v-else-if="dirMode === 'home'"
+                data-testid="script-dialog-home-notice"
+              >
+                <CatalogText
+                  k="automations.dialog.script.homeNotice.description"
+                  :params="{ home: '' }"
+                >
                   <template #home><VarText :parts="homeParts" /></template>
                 </CatalogText>
                 <Button
@@ -329,23 +394,39 @@ useShortcut(window, ['form.submit'], () => void save());
               <FieldDescription v-else data-testid="script-dialog-dir-preview">
                 <VarText :parts="folderParts" />
               </FieldDescription>
-              <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{ blocker }}</FieldError>
-              <FieldError v-if="errors.folder" data-testid="script-dialog-folder-error">{{ errors.folder }}</FieldError>
+              <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{
+                blocker
+              }}</FieldError>
+              <FieldError v-if="errors.folder" data-testid="script-dialog-folder-error">{{
+                errors.folder
+              }}</FieldError>
             </Field>
-
 
             <Field v-if="ade" orientation="horizontal">
-              <Checkbox id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
-              <Label for="script-use-ade-dir">{{ t('automations.dialog.script.useAdeDir.label') }}</Label>
+              <Checkbox
+                id="script-use-ade-dir"
+                v-model="useAdeDir"
+                data-testid="script-use-ade-dir"
+              />
+              <Label for="script-use-ade-dir">{{
+                t('automations.dialog.script.useAdeDir.label')
+              }}</Label>
             </Field>
-
           </TabsContent>
 
-          <TabsContent value="params" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
+          <TabsContent
+            value="params"
+            force-mount
+            class="flex flex-col gap-3 data-[state=inactive]:hidden"
+          >
             <ParamsEditor v-model="params" :kind="kind" :errors="errors.params" />
           </TabsContent>
 
-          <TabsContent value="schedule" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
+          <TabsContent
+            value="schedule"
+            force-mount
+            class="flex flex-col gap-3 data-[state=inactive]:hidden"
+          >
             <Field orientation="horizontal">
               <Checkbox id="script-schedule" v-model="scheduleOn" data-testid="script-schedule" />
               <Label for="script-schedule">{{ t('automations.schedule.enable.label') }}</Label>
@@ -358,7 +439,9 @@ useShortcut(window, ['form.submit'], () => void save());
               :kind="kind"
               :params="params"
             />
-            <FieldError v-if="errors.cron" data-testid="script-dialog-cron-error">{{ errors.cron }}</FieldError>
+            <FieldError v-if="errors.cron" data-testid="script-dialog-cron-error">{{
+              errors.cron
+            }}</FieldError>
           </TabsContent>
 
           <FieldError v-if="error" data-testid="script-dialog-error">{{ error }}</FieldError>
@@ -367,7 +450,9 @@ useShortcut(window, ['form.submit'], () => void save());
 
       <DialogFooter>
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" data-testid="script-dialog-cancel">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="script-dialog-cancel">{{
+            t('common.action.cancel.label')
+          }}</Button>
         </DialogClose>
         <Button
           variant="dialog-primary"
