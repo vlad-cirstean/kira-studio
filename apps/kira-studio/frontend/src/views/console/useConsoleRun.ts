@@ -41,11 +41,16 @@ export function useConsoleRun(opts: {
   const connectError = connect.error;
   const runBlocked = computed(() => opts.running.value || starting.value);
 
+  // Keyed on text and dialect only, so a caret move runs just the cheap offset scan below.
+  const splitStatements = computed(() =>
+    opts.dialect.value === undefined
+      ? []
+      : splitSqlStatements(opts.tab.value.state.text, opts.splitOptionsFor(opts.dialect.value)),
+  );
   const statementAtCursorText = computed<string | undefined>(() => {
     if (opts.dialect.value === undefined) return undefined;
-    const text = opts.tab.value.state.text;
-    const statements = splitSqlStatements(text, opts.splitOptionsFor(opts.dialect.value));
-    return statementAtOffset(statements, text, opts.cursorPos.value)?.text;
+    return statementAtOffset(splitStatements.value, opts.tab.value.state.text, opts.cursorPos.value)
+      ?.text;
   });
   const canExplain = computed(
     () =>
