@@ -15,7 +15,6 @@ const SKIP_FILE = /(?:\.spec\.ts|\.test\.ts|_test\.go|\.d\.ts|\.check\.ts)$/;
 /** P267 F0 seeds: keys with no caller yet, one per object so writers merge cleanly. A writer deletes its seed when it adds a real key (F1/F2/streams); empty by P267 close. */
 const SEEDS: ReadonlySet<string> = new Set([
   'common.discard.title',
-  'theme.disclosure.toggle.label',
   'theme.identifier.copy.label',
   'workbench.findBar.seed.label',
 ]);
