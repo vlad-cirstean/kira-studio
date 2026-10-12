@@ -4055,10 +4055,10 @@ existing `pendingReviewTargetByCodeRepoId`), consumed once by `RepoGraphView.vue
 `MountOptions.pendingUiAction` — the same "bootstrap-island" seam G10 D19's palette commands already
 use.
 
-**The date formatters live in `@kira/git-core`.** `formatRelativeDate`/`formatAbsoluteDate` are in
-`packages/git-core/src/lib/dateFormat.ts` (no DOM dependency); `packages/git-ui/src/components/dateFormat.ts`
-re-exports them and keeps only the DOM-bound `measureAbsoluteDateWidth`. A second copy in the VS Code
-extension's `blameAge.ts` went away with the extension (P243 Part 2).
+**Date formatters live in `@workbench/behaviour/format`.** Git UI formats through its `formatAbsoluteUtc`,
+`formatAgeCompact` and `formatDateTime`; `packages/git-ui/src/lib/dateFormat.ts` keeps only the DOM-bound
+`measureAbsoluteDateWidth`. No second copy: the VS Code extension's `blameAge.ts` went away with the
+extension (P243 Part 2).
 
 **A settings toggle, defaulted on.** `appearance.inlineBlame` gates the inline renderer (the
 status-bar item is unaffected by it, above) — `views/repo/RepoFileView.vue` watches it live, so

@@ -838,3 +838,37 @@ Needs Xcode command line tools. Not run in the sandbox, `wkhost.swift` is uncomp
    the real app: `__kiraScrollTrace` (`docs/PERF.md` section 2.1a). Note perceived smoothness and
    blank edges per page.
 
+
+## `KIRA_*` environment variables
+
+Every name read or set in Go. "Set by" says who supplies it; "you" means set it by hand.
+
+| Name | Purpose | Set by |
+|---|---|---|
+| `KIRA_HOME` | Kira Studio data dir. Panics in a non-`production` test binary when unset | you; `testx.RunWithTempHomes` in tests |
+| `KIRA_SPACE_HOME` | Kira Space data dir and instance-lock dir (`app.lock`) | you; `testx.RunWithTempHomes` |
+| `KIRA_MEMORY_HOME` | Memory data dir, else `~/.kira-memory` | you; `testx.RunWithTempHomes` |
+| `KIRA_DEV` | Overrides the production check on a non-`production` build (`kirapaths`) | you |
+| `KIRA_INSECURE_SECRETS` | `1` stores secrets unencrypted on Linux without a keyring. Dev only | you; IPC fixture harness |
+| `KIRA_NO_STARTUP_ALERT` | Skips the native startup-failure dialog; the failure is still logged (`startupfail`) | you, CI and headless runs |
+| `KIRA_ORT_LIB` | ONNX Runtime shared library path, else the bundled copy | you |
+| `KIRA_TERMINAL_ID`, `KIRA_AGENT_HOOK_SOCKET`, `KIRA_AGENT_HOOK_TOKEN` | Identify a terminal and its hook socket to the Claude hook shim | `terminal` on launch, `agenthooks` |
+| `KIRA_USER_STATUSLINE` | The user's own statusline command the hook shim chains to | `agenthooks` shim |
+| `KIRA_ASKPASS_SOCK`, `KIRA_ASKPASS_TOKEN`, `KIRA_ASKPASS_OPID`, `KIRA_ASKPASS_TIMEOUT_MS` | Git askpass helper reaches the prompt broker; per-op id and timeout | `gitaskpass` broker. `loginshell` strips the first two |
+| `KIRA_PREPARE`, `KIRA_WORKTREE_PATH`, `KIRA_WORKTREE_BRANCH`, `KIRA_REPO_ROOT`, `KIRA_REPO_COMMON_DIR` | Worktree prepare script context. `KIRA_WORKTREE_BRANCH` is omitted on a detached head | `gitprepare` |
+| `KIRA_TASK`, `KIRA_REPO`, `KIRA_BRANCH`, `KIRA_BASE`, `KIRA_<NAME>` | Built-in vars of an automation script (`scripts.BuiltinEnv`) | `adeflow` automations |
+| `KIRA_PARAM_<NAME>` | Smart-script parameter value; a multiselect is newline-joined | `scripts` smart runs |
+| `KIRA_IPC_FIXTURES` | `write` regenerates IPC fixtures | you |
+| `KIRA_GIT_FIXTURES` | `write` regenerates the porcelain golden corpus | you |
+| `KIRA_CONTRACT` | `write` stores flow-test contract output | you |
+| `KIRA_FLOW_COMPLETE` | Opts into the complete flow suite | you, CI |
+| `KIRA_FLOW_DOCKER` | `require` fails, rather than skips, flow tests without Docker | you, CI |
+| `KIRA_FLOWTEST_RUN` | Run id inside a Docker flow-test child process | `dockerflow` tests |
+| `KIRA_TEST_MATRIX` | Gates the Tier-2 adapter matrix | you, CI |
+| `KIRA_COMPAT_IMAGE_<KIND>` | Overrides the adapter compat container image per kind | you |
+| `KIRA_FAKE_SCEN`, `KIRA_FAKE_DIR`, `KIRA_DOC` | Fake agent: scenario JSON or path, call-log dir, doc basename | flow tests |
+| `KIRA_FAKE_CLAUDE` | Re-executes the ADE test binary as a fake `claude` | `ade` tests |
+| `KIRA_TEST_MEMORY_MCP` | Real `claude` tests: run the binary as the memory MCP server | `apps/kira-space/tests/claude` |
+| `KIRA_GIT_DIFFERENTIAL`, `KIRA_GIT_PERF` | `1` runs the git search differential test, the git perf probe | you |
+| `KIRA_DATAGRIP_REAL_PROJECT` | Path of a real DataGrip project for the opt-in import test | you |
+| `KIRA_EMBED_SMOKE_WORKER`, `KIRA_EMBED_FAKE_WORKER`, `KIRA_ASKPASS_HELPER_PROCESS`, `KIRA_TEST_MARKER` | Re-exec markers inside the owning package's tests; never set by hand | the tests themselves |
