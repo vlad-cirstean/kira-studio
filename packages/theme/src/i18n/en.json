@@ -779,6 +779,35 @@
         }
       }
     },
+    "llmPrompts": {
+      "badEncoding": {
+        "body": "The prompt contains invalid text encoding."
+      },
+      "breaks": {
+        "body": "This change breaks {name}: {cause}."
+      },
+      "empty": {
+        "body": "The prompt can’t be empty."
+      },
+      "missingFragment": {
+        "body": "The prompt must include the shared paragraph {name}."
+      },
+      "missingVar": {
+        "body": "The prompt must use the variable {name}."
+      },
+      "parse": {
+        "body": "The template can’t be parsed: {cause}."
+      },
+      "render": {
+        "body": "The template can’t be rendered: {cause}."
+      },
+      "renderEmpty": {
+        "body": "The template renders to nothing."
+      },
+      "tooLong": {
+        "body": "The prompt is longer than {max} bytes."
+      }
+    },
     "menu": {
       "closeTab": {
         "label": "Close Tab"
@@ -5075,6 +5104,192 @@
       },
       "switch": {
         "tooltip": "Switch to this worktree"
+      }
+    }
+  },
+  "llmPrompts": {
+    "entry": {
+      "adeJiraLine": {
+        "description": "The Jira key and link line of a launch message.",
+        "title": "Jira line",
+        "usedBy": {
+          "body": "Included in the step, stage, review and start messages."
+        }
+      },
+      "adeRebaseContextLine": {
+        "description": "Tells the agent that the last rebase of a branch did not finish and points to run_outcome.",
+        "title": "Unfinished rebase line",
+        "usedBy": {
+          "body": "Added to step prompts and launch messages for each branch with an unfinished rebase."
+        }
+      },
+      "adeRebasePrompt": {
+        "description": "Lists the git commands to rebase a stack of branches, then the conflict and push rules.",
+        "title": "Rebase prompt",
+        "usedBy": {
+          "body": "Shown in the rebase dialog and sent to the rebase agent."
+        }
+      },
+      "adeRepoLine": {
+        "description": "One repository line of a launch message. It shows the name, branch and worktree, or a read-only folder.",
+        "title": "Repository line",
+        "usedBy": {
+          "body": "Included in the stage and start messages."
+        }
+      },
+      "adeReviewMessage": {
+        "description": "The first message of the review agent. It lists the task, notes, and each branch with its base and worktree.",
+        "title": "Review message",
+        "usedBy": {
+          "body": "Sent when the review agent starts for a task."
+        }
+      },
+      "adeSendBackLine": {
+        "description": "Tells the agent that a later step failed and asks it to fix the implementation.",
+        "title": "Send back message",
+        "usedBy": {
+          "body": "Sent when a failed step sends a branch back to an earlier step."
+        }
+      },
+      "adeStageMessage": {
+        "description": "The first message of a stage session. It carries the stage name, task, repositories, notes and the stage prompt.",
+        "title": "Stage message",
+        "usedBy": {
+          "body": "Sent to Claude when a stage session starts."
+        }
+      },
+      "adeStartMessage": {
+        "description": "The first message of a branch launch session. It names the task, repository and the first open step.",
+        "title": "Start message",
+        "usedBy": {
+          "body": "Sent when a launch session opens on a branch."
+        }
+      },
+      "adeStepPrompt": {
+        "description": "The default prompt of a pipeline step. It carries the task, Jira link, repository, branch and the step’s own prompt, then the finish instruction.",
+        "title": "Step prompt",
+        "usedBy": {
+          "body": "Sent to the agent when a workflow step runs without an edited message."
+        }
+      },
+      "dbmcpInstructions": {
+        "description": "Explains how an agent should explore connections and run queries through the database MCP server.",
+        "title": "Database MCP instructions",
+        "usedBy": {
+          "body": "Sent to Claude when it connects to the database MCP server."
+        }
+      },
+      "headlessFinishStepAck": {
+        "description": "The reply to a finish_step call. It tells the agent to stop.",
+        "title": "Finish step reply",
+        "usedBy": {
+          "body": "Returned to the agent after it calls finish_step."
+        }
+      },
+      "headlessFinishStepSuffix": {
+        "description": "Tells an agent step how to report its result with the finish_step tool, using the results the step declares.",
+        "title": "Finish step instruction",
+        "usedBy": {
+          "body": "Ends every ADE step prompt and every resumed step message."
+        }
+      },
+      "headlessRebaseReportSuffix": {
+        "description": "Tells the rebase agent to run git only through the git tool and how to report with finish_step.",
+        "title": "Rebase report instruction",
+        "usedBy": {
+          "body": "Ends every rebase run prompt, edited ones included."
+        }
+      },
+      "headlessScriptReportSuffix": {
+        "description": "Tells a smart script agent how to report its result with finish_step.",
+        "title": "Script report instruction",
+        "usedBy": {
+          "body": "Ends every smart script prompt, one-off edits included."
+        }
+      },
+      "headlessSpaceInstructions": {
+        "description": "Tells the agent the order to use the Kira Space tools. It reads the task, declares repositories, then branches.",
+        "title": "Kira Space tools instructions",
+        "usedBy": {
+          "body": "Sent to Claude when a run connects to the Kira Space tools server."
+        }
+      },
+      "headlessSpaceSuffix": {
+        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branch.",
+        "title": "Kira Space tools notice",
+        "usedBy": {
+          "body": "Added before the finish instruction when a workflow turns the Kira Space tools on."
+        }
+      },
+      "memoryDataHygiene": {
+        "description": "A paragraph that tells Claude to treat the document text as data and never follow instructions found inside it.",
+        "title": "Untrusted input notice",
+        "usedBy": {
+          "body": "Included in the memory gate, reconcile, import extract and import finalize prompts."
+        }
+      },
+      "memoryGateSystem": {
+        "description": "Judges each fact before it is stored. It splits the fact into single claims, adds keywords, or challenges it with questions.",
+        "title": "Memory gate",
+        "usedBy": {
+          "body": "Sent as the system prompt of the Claude call that checks every memory save. The reply follows a fixed schema."
+        }
+      },
+      "memoryImportExtractSystem": {
+        "description": "Extracts short, durable facts from one chunk of an imported file.",
+        "title": "Import fact extraction",
+        "usedBy": {
+          "body": "Sent as the system prompt for each chunk while a memory import reads a file."
+        }
+      },
+      "memoryImportFinalizeSystem": {
+        "description": "Merges the facts of one imported file and stores them through the memory tools.",
+        "title": "Import finalize",
+        "usedBy": {
+          "body": "Sent as the system prompt of the Claude run that finishes one file of a memory import."
+        }
+      },
+      "memoryMcpInstructions": {
+        "description": "Tells an agent when to store a memory and how to search the store.",
+        "title": "Memory server instructions",
+        "usedBy": {
+          "body": "Sent to Claude when a session connects to the memory MCP server. A change applies to new sessions."
+        }
+      },
+      "memoryMcpRememberMessage": {
+        "description": "The message the remember command sends to the agent, with the text to remember appended.",
+        "title": "Remember message",
+        "usedBy": {
+          "body": "Sent when someone runs the remember command from the memory MCP server."
+        }
+      },
+      "memoryMcpSemanticNotInstalled": {
+        "description": "Warns the agent that results are keyword matches only because the semantic model is missing.",
+        "title": "Semantic search missing notice",
+        "usedBy": {
+          "body": "Appended to search_memories results while semantic search is not installed."
+        }
+      },
+      "memoryMcpSemanticUnavailable": {
+        "description": "Warns the agent that results are keyword matches only and gives the reason.",
+        "title": "Semantic search failing notice",
+        "usedBy": {
+          "body": "Appended to search_memories results when semantic search fails."
+        }
+      },
+      "memoryMcpStoreChallenged": {
+        "description": "Tells the agent that nothing was stored and what to do next. The questions follow it.",
+        "title": "Store challenge notice",
+        "usedBy": {
+          "body": "Returned from store_memory when the gate challenges an item."
+        }
+      },
+      "memoryReconcileSystem": {
+        "description": "Compares new facts with similar stored memories and picks add, update or no change for each.",
+        "title": "Memory reconcile",
+        "usedBy": {
+          "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
+        }
       }
     }
   },
