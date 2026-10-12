@@ -978,3 +978,34 @@ Stream C:
 - Allowlists hold 9 permanent lines: foundation 2 (`protocol/frame.ts`, `button/index.ts`), stream-a 4, stream-b 1, stream-c 2 (check `scripts/copy-allowlist/*.txt`).
 - `check-catalog --unused` (C10) reports 13 unused keys, among them `workbench.module.title`, `common.state.saving.loading`, `backend.prompt.*.title`. Not part of `bun run lint`.
 - Go tests `grpcflow` (protojson whitespace) and `queryplan` `TestParityFixtures` fail; no Go file changed since `51527fd7e`.
+
+## P265 result
+
+Status: Done. Test-and-fix and close-out commits on top of `924d41691`, nothing pushed.
+
+### Commits
+
+- `8eb9a85dc`, `8d65d55d1`: worker-safe i18n index, `CatalogText` imported directly (SFC re-export broke the Vite worker and the Playwright Node loader).
+- `45cc18f1d`, `1f0eb0b98`: untranslated text the new specs found, now in the catalog (body modes, system font, command dialog, default request title, workflow edge and checklist aria labels).
+- `0ef9ceea8`, `3add21351`: spec tuning, coverage helper tracks marker depth across sibling text nodes, skips rich-text and flow-engine subtrees, skips derived switch aria-label.
+- `49cc8dd0c`: close-out. `ConfirmOptions.title` required; `cancelLabel`, `plural()`, `copyAnnounced` shim removed; C10 on in lint; 4 keys deleted (the other 11 flagged keys are `backend.*` read from Go; C10 now scans `internal/`); allowlist directory folded into `scripts/copy/exemptions.ts` (9 permanent entries, each with reason; `ALLOWED_DUPLICATES` empty).
+- `5a0b00d19`: real bug, search toolbars passed slot `#index` to a message with `{position}`, so the number never rendered; plus 14 Studio specs moved to catalog wording.
+- `5767c767d`: mobile write specs confirm by `confirm-yes`, not the old label.
+- `7c977a051`: visual baselines.
+- `b46c24652`: Go plan issue messages match the catalog wording the parity fixtures pin (`queryplan` `TestParityFixtures`).
+- `5169db3e3`: `grpcclient` compacts and re-indents protojson output; protojson randomises whitespace per build.
+
+### Suites
+
+- `test:unit`: 1884 pass.
+- Studio `ui`+`ui-timing`: 21 failed on first run (20 spec wording expectations, 1 real bug above); 134 re-run after fixes green. `ui-timing`: 1 failed, `perf.spec.ts` scroll frame p95 80 ms against bound under 80 ms, load-sensitive known item, not loosened.
+- Space `ui`: 477 pass.
+- Mobile (ios, android): 57 pass, 4 failed first run (old confirm label), 12 pass after fix.
+- Visual: Studio 13 baselines and Space 10 re-recorded; each diff inspected, text regions only (wording, ellipsis, label width), no layout or colour change. Studio: connection dialog, script dialog, data grid, console, http request view, schema dialog, workbench shell, settings Appearance/Data/Cache/Api/Database MCP/Advanced. Space: workflow graph (2), git repo settings, repositories dialog, row menu (narrower, shorter labels), stash dialog, settings Advanced/Appearance/Git/Memory.
+- `go test ./...`, `lint`, `lint:go`, `lint:dead`, `typecheck`: green.
+
+### Deviations
+
+- Git menu "New branch" and "Force push" lost their ellipsis through the C3 duplicate rule. Kept as is, final decision.
+- Plan said 13 unused keys; it was 15, mostly `backend.*` used from Go.
+- The two Go failures were not P265 regressions: queryplan fixtures were reworded by Stream A while the Go port kept old text; protojson whitespace is random per build.
