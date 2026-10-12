@@ -46,7 +46,9 @@ import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { computed, ref, useId, watch } from 'vue';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
+import Identifier from '@workbench/components/Identifier.vue';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { stashLabel } from '../../lib/stashListModel.ts';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
@@ -73,11 +75,7 @@ const props = defineProps<{
   saveSourceEntry: StashEntry | undefined;
 }>();
 
-const emit = defineEmits<{
-  (e: 'close-create'): void;
-  (e: 'close-branch'): void;
-  (e: 'close-save'): void;
-}>();
+const emit = defineEmits<(e: 'close') => void>();
 
 type Mode = 'create' | 'branch' | 'save' | 'popConfirm' | undefined;
 
@@ -118,7 +116,7 @@ watch(
 );
 
 function cancelCreate(): void {
-  emit('close-create');
+  emit('close');
 }
 
 async function submitCreate(): Promise<void> {
@@ -135,7 +133,7 @@ async function submitCreate(): Promise<void> {
     paths: [...pathspec.value],
   });
   if (!result.ok) return;
-  emit('close-create');
+  emit('close');
 }
 
 // ---------------------------------------------------------------------------------------
@@ -153,6 +151,7 @@ watch(
     if (entry === undefined) return;
     branchName.value = '';
     branchPreflight.value = undefined;
+    void nextTick(form.reset);
   },
 );
 
@@ -178,6 +177,13 @@ const branchNameLocalError = computed(() => {
   return valid || error === undefined ? undefined : renderText(error);
 });
 
+const form = useFormErrors({
+  branch: {
+    value: () => branchName.value,
+    error: () => branchNameLocalError.value ?? branchPreflight.value?.name.error ?? null,
+  },
+});
+
 /** Only a genuinely invalid/taken name (or nothing typed yet) blocks the button — a `blocked`
  *  checkout half (OQ6) still lets the user create the branch; §7.6/probe 11's own point is that
  *  the branch creation always succeeds, only the pop half can fail, and OQ6's recommendation is to
@@ -191,7 +197,7 @@ const canSubmitBranch = computed(
 );
 
 function cancelBranch(): void {
-  emit('close-branch');
+  emit('close');
 }
 
 async function submitBranch(): Promise<void> {
@@ -199,7 +205,7 @@ async function submitBranch(): Promise<void> {
   if (entry === undefined || !canSubmitBranch.value) return;
   const result = await props.ops.runStashBranch(entry, branchName.value.trim());
   if (!result.ok) return;
-  emit('close-branch');
+  emit('close');
 }
 
 // ---------------------------------------------------------------------------------------
@@ -237,7 +243,7 @@ const canSubmitSave = computed(
 );
 
 function cancelSave(): void {
-  emit('close-save');
+  emit('close');
 }
 
 async function submitSave(): Promise<void> {
@@ -245,7 +251,7 @@ async function submitSave(): Promise<void> {
   const sha = saveSource.value === 'entry' ? props.saveSourceEntry?.sha : undefined;
   const result = await props.ops.runGlobalStashSave(saveLabel.value.trim(), sha);
   if (!result.ok) return;
-  emit('close-save');
+  emit('close');
 }
 
 // ---------------------------------------------------------------------------------------
@@ -305,7 +311,11 @@ function onClose(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && onClose()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent
+      :aria-describedby="undefined"
+      size="md"
+      :dirty="(mode === 'create' && message !== '') || (mode === 'branch' && branchName !== '')"
+    >
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
       </DialogHeader>
@@ -350,7 +360,7 @@ function onClose(): void {
               :params="{ message: branchTarget?.message ?? '' }"
             >
               <template #stash
-                ><code class="font-data">{{ stashRef(branchTarget?.index ?? '') }}</code></template
+                ><Identifier :value="stashRef(branchTarget?.index ?? '')" /></template
               >
             </CatalogText>
           </FieldDescription>
@@ -362,10 +372,10 @@ function onClose(): void {
               type="text"
               size="kira-lg"
               class="w-full"
+              v-bind="form.invalidAttrs('branch')"
             />
-            <FieldError v-if="branchNameLocalError">{{ branchNameLocalError }}</FieldError>
-            <FieldError v-else-if="branchPreflight?.name.error">{{
-              branchPreflight.name.error
+            <FieldError v-if="form.errorFor('branch')" :id="form.errorId('branch')">{{
+              form.errorFor('branch')
             }}</FieldError>
           </Field>
           <Alert v-if="branchPreflight?.verdict === 'blocked'" variant="warn">
@@ -419,9 +429,7 @@ function onClose(): void {
               ><AlertDescription>
                 <p>{{ t('git.dialog.stash.untrackedCollision.body') }}</p>
                 <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                  <li v-for="path in blocker.paths" :key="path"
-                    ><code class="font-data">{{ path }}</code></li
-                  >
+                  <li v-for="path in blocker.paths" :key="path"><Identifier :value="path" /></li>
                 </ul>
                 <p>{{ t('git.dialog.stash.untrackedCollision.hint') }}</p>
               </AlertDescription></Alert
@@ -430,9 +438,7 @@ function onClose(): void {
               ><AlertDescription>
                 <p>{{ t('git.dialog.stash.localChanges.body') }}</p>
                 <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                  <li v-for="path in blocker.paths" :key="path"
-                    ><code class="font-data">{{ path }}</code></li
-                  >
+                  <li v-for="path in blocker.paths" :key="path"><Identifier :value="path" /></li>
                 </ul>
                 <p>{{ t('git.dialog.stash.localChanges.hint') }}</p>
               </AlertDescription></Alert
@@ -451,7 +457,7 @@ function onClose(): void {
                 <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
                 <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                   <li v-for="path in pending.preflight.prediction.paths" :key="path">
-                    <code class="font-data">{{ path }}</code>
+                    <Identifier :value="path" />
                   </li>
                 </ul>
                 <p>{{

@@ -20,6 +20,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -50,9 +51,7 @@ function pullNow(): void {
             :params="{ count: pending.behind }"
           >
             <template #branch><strong>{{ pending.branch }}</strong></template>
-            <template #upstream
-              ><code class="font-data">{{ pending.upstreamShortName }}</code></template
-            >
+            <template #upstream><Identifier :value="pending.upstreamShortName" /></template>
           </CatalogText>
         </DialogDescription>
       </DialogBody>

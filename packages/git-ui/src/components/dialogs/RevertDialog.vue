@@ -25,6 +25,7 @@ import { Field, FieldLabel } from '@theme/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
@@ -91,7 +92,7 @@ function confirm(): void {
           <p>{{ t('git.dialog.revert.mainline.body') }}</p>
           <RadioGroup v-model="selectedMainline">
             <Card v-for="entry in preflight?.mainlineRequired" :key="entry.sha">
-              <p class="m-0 mb-0.5"><code class="font-data">{{ shortSha(entry.sha) }}</code></p>
+              <p class="m-0 mb-0.5"><Identifier :value="entry.sha" :short="shortSha" /></p>
               <Field
                 v-for="parent in entry.parents"
                 :key="parent.parentNumber"
@@ -108,9 +109,7 @@ function confirm(): void {
                       k="git.common.mergeParent.option"
                       :params="{ number: parent.parentNumber, subject: parent.subject }"
                     >
-                      <template #sha
-                        ><code class="font-data">{{ shortSha(parent.sha) }}</code></template
-                      >
+                      <template #sha><Identifier :value="parent.sha" :short="shortSha" /></template>
                     </CatalogText>
                   </span>
                 </FieldLabel>

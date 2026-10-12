@@ -220,19 +220,8 @@ export function flattenTreeRows(
   return rows;
 }
 
-/** §8's explicit render cap — 500 rows, then a "Show all N files" row, never a second
- *  virtualizer (`CLAUDE.md`'s prefer-a-library rule; see the plan's own escalation ladder). */
-export const FILE_TREE_ROW_CAP = 500;
-
-export interface CappedRows {
-  readonly visible: readonly FileTreeRow[];
-  readonly hiddenCount: number;
-}
-
-export function capRows(rows: readonly FileTreeRow[], cap: number = FILE_TREE_ROW_CAP): CappedRows {
-  if (rows.length <= cap) return { visible: rows, hiddenCount: 0 };
-  return { visible: rows.slice(0, cap), hiddenCount: rows.length - cap };
-}
+/** §8's render cap page: 500 rows, then a "Show more" row, never a second virtualizer. */
+export const FILE_TREE_PAGE_SIZE = 500;
 
 /** `originalPath → path` with the common leading *directory* path truncated (§6.4: "a file
  *  moved within a directory shows `old.ts → new.ts`, not two full paths") — compares directory

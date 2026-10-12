@@ -1,6 +1,6 @@
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
-import { logError } from '@workbench/bridge/log';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 
@@ -65,15 +65,7 @@ export class RepoSettingsState {
       this.settings.value = defaultRepoSettingsSnapshot();
       return;
     }
-    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
-  }
-
-  /** F10: a `void this.reload()`-shaped call (the only call site in this class) has no caller
-   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
-   *  error and a silent unhandled rejection with the dialog left showing stale settings forever.
-   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
-  #logBackgroundError(context: string, error: unknown): void {
-    logError('RepoSettingsState', `${context} failed`, error);
+    fireAndForget(this.reload(), 'repoSettings');
   }
 
   async reload(): Promise<void> {

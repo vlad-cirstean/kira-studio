@@ -39,6 +39,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -95,8 +96,8 @@ function stashAndCarry(): void {
         <template v-else-if="headline?.kind === 'worktreeConflict'">
           <DialogDescription>
             <CatalogText k="git.dialog.checkout.worktreeConflict.body">
-              <template #branch><code class="font-data">{{ headline.branch }}</code></template>
-              <template #path><code class="font-data">{{ headline.worktreePath }}</code></template>
+              <template #branch><Identifier :value="headline.branch" /></template>
+              <template #path><Identifier :value="headline.worktreePath" /></template>
             </CatalogText>
           </DialogDescription>
         </template>
@@ -104,9 +105,7 @@ function stashAndCarry(): void {
         <template v-else-if="headline?.kind === 'blockedByUntracked'">
           <DialogDescription>{{ t('git.dialog.checkout.untracked.body') }}</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in headline.paths" :key="path"
-              ><code class="font-data">{{ path }}</code></li
-            >
+            <li v-for="path in headline.paths" :key="path"><Identifier :value="path" /></li>
           </ul>
           <p>{{ t('git.dialog.checkout.untracked.hint') }}</p>
         </template>
@@ -114,9 +113,7 @@ function stashAndCarry(): void {
         <template v-else-if="trackedBlocker">
           <DialogDescription>{{ t('git.dialog.checkout.localChanges.body') }}</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in trackedBlocker.paths" :key="path"
-              ><code class="font-data">{{ path }}</code></li
-            >
+            <li v-for="path in trackedBlocker.paths" :key="path"><Identifier :value="path" /></li>
           </ul>
           <Alert v-if="canDiscard" variant="warn">
             <AlertDescription>

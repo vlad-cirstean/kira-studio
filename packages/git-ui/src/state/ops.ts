@@ -301,15 +301,15 @@ export class OpsState {
     // Any change at all (a ref write OR a worktree/index touch) can move `inProgress`,
     // `dirtyPaths` or the upstream ahead/behind counts — unlike `RefsState`, which only cares
     // about `refsChanged`, this refreshes on both event kinds (no `kind` filter below).
-    this.#repo = new RepoScopedReload(bridge, 'OpsState', {
+    this.#repo = new RepoScopedReload(bridge, 'gitOps', {
       onChanged: () => {
-        this.#repo.fireAndForget('refreshStatus', () => this.refreshStatus());
+        this.#repo.fireAndForget(() => this.refreshStatus());
         // F4: the server's undo slot is per `RepoEntry`, shared by every surface holding this
         // repo (another webview, the native app, a review view). An op run from one of those
         // replaces the slot; without this, this surface kept showing its own stale slot and got
         // NotFound on click. Previously refreshed only from `setRepoId` (this surface's own repo
         // switch), which never observes another surface's write.
-        this.#repo.fireAndForget('refreshUndo', () => this.refreshUndo());
+        this.#repo.fireAndForget(() => this.refreshUndo());
       },
     });
     this.#unsubscribeProgress = bridge.on('remote.progress', (event) => {
@@ -342,8 +342,8 @@ export class OpsState {
       this.undoSlot.value = null;
       return;
     }
-    this.#repo.fireAndForget('refreshStatus', () => this.refreshStatus());
-    this.#repo.fireAndForget('refreshUndo', () => this.refreshUndo());
+    this.#repo.fireAndForget(() => this.refreshStatus());
+    this.#repo.fireAndForget(() => this.refreshUndo());
   }
 
   /** F6: settles every pending confirm dialog and pull prompt with its own cancel value — shared

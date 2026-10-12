@@ -36,7 +36,7 @@ function isStashDecoration(ref: DecorationRef): boolean {
 }
 
 // `kira-cell-date` stays as a runtime class: tests and the width probe read it.
-const CELL_TEXT_CLASS = 'overflow-hidden text-ellipsis whitespace-nowrap';
+const CELL_TEXT_CLASS = 'truncate';
 const CELL_AUTHOR_CLASS = `text-muted-foreground ${CELL_TEXT_CLASS}`;
 const CELL_DATE_CLASS = `kira-cell-date tabular-nums text-muted-foreground ${CELL_TEXT_CLASS}`;
 // The message cell is a 2-row grid when the row has badges: badge line over the subject.
@@ -44,7 +44,7 @@ const CELL_MESSAGE_CLASS = 'kira-cell-message flex items-center gap-1 min-w-0 ov
 const CELL_MESSAGE_BADGES_CLASS =
   'kira-cell-message grid grid-rows-[var(--kira-graph-h-xs)_1fr] items-center min-w-0 overflow-hidden';
 const CELL_MESSAGE_COLLAPSED_CLASS = CELL_MESSAGE_CLASS;
-const SUBJECT_CLASS = 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap';
+const SUBJECT_CLASS = 'min-w-0 flex-1 truncate';
 // Grid track 2 under the badge line; `flex-1` is inert there.
 const SUBJECT_BADGED_CLASS = 'row-start-2';
 const SUBJECT_STASH_CLASS = `${SUBJECT_CLASS} italic`;

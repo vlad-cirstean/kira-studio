@@ -1,5 +1,5 @@
 import type { EventPayload } from '@kira/git-ipc';
-import { logError } from '@workbench/bridge/log';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import type { BridgeClient } from '../bridge/client.ts';
 
 /**
@@ -7,8 +7,7 @@ import type { BridgeClient } from '../bridge/client.ts';
  * frame around their own `repo.changed` subscription — ignore an event for any other repo (and,
  * for four of the five, any event `kind` but the one that actually invalidates this class's own
  * data), track the active repoId for `reload()`'s own in-flight-repo-switch guard, and log a
- * background reload's rejection with this class's own name rather than let it become a silent
- * unhandled rejection. Each class's own `reload()` body (which bridge method, how the result
+ * background reload's rejection under this class's own scope. Each class's own `reload()` body (which bridge method, how the result
  * applies, its own `createLatestRequest` tracker) is untouched — only this surrounding wiring
  * moved out, so the latest-request-wins ordering itself is unchanged.
  *
@@ -56,14 +55,9 @@ export class RepoScopedReload {
     this.#repoId = repoId;
   }
 
-  /** `void fn().catch(...)` tagged with this class's own log name — the fire-and-forget idiom
-   *  every `setRepoId`/`repo.changed` handler in this file already repeated verbatim. */
-  fireAndForget(context: string, fn: () => Promise<void>): void {
-    void fn().catch((error) => this.#logBackgroundError(context, error));
-  }
-
-  #logBackgroundError(context: string, error: unknown): void {
-    logError(this.#logName, `${context} failed`, error);
+  /** Runs a background reload; a rejection logs under this class's scope. */
+  fireAndForget(fn: () => Promise<void>): void {
+    fireAndForget(fn(), this.#logName);
   }
 
   dispose(): void {

@@ -38,9 +38,9 @@ export class WorktreeState {
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
-    this.#repo = new RepoScopedReload(bridge, 'WorktreeState', {
+    this.#repo = new RepoScopedReload(bridge, 'gitWorktrees', {
       kind: 'refsChanged',
-      onChanged: () => this.#repo.fireAndForget('reload', () => this.reload()),
+      onChanged: () => this.#repo.fireAndForget(() => this.reload()),
     });
   }
 
@@ -53,7 +53,7 @@ export class WorktreeState {
       this.entries.value = [];
       return;
     }
-    this.#repo.fireAndForget('reload', () => this.reload());
+    this.#repo.fireAndForget(() => this.reload());
   }
 
   async reload(): Promise<void> {

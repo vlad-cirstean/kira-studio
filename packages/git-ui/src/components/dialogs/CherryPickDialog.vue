@@ -25,6 +25,7 @@ import { Field, FieldLabel } from '@theme/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
@@ -118,25 +119,19 @@ function confirm(): void {
               <template v-else-if="blocker.kind === 'stagedChanges'">
                 <p>{{ t('git.dialog.cherryPick.stagedChanges.body') }}</p>
                 <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                  <li v-for="path in blocker.paths" :key="path"
-                    ><code class="font-data">{{ path }}</code></li
-                  >
+                  <li v-for="path in blocker.paths" :key="path"><Identifier :value="path" /></li>
                 </ul>
               </template>
               <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
                 <p>{{ t('git.dialog.cherryPick.localChanges.body') }}</p>
                 <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                  <li v-for="path in blocker.paths" :key="path"
-                    ><code class="font-data">{{ path }}</code></li
-                  >
+                  <li v-for="path in blocker.paths" :key="path"><Identifier :value="path" /></li>
                 </ul>
               </template>
               <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
                 <p>{{ t('git.dialog.cherryPick.untracked.body') }}</p>
                 <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                  <li v-for="path in blocker.paths" :key="path"
-                    ><code class="font-data">{{ path }}</code></li
-                  >
+                  <li v-for="path in blocker.paths" :key="path"><Identifier :value="path" /></li>
                 </ul>
               </template>
             </AlertDescription></Alert
@@ -162,9 +157,7 @@ function confirm(): void {
                     k="git.common.mergeParent.option"
                     :params="{ number: entry.parentNumber, subject: entry.subject }"
                   >
-                    <template #sha
-                      ><code class="font-data">{{ shortSha(entry.sha) }}</code></template
-                    >
+                    <template #sha><Identifier :value="entry.sha" :short="shortSha" /></template>
                   </CatalogText>
                 </span>
               </FieldLabel>

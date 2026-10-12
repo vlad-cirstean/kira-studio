@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { shortSha } from '@kira/git-core';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { t } from '@theme/i18n';
@@ -71,7 +70,7 @@ import { localNameForRemoteBranch, remoteCheckoutTarget } from './lib/refListMod
 import { buildRefMenu, buildRowMenu, buildStashMenu } from './lib/rowMenuModel.ts';
 import type { SearchOption } from './lib/searchResultsModel.ts';
 import { childOf, parentOf } from './lib/stackListModel.ts';
-import { renderText } from './lib/text.ts';
+import { renderText, shaLabel } from './lib/text.ts';
 import { useSectionMenu } from './lib/useSectionMenu.ts';
 import { ASYNC_FAILURES, type AsyncFailure } from './state/asyncFailures.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
@@ -345,7 +344,7 @@ function buildGraphTips(): TipRef[] {
       tips.push({ sha: branch.objectId, key: `branch:${branch.refname}`, label: branch.shortName });
     }
   } else if (head?.kind === 'detached') {
-    tips.push({ sha: head.sha, key: `detached:${head.sha}`, label: shortSha(head.sha) });
+    tips.push({ sha: head.sha, key: `detached:${head.sha}`, label: shaLabel(head.sha) });
   }
   // `head.kind === 'unborn'` contributes no group 0 tip — no commit exists yet to be one.
 
@@ -1721,7 +1720,7 @@ onBeforeUnmount(() => {
       <NoRepositoryPanel
         v-else-if="!repoState.activeRepo.value"
         :repo-state="repoState"
-        @repo-opened="handleRepoOpened"
+        @repoOpened="handleRepoOpened"
       />
 
       <template v-else-if="repoState.activeRepo.value.head.kind === 'unborn'">
@@ -1790,7 +1789,7 @@ onBeforeUnmount(() => {
               @scroll="scrollRow = $event"
               @toggle-detail="toggleDetail"
               @open-detail="openDetail"
-              @close-detail="closeDetail"
+              @closeDetail="closeDetail"
               @refresh="triggerRefresh"
               @context-menu="handleGridContextMenu"
               @ref-context-menu="handleGridRefContextMenu"
@@ -1827,7 +1826,7 @@ onBeforeUnmount(() => {
             />
             <EmptyState
               v-if="!hasSelection"
-              class="h-full p-6"
+              fill
               icon="git-commit"
               :title="t('git.detail.noSelection.emptyHint')"
             />
@@ -1856,7 +1855,7 @@ onBeforeUnmount(() => {
 
         <div
           v-if="detailOpen && breakpoint === 'overlay'"
-          class="absolute inset-0 flex justify-end bg-scrim z-20"
+          class="absolute inset-0 flex justify-end bg-scrim z-(--kira-z-dialog)"
         >
           <aside
             ref="overlayDetailRegionEl"
@@ -1866,7 +1865,7 @@ onBeforeUnmount(() => {
           >
             <EmptyState
               v-if="!hasSelection"
-              class="h-full p-6"
+              fill
               icon="git-commit"
               :title="t('git.detail.noSelection.emptyHint')"
             />
@@ -1963,12 +1962,12 @@ onBeforeUnmount(() => {
           :branch-target="stashBranchTarget"
           :save-open="globalStashSaveOpen"
           :save-source-entry="globalStashSaveSourceEntry"
-          @close-create="stashCreateOpen = false"
-          @close-branch="stashBranchTarget = undefined"
-          @close-save="
-              globalStashSaveOpen = false;
-              globalStashSaveSourceEntry = undefined;
-            "
+          @close="
+            stashCreateOpen = false;
+            stashBranchTarget = undefined;
+            globalStashSaveOpen = false;
+            globalStashSaveSourceEntry = undefined;
+          "
         />
         <WorktreeDialog
           :worktrees="worktreeState"
@@ -1976,7 +1975,7 @@ onBeforeUnmount(() => {
           :refs="refsState"
           :create-request="worktreeCreateRequest"
           :base-path-default="worktreeBasePathDefault"
-          @close-create="worktreeCreateRequest = undefined"
+          @close="worktreeCreateRequest = undefined"
         />
         <StackDialog
           :stack="stackState"

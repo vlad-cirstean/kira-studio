@@ -63,9 +63,9 @@ export class RefsState {
             .map((row) => row.shortName),
         ),
     );
-    this.#repo = new RepoScopedReload(bridge, 'RefsState', {
+    this.#repo = new RepoScopedReload(bridge, 'gitRefs', {
       kind: 'refsChanged',
-      onChanged: () => this.#repo.fireAndForget('reload', () => this.reload()),
+      onChanged: () => this.#repo.fireAndForget(() => this.reload()),
     });
   }
 
@@ -78,7 +78,7 @@ export class RefsState {
       this.#clear();
       return;
     }
-    this.#repo.fireAndForget('reload', () => this.reload());
+    this.#repo.fireAndForget(() => this.reload());
   }
 
   async reload(): Promise<void> {

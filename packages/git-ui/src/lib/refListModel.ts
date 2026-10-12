@@ -25,7 +25,7 @@ export function sortTags(rows: readonly RefRow[]): RefRow[] {
   return sortByName(rows);
 }
 
-/** The picker's own "N more" cap, kept well under `FILE_TREE_ROW_CAP` — a repo with more local
+/** The picker's own "N more" cap, kept well under the file tree's 500-row page — a repo with more local
  *  branches or tags than this is filtering, not scrolling, through the picker (§6.3's narrow-panel
  *  budget applies here even harder than to the file tree). */
 export const REF_LIST_SECTION_CAP = 50;

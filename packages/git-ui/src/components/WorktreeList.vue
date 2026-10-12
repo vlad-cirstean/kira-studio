@@ -18,6 +18,8 @@
  */
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
@@ -32,6 +34,8 @@ import {
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import { cn } from '@theme/lib/utils';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref } from 'vue';
 import { type PickerList, worktreeLabel } from '../lib/pickerModel.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -46,13 +50,13 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'switch-worktree', path: string): void;
-  (e: 'create-worktree'): void;
+  (e: 'switchWorktree', path: string): void;
+  (e: 'createWorktree'): void;
 }>();
 
 function switchTo(entry: WorktreeEntry): void {
   if (entry.isCurrent) return;
-  emit('switch-worktree', entry.path);
+  emit('switchWorktree', entry.path);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -117,7 +121,7 @@ async function confirmRemove(): Promise<void> {
 <template>
   <section :aria-label="t('common.module.worktrees.label')">
     <SectionHeading :label="t('common.module.worktrees.label')">
-      <Button variant="toolbar" size="kira" class="ml-auto" @click="emit('create-worktree')">
+      <Button variant="toolbar" size="kira" class="ml-auto" @click="emit('createWorktree')">
         {{ t('git.worktree.create.label') }}
       </Button>
     </SectionHeading>
@@ -159,9 +163,9 @@ async function confirmRemove(): Promise<void> {
           <CodiconIcon name="window" :size="13" />
         </span>
         <span class="truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
-        <span class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground">{{
-          entry.path
-        }}</span>
+        <span :class="cn('flex-1 min-w-0', rowMeta)">
+          <Identifier split="path" :value="entry.path" />
+        </span>
       </div>
       <TooltipIconButton
         v-if="!entry.isCurrent"
@@ -176,14 +180,14 @@ async function confirmRemove(): Promise<void> {
         @click="requestRemove(entry)"
       />
     </div>
-    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{
+    <InlineState v-if="section.visible.length === 0" kind="empty">{{
       t('git.worktree.list.empty')
-    }}</div>
+    }}</InlineState>
 
     <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
          modal content there prevents the panel dismissing under this nested Dialog. -->
     <Dialog :open="pendingRemove !== undefined" @update:open="(v) => !v && cancelRemove()">
-      <DialogContent :aria-describedby="undefined" size="md">
+      <DialogContent :aria-describedby="undefined" size="md" :dirty="typedToken !== ''">
         <DialogHeader>
           <DialogTitle>{{
             pendingRemove ? t('git.worktree.removeConfirm.title', { path: pendingRemove.entry.path }) : ''
@@ -197,9 +201,7 @@ async function confirmRemove(): Promise<void> {
             <p>
               <CatalogText k="git.worktree.removeConfirm.body">
                 <template #token
-                  ><code class="font-data">{{
-                    pendingRemove.preflight.confirmToken
-                  }}</code></template
+                  ><Identifier :value="pendingRemove.preflight.confirmToken ?? ''" /></template
                 >
               </CatalogText>
             </p>

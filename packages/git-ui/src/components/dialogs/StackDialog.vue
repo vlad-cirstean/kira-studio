@@ -30,6 +30,7 @@ import { Field, FieldLabel } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -150,7 +151,11 @@ function closeDialog(): void {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && closeDialog()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent
+      :aria-describedby="undefined"
+      size="md"
+      :dirty="target?.mode === 'setParent' && selectedParent !== ''"
+    >
       <DialogHeader>
         <DialogTitle>
           {{
@@ -185,7 +190,7 @@ function closeDialog(): void {
           <template v-else>
             <p>
               <CatalogText k="git.dialog.stack.plan.body">
-                <template #base><code class="font-data">{{ preflight.base }}</code></template>
+                <template #base><Identifier :value="preflight.base" /></template>
               </CatalogText>
             </p>
             <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
@@ -198,8 +203,8 @@ function closeDialog(): void {
                     source: entry.baseSource,
                   }"
                 >
-                  <template #branch><code class="font-data">{{ entry.branch }}</code></template>
-                  <template #parent><code class="font-data">{{ entry.parent }}</code></template>
+                  <template #branch><Identifier :value="entry.branch" /></template>
+                  <template #parent><Identifier :value="entry.parent" /></template>
                 </CatalogText>
               </li>
             </ul>

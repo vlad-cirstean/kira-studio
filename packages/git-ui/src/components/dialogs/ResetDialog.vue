@@ -40,7 +40,9 @@ import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref, useId, watch } from 'vue';
+import { shaLabel } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 
 const props = defineProps<{ ops: OpsState }>();
@@ -73,7 +75,7 @@ function selectMode(next: ResetMode): void {
 
 /** `HEAD` is a Git ref name, not prose. */
 const refName = computed(() => preflight.value?.branch ?? 'HEAD');
-const shortTarget = computed(() => shortSha(preflight.value?.target ?? ''));
+const shortTarget = computed(() => shaLabel(preflight.value?.target ?? ''));
 const destroys = computed(() => preflight.value?.destroys ?? []);
 const requiresToken = computed(() => preflight.value?.requiresTypedConfirmation ?? false);
 const canStashFirst = computed(() => (preflight.value?.routes ?? []).includes('stashFirst'));
@@ -99,12 +101,12 @@ function confirm(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent size="md" destructive>
+    <DialogContent size="md" destructive :dirty="typedToken !== ''">
       <DialogHeader>
         <DialogTitle>
           <CatalogText k="git.dialog.reset.title">
-            <template #ref><code class="font-data">{{ refName }}</code></template>
-            <template #sha><code class="font-data">{{ shortTarget }}</code></template>
+            <template #ref><Identifier :value="refName" /></template>
+            <template #sha><Identifier :value="shortTarget" /></template>
           </CatalogText>
           <span v-if="preflight?.targetSubject" class="ml-1 font-normal text-muted-foreground">{{
             preflight.targetSubject
@@ -122,12 +124,12 @@ function confirm(): void {
         <template v-else-if="preflight?.gaining === 0">
           <DialogDescription>
             <CatalogText k="git.dialog.reset.leaving.body" :params="{ count: preflight.leaving }">
-              <template #ref><code class="font-data">{{ refName }}</code></template>
+              <template #ref><Identifier :value="refName" /></template>
             </CatalogText>
           </DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="c in preflight.leavingCommits" :key="c.sha">
-              <code class="font-data">{{ shortSha(c.sha) }}</code> {{ c.subject }}
+              <Identifier :value="c.sha" :short="shortSha" /> {{ c.subject }}
             </li>
           </ul>
           <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">{{
@@ -179,9 +181,7 @@ function confirm(): void {
             <AlertDescription>
               <p>{{ t('git.dialog.reset.discard.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in destroys" :key="path"
-                  ><code class="font-data">{{ path }}</code></li
-                >
+                <li v-for="path in destroys" :key="path"><Identifier :value="path" /></li>
               </ul>
             </AlertDescription>
           </Alert>
@@ -199,7 +199,7 @@ function confirm(): void {
           <Field v-if="!stashFirst">
             <FieldLabel :for="tokenId">
               <CatalogText k="git.dialog.reset.token.label">
-                <template #token><code class="font-data">{{ shortTarget }}</code></template>
+                <template #token><Identifier :value="shortTarget" /></template>
               </CatalogText>
             </FieldLabel>
             <Input

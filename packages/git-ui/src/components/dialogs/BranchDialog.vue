@@ -26,7 +26,9 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { computed, ref, useId, watch } from 'vue';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
+import Identifier from '@workbench/components/Identifier.vue';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -44,6 +46,7 @@ watch(
     if (!isOpen) return;
     name.value = '';
     checkout.value = true;
+    void nextTick(form.reset);
   },
 );
 
@@ -53,6 +56,9 @@ const nameError = computed(() => {
   return valid || error === undefined ? undefined : renderText(error);
 });
 const canSubmit = computed(() => name.value !== '' && nameError.value === undefined);
+const form = useFormErrors({
+  name: { value: () => name.value, error: () => nameError.value ?? null },
+});
 
 function cancel(): void {
   emit('close');
@@ -73,21 +79,30 @@ async function submit(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent :aria-describedby="undefined" size="md" :dirty="name !== ''">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.branch.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <FieldDescription>
           <CatalogText k="git.dialog.branch.startPoint.description">
-            <template #sha><code class="font-data">{{ shortSha(startPoint) }}</code></template>
+            <template #sha><Identifier :value="startPoint" :short="shortSha" /></template>
           </CatalogText>
         </FieldDescription>
 
         <Field>
           <FieldLabel :for="nameId">{{ t('common.field.name.label') }}</FieldLabel>
-          <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
-          <FieldError v-if="nameError">{{ nameError }}</FieldError>
+          <Input
+            :id="nameId"
+            v-model="name"
+            type="text"
+            size="kira-lg"
+            class="w-full"
+            v-bind="form.invalidAttrs('name')"
+          />
+          <FieldError v-if="form.errorFor('name')" :id="form.errorId('name')">{{
+            form.errorFor('name')
+          }}</FieldError>
         </Field>
 
         <Field orientation="horizontal">

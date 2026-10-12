@@ -12,15 +12,16 @@
  *    On a protected branch (`preflight.protectedBy` non-null) it additionally requires typing
  *    the branch name back, D52's own friction for the common protected case.
  *  - Plain `--force` bypasses the lease entirely and is behind its own, separately-worded
- *    confirmation (a `<details>` disclosure, collapsed by default) — needed on top of, not
+ *    confirmation (a `Disclosure`, collapsed by default) — needed on top of, not
  *    instead of, the typed branch name when the branch is also protected.
  *
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content. The plain-`--force` confirm button stays inside the
- * `<details>` body (in the default slot) rather than moving to `DialogFooter`, since it belongs
+ * `Disclosure` body (in the default slot) rather than moving to `DialogFooter`, since it belongs
  * beside its own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
  */
 import { shortSha } from '@kira/git-core';
+import Disclosure from '@theme/components/Disclosure.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -37,6 +38,7 @@ import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -91,7 +93,7 @@ function confirmPlain(): void {
 
 <template>
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
-    <DialogContent size="md" destructive>
+    <DialogContent size="md" destructive :dirty="typedBranch !== '' || understandPlain">
       <DialogHeader>
         <DialogTitle>{{
           t('git.dialog.forcePushConfirm.title', { branch: pending.branch, remote: pending.remote })
@@ -102,13 +104,9 @@ function confirmPlain(): void {
           <CatalogText
             :k="pending.preflight.remoteTip === null ? 'git.dialog.forcePushConfirm.bodyNew.body' : 'git.dialog.forcePushConfirm.body'"
           >
-            <template #ref
-              ><code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code></template
-            >
+            <template #ref><Identifier :value="`${pending.remote}/${resolvedBranch}`" /></template>
             <template #sha
-              ><code class="font-data">{{
-                shortSha(pending.preflight.remoteTip ?? '')
-              }}</code></template
+              ><Identifier :value="pending.preflight.remoteTip ?? ''" :short="shortSha" /></template
             >
           </CatalogText>
           <template v-if="pending.preflight.behind > 0">
@@ -119,8 +117,8 @@ function confirmPlain(): void {
         <Alert v-if="protectedBy" variant="warn">
           <AlertDescription>
             <CatalogText k="git.dialog.forcePushConfirm.protected.hint">
-              <template #branch><code class="font-data">{{ resolvedBranch }}</code></template>
-              <template #pattern><code class="font-data">{{ protectedBy }}</code></template>
+              <template #branch><Identifier :value="resolvedBranch" /></template>
+              <template #pattern><Identifier :value="protectedBy" /></template>
             </CatalogText>
           </AlertDescription>
         </Alert>
@@ -137,11 +135,11 @@ function confirmPlain(): void {
           />
         </Field>
 
-        <details class="pt-2 border-t border-border text-kira-md">
-          <summary class="cursor-pointer text-muted-foreground"
+        <Disclosure class="pt-2 border-t border-border" trigger-class="text-muted-foreground">
+          <template #label
             ><CatalogText k="git.dialog.forcePushConfirm.plain.label">
               <template #flag><code class="font-data">--force</code></template>
-            </CatalogText></summary
+            </CatalogText></template
           >
           <div class="mt-3">
             <Alert variant="warn">
@@ -171,7 +169,7 @@ function confirmPlain(): void {
               {{ t('git.dialog.forcePushConfirm.plainConfirm.confirm') }}
             </Button>
           </div>
-        </details>
+        </Disclosure>
       </DialogBody>
 
       <DialogFooter>

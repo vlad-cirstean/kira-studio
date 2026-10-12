@@ -13,6 +13,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed, useId } from 'vue';
 
 const props = defineProps<{
@@ -40,9 +41,7 @@ const noCommitModel = computed({
       <AlertDescription>
         <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
         <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-          <li v-for="path in prediction.paths" :key="path"
-            ><code class="font-data">{{ path }}</code></li
-          >
+          <li v-for="path in prediction.paths" :key="path"><Identifier :value="path" /></li>
         </ul>
       </AlertDescription>
     </Alert>

@@ -47,8 +47,9 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { type MessageKey, t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
 import { errorText } from '@workbench/bridge/codedError';
-import { computed, reactive, ref, useId, watch } from 'vue';
+import { computed, nextTick, reactive, ref, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 
 const props = defineProps<{
@@ -84,6 +85,7 @@ watch(
     draftBase = props.repoSettingsState.settings.value;
     Object.assign(draft, draftBase);
     saveError.value = undefined;
+    void nextTick(form.reset);
   },
 );
 
@@ -132,6 +134,27 @@ const pageSizeValid = computed(() => {
   const { minimum, maximum } = SETTINGS['kiraSpace.graph.pageSize'];
   return Number.isInteger(size) && size >= minimum && size <= maximum;
 });
+
+const form = useFormErrors({
+  pageSize: {
+    value: () => draft['kiraSpace.graph.pageSize'],
+    error: () =>
+      pageSizeValid.value
+        ? null
+        : t('git.dialog.repoSettings.pageSize.error', {
+            min: SETTINGS['kiraSpace.graph.pageSize'].minimum,
+            max: SETTINGS['kiraSpace.graph.pageSize'].maximum,
+          }),
+  },
+});
+
+const isDirty = computed(() =>
+  (Object.keys(draft) as (keyof RepoSettingsDraft)[]).some((key) => {
+    const a = draft[key];
+    const b = draftBase[key];
+    return Array.isArray(a) ? a.join('\n') !== (b as readonly string[]).join('\n') : a !== b;
+  }),
+);
 
 const pageSizeId = useId();
 const autoStashId = useId();
@@ -191,7 +214,7 @@ async function save(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && close()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent :aria-describedby="undefined" size="md" :dirty="isDirty">
       <DialogHeader>
         <DialogTitle>{{ t('git.toolbar.repoSettings.tooltip') }}</DialogTitle>
       </DialogHeader>
@@ -208,13 +231,11 @@ async function save(): Promise<void> {
               group-class="h-control w-32"
               :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
               :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
-              :aria-invalid="!pageSizeValid"
+              v-bind="form.invalidAttrs('pageSize')"
               @update:model-value="onPageSizeChange"
             />
-            <FieldError v-if="!pageSizeValid">
-              {{
-                t('git.dialog.repoSettings.pageSize.error', { min: SETTINGS['kiraSpace.graph.pageSize'].minimum, max: SETTINGS['kiraSpace.graph.pageSize'].maximum })
-              }}
+            <FieldError v-if="form.errorFor('pageSize')" :id="form.errorId('pageSize')">
+              {{ form.errorFor('pageSize') }}
             </FieldError>
           </Field>
           <Field>

@@ -64,9 +64,9 @@ export class StackState {
   constructor(bridge: BridgeClient, pr?: PrState) {
     this.#bridge = bridge;
     this.#pr = pr;
-    this.#repo = new RepoScopedReload(bridge, 'StackState', {
+    this.#repo = new RepoScopedReload(bridge, 'gitStack', {
       kind: 'refsChanged',
-      onChanged: () => this.#repo.fireAndForget('reload', () => this.reload()),
+      onChanged: () => this.#repo.fireAndForget(() => this.reload()),
     });
     this.#unsubscribeProgress = bridge.on('stack.progress', (event) => {
       if (this.#repo.repoId !== event.repoId) return;
@@ -87,7 +87,7 @@ export class StackState {
       this.generation.value++;
       return;
     }
-    this.#repo.fireAndForget('reload', () => this.reload());
+    this.#repo.fireAndForget(() => this.reload());
   }
 
   async reload(): Promise<void> {
@@ -132,7 +132,7 @@ export class StackState {
     } finally {
       this.restacking.value = false;
       if (this.#repo.isCurrent(repoId)) {
-        this.#repo.fireAndForget('reload', () => this.reload());
+        this.#repo.fireAndForget(() => this.reload());
       }
     }
   }

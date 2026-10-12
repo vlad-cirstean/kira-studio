@@ -30,7 +30,9 @@ import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { computed, ref, useId, watch } from 'vue';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
+import Identifier from '@workbench/components/Identifier.vue';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -50,7 +52,7 @@ const props = defineProps<{
   basePathDefault: string;
 }>();
 
-const emit = defineEmits<(e: 'close-create') => void>();
+const emit = defineEmits<(e: 'close') => void>();
 
 const active = computed(() => props.createRequest !== undefined);
 
@@ -82,6 +84,7 @@ watch(
       seed.startPoint ??
       (props.refs.head.value?.kind === 'branch' ? props.refs.head.value.name : '');
     preflight.value = undefined;
+    void nextTick(form.reset);
   },
 );
 
@@ -101,6 +104,10 @@ const newBranchNameError = computed(() => {
   if (mode.value !== 'newBranch' || branch.value.trim() === '') return undefined;
   const { valid, error } = validateRefName(branch.value.trim());
   return valid || error === undefined ? undefined : renderText(error);
+});
+
+const form = useFormErrors({
+  branch: { value: () => branch.value, error: () => newBranchNameError.value ?? null },
 });
 
 watch([path, mode, branch, startPoint], async ([p, m, b, s]) => {
@@ -129,7 +136,7 @@ const canSubmitCreate = computed(() => {
 });
 
 function cancelCreate(): void {
-  emit('close-create');
+  emit('close');
 }
 
 async function submitCreate(): Promise<void> {
@@ -142,7 +149,7 @@ async function submitCreate(): Promise<void> {
     startPoint: mode.value === 'existingBranch' ? undefined : startPoint.value.trim() || undefined,
   });
   if (!result.ok) return; // the failure is already announced (opsState.announcement) — stay open.
-  emit('close-create');
+  emit('close');
 }
 
 /** G28 D7: closes G25 §9's own named hand-forward — OFFERED, never taken automatically (unlike
@@ -169,7 +176,7 @@ async function submitCreateDetached(): Promise<void> {
     startPoint: branchName,
   });
   if (!result.ok) return;
-  emit('close-create');
+  emit('close');
 }
 
 function onClose(): void {
@@ -179,7 +186,7 @@ function onClose(): void {
 
 <template>
   <Dialog :open="active" @update:open="(v) => !v && onClose()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent :aria-describedby="undefined" size="md" :dirty="path !== '' || branch !== ''">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.worktree.title') }}</DialogTitle>
       </DialogHeader>
@@ -251,8 +258,11 @@ function onClose(): void {
                 size="kira-lg"
                 class="w-full"
                 :placeholder="t('git.dialog.worktree.newBranch.example')"
+                v-bind="form.invalidAttrs('branch')"
               />
-              <FieldError v-if="newBranchNameError">{{ newBranchNameError }}</FieldError>
+              <FieldError v-if="form.errorFor('branch')" :id="form.errorId('branch')">{{
+                form.errorFor('branch')
+              }}</FieldError>
             </Field>
             <Field>
               <FieldLabel :for="startPointId">{{
@@ -290,27 +300,23 @@ function onClose(): void {
                 }}</template>
                 <template v-else-if="blocker.kind === 'pathExists'">
                   <CatalogText k="git.dialog.worktree.blocker.pathExists.error">
-                    <template #path><code class="font-data">{{ blocker.path }}</code></template>
+                    <template #path><Identifier :value="blocker.path" /></template>
                   </CatalogText>
                 </template>
                 <template v-else-if="blocker.kind === 'branchCheckedOutElsewhere'">
                   <CatalogText k="git.dialog.worktree.blocker.checkedOut.error">
-                    <template #branch><code class="font-data">{{ blocker.branch }}</code></template>
-                    <template #path
-                      ><code class="font-data">{{ blocker.worktreePath }}</code></template
-                    >
+                    <template #branch><Identifier :value="blocker.branch" /></template>
+                    <template #path><Identifier :value="blocker.worktreePath" /></template>
                   </CatalogText>
                 </template>
                 <template v-else-if="blocker.kind === 'branchExists'">
                   <CatalogText k="git.dialog.worktree.blocker.branchExists.error">
-                    <template #branch><code class="font-data">{{ blocker.branch }}</code></template>
+                    <template #branch><Identifier :value="blocker.branch" /></template>
                   </CatalogText>
                 </template>
                 <template v-else-if="blocker.kind === 'unknownStartPoint'">
                   <CatalogText k="git.dialog.worktree.blocker.unknownStartPoint.error">
-                    <template #startPoint
-                      ><code class="font-data">{{ blocker.startPoint }}</code></template
-                    >
+                    <template #startPoint><Identifier :value="blocker.startPoint" /></template>
                   </CatalogText>
                 </template>
               </AlertDescription></Alert

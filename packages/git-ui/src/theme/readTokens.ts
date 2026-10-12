@@ -1,3 +1,5 @@
+import { ROW_HEIGHT_PX } from '@workbench/lib/rowHeight';
+
 /**
  * The getComputedStyle bridge for the tokens JavaScript needs as a number: `--kira-graph-row-h`/
  * `--kira-graph-row-h-compact` reach SlickGrid's `rowHeight` option and `rowSvg.ts`'s per-row
@@ -147,8 +149,7 @@ export class TokenReader {
 }
 
 /** Fallbacks outside a real browser (no stylesheet loaded). */
-const FALLBACK_ROW_HEIGHT = 46;
-const FALLBACK_ROW_HEIGHT_COMPACT = 28;
+const FALLBACK_GRAPH_ROW_PX = 46;
 
 /**
  * `--kira-graph-row-h` as a pixel number: the height of a row with a ref/PR badge line. A malformed
@@ -156,11 +157,11 @@ const FALLBACK_ROW_HEIGHT_COMPACT = 28;
  */
 export function rowHeightPx(reader: TokenReader): number {
   const parsed = Number.parseFloat(reader.tokens['--kira-graph-row-h']);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_GRAPH_ROW_PX;
 }
 
 /** `--kira-graph-row-h-compact` as a pixel number: an undecorated row, and the grid's default `rowHeight`. */
 export function compactRowHeightPx(reader: TokenReader): number {
   const parsed = Number.parseFloat(reader.tokens['--kira-graph-row-h-compact']);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT_COMPACT;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : ROW_HEIGHT_PX.comfortable;
 }

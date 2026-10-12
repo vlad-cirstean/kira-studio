@@ -27,7 +27,9 @@ import {
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
-import { computed, ref, useId, watch } from 'vue';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
+import Identifier from '@workbench/components/Identifier.vue';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { canSubmitTagCreate, classifyTagName } from '../../lib/tagDialogModel.ts';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
@@ -58,11 +60,18 @@ watch(
     annotated.value = false;
     message.value = '';
     force.value = false;
+    void nextTick(form.reset);
   },
 );
 
 const state = computed(() => classifyTagName(name.value, props.existingTags, force.value));
 const canSubmit = computed(() => canSubmitTagCreate(state.value, annotated.value, message.value));
+const form = useFormErrors({
+  name: {
+    value: () => name.value,
+    error: () => (state.value.nameError ? renderText(state.value.nameError) : null),
+  },
+});
 
 function cancel(): void {
   emit('close');
@@ -83,21 +92,30 @@ async function submit(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent :aria-describedby="undefined" size="md" :dirty="name !== '' || message !== ''">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.tag.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <FieldDescription>
           <CatalogText k="git.dialog.tag.target.description">
-            <template #sha><code class="font-data">{{ shortSha(target) }}</code></template>
+            <template #sha><Identifier :value="target" :short="shortSha" /></template>
           </CatalogText>
         </FieldDescription>
 
         <Field>
           <FieldLabel :for="nameId">{{ t('common.field.name.label') }}</FieldLabel>
-          <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
-          <FieldError v-if="state.nameError">{{ renderText(state.nameError) }}</FieldError>
+          <Input
+            :id="nameId"
+            v-model="name"
+            type="text"
+            size="kira-lg"
+            class="w-full"
+            v-bind="form.invalidAttrs('name')"
+          />
+          <FieldError v-if="form.errorFor('name')" :id="form.errorId('name')">{{
+            form.errorFor('name')
+          }}</FieldError>
         </Field>
 
         <template v-if="state.verdict === 'blockedByExisting'">

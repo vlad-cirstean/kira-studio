@@ -26,7 +26,9 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/componen
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { computed, ref, useId, watch } from 'vue';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
+import Identifier from '@workbench/components/Identifier.vue';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -41,6 +43,7 @@ watch(
   (isOpen) => {
     if (!isOpen) return;
     name.value = props.currentName;
+    void nextTick(form.reset);
   },
 );
 
@@ -52,6 +55,9 @@ const nameError = computed(() => {
 const canSubmit = computed(
   () => name.value !== '' && name.value !== props.currentName && nameError.value === undefined,
 );
+const form = useFormErrors({
+  name: { value: () => name.value, error: () => nameError.value ?? null },
+});
 
 function cancel(): void {
   emit('close');
@@ -67,21 +73,30 @@ async function submit(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
-    <DialogContent :aria-describedby="undefined" size="md">
+    <DialogContent :aria-describedby="undefined" size="md" :dirty="name !== currentName">
       <DialogHeader>
         <DialogTitle>{{ t('git.dialog.rename.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <FieldDescription>
           <CatalogText k="git.dialog.rename.description">
-            <template #name><code class="font-data">{{ currentName }}</code></template>
+            <template #name><Identifier :value="currentName" /></template>
           </CatalogText>
         </FieldDescription>
 
         <Field>
           <FieldLabel :for="nameId">{{ t('git.dialog.rename.name.label') }}</FieldLabel>
-          <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
-          <FieldError v-if="nameError">{{ nameError }}</FieldError>
+          <Input
+            :id="nameId"
+            v-model="name"
+            type="text"
+            size="kira-lg"
+            class="w-full"
+            v-bind="form.invalidAttrs('name')"
+          />
+          <FieldError v-if="form.errorFor('name')" :id="form.errorId('name')">{{
+            form.errorFor('name')
+          }}</FieldError>
         </Field>
       </DialogBody>
 

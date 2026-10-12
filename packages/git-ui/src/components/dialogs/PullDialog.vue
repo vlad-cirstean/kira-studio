@@ -25,6 +25,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -51,7 +52,7 @@ function stashAndCarry(): void {
       <DialogBody>
         <DialogDescription>
           <CatalogText k="git.dialog.pull.body">
-            <template #strategy><code class="font-data">{{ pending.strategy }}</code></template>
+            <template #strategy><Identifier :value="pending.strategy" /></template>
           </CatalogText>
         </DialogDescription>
         <Alert variant="warn">

@@ -1,13 +1,10 @@
 import type { CommitStore } from '@kira/git-core';
 import type { GhStatus, PrLookupResult, PrRecord } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import { TIMING } from '@workbench/behaviour/timing';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createCancellableTimer } from './cancellableTimer.ts';
-
-/** D7's own selection debounce — arrow-keying through forty rows in one second costs one call,
- *  not forty. */
-const SELECTION_DEBOUNCE_MS = 300;
 
 /** G30 round-1 performance review, finding #1: `ensureSnapshot`'s own worker-pool cap — see that
  *  method's doc comment. Six, not one and not unbounded: small enough that a repo with hundreds of
@@ -92,7 +89,7 @@ export class PrState {
   #selectSha: string | undefined;
   readonly #selectTimer = createCancellableTimer(() => {
     if (this.#selectSha !== undefined) void this.#requestCommit(this.#selectSha);
-  }, SELECTION_DEBOUNCE_MS);
+  }, TIMING.preview);
   #selectController: AbortController | undefined;
   readonly #branchRequests = new Set<string>();
   /** G31 round-2 performance review, finding #3: branches whose `branch.resolvePr` answer came
@@ -219,7 +216,7 @@ export class PrState {
   }
 
   /** Selection changed (`SelectionState`'s own sha, mirrored here by the caller, exactly as
-   *  `DetailState.select` already is) — starts D7's own 300ms debounce, aborting any in-flight
+   *  `DetailState.select` already is) — starts D7's own selection debounce (`TIMING.preview`), aborting any in-flight
    *  request first. `null` clears the current selection's own result immediately, with no
    *  request. */
   select(sha: string | null): void {

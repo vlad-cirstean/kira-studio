@@ -78,11 +78,11 @@ export class StashState {
         this.globalEntries.value.find((entry) => entry.sha === sha)
       );
     });
-    this.#repo = new RepoScopedReload(bridge, 'StashState', {
+    this.#repo = new RepoScopedReload(bridge, 'gitStash', {
       kind: 'refsChanged',
       onChanged: () => {
-        this.#repo.fireAndForget('reload', () => this.reload());
-        this.#repo.fireAndForget('reloadGlobal', () => this.reloadGlobal());
+        this.#repo.fireAndForget(() => this.reload());
+        this.#repo.fireAndForget(() => this.reloadGlobal());
       },
     });
   }
@@ -99,8 +99,8 @@ export class StashState {
     this.selectedSha.value = null;
     this.changes.value = undefined;
     this.error.value = undefined;
-    this.#repo.fireAndForget('reload', () => this.reload());
-    this.#repo.fireAndForget('reloadGlobal', () => this.reloadGlobal());
+    this.#repo.fireAndForget(() => this.reload());
+    this.#repo.fireAndForget(() => this.reloadGlobal());
   }
 
   async reload(): Promise<void> {
