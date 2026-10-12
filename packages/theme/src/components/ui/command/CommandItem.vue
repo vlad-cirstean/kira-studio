@@ -17,7 +17,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
 const id = useId();
 const { filterState, allItems, allGroups } = useCommand();
-const groupContext = useCommandGroup();
+const groupContext = useCommandGroup(null);
 
 const isRender = computed(() => {
   if (!filterState.search) {
