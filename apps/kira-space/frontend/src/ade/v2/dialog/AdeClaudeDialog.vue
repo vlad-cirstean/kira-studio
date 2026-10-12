@@ -188,7 +188,7 @@ async function discard(): Promise<void> {
             :branch-id="baseBranch.id"
             :model-value="dialogs.spec?.onto ?? null"
             :current="currentBase"
-            @update:model-value="dialogs.pickBase"
+            @update:model-value="(c) => c && dialogs.pickBase(c)"
           />
         </div>
 

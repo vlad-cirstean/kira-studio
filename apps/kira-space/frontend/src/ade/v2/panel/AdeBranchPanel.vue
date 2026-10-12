@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import KeyValueList from '@theme/components/KeyValueList.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
+import Identifier from '@workbench/components/Identifier.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -255,9 +258,9 @@ function deployNote(d: Deployment): string {
   >
     <template #header>
       <Button
-        variant="ghost"
-        size="kira"
-        class="-ml-1.5 max-w-full justify-start self-start truncate text-muted-foreground"
+        variant="link"
+        size="inline"
+        class="max-w-full justify-start self-start truncate"
         data-testid="ade-panel-back"
         @click="ui.select(card.task.id)"
       >
@@ -279,7 +282,7 @@ function deployNote(d: Deployment): string {
           </span>
         </AdeTip>
         <h3
-          class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-medium leading-4.5"
+          class="m-0 line-clamp-2 min-w-0 flex-1 break-all font-data text-kira-lg font-medium text-fg"
           data-testid="ade-panel-title"
         >
           {{
@@ -290,12 +293,15 @@ function deployNote(d: Deployment): string {
       <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{
         facts
       }}</div>
-      <FieldError v-if="setupError" data-testid="ade-panel-setup-error">{{
-        setupError
-      }}</FieldError>
-      <FieldError v-if="ui.actionError[card.task.id]" data-testid="ade-panel-action-error">
-        {{ ui.actionError[card.task.id] }}
-      </FieldError>
+      <Alert v-if="setupError" variant="error" data-testid="ade-panel-setup-error"
+        ><AlertDescription>{{ setupError }}</AlertDescription></Alert
+      >
+      <Alert
+        v-if="ui.actionError[card.task.id]"
+        variant="error"
+        data-testid="ade-panel-action-error"
+        ><AlertDescription>{{ ui.actionError[card.task.id] }}</AlertDescription></Alert
+      >
       <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-1">
         <Button
           variant="dialog"
@@ -364,12 +370,12 @@ function deployNote(d: Deployment): string {
 
     <div
       v-if="ui.branchTab === 'details'"
-      class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-3 text-kira-md"
+      class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3 pb-3 pt-3 text-kira-md"
       data-testid="ade-branch-details"
     >
-      <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-        <span class="text-kira-sm text-muted-foreground">{{ t('common.field.branch.label') }}</span>
-        <div class="flex min-h-row min-w-0 items-center gap-2">
+      <KeyValueList class="items-center">
+        <dt>{{ t('common.field.branch.label') }}</dt>
+        <dd class="flex min-h-row min-w-0 items-center gap-2">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" wide />
           <template v-if="branch.name">
             <a
@@ -381,7 +387,7 @@ function deployNote(d: Deployment): string {
                 branch.name
               }}</a
             >
-            <span v-else class="min-w-0 truncate font-data text-kira-md">{{ branch.name }}</span>
+            <Identifier v-else :value="branch.name" />
             <span class="flex-1" />
             <TooltipIconButton
               :icon="copied && copiedKey === 'branch' ? 'check' : 'copy'"
@@ -390,11 +396,9 @@ function deployNote(d: Deployment): string {
               @click="copyLink('branch', branchUrl || branch.name)"
             />
           </template>
-        </div>
-        <span class="text-kira-sm text-muted-foreground">{{
-          t('space.ade.branchPanel.pr.label')
-        }}</span>
-        <div class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
+        </dd>
+        <dt>{{ t('space.ade.branchPanel.pr.label') }}</dt>
+        <dd class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
           <AdeChip
             :label="pr ? prStateLabel(pr.state) : t('common.state.none.option')"
             :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'"
@@ -415,8 +419,8 @@ function deployNote(d: Deployment): string {
               @click="copyLink('pr', pr.url)"
             />
           </template>
-        </div>
-      </div>
+        </dd>
+      </KeyValueList>
 
       <AdeWorktreeSetup :row="row" />
 
@@ -440,7 +444,7 @@ function deployNote(d: Deployment): string {
           :data-target="i.target"
         >
           <AdeChip :label="t(INTO_STATUS[i.status])" :tone="INTO_TONE[i.status]" wide />
-          <span class="font-data text-kira-md">{{ i.target }}</span>
+          <Identifier :value="i.target" />
           <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{
             intoNote(i)
           }}</span>
@@ -450,7 +454,7 @@ function deployNote(d: Deployment): string {
             size="kira"
             class="shrink-0 "
             :class="ACTION_CLASS[i.status === 'stale' ? 'amber' : 'claude']"
-            :disabled="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
+            :pending="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"
           >
@@ -459,9 +463,9 @@ function deployNote(d: Deployment): string {
             }}
           </Button>
         </div>
-        <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">
-          {{ t('space.ade.branchPanel.noIntegration.emptyHint') }}
-        </div>
+        <InlineState v-if="intoRows.length === 0" kind="empty">{{
+          t('space.ade.branchPanel.noIntegration.emptyHint')
+        }}</InlineState>
       </div>
 
       <div class="flex flex-col gap-0.5">
@@ -476,14 +480,14 @@ function deployNote(d: Deployment): string {
           :data-env="d.env"
         >
           <AdeChip :label="t(DEPLOY_STATUS[d.status])" :tone="DEPLOY_TONE[d.status]" wide />
-          <span class="font-data text-kira-md">{{ d.env }}</span>
+          <Identifier :value="d.env" />
           <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{
             deployNote(d)
           }}</span>
         </div>
-        <div v-if="deployRows.length === 0" class="text-kira-md text-subtle">
-          {{ t('space.ade.branchPanel.noEnvironments.emptyHint') }}
-        </div>
+        <InlineState v-if="deployRows.length === 0" kind="empty">{{
+          t('space.ade.branchPanel.noEnvironments.emptyHint')
+        }}</InlineState>
       </div>
     </div>
     <AdeSessionsTab

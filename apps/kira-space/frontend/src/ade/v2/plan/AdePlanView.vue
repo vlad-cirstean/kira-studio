@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { paneFrame } from '@theme/components/frames';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { cn } from '@theme/lib/utils';
 import { useElementSize, useScroll } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
@@ -11,8 +13,8 @@ import { computed, nextTick, ref } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import { dayLabel, firstWork, isoToOffset, nextWork, offsetToIso } from '../board/calendar';
-import { dayMenuFor } from '../board/dayMenu';
 import { dropVerdict, shiftPlanArgs } from '../board/dropPlan';
+import { dayMenuFor } from '../board/menu';
 import { refreshNote, remoteErrorText } from '../board/panelFacts';
 import { ITEM_LIMIT, type TimelineBand } from '../board/timeline';
 import { useRefresh, useSetPlan } from '../queries';
@@ -39,14 +41,14 @@ const { height: headerHeight } = useElementSize(headerEl);
 const { y: scrollY } = useScroll(scrollEl);
 
 // ---- refresh
-const busyIds = ref<string[]>([]);
-const allBusy = ref(false);
+const refreshingIds = ref<string[]>([]);
+const refreshingAll = ref(false);
 const refreshErrors = ref<Record<string, string>>({});
 
 async function runRefresh(codeRepoIds: string[], all: boolean): Promise<void> {
   const ids = all ? (model.value?.board.repos.map((r) => r.codeRepoId) ?? []) : codeRepoIds;
-  busyIds.value = [...busyIds.value, ...ids];
-  allBusy.value = allBusy.value || all;
+  refreshingIds.value = [...refreshingIds.value, ...ids];
+  refreshingAll.value = refreshingAll.value || all;
   const errs = { ...refreshErrors.value };
   for (const id of ids) delete errs[id];
   try {
@@ -62,8 +64,8 @@ async function runRefresh(codeRepoIds: string[], all: boolean): Promise<void> {
     for (const id of ids) errs[id] = msg;
   } finally {
     refreshErrors.value = errs;
-    busyIds.value = busyIds.value.filter((id) => !ids.includes(id));
-    if (all) allBusy.value = false;
+    refreshingIds.value = refreshingIds.value.filter((id) => !ids.includes(id));
+    if (all) refreshingAll.value = false;
   }
 }
 
@@ -74,7 +76,7 @@ const chips = computed<RepoChipModel[]>(() =>
     remote: r.remote,
     lastFetchAt: r.lastFetchAt,
     shown: !ui.hiddenRepoIds.includes(r.codeRepoId),
-    busy: busyIds.value.includes(r.codeRepoId),
+    pending: refreshingIds.value.includes(r.codeRepoId),
     error: refreshErrors.value[r.codeRepoId] ?? '',
     summary: ui.refreshSummary[r.codeRepoId] ?? '',
   })),
@@ -315,7 +317,7 @@ function onForcePush(row: BranchRowModel): void {
 <template>
   <div
     ref="scrollEl"
-    class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg"
+    :class="cn(paneFrame, 'relative flex-1 overflow-auto')"
     data-testid="ade-plan"
   >
     <QueryState
@@ -324,10 +326,10 @@ function onForcePush(row: BranchRowModel): void {
       :loading-label="t('space.ade.plan.view.loading.loading')"
     >
       <template v-if="model">
-        <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
+        <div ref="headerEl" class="sticky top-0 z-2 bg-bg">
           <AdePlanHeader
             :repos="chips"
-            :all-busy="allBusy"
+            :all-pending="refreshingAll"
             :ripple="model.ripple"
             @refresh-all="runRefresh([], true)"
             @refresh-one="(id) => runRefresh([id], false)"

@@ -203,7 +203,7 @@ async function pick(b: CandidateBranch): Promise<void> {
             <AdeBasePicker
               :code-repo-id="id"
               :model-value="bases[id] ?? MAIN"
-              @update:model-value="(c) => (bases[id] = c)"
+              @update:model-value="(c) => c && (bases[id] = c)"
             />
           </div>
         </template>

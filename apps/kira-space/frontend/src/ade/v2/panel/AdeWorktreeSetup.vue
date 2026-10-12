@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
 import { revealElement } from '@workbench/behaviour/focus';
 import { queryClient } from '@workbench/state/queryClient';
@@ -42,9 +43,7 @@ watch(
     class="flex flex-col gap-0.5"
     data-testid="ade-worktree-setup"
   >
-    <div class="pb-0.5 text-kira-sm text-muted-foreground">{{
-      t('space.ade.setup.title.label')
-    }}</div>
+    <SectionHeading :label="t('space.ade.setup.title.label')" />
     <AdeSetupProgress :branch="row.branch" :repo="row.repo" />
   </div>
 </template>

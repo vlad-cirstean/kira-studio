@@ -11,6 +11,7 @@ import {
 import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
+import { formatPercent } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
@@ -144,7 +145,7 @@ const headStyle = computed(() =>
       <div
         v-if="!card.review"
         ref="head"
-        class="box-border flex h-17 w-full cursor-pointer flex-col justify-center gap-1 border-b border-l-3 border-b-border px-2.5 py-1.5"
+        class="box-border flex h-17 w-full flex-col justify-center gap-1 border-b border-l-3 border-b-border px-2.5 py-1.5"
         :class="card.selected ? 'border-l-focus bg-hover' : 'border-l-transparent'"
         :style="headStyle"
         role="button"
@@ -191,7 +192,7 @@ const headStyle = computed(() =>
                     :style="{ width: `${p.percent}%` }"
                   />
                 </span>
-                <span class="text-kira-sm text-fg">{{ p.percent }}%</span>
+                <span class="text-kira-sm text-fg">{{ formatPercent(p.percent) }}</span>
               </span>
             </AdeTip>
           </template>
@@ -261,10 +262,10 @@ const headStyle = computed(() =>
         </div>
         <AdeTip :text="card.title">
           <Button
-            size="kira"
             type="button"
             variant="link"
-            class="line-clamp-2 block h-auto justify-start whitespace-normal break-words rounded-none border-0 p-0 text-left text-kira-lg leading-4"
+            size="inline"
+            class="line-clamp-2 block justify-start whitespace-normal break-words rounded-none border-0 text-left text-kira-lg leading-4"
             :class="card.parked ? 'text-muted-foreground' : 'text-fg'"
             :aria-label="t('space.ade.plan.card.open.aria', { title: card.title })"
             data-testid="ade-card-title"

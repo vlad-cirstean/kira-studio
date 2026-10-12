@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import EmptyState from '@theme/components/EmptyState.vue';
+import { paneFrame } from '@theme/components/frames';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { t } from '@theme/i18n';
+import { cn } from '@theme/lib/utils';
 import { useElementSize, useParentElement } from '@vueuse/core';
 import { computed } from 'vue';
 import { useAdeLayoutStore } from '../../../state/adeLayout';
@@ -56,7 +59,7 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
     v-bind="pane.bind"
   />
   <aside
-    class="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg"
+    :class="cn(paneFrame, 'flex shrink-0 flex-col')"
     :style="{ width: `${width}px` }"
     data-testid="ade-panel"
   >
@@ -65,8 +68,11 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
       <AdeTaskPanel v-else :card="card" :model="model" />
     </template>
     <AdeArchivedPanel v-else-if="archived" :entry="archived" />
-    <p v-else class="p-5 text-kira-md text-muted-foreground" data-testid="ade-panel-empty">
-      {{ t('space.ade.panel.empty.emptyHint') }}
-    </p>
+    <EmptyState
+      v-else
+      fill
+      :title="t('space.ade.panel.empty.emptyHint')"
+      data-testid="ade-panel-empty"
+    />
   </aside>
 </template>

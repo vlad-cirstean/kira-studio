@@ -6,14 +6,14 @@ import { control } from '../../../bridge/control';
 import { useRunAutomation } from '../automation/useRunAutomation';
 import { changeBaseChoices } from '../board/changeBase';
 import { movePlanArgs } from '../board/dropPlan';
-import { taskPatch } from '../board/panelFacts';
-import { reviewChoices } from '../board/reviewCode';
 import {
   type TaskMenuCmd,
   type TaskMenuEntry,
   type TaskMenuItem,
   taskMenuModel,
-} from '../board/taskMenu';
+} from '../board/menu';
+import { taskPatch } from '../board/panelFacts';
+import { reviewChoices } from '../board/reviewCode';
 import { useSetPlan, useSetTaskStage, useStopRun, useUpdateTask } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useTaskAction } from '../run/useTaskAction';

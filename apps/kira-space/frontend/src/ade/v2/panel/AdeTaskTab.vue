@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -9,10 +10,9 @@ import { t } from '@theme/i18n';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
-import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
-import { repoTint } from '../../../state/coderepos';
 import AdeChip from '../AdeChip.vue';
+import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
 import { STATUS_TONE, statusLabel as statusText, tagLabel } from '../board/actions';
 import { integrationChips } from '../board/labels';
@@ -36,8 +36,6 @@ const addUi = useAdeAddUiStore();
 const update = useUpdateTask();
 const addRepo = useAddTaskRepo();
 const repos = useRepos();
-const repoLinks = useRepoLinksStore();
-const tintOf = (id: string) => repoTint(repoLinks.repoColorOf(id));
 
 const task = computed(() => props.card.task);
 const review = computed(() => props.card.review);
@@ -121,26 +119,26 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
     class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3 pb-3 pt-3 text-kira-md"
     data-testid="ade-task-tab"
   >
-    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-      <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">{{
-        t('common.field.name.label')
-      }}</Label>
-      <Input
-        id="ade-task-name"
-        :model-value="nameEdit.text.value"
-        :placeholder="card.defaultTitle"
-        size="kira-lg"
-        class="font-medium"
-        data-testid="ade-task-name"
-        @update:model-value="nameEdit.onInput"
-        @blur="nameEdit.onCommit"
-        @keydown="nameEdit.onKeydown"
-      />
-      <span class="text-kira-sm text-muted-foreground">{{ t('common.field.status.label') }}</span>
-      <div class="flex min-h-row items-center gap-2">
+    <KeyValueList class="items-center">
+      <dt><Label for="ade-task-name">{{ t('common.field.name.label') }}</Label></dt>
+      <dd
+        ><Input
+          id="ade-task-name"
+          :model-value="nameEdit.text.value"
+          :placeholder="card.defaultTitle"
+          size="kira-lg"
+          class="font-medium"
+          data-testid="ade-task-name"
+          @update:model-value="nameEdit.onInput"
+          @blur="nameEdit.onCommit"
+          @keydown="nameEdit.onKeydown"
+        /></dd
+      >
+      <dt>{{ t('common.field.status.label') }}</dt>
+      <dd class="flex min-h-row items-center gap-2">
         <AdeChip :label="statusLabel" :tone="statusTone" />
         <span class="text-kira-sm text-subtle" data-testid="ade-task-status-why">{{ why }}</span>
-      </div>
+      </dd>
       <AdeLinkRow
         id="ade-task-jira"
         :label="t('common.product.jira.label')"
@@ -163,13 +161,13 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         @save="links.saveGithub"
         @clear="links.clearGithub"
       />
-      <span class="text-kira-sm text-muted-foreground">{{
-        t('space.ade.estimate.field.label')
-      }}</span>
-      <AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" />
+      <dt>{{ t('space.ade.estimate.field.label') }}</dt>
+      <dd
+        ><AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" /></dd
+      >
       <template v-if="!review">
-        <span />
-        <div class="flex min-h-row items-center gap-2">
+        <dt />
+        <dd class="flex min-h-row items-center gap-2">
           <Switch
             id="ade-task-parked"
             :model-value="card.parked"
@@ -180,18 +178,18 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
             t('space.ade.board.notMerging.label')
           }}</Label>
           <span class="text-kira-sm text-subtle">{{ t('space.ade.taskTab.notMerging.hint') }}</span>
-        </div>
+        </dd>
       </template>
-    </div>
-    <FieldError v-if="fieldError" data-testid="ade-task-error">{{ fieldError }}</FieldError>
+    </KeyValueList>
+    <Alert v-if="fieldError" variant="error" data-testid="ade-task-error"
+      ><AlertDescription>{{ fieldError }}</AlertDescription></Alert
+    >
 
     <AdeWorkflowBlock v-if="!review && !card.parked" :card="card" />
 
     <div class="flex flex-col gap-0.5">
       <div class="flex items-center gap-2 pb-0.5">
-        <span class="text-kira-sm text-muted-foreground">{{
-          t('common.module.branches.label')
-        }}</span>
+        <span class="text-kira-sm text-subtle">{{ t('common.module.branches.label') }}</span>
         <span class="flex-1" />
         <template v-if="!review">
           <Label for="ade-add-repo" class="sr-only">{{
@@ -226,21 +224,14 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         size="kira"
         v-for="row in card.rows"
         :key="row.id"
-        variant="ghost"
+        variant="toolbar"
         class="min-h-row w-full justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
         data-testid="ade-task-branch"
         :data-branch-id="row.id"
         @click="ui.selectBranch(task.id, row.id)"
       >
         <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
-        <span
-          class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-medium"
-          :class="tintOf(row.branch.codeRepoId).class"
-          :style="tintOf(row.branch.codeRepoId).style"
-          >{{
-            row.repo
-          }}</span
-        >
+        <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
         <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
           <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
             c.label

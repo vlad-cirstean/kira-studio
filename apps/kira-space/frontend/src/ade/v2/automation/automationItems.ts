@@ -1,6 +1,6 @@
 import type { CustomScript } from '@shared/domain/scripts';
 import { t } from '@theme/i18n';
-import type { TaskMenuItem } from '../board/taskMenu';
+import type { TaskMenuItem } from '../board/menu';
 
 /** The Run automation submenu: one item per saved script, smart ones marked; a hint when none. */
 export function automationItems(scripts: readonly CustomScript[]): TaskMenuItem[] {

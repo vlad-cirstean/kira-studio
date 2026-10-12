@@ -19,13 +19,13 @@ function onClick(): void {
 <template>
   <AdeTip :text="tip">
     <Button
-      size="kira"
+      size="inline"
       type="button"
-      variant="ghost"
+      variant="toolbar"
       :aria-label="t('common.needsYou.status')"
-      class="size-4.5 cursor-pointer rounded-full border-0 p-0 text-kira-sm font-extrabold shadow-[0_0_0_3px_var(--color-tone-amber-tint)]"
+      class="size-4.5 rounded-full border-0 p-0 text-kira-sm font-extrabold shadow-[0_0_0_3px_var(--color-tone-amber-tint)]"
       :class="TONE_SOLID_CLASS.amber"
-      :disabled="busy"
+      :pending="busy"
       data-testid="ade-attention"
       @click.stop="onClick"
       >!</Button

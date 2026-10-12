@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import {
   Command,
   CommandEmpty,
@@ -18,21 +18,20 @@ import AdeTip from './AdeTip.vue';
 import { useRepoBranches } from './queries';
 import type { BaseChoice, BasePick } from './wire';
 
-// The base of a branch: main, a planner branch, or any branch of the repo. `modelValue` null = the
+// The base of a branch: main, a planner branch, or any branch of the repo. A null model = the
 // current base, shown as `current`.
 const props = defineProps<{
   codeRepoId: string;
   /** The branch whose base is picked: it and its descendants are listed but disabled. */
   branchId?: string;
-  modelValue: BaseChoice | null;
-  /** Name shown while `modelValue` is null. */
+  /** Name shown while the model is null. */
   current?: string;
 }>();
-const emit = defineEmits<{ 'update:modelValue': [choice: BaseChoice] }>();
+const modelValue = defineModel<BaseChoice | null>({ required: true });
 
 const open = ref(false);
 const branches = useRepoBranches(() =>
-  open.value || props.modelValue !== null
+  open.value || modelValue.value !== null
     ? { codeRepoId: props.codeRepoId, branchId: props.branchId ?? '' }
     : null,
 );
@@ -45,7 +44,7 @@ const plain = computed(() =>
 );
 
 const shown = computed(() => {
-  const m = props.modelValue;
+  const m = modelValue.value;
   if (m === null) return props.current ?? data.value?.mainName ?? 'main';
   if (m.branchId)
     return data.value?.branches.find((b) => b.branchId === m.branchId)?.name || m.branchId;
@@ -57,7 +56,7 @@ function label(b: BasePick): string {
   return b.name || b.taskTitle;
 }
 function choose(c: BaseChoice): void {
-  emit('update:modelValue', c);
+  modelValue.value = c;
   open.value = false;
 }
 const pickOf = (b: BasePick): BaseChoice =>
@@ -67,15 +66,10 @@ const pickOf = (b: BasePick): BaseChoice =>
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button
-        variant="dialog"
-        size="kira"
-        class="max-w-full justify-start gap-1.5"
-        data-testid="ade-base-picker"
-      >
-        <CodiconIcon name="git-branch" :size="12" />
+      <PickerTrigger size="kira" data-testid="ade-base-picker">
+        <template #leading><CodiconIcon name="git-branch" :size="12" /></template>
         <VarText :parts="parts" />
-      </Button>
+      </PickerTrigger>
     </PopoverTrigger>
     <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="ade-base-popover">
       <Command>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
-import { SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
+import { SORTABLE_CHOSEN_CLASS, SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
@@ -46,6 +46,7 @@ const emit = defineEmits<{
 // drop target from the pointer instead.
 const dropEl = ref<HTMLElement | null>(null);
 const ghostClass = SORTABLE_GHOST_CLASS;
+const chosenClass = SORTABLE_CHOSEN_CLASS;
 useDraggable(dropEl, {
   draggable: '[data-ade-task]',
   sort: false,
@@ -54,7 +55,7 @@ useDraggable(dropEl, {
   fallbackOnBody: true,
   fallbackTolerance: 4,
   ghostClass,
-  chosenClass: 'ring-2',
+  chosenClass,
   onStart: (evt) => emit('dragStart', evt.item.dataset.taskId ?? ''),
   onEnd: () => emit('dragEnd'),
 });
@@ -141,8 +142,8 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         size="kira"
         v-for="h in history"
         :key="h.key"
-        variant="ghost"
-        class="ml-54.5 h-row w-auto justify-start gap-2 bg-tone-purple-solid/6 px-2.5 font-normal text-muted-foreground"
+        variant="toolbar"
+        class="ml-54.5 h-row w-auto justify-start gap-2 bg-tone-purple-solid/6 px-2.5 font-normal"
         :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
@@ -189,10 +190,9 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         size="kira"
         v-for="s in spans"
         :key="s.taskId"
-        variant="ghost"
-        class="ml-54.5 h-row w-auto justify-start gap-2 border border-l-3 border-dashed border-border-strong px-2.5 font-normal text-muted-foreground"
+        variant="toolbar"
+        class="ml-54.5 h-row w-auto justify-start gap-2 border border-l-3 border-dashed border-border-strong px-2.5 font-normal"
         :style="{ borderLeftColor: s.color }"
-        :title="s.tip"
         data-testid="ade-span-row"
         @click="emit('select', s.taskId)"
       >

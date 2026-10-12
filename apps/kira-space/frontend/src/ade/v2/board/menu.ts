@@ -1,14 +1,17 @@
 import type { ShortcutId } from '@shared/domain/shortcuts';
 import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
+import type { Settings, SettingsPatch } from '../../../state/settingsDomain';
 import type { CardModel } from '../plan/usePlanModel';
-import type { Plan, Session } from '../wire';
-import { type Calendar, LATER, nextWork } from './calendar';
+import type { Plan, Run, Session } from '../wire';
+import type { BranchGraph } from './branchGraph';
+import { type Calendar, isWeekend, LATER, nextWork, offsetToIso } from './calendar';
 import type { ChangeBaseChoice } from './changeBase';
-import type { RebaseAct } from './rebaseActions';
+import { type RebaseAct, rebaseActs } from './rebaseActions';
 import type { ReviewChoice } from './reviewCode';
 import { nextStageId } from './stageBlocks';
 
+// ---- Task context menu
 // Task context menu (P198): which entries a task shows and what each does. Pure; `useTaskMenu` maps
 // a command to its call.
 
@@ -336,5 +339,114 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
       disabled: i.archivePending,
     },
   );
+  return out;
+}
+
+// ---- Day context menu
+export interface DayMenu {
+  label: string;
+  patch: SettingsPatch['ade'];
+  /** Marking a worked weekday off, with tasks starting that day: offer to move them. */
+  confirm: boolean;
+}
+
+/** Day context menu, mockup v2 lines 1315-1332. `null` on Later and past days; off > weekend > weekday. */
+export function dayMenuFor(
+  cal: Calendar,
+  settings: Settings['ade'],
+  today: string,
+  day: number,
+  startCount: number,
+): DayMenu | null {
+  if (day === LATER || day < 0) return null;
+  const iso = offsetToIso(today, day);
+  if (cal.offDays.has(day)) {
+    return {
+      label: t('space.ade.board.dayMenu.workingDay.label'),
+      patch: { offDays: settings.offDays.filter((d) => d !== iso) },
+      confirm: false,
+    };
+  }
+  if (isWeekend(cal, day)) {
+    return cal.workWeekend.has(day)
+      ? {
+          label: t('space.ade.board.dayMenu.weekend.label'),
+          patch: { workWeekendDays: settings.workWeekendDays.filter((d) => d !== iso) },
+          confirm: false,
+        }
+      : {
+          label: t('space.ade.board.dayMenu.workThisDay.label'),
+          patch: { workWeekendDays: [...settings.workWeekendDays, iso] },
+          confirm: false,
+        };
+  }
+  return {
+    label: t('space.ade.board.dayMenu.dayOff.label'),
+    patch: { offDays: [...settings.offDays.filter((d) => d >= today), iso] },
+    confirm: startCount > 0,
+  };
+}
+
+// ---- Branch row fix menu
+/** The branch row's right-click menu (mockup `branchMenu`): what can be fixed on a created mine
+ *  branch, one item per fix. */
+
+export type FixItem =
+  | { id: string; kind: 'merge'; label: string; target: string }
+  | { id: string; kind: 'act'; label: string; act: RebaseAct; hint: readonly TextPart[] }
+  | { id: string; kind: 'forcePush'; label: string };
+
+export interface FixInput {
+  branchId: string;
+  graph: BranchGraph;
+  /** The repo's integration branches. */
+  targets: readonly string[];
+  /** `TimelineView.after`: earlier-merging branch this one shares files with. */
+  after: ReadonlyMap<string, { id: string; file: string }>;
+  unpushed: Readonly<Record<string, boolean>>;
+  runs: readonly Run[];
+  /** Short name of the repo's main branch, `''` when unresolved. */
+  mainName: string;
+}
+
+const plain = (parts: readonly TextPart[]): string =>
+  parts.map((p) => (typeof p === 'string' ? p : p.value)).join('');
+
+/** `null` for a draft or a branch that is not mine: those get no menu. */
+export function fixItems(i: FixInput): FixItem[] | null {
+  const b = i.graph.byBranch.get(i.branchId);
+  if (!b || b.name === '' || b.kind !== 'mine') return null;
+  const out: FixItem[] = [];
+  for (const target of i.targets) {
+    const status = b.integration.find((x) => x.target === target)?.status ?? 'not merged';
+    if (status === 'merged') continue;
+    out.push({
+      id: `ade-fix-merge-${target}`,
+      kind: 'merge',
+      label: t(
+        status === 'stale'
+          ? 'space.ade.board.fixMenu.reMerge.label'
+          : 'space.ade.board.fixMenu.merge.label',
+        { target },
+      ),
+      target,
+    });
+  }
+  const acts = rebaseActs({
+    branch: b,
+    graph: i.graph,
+    after: i.after,
+    runs: i.runs,
+    mainName: i.mainName,
+  });
+  for (const act of acts) {
+    out.push({ id: `ade-fix-${act.id}`, kind: 'act', label: plain(act.label), act, hint: act.tip });
+  }
+  if (i.unpushed[b.id])
+    out.push({
+      id: 'ade-fix-force-push',
+      kind: 'forcePush',
+      label: t('common.forcePush.label'),
+    });
   return out;
 }

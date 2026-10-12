@@ -16,7 +16,7 @@ import type { BacklogItem } from '../wire';
 // One backlog line: reorder, promote, delete, added-ago, inline-edit text and quiet link facts.
 const props = defineProps<{ item: BacklogItem; selected: boolean }>();
 const emit = defineEmits<{
-  pick: [];
+  select: [];
   move: [delta: -1 | 1];
   promote: [];
   remove: [];
@@ -45,16 +45,16 @@ const facts = computed(() => {
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds inputs and buttons a button cannot. -->
   <div
-    :class="cn(rowVariants({ layout: 'tree', selected }), 'cursor-pointer gap-2 border-b border-border py-1')"
+    :class="cn(rowVariants({ layout: 'tree', selected }), 'gap-2 border-b border-border py-1')"
     :style="rowIndent(0)"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
     data-testid="ade-backlog-row"
     :data-item-id="item.id"
-    @click="emit('pick')"
-    @keydown.self.enter="emit('pick')"
-    @keydown.self.space.prevent="emit('pick')"
+    @click="emit('select')"
+    @keydown.self.enter="emit('select')"
+    @keydown.self.space.prevent="emit('select')"
   >
     <AdeTip :text="t('common.moveUp.tooltip')">
       <Button
@@ -94,7 +94,7 @@ const facts = computed(() => {
       <Button
         variant="toolbar"
         size="kira-icon"
-        class="text-error"
+        data-tone="error"
         :aria-label="t('common.action.delete.label')"
         data-testid="ade-backlog-delete"
         @click.stop="emit('remove')"
@@ -111,7 +111,8 @@ const facts = computed(() => {
     <Input
       :id="`ade-backlog-${item.id}`"
       :model-value="edit.text.value"
-      class="min-w-0 flex-1 border-transparent bg-transparent px-2 dark:bg-transparent"
+      appearance="inline"
+      class="min-w-0 flex-1"
       data-testid="ade-backlog-text"
       @update:model-value="edit.onInput"
       @blur="edit.onCommit"

@@ -17,7 +17,7 @@ const props = defineProps<{
   remote: string;
   lastFetchAt: number | null;
   shown: boolean;
-  busy: boolean;
+  pending: boolean;
   error: string;
   /** What the last fetch changed, e.g. `3 refs changed`; `''` before any fetch. */
   summary: string;
@@ -26,7 +26,7 @@ const emit = defineEmits<{ toggle: []; refresh: [] }>();
 
 const ago = useRelativeTime(() => props.lastFetchAt ?? 0);
 const note = computed(() => {
-  if (props.busy) return t('common.fetching.loading');
+  if (props.pending) return t('common.fetching.loading');
   if (props.error) return props.error;
   if (props.remote === '') {
     const none = t('space.ade.plan.repoChip.noRemote.status');
@@ -45,7 +45,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
   <Badge
     variant="chip"
     class="h-control-lg max-w-80 gap-1.5 border border-border-strong px-0.5"
-    :class="shown ? 'bg-elevated' : 'bg-transparent opacity-50'"
+    :class="shown ? 'bg-elevated' : 'bg-transparent'"
     data-testid="ade-repo-chip"
     :data-repo-id="codeRepoId"
   >
@@ -76,7 +76,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
       <Button
         variant="toolbar"
         size="kira-icon"
-        :disabled="busy"
+        :pending="pending"
         :aria-label="t('space.ade.plan.repoChip.refresh.aria', { label })"
         data-testid="ade-repo-refresh"
         @click="emit('refresh')"

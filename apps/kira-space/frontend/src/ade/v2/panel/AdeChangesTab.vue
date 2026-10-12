@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { computed, useTemplateRef } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { TONE_TAG_CLASS } from '../tones';
@@ -30,17 +33,27 @@ const worktree = computed(() => {
 });
 const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).join(', '));
 
-// A branch can touch thousands of files: the list scrolls in its own box and renders only the window.
-const FILE_ROW_HEIGHT = 24;
+// A branch can touch thousands of files or commits: each list scrolls in its own box and renders only the window.
+const { single: rowHeight } = useRowHeight();
 const filesEl = useTemplateRef<HTMLElement>('filesEl');
+const commitsEl = useTemplateRef<HTMLElement>('commitsEl');
 const {
   virtualItems: fileItems,
   totalSize: filesSize,
   onScroll: onFilesScroll,
 } = useVirtualRows({
   count: () => props.branch.files.length,
-  rowHeight: () => FILE_ROW_HEIGHT,
+  rowHeight: () => rowHeight.value,
   scrollElement: filesEl,
+});
+const {
+  virtualItems: commitItems,
+  totalSize: commitsSize,
+  onScroll: onCommitsScroll,
+} = useVirtualRows({
+  count: () => props.branch.commits.length,
+  rowHeight: () => rowHeight.value,
+  scrollElement: commitsEl,
 });
 
 const dirtyClass = (d: DirtyEntry): string =>
@@ -50,41 +63,36 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
 
 <template>
   <div
-    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3 pb-3 pt-2.5 text-kira-md"
+    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3 pb-3 pt-3 text-kira-md"
     data-testid="ade-changes-tab"
   >
-    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
-      <span class="text-muted-foreground">{{ t('space.common.base.label') }}</span>
-      <span class="font-data text-kira-sm"
-        >{{ base }}
-        · ↑{{ branch.ahead }}
-        ↓{{ branch.behind }}</span
-      >
-      <span class="text-muted-foreground">{{ t('common.worktree.label') }}</span>
-      <span
+    <KeyValueList class="items-baseline">
+      <dt>{{ t('space.common.base.label') }}</dt>
+      <dd class="font-data text-kira-sm">{{ base }} · ↑{{ branch.ahead }} ↓{{ branch.behind }}</dd>
+      <dt>{{ t('common.worktree.label') }}</dt>
+      <dd
         class="font-data text-kira-sm"
         :class="branch.dirty.length ? 'text-tone-amber' : undefined"
         data-testid="ade-changes-worktree"
-        >{{
-          worktree
-        }}</span
       >
+        {{ worktree }}
+      </dd>
       <template v-if="conflicts">
-        <span class="text-muted-foreground">{{ t('space.ade.changes.conflicts.label') }}</span>
-        <span class="font-data text-kira-sm text-tone-red" data-testid="ade-changes-conflict">{{
-          conflicts
-        }}</span>
+        <dt>{{ t('space.ade.changes.conflicts.label') }}</dt>
+        <dd class="font-data text-kira-sm text-tone-red" data-testid="ade-changes-conflict">
+          {{ conflicts }}
+        </dd>
       </template>
       <template v-if="shared">
-        <span class="text-muted-foreground">{{ t('space.ade.changes.shares.label') }}</span>
-        <span class="font-data text-kira-sm text-tone-amber" data-testid="ade-changes-shared">{{
-          shared
-        }}</span>
+        <dt>{{ t('space.ade.changes.shares.label') }}</dt>
+        <dd class="font-data text-kira-sm text-tone-amber" data-testid="ade-changes-shared">
+          {{ shared }}
+        </dd>
       </template>
-    </div>
+    </KeyValueList>
 
     <div v-if="branch.dirty.length" class="flex flex-col gap-0.5">
-      <div class="text-muted-foreground">{{ t('space.ade.changes.uncommitted.label') }}</div>
+      <SectionHeading :label="t('space.ade.changes.uncommitted.label')" />
       <div
         v-for="d in branch.dirty"
         :key="d.path"
@@ -97,15 +105,29 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
     </div>
 
     <div class="flex flex-col gap-0.5">
-      <div class="text-muted-foreground">{{ t('common.module.commits.label') }}</div>
+      <SectionHeading :label="t('common.module.commits.label')" />
       <div
-        v-for="c in branch.commits"
-        :key="c.sha"
-        class="flex items-baseline gap-2"
-        data-testid="ade-changes-commit-row"
+        ref="commitsEl"
+        class="max-h-64 overflow-auto"
+        data-testid="ade-changes-commits"
+        @scroll.passive="onCommitsScroll"
       >
-        <span class="font-data text-kira-sm text-tone-amber-solid">{{ c.sha }}</span>
-        <AdeTip :text="commitTitle(c)"><span class="truncate">{{ c.message }}</span></AdeTip>
+        <div class="relative w-full" :style="{ height: `${commitsSize}px` }">
+          <div
+            v-for="item in commitItems"
+            :key="branch.commits[item.index]?.sha ?? item.key"
+            :class="cn(VIRTUAL_ROW_CLASS, 'flex items-baseline gap-2')"
+            :style="{ height: `${rowHeight}px`, transform: `translateY(${item.start}px)` }"
+            data-testid="ade-changes-commit-row"
+          >
+            <span class="font-data text-kira-sm text-tone-amber-solid">{{
+              branch.commits[item.index]?.sha
+            }}</span>
+            <AdeTip :text="commitTitle(branch.commits[item.index] as Commit)"
+              ><span class="truncate">{{ branch.commits[item.index]?.message }}</span></AdeTip
+            >
+          </div>
+        </div>
       </div>
       <div
         v-if="branch.commitCount > branch.commits.length"
@@ -116,7 +138,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
     </div>
 
     <div class="flex flex-col gap-0.5">
-      <div class="text-muted-foreground">{{ t('common.module.files.label') }}</div>
+      <SectionHeading :label="t('common.module.files.label')" />
       <div
         ref="filesEl"
         class="max-h-64 overflow-auto"
@@ -134,7 +156,7 @@ const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
                 branch.conflictsIfRebased.includes(branch.files[item.index]?.path ?? '') ? TONE_TAG_CLASS.red : 'text-fg',
               )
             "
-            :style="{ height: `${FILE_ROW_HEIGHT}px`, transform: `translateY(${item.start}px)` }"
+            :style="{ height: `${rowHeight}px`, transform: `translateY(${item.start}px)` }"
             data-testid="ade-changes-file-row"
           >
             {{ branch.files[item.index]?.path }}

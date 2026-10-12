@@ -105,7 +105,6 @@ U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host ex
 U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
 U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret
 # B (apps/kira-space, W/memory)
-U9 apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue # inline edit input blends into the row until focused
 U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
 U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
 U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-zone DOM built outside Vue cannot render Alert, banner tint matches Alert error

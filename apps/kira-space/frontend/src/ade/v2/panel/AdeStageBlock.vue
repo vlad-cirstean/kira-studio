@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
-import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
@@ -187,8 +187,8 @@ function logToggleLabel(runId: string): string {
 <template>
   <Card
     variant="section"
-    class="gap-1 px-2.5 py-2"
-    :class="[skipped ? 'opacity-60' : '', boxClass]"
+    class="gap-1 px-2 py-2"
+    :class="[skipped ? 'text-muted-foreground' : '', boxClass]"
     data-testid="ade-stage-block"
     :data-stage-id="block.stage.id"
     :data-state="block.state"
@@ -204,7 +204,7 @@ function logToggleLabel(runId: string): string {
         :tone="STATE_TONE[block.state]"
         class="min-w-10 text-center"
       />
-      <slot name="action" />
+      <slot name="actions" />
       <span class="text-kira-lg font-medium" data-testid="ade-stage-block-name">{{
         block.stage.name
       }}</span>
@@ -288,7 +288,7 @@ function logToggleLabel(runId: string): string {
       </div>
       <template v-for="rl in sv.runs" :key="rl.run.branchId">
         <div
-          class="flex min-h-control items-center gap-1.75 pl-6"
+          class="flex min-h-control items-center gap-2 pl-6"
           data-testid="ade-run-line"
           :data-branch-id="rl.run.branchId"
         >
@@ -328,7 +328,7 @@ function logToggleLabel(runId: string): string {
             size="kira"
             class="shrink-0 "
             :class="ACTION_CLASS.claude"
-            :disabled="takeOver.pending.has(rl.run.sessionId)"
+            :pending="takeOver.pending.has(rl.run.sessionId)"
             data-testid="ade-run-takeover"
             @click="takeOver.request(rl.run.sessionId)"
           >
@@ -377,9 +377,9 @@ function logToggleLabel(runId: string): string {
     <Button
       v-for="row in released"
       :key="row.id"
-      variant="ghost"
+      variant="toolbar"
       size="kira-lg"
-      class="w-full justify-start gap-2 rounded-kira-sm bg-bg px-1.5 text-left text-fg"
+      class="w-full justify-start gap-2 bg-bg px-1.5 text-left text-fg"
       data-testid="ade-release-row"
       :data-branch-id="row.id"
       @click="ui.selectBranch(card.task.id, row.id)"
@@ -423,6 +423,8 @@ function logToggleLabel(runId: string): string {
         </TooltipDisabledTrigger>
       </AdeTip>
     </div>
-    <FieldError v-if="error" data-testid="ade-stage-block-error">{{ error }}</FieldError>
+    <Alert v-if="error" variant="error" data-testid="ade-stage-block-error"
+      ><AlertDescription>{{ error }}</AlertDescription></Alert
+    >
   </Card>
 </template>

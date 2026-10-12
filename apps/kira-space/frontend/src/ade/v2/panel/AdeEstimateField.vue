@@ -86,6 +86,8 @@ const hint = computed(() =>
         step="0.5"
         size="kira-lg"
         class="w-20"
+        :aria-invalid="error ? true : undefined"
+        :aria-describedby="error ? 'ade-estimate-error-text' : undefined"
         data-testid="ade-estimate-extend"
       />
       <span class="text-kira-sm text-muted-foreground">{{
@@ -112,6 +114,8 @@ const hint = computed(() =>
         step="0.5"
         size="kira-lg"
         class="w-20"
+        :aria-invalid="error ? true : undefined"
+        :aria-describedby="error ? 'ade-estimate-error-text' : undefined"
         data-testid="ade-estimate-num"
         @change="commit"
       />
@@ -127,6 +131,8 @@ const hint = computed(() =>
       />
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
-    <FieldError v-if="error" data-testid="ade-estimate-error">{{ error }}</FieldError>
+    <FieldError v-if="error" id="ade-estimate-error-text" data-testid="ade-estimate-error">{{
+      error
+    }}</FieldError>
   </div>
 </template>

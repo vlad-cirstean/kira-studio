@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowActions } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Kbd } from '@theme/components/ui/kbd';
@@ -13,7 +14,7 @@ import { useRepos } from '../../../repo/state/reposQueries';
 import { repoTint } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
 import { useRunAutomation } from '../automation/useRunAutomation';
-import { fixItems } from '../board/fixMenu';
+import { fixItems } from '../board/menu';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -140,7 +141,7 @@ const rowBgClass = computed(() => {
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
   <div
     ref="rowEl"
-    class="group box-border flex h-board-row w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
+    class="group box-border flex h-board-row w-full items-center gap-1.5 border-l-3 px-2.5"
     :class="[
       rowBgClass,
       selected ? 'border-l-focus' : 'border-l-transparent',
@@ -262,7 +263,7 @@ const rowBgClass = computed(() => {
       icon="git-compare"
       :label="t('space.ade.board.taskMenu.reviewCode.label')"
       class="size-5 shrink-0"
-      :class="selected ? 'opacity-100' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'"
+      :class="selected ? 'opacity-100' : rowActions"
       disabled-trigger
       :disabled="reviewCode.pending.value || choice.disabled"
       data-testid="ade-branch-review"

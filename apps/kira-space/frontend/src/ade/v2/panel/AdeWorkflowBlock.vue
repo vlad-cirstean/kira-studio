@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -79,20 +79,16 @@ function edit(): void {
         </TooltipTrigger>
         <TooltipContent>{{ t('space.ade.workflowBlock.spaceToolsHint.hint') }}</TooltipContent>
       </Tooltip>
-      <Button
-        variant="link"
-        size="kira"
-        class="px-2 text-info"
-        data-testid="ade-edit-workflows"
-        @click="edit"
-      >
+      <Button variant="link" size="inline" data-testid="ade-edit-workflows" @click="edit">
         {{ t('space.ade.workflowBlock.edit.label') }}
       </Button>
     </div>
-    <FieldError v-if="error" data-testid="ade-workflow-error">{{ error }}</FieldError>
+    <Alert v-if="error" variant="error" data-testid="ade-workflow-error"
+      ><AlertDescription>{{ error }}</AlertDescription></Alert
+    >
     <AdeStageMover :card="card" />
     <AdeStageBlock v-for="b in card.blocks" :key="b.stage.id" :block="b" :card="card">
-      <template #action>
+      <template #actions>
         <AdeTaskActionButton v-if="b.state === 'now'" :card="card" />
       </template>
     </AdeStageBlock>

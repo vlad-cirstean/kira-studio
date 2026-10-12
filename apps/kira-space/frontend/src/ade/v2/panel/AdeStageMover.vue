@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Button } from '@theme/components/ui/button';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
-import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { errorText } from '@workbench/bridge/codedError';
@@ -59,10 +58,12 @@ async function move(stageId: string): Promise<void> {
       />
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button variant="dialog" size="kira" :disabled="live" data-testid="ade-stage-pick">
-            {{ options[at]?.name }}
-            <CodiconIcon name="chevron-down" :size="12" />
-          </Button>
+          <PickerTrigger
+            size="kira"
+            :label="options[at]?.name"
+            :disabled="live"
+            data-testid="ade-stage-pick"
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" data-testid="ade-stage-menu">
           <DropdownMenuItem
@@ -87,6 +88,8 @@ async function move(stageId: string): Promise<void> {
         @click="move(next?.id ?? '')"
       />
     </div>
-    <FieldError v-if="error" data-testid="ade-stage-error">{{ error }}</FieldError>
+    <Alert v-if="error" variant="error" data-testid="ade-stage-error"
+      ><AlertDescription>{{ error }}</AlertDescription></Alert
+    >
   </div>
 </template>

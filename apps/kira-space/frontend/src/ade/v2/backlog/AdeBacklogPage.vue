@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { FieldError } from '@theme/components/ui/field';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { paneFrame } from '@theme/components/frames';
+import InlineState from '@theme/components/InlineState.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
+import { cn } from '@theme/lib/utils';
 import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -94,14 +99,10 @@ function onEdit(id: string, value: string): void {
 
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-backlog">
-    <div
-      class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg"
-    >
+    <div :class="cn(paneFrame, 'flex flex-1 flex-col')">
       <PanelHeader>{{ t('space.common.backlog.label') }}</PanelHeader>
       <div class="flex shrink-0 flex-col gap-2 border-b border-border p-3">
-        <span class="text-kira-md text-muted-foreground">{{
-          t('space.ade.backlog.intro.hint')
-        }}</span>
+        <FieldDescription>{{ t('space.ade.backlog.intro.hint') }}</FieldDescription>
         <Label for="ade-backlog-add" class="sr-only">{{ t('space.ade.backlog.add.label') }}</Label>
         <Input
           id="ade-backlog-add"
@@ -111,7 +112,9 @@ function onEdit(id: string, value: string): void {
           data-testid="ade-backlog-add"
           @keydown.enter="capture"
         />
-        <FieldError v-if="error" data-testid="ade-backlog-page-error">{{ error }}</FieldError>
+        <Alert v-if="error" variant="error" data-testid="ade-backlog-page-error"
+          ><AlertDescription>{{ error }}</AlertDescription></Alert
+        >
       </div>
       <div class="flex min-h-0 flex-1 flex-col overflow-auto">
         <AdeBacklogRow
@@ -119,20 +122,18 @@ function onEdit(id: string, value: string): void {
           :key="item.id"
           :item="item"
           :selected="selected?.id === item.id"
-          @pick="pickedId = item.id"
+          @select="pickedId = item.id"
           @move="(d) => onMove(i, d)"
           @promote="onPromote(item.id)"
           @remove="onRemove(item.id)"
           @edit="(v) => onEdit(item.id, v)"
         />
-        <div v-if="!items.length" class="px-3 py-6 text-kira-lg text-subtle">{{
+        <InlineState v-if="!items.length" kind="empty">{{
           t('space.common.backlogEmpty.empty')
-        }}</div>
+        }}</InlineState>
       </div>
     </div>
-    <aside
-      class="flex min-h-0 w-130 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg"
-    >
+    <aside :class="cn(paneFrame, 'flex w-130 shrink-0 flex-col')">
       <AdeBacklogPanel
         v-if="selected"
         :key="selected.id"
@@ -140,9 +141,7 @@ function onEdit(id: string, value: string): void {
         @promote="onPromote(selected.id)"
         @remove="onRemove(selected.id)"
       />
-      <div v-else class="p-5 text-kira-md text-subtle">{{
-        t('space.ade.backlog.selectHint.hint')
-      }}</div>
+      <EmptyState v-else fill :title="t('space.ade.backlog.selectHint.hint')" />
     </aside>
   </div>
 </template>

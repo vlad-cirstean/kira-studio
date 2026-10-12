@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ScriptProgress from '@theme/components/ScriptProgress.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
@@ -51,9 +51,9 @@ async function onRetry(): Promise<void> {
           variant="dialog"
           v-if="status.state === 'failed'"
           size="kira"
-          class="shrink-0 rounded-kira-xs px-2 "
+          class="shrink-0"
           :class="TONE_SOLID_CLASS.amber"
-          :disabled="retry.isPending.value"
+          :pending="retry.isPending.value"
           data-testid="ade-setup-retry"
           @click="onRetry"
         >
@@ -67,6 +67,8 @@ async function onRetry(): Promise<void> {
         max-height="160px"
       />
     </ScriptProgress>
-    <FieldError v-if="error" data-testid="ade-setup-error">{{ error }}</FieldError>
+    <Alert v-if="error" variant="error" data-testid="ade-setup-error"
+      ><AlertDescription>{{ error }}</AlertDescription></Alert
+    >
   </div>
 </template>

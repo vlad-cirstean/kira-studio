@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
@@ -23,7 +23,6 @@ import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { TONE_TAG_CLASS } from '../tones';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeTaskTab from './AdeTaskTab.vue';
 
@@ -105,7 +104,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         <Button
           variant="dialog"
           size="kira-lg"
-          :disabled="dialogs.pending.has(`archive:${card.task.id}`)"
+          :pending="dialogs.pending.has(`archive:${card.task.id}`)"
           data-testid="ade-panel-archive"
           @click="dialogs.archive(card.task.id)"
         >
@@ -144,7 +143,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         <AdeChip :label="label" :tone="tone" />
         <AdeTip :text="card.title">
           <h3
-            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-medium leading-4.5"
+            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-medium text-fg"
             data-testid="ade-panel-title"
           >
             {{ card.title }}
@@ -154,28 +153,26 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
       <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{
         facts
       }}</div>
-      <FieldError v-if="ui.actionError[card.task.id]" data-testid="ade-panel-action-error">
-        {{ ui.actionError[card.task.id] }}
-      </FieldError>
-      <AdeAutomationsBlock :task-id="card.task.id" />
-      <div
-        v-if="card.review"
-        class="flex items-center gap-2 rounded-kira px-2.5 py-1.5 text-kira-md"
-        :class="TONE_TAG_CLASS.blue"
-        data-testid="ade-panel-review-note"
+      <Alert
+        v-if="ui.actionError[card.task.id]"
+        variant="error"
+        data-testid="ade-panel-action-error"
+        ><AlertDescription>{{ ui.actionError[card.task.id] }}</AlertDescription></Alert
       >
-        {{
+      <AdeAutomationsBlock :task-id="card.task.id" />
+      <Alert v-if="card.review" variant="info" data-testid="ade-panel-review-note"
+        ><AlertDescription>{{
           t('space.ade.taskPanel.reviewNote.body', { owner: card.task.owner || t('space.ade.taskPanel.someone.label') })
-        }}
-      </div>
+        }}</AlertDescription></Alert
+      >
     </template>
     <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />
     <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
     <div v-else class="flex min-h-0 flex-1 flex-col p-3" data-testid="ade-notes-tab">
       <AdeNotesEditor :notes="card.task.notes" :item-id="card.task.id" @save="saveNotes" />
-      <FieldError v-if="notesError" class="pt-1" data-testid="ade-notes-error">{{
-        notesError
-      }}</FieldError>
+      <Alert v-if="notesError" variant="error" data-testid="ade-notes-error"
+        ><AlertDescription>{{ notesError }}</AlertDescription></Alert
+      >
     </div>
   </AdePanelFrame>
 </template>

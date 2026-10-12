@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
@@ -10,6 +11,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
+import AdeTip from '../AdeTip.vue';
 import { backlogPatch, parseGithub } from '../board/panelFacts';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import AdeLinkRow from '../panel/AdeLinkRow.vue';
@@ -73,16 +75,17 @@ function saveNotes(_id: string, value: string): void {
         t('space.ade.backlog.captured.label', { ago })
       }}</div>
       <div class="flex gap-2">
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          :class="TONE_SOLID_CLASS.amber"
-          :title="t('space.ade.backlog.promotePanel.tooltip')"
-          data-testid="ade-backlog-panel-promote"
-          @click="emit('promote')"
-        >
-          {{ t('space.ade.backlog.promotePanel.label') }}
-        </Button>
+        <AdeTip :text="t('space.ade.backlog.promotePanel.tooltip')">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            :class="TONE_SOLID_CLASS.amber"
+            data-testid="ade-backlog-panel-promote"
+            @click="emit('promote')"
+          >
+            {{ t('space.ade.backlog.promotePanel.label') }}
+          </Button>
+        </AdeTip>
         <Button
           variant="dialog"
           size="kira-lg"
@@ -93,46 +96,46 @@ function saveNotes(_id: string, value: string): void {
         </Button>
       </div>
     </header>
-    <div
-      class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md"
-    >
-      <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">{{
-        t('common.field.title.label')
-      }}</Label>
-      <Input
-        id="ade-backlog-title-input"
-        :model-value="titleEdit.text.value"
-        class="font-medium"
-        data-testid="ade-backlog-title-input"
-        @update:model-value="titleEdit.onInput"
-        @blur="titleEdit.onCommit"
-        @keydown="titleEdit.onKeydown"
-      />
-      <AdeLinkRow
-        id="ade-backlog-jira"
-        :label="t('common.product.jira.label')"
-        chip=""
-        :text="jira?.key ?? ''"
-        :url="jira?.url ?? ''"
-        :placeholder="t('space.ade.backlog.jira.placeholder')"
-        :error="links.jiraError.value"
-        @save="links.saveJira"
-        @clear="links.clearJira"
-      />
-      <AdeLinkRow
-        id="ade-backlog-github"
-        :label="t('common.product.github.label')"
-        :chip="links.github.value?.kind ?? ''"
-        :text="links.github.value?.ref ?? ''"
-        :url="parseGithub(item.githubUrl) ? item.githubUrl : ''"
-        :placeholder="t('space.ade.backlog.github.placeholder')"
-        :error="links.githubError.value"
-        @save="links.saveGithub"
-        @clear="links.clearGithub"
-      />
-      <FieldError v-if="error" class="col-span-2" data-testid="ade-backlog-error">{{
-        error
-      }}</FieldError>
+    <div class="flex shrink-0 flex-col gap-2 px-3 py-3 text-kira-md">
+      <KeyValueList class="items-center">
+        <dt><Label for="ade-backlog-title-input">{{ t('common.field.title.label') }}</Label></dt>
+        <dd
+          ><Input
+            id="ade-backlog-title-input"
+            :model-value="titleEdit.text.value"
+            class="font-medium"
+            data-testid="ade-backlog-title-input"
+            @update:model-value="titleEdit.onInput"
+            @blur="titleEdit.onCommit"
+            @keydown="titleEdit.onKeydown"
+          /></dd
+        >
+        <AdeLinkRow
+          id="ade-backlog-jira"
+          :label="t('common.product.jira.label')"
+          chip=""
+          :text="jira?.key ?? ''"
+          :url="jira?.url ?? ''"
+          :placeholder="t('space.ade.backlog.jira.placeholder')"
+          :error="links.jiraError.value"
+          @save="links.saveJira"
+          @clear="links.clearJira"
+        />
+        <AdeLinkRow
+          id="ade-backlog-github"
+          :label="t('common.product.github.label')"
+          :chip="links.github.value?.kind ?? ''"
+          :text="links.github.value?.ref ?? ''"
+          :url="parseGithub(item.githubUrl) ? item.githubUrl : ''"
+          :placeholder="t('space.ade.backlog.github.placeholder')"
+          :error="links.githubError.value"
+          @save="links.saveGithub"
+          @clear="links.clearGithub"
+        />
+      </KeyValueList>
+      <Alert v-if="error" variant="error" data-testid="ade-backlog-error"
+        ><AlertDescription>{{ error }}</AlertDescription></Alert
+      >
     </div>
     <div class="flex min-h-0 flex-1 flex-col px-3 pb-3">
       <AdeNotesEditor :notes="item.notes" :item-id="item.id" @save="saveNotes" />

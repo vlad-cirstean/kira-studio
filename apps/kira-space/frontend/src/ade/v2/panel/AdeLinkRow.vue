@@ -42,8 +42,8 @@ function openLink(e: MouseEvent): void {
 </script>
 
 <template>
-  <span class="text-kira-sm text-muted-foreground">{{ label }}</span>
-  <div class="flex min-w-0 flex-col justify-center">
+  <dt>{{ label }}</dt>
+  <dd class="flex min-w-0 flex-col justify-center">
     <div class="flex min-h-row min-w-0 items-center gap-2">
       <template v-if="text">
         <AdeChip v-if="chip" :label="chip" tone="grey" wide />
@@ -80,6 +80,8 @@ function openLink(e: MouseEvent): void {
           :id="id"
           v-model="draft"
           :placeholder="placeholder"
+          :aria-invalid="error ? true : undefined"
+          :aria-describedby="error ? `${id}-error-text` : undefined"
           size="kira-lg"
           class="min-w-0 flex-1"
           :data-testid="`${id}-input`"
@@ -96,6 +98,8 @@ function openLink(e: MouseEvent): void {
         </Button>
       </template>
     </div>
-    <FieldError v-if="error" :data-testid="`${id}-error`">{{ error }}</FieldError>
-  </div>
+    <FieldError v-if="error" :id="`${id}-error-text`" :data-testid="`${id}-error`">{{
+      error
+    }}</FieldError>
+  </dd>
 </template>

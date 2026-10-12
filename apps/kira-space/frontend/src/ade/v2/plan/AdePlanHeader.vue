@@ -13,12 +13,12 @@ export interface RepoChipModel {
   remote: string;
   lastFetchAt: number | null;
   shown: boolean;
-  busy: boolean;
+  pending: boolean;
   error: string;
   summary: string;
 }
 
-defineProps<{ repos: RepoChipModel[]; allBusy: boolean; ripple: Ripple | null }>();
+defineProps<{ repos: RepoChipModel[]; allPending: boolean; ripple: Ripple | null }>();
 const emit = defineEmits<{
   refreshAll: [];
   refreshOne: [codeRepoId: string];
@@ -34,13 +34,13 @@ const emit = defineEmits<{
         <Button
           variant="dialog"
           size="kira-lg"
-          :disabled="allBusy"
+          :pending="allPending"
           data-testid="ade-refresh-all"
           @click="emit('refreshAll')"
         >
           <CodiconIcon name="refresh" :size="12" />
           {{
-            allBusy ? t('space.ade.plan.header.refreshing.loading') : t('common.refreshAll.label')
+            allPending ? t('space.ade.plan.header.refreshing.loading') : t('common.refreshAll.label')
           }}
         </Button>
       </template>
