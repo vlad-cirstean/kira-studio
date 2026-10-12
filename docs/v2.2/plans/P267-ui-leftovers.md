@@ -515,7 +515,8 @@ primitives, `TooltipIconButton`); `HighlightedText` takes parts (no `splitMatche
    SPINNER_DELAY`.
 3. `QueryState` on `EmptyState loading`/`InlineState`; `bootstrapShell` provides `confirmDiscard`.
 4. `WorkbenchShell`: drop the `dragging` cursor wiring; `ResizeHandle` drops the `dragging` emit.
-5. Delete `packages/kira-ui` (workspace, `W/package.json` dep, tsconfig paths, knip, mutation
+5. Delete `packages/kira-ui` (workspace, `W/package.json` dep, root `typecheck:git` script's
+   `packages/kira-ui/tsconfig.json` step, tsconfig paths, knip, mutation
    summarize text, `DIRS`, U58 `/kira-ui/` and `floatingPosition.ts` exempts, AutocompleteField
    U36/U41/U47/U58 PERMANENT lines, `ContextMenu` U27 line, `WorkbenchShell` U31 line).
 6. Scripts: copy checker skips cva variant keys (drop `button/index.ts` exemption);
