@@ -2,6 +2,7 @@ import { defaultLayout, type Layout, type LayoutPatch } from '@shared/domain/lay
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
+import { fireAndForget } from '../bridge/fireAndForget';
 import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P103 Part 2 (§5.3): hoisted from Kira Studio's own state/layout.ts (P100 Part 2's comment on
@@ -44,7 +45,7 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
     const flushWrite = useDebounceFn(() => {
       const toSend = pendingPatch;
       pendingPatch = {};
-      void control.layoutSet(toSend);
+      fireAndForget(control.layoutSet(toSend), 'layout');
     }, WRITE_DEBOUNCE_MS);
 
     // applyRemote assigns a layout straight into local state with no re-emit back to

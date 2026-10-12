@@ -1,6 +1,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
+import { fireAndForget } from '../bridge/fireAndForget';
 
 // P128 §2.3: hoisted from Kira Studio's own state/mode.ts — mode is this app's one-dimensional
 // "which module" state, there is no second dimension layered on top of it.
@@ -47,7 +48,7 @@ export function createModeStore<
     const state = reactive({ active: defaultMode }) as { active: M };
 
     function writeMode(): void {
-      void control.windowsSetMode(state.active);
+      fireAndForget(control.windowsSetMode(state.active), 'mode');
     }
 
     // P99 §9.3: useDebounceFn replaces a hand-rolled clearTimeout/setTimeout pair.

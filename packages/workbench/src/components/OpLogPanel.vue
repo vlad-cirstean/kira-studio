@@ -2,11 +2,11 @@
 // biome-ignore lint/correctness/noUnusedImports: resolves the generic="R extends OpLogRecord" attribute above — biome only sees the <script> body, never that tag's own attribute string.
 import type { OpLogRecord, OpStatus } from '@shared/domain/ops';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
@@ -187,12 +187,12 @@ function durationText(ms: number | null): string | null {
       </Tooltip>
     </div>
 
-    <Empty v-if="records.length === 0" class="min-h-0 flex-1">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="checklist" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('workbench.opLog.none.empty') }}</EmptyTitle>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState
+      v-if="records.length === 0"
+      class="min-h-0 flex-1"
+      icon="checklist"
+      :title="t('workbench.opLog.none.empty')"
+    />
     <template v-else>
       <div
         :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-2 px-2 shrink-0 h-4.5')"

@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { useQueryClient } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Label } from '@theme/components/ui/label';
 import { type MessageKey, t } from '@theme/i18n';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
@@ -20,11 +16,11 @@ import {
   useDockerStatus,
   useImages,
   useNetworks,
-  useRetryStatus,
   useVolumes,
 } from '../queries';
 import { type DockerSection, useDockerUiStore } from '../state/dockerUi';
 import { useStatsSubscription } from '../state/useStatsSubscription';
+import ConnectionState from './ConnectionState.vue';
 import ContainerList from './ContainerList.vue';
 import EndpointChip from './EndpointChip.vue';
 import ImageList from './ImageList.vue';
@@ -45,8 +41,6 @@ const runningIds = computed(() =>
   (containers.data.value ?? []).filter((c) => c.state === 'running').map((c) => c.id),
 );
 useStatsSubscription(runningIds);
-
-const { retrying, retry } = useRetryStatus();
 
 const ok = computed(() => status.data.value?.state === 'ok');
 
@@ -138,16 +132,6 @@ async function refresh(): Promise<void> {
       <VolumeList v-else-if="ui.section === 'volumes'" />
       <NetworkList v-else />
     </template>
-    <Empty v-else class="h-full" data-testid="docker-panel-unavailable">
-      <EmptyHeader>
-        <EmptyMedia>
-          <CodiconIcon v-if="status.data.value" name="debug-disconnect" :size="24" class="text-error" />
-          <Spinner v-else :size="24" label="" />
-        </EmptyMedia>
-        <EmptyTitle>{{ status.data.value ? t('docker.panel.unavailable.title') : t('common.connecting.loading') }}</EmptyTitle>
-        <EmptyDescription v-if="status.data.value">{{ t('docker.panel.unavailable.description') }}</EmptyDescription>
-      </EmptyHeader>
-      <Button v-if="status.data.value" size="kira" variant="toolbar" :disabled="retrying" @click="retry">{{ t('common.action.retry.label') }}</Button>
-    </Empty>
+    <ConnectionState v-else />
   </div>
 </template>

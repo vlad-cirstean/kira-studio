@@ -199,9 +199,7 @@ test('daemon down shows the unavailable state; Retry refetches and renders the l
   await openDocker(page);
 
   await expect(page.locator('[data-testid="docker-unavailable"]')).toBeVisible();
-  await expect(page.locator('[data-testid="docker-unavailable-title"]')).toContainText(
-    'isn’t running',
-  );
+  await expect(page.locator('[data-testid="docker-unavailable"]')).toContainText('isn’t running');
 
   state.status = OK_STATUS;
   await page.locator('[data-testid="docker-retry"]').click();

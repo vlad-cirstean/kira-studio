@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
   Tooltip,
   TooltipContent,
@@ -9,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import ModuleStart from '../components/ModuleStart.vue';
 import { useNewTerminal } from './module';
 
 // P91 §12: MainView.vue's own fallback when the Automations module has no active tab — the state a
@@ -20,32 +20,28 @@ const { canOpen, open } = useNewTerminal();
 </script>
 
 <template>
-  <div class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="automations-start">
-    <div class="w-105 max-w-full">
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="terminal-bash" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('automations.start.none.empty') }}</EmptyTitle>
-          <EmptyDescription>{{ t('automations.start.none.emptyHint') }}</EmptyDescription>
-        </EmptyHeader>
-          <Tooltip :disabled="canOpen">
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger :class="{ 'pointer-events-none': !canOpen }">
-                <Button
-                  variant="dialog-primary"
-                  size="kira-lg"
-                  data-testid="automations-start-new"
-                  :disabled="!canOpen"
-                  @click="open"
-                >
-                  <CodiconIcon name="terminal-bash" :size="13" />
-                  {{ t('common.newTerminal.label') }}
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('automations.start.homeUnavailable.tooltip') }}</TooltipContent>
-          </Tooltip>
-      </Empty>
-    </div>
-  </div>
+  <ModuleStart
+    icon="terminal-bash"
+    :title="t('automations.start.none.empty')"
+    :description="t('automations.start.none.emptyHint')"
+    data-testid="automations-start"
+  >
+    <Tooltip :disabled="canOpen">
+      <TooltipTrigger as-child>
+        <TooltipDisabledTrigger :class="{ 'pointer-events-none': !canOpen }">
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="automations-start-new"
+            :disabled="!canOpen"
+            @click="open"
+          >
+            <CodiconIcon name="terminal-bash" :size="13" />
+            {{ t('common.newTerminal.label') }}
+          </Button>
+        </TooltipDisabledTrigger>
+      </TooltipTrigger>
+      <TooltipContent>{{ t('automations.start.homeUnavailable.tooltip') }}</TooltipContent>
+    </Tooltip>
+  </ModuleStart>
 </template>

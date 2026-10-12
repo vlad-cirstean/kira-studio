@@ -2,12 +2,12 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -479,14 +479,15 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             </template>
           </div>
         </div>
-        <Empty v-else class="h-full">
+        <EmptyState
+          v-else
+          class="h-full"
+          icon="terminal-bash"
+          :title="t('automations.panel.none.empty')"
+          :description="t('automations.panel.none.emptyHint')"
+        >
           <FieldError v-if="actionError" data-testid="script-error">{{ actionError }}</FieldError>
-          <EmptyHeader>
-            <EmptyMedia><CodiconIcon name="terminal-bash" :size="24" /></EmptyMedia>
-            <EmptyTitle>{{ t('automations.panel.none.empty') }}</EmptyTitle>
-            <EmptyDescription>{{ t('automations.panel.none.emptyHint') }}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        </EmptyState>
       </div>
       <RunsSection @rerun="rerun" />
       <ScriptDialog

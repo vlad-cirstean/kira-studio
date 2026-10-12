@@ -1,14 +1,12 @@
 import { useDebounceFn, useDocumentVisibility } from '@vueuse/core';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { onScopeDispose, type Ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { useDockerStatsStore } from './dockerStats';
 
 const RESUBSCRIBE_DEBOUNCE_MS = 300;
 
-function statsBestEffort(): void {
-  // Live stats are best effort; the next visibility or id change subscribes again.
-}
-
+// Live stats are best effort: a failed call logs, and the next visibility or id change subscribes again.
 /** Keeps Go's stats stream subscribed to `ids` while mounted and visible. */
 export function useStatsSubscription(ids: Ref<string[]>): void {
   const { control } = useDocker();
@@ -21,12 +19,12 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
     if (visibility.value !== 'visible' || ids.value.length === 0) {
       if (subscribed) {
         subscribed = false;
-        void control.statsUnsubscribe().catch(statsBestEffort);
+        fireAndForget(control.statsUnsubscribe(), 'docker.stats');
       }
       return;
     }
     subscribed = true;
-    void control.statsSubscribe(ids.value).catch(statsBestEffort);
+    fireAndForget(control.statsSubscribe(ids.value), 'docker.stats');
   }, RESUBSCRIBE_DEBOUNCE_MS);
 
   function listen(): void {
@@ -46,7 +44,7 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
       if (v !== prevV && v !== 'visible') {
         sync.cancel?.();
         subscribed = false;
-        void control.statsUnsubscribe().catch(statsBestEffort);
+        fireAndForget(control.statsUnsubscribe(), 'docker.stats');
         return;
       }
       void sync();
@@ -62,6 +60,6 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
   onScopeDispose(() => {
     unlisten();
     sync.cancel?.();
-    if (subscribed) void control.statsUnsubscribe().catch(statsBestEffort);
+    if (subscribed) fireAndForget(control.statsUnsubscribe(), 'docker.stats');
   });
 }

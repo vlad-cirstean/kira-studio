@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { BoxesIcon, HammerIcon, NetworkIcon } from '@lucide/vue';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -47,12 +46,12 @@ const label = computed(() => {
         :aria-label="label"
         v-bind="$attrs"
       >
-        <BoxesIcon v-if="origin === 'compose'" :size="size" style="color: #00b4ff" />
+        <CodiconIcon v-if="origin === 'compose'" name="layers" :size="size" style="color: #00b4ff" />
         <svg v-else-if="origin === 'kubernetes' || origin === 'kind'" :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true">
           <path :fill="`#${siKubernetes.hex}`" :d="siKubernetes.path" />
         </svg>
-        <NetworkIcon v-else-if="origin === 'swarm'" :size="size" />
-        <HammerIcon v-else-if="origin === 'buildx'" :size="size" />
+        <CodiconIcon v-else-if="origin === 'swarm'" name="type-hierarchy" :size="size" />
+        <CodiconIcon v-else-if="origin === 'buildx'" name="tools" :size="size" />
         <CodiconIcon v-else-if="origin === 'devcontainer'" name="remote-explorer" :size="size" />
         <CodiconIcon v-else name="beaker" :size="size" />
       </span>

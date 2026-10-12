@@ -4,6 +4,7 @@ import { computed, type InjectionKey, ref, watch } from 'vue';
 import { usePersistedState } from '../behaviour/persisted';
 import { errorText } from '../bridge/codedError';
 import type { AppUpdateStatus } from '../bridge/createCoreControl';
+import { fireAndForget } from '../bridge/fireAndForget';
 import { queryClient } from './queryClient';
 
 // P119: hoisted from Kira Studio's own state/appUpdate.ts (the poll) and rebuilt onto
@@ -113,7 +114,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
     }
 
     function cancelInstall(): void {
-      void control.updateCancelInstall();
+      fireAndForget(control.updateCancelInstall(), 'appUpdate');
     }
 
     return {

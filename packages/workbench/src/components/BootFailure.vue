@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 
 // P113 F6: main.ts's own boot-failure fallback, both apps — mounted in place of App.vue when
@@ -18,12 +18,12 @@ const emit = defineEmits<{ retry: [] }>();
 <template>
   <div class="h-full flex items-center justify-center overflow-auto p-4" data-testid="boot-failure">
     <div class="w-105 max-w-full">
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ t('workbench.bootFailure.title', { product: appName }) }}</EmptyTitle>
-          <EmptyDescription class="whitespace-pre-wrap">{{ message }}</EmptyDescription>
-        </EmptyHeader>
+      <EmptyState
+        icon="warning"
+        :title="t('workbench.bootFailure.title', { product: appName })"
+        :description="message"
+        class="whitespace-pre-wrap"
+      >
         <Button
           variant="dialog-primary"
           size="kira-lg"
@@ -33,7 +33,7 @@ const emit = defineEmits<{ retry: [] }>();
           <CodiconIcon name="refresh" :size="13" />
           {{ t('common.action.retry.label') }}
         </Button>
-      </Empty>
+      </EmptyState>
     </div>
   </div>
 </template>

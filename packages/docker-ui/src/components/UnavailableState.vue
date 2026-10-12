@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useRetryStatus } from '../queries';
@@ -47,13 +47,13 @@ const copy = computed(() => {
 </script>
 
 <template>
-  <Empty class="h-full" data-testid="docker-unavailable">
-    <EmptyHeader>
-      <EmptyMedia><CodiconIcon name="debug-disconnect" :size="24" class="text-error" /></EmptyMedia>
-      <EmptyTitle data-testid="docker-unavailable-title">{{ copy.title }}</EmptyTitle>
-      <EmptyDescription data-testid="docker-unavailable-hint">{{ copy.hint }}</EmptyDescription>
-    </EmptyHeader>
-    <EmptyContent>
+  <EmptyState
+    class="h-full"
+    data-testid="docker-unavailable"
+    :title="copy.title"
+    :description="copy.hint"
+  >
+    <template #media><CodiconIcon name="debug-disconnect" :size="24" class="text-error" /></template>
       <code class="font-data text-kira-sm text-muted-foreground" data-testid="docker-unavailable-endpoint">{{ status.endpoint.host }}</code>
       <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{ status.message }}</p>
       <div class="flex items-center gap-2">
@@ -63,6 +63,5 @@ const copy = computed(() => {
         <EndpointChip />
       </div>
       <p class="text-kira-sm text-muted-foreground">{{ t('docker.unavailable.recheck.hint') }}</p>
-    </EmptyContent>
-  </Empty>
+  </EmptyState>
 </template>

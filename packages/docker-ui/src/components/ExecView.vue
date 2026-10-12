@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { t } from '@theme/i18n';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
@@ -42,17 +42,19 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
 
 <template>
   <div class="flex h-full flex-col" data-testid="docker-exec">
-    <Empty v-if="sessions.length === 0" class="h-full" data-testid="docker-exec-empty">
-      <EmptyHeader>
-        <EmptyMedia><CodiconIcon name="terminal" :size="24" /></EmptyMedia>
-        <EmptyTitle>{{ t('docker.exec.none.empty') }}</EmptyTitle>
-        <EmptyDescription>{{ t('docker.exec.none.emptyHint') }}</EmptyDescription>
-      </EmptyHeader>
+    <EmptyState
+      v-if="sessions.length === 0"
+      class="h-full"
+      data-testid="docker-exec-empty"
+      icon="terminal"
+      :title="t('docker.exec.none.empty')"
+      :description="t('docker.exec.none.emptyHint')"
+    >
       <Button size="kira" variant="toolbar" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
         {{ t('common.newSession.label') }}
       </Button>
-    </Empty>
+    </EmptyState>
     <template v-else>
     <div class="flex shrink-0 items-center gap-0.5 border-b border-border px-1.5 py-1">
       <span

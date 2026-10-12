@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Skeleton } from '@theme/components/ui/skeleton';
 import { type MessageKey, t } from '@theme/i18n';
@@ -109,14 +109,15 @@ function act(action: 'start' | 'stop' | 'restart'): void {
     </div>
     <QueryState v-else :query="detail" :is-empty="() => false">
     <template #error>
-      <Empty class="h-full" data-testid="docker-detail-error">
-        <EmptyHeader>
-          <EmptyMedia><CodiconIcon name="warning" :size="24" class="text-warn" /></EmptyMedia>
-          <EmptyTitle>{{ t('docker.detail.notFound.title') }}</EmptyTitle>
-          <EmptyDescription>{{ t('docker.detail.notFound.description') }}</EmptyDescription>
-        </EmptyHeader>
+      <EmptyState
+        class="h-full"
+        data-testid="docker-detail-error"
+        :title="t('docker.detail.notFound.title')"
+        :description="t('docker.detail.notFound.description')"
+      >
+        <template #media><CodiconIcon name="warning" :size="24" class="text-warn" /></template>
         <Button size="kira" variant="toolbar" @click="ui.select(null)">{{ t('docker.detail.backToOverview.label') }}</Button>
-      </Empty>
+      </EmptyState>
     </template>
     <template #loading>
       <div class="flex flex-col gap-2 p-3" aria-busy="true">

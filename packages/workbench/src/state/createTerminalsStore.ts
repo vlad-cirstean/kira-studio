@@ -5,6 +5,7 @@ import type { TerminalEvent } from '@shared/protocol/events';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { errorText } from '../bridge/codedError';
+import { fireAndForget } from '../bridge/fireAndForget';
 import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
 import { createOrderedWriter } from './orderedWrites';
 
@@ -234,7 +235,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
     }
 
     function resizeTerminal(tabId: string, cols: number, rows: number): void {
-      void control.terminalResize(tabId, cols, rows);
+      fireAndForget(control.terminalResize(tabId, cols, rows), 'terminals');
     }
 
     /** dropResources' own target (state/tabKinds.ts) — kills the pty and drops every trace of this
@@ -249,7 +250,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       sinks.delete(tabId);
       drainByTabId.delete(tabId);
       writer.drop(tabId);
-      void control.terminalClose(tabId);
+      fireAndForget(control.terminalClose(tabId), 'terminals');
     }
 
     function terminalSession(tabId: string): TerminalSession | undefined {
