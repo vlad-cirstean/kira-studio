@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import EmptyState from '@theme/components/EmptyState.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
@@ -118,17 +118,18 @@ const historyToggleId = useId();
           </Alert>
         </template>
         <template #empty>
-          <Empty class="h-full" data-testid="memory-empty">
-            <EmptyHeader>
-              <EmptyTitle>{{ query.trim() === '' ? t('memory.panel.list.empty') : t('common.state.noMatches.empty') }}</EmptyTitle>
-              <EmptyDescription v-if="query.trim() !== ''">{{ t('memory.panel.list.emptyHint') }}</EmptyDescription>
-            </EmptyHeader>
+          <EmptyState
+            class="h-full"
+            data-testid="memory-empty"
+            :title="query.trim() === '' ? t('memory.panel.list.empty') : t('common.state.noMatches.empty')"
+            :description="query.trim() !== '' ? t('memory.panel.list.emptyHint') : undefined"
+          >
             <MemorySetupHint
               v-if="query.trim() === ''"
               :message="t('memory.panel.connectClaude.hint')"
               data-testid="memory-setup-hint-claude"
             />
-          </Empty>
+          </EmptyState>
         </template>
         <template #default="{ data }">
         <div class="flex flex-col">

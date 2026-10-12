@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { needsKindLabel } from '@ade/board/needsYou';
 import { TONE_TAG_CLASS } from '@ade/tones';
+import EmptyState from '@theme/components/EmptyState.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Alert } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
@@ -69,12 +69,7 @@ async function confirmTakeOver(): Promise<void> {
       <Alert variant="error" strip data-testid="needs-error">{{ t('mobile.needs.loadError.error') }}</Alert>
     </template>
     <template v-if="model">
-      <Empty v-if="model.needs.empty" class="py-10" data-testid="needs-empty">
-        <EmptyHeader>
-          <EmptyTitle>{{ t('mobile.needs.list.empty') }}</EmptyTitle>
-          <EmptyDescription>{{ model.needs.footer }}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState v-if="model.needs.empty" class="py-10" data-testid="needs-empty" :title="t('mobile.needs.list.empty')" :description="model.needs.footer" />
       <template v-else>
         <PermissionHint v-if="needsAgentInput" :what="t('mobile.needs.replyOff.hint')" />
         <ul class="m-0 flex list-none flex-col p-0">
@@ -100,13 +95,13 @@ async function confirmTakeOver(): Promise<void> {
               <Button size="kira"
                 v-if="item.kind === 'question'"
                 variant="dialog-primary"
-                class="h-11 px-4"
+                class="h-touch px-4"
                 data-testid="needs-reply"
                 @click="replying = { sessionId: item.sessionId, context: item.what }"
               >
                 {{ t('space.common.reply.label') }}
               </Button>
-              <Button v-if="item.kind === 'question'" as-child size="kira" variant="dialog" class="h-11 px-4 no-underline">
+              <Button v-if="item.kind === 'question'" as-child size="kira" variant="dialog" class="h-touch px-4 no-underline">
                 <RouterLink :to="{ name: 'terminal', params: { sessionId: item.sessionId } }" data-testid="needs-terminal">
                   {{ t('common.module.terminal.label') }}
                 </RouterLink>
@@ -114,7 +109,7 @@ async function confirmTakeOver(): Promise<void> {
               <Button size="kira"
                 v-else-if="item.kind === 'stuck run'"
                 variant="dialog"
-                class="h-11 px-4"
+                class="h-touch px-4"
                 data-testid="needs-take-over"
                 @click="askTakeOver(item.sessionId, item.what)"
               >

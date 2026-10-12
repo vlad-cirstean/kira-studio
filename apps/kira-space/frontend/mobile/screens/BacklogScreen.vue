@@ -3,9 +3,9 @@ import { parseGithub } from '@ade/board/panelFacts';
 import { useBacklog } from '@ade/readQueries';
 import type { BacklogItem } from '@ade/wire';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { t } from '@theme/i18n';
 import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
@@ -80,7 +80,7 @@ useSortableReorder(
     <form v-else class="flex gap-2 border-b border-border p-3" @submit.prevent="add">
       <Input
         :model-value="text"
-        class="h-11 flex-1"
+        class="h-touch flex-1"
         :placeholder="t('mobile.backlog.add.placeholder')"
         enterkeyhint="done"
         @update:model-value="(v) => (text = String(v))"
@@ -89,7 +89,7 @@ useSortableReorder(
       <Button size="kira"
         type="submit"
         variant="dialog-primary"
-        class="h-11 px-4"
+        class="h-touch px-4"
         :disabled="!text.trim() || writes.addBacklogItem.isPending.value"
         data-testid="backlog-add-submit"
       >
@@ -105,12 +105,7 @@ useSortableReorder(
       <Alert variant="error" strip data-testid="backlog-error">{{ t('mobile.backlog.loadError.error') }}</Alert>
     </template>
     <template #empty>
-      <Empty class="py-10" data-testid="backlog-empty">
-        <EmptyHeader>
-          <EmptyTitle>{{ t('space.common.backlogEmpty.empty') }}</EmptyTitle>
-          <EmptyDescription>{{ t('mobile.backlog.list.emptyHint') }}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState class="py-10" data-testid="backlog-empty" :title="t('space.common.backlogEmpty.empty')" :description="t('mobile.backlog.list.emptyHint')" />
     </template>
     <template #default="{ data }">
     <ol ref="list" class="m-0 flex list-none flex-col p-0">
@@ -138,7 +133,7 @@ useSortableReorder(
           </button>
           <span
             v-if="canWrite"
-            class="flex size-11 shrink-0 touch-none items-center justify-center text-subtle"
+            class="flex size-touch shrink-0 touch-none items-center justify-center text-subtle"
             role="img"
             :aria-label="t('mobile.backlog.handle.aria')"
             data-drag-handle

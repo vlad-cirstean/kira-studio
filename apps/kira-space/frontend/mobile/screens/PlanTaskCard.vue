@@ -83,7 +83,7 @@ const stopFirst = computed(() => props.card.moves.live);
     <div v-if="open && canMove" class="flex flex-wrap gap-2 px-3 pb-3 pl-8" data-testid="plan-actions">
       <Button size="kira"
         variant="dialog"
-        class="h-11 px-4"
+        class="h-touch px-4"
         :disabled="stopFirst || !card.moves.prev"
         data-testid="plan-stage-back"
         @click="actions.ask('back')"
@@ -92,7 +92,7 @@ const stopFirst = computed(() => props.card.moves.live);
       </Button>
       <Button size="kira"
         variant="dialog"
-        class="h-11 px-4"
+        class="h-touch px-4"
         :disabled="stopFirst || !card.moves.next"
         data-testid="plan-stage-next"
         @click="actions.ask('next')"
@@ -102,7 +102,7 @@ const stopFirst = computed(() => props.card.moves.live);
       <Button size="kira"
         v-if="actions.startKind.value"
         variant="dialog-primary"
-        class="h-11 px-4"
+        class="h-touch px-4"
         data-testid="plan-start"
         @click="actions.ask('start')"
       >
@@ -112,7 +112,7 @@ const stopFirst = computed(() => props.card.moves.live);
     </div>
 
     <div v-if="open && permissions.agentInput && card.tuiSessions.length" class="flex flex-col gap-1 px-3 pb-3 pl-8">
-      <Button v-for="session in card.tuiSessions" :key="session.id" as-child size="kira" variant="dialog" class="h-11 px-3 no-underline">
+      <Button v-for="session in card.tuiSessions" :key="session.id" as-child size="kira" variant="dialog" class="h-touch px-3 no-underline">
         <RouterLink :to="{ name: 'terminal', params: { sessionId: session.id } }" data-testid="plan-terminal">{{ t('common.module.terminal.label') }}</RouterLink>
       </Button>
     </div>

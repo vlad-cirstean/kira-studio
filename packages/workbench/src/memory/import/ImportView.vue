@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
@@ -33,12 +33,7 @@ const jobItems = computed(() =>
         @update:model-value="(v) => (selectedJobId = v)"
       />
     </div>
-    <Empty v-if="!current" class="h-full" data-testid="import-empty">
-      <EmptyHeader>
-        <EmptyTitle>{{ t('memory.import.list.empty') }}</EmptyTitle>
-        <EmptyDescription>{{ t('memory.import.list.emptyHint') }}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState v-if="!current" class="h-full" data-testid="import-empty" :title="t('memory.import.list.empty')" :description="t('memory.import.list.emptyHint')" />
     <ImportJobDetail v-else :key="current.id" :job-id="current.id" class="min-h-0 flex-1" />
   </div>
 </template>

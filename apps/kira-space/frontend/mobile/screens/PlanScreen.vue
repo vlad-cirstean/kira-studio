@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert } from '@theme/components/ui/alert';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import QueryState from '@workbench/components/QueryState.vue';
 import { ref } from 'vue';
@@ -19,12 +19,7 @@ const open = ref<string | null>(null);
     <template #error>
       <Alert variant="error" strip data-testid="plan-error">{{ t('mobile.plan.loadError.error') }}</Alert>
     </template>
-    <Empty v-if="model && !model.plan.length" class="py-10" data-testid="plan-empty">
-      <EmptyHeader>
-        <EmptyTitle>{{ t('mobile.plan.list.empty') }}</EmptyTitle>
-        <EmptyDescription>{{ t('mobile.plan.list.emptyHint') }}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState v-if="model && !model.plan.length" class="py-10" data-testid="plan-empty" :title="t('mobile.plan.list.empty')" :description="t('mobile.plan.list.emptyHint')" />
     <template v-else-if="model">
       <div v-for="group in model.plan" :key="group.key" data-testid="plan-group">
         <h2 class="m-0 border-b border-border bg-chrome px-3 py-1.5 text-kira-sm font-medium uppercase tracking-wide text-subtle">

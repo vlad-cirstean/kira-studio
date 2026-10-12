@@ -26,7 +26,7 @@ const KEYS: { id: string; label: MessageKey; icon?: string; seq: () => string }[
   <div class="flex gap-1 overflow-x-auto px-2 py-1 scrollbar-none" data-testid="term-keybar">
     <Button size="kira"
       variant="dialog"
-      class="h-11 shrink-0 px-3"
+      class="h-touch shrink-0 px-3"
       :class="ctrl ? 'bg-primary text-primary-foreground' : ''"
       :aria-pressed="ctrl"
       data-testid="term-key-ctrl"
@@ -38,7 +38,7 @@ const KEYS: { id: string; label: MessageKey; icon?: string; seq: () => string }[
       v-for="key in KEYS"
       :key="key.id"
       variant="dialog"
-      class="h-11 shrink-0 px-3"
+      class="h-touch shrink-0 px-3"
       :aria-label="t(key.label)"
       :data-testid="`term-key-${key.id}`"
       @click="emit('key', key.seq())"

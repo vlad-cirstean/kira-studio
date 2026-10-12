@@ -2,11 +2,11 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Card } from '@theme/components/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { formatDateTime as when } from '../behaviour/format';
+import ModuleStart from '../components/ModuleStart.vue';
 import QueryState from '../components/QueryState.vue';
 import ImportView from './import/ImportView.vue';
 import { useImportUiStore } from './import/importStore';
@@ -32,12 +32,7 @@ function eventsFor(id: string) {
 <template>
   <ImportView v-if="imports.view === 'imports'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
-    <Empty v-if="!selectedId" class="h-full" data-testid="memory-detail-empty">
-      <EmptyHeader>
-        <EmptyTitle>{{ t('memory.start.empty') }}</EmptyTitle>
-        <EmptyDescription>{{ t('memory.start.emptyHint') }}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <ModuleStart v-if="!selectedId" class="h-full" data-testid="memory-detail-empty" icon="book" :title="t('memory.start.empty')" :description="t('memory.start.emptyHint')" />
     <QueryState v-else :query="history" :is-empty="() => false">
       <template #error="{ message }">
         <Alert variant="error" strip>
