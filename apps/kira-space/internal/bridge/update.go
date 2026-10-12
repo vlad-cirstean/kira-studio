@@ -49,7 +49,7 @@ func (s *UpdateService) Status(ctx context.Context) (UpdateStatus, error) {
 // Status is never UpdateAvailable, so a dev build can never reach Stage.
 func (s *UpdateService) InstallUpdate(ctx context.Context) error {
 	if !s.Checker.Status(ctx).UpdateAvailable {
-		return ipcerr.T(ipcerr.CodeConflict, "backend.space.update.noNewerRelease.body", nil)
+		return ipcerr.T(ipcerr.CodeConflict, "backend.core.appUpdate.noNewerRelease.body", nil)
 	}
 	if err := s.Installer.Stage(ctx); err != nil {
 		return err

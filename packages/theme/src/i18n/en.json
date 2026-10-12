@@ -506,6 +506,9 @@
         "logOpenFailed": {
           "body": "Couldn’t open the install log ({cause})."
         },
+        "noNewerRelease": {
+          "body": "No newer release is available."
+        },
         "notRelease": {
           "body": "Updates are available only in release builds."
         },
@@ -1234,11 +1237,6 @@
       },
       "seed": {
         "body": "Space seed placeholder."
-      },
-      "update": {
-        "noNewerRelease": {
-          "body": "No newer release is available."
-        }
       }
     },
     "studio": {
@@ -1596,11 +1594,6 @@
       },
       "seed": {
         "body": "Studio seed placeholder."
-      },
-      "update": {
-        "noNewerRelease": {
-          "body": "No newer release is available."
-        }
       },
       "validation": {
         "nameRequired": {
