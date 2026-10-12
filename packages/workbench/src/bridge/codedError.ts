@@ -10,6 +10,9 @@ export type CodedError = Error & { code?: string; details?: unknown };
 // JSON encoding and whose .cause is that same {code, message} as an object. Unwrapped once, here,
 // so every consumer keeps reading `err.message` for display and `err.code` for branching.
 export function toCodedError(err: unknown): CodedError {
+  // Idempotent: `unwrap` already coded it, and display and retry gating unwrap again.
+  if (err instanceof Error && typeof (err as CodedError).code === 'string')
+    return err as CodedError;
   const e = err as { message?: string; cause?: unknown };
   const cause = e.cause as { code?: unknown; message?: unknown; details?: unknown } | undefined;
   let code = 'E_INTERNAL';

@@ -5,6 +5,7 @@ import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../behaviour/clipboard';
 import { revealElement } from '../behaviour/focus';
@@ -133,7 +134,7 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
             type: 'item',
             id: 'duplicate-tab',
             label: t('workbench.tabStrip.duplicate.label'),
-            icon: 'copy',
+            icon: ICON.duplicate,
             run: () => void duplicateTab(tab.id),
           } as const,
         ]
