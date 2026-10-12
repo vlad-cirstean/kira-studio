@@ -2,6 +2,7 @@
 import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
@@ -54,13 +55,13 @@ const notice = computed(() => {
     class="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-4 py-8"
     data-testid="pair-screen"
   >
-    <h1 class="m-0 text-kira-xl font-medium">{{ t('common.product.kiraSpace.label') }}</h1>
+    <h1 class="m-0 text-kira-lg font-medium">{{ t('common.product.kiraSpace.label') }}</h1>
     <p class="m-0 text-muted-foreground">
       {{ t('mobile.pair.intro.description') }}
     </p>
-    <p class="m-0 text-kira-sm text-muted-foreground">
+    <FieldDescription>
       {{ t('mobile.pair.unencrypted.description') }}
-    </p>
+    </FieldDescription>
 
     <template v-if="waiting">
       <Card class="flex flex-col gap-1" data-testid="pair-waiting">
@@ -87,6 +88,7 @@ const notice = computed(() => {
         <Input
           :id="labelId"
           v-model="label"
+          size="touch"
           maxlength="64"
           autocomplete="off"
           data-testid="pair-label"

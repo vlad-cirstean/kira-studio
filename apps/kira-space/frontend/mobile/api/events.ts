@@ -2,6 +2,7 @@ import type { AdeSignalSource } from '@ade/readSignals';
 import type { LogEvent, RunsChangedEvent } from '@ade/wire';
 import { CHANNEL } from '@shared/protocol/events';
 import { useEventSource } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed, onScopeDispose, ref, watch } from 'vue';
 import { getJson } from './http';
 
@@ -58,7 +59,7 @@ export type ConnectionStatus = 'live' | 'reconnecting' | 'offline';
  *  every reconnect: pushes sent while disconnected are gone, so callers refetch. */
 export function useServerEvents(onResync: () => void) {
   const { eventSource, status, error } = useEventSource('/api/events', [], {
-    autoReconnect: { retries: -1, delay: 3000 },
+    autoReconnect: { retries: -1, delay: TIMING.reconnect },
   });
   const opened = ref(false);
 

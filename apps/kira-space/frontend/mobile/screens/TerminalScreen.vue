@@ -139,9 +139,8 @@ function leave(): void {
   >
     <header class="flex items-center gap-2 border-b border-border bg-chrome px-2 py-1">
       <Button
-        variant="ghost"
-        size="kira-icon"
-        class="size-touch"
+        size="touch-icon"
+        variant="toolbar"
         :aria-label="t('common.action.back.label')"
         data-testid="term-back"
         @click="leave"
@@ -155,9 +154,8 @@ function leave(): void {
         {{ t(STATUS_LABEL[remote.status.value]) }}
       </span>
       <Button
-        variant="ghost"
-        size="kira-icon"
-        class="size-touch"
+        size="touch-icon"
+        variant="toolbar"
         :aria-label="t('mobile.terminal.fontDown.aria')"
         data-testid="term-font-down"
         :disabled="fontSize <= FONT_MIN"
@@ -167,9 +165,8 @@ function leave(): void {
         }}</Button
       >
       <Button
-        variant="ghost"
-        size="kira-icon"
-        class="size-touch"
+        size="touch-icon"
+        variant="toolbar"
         :aria-label="t('mobile.terminal.fontUp.aria')"
         data-testid="term-font-up"
         :disabled="fontSize >= FONT_MAX"
@@ -178,16 +175,9 @@ function leave(): void {
           t('mobile.terminal.fontUp.label')
         }}</Button
       >
-      <Button
-        size="kira"
-        variant="dialog"
-        class="h-touch px-3"
-        data-testid="term-release"
-        @click="leave"
-        >{{
-          t('mobile.terminal.release.label')
-        }}</Button
-      >
+      <Button size="touch" variant="dialog" data-testid="term-release" @click="leave">{{
+        t('mobile.terminal.release.label')
+      }}</Button>
     </header>
 
     <PermissionHint v-if="!permissions.agentInput" :what="t('mobile.terminal.controlOff.hint')" />
@@ -211,7 +201,8 @@ function leave(): void {
       >
         <Input
           :model-value="compose"
-          class="h-touch flex-1 text-kira-touch"
+          size="touch"
+          class="flex-1"
           :placeholder="t('mobile.terminal.compose.placeholder')"
           enterkeyhint="send"
           autocapitalize="off"
@@ -220,10 +211,9 @@ function leave(): void {
           @update:model-value="(v) => (compose = String(v))"
         />
         <Button
-          size="kira"
+          size="touch"
           type="submit"
           variant="dialog-primary"
-          class="h-touch px-4"
           :disabled="!compose"
           data-testid="term-compose-send"
           >{{

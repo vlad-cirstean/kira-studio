@@ -51,7 +51,7 @@ async function send(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="sm" data-testid="reply-sheet">
+    <DialogContent size="sm" :dirty="message !== ''" data-testid="reply-sheet">
       <DialogHeader>
         <DialogTitle>{{ t('mobile.reply.dialog.title') }}</DialogTitle>
         <DialogDescription>{{ context }}</DialogDescription>
@@ -70,9 +70,9 @@ async function send(): Promise<void> {
       </DialogBody>
       <DialogFooter>
         <Button
-          size="kira"
+          size="touch"
           variant="dialog"
-          class="h-touch flex-1"
+          class="flex-1"
           data-testid="reply-cancel"
           @click="emit('close')"
           >{{
@@ -80,10 +80,11 @@ async function send(): Promise<void> {
           }}</Button
         >
         <Button
-          size="kira"
+          size="touch"
           variant="dialog-primary"
-          class="h-touch flex-1"
-          :disabled="!message.trim() || writes.sendReply.isPending.value"
+          class="flex-1"
+          :pending="writes.sendReply.isPending.value"
+          :disabled="!message.trim()"
           data-testid="reply-send"
           @click="send"
         >

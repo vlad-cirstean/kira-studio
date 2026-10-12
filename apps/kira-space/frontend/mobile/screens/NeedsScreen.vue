@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import AdeChip from '@ade/AdeChip.vue';
 import { needsKindLabel } from '@ade/board/needsYou';
-import { TONE_TAG_CLASS } from '@ade/tones';
 import EmptyState from '@theme/components/EmptyState.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Alert } from '@theme/components/ui/alert';
-import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
@@ -67,11 +67,6 @@ async function confirmTakeOver(): Promise<void> {
 <template>
   <section class="flex flex-col" data-testid="needs-screen">
     <QueryState :query="boardQuery" :is-empty="() => false">
-      <template #loading
-        ><p class="m-0 p-4 text-muted-foreground">{{
-          t('common.state.loading.loading')
-        }}</p></template
-      >
       <template #error>
         <Alert variant="error" strip data-testid="needs-error">{{
           t('mobile.needs.loadError.error')
@@ -80,7 +75,7 @@ async function confirmTakeOver(): Promise<void> {
       <template v-if="model">
         <EmptyState
           v-if="model.needs.empty"
-          class="py-10"
+          fill
           data-testid="needs-empty"
           :title="t('mobile.needs.list.empty')"
           :description="model.needs.footer"
@@ -91,14 +86,12 @@ async function confirmTakeOver(): Promise<void> {
             <li
               v-for="item in model.needs.items"
               :key="item.id"
-              class="flex flex-col gap-1 border-b border-border px-3 py-2.5"
+              class="flex flex-col gap-1 border-b border-border px-3 py-3"
               data-testid="needs-item"
               :data-kind="item.kind"
             >
               <span class="flex items-center gap-2">
-                <Badge variant="chip" :class="TONE_TAG_CLASS[item.tone]">{{
-                  needsKindLabel(item.kind)
-                }}</Badge>
+                <AdeChip :label="needsKindLabel(item.kind)" :tone="item.tone" />
                 <span class="text-kira-sm text-subtle">{{
                   item.ageMs === null ? '' : formatRelative(0, item.ageMs)
                 }}</span>
@@ -114,21 +107,20 @@ async function confirmTakeOver(): Promise<void> {
               <span v-if="item.scope" class="text-kira-sm text-subtle">{{ item.scope }}</span>
               <span v-if="canReply && item.sessionId" class="flex gap-2 pt-1">
                 <Button
-                  size="kira"
+                  size="touch"
                   v-if="item.kind === 'question'"
                   variant="dialog-primary"
-                  class="h-touch px-4"
                   data-testid="needs-reply"
                   @click="replying = { sessionId: item.sessionId, context: item.what }"
                 >
                   {{ t('space.common.reply.label') }}
                 </Button>
                 <Button
+                  size="touch"
                   v-if="item.kind === 'question'"
                   as-child
-                  size="kira"
                   variant="dialog"
-                  class="h-touch px-4 no-underline"
+                  class="no-underline"
                 >
                   <RouterLink
                     :to="{ name: 'terminal', params: { sessionId: item.sessionId } }"
@@ -138,10 +130,9 @@ async function confirmTakeOver(): Promise<void> {
                   </RouterLink>
                 </Button>
                 <Button
-                  size="kira"
+                  size="touch"
                   v-else-if="item.kind === 'stuck run'"
                   variant="dialog"
-                  class="h-touch px-4"
                   data-testid="needs-take-over"
                   @click="askTakeOver(item.sessionId, item.what)"
                 >
@@ -150,9 +141,9 @@ async function confirmTakeOver(): Promise<void> {
               </span>
             </li>
           </ul>
-          <p class="m-0 px-3 py-2 text-kira-sm text-subtle" data-testid="needs-footer">{{
+          <FieldDescription class="px-3 py-2" data-testid="needs-footer">{{
             model.needs.footer
-          }}</p>
+          }}</FieldDescription>
         </template>
       </template>
     </QueryState>

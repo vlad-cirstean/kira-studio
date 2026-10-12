@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import AdeChip from '@ade/AdeChip.vue';
 import { statusLabel } from '@ade/board/actions';
-import { TONE_TAG_CLASS } from '@ade/tones';
 import StatusDot from '@theme/components/StatusDot.vue';
-import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
+import { Progress } from '@theme/components/ui/progress';
+import { formatPercent } from '@theme/format';
 import { t } from '@theme/i18n';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
 import { storeToRefs } from 'pinia';
@@ -35,7 +37,7 @@ const stopFirst = computed(() => props.card.moves.live);
   <li class="border-b border-border" data-testid="plan-task" :data-status="card.status">
     <button
       type="button"
-      class="flex w-full items-start gap-2.5 bg-transparent px-3 py-2.5 text-left text-fg"
+      class="flex w-full items-start gap-3 bg-transparent px-3 py-3 text-left text-fg"
       :aria-expanded="open"
       @click="$emit('toggle')"
     >
@@ -43,31 +45,15 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <Badge variant="chip" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{
-            statusLabel(card.status)
-          }}</Badge>
+          <AdeChip :label="statusLabel(card.status)" :tone="tone" />
           <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{
             card.progress.label
           }}</span>
-          <Badge
-            v-for="repo in card.repos"
-            :key="repo"
-            variant="chip"
-            class="bg-field text-muted-foreground"
-            >{{
-              repo
-            }}</Badge
-          >
+          <AdeChip v-for="repo in card.repos" :key="repo" :label="repo" tone="grey" />
         </span>
-        <span
-          v-if="card.progress.showBar"
-          class="h-1 overflow-hidden rounded-full bg-field"
-          role="progressbar"
-          :aria-valuenow="card.progress.percent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-        >
-          <span class="block h-full bg-primary" :style="{ width: `${card.progress.percent}%` }" />
+        <span v-if="card.progress.showBar" class="flex items-center gap-2">
+          <Progress :model-value="card.progress.percent" />
+          <span class="text-kira-sm text-fg">{{ formatPercent(card.progress.percent) }}</span>
         </span>
         <span v-if="card.attention" class="text-kira-sm text-warn" data-testid="plan-attention">{{
           card.attention
@@ -122,9 +108,8 @@ const stopFirst = computed(() => props.card.moves.live);
       data-testid="plan-actions"
     >
       <Button
-        size="kira"
+        size="touch"
         variant="dialog"
-        class="h-touch px-4"
         :disabled="stopFirst || !card.moves.prev"
         data-testid="plan-stage-back"
         @click="actions.ask('back')"
@@ -132,9 +117,8 @@ const stopFirst = computed(() => props.card.moves.live);
         {{ t('common.action.back.label') }}
       </Button>
       <Button
-        size="kira"
+        size="touch"
         variant="dialog"
-        class="h-touch px-4"
         :disabled="stopFirst || !card.moves.next"
         data-testid="plan-stage-next"
         @click="actions.ask('next')"
@@ -142,18 +126,17 @@ const stopFirst = computed(() => props.card.moves.live);
         {{ t('common.action.next.label') }}
       </Button>
       <Button
-        size="kira"
+        size="touch"
         v-if="actions.startKind.value"
         variant="dialog-primary"
-        class="h-touch px-4"
         data-testid="plan-start"
         @click="actions.ask('start')"
       >
         {{ t('common.action.start.label') }}
       </Button>
-      <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">{{
+      <FieldDescription v-if="stopFirst" class="w-full">{{
         t('mobile.plan.stopFirst.hint')
-      }}</p>
+      }}</FieldDescription>
     </div>
 
     <div
@@ -161,12 +144,12 @@ const stopFirst = computed(() => props.card.moves.live);
       class="flex flex-col gap-1 px-3 pb-3 pl-8"
     >
       <Button
+        size="touch"
         v-for="session in card.tuiSessions"
         :key="session.id"
         as-child
-        size="kira"
         variant="dialog"
-        class="h-touch px-3 no-underline"
+        class="no-underline"
       >
         <RouterLink
           :to="{ name: 'terminal', params: { sessionId: session.id } }"

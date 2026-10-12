@@ -84,18 +84,19 @@ useSortableReorder(
     <form v-else class="flex gap-2 border-b border-border p-3" @submit.prevent="add">
       <Input
         :model-value="text"
-        class="h-touch flex-1"
+        size="touch"
+        class="flex-1"
         :placeholder="t('mobile.backlog.add.placeholder')"
         enterkeyhint="done"
         @update:model-value="(v) => (text = String(v))"
         data-testid="backlog-add"
       />
       <Button
-        size="kira"
+        size="touch"
         type="submit"
         variant="dialog-primary"
-        class="h-touch px-4"
-        :disabled="!text.trim() || writes.addBacklogItem.isPending.value"
+        :pending="writes.addBacklogItem.isPending.value"
+        :disabled="!text.trim()"
         data-testid="backlog-add-submit"
       >
         {{ t('common.action.add.label') }}
@@ -105,11 +106,6 @@ useSortableReorder(
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
     <QueryState :query="backlog" :is-empty="(d) => d.items.length === 0">
-      <template #loading
-        ><p class="m-0 p-4 text-muted-foreground">{{
-          t('common.state.loading.loading')
-        }}</p></template
-      >
       <template #error>
         <Alert variant="error" strip data-testid="backlog-error">{{
           t('mobile.backlog.loadError.error')
@@ -117,7 +113,7 @@ useSortableReorder(
       </template>
       <template #empty>
         <EmptyState
-          class="py-10"
+          fill
           data-testid="backlog-empty"
           :title="t('space.common.backlogEmpty.empty')"
           :description="t('mobile.backlog.list.emptyHint')"
@@ -135,7 +131,7 @@ useSortableReorder(
             <div class="flex items-stretch">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-start gap-3 bg-transparent px-3 py-2.5 text-left text-fg"
+                class="flex min-w-0 flex-1 items-start gap-3 bg-transparent px-3 py-3 text-left text-fg"
                 :aria-expanded="open === item.id"
                 @click="open = open === item.id ? null : item.id"
               >

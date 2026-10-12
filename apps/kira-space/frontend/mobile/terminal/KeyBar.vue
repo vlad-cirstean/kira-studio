@@ -4,8 +4,9 @@ import { Button } from '@theme/components/ui/button';
 import { type MessageKey, t } from '@theme/i18n';
 
 // Keys a soft keyboard lacks. Arrows honour the application cursor mode Claude Code may enable.
-const props = defineProps<{ appCursor: boolean; ctrl: boolean }>();
-const emit = defineEmits<{ key: [seq: string]; 'update:ctrl': [on: boolean] }>();
+const props = defineProps<{ appCursor: boolean }>();
+const ctrl = defineModel<boolean>('ctrl', { required: true });
+const emit = defineEmits<{ key: [seq: string] }>();
 
 const arrow = (letter: string): string => (props.appCursor ? `\x1bO${letter}` : `\x1b[${letter}`);
 
@@ -40,22 +41,21 @@ const KEYS: { id: string; label: MessageKey; icon?: string; seq: () => string }[
 <template>
   <div class="flex gap-1 overflow-x-auto px-2 py-1 scrollbar-none" data-testid="term-keybar">
     <Button
-      size="kira"
-      variant="dialog"
-      class="h-touch shrink-0 px-3"
-      :class="ctrl ? 'bg-primary text-primary-foreground' : ''"
+      size="touch"
+      :variant="ctrl ? 'dialog-primary' : 'dialog'"
+      class="shrink-0"
       :aria-pressed="ctrl"
       data-testid="term-key-ctrl"
-      @click="emit('update:ctrl', !ctrl)"
+      @click="ctrl = !ctrl"
     >
       {{ t('mobile.terminal.keys.ctrl.label') }}
     </Button>
     <Button
-      size="kira"
+      size="touch"
       v-for="key in KEYS"
       :key="key.id"
       variant="dialog"
-      class="h-touch shrink-0 px-3"
+      class="shrink-0"
       :aria-label="t(key.label)"
       :data-testid="`term-key-${key.id}`"
       @click="emit('key', key.seq())"

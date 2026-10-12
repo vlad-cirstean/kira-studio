@@ -60,7 +60,7 @@ test('Plan groups tasks by day and expands a task into its stages', async ({ pag
   const cart = page
     .locator(t('plan-task'))
     .filter({ hasText: 'Cart total test fails intermittently' });
-  await expect(cart.locator(t('plan-status'))).toBeVisible();
+  await expect(cart.locator(t('ade-chip')).first()).toBeVisible();
   await cart.locator('button').first().click();
   await expect(cart.locator(t('plan-stages'))).toBeVisible();
   await expect(cart.locator(t('plan-stages'))).toContainText('Release');
