@@ -3861,9 +3861,6 @@
       "parentNoSubject": {
         "label": "Parent {number} · {sha}"
       },
-      "showAll": {
-        "label": "Show all {count} files"
-      },
       "similar": {
         "tooltip": "{percent}% similar — {from} → {to}"
       },

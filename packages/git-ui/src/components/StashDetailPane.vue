@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import type { CommitStore } from '@kira/git-core';
+import { shortSha } from '@kira/git-core';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { FieldError } from '@theme/components/ui/field';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
+import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 /**
  * `docs/plans/P9.md` W14 (OQ4): "selecting a stash node or list row loads `stash.show` into the
  * existing `FileTree.vue`". Mirrors `DetailPane.vue`'s own composition but keyed off `StashState`
@@ -15,14 +22,7 @@ import type { CommitStore } from '@kira/git-core';
  * `fallbackSha` param (D12) carries that through to the host handler now, which retries the whole
  * composition against it when `path` is not among the primary sha's changed files.
  */
-import { shortSha } from '@kira/git-core';
-import EmptyState from '@theme/components/EmptyState.vue';
-import Spinner from '@theme/components/Spinner.vue';
-import { Badge } from '@theme/components/ui/badge';
-import { FieldError } from '@theme/components/ui/field';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { t } from '@theme/i18n';
-import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
+import Identifier from '@workbench/components/Identifier.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
 import { openFileAnnounced } from '../lib/openFileAnnounced.ts';
@@ -77,7 +77,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           </TooltipTrigger>
           <TooltipContent>{{ entry.message }}</TooltipContent>
         </Tooltip>
-        <Badge>{{ shortSha(entry.baseSha) }}</Badge>
+        <Badge><Identifier :value="entry.baseSha" :short="shortSha" /></Badge>
         <Badge v-if="entry.includedUntracked">{{ t('git.stash.untracked.example') }}</Badge>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -105,11 +105,7 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <EmptyState
-      v-else-if="!stash.error.value"
-      class="p-6"
-      :title="t('common.state.loading.loading')"
-    >
+    <EmptyState v-else-if="!stash.error.value" :title="t('common.state.loading.loading')">
       <template #media><Spinner :size="24" label="" /></template>
     </EmptyState>
   </div>

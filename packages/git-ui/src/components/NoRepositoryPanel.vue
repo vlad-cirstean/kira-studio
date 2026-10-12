@@ -20,7 +20,7 @@ import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
 
 const props = defineProps<{ repoState: RepoState }>();
-const emit = defineEmits<(event: 'repo-opened', repoId: string) => void>();
+const emit = defineEmits<(event: 'repoOpened', repoId: string) => void>();
 
 // P108 F8: this panel's own refreshList() call (independent of bootstrap()'s own) can fail too —
 // distinct copy so a transport drop here never reads as "none of your folders is a Git
@@ -45,7 +45,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
   pickError.value = undefined;
   try {
     const result = await props.repoState.open(candidate.path);
-    if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
+    if (result.kind === 'ok') emit('repoOpened', result.repo.repoId);
   } catch (err) {
     // `transport-closed` (the host disconnecting mid-request) is ignored outright — this panel
     // is about to be replaced by the boot-error banner (F8) rather than needing its own copy of it.
@@ -57,7 +57,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
 
 <template>
   <EmptyState
-    class="h-full p-6"
+    fill
     data-testid="no-repository-panel"
     :icon="STATE_ICONS.repo"
     :title="t('git.noRepository.open.title')"

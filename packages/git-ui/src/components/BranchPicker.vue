@@ -14,7 +14,6 @@
  * context menu W14 builds, which is where the destructive actions live") — a kebab button (mouse
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
-import { shortSha } from '@kira/git-core';
 import type { RefRow, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
@@ -64,6 +63,7 @@ import {
 } from '../lib/refListModel.ts';
 import { buildRefMenu, remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import { childOf, parentOf } from '../lib/stackListModel.ts';
+import { shaLabel } from '../lib/text.ts';
 import { useFieldFocus } from '../lib/useFieldFocus.ts';
 import { useSectionMenu } from '../lib/useSectionMenu.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -163,7 +163,7 @@ const triggerLabel = computed(() => {
   if (!head) return '…';
   if (head.kind === 'branch') return head.name;
   if (head.kind === 'unborn') return t('git.picker.unborn.label', { name: head.name });
-  return shortSha(head.sha);
+  return shaLabel(head.sha);
 });
 
 const pickerInput = computed<PickerInput>(() => ({
@@ -782,7 +782,7 @@ watch(visibleBranchNames, (names) => {
                 :known-remotes="knownRemotes"
                 :in-progress="ops.statusSummary.value?.inProgress ?? null"
                 :focused-row-id="activeRowId"
-                @checked-out="close"
+                @checkedOut="close"
               />
               <ShowMoreButton
                 :step="REF_LIST_SECTION_CAP"
@@ -799,8 +799,8 @@ watch(visibleBranchNames, (names) => {
                 :in-progress="ops.statusSummary.value?.inProgress ?? null"
                 :current-branch="refs.currentBranchName.value ?? null"
                 :focused-row-id="activeRowId"
-                @branch-from-stash="(entry) => emit('branchFromStash', entry)"
-                @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
+                @branchFromStash="(entry) => emit('branchFromStash', entry)"
+                @saveEntryToGlobalStash="(entry) => emit('saveEntryToGlobalStash', entry)"
                 @selected="closeForCheckout"
               />
               <ShowMoreButton
@@ -816,8 +816,8 @@ watch(visibleBranchNames, (names) => {
                 :in-progress="ops.statusSummary.value?.inProgress ?? null"
                 :current-branch="refs.currentBranchName.value ?? null"
                 :focused-row-id="activeRowId"
-                @branch-from-stash="(entry) => emit('branchFromStash', entry)"
-                @save-global-stash="emit('saveGlobalStash')"
+                @branchFromStash="(entry) => emit('branchFromStash', entry)"
+                @saveGlobalStash="emit('saveGlobalStash')"
                 @selected="closeForCheckout"
               />
               <ShowMoreButton
@@ -833,8 +833,8 @@ watch(visibleBranchNames, (names) => {
                 :worktrees="worktrees"
                 :ops="ops"
                 :focused-row-id="activeRowId"
-                @switch-worktree="(path) => emit('switchWorktree', path)"
-                @create-worktree="emit('createWorktree')"
+                @switchWorktree="(path) => emit('switchWorktree', path)"
+                @createWorktree="emit('createWorktree')"
               />
               <ShowMoreButton
                 :step="REF_LIST_SECTION_CAP"
@@ -851,8 +851,8 @@ watch(visibleBranchNames, (names) => {
                 :pr="pr"
                 :open-pull-request="openPullRequest"
                 :focused-row-id="activeRowId"
-                @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
-                @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
+                @openRestackDialog="(branch) => emit('openRestackDialog', branch)"
+                @openSetParentDialog="(branch) => emit('openSetStackParentDialog', branch)"
               />
               <ShowMoreButton
                 :step="REF_LIST_SECTION_CAP"

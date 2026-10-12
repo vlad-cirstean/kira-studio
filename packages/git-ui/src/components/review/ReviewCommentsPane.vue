@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { shortSha } from '@kira/git-core';
 import type { LineRange, ReviewComment } from '@kira/git-ipc';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 /**
@@ -20,6 +19,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, useTemplateRef } from 'vue';
+import { shaLabel } from '../../lib/text.ts';
 import type { ReviewCommentsState } from '../../state/reviewComments.ts';
 
 const props = defineProps<{
@@ -28,7 +28,7 @@ const props = defineProps<{
 
 // Reuses ReviewFilesState.selectFile rather than a second editor.openRangeDiff call site (D10) —
 // revealing the specific line inside the diff is not attempted (§10).
-const emit = defineEmits<(e: 'select-comment', path: string) => void>();
+const emit = defineEmits<(e: 'select', path: string) => void>();
 
 interface PathGroup {
   readonly path: string;
@@ -61,7 +61,7 @@ function lineLabel(range: LineRange): string {
 
 /** D12's own two suffix forms, restated for the sidebar rather than the export's plain text. */
 function anchorTitle(c: ReviewComment): string | undefined {
-  const sha7 = shortSha(c.anchorSha);
+  const sha7 = shaLabel(c.anchorSha);
   switch (c.anchor) {
     case 'removed':
       return t('git.review.comments.anchorRemoved.hint', { sha: sha7 });
@@ -141,10 +141,10 @@ const listEl = useTemplateRef<HTMLElement>('list');
                 <div class="flex items-center gap-1">
                   <Button
                     variant="link"
-                    size="kira"
-                    class="h-auto p-0 border-0 font-data font-normal text-muted-foreground text-graph-sm after:absolute after:inset-0"
+                    size="inline"
+                    class="font-data text-muted-foreground text-graph-sm after:absolute after:inset-0"
                     :aria-label="t('git.review.comments.open.aria', { path: group.path, line: lineLabel(c.range) })"
-                    @click="emit('select-comment', group.path)"
+                    @click="emit('select', group.path)"
                   >
                     {{ lineLabel(c.range) }}
                   </Button>
@@ -158,7 +158,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
                   <TooltipIconButton
                     icon="trash"
                     :label="t('git.review.comments.delete.tooltip')"
-                    class="relative z-10 ml-auto"
+                    class="relative z-2 ml-auto"
                     :disabled="reviewComments.pending.value"
                     @click="reviewComments.remove(c.id)"
                   />

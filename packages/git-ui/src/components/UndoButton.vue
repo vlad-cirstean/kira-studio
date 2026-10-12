@@ -34,7 +34,7 @@ async function undo(): Promise<void> {
   <div v-if="ops.undoSlot.value" class="flex items-center gap-0.5">
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira" :disabled="ops.busy.value" @click="undo">
+        <Button variant="toolbar" size="kira" :pending="ops.busy.value" @click="undo">
           <CodiconIcon name="discard" :size="13" />
           {{ ops.undoSlot.value.label }}
         </Button>

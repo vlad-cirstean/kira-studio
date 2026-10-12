@@ -22,7 +22,7 @@ const copy = computed(() => {
 <template>
   <EmptyState
     v-if="copy"
-    class="h-full p-6"
+    fill
     role="alert"
     data-testid="git-blocked-panel"
     :title="copy.title"

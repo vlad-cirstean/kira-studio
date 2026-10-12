@@ -17,7 +17,6 @@ import type { CommitStore } from '@kira/git-core';
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
  * `ReviewCommitRow.vue` alike.
  */
-import { shortSha } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
@@ -25,15 +24,16 @@ import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
-import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
+import { useCappedList } from '@workbench/behaviour/cappedList';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { errorText } from '@workbench/bridge/codedError';
+import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useId, watch } from 'vue';
@@ -42,8 +42,7 @@ import { setiIconFor } from '../icons/setiFileIcon.ts';
 import {
   buildFileTree,
   buildFlatList,
-  capRows,
-  FILE_TREE_ROW_CAP,
+  FILE_TREE_PAGE_SIZE,
   type FileTreeRow,
   filterFiles,
   flattenTreeRows,
@@ -53,6 +52,7 @@ import {
 } from '../lib/fileTreeModel.ts';
 import { sectionsToMenuItems } from '../lib/menuModel.ts';
 import { buildFileRowMenu } from '../lib/rowMenuModel.ts';
+import { shaLabel } from '../lib/text.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 
@@ -183,19 +183,15 @@ const rows = computed<FileTreeRow[]>(() => {
   return flattenTreeRows(tree.value, isExpanded);
 });
 
-/** §8's cap, lifted for the current commit once "Show all N files" is clicked — not persisted
- *  (a fresh commit selection gets the cap again; §8 is about one pathological commit, not a
- *  standing preference). */
-const capLifted = ref(false);
-watch(
-  () => props.files,
-  () => {
-    capLifted.value = false;
-  },
-);
-const capped = computed(() =>
-  capRows(rows.value, capLifted.value ? Number.POSITIVE_INFINITY : FILE_TREE_ROW_CAP),
-);
+/** §8's render cap; a fresh commit selection gets the first page again. */
+const {
+  visible: visibleRows,
+  hiddenCount,
+  showMore,
+  reset: resetCap,
+  step: capStep,
+} = useCappedList(rows, FILE_TREE_PAGE_SIZE);
+watch(() => props.files, resetCap);
 
 const treeEl = ref<HTMLDivElement | null>(null);
 const rootEl = ref<HTMLElement | null>(null);
@@ -214,9 +210,9 @@ usePanelHeaderSearch(rootEl, {
  *  entirely (a parent-commit pick, a repo refresh re-resolving a selection). A `selectedFile` the
  *  current filter/list-mode has hidden leaves the cursor where it was. */
 watch(
-  [() => props.selectedFile, capped],
+  [() => props.selectedFile, visibleRows],
   ([selectedFile]) => {
-    const rowsNow = capped.value.visible;
+    const rowsNow = visibleRows.value;
     const selected = rowsNow.find(
       (row) => row.kind === 'file' && row.node.fileIndex === selectedFile,
     );
@@ -233,17 +229,17 @@ watch(
  *  keystroke that leaves the cap in the same state, which `capped` itself recomputes on. */
 let lastHiddenCount: number | undefined;
 watch(
-  capped,
-  (value) => {
-    if (value.hiddenCount > 0 && value.hiddenCount !== lastHiddenCount) {
+  hiddenCount,
+  (hidden) => {
+    if (hidden > 0 && hidden !== lastHiddenCount) {
       props.actions.announce(
         t('git.fileTree.capped.announce', {
-          shown: value.visible.length,
+          shown: visibleRows.value.length,
           total: rows.value.length,
         }),
       );
     }
-    lastHiddenCount = value.hiddenCount;
+    lastHiddenCount = hidden;
   },
   { immediate: true },
 );
@@ -271,7 +267,7 @@ function rowClass(row: FileTreeRow): string {
  *  preview" behaviour, now expressed as a second emit rather than a mode flip, and now something
  *  a double click/`Enter` can additionally *pin*. */
 function selectRow(index: number, options: { follow?: boolean } = {}): void {
-  const row = capped.value.visible[index];
+  const row = visibleRows.value[index];
   if (!row) return;
   activeKey.value = rowKey(row);
   if (row.kind === 'directory') return;
@@ -281,7 +277,7 @@ function selectRow(index: number, options: { follow?: boolean } = {}): void {
 }
 
 function onRowClick(index: number): void {
-  const row = capped.value.visible[index];
+  const row = visibleRows.value[index];
   if (!row) return;
   if (row.kind === 'directory') {
     activeKey.value = rowKey(row);
@@ -297,18 +293,18 @@ function onRowClick(index: number): void {
  *  existing preview tab into a permanent one rather than opening a second, which is why no click-delay debounce is introduced here (a debounce would add a
  *  visible lag to every single click to serve the rarer gesture). */
 function onRowDblClick(index: number): void {
-  const row = capped.value.visible[index];
+  const row = visibleRows.value[index];
   if (!row || row.kind === 'directory') return;
   emit('openFile', row.node.fileIndex, true);
 }
 
 function indexOfKey(key: string): number {
-  return capped.value.visible.findIndex((row) => rowKey(row) === key);
+  return visibleRows.value.findIndex((row) => rowKey(row) === key);
 }
 
 const nav = useListNavigation<FileTreeRow>({
   container: treeEl,
-  items: () => capped.value.visible,
+  items: () => visibleRows.value,
   key: rowKey,
   activeKey,
   selectOnMove: true,
@@ -345,7 +341,7 @@ const parentOptions = computed<ParentOption[]>(() =>
   props.parents.map((sha, index) => {
     const row = props.store.rowOfSha(sha);
     const subject = row !== -1 ? props.store.subjectAt(row) : undefined;
-    const sha7 = shortSha(sha);
+    const sha7 = shaLabel(sha);
     const label = subject
       ? t('git.fileTree.parent.label', { number: index + 1, sha: sha7, subject })
       : t('git.fileTree.parentNoSubject.label', { number: index + 1, sha: sha7 });
@@ -539,7 +535,7 @@ const parentSelectId = useId();
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
       <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from nav.rowProps. -->
       <div
-        v-for="(row, index) in capped.visible"
+        v-for="(row, index) in visibleRows"
         :key="rowKey(row)"
         data-testid="file-tree-row"
         :class="rowClass(row)"
@@ -639,7 +635,7 @@ const parentSelectId = useId();
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the container. -->
       <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from nav.rowProps. -->
       <div
-        v-for="(row, index) in capped.visible"
+        v-for="(row, index) in visibleRows"
         :key="rowKey(row)"
         data-testid="file-tree-row"
         :class="rowClass(row)"
@@ -734,14 +730,11 @@ const parentSelectId = useId();
     </div>
 
     <!-- Outside the tree/listbox: those roles may own only treeitems/options. -->
-    <Button
-      v-if="capped.hiddenCount > 0"
-      variant="link"
-      size="kira"
-      class="text-focus w-full border-t border-border p-1 h-auto justify-start"
-      @click="capLifted = true"
-    >
-      {{ t('git.fileTree.showAll.label', { count: rows.length }) }}
-    </Button>
+    <ShowMoreButton
+      :hidden-count="hiddenCount"
+      :step="capStep"
+      class="border-t border-border"
+      @click="showMore"
+    />
   </div>
 </template>

@@ -18,7 +18,7 @@ defineProps<{ branchName: string }>();
 
 <template>
   <EmptyState
-    class="h-full p-6"
+    fill
     data-testid="empty-repository-panel"
     :icon="STATE_ICONS.commit"
     :title="t('git.emptyRepository.title')"

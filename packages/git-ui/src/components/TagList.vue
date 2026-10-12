@@ -35,10 +35,10 @@ const props = defineProps<{
   focusedRowId?: string;
 }>();
 
-const emit = defineEmits<(e: 'checked-out') => void>();
+const emit = defineEmits<(e: 'checkedOut') => void>();
 
 async function checkout(row: RefRow): Promise<void> {
-  emit('checked-out');
+  emit('checkedOut');
   await props.ops.runCheckout(row.shortName, 'switch');
 }
 

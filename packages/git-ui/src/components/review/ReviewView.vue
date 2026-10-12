@@ -5,13 +5,11 @@ import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 /**
  * `docs/plans/P7.md` W11 — the sidebar view's whole root, mounted by `main.ts` in place of
@@ -832,21 +830,19 @@ watch(
     </template>
 
     <template v-else-if="!review">
-      <EmptyState class="h-full" :title="t('git.review.loading.loading')">
-        <template #media><Spinner :size="24" label="" /></template>
-      </EmptyState>
+      <EmptyState fill loading :title="t('git.review.loading.loading')" />
     </template>
 
     <template v-else-if="noActiveRepo">
       <div class="flex flex-col gap-1 p-3 min-h-0">
-        <h2 class="text-kira-md text-fg">{{ t('git.review.start.title') }}</h2>
+        <h2 class="text-kira-lg font-medium text-fg">{{ t('git.review.start.title') }}</h2>
         <p>{{ t('git.review.noRepo.emptyHint') }}</p>
       </div>
     </template>
 
     <template v-else-if="!review.branch.value">
       <div class="flex flex-col gap-1 p-3 min-h-0 h-full" data-testid="review-no-branch">
-        <h2 class="text-kira-md text-fg">{{ t('git.review.start.title') }}</h2>
+        <h2 class="text-kira-lg font-medium text-fg">{{ t('git.review.start.title') }}</h2>
         <p class=" text-muted-foreground">
           {{ t('git.review.noBranch.emptyHint') }}
         </p>
@@ -918,7 +914,7 @@ watch(
         <BaseSelector
           :resolution="review.resolution.value"
           :refs-state="refsState"
-          @select-base="review.setBase($event)"
+          @select="review.setBase($event)"
         />
         <TooltipIconButton
           icon="arrow-swap"
@@ -947,7 +943,7 @@ watch(
           <template #item="{ item }">
             <CodiconIcon :name="item.icon ?? ''" :size="13" />
             <span class="sr-only">{{ item.label }}</span>
-            <Badge variant="count">{{ item.count }}</Badge>
+            <span v-if="item.count !== undefined" :class="rowMeta">{{ item.count }}</span>
           </template>
         </SecondaryTabs>
         <!-- G19 D6 (item 6): the always-rendered filter input is now gated behind a search-icon
@@ -1081,7 +1077,7 @@ watch(
                   :list-mode="listMode"
                   :filter="filter"
                   @toggle="toggleRow(shas[item.index] as string)"
-                  @focus-row="focusedSha = shas[item.index] as string"
+                  @focusRow="focusedSha = shas[item.index] as string"
                 />
               </div>
             </div>
@@ -1129,7 +1125,7 @@ watch(
           "
           class="flex-1 min-h-0"
           :review-comments="reviewComments"
-          @select-comment="onSelectComment"
+          @select="onSelectComment"
         />
       </div>
     </template>

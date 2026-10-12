@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { CommitStore } from '@kira/git-core';
-import { shortSha } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
 /**
  * `docs/plans/P7.md` W13 — one commit in the review list. Collapsed: a disclosure triangle,
@@ -26,10 +25,12 @@ import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
+import Identifier from '@workbench/components/Identifier.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, useTemplateRef } from 'vue';
 import { openAllChangesAnnounced } from '../../lib/openAllChangesAnnounced.ts';
 import { buildReadOnlyRowMenu } from '../../lib/rowMenuModel.ts';
+import { shaLabel } from '../../lib/text.ts';
 import { useSectionMenu } from '../../lib/useSectionMenu.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
@@ -56,12 +57,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle'): void;
-  (e: 'focus-row'): void;
+  (e: 'focusRow'): void;
 }>();
 
 const row = computed(() => props.store.rowOfSha(props.sha));
 const commit = computed(() => (row.value === -1 ? undefined : props.store.commitAt(row.value)));
-const sha7 = computed(() => shortSha(props.sha));
 const dateText = computed(() =>
   commit.value ? formatAgeCompact(commit.value.committer.timestamp) : '',
 );
@@ -73,7 +73,7 @@ const dateText = computed(() =>
  *  correct for keeping either action's click from also toggling the row. */
 function onRowClick(event: MouseEvent): void {
   if ((event.target as Element | null)?.closest('[data-testid="review-row-actions"]')) return;
-  emit('focus-row');
+  emit('focusRow');
   emit('toggle');
 }
 
@@ -86,7 +86,7 @@ useEventListener(headerEl, 'click', onRowClick);
 const rowMenu = useSectionMenu();
 
 function onContextMenu(event: MouseEvent): void {
-  emit('focus-row');
+  emit('focusRow');
   rowMenu.openAt(event, buildReadOnlyRowMenu(), onMenuSelect);
 }
 
@@ -171,7 +171,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div
     v-if="commit"
-    class="flex flex-col border-b border-border cursor-pointer group focus-visible:focus-ring"
+    class="flex flex-col border-b border-border group focus-visible:focus-ring"
     role="treeitem"
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"
@@ -189,13 +189,13 @@ function onOpenFile(index: number, pinned: boolean): void {
     <div
       data-testid="review-row-header"
       ref="headerEl"
-      :class="cn(rowVariants({ layout: 'tree' }), 'cursor-pointer py-1 px-2 min-w-0 font-ui')"
+      :class="cn(rowVariants({ layout: 'tree' }), 'py-1 px-2 min-w-0 font-ui')"
     >
       <TreeTwisty
         :expanded="expanded"
         :has-children="true"
         @toggle="
-          emit('focus-row');
+          emit('focusRow');
           emit('toggle');
         "
       />
@@ -213,12 +213,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
                sha renders as plain text; the existing copySha context-menu item (buildReadOnlyRowMenu)
                already covers this, and F7 found these two affordances genuinely redundant with it. -->
-          <span
-            class="font-data text-inherit shrink-0 bg-transparent border-0 cursor-pointer p-0"
-            >{{
-              sha7
-            }}</span
-          >
+          <Identifier class="shrink-0" :value="sha" :short="shaLabel" />
         </span>
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within

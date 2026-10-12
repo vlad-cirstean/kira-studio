@@ -32,8 +32,10 @@ const props = defineProps<{
 }>();
 
 const isOpen = ref(false);
-const preview = ref<{ strategy: PullStrategy; source: PullStrategySource } | undefined>(undefined);
-const previewLoading = ref(false);
+type Preview =
+  | { kind: 'resolving' }
+  | { kind: 'ready'; strategy: PullStrategy; source: PullStrategySource };
+const preview = ref<Preview | undefined>(undefined);
 
 const lastRun = computed(() => props.ops.pullStrategy.value);
 const mainTitle = computed(() => {
@@ -59,14 +61,15 @@ const menuSections = computed<MenuSection[]>(() => [
         label: t('git.toolbar.pullDefault.label'),
         disabled: false,
         disabledReason: undefined,
-        detail: previewLoading.value
-          ? t('git.toolbar.pullResolving.loading')
-          : preview.value
-            ? t('common.withDetail.label', {
-                first: pullStrategyLabel(preview.value.strategy),
-                second: describePullStrategySource(preview.value.source),
-              })
-            : undefined,
+        detail:
+          preview.value?.kind === 'resolving'
+            ? t('git.toolbar.pullResolving.loading')
+            : preview.value
+              ? t('common.withDetail.label', {
+                  first: pullStrategyLabel(preview.value.strategy),
+                  second: describePullStrategySource(preview.value.source),
+                })
+              : undefined,
       },
       ...STRATEGIES.map((strategy) => ({
         id: `pull-strategy-${strategy}`,
@@ -96,22 +99,21 @@ async function onOpenChange(value: boolean): Promise<void> {
   isOpen.value = value;
   if (!value) return;
   const seq = ++previewSeq;
-  previewLoading.value = true;
+  preview.value = { kind: 'resolving' };
+  let next: Preview | undefined;
   try {
     const pre = await props.ops.previewPullStrategy(props.branch);
-    if (seq === previewSeq && pre) preview.value = { strategy: pre.strategy, source: pre.source };
+    if (pre) next = { kind: 'ready', strategy: pre.strategy, source: pre.source };
   } catch {
     // The preview is a hint only; without it the item shows no detail and Pull still works.
-  } finally {
-    if (seq === previewSeq) previewLoading.value = false;
   }
+  if (seq === previewSeq) preview.value = next;
 }
 
 watch(
   () => props.branch,
   () => {
     previewSeq++;
-    previewLoading.value = false;
     preview.value = undefined;
   },
 );

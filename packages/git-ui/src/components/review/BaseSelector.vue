@@ -29,7 +29,7 @@ const props = defineProps<{
   refsState: RefsState;
 }>();
 
-const emit = defineEmits<(e: 'select-base', ref: string) => void>();
+const emit = defineEmits<(e: 'select', ref: string) => void>();
 
 /** `"override"` and `"none"` both render nothing — an overridden base needs no explanation of
  *  where it came from, and `reason: "none"` never reaches this (paired only with `base: null`,
@@ -101,7 +101,7 @@ function candidateReason(candidate: BaseCandidate): string {
 
 function pick(ref: string): void {
   close();
-  emit('select-base', ref);
+  emit('select', ref);
 }
 
 /** §5.2: reka's own default (the panel's first focusable element) loses to the filter input

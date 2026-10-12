@@ -22,6 +22,7 @@
 import { describeInProgress } from '@kira/git-core';
 import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import { renderText } from '../lib/text.ts';
@@ -32,27 +33,27 @@ const props = defineProps<{
 }>();
 
 const inProgress = computed(() => props.ops.statusSummary.value?.inProgress ?? null);
-const busyAction = ref<'continue' | 'skip' | 'abort' | undefined>(undefined);
+const activeAction = ref<'continue' | 'skip' | 'abort' | undefined>(undefined);
 
 const CONTINUE_REASON_ID = 'git-conflict-continue-reason';
 
 async function onContinue(): Promise<void> {
-  if (busyAction.value) return;
-  busyAction.value = 'continue';
+  if (activeAction.value) return;
+  activeAction.value = 'continue';
   try {
     await props.ops.continueOp();
   } finally {
-    busyAction.value = undefined;
+    activeAction.value = undefined;
   }
 }
 
 async function onAbort(): Promise<void> {
-  if (busyAction.value) return;
-  busyAction.value = 'abort';
+  if (activeAction.value) return;
+  activeAction.value = 'abort';
   try {
     await props.ops.abortOp();
   } finally {
-    busyAction.value = undefined;
+    activeAction.value = undefined;
   }
 }
 
@@ -60,12 +61,12 @@ async function onAbort(): Promise<void> {
  *  (cherry-pick and revert only, probe 6), the same gate `core`'s own `InProgressOperation.canSkip`
  *  already computes. */
 async function onSkip(): Promise<void> {
-  if (busyAction.value) return;
-  busyAction.value = 'skip';
+  if (activeAction.value) return;
+  activeAction.value = 'skip';
   try {
     await props.ops.skipOp();
   } finally {
-    busyAction.value = undefined;
+    activeAction.value = undefined;
   }
 }
 
@@ -95,7 +96,8 @@ const PATH_DISPLAY_CAP = 20;
         v-if="inProgress.canContinue"
         variant="toolbar"
         size="kira"
-        :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
+        :pending="activeAction === 'continue'"
+        :disabled="inProgress.unmergedCount > 0 || activeAction === 'skip' || activeAction === 'abort'"
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
       >
@@ -105,7 +107,8 @@ const PATH_DISPLAY_CAP = 20;
         v-if="inProgress.canSkip"
         variant="toolbar"
         size="kira"
-        :disabled="busyAction !== undefined"
+        :pending="activeAction === 'skip'"
+        :disabled="activeAction === 'continue' || activeAction === 'abort'"
         @click="onSkip"
       >
         {{ t('common.skip.label') }}
@@ -114,28 +117,25 @@ const PATH_DISPLAY_CAP = 20;
         v-if="inProgress.canAbort"
         variant="danger"
         size="kira"
-        :disabled="busyAction !== undefined"
+        :pending="activeAction === 'abort'"
+        :disabled="activeAction === 'continue' || activeAction === 'skip'"
         @click="onAbort"
       >
         {{ t('common.abort.label') }}
       </Button>
     </div>
 
-    <p
-      v-if="inProgress.unmergedCount > 0"
-      :id="CONTINUE_REASON_ID"
-      class="mt-0.5 text-kira-sm text-muted-foreground"
-    >
+    <FieldDescription v-if="inProgress.unmergedCount > 0" :id="CONTINUE_REASON_ID" class="mt-0.5">
       {{
         t(
           inProgress.canSkip ? 'git.conflict.resolveOrSkip.description' : 'git.conflict.resolve.description',
           { count: inProgress.unmergedCount },
         )
       }}
-    </p>
-    <p v-else-if="inProgress.canSkip" class="mt-0.5 text-kira-sm text-muted-foreground">
+    </FieldDescription>
+    <FieldDescription v-else-if="inProgress.canSkip" class="mt-0.5">
       {{ t('git.conflict.resolved.description') }}
-    </p>
+    </FieldDescription>
 
     <ul
       v-if="inProgress.conflictedPaths.length > 0"

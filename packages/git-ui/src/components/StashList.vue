@@ -20,13 +20,13 @@
  * (`stashRowModel`) and its own menu action set (Pop/Drop/`stashSaveGlobal` exist only on a real
  * stack entry, never on a global bucket one).
  */
-import { shortSha } from '@kira/git-core';
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { t } from '@theme/i18n';
 import type { PickerList } from '../lib/pickerModel.ts';
 import { buildStashMenu } from '../lib/rowMenuModel.ts';
 import { isAutoStash, originLabel, stashLabel } from '../lib/stashListModel.ts';
+import { shaLabel } from '../lib/text.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
@@ -63,7 +63,7 @@ function stashRowModel(entry: StashEntry): StashRowModel {
   return {
     id: `stash:${entry.sha}`,
     rowTooltip: t('git.stash.base.tooltip', {
-      sha: shortSha(entry.baseSha),
+      sha: shaLabel(entry.baseSha),
       subject: entry.baseSubject,
     }),
     badge: `stash@{${entry.index}}`,

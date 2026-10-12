@@ -5,7 +5,7 @@
  * affordance, since both need P6's ref list and op executor. `docs/plans/P8.md` W17 adds the
  * fetch/pull/push group itself; the trailing `⚙` is a settings gear (G18 D13): the gear opens
  * `App.vue`'s own `RepoSettingsDialog.vue`, this toolbar owning no dialog state of its own
- * (`open-repo-settings` emit), the same shape `stash-changes` already follows.
+ * (`openRepoSettings` emit), the same shape `stashChanges` already follows.
  *
  * `docs/plans/P11.md` W14 originally added a fifth slot here, `SearchBox.vue`, crammed into this
  * same row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
@@ -50,7 +50,7 @@ import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
-// real import to infer the template's inline @branch-from-stash handler's parameter type from
+// real import to infer the template's inline @branchFromStash handler's parameter type from
 // BranchPicker's own emits declaration — a type-only import here breaks that inference (TS7006).
 // PullStrategyPicker and RefreshButton: a .vue default export is a *value* — the component object
 // the template instantiates. `import type` erases it, and Vue then renders the tag as an unknown
@@ -89,33 +89,33 @@ const emit = defineEmits<{
   /** `docs/plans/P9.md` W14: opens `StashDialog.vue`'s create mode — owned by `App.vue`, exactly
    *  like `createBranchHere`/`createTagHere`'s own dialog state, since this button has no
    *  pre-flight endpoint of its own to preview first (the dialog IS the confirm step). */
-  (event: 'stash-changes'): void;
+  (event: 'stashChanges'): void;
   /** Forwarded straight from `BranchPicker.vue`'s own emit — see `StashList.vue`'s doc comment. */
-  (event: 'branch-from-stash', entry: StashEntry): void;
+  (event: 'branchFromStash', entry: StashEntry): void;
   /** G28 D13: forwarded straight from `BranchPicker.vue`'s own emits — see
    *  `GlobalStashList.vue`'s/`StashList.vue`'s own doc comments. */
-  (event: 'save-global-stash'): void;
-  (event: 'save-entry-to-global-stash', entry: StashEntry): void;
+  (event: 'saveGlobalStash'): void;
+  (event: 'saveEntryToGlobalStash', entry: StashEntry): void;
   /** G25: forwarded straight from `BranchPicker.vue` -> `WorktreeList.vue`'s own emits — see
    *  `WorktreeList.vue`'s own doc comment on why this toolbar does not act on them itself. */
-  (event: 'switch-worktree', path: string): void;
-  (event: 'create-worktree', seed?: WorktreeCreateSeed): void;
+  (event: 'switchWorktree', path: string): void;
+  (event: 'createWorktree', seed?: WorktreeCreateSeed): void;
   /** G26: forwarded straight from `BranchPicker.vue` -> `StackList.vue`'s own emits — `App.vue`
    *  owns `StackDialog.vue`'s actual open state, the same "toolbar owns no dialog state itself"
    *  shape every other dialog-opening emit above already follows. */
-  (event: 'open-restack-dialog', branch: string): void;
-  (event: 'open-set-stack-parent-dialog', branch: string): void;
+  (event: 'openRestackDialog', branch: string): void;
+  (event: 'openSetStackParentDialog', branch: string): void;
   /** G18 D13: the settings gear (`⚙`) this toolbar's own ascii layout has named since §6.2 but no
    *  phase implemented until now — opens `App.vue`'s own `RepoSettingsDialog.vue`, the same
-   *  "toolbar owns no dialog state itself" shape `stash-changes` above already follows. */
-  (event: 'open-repo-settings'): void;
+   *  "toolbar owns no dialog state itself" shape `stashChanges` above already follows. */
+  (event: 'openRepoSettings'): void;
   /** Toggles `App.vue`'s own search row (`toggleSearchRow`) — the toolbar owns no search state of
    *  its own, the same "emit, don't own" shape every other dialog/panel-toggling emit above
    *  already follows. */
-  (event: 'toggle-search'): void;
+  (event: 'toggleSearch'): void;
   /** P93 §4.4/§7: toggles `App.vue`'s own `collapseBranches` preference — the toolbar owns no
-   *  collapse state of its own, same "emit, don't own" shape as `toggle-search` above. */
-  (event: 'toggle-collapse-branches'): void;
+   *  collapse state of its own, same "emit, don't own" shape as `toggleSearch` above. */
+  (event: 'toggleCollapseBranches'): void;
 }>();
 
 function copy(text: string, message: string): void {
@@ -298,13 +298,13 @@ const stashDisabled = computed(
       :stack="stackState"
       :pr="prState"
       :open-pull-request="openPullRequest"
-      @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
-      @save-global-stash="emit('save-global-stash')"
-      @save-entry-to-global-stash="(entry) => emit('save-entry-to-global-stash', entry)"
-      @switch-worktree="(path) => emit('switch-worktree', path)"
-      @create-worktree="(seed) => emit('create-worktree', seed)"
-      @open-restack-dialog="(branch) => emit('open-restack-dialog', branch)"
-      @open-set-stack-parent-dialog="(branch) => emit('open-set-stack-parent-dialog', branch)"
+      @branchFromStash="(entry) => emit('branchFromStash', entry)"
+      @saveGlobalStash="emit('saveGlobalStash')"
+      @saveEntryToGlobalStash="(entry) => emit('saveEntryToGlobalStash', entry)"
+      @switchWorktree="(path) => emit('switchWorktree', path)"
+      @createWorktree="(seed) => emit('createWorktree', seed)"
+      @openRestackDialog="(branch) => emit('openRestackDialog', branch)"
+      @openSetStackParentDialog="(branch) => emit('openSetStackParentDialog', branch)"
     />
     <span
       v-if="stackState.restacking.value"
@@ -394,7 +394,7 @@ const stashDisabled = computed(
           size="kira"
           :disabled="stashDisabled"
           data-testid="stash-changes-button"
-          @click="emit('stash-changes')"
+          @click="emit('stashChanges')"
         >
           <CodiconIcon name="inbox" :size="13" />
           {{ t('git.toolbar.stash.label') }}
@@ -410,7 +410,7 @@ const stashDisabled = computed(
       :label="t('git.toolbar.collapseBranches.tooltip')"
       :pressed="collapseBranches"
       data-testid="graph-collapse-toggle"
-      @click="emit('toggle-collapse-branches')"
+      @click="emit('toggleCollapseBranches')"
     />
 
     <TooltipIconButton
@@ -418,14 +418,14 @@ const stashDisabled = computed(
       :label="t('common.action.search.label')"
       :pressed="searchOpen"
       data-testid="search-toggle-button"
-      @click="emit('toggle-search')"
+      @click="emit('toggleSearch')"
     />
 
     <TooltipIconButton
       :icon="ICON.settings"
       :label="t('git.toolbar.repoSettings.tooltip')"
       data-testid="repo-settings-button"
-      @click="emit('open-repo-settings')"
+      @click="emit('openRepoSettings')"
     />
 
     <div

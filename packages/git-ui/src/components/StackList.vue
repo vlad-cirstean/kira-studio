@@ -48,8 +48,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'open-restack-dialog', branch: string): void;
-  (e: 'open-set-parent-dialog', branch: string): void;
+  (e: 'openRestackDialog', branch: string): void;
+  (e: 'openSetParentDialog', branch: string): void;
 }>();
 
 function byBranchMap() {
@@ -71,11 +71,11 @@ function orphanRows(): StackRow[] {
 }
 
 function requestRestack(branch: string): void {
-  emit('open-restack-dialog', branch);
+  emit('openRestackDialog', branch);
 }
 
 function requestSetParent(branch: string): void {
-  emit('open-set-parent-dialog', branch);
+  emit('openSetParentDialog', branch);
 }
 
 /** No confirmation dialog: this is a config-only, fully undoable write (D2/D10) — the same
