@@ -3,6 +3,7 @@ import { expect, test } from './fixtures';
 import { adeBoard, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
 // Review code: one step from the Plan to a branch's review window.
@@ -18,10 +19,9 @@ function calls(control: { log(): { channel: string; args?: unknown }[] }) {
   return control.log().filter((e) => e.channel === IPC.adeTaskOpenReviewWindow);
 }
 
-// The app reads the platform from the user agent, which can differ from the host Playwright types for.
+// The Go menu accelerator pushes this event; no window keydown remains.
 async function pressReview(page: Page): Promise<void> {
-  const mac = await page.evaluate(() => navigator.userAgent.includes('Mac'));
-  await page.keyboard.press(`${mac ? 'Meta' : 'Control'}+Shift+R`);
+  await emitWailsEvent(page, IPC.reviewCode, null);
 }
 
 async function pickerIds(page: Page): Promise<string[]> {

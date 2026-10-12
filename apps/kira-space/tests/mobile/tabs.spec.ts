@@ -45,7 +45,9 @@ test('contract: Backlog lists what the backend returns', async ({ page }) => {
 test('Plan groups tasks by day and expands a task into its stages', async ({ page }) => {
   await page.locator(t('tab-plan')).click();
   await expect(page).toHaveURL(/\/plan$/);
-  const labels = await page.locator(`${t('plan-group')} h2`).allTextContents();
+  const labels = await page
+    .locator(`${t('plan-group')} [data-slot="section-heading"]`)
+    .allTextContents();
   expect(labels.map((l) => l.trim())).toEqual([
     'Earlier',
     'Today',
