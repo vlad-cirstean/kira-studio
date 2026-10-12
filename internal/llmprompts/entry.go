@@ -75,6 +75,9 @@ type Prompt[V any] struct{ id ID }
 // ID is the entry id.
 func (p Prompt[V]) ID() ID { return p.id }
 
+// Schema is the fixed JSON output schema of a schema-bound prompt.
+func (p Prompt[V]) Schema() []byte { return []byte(mustEntry(p.id).Entry.Schema) }
+
 // Text is the effective text for v: the valid override rendered, else the default.
 func (p Prompt[V]) Text(src Source, v V) string { return Render(src, p.id, v) }
 

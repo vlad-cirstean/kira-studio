@@ -18,17 +18,6 @@ const (
 	extractBudget    = "0.50"
 )
 
-const extractSchema = `{
-  "type": "object", "additionalProperties": false, "required": ["facts"],
-  "properties": {"facts": {"type": "array", "items": {
-    "type": "object", "additionalProperties": false,
-    "required": ["fact", "evidence", "section", "unresolved"],
-    "properties": {
-      "fact": {"type": "string"}, "evidence": {"type": "string"},
-      "section": {"type": "string"}, "unresolved": {"type": "string"}
-    }}}}
-}`
-
 type extractDoc struct {
 	Path  string `json:"path"`
 	Title string `json:"title"`
@@ -78,7 +67,7 @@ func (a ClaudeAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutpu
 		return ExtractOutput{}, err
 	}
 	res, err := a.Runner.RunResult(ctx, memory.Call{
-		System: llmprompts.MemoryImportExtractSystem.Text(a.prompts(), llmprompts.ExtractVars{MaxFacts: maxFactsPerChunk, MaxEvidence: maxEvidenceLen}), Input: string(input), Schema: json.RawMessage(extractSchema),
+		System: llmprompts.MemoryImportExtractSystem.Text(a.prompts(), llmprompts.ExtractVars{MaxFacts: maxFactsPerChunk, MaxEvidence: maxEvidenceLen}), Input: string(input), Schema: llmprompts.MemoryImportExtractSystem.Schema(),
 		Timeout: extractTimeout, Budget: extractBudget,
 	})
 	out := ExtractOutput{CostUSD: res.CostUSD}

@@ -9,28 +9,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-const gateSchema = `{
-  "type": "object", "additionalProperties": false,
-  "required": ["items"],
-  "properties": {
-    "items": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false,
-      "required": ["index", "verdict", "questions", "facts"],
-      "properties": {
-        "index": {"type": "integer"},
-        "verdict": {"enum": ["accept", "challenge"]},
-        "questions": {"type": "array", "items": {"type": "string"}},
-        "facts": {"type": "array", "items": {
-          "type": "object", "additionalProperties": false,
-          "required": ["fact", "reason", "keywords"],
-          "properties": {
-            "fact": {"type": "string"}, "reason": {"type": "string"},
-            "keywords": {"type": "array", "items": {"type": "string"}}
-          }}}
-      }}}
-  }
-}`
-
 type gateInput struct {
 	Items          []gateInputItem `json:"items"`
 	Clarifications []gateClarify   `json:"clarifications,omitempty"`
@@ -89,7 +67,7 @@ func (s *Service) runGate(ctx context.Context, req StoreRequest) ([]gateVerdict,
 	if err != nil {
 		return nil, fmt.Errorf("memory: encode gate input: %w", err)
 	}
-	raw, err := s.runner.Run(ctx, Call{System: llmprompts.MemoryGateSystem.Text(s.opts.Prompts, llmprompts.GateVars{MaxKeywords: MaxKeywords}), Input: string(body), Schema: []byte(gateSchema)})
+	raw, err := s.runner.Run(ctx, Call{System: llmprompts.MemoryGateSystem.Text(s.opts.Prompts, llmprompts.GateVars{MaxKeywords: MaxKeywords}), Input: string(body), Schema: llmprompts.MemoryGateSystem.Schema()})
 	if err != nil {
 		return nil, err
 	}

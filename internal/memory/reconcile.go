@@ -10,19 +10,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-const reconcileSchema = `{
-  "type": "object", "additionalProperties": false, "required": ["decisions"],
-  "properties": {"decisions": {"type": "array", "items": {
-    "type": "object", "additionalProperties": false,
-    "required": ["index", "action", "target", "fact", "reason", "why"],
-    "properties": {
-      "index": {"type": "integer"},
-      "action": {"enum": ["add", "update", "noop"]},
-      "target": {"type": "string"},
-      "fact": {"type": "string"}, "reason": {"type": "string"}, "why": {"type": "string"}
-    }}}}
-}`
-
 const reconcileCandidateLimit = 10
 
 // work is one accepted fact moving through reconcile and commit.
@@ -160,7 +147,7 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 	if err != nil {
 		return fmt.Errorf("memory: encode reconcile input: %w", err)
 	}
-	raw, err := s.runner.Run(ctx, Call{System: llmprompts.MemoryReconcileSystem.Text(s.opts.Prompts, llmprompts.NoVars{}), Input: string(body), Schema: []byte(reconcileSchema)})
+	raw, err := s.runner.Run(ctx, Call{System: llmprompts.MemoryReconcileSystem.Text(s.opts.Prompts, llmprompts.NoVars{}), Input: string(body), Schema: llmprompts.MemoryReconcileSystem.Schema()})
 	if err != nil {
 		return err
 	}

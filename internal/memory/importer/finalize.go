@@ -27,18 +27,6 @@ var finalizeTools = []string{
 	"mcp__" + mcpServerName + "__memory_history",
 }
 
-const finalizeSchema = `{
-  "type": "object", "additionalProperties": false, "required": ["unresolved", "dropped"],
-  "properties": {
-    "unresolved": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false, "required": ["fact", "questions"],
-      "properties": {"fact": {"type": "string"}, "questions": {"type": "array", "items": {"type": "string"}}}}},
-    "dropped": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false, "required": ["fact", "why"],
-      "properties": {"fact": {"type": "string"}, "why": {"type": "string"}}}}
-  }
-}`
-
 type finalizeDoc struct {
 	Path   string `json:"path"`
 	Title  string `json:"title"`
@@ -81,7 +69,7 @@ func (a ClaudeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOu
 	}
 	timeout, budget := finalizeLimits(len(in.Facts))
 	res, err := a.Runner.RunResult(ctx, memory.Call{
-		System: llmprompts.MemoryImportFinalizeSystem.Text(a.prompts(), llmprompts.FinalizeVars{MaxItems: memory.MaxItems, MaxReason: memory.MaxReasonLen}), Input: string(input), Schema: json.RawMessage(finalizeSchema),
+		System: llmprompts.MemoryImportFinalizeSystem.Text(a.prompts(), llmprompts.FinalizeVars{MaxItems: memory.MaxItems, MaxReason: memory.MaxReasonLen}), Input: string(input), Schema: llmprompts.MemoryImportFinalizeSystem.Schema(),
 		MCPConfig: mcpConfig(a.Executable, a.Home, in.FileID, a.Env), AllowedTools: finalizeTools,
 		Timeout: timeout, Budget: budget,
 	})
