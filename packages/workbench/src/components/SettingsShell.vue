@@ -10,7 +10,7 @@ import {
 import { t } from '@theme/i18n';
 import { rowVariants } from '@theme/lib/rowVariants';
 import type { ComputedRef, Ref } from 'vue';
-import { computed, reactive, ref } from 'vue';
+import { computed, onUnmounted, reactive, ref } from 'vue';
 import { errorText } from '../bridge/codedError';
 
 // P103 Part 2 (§5.5): Kira Studio's own workbench/SettingsDialog.vue and Kira Space's, unified —
@@ -75,6 +75,9 @@ const props = defineProps<{
   defaults: T;
   current: T;
   save: (patch: SectionPatch) => Promise<void>;
+  /** State kept outside the settings draft (the Prompts section's edits): the one Save runs its
+   *  `save` first, then the settings patch. */
+  extra?: { isDirty: boolean; isValid: boolean; save: () => Promise<void>; discard: () => void };
 }>();
 
 const emit = defineEmits<{ close: [] }>();
@@ -126,7 +129,9 @@ const pendingPatch = computed<SectionPatch>(() => {
   return patch;
 });
 
-const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
+const isDirty = computed(
+  () => Object.keys(pendingPatch.value).length > 0 || props.extra?.isDirty === true,
+);
 
 // P85 §10.1: activeSection seeds from the app's own deep-link state (`initialSection`, e.g.
 // CookiesPane.vue's "Edit global defaults…" landing on the 'Api' section) — undefined (a plain
@@ -153,6 +158,7 @@ function registerFieldError(
   fieldErrors.set(id, error);
 }
 const isValid = computed(() => {
+  if (props.extra && !props.extra.isValid) return false;
   for (const error of fieldErrors.values()) {
     if (error.value) return false;
   }
@@ -166,6 +172,9 @@ function onDismiss(): void {
   emit('close');
 }
 
+// Every close route unmounts this component, so one hook discards the extra state for all of them.
+onUnmounted(() => props.extra?.discard());
+
 const saveError = ref<string | null>(null);
 
 // P17 D7: a failed Save keeps the dialog open and shows the error; only a successful Save closes
@@ -174,12 +183,14 @@ async function onSave(): Promise<void> {
   if (!isValid.value) return;
   saveError.value = null;
   const patch = pendingPatch.value;
-  if (Object.keys(patch).length === 0) {
+  const hasPatch = Object.keys(patch).length > 0;
+  if (!hasPatch && !props.extra?.isDirty) {
     emit('close');
     return;
   }
   try {
-    await props.save(patch);
+    await props.extra?.save();
+    if (hasPatch) await props.save(patch);
     emit('close');
   } catch (err) {
     saveError.value = errorText(err);
