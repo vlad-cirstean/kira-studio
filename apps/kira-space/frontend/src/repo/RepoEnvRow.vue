@@ -13,7 +13,7 @@ import type { Environment } from '../ade/v2/wire';
 const props = defineProps<{
   env: Environment;
   index: number;
-  busy?: boolean;
+  pending?: boolean;
   focusOnMount?: boolean;
   save: (env: Environment) => Promise<void>;
 }>();
@@ -66,7 +66,7 @@ const script = useInlineEdit({
       <TooltipIconButton
         icon="close"
         :label="t('space.repo.env.remove.tooltip')"
-        :disabled="busy"
+        :pending="pending"
         data-testid="repo-env-remove"
         @click="emit('remove')"
       />

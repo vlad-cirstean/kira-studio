@@ -123,7 +123,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!repoId" class="h-full overflow-y-auto flex flex-col">
-    <EmptyState class="flex-1 min-h-0" icon="warning" :title="noRepositoryMessage()" />
+    <EmptyState fill icon="warning" :title="noRepositoryMessage()" />
   </div>
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
     <div
@@ -174,25 +174,21 @@ onUnmounted(() => {
         />
         <EmptyState
           v-else-if="sectionState[section.path] === 'binary'"
-          class="p-4"
           icon="file-binary"
           :title="t('space.repo.view.binaryCompare.empty')"
         />
         <EmptyState
           v-else-if="sectionState[section.path] === 'tooLarge'"
-          class="p-4"
           icon="warning"
           :title="t('space.repo.view.tooLargeCompare.empty')"
         />
         <EmptyState
           v-else-if="sectionState[section.path] === 'bothMissing'"
-          class="p-4"
           icon="warning"
           :title="t('space.repo.view.missing.empty')"
         />
         <EmptyState
           v-else
-          class="p-4"
           icon="warning"
           :title="sectionError[section.path] || t('space.repo.view.openDiffFailed.error')"
         />
@@ -200,7 +196,7 @@ onUnmounted(() => {
     </div>
     <EmptyState
       v-if="sections.length === 0"
-      class="flex-1 min-h-0"
+      fill
       icon="git-compare"
       :title="t('space.repo.view.noChanges.empty')"
     />

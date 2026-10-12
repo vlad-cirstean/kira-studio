@@ -1,5 +1,6 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { useDocumentVisibility, useWindowFocus, watchDebounced } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed } from 'vue';
@@ -43,7 +44,7 @@ export function installAgentNotifyFocus(): void {
     (state) => {
       fireAndForget(control.agentNotifyReportFocus(state), 'agentNotify');
     },
-    { debounce: 150, immediate: true, deep: true },
+    { debounce: TIMING.persist, immediate: true, deep: true },
   );
 
   control.onAgentRevealTerminal(({ terminalId }) => {

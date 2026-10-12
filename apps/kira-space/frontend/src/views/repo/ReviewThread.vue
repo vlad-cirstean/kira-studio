@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { shortSha } from '@kira/git-core';
 // C11 §7.4 (S10) — one review thread's body over Monaco, mounted into an IViewZone by
 // reviewDecorations.ts (S9) via createApp/unmount, never routed through the workbench's own tab
 // system (this is editor-surface furniture, not a view). Two modes: 'view' renders an existing
@@ -12,9 +11,11 @@ import type { ReviewComment } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Textarea } from '@theme/components/ui/textarea';
+import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, ref, useTemplateRef } from 'vue';
+import { anchorParts } from './reviewAnchor';
 
 const props = defineProps<{
   mode: 'view' | 'compose';
@@ -32,23 +33,7 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-// reviewComments.ts:63-74, ported verbatim (the anchoring itself is server-side, §7.2 — this is
-// only the display string).
-const anchorLabel = computed<string | undefined>(() => {
-  const comment = props.comment;
-  if (!comment) return undefined;
-  const sha = shortSha(comment.anchorSha);
-  switch (comment.anchor) {
-    case 'removed':
-      return t('space.repo.view.anchorRemoved.status', { branch: props.branch, sha });
-    case 'stale':
-      return t('space.repo.view.anchorStale.status', { branch: props.branch, sha });
-    case 'exact':
-    case 'projected':
-      return undefined;
-  }
-  return undefined;
-});
+const anchorLabel = computed(() => anchorParts(props.comment, props.branch));
 
 const draft = ref('');
 const input = useTemplateRef<{ $el: HTMLElement }>('input');
@@ -72,7 +57,7 @@ function submit(): void {
     data-testid="review-thread"
   >
     <template v-if="mode === 'view' && comment">
-      <div v-if="anchorLabel" class="text-warn italic">{{ anchorLabel }}</div>
+      <div v-if="anchorLabel" class="text-warn italic"><VarText :parts="anchorLabel" /></div>
       <div class="whitespace-pre-wrap break-words">{{ comment.body }}</div>
       <div class="flex justify-end gap-1.5">
         <Button variant="toolbar" size="kira" @click="emit('close')">

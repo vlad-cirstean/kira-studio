@@ -78,5 +78,5 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!errorMessage" ref="container" class="h-full w-full" data-testid="repo-graph-host" />
-  <EmptyState v-else class="h-full" icon="warning" :title="errorMessage" />
+  <EmptyState v-else fill icon="warning" :title="errorMessage" />
 </template>

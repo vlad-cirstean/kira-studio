@@ -3,6 +3,7 @@ import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
+import { revealElement } from '@workbench/behaviour/focus';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
@@ -124,7 +125,8 @@ function onReadingClick(event: MouseEvent): void {
   if (!href?.startsWith('#')) return;
   const id = decodeURIComponent(href.slice(1));
   if (!id) return;
-  readingPane.value?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView({ block: 'start' });
+  const target = readingPane.value?.querySelector(`#${CSS.escape(id)}`);
+  if (target) revealElement(target, { block: 'start' });
 }
 
 // P105 §5.1: the pane itself is not interactive — it only delegates to real, already-keyboard-
@@ -303,7 +305,7 @@ onUnmounted(() => {
       <div
         v-if="view === 'reading'"
         ref="readingPane"
-        class="md-reading flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4"
+        class="md-reading kira-prose flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4 [&>*]:max-w-prose [&>pre]:max-w-none [&>table]:max-w-none"
         data-testid="repo-file-markdown"
         v-html="renderedHtml"
       />
@@ -312,120 +314,26 @@ onUnmounted(() => {
   </template>
   <EmptyState
     v-else-if="state === 'binary'"
-    class="flex-1 min-h-0"
+    fill
     icon="file-binary"
     :title="t('space.repo.view.binaryPreview.empty')"
   />
   <EmptyState
     v-else-if="state === 'tooLarge'"
-    class="flex-1 min-h-0"
+    fill
     icon="warning"
     :title="t('space.repo.view.tooLargePreview.empty')"
   />
   <EmptyState
     v-else-if="state === 'missing'"
-    class="flex-1 min-h-0"
+    fill
     icon="warning"
     :title="t('space.repo.view.missing.empty')"
   />
   <EmptyState
     v-else
-    class="flex-1 min-h-0"
+    fill
     icon="warning"
     :title="errorMessage || t('space.repo.view.openFileFailed.error')"
   />
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: .monaco-host/.repo-file/.md-reading's own base declarations moved onto the template
-   directly -- each of .monaco-host's two mount points (markdown vs. plain-file branch, mutually
-   exclusive per state.value) is template-static, so the descendant-selector override this used to
-   need is resolved per branch instead. `.monaco-host` stays a bare marker class (a real,
-   heavily-used test dependency across many spec files, not just this view's own); `.md-reading`
-   stays one too, since every rule below targets markdown-rendered `v-html` content with no
-   template element of its own to carry a class.
-
-   D14: every value below is an existing --kira-* token — no new literal. Tailwind's preflight
-   zeroes margin/padding on `*`, font-size/font-weight on headings, and list-style on lists, so
-   every block element below restates its own spacing (and headings their own scale, P73 §7); that
-   is expected here, not a workaround. */
-/* v1.9 tailwind-declines deep dive: Tailwind ships a real `max-w-prose` utility (65ch) for
-   exactly this — readable line length — narrower than the original 72ch but the same intent. */
-.md-reading > :deep(*) {
-  @apply max-w-prose;
-}
-.md-reading :deep(h1),
-.md-reading :deep(h2),
-.md-reading :deep(h3),
-.md-reading :deep(h4),
-.md-reading :deep(h5),
-.md-reading :deep(h6) {
-  @apply font-medium leading-tight mt-4 mx-0 mb-1.5;
-}
-/* P73 §7(b): em, not --kira-t-xl (tokens.css: deliberately a 20px literal that ignores Appearance)
-   — resolves against .md-reading's own font-size, so the scale tracks the Appearance font-size
-   setting for free. Headings don't nest, so nothing compounds. */
-.md-reading :deep(h1) {
-  @apply border-b border-border text-[1.6em] pb-1.5;
-}
-.md-reading :deep(h2) {
-  @apply text-[1.4em];
-}
-.md-reading :deep(h3) {
-  @apply text-[1.2em];
-}
-.md-reading :deep(h4) {
-  @apply text-[1.05em];
-}
-.md-reading :deep(h5),
-.md-reading :deep(h6) {
-  @apply text-[1em];
-}
-.md-reading :deep(p) {
-  @apply mt-0 mx-0 mb-2;
-}
-.md-reading :deep(ul),
-.md-reading :deep(ol) {
-  @apply list-[revert] mt-0 mx-0 mb-2 pl-4;
-}
-.md-reading :deep(li) {
-  @apply my-0.5 mx-0;
-}
-.md-reading :deep(a) {
-  @apply text-info cursor-pointer;
-}
-.md-reading :deep(blockquote) {
-  @apply border-l-4 border-border text-muted-foreground mt-0 mx-0 mb-2 py-0 px-2;
-}
-.md-reading :deep(hr) {
-  @apply border-0 border-t border-border my-4 mx-0;
-}
-.md-reading :deep(code) {
-  @apply bg-field rounded-kira-sm font-data text-kira-sm py-[0.1em] px-[0.35em];
-}
-.md-reading :deep(pre) {
-  @apply overflow-auto bg-field rounded-kira-sm max-w-none mt-0 mx-0 mb-2 p-2;
-}
-/* P73 §7(a): more specific than :deep(code) above, so fenced code wins without touching that
-   rule — a fenced block matches Monaco's own size exactly. Inline code deliberately stays at
-   --kira-t-sm (the step-down exists so a same-px monospace run doesn't outsize the prose around
-   it, which doesn't apply inside a standalone block). */
-.md-reading :deep(pre code) {
-  @apply bg-none p-0 text-kira-md;
-}
-.md-reading :deep(table) {
-  @apply border-collapse max-w-none mt-0 mx-0 mb-2;
-}
-.md-reading :deep(th),
-.md-reading :deep(td) {
-  @apply border border-border text-left py-1 px-2;
-}
-.md-reading :deep(thead) {
-  @apply border-b border-border;
-}
-.md-reading :deep(img) {
-  @apply max-w-full;
-}
-</style>

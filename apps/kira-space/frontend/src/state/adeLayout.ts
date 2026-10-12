@@ -1,5 +1,6 @@
 import type { LayoutPatch } from '@shared/domain/layout';
 import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { hydrateThenSubscribe } from '@workbench/state/hydrateThenSubscribe';
 import { defineStore } from 'pinia';
@@ -12,8 +13,6 @@ interface AdeLayoutSlice {
   panel: { ade?: { width?: number } };
 }
 
-const WRITE_DEBOUNCE_MS = 150;
-
 export const useAdeLayoutStore = defineStore('adeLayout', () => {
   /** 0 = half the row. */
   const width = ref(0);
@@ -24,7 +23,7 @@ export const useAdeLayoutStore = defineStore('adeLayout', () => {
 
   const flush = useDebounceFn((w: number) => {
     fireAndForget(control.layoutSet({ panel: { ade: { width: w } } } as LayoutPatch), 'layout');
-  }, WRITE_DEBOUNCE_MS);
+  }, TIMING.persist);
 
   function setWidth(w: number): void {
     width.value = w;

@@ -54,16 +54,14 @@ function onRevealBlameCommit(): void {
           <TooltipDisabledTrigger>
             <Button
               variant="toolbar"
-              size="kira"
-              class="h-control-sm gap-1 px-1.5 text-fg"
+              size="status"
+              class="text-fg"
               data-testid="blame-status"
               :disabled="!blameStatusStore.reveal"
               @click="onRevealBlameCommit"
             >
               <CodiconIcon name="git-commit" :size="13" />
-              <span class="max-w-80 overflow-hidden text-ellipsis whitespace-nowrap">{{
-                blameText
-              }}</span>
+              <span class="max-w-80 truncate">{{ blameText }}</span>
             </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>

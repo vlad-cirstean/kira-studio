@@ -1,6 +1,7 @@
 import type { FileStatusCode } from '@shared/domain/repo';
 import type { StickyRowLike } from '@theme/stickyBand';
 import { compareNatural } from '@workbench/behaviour/match';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
@@ -143,6 +144,11 @@ export const useFileTreeStore = defineStore('fileTree', () => {
   const perRepo = createPerRepoState(emptyTreeState);
   const byRepo = perRepo.all;
   const { stateFor } = perRepo;
+  // Expanded directories per repo survive a reload; a repo with no entry opens its root children.
+  const savedExpanded = usePersistedState<Record<string, string[]>>(
+    'kira.space.fileTree.expanded',
+    {},
+  );
 
   /** True once repoId's listing has loaded at least once — GitPanel.vue's own loading gate. */
   function isRepoTreeLoaded(repoId: string): boolean {
@@ -184,7 +190,9 @@ export const useFileTreeStore = defineStore('fileTree', () => {
       // §7.2: "the repo root's own children expanded on first open" — only on the very first
       // load, so a later Refresh never re-expands whatever the user has since collapsed.
       if (!state.loaded) {
-        for (const node of state.tree) if (node.isDir) state.expanded.add(node.path);
+        const saved = savedExpanded.value[repoId];
+        if (saved) for (const path of saved) state.expanded.add(path);
+        else for (const node of state.tree) if (node.isDir) state.expanded.add(node.path);
       }
       state.loaded = true;
     } catch (err) {
@@ -206,6 +214,7 @@ export const useFileTreeStore = defineStore('fileTree', () => {
     if (!state) return;
     if (state.expanded.has(path)) state.expanded.delete(path);
     else state.expanded.add(path);
+    savedExpanded.value = { ...savedExpanded.value, [repoId]: [...state.expanded] };
   }
 
   function visibleRepoRows(repoId: string, search: string): RepoTreeRowVm[] {
@@ -218,7 +227,11 @@ export const useFileTreeStore = defineStore('fileTree', () => {
 
   /** Drops repoId's own cached tree — RemoveRepo's own cleanup (a removed repo's tree state must
    *  not outlive it, however briefly, in this module-level map). */
-  const dropRepoTree = perRepo.drop;
+  function dropRepoTree(repoId: string): void {
+    perRepo.drop(repoId);
+    const { [repoId]: _dropped, ...rest } = savedExpanded.value;
+    savedExpanded.value = rest;
+  }
 
   return {
     isRepoTreeLoaded,

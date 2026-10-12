@@ -30,12 +30,12 @@ import type {
   ReviewComment,
   Transport,
 } from '@kira/git-ipc';
-import { buttonVariants } from '@theme/components/ui/button';
 import { i18n, t } from '@theme/i18n';
 import { logError } from '@workbench/bridge/log';
 import { type App, createApp, nextTick } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
+import ReviewBanner from './ReviewBanner.vue';
 import ReviewThread from './ReviewThread.vue';
 
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
@@ -195,12 +195,15 @@ export function attachReviewDecorations(
   // openZone/closeZone's own compose/thread box above) banners the real failure at the top of the
   // editor with a manual retry, independent of that zone's own lifecycle.
   let errorZoneId: string | null = null;
+  let bannerApp: App | null = null;
 
   function closeErrorZone(): void {
     if (errorZoneId === null) return;
     const id = errorZoneId;
     modifiedEditor.changeViewZones((accessor) => accessor.removeZone(id));
     errorZoneId = null;
+    bannerApp?.unmount();
+    bannerApp = null;
   }
 
   // C13-9: one banner zone, two distinct uses — a genuine failure (network/server error, worth a
@@ -209,24 +212,13 @@ export function attachReviewDecorations(
   function showBannerZone(message: string, retryable: boolean): void {
     closeErrorZone();
     const domNode = document.createElement('div');
-    // §3.1: same paint-order defect as the compose zone above — the Retry button is otherwise
-    // unreachable.
+    // §3.1: same paint-order defect as the compose zone above — Retry is otherwise unreachable.
     domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
-    domNode.className =
-      'kira-review-load-error flex h-full items-center gap-2 bg-error/10 px-3 text-kira-md text-error';
-    const span = document.createElement('span');
-    span.textContent = message;
-    domNode.append(span);
-    if (retryable) {
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.className = buttonVariants({ variant: 'dialog-danger', size: 'kira' });
-      retry.textContent = t('common.action.retry.label');
-      retry.addEventListener('click', () => void load());
-      domNode.append(retry);
-    }
+    bannerApp = createApp(ReviewBanner, { message, retryable, onRetry: () => void load() });
+    bannerApp.use(i18n);
+    bannerApp.mount(domNode);
     modifiedEditor.changeViewZones((accessor) => {
-      errorZoneId = accessor.addZone({ afterLineNumber: 0, heightInPx: 28, domNode });
+      errorZoneId = accessor.addZone({ afterLineNumber: 0, heightInPx: 40, domNode });
     });
   }
 

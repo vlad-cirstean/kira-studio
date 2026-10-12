@@ -1,5 +1,5 @@
 import type { CodeSearchEvent, FileMatches, SearchStats } from '@shared/domain/repo';
-import { useLocalStorage } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { errorText } from '@workbench/bridge/codedError';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { defineStore } from 'pinia';
@@ -306,7 +306,7 @@ type RepoPanelTab = 'repos' | 'files' | 'review';
 const PANEL_TABS: readonly string[] = ['repos', 'files', 'review'];
 
 export const useRepoPanelTabStore = defineStore('repoPanelTab', () => {
-  const panelTab = useLocalStorage<string>('kira.git.panelTab', 'repos');
+  const panelTab = usePersistedState<string>('kira.git.panelTab', 'repos');
 
   function repoPanelTab(): RepoPanelTab {
     return PANEL_TABS.includes(panelTab.value) ? (panelTab.value as RepoPanelTab) : 'repos';

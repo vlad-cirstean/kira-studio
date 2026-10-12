@@ -94,13 +94,7 @@ const detail = computed(() => {
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <Button
-        variant="toolbar"
-        size="kira"
-        class="h-control-sm gap-1 px-1.5 text-kira-sm font-normal"
-        :class="tone"
-        data-testid="claude-usage-status"
-      >
+      <Button variant="toolbar" size="status" :class="tone" data-testid="claude-usage-status">
         <CodiconIcon name="dashboard" :size="13" />
         <span class="font-data" data-testid="claude-usage-text">{{ text }}</span>
       </Button>

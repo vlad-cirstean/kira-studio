@@ -2,7 +2,13 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLegend,
+  FieldSet,
+} from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
@@ -179,17 +185,15 @@ const activeDevices = computed(() =>
       {{ t('space.settings.mobileAccess.plaintext.body') }}
     </Alert>
 
-    <section class="flex flex-col gap-1" data-testid="mobile-access-network">
-      <h3 class="m-0 text-kira-md font-medium">{{
-        t('space.settings.mobileAccess.network.title')
-      }}</h3>
+    <FieldSet class="gap-1" data-testid="mobile-access-network">
+      <FieldLegend>{{ t('space.settings.mobileAccess.network.title') }}</FieldLegend>
       <p v-if="trusted" class="m-0 text-kira-sm" data-testid="mobile-access-trusted">
         {{ trustedText }}
       </p>
-      <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-trusted">
+      <FieldDescription v-else data-testid="mobile-access-trusted">
         {{ t('space.settings.mobileAccess.network.none.empty') }}
-      </p>
-      <p v-if="current" class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
+      </FieldDescription>
+      <FieldDescription v-if="current" data-testid="mobile-access-current">
         {{
           t('space.settings.mobileAccess.network.current.status', {
             address: current.address,
@@ -198,15 +202,16 @@ const activeDevices = computed(() =>
             mac: current.routerMac,
           })
         }}
-      </p>
-      <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
+      </FieldDescription>
+      <FieldDescription v-else data-testid="mobile-access-current">
         {{ t('space.settings.mobileAccess.network.offNetwork.empty') }}
-      </p>
+      </FieldDescription>
       <div class="flex gap-2">
         <Button
           variant="dialog"
           size="kira-lg"
-          :disabled="trusting || !canTrust"
+          :pending="trusting"
+          :disabled="!canTrust"
           data-testid="mobile-access-trust"
           @click="onTrust"
         >
@@ -229,23 +234,17 @@ const activeDevices = computed(() =>
       >
         {{ store.status.stopDetail }}
       </p>
-    </section>
+    </FieldSet>
 
-    <section
-      v-if="store.status.running"
-      class="flex flex-col gap-1"
-      data-testid="mobile-access-step-app"
-    >
-      <h3 class="m-0 text-kira-md font-medium">{{
-        t('space.settings.mobileAccess.openApp.title')
-      }}</h3>
+    <FieldSet v-if="store.status.running" class="gap-1" data-testid="mobile-access-step-app">
+      <FieldLegend>{{ t('space.settings.mobileAccess.openApp.title') }}</FieldLegend>
       <figure class="m-0 flex flex-col gap-0.5">
         <MobileQr :url="store.status.appUrl" />
         <figcaption class="font-data text-kira-sm break-all select-all">{{
           store.status.appUrl
         }}</figcaption>
       </figure>
-    </section>
+    </FieldSet>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
@@ -280,7 +279,8 @@ const activeDevices = computed(() =>
         variant="dialog"
         size="kira-lg"
         class="self-start"
-        :disabled="applying || !!portError || !portChanged"
+        :pending="applying"
+        :disabled="!!portError || !portChanged"
         data-testid="mobile-access-apply-port"
         @click="onApplyPort"
       >
@@ -288,17 +288,11 @@ const activeDevices = computed(() =>
       </Button>
     </Field>
 
-    <section class="flex flex-col gap-1">
-      <h3 class="m-0 text-kira-md font-medium">{{
-        t('space.settings.mobileAccess.devices.title')
-      }}</h3>
-      <p
-        v-if="activeDevices.length === 0"
-        class="text-subtle text-kira-sm"
-        data-testid="mobile-devices-empty"
-      >
+    <FieldSet class="gap-1">
+      <FieldLegend>{{ t('space.settings.mobileAccess.devices.title') }}</FieldLegend>
+      <FieldDescription v-if="activeDevices.length === 0" data-testid="mobile-devices-empty">
         {{ t('space.settings.mobileAccess.devices.none.empty') }}
-      </p>
+      </FieldDescription>
       <ul v-else class="m-0 flex list-none flex-col gap-1 p-0">
         <li
           v-for="device in activeDevices"
@@ -359,6 +353,6 @@ const activeDevices = computed(() =>
           </span>
         </li>
       </ul>
-    </section>
+    </FieldSet>
   </div>
 </template>

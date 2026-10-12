@@ -10,12 +10,11 @@ import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
+import { TIMING } from '@workbench/behaviour/timing';
 import { type ShallowRef, shallowRef } from 'vue';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 
 type CodeEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
-
-const DEBOUNCE_MS = 150;
 
 /** `blame.line`'s own sentinel for a line whose content isn't in any commit yet (an unstaged,
  *  on-disk edit) — the same literal `porcelain.UncommittedBlameSHA` and
@@ -152,7 +151,7 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
 
   // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be —
   // resolveDebounced.cancel() below is cancelPending()'s own equivalent of the old clearTimeout.
-  const resolveDebounced = useDebounceFn((line: number) => resolveLine(line), DEBOUNCE_MS);
+  const resolveDebounced = useDebounceFn((line: number) => resolveLine(line), TIMING.search);
 
   function cancelPending(): void {
     resolveDebounced.cancel();

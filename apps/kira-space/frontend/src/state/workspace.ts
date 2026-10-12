@@ -1,5 +1,5 @@
 import { t } from '@theme/i18n';
-import { useLocalStorage } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { windowKey } from '@workbench/lib/window';
 import { defineStore } from 'pinia';
@@ -57,7 +57,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     active: GENERAL_WORKSPACE as WorkspaceKey,
     openRepos: [] as string[], // code_repos.id, in switcher order
   });
-  const lastRepoKey = useLocalStorage<WorkspaceKey | null>(
+  const lastRepoKey = usePersistedState<WorkspaceKey | null>(
     `kira.space.lastRepo.${windowKey}`,
     null,
   );

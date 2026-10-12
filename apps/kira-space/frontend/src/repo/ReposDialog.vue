@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -206,7 +207,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                       type="button"
                       role="option"
                       v-bind="nav.rowProps(r.id)"
-                      class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
+                      class="relative flex w-full shrink-0 items-center gap-1.5 border-none text-left"
                       :class="repoRowClass(r)"
                       :aria-selected="showRepos && selected?.id === r.id"
                       data-testid="repos-dialog-repo"
@@ -237,7 +238,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
           <div class="flex flex-col gap-px border-t border-border px-1 py-1.5">
             <button
               type="button"
-              class="flex w-full cursor-pointer items-center gap-1.5 border-none text-left"
+              class="flex w-full items-center gap-1.5 border-none text-left"
               :class="rowVariants({ layout: 'nav', selected: dialog.tab === 'folders' })"
               :aria-current="dialog.tab === 'folders' ? 'page' : undefined"
               data-testid="repos-dialog-tab-folders"
@@ -341,7 +342,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               <Button
                 variant="dialog"
                 size="kira-lg"
-                :disabled="addFolder.isPending.value"
+                :pending="addFolder.isPending.value"
                 data-testid="repos-dialog-add-folder"
                 @click="onAddFolder"
               >
@@ -417,9 +418,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
 
       <DialogFooter>
         <template v-if="!showRepos && note" #start>
-          <p class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{
-            note
-          }}</p>
+          <FieldDescription data-testid="repos-dialog-note">{{ note }}</FieldDescription>
         </template>
         <DialogClose as-child>
           <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-footer-close">{{

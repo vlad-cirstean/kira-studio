@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
+import InlineState from '@theme/components/InlineState.vue';
 import { Button } from '@theme/components/ui/button';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -197,8 +205,8 @@ async function chooseColor(next: PaletteColor): Promise<void> {
 
 <template>
   <div class="flex flex-col gap-4" data-testid="repo-config">
-    <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">{{ t('space.repo.config.repository.label') }}</h3>
+    <FieldSet class="gap-3">
+      <FieldLegend>{{ t('space.repo.config.repository.label') }}</FieldLegend>
       <Field>
         <FieldLabel for="repo-nick">{{ t('space.repo.config.nickname.label') }}</FieldLabel>
         <Input
@@ -261,10 +269,10 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           {{ source }}
         </dd>
       </dl>
-    </section>
+    </FieldSet>
 
-    <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">{{ t('common.module.worktrees.label') }}</h3>
+    <FieldSet class="gap-3">
+      <FieldLegend>{{ t('common.module.worktrees.label') }}</FieldLegend>
       <Field>
         <FieldLabel for="repo-prepare">{{ t('space.repo.config.prepare.label') }}</FieldLabel>
         <FieldDescription>
@@ -327,10 +335,10 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           basePath.error.value
         }}</FieldError>
       </Field>
-    </section>
+    </FieldSet>
 
-    <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">{{ t('common.module.branches.label') }}</h3>
+    <FieldSet class="gap-3">
+      <FieldLegend>{{ t('common.module.branches.label') }}</FieldLegend>
       <Field>
         <FieldLabel for="repo-targets">{{ t('space.repo.config.targets.label') }}</FieldLabel>
         <FieldDescription>{{ t('space.repo.config.targets.description') }}</FieldDescription>
@@ -348,22 +356,18 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           targets.error.value
         }}</FieldError>
       </Field>
-    </section>
+    </FieldSet>
 
-    <section class="flex flex-col gap-3">
-      <h3 class="m-0 text-kira-lg">{{ t('space.repo.config.environments.title') }}</h3>
-      <p class="m-0 text-kira-md text-muted-foreground">
+    <FieldSet class="gap-3">
+      <FieldLegend>{{ t('space.repo.config.environments.title') }}</FieldLegend>
+      <FieldDescription>
         <CatalogText k="space.repo.config.environments.intro.hint">
           <template #command><code class="font-data">{{ VERSION_EXAMPLE }}</code></template>
         </CatalogText>
-      </p>
-      <p
-        v-if="envRows.length === 0"
-        class="m-0 text-kira-md text-muted-foreground"
-        data-testid="repo-env-empty"
-      >
+      </FieldDescription>
+      <InlineState v-if="envRows.length === 0" kind="empty" data-testid="repo-env-empty">
         {{ t('common.noEnvironments.empty') }}
-      </p>
+      </InlineState>
       <div v-else class="flex flex-col gap-1.5">
         <div
           class="flex items-center gap-1.5 text-kira-sm text-muted-foreground"
@@ -380,7 +384,7 @@ async function chooseColor(next: PaletteColor): Promise<void> {
           :index="r.index"
           :focus-on-mount="r.draft"
           :save="(env) => (r.draft ? saveDraft(r.key, env) : saveEnv(r.index, env))"
-          :busy="update.isPending.value"
+          :pending="update.isPending.value"
           @remove="r.draft ? removeDraft(r.key) : removeEnv(r.index)"
         />
       </div>
@@ -389,12 +393,13 @@ async function chooseColor(next: PaletteColor): Promise<void> {
         variant="dialog"
         size="kira-lg"
         class="self-start"
-        :disabled="update.isPending.value || drafts.length > 0"
+        :pending="update.isPending.value"
+        :disabled="drafts.length > 0"
         data-testid="repo-add-env"
         @click="addEnv"
       >
         {{ t('space.repo.env.add.label') }}
       </Button>
-    </section>
+    </FieldSet>
   </div>
 </template>

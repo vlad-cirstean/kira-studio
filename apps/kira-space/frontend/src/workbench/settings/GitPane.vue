@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLegend,
+  FieldSet,
+} from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -89,114 +95,118 @@ const graphFontSizeId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <h3 class="text-kira-lg">{{ t('space.settings.git.remote.title') }}</h3>
-    <p class="text-subtle text-kira-sm">
-      {{ t('space.settings.git.remote.description') }}
-    </p>
-    <Field>
-      <div class="flex items-center justify-between gap-1">
-        <Label :for="protectedBranchesId">{{ t('space.settings.git.protected.label') }}</Label>
-        <TooltipIconButton
-          icon="discard"
-          :label="t('common.action.resetToDefault.label')"
-          data-testid="settings-reset-git-protectedBranches"
-          :disabled-trigger="isAtDefault('git', 'protectedBranches')"
-          :disabled="isAtDefault('git', 'protectedBranches')"
-          @click="resetProtectedBranches"
+    <FieldSet class="gap-3">
+      <FieldLegend class="pt-0">{{ t('space.settings.git.remote.title') }}</FieldLegend>
+      <FieldDescription>
+        {{ t('space.settings.git.remote.description') }}
+      </FieldDescription>
+      <Field>
+        <div class="flex items-center justify-between gap-1">
+          <Label :for="protectedBranchesId">{{ t('space.settings.git.protected.label') }}</Label>
+          <TooltipIconButton
+            icon="discard"
+            :label="t('common.action.resetToDefault.label')"
+            data-testid="settings-reset-git-protectedBranches"
+            :disabled-trigger="isAtDefault('git', 'protectedBranches')"
+            :disabled="isAtDefault('git', 'protectedBranches')"
+            @click="resetProtectedBranches"
+          />
+        </div>
+        <Textarea
+          :id="protectedBranchesId"
+          v-model="protectedBranchesText"
+          class="font-data"
+          rows="4"
+          :placeholder="t('space.settings.git.protected.example')"
+          data-testid="settings-git-protected-branches"
         />
-      </div>
-      <Textarea
-        :id="protectedBranchesId"
-        v-model="protectedBranchesText"
-        class="font-data"
-        rows="4"
-        :placeholder="t('space.settings.git.protected.example')"
-        data-testid="settings-git-protected-branches"
-      />
-      <FieldDescription>{{ t('space.settings.git.protected.description') }}</FieldDescription>
-    </Field>
-    <Field>
-      <div class="flex items-center justify-between gap-1">
-        <Label :for="fetchAutoIntervalMinutesId">{{
-          t('space.settings.git.fetchInterval.label')
-        }}</Label>
-        <TooltipIconButton
-          icon="discard"
-          :label="t('common.action.resetToDefault.label')"
-          data-testid="settings-reset-git-fetchAutoIntervalMinutes"
-          :disabled-trigger="isAtDefault('git', 'fetchAutoIntervalMinutes')"
-          :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
-          @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
+        <FieldDescription>{{ t('space.settings.git.protected.description') }}</FieldDescription>
+      </Field>
+      <Field>
+        <div class="flex items-center justify-between gap-1">
+          <Label :for="fetchAutoIntervalMinutesId">{{
+            t('space.settings.git.fetchInterval.label')
+          }}</Label>
+          <TooltipIconButton
+            icon="discard"
+            :label="t('common.action.resetToDefault.label')"
+            data-testid="settings-reset-git-fetchAutoIntervalMinutes"
+            :disabled-trigger="isAtDefault('git', 'fetchAutoIntervalMinutes')"
+            :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
+            @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
+          />
+        </div>
+        <NumberStepperInput
+          :id="fetchAutoIntervalMinutesId"
+          :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
+          :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
+          :aria-invalid="!!fetchAutoIntervalError || undefined"
+          data-testid="settings-git-fetch-auto-interval"
+          :model-value="String(draft.git.fetchAutoIntervalMinutes)"
+          @input="onFetchAutoIntervalInput"
         />
-      </div>
-      <NumberStepperInput
-        :id="fetchAutoIntervalMinutesId"
-        :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
-        :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
-        :aria-invalid="!!fetchAutoIntervalError || undefined"
-        data-testid="settings-git-fetch-auto-interval"
-        :model-value="String(draft.git.fetchAutoIntervalMinutes)"
-        @input="onFetchAutoIntervalInput"
-      />
-      <FieldError
-        v-if="fetchAutoIntervalError"
-        data-testid="settings-git-fetch-auto-interval-error"
-      >
-        {{ fetchAutoIntervalError }}
-      </FieldError>
-      <FieldDescription v-else>{{
-        t('space.settings.git.fetchInterval.description')
-      }}</FieldDescription>
-    </Field>
-    <Field>
-      <div class="flex items-center justify-between gap-1">
-        <Label :for="gitPathId">{{ t('space.settings.git.gitPath.label') }}</Label>
-        <TooltipIconButton
-          icon="discard"
-          :label="t('common.action.resetToDefault.label')"
-          data-testid="settings-reset-git-gitPath"
-          :disabled-trigger="isAtDefault('git', 'gitPath')"
-          :disabled="isAtDefault('git', 'gitPath')"
-          @click="resetLeaf('git', 'gitPath')"
+        <FieldError
+          v-if="fetchAutoIntervalError"
+          data-testid="settings-git-fetch-auto-interval-error"
+        >
+          {{ fetchAutoIntervalError }}
+        </FieldError>
+        <FieldDescription v-else>{{
+          t('space.settings.git.fetchInterval.description')
+        }}</FieldDescription>
+      </Field>
+      <Field>
+        <div class="flex items-center justify-between gap-1">
+          <Label :for="gitPathId">{{ t('space.settings.git.gitPath.label') }}</Label>
+          <TooltipIconButton
+            icon="discard"
+            :label="t('common.action.resetToDefault.label')"
+            data-testid="settings-reset-git-gitPath"
+            :disabled-trigger="isAtDefault('git', 'gitPath')"
+            :disabled="isAtDefault('git', 'gitPath')"
+            @click="resetLeaf('git', 'gitPath')"
+          />
+        </div>
+        <Input
+          :id="gitPathId"
+          type="text"
+          class="w-full font-data"
+          data-testid="settings-git-path"
+          v-model="draft.git.gitPath"
         />
-      </div>
-      <Input
-        :id="gitPathId"
-        type="text"
-        class="w-full font-data"
-        data-testid="settings-git-path"
-        v-model="draft.git.gitPath"
-      />
-      <FieldDescription>{{ t('space.settings.git.gitPath.description') }}</FieldDescription>
-    </Field>
-    <h3 class="text-kira-lg">{{ t('common.graph.label') }}</h3>
-    <Field>
-      <div class="flex items-center justify-between gap-1">
-        <Label :for="graphFontSizeId">{{ t('space.settings.git.graphFont.label') }}</Label>
-        <TooltipIconButton
-          icon="discard"
-          :label="t('common.action.resetToDefault.label')"
-          data-testid="settings-reset-git-graphFontSize"
-          :disabled-trigger="isAtDefault('git', 'graphFontSize')"
-          :disabled="isAtDefault('git', 'graphFontSize')"
-          @click="resetLeaf('git', 'graphFontSize')"
+        <FieldDescription>{{ t('space.settings.git.gitPath.description') }}</FieldDescription>
+      </Field>
+    </FieldSet>
+    <FieldSet class="gap-3">
+      <FieldLegend>{{ t('common.graph.label') }}</FieldLegend>
+      <Field>
+        <div class="flex items-center justify-between gap-1">
+          <Label :for="graphFontSizeId">{{ t('space.settings.git.graphFont.label') }}</Label>
+          <TooltipIconButton
+            icon="discard"
+            :label="t('common.action.resetToDefault.label')"
+            data-testid="settings-reset-git-graphFontSize"
+            :disabled-trigger="isAtDefault('git', 'graphFontSize')"
+            :disabled="isAtDefault('git', 'graphFontSize')"
+            @click="resetLeaf('git', 'graphFontSize')"
+          />
+        </div>
+        <NumberStepperInput
+          :id="graphFontSizeId"
+          :min="FONT_SIZE_RANGE.min"
+          :max="FONT_SIZE_RANGE.max"
+          :aria-invalid="!!graphFontSizeError || undefined"
+          data-testid="settings-git-graphFontSize"
+          :model-value="String(draft.git.graphFontSize)"
+          @input="onGraphFontSizeInput"
         />
-      </div>
-      <NumberStepperInput
-        :id="graphFontSizeId"
-        :min="FONT_SIZE_RANGE.min"
-        :max="FONT_SIZE_RANGE.max"
-        :aria-invalid="!!graphFontSizeError || undefined"
-        data-testid="settings-git-graphFontSize"
-        :model-value="String(draft.git.graphFontSize)"
-        @input="onGraphFontSizeInput"
-      />
-      <FieldError v-if="graphFontSizeError" data-testid="settings-git-graphFontSize-error">
-        {{ graphFontSizeError }}
-      </FieldError>
-      <FieldDescription v-else>{{
-        t('space.settings.git.graphFont.description')
-      }}</FieldDescription>
-    </Field>
+        <FieldError v-if="graphFontSizeError" data-testid="settings-git-graphFontSize-error">
+          {{ graphFontSizeError }}
+        </FieldError>
+        <FieldDescription v-else>{{
+          t('space.settings.git.graphFont.description')
+        }}</FieldDescription>
+      </Field>
+    </FieldSet>
   </div>
 </template>

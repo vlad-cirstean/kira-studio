@@ -9,7 +9,7 @@ import { useRowHeight } from '@workbench/lib/rowHeight';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
-import { menuForRepoRow } from './menus';
+import { menuForRepoRow } from './menu';
 import RepoTreeRow from './RepoTreeRow.vue';
 import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
 

@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import HighlightedText from '@theme/components/HighlightedText.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
@@ -14,6 +16,8 @@ import type { RepoSearchRowVm } from './state/search';
 const props = defineProps<{
   row: RepoSearchRowVm;
   selected: boolean;
+  /** Roving tabindex from `nav.rowProps`. */
+  tabindex?: number;
   class?: HTMLAttributes['class'];
 }>();
 
@@ -37,11 +41,11 @@ const previewParts = computed(() => {
   const preview = props.row.preview ?? '';
   const start = props.row.previewMatchStart ?? 0;
   const end = props.row.previewMatchEnd ?? 0;
-  return {
-    before: preview.slice(0, start),
-    match: preview.slice(start, end),
-    after: preview.slice(end),
-  };
+  return [
+    { text: preview.slice(0, start), match: false },
+    { text: preview.slice(start, end), match: true },
+    { text: preview.slice(end), match: false },
+  ].filter((p) => p.text !== '');
 });
 
 function onClick(): void {
@@ -62,7 +66,6 @@ function onDblClick(): void {
 
 <template>
   <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
-  <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
   <div
     v-if="row.kind === 'file'"
     :class="
@@ -77,29 +80,19 @@ function onDblClick(): void {
     :data-path="row.path"
     role="option"
     :aria-selected="selected"
+    :tabindex="tabindex"
     @click="onClick"
   >
-    <!-- P110 I2-13: shares TreeTwisty with the tree rows, but deliberately keeps no cursor-pointer
-         (base.css's own retired comment: "a real, deliberate difference") -- the whole row is
-         already the click target (onClick below), so the twisty here is decoration, not its own
-         control; @toggle mirrors that same row click rather than doing nothing under it. -->
-    <TreeTwisty
-      :expanded="!row.collapsed"
-      :has-children="true"
-      class="cursor-default"
-      @toggle="onClick"
-    />
+    <!-- The whole row is the click target (onClick), so the twisty's @toggle mirrors that row click. -->
+    <TreeTwisty :expanded="!row.collapsed" :has-children="true" @toggle="onClick" />
     <span
       class="shrink-0 w-4 h-4 mask-contain mask-no-repeat mask-center"
       :style="fileIconStyle(row.path)"
       aria-hidden="true"
     ></span>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <span class="overflow-hidden text-ellipsis flex-1 min-w-0">{{ fileName }}</span>
-      </TooltipTrigger>
-      <TooltipContent>{{ row.path }}</TooltipContent>
-    </Tooltip>
+    <span class="min-w-0 flex-1"
+      ><TruncatedText :text="row.path">{{ fileName }}</TruncatedText></span
+    >
     <span class="text-kira-sm text-subtle shrink-0" data-testid="repo-search-match-count">{{
       row.matchCount
     }}</span>
@@ -111,7 +104,6 @@ function onDblClick(): void {
     </Tooltip>
   </div>
   <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
-  <!-- biome-ignore lint/a11y/useFocusableInteractive: nav.rowProps sets the roving tabindex. -->
   <div
     v-else
     :class="
@@ -127,15 +119,12 @@ function onDblClick(): void {
     :data-line="row.line"
     role="option"
     :aria-selected="selected"
+    :tabindex="tabindex"
     @click="onClick"
     @dblclick="onDblClick"
   >
     <span class="text-kira-sm text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
-    <span class="overflow-hidden text-ellipsis"
-      >{{ previewParts.before
-      }}<span class="rounded-kira-xs bg-search-match">{{ previewParts.match }}</span>
-      {{ previewParts.after }}</span
-    >
+    <span class="min-w-0 truncate"><HighlightedText :parts="previewParts" /></span>
   </div>
   <!-- Row state and indent come from `rowVariants`/`rowIndent` (match rows sit one level in). -->
 </template>

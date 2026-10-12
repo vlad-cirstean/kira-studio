@@ -350,7 +350,6 @@ check_font_scale() {
   host_hits=$(_font_scale_anchor "$host_hits" "${FRONTEND_SRC}/workbench/settings/AppearancePane.vue" 2)
   host_hits=$(_font_scale_anchor "$host_hits" "${FRONTEND_SRC}/views/shared/keyvalue/KeyValuePane.vue" 1)
   host_hits=$(_font_scale_anchor "$host_hits" "${FRONTEND_SRC}/views/stream/StreamView.vue" 2)
-  host_hits=$(_font_scale_anchor "$host_hits" "${SPACE_SRC}/views/repo/RepoFileView.vue" 5)
   host_hits=$(_font_scale_anchor "$host_hits" "${THEME_SRC}/base.css" 5)
   if [ -n "$host_hits" ]; then
     echo "check-theme-classes: chrome font size off the four-value scale -- replace with $hint:" >&2

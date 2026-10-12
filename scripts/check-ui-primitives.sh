@@ -107,11 +107,8 @@ U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves
 # B (apps/kira-space, W/memory)
 U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
 U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
-U26 apps/kira-space/frontend/src/views/repo/reviewDecorations.ts # Monaco view-zone DOM built outside Vue cannot render Alert, banner tint matches Alert error
 U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
-U38 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # em-relative markdown heading scale tracks the Appearance font size, counted anchor in check-theme-classes
 U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
-U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge
 U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
 U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
 U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
