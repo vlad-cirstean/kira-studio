@@ -6,29 +6,24 @@ import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import { toNumber } from '../lib/editDiff';
 
-const props = defineProps<{
-  modelValue: number;
+defineOptions({ inheritAttrs: false });
+const model = defineModel<number>({ required: true });
+defineProps<{
   allowUnlimited?: boolean;
   disabled?: boolean;
   testid: string;
 }>();
-const emit = defineEmits<{ 'update:modelValue': [value: number] }>();
-
 const MIB = 1024 ** 2;
 const GIB = 1024 ** 3;
 
-const unit = ref<'MiB' | 'GiB'>(
-  props.modelValue >= GIB && props.modelValue % GIB === 0 ? 'GiB' : 'MiB',
-);
-const factor = computed(() => (unit.value === 'GiB' ? GIB : MIB));
-const unlimited = computed(() => props.modelValue === -1);
-const amount = computed(() =>
-  props.modelValue > 0 ? String(props.modelValue / factor.value) : '',
-);
+const unit = ref<'MB' | 'GB'>(model.value >= GIB && model.value % GIB === 0 ? 'GB' : 'MB');
+const factor = computed(() => (unit.value === 'GB' ? GIB : MIB));
+const unlimited = computed(() => model.value === -1);
+const amount = computed(() => (model.value > 0 ? String(model.value / factor.value) : ''));
 
 function setAmount(v: string | number): void {
   const n = toNumber(v);
-  emit('update:modelValue', n > 0 ? Math.round(n * factor.value) : 0);
+  model.value = n > 0 ? Math.round(n * factor.value) : 0;
 }
 </script>
 
@@ -39,6 +34,7 @@ function setAmount(v: string | number): void {
       min="0"
       step="any"
       class="w-28"
+      v-bind="$attrs"
       :placeholder="t('docker.edit.noLimit.placeholder')"
       :model-value="amount"
       :disabled="disabled || unlimited"
@@ -51,15 +47,15 @@ function setAmount(v: string | number): void {
       :disabled="disabled || unlimited"
       :data-testid="`${testid}-unit`"
     >
-      <option value="MiB">{{ t('docker.unit.mib.option') }}</option>
-      <option value="GiB">{{ t('docker.unit.gib.option') }}</option>
+      <option value="MB">{{ t('docker.unit.mib.option') }}</option>
+      <option value="GB">{{ t('docker.unit.gib.option') }}</option>
     </NativeSelect>
     <span v-if="allowUnlimited" class="flex items-center gap-1.5 text-muted-foreground">
       <Checkbox
         :model-value="unlimited"
         :disabled="disabled"
         :data-testid="`${testid}-unlimited`"
-        @update:model-value="emit('update:modelValue', $event ? -1 : 0)"
+        @update:model-value="model = $event ? -1 : 0"
         :aria-label="t('docker.edit.unlimited.label')"
       />{{ t('docker.edit.unlimited.label') }}
     </span>

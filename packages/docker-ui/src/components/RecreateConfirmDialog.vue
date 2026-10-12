@@ -10,20 +10,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import Identifier from '@workbench/components/Identifier.vue';
 import type { PendingChange } from '../lib/editDiff';
 import type { DockerEditSpec } from '../wire';
 import EditPendingSummary from './EditPendingSummary.vue';
 
-defineProps<{ spec: DockerEditSpec; changes: PendingChange[]; busy: boolean }>();
-const emit = defineEmits<{ cancel: []; confirm: [] }>();
+defineProps<{ spec: DockerEditSpec; changes: PendingChange[]; pending: boolean }>();
+const emit = defineEmits<{ close: []; confirm: [] }>();
 
 const COMPOSE = 'Compose';
 </script>
 
 <template>
-  <Dialog :open="true" @update:open="(v) => !v && emit('cancel')">
+  <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="lg" destructive data-testid="docker-edit-dialog">
       <DialogHeader>
         <DialogTitle>{{ t('docker.dialog.recreateConfirm.title') }}</DialogTitle>
@@ -33,10 +35,8 @@ const COMPOSE = 'Compose';
       <DialogBody>
         <EditPendingSummary :changes="changes" />
 
-        <section class="flex flex-col gap-1" data-testid="docker-edit-lost">
-          <h4 class="text-kira-sm uppercase tracking-wider text-muted-foreground">{{
-            t('docker.dialog.recreateConfirm.lost.title')
-          }}</h4>
+        <FieldSet data-testid="docker-edit-lost">
+          <FieldLegend>{{ t('docker.dialog.recreateConfirm.lost.title') }}</FieldLegend>
           <ul class="m-0 flex list-disc flex-col gap-0.5 pl-5">
             <li data-testid="docker-edit-lost-layer">{{
               t('docker.dialog.recreateConfirm.lostLayer.body')
@@ -48,19 +48,17 @@ const COMPOSE = 'Compose';
               data-testid="docker-edit-lost-volume"
             >
               <CatalogText k="docker.dialog.recreateConfirm.lostVolume.body">
-                <template #name><span class="font-data">{{ v.name }}</span></template>
-                <template #destination><span class="font-data">{{ v.destination }}</span></template>
+                <template #name><Identifier :value="v.name" /></template>
+                <template #destination><Identifier :value="v.destination" /></template>
               </CatalogText>
             </li>
             <li>{{ t('docker.dialog.recreateConfirm.lostLogs.body') }}</li>
             <li>{{ t('docker.dialog.recreateConfirm.lostId.body') }}</li>
           </ul>
-        </section>
+        </FieldSet>
 
-        <section class="flex flex-col gap-1" data-testid="docker-edit-kept">
-          <h4 class="text-kira-sm uppercase tracking-wider text-muted-foreground">{{
-            t('docker.dialog.recreateConfirm.kept.title')
-          }}</h4>
+        <FieldSet data-testid="docker-edit-kept">
+          <FieldLegend>{{ t('docker.dialog.recreateConfirm.kept.title') }}</FieldLegend>
           <ul class="m-0 flex list-disc flex-col gap-0.5 pl-5">
             <li>{{ t('docker.dialog.recreateConfirm.keptBase.body') }}</li>
             <li v-if="spec.preserved.length">{{
@@ -71,7 +69,7 @@ const COMPOSE = 'Compose';
             }}</li>
             <li v-else>{{ t('docker.dialog.recreateConfirm.staysStopped.body') }}</li>
           </ul>
-        </section>
+        </FieldSet>
 
         <Alert v-if="spec.dependents.length" variant="warn" data-testid="docker-edit-dependents">
           <AlertDescription>
@@ -95,7 +93,7 @@ const COMPOSE = 'Compose';
           size="kira-lg"
           data-dialog-dismiss
           data-testid="docker-edit-cancel"
-          @click="emit('cancel')"
+          @click="emit('close')"
           >{{
             t('common.action.cancel.label')
           }}</Button
@@ -103,7 +101,7 @@ const COMPOSE = 'Compose';
         <Button
           variant="dialog-danger"
           size="kira-lg"
-          :disabled="busy"
+          :pending="pending"
           data-testid="docker-edit-confirm"
           @click="emit('confirm')"
         >

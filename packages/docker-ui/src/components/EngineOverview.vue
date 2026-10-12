@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowVariants } from '@theme/components/rowVariants';
+import KeyValueList from '@theme/components/KeyValueList.vue';
+import { rowMeta, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
   useContainerAction,
   useContainers,
@@ -134,11 +135,20 @@ const stoppedIds = computed(() =>
     .filter((c) => c.state !== 'running' && c.state !== 'paused')
     .map((c) => c.id),
 );
-const anyBusy = computed(() =>
+const inFlight = computed(() =>
   [...runningIds.value, ...stoppedIds.value].some((id) => actions.isBusy(id)),
 );
 
+const bulk = ref<'start' | 'stop' | undefined>(undefined);
+const startLocked = computed(
+  () => stoppedIds.value.length === 0 || (inFlight.value && bulk.value === 'stop'),
+);
+const stopLocked = computed(
+  () => runningIds.value.size === 0 || (inFlight.value && bulk.value === 'start'),
+);
+
 function runAll(ids: Iterable<string>, action: 'start' | 'stop'): void {
+  bulk.value = action;
   for (const id of ids) {
     actions.run(id, action).catch(() => {
       // Surfaced through `actions.error`.
@@ -168,7 +178,8 @@ function refresh(): Promise<void> {
           <Button
             size="kira"
             variant="toolbar"
-            :disabled="anyBusy || stoppedIds.length === 0"
+            :disabled="startLocked"
+            :pending="inFlight && bulk === 'start'"
             data-testid="docker-start-stopped"
             @click="runAll(stoppedIds, 'start')"
           >
@@ -178,7 +189,8 @@ function refresh(): Promise<void> {
           <Button
             size="kira"
             variant="toolbar"
-            :disabled="anyBusy || runningIds.size === 0"
+            :disabled="stopLocked"
+            :pending="inFlight && bulk === 'stop'"
             data-testid="docker-stop-all"
             @click="runAll(runningIds, 'stop')"
           >
@@ -263,7 +275,7 @@ function refresh(): Promise<void> {
             >
               <CodiconIcon :name="l.icon" :size="13" class="text-muted-foreground" />
               <span class="flex-1">{{ t(l.label) }}</span>
-              <Badge variant="count">{{ l.count }}</Badge>
+              <span :class="rowMeta">{{ l.count }}</span>
               <CodiconIcon name="chevron-right" :size="12" class="text-muted-foreground" />
             </button>
           </DetailSection>
@@ -277,14 +289,12 @@ function refresh(): Promise<void> {
       </DetailSection>
 
       <DetailSection :title="t('docker.engine.engine.title')" class="shrink-0">
-        <dl class="@container">
-          <div class="grid grid-cols-1 gap-x-6 gap-y-2 @xl:grid-cols-2 @4xl:grid-cols-3">
-            <div v-for="[ k, v ] in facts" :key="k" class="min-w-0">
-              <dt class="text-kira-sm text-muted-foreground">{{ k }}</dt>
-              <dd class="break-all font-data">{{ v }}</dd>
-            </div>
-          </div>
-        </dl>
+        <KeyValueList>
+          <template v-for="[ k, v ] in facts" :key="k">
+            <dt>{{ k }}</dt>
+            <dd class="break-all font-data">{{ v }}</dd>
+          </template>
+        </KeyValueList>
       </DetailSection>
     </template>
   </div>

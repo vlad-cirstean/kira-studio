@@ -49,7 +49,7 @@ const hostTab = (id: string) => ({
   <div class="flex h-full flex-col" data-testid="docker-exec">
     <EmptyState
       v-if="sessions.length === 0"
-      class="h-full"
+      fill
       data-testid="docker-exec-empty"
       icon="terminal"
       :title="t('docker.exec.none.empty')"

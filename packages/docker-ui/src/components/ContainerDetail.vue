@@ -5,18 +5,19 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { Skeleton } from '@theme/components/ui/skeleton';
 import { type MessageKey, t } from '@theme/i18n';
-import { copyText } from '@workbench/behaviour/clipboard';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
+import Identifier from '@workbench/components/Identifier.vue';
 import QueryState from '@workbench/components/QueryState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { publishedPorts, shortId, stateDotTone } from '../lib/format';
+import type { ContainerAction } from '../queries';
 import { useContainerAction, useContainerDetail } from '../queries';
 import { useDockerEditStore } from '../state/dockerEdit';
 import { useDockerStatsStore } from '../state/dockerStats';
@@ -42,11 +43,17 @@ const actions = useContainerAction();
 const c = computed(() => detail.data.value?.container);
 const registryUrl = computed(() => detail.data.value?.registryUrl ?? '');
 const running = computed(() => c.value?.state === 'running');
+const isUp = running;
 const live = computed(() => (running.value ? stats.latest.get(props.containerId) : undefined));
 const recreating = computed(() => edits.applying[props.containerId] === 'recreate');
-const busy = computed(
+const inFlight = computed(
   () => actions.isBusy(props.containerId) || edits.applying[props.containerId] !== undefined,
 );
+const lastAction = ref<ContainerAction | undefined>(undefined);
+const pendingOf = (action: ContainerAction): boolean =>
+  inFlight.value && lastAction.value === action;
+const lockedBy = (action: ContainerAction): boolean =>
+  inFlight.value && lastAction.value !== action;
 
 const TABS: ReadonlyArray<{
   id: DockerDetailTab;
@@ -97,7 +104,8 @@ function openRegistry(url: string): void {
   void docker.openExternal(url);
 }
 
-function act(action: 'start' | 'stop' | 'restart'): void {
+function act(action: ContainerAction): void {
+  lastAction.value = action;
   void actions.run(props.containerId, action).catch(() => {
     // Surfaced through `actions.error`.
   });
@@ -116,7 +124,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
     <QueryState v-else :query="detail" :is-empty="() => false">
       <template #error>
         <EmptyState
-          class="h-full"
+          fill
           data-testid="docker-detail-error"
           :title="t('docker.detail.notFound.title')"
           :description="t('docker.detail.notFound.description')"
@@ -149,7 +157,8 @@ function act(action: 'start' | 'stop' | 'restart'): void {
               <Button
                 size="kira"
                 variant="toolbar"
-                :disabled="busy || running"
+                :disabled="isUp || lockedBy('start')"
+                :pending="pendingOf('start')"
                 data-testid="docker-action-start"
                 @click="act('start')"
               >
@@ -159,7 +168,8 @@ function act(action: 'start' | 'stop' | 'restart'): void {
               <Button
                 size="kira"
                 variant="toolbar"
-                :disabled="busy || !running"
+                :disabled="!isUp || lockedBy('stop')"
+                :pending="pendingOf('stop')"
                 data-testid="docker-action-stop"
                 @click="act('stop')"
               >
@@ -169,7 +179,8 @@ function act(action: 'start' | 'stop' | 'restart'): void {
               <Button
                 size="kira"
                 variant="toolbar"
-                :disabled="busy || !running"
+                :disabled="!isUp || lockedBy('restart')"
+                :pending="pendingOf('restart')"
                 data-testid="docker-action-restart"
                 @click="act('restart')"
               >
@@ -189,14 +200,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
               data-testid="docker-detail-registry"
               @click="openRegistry(registryUrl)"
             />
-            <span class="inline-flex items-center gap-0.5 font-data" data-testid="docker-detail-id">
-              {{ shortId(c.id) }}
-              <TooltipIconButton
-                icon="copy"
-                :label="t('common.action.copyId.label')"
-                @click="copyText(c.id)"
-              />
-            </span>
+            <Identifier :value="c.id" :short="shortId" copyable data-testid="docker-detail-id" />
             <span v-if="c.status">{{ c.status }}</span>
             <span
               v-for="p in publishedPorts(c.ports)"
@@ -223,13 +227,9 @@ function act(action: 'start' | 'stop' | 'restart'): void {
             </span>
           </div>
         </div>
-        <FieldError
-          v-if="actions.error.value"
-          class="shrink-0 border-b border-border px-3 py-1"
-          data-testid="docker-action-error"
-        >
-          {{ (actions.error.value as Error).message }}
-        </FieldError>
+        <Alert v-if="actions.error.value" variant="error" data-testid="docker-action-error">
+          <AlertDescription>{{ (actions.error.value as Error).message }}</AlertDescription>
+        </Alert>
         <ViewToolbar class="overflow-x-auto">
           <SecondaryTabs
             :model-value="ui.detailTab"

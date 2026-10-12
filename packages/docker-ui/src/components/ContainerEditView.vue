@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -287,10 +286,11 @@ const originNotice = computed(() => {
               size="kira"
               variant="toolbar"
               :disabled="!canApplyNow"
+              :pending="applying === 'inPlace'"
               data-testid="docker-edit-apply-now"
               @click="applyNow"
             >
-              <Spinner v-if="applying === 'inPlace'" label="" />{{ t('common.action.apply.label') }}
+              {{ t('common.action.apply.label') }}
             </Button>
           </div>
         </TabsContent>
@@ -319,10 +319,10 @@ const originNotice = computed(() => {
               size="kira"
               variant="toolbar"
               :disabled="!canRecreate"
+              :pending="applying === 'recreate'"
               data-testid="docker-edit-apply-recreate"
               @click="confirming = true"
             >
-              <Spinner v-if="applying === 'recreate'" label="" />
               {{ t('docker.edit.recreate.label') }}
             </Button>
           </div>
@@ -334,8 +334,8 @@ const originNotice = computed(() => {
       v-if="confirming && base"
       :spec="base"
       :changes="changes"
-      :busy="!!applying"
-      @cancel="confirming = false"
+      :pending="!!applying"
+      @close="confirming = false"
       @confirm="confirmRecreate"
     />
   </div>

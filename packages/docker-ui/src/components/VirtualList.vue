@@ -2,6 +2,7 @@
 import { type ListNavigationOptions, useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/lib/rowHeight';
+import type { MenuItem } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 
 const props = withDefaults(
@@ -14,6 +15,10 @@ const props = withDefaults(
     open?: (row: T) => void;
     /** ContextMenu key and Shift+F10 on a row. */
     menu?: (row: T, rect: DOMRect) => void;
+    /** Click, Space and right-click select the row. */
+    select?: (row: T) => void;
+    /** Right-click menu of a row; none (or empty) leaves the browser menu alone. */
+    menuFor?: (row: T) => MenuItem[];
     /** Group rows that expand and collapse (Right and Left). */
     tree?: ListNavigationOptions<T>['tree'];
   }>(),
@@ -23,7 +28,12 @@ const props = withDefaults(
 defineSlots<{
   row(props: {
     row: T;
-    nav: { 'data-nav-key': string; tabindex: 0 | -1; onFocus: () => void };
+    nav: {
+      'data-nav-key': string;
+      tabindex: 0 | -1;
+      onFocus: () => void;
+      onContextmenu: (e: MouseEvent) => void;
+    };
   }): unknown;
 }>();
 
@@ -45,6 +55,7 @@ const nav = useListNavigation<T>({
   items: () => props.rows,
   key: (row) => row.key,
   activeKey,
+  onSelect: (row) => props.select?.(row),
   onOpen: (row) => props.open?.(row),
   onMenu: (row, rect) => props.menu?.(row, rect),
   tree: props.tree && {
@@ -57,6 +68,18 @@ const nav = useListNavigation<T>({
   scrollToIndex: (index) => scrollToIndex(index),
   rendered: () => virtualItems.value,
 });
+
+function rowNav(row: T) {
+  return {
+    ...nav.rowProps(row.key),
+    onContextmenu: (e: MouseEvent) => {
+      const items = props.menuFor?.(row) ?? [];
+      if (items.length === 0) return;
+      e.preventDefault();
+      nav.contextMenu(row, e, items);
+    },
+  };
+}
 </script>
 
 <template>
@@ -74,7 +97,7 @@ const nav = useListNavigation<T>({
         :class="VIRTUAL_ROW_CLASS"
         :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
       >
-        <slot name="row" :row="rows[vi.index]!" :nav="nav.rowProps(rows[vi.index]!.key)" />
+        <slot name="row" :row="rows[vi.index]!" :nav="rowNav(rows[vi.index]!)" />
       </div>
     </div>
   </div>

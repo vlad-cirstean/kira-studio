@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import StatusDot from '@theme/components/StatusDot.vue';
-import { FieldError } from '@theme/components/ui/field';
+import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { useFormErrors } from '@workbench/behaviour/formErrors';
 import { computed, inject } from 'vue';
 import type { EditMode } from '../lib/editDiff';
 import { inPlaceSectionKey } from '../lib/editSection';
@@ -13,10 +14,13 @@ const props = defineProps<{
   mode: EditMode;
   changed?: boolean;
   error?: string;
-  hint?: string;
+  description?: string;
 }>();
 
 const inPlaceTab = inject(inPlaceSectionKey, undefined);
+const form = useFormErrors({
+  field: { value: () => props.changed, error: () => props.error ?? null },
+});
 const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recreate');
 </script>
 
@@ -36,16 +40,18 @@ const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recr
         <TooltipContent>{{ t('common.changed.status') }}</TooltipContent>
       </Tooltip>
     </div>
-    <slot />
-    <FieldError v-if="error" data-testid="docker-edit-field-error">{{ error }}</FieldError>
-    <p
-      v-else-if="needsRecreate"
-      class="text-muted-foreground"
-      data-testid="docker-edit-field-recreate-hint"
+    <slot v-bind="{ invalid: form.invalidAttrs('field') }" />
+    <FieldError
+      v-if="form.errorFor('field')"
+      :id="form.errorId('field')"
+      data-testid="docker-edit-field-error"
       >{{
-        t('docker.edit.needsRecreate.hint')
-      }}</p
+        form.errorFor('field')
+      }}</FieldError
     >
-    <p v-else-if="hint" class="text-muted-foreground">{{ hint }}</p>
+    <FieldDescription v-else-if="needsRecreate" data-testid="docker-edit-field-recreate-hint">{{
+      t('docker.edit.needsRecreate.hint')
+    }}</FieldDescription>
+    <FieldDescription v-else-if="description">{{ description }}</FieldDescription>
   </fieldset>
 </template>

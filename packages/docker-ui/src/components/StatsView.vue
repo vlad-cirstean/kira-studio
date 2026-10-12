@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
 import { t } from '@theme/i18n';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { computed } from 'vue';
@@ -50,20 +51,20 @@ const mem = computed(() => history.value.map((s) => s.memUsage));
           <StatsSparkline :values="mem" :max="latest.memLimit" height-class="h-24" />
         </DetailSection>
         <DetailSection :title="t('docker.stats.io.title')" class="@3xl:col-span-2">
-          <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-            <dt class="text-muted-foreground">{{ t('docker.stats.network.label') }}</dt>
+          <KeyValueList>
+            <dt>{{ t('docker.stats.network.label') }}</dt>
             <dd class="font-data"
               >{{ formatBytes(latest.netRx) }}
               / {{ formatBytes(latest.netTx) }}</dd
             >
-            <dt class="text-muted-foreground">{{ t('docker.stats.block.label') }}</dt>
+            <dt>{{ t('docker.stats.block.label') }}</dt>
             <dd class="font-data"
               >{{ formatBytes(latest.blockRead) }}
               / {{ formatBytes(latest.blockWrite) }}</dd
             >
-            <dt class="text-muted-foreground">{{ t('docker.stats.pids.label') }}</dt>
+            <dt>{{ t('docker.stats.pids.label') }}</dt>
             <dd class="font-data">{{ latest.pids }}</dd>
-          </dl>
+          </KeyValueList>
         </DetailSection>
       </div>
     </div>

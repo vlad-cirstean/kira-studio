@@ -9,7 +9,7 @@ import { cn } from '@theme/lib/utils';
 import { displayValue, formatBytes, formatDateTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useDocker } from '../context';
-import { shortId, stateDotTone } from '../lib/format';
+import { nameOrShortId, stateDotTone } from '../lib/format';
 import { useContainers, useImages, useInspect, useNetworks, useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { InspectKind } from '../wire';
@@ -46,9 +46,9 @@ const volume = computed(() => (volumes.data.value ?? []).find((v) => v.name === 
 const network = computed(() => (networks.data.value ?? []).find((n) => n.id === props.id));
 
 const title = computed(() => {
-  if (props.kind === 'image') return image.value?.tags[0] ?? shortId(props.id);
+  if (props.kind === 'image') return nameOrShortId(image.value?.tags[0], props.id);
   if (props.kind === 'volume') return props.id;
-  return network.value?.name ?? shortId(props.id);
+  return nameOrShortId(network.value?.name, props.id);
 });
 
 const registryUrl = computed(() =>
@@ -107,7 +107,7 @@ const usedBy = computed<string[]>(() => {
 const usedByRows = computed(() =>
   usedBy.value.map((id) => {
     const c = (containers.data.value ?? []).find((x) => x.id === id);
-    return { id, name: c?.name ?? shortId(id), state: c?.state };
+    return { id, name: nameOrShortId(c?.name, id), state: c?.state };
   }),
 );
 </script>
@@ -135,12 +135,12 @@ const usedByRows = computed(() =>
     <div class="@container p-3">
       <div class="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2">
         <DetailSection :title="t('common.details.title')">
-          <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+          <KeyValueList>
             <template v-for="[ k, v ] in facts" :key="k">
-              <dt class="text-muted-foreground">{{ k }}</dt>
+              <dt>{{ k }}</dt>
               <dd class="break-all font-data">{{ v }}</dd>
             </template>
-          </dl>
+          </KeyValueList>
         </DetailSection>
         <DetailSection :title="t('docker.resource.usedBy.title')" flush>
           <p

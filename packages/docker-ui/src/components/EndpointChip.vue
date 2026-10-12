@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import PickerTrigger from '@theme/components/PickerTrigger.vue';
+import { rowMeta } from '@theme/components/rowVariants';
 import StatusDot from '@theme/components/StatusDot.vue';
-import { Button } from '@theme/components/ui/button';
+import TruncatedText from '@theme/components/TruncatedText.vue';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,23 +48,21 @@ async function onSelect(value: unknown): Promise<void> {
 <template>
   <DropdownMenu :modal="false">
     <DropdownMenuTrigger as-child>
-      <Button
-        variant="toolbar"
+      <PickerTrigger
         size="kira"
-        class="h-control-sm min-w-0 gap-1 px-1 normal-case tracking-normal text-kira-sm font-normal text-fg"
+        class="max-w-48"
         data-testid="docker-endpoint-chip"
         :aria-label="t('docker.endpoint.chip.aria', { context: endpoint?.context ?? '' })"
+        :label="endpoint?.context ?? 'docker'"
       >
-        <StatusDot
-          :tone="ok ? 'ok' : 'error'"
-          data-testid="docker-status-dot"
-          :data-state="ok ? 'ok' : 'unavailable'"
-        />
-        <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
-          endpoint?.context ?? 'docker'
-        }}</span>
-        <CodiconIcon name="chevron-down" :size="12" />
-      </Button>
+        <template #leading>
+          <StatusDot
+            :tone="ok ? 'ok' : 'error'"
+            data-testid="docker-status-dot"
+            :data-state="ok ? 'ok' : 'unavailable'"
+          />
+        </template>
+      </PickerTrigger>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" data-testid="docker-context-menu">
       <DropdownMenuRadioGroup :model-value="selected" @update:model-value="onSelect">
@@ -71,9 +71,7 @@ async function onSelect(value: unknown): Promise<void> {
           class="h-auto min-h-control py-1"
           data-testid="docker-context-automatic"
         >
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            t('docker.endpoint.automatic.option')
-          }}</span>
+          <TruncatedText class="flex-1" :text="t('docker.endpoint.automatic.option')" />
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
         <DropdownMenuSeparator />
@@ -86,13 +84,8 @@ async function onSelect(value: unknown): Promise<void> {
           :data-value="c.name"
         >
           <span class="flex min-w-0 flex-1 flex-col">
-            <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ c.name }}</span>
-            <span
-              class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-muted-foreground"
-              >{{
-                c.host
-              }}</span
-            >
+            <TruncatedText :text="c.name" />
+            <TruncatedText :text="c.host" :class="rowMeta" />
           </span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>

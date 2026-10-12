@@ -1,9 +1,16 @@
-import { useLocalStorage } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { ResourceKind } from '../wire';
 
 export type DockerSection = 'containers' | 'images' | 'volumes' | 'networks';
+const SECTIONS: readonly string[] = ['containers', 'images', 'volumes', 'networks'];
+const sectionSchema = {
+  safeParse: (v: unknown) =>
+    typeof v === 'string' && SECTIONS.includes(v)
+      ? { success: true as const, data: v as DockerSection }
+      : { success: false as const },
+};
 export type DockerDetailTab = 'overview' | 'logs' | 'terminal' | 'stats' | 'inspect' | 'edit';
 
 export interface DockerSelection {
@@ -12,12 +19,14 @@ export interface DockerSelection {
 }
 
 export const useDockerUiStore = defineStore('dockerUi', () => {
-  const section = ref<DockerSection>('containers');
+  const section = usePersistedState<DockerSection>('kira.docker.section', 'containers', {
+    schema: sectionSchema,
+  });
   const selection = ref<DockerSelection | null>(null);
   const detailTab = ref<DockerDetailTab>('overview');
   const search = ref('');
-  const showStopped = ref(true);
-  const collapsedGroups = useLocalStorage<string[]>('kira.docker.collapsedGroups', []);
+  const showStopped = usePersistedState('kira.docker.showStopped', true);
+  const collapsedGroups = usePersistedState<string[]>('kira.docker.collapsedGroups', []);
 
   function select(next: DockerSelection | null, tab: DockerDetailTab = 'overview'): void {
     selection.value = next;

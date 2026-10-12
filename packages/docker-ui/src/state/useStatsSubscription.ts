@@ -1,10 +1,9 @@
 import { useDebounceFn, useDocumentVisibility } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { onScopeDispose, type Ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { useDockerStatsStore } from './dockerStats';
-
-const RESUBSCRIBE_DEBOUNCE_MS = 300;
 
 // Live stats are best effort: a failed call logs, and the next visibility or id change subscribes again.
 /** Keeps Go's stats stream subscribed to `ids` while mounted and visible. */
@@ -25,7 +24,7 @@ export function useStatsSubscription(ids: Ref<string[]>): void {
     }
     subscribed = true;
     fireAndForget(control.statsSubscribe(ids.value), 'docker.stats');
-  }, RESUBSCRIBE_DEBOUNCE_MS);
+  }, TIMING.preview);
 
   function listen(): void {
     if (!off) off = control.onStats((e) => store.ingest(e.samples));

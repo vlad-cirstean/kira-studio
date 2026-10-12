@@ -12,6 +12,8 @@ const props = withDefaults(
   { max: 0, width: 240, height: 48, heightClass: 'h-[3rem]' },
 );
 
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+
 const coords = computed(() => {
   const n = props.values.length;
   if (n < 2) return [];
@@ -23,9 +25,7 @@ const coords = computed(() => {
   ]);
 });
 
-const line = computed(() =>
-  coords.value.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '),
-);
+const line = computed(() => coords.value.map(([x, y]) => `${round1(x)},${round1(y)}`).join(' '));
 const area = computed(() =>
   line.value ? `0,${props.height} ${line.value} ${props.width},${props.height}` : '',
 );

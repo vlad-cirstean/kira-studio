@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
@@ -53,11 +54,11 @@ const ago = useRelativeTime(takenAt);
         t('docker.measure.label')
       }}</Button>
     </div>
-    <dl v-else class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-      <dt class="text-muted-foreground">{{ t('docker.size.writableLayer.label') }}</dt>
+    <KeyValueList v-else>
+      <dt>{{ t('docker.size.writableLayer.label') }}</dt>
       <dd class="font-data" data-testid="docker-size-rw">{{ formatBytes(size.sizeRw) }}</dd>
-      <dt class="text-muted-foreground">{{ t('docker.size.total.label') }}</dt>
+      <dt>{{ t('docker.size.total.label') }}</dt>
       <dd class="font-data" data-testid="docker-size-rootfs">{{ formatBytes(size.sizeRootFs) }}</dd>
-    </dl>
+    </KeyValueList>
   </DetailSection>
 </template>

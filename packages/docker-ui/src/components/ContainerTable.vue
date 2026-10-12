@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import EmptyState from '@theme/components/EmptyState.vue';
+import { rowActions } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -15,7 +17,6 @@ import { useContainerAction, useContainers } from '../queries';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
-import ListState from './ListState.vue';
 import UsageBar from './UsageBar.vue';
 
 const ui = useDockerUiStore();
@@ -27,7 +28,7 @@ const rows = computed(() =>
   [...(containers.data.value ?? [])].sort((a, b) => {
     const ra = a.state === 'running' ? 0 : 1;
     const rb = b.state === 'running' ? 0 : 1;
-    return ra - rb || compareNatural(a.name, b.name);
+    return ra - rb || compareNatural(a.name, b.name) || compareNatural(a.id, b.id);
   }),
 );
 
@@ -51,17 +52,19 @@ const nav = useListNavigation<DockerContainer>({
   items: () => rows.value,
   key: (c) => c.id,
   activeKey,
-  onOpen: (c) => open(c),
+  onOpen: (c) => open(c, 'logs'),
 });
 </script>
 
 <template>
   <QueryState :query="containers" :is-empty="() => rows.length === 0">
     <template #empty>
-      <ListState
+      <EmptyState
+        fill
+        data-testid="docker-list-empty"
         icon="server"
         :title="t('docker.container.none.empty')"
-        :hint="t('docker.container.none.emptyHint')"
+        :description="t('docker.container.none.emptyHint')"
       />
     </template>
     <div ref="tableEl" class="@container" role="listbox" data-testid="docker-table">
@@ -77,7 +80,6 @@ const nav = useListNavigation<DockerContainer>({
         <span />
       </div>
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
       <div
         v-for="c in rows"
         :key="c.id"
@@ -88,6 +90,7 @@ const nav = useListNavigation<DockerContainer>({
         role="option"
         :aria-selected="false"
         v-bind="nav.rowProps(c.id)"
+        :tabindex="nav.tabindexFor(c.id)"
         @click="open(c)"
         @dblclick="open(c, 'logs')"
       >
@@ -135,10 +138,7 @@ const nav = useListNavigation<DockerContainer>({
         </template>
         <span class="flex items-center justify-end">
           <Spinner v-if="actions.isBusy(c.id)" label="" />
-          <span
-            v-else
-            class="invisible flex group-hover/row:visible group-focus-within/row:visible"
-          >
+          <span v-else :class="cn('flex', rowActions)">
             <TooltipIconButton
               icon="output"
               :label="t('docker.tab.logs.label')"
@@ -148,7 +148,7 @@ const nav = useListNavigation<DockerContainer>({
               v-if="c.state === 'running'"
               icon="debug-stop"
               :label="t('common.action.stop.label')"
-              class="text-error hover:text-error"
+              tone="error"
               data-testid="docker-table-stop"
               @click.stop="act(c, 'stop')"
             />
@@ -156,7 +156,7 @@ const nav = useListNavigation<DockerContainer>({
               v-else
               icon="play"
               :label="t('common.action.start.label')"
-              class="text-ok hover:text-ok"
+              tone="ok"
               data-testid="docker-table-start"
               @click.stop="act(c, 'start')"
             />

@@ -1,75 +1,114 @@
 <script setup lang="ts">
-import SearchField from '@theme/components/SearchField.vue';
+import HighlightedText from '@theme/components/HighlightedText.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
-import { FieldError } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
 import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
-import { useFollowTail } from '@workbench/behaviour/followTail';
-import { matchesQuery } from '@workbench/behaviour/match';
+import { revealElement } from '@workbench/behaviour/focus';
+import { matchesQuery, splitMatches } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
-import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import FindBar from '@workbench/components/FindBar.vue';
+import LogLines from '@workbench/components/LogLines.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { type AnsiSegment, parseAnsi } from '@workbench/lib/ansi';
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { useDocker } from '../context';
-import { parseAnsi, splitMatches } from '../lib/ansi';
 import type { DockerLogLine } from '../wire';
 
 const props = defineProps<{ containerId: string }>();
 
 const MAX_LINES = 20_000;
-const WRAP_RENDER_LINES = 2_000;
-const ROW_HEIGHT = 18;
+// Fixed: LogLines rows are one line tall unless wrapped.
+const LOG_ROW_PX = 18;
 const TAILS = [100, 1000, 5000, -1] as const;
 
 const tailLabel = (n: number): string =>
   n === -1 ? t('common.state.all.option') : t('docker.logs.tail.option', { count: n });
 
 interface Line extends DockerLogLine {
-  n: number;
+  id: number;
 }
 
 const { control } = useDocker();
 
 const lines = shallowRef<Line[]>([]);
-const follow = ref(true);
 const timestamps = ref(false);
 const wrap = ref(false);
 const tail = ref<number>(1000);
-const filter = ref('');
+const findOpen = ref(false);
+const query = ref('');
+const needle = ref('');
+const current = ref(0);
 const ended = ref(false);
 const failure = ref('');
 const streamError = ref('');
+const logsEl = useTemplateRef<{ $el: HTMLElement }>('logsEl');
 
 let streamId = '';
 let opening: Promise<unknown> = Promise.resolve();
 let seq = 0;
 let off: (() => void) | null = null;
 
-const needle = computed(() => filter.value.trim().toLowerCase());
-const visible = computed(() => {
+const matchLines = computed<number[]>(() => {
   const q = needle.value;
-  return q === '' ? lines.value : lines.value.filter((l) => matchesQuery(l.text, q));
+  if (q === '') return [];
+  const out: number[] = [];
+  lines.value.forEach((l, i) => {
+    if (matchesQuery(plain(l.text), q)) out.push(i);
+  });
+  return out;
 });
-const wrapped = computed(() => visible.value.slice(-WRAP_RENDER_LINES));
+const currentLine = computed(() => matchLines.value[current.value]);
 
-const scrollEl = ref<HTMLElement | null>(null);
-const {
-  virtualItems,
-  totalSize,
-  onScroll: onVirtualScroll,
-} = useVirtualRows({
-  count: () => visible.value.length,
-  rowHeight: () => ROW_HEIGHT,
-  scrollElement: scrollEl,
-  overscan: 20,
+const plain = (text: string): string =>
+  parseAnsi(text)
+    .map((seg) => seg.text)
+    .join('');
+
+function onQuery(q: string): void {
+  needle.value = q.trim().toLowerCase();
+  current.value = 0;
+  void nextTick(revealCurrent);
+}
+
+function step(delta: number): void {
+  const n = matchLines.value.length;
+  if (n === 0) return;
+  current.value = (current.value + delta + n) % n;
+  void nextTick(revealCurrent);
+}
+
+function closeFind(): void {
+  findOpen.value = false;
+  query.value = '';
+  needle.value = '';
+}
+
+function revealCurrent(): void {
+  const index = currentLine.value;
+  const scroller = logsEl.value?.$el;
+  if (index === undefined || !scroller) return;
+  const row = scroller.querySelector(`[data-index="${index}"]`);
+  if (row) {
+    revealElement(row, { block: 'center' });
+    return;
+  }
+  scroller.scrollTop = index * LOG_ROW_PX;
+  requestAnimationFrame(() => {
+    const placed = scroller.querySelector(`[data-index="${index}"]`);
+    if (placed) revealElement(placed, { block: 'center' });
+  });
+}
+
+watch(matchLines, (m) => {
+  if (current.value >= m.length) current.value = Math.max(0, m.length - 1);
 });
-
-const { atBottom, jumpToLatest, stick } = useFollowTail(scrollEl, lines, { follow });
 
 function append(batch: DockerLogLine[]): void {
-  const next = lines.value.concat(batch.map((l) => ({ ...l, n: seq++ })));
+  const next = lines.value.concat(batch.map((l) => ({ ...l, id: seq++ })));
   lines.value = next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
 }
 
@@ -121,18 +160,20 @@ async function open(): Promise<void> {
 const reopen = useDebounceFn(() => void open(), TIMING.search);
 
 watch([() => props.containerId, tail, timestamps], () => void reopen(), { immediate: true });
-watch(follow, (v) => {
-  if (v) stick();
-});
 onBeforeUnmount(() => {
   reopen.cancel?.();
   void close();
 });
 
-const emptyText = computed(() => {
-  if (needle.value) return t('docker.logs.noMatches.emptyHint');
-  return ended.value ? t('docker.logs.none.emptyHint') : t('docker.logs.waiting.loading');
-});
+const errorMessage = computed(() => failure.value || (ended.value ? streamError.value : ''));
+
+function segmentStyle(seg: AnsiSegment): Record<string, string> | undefined {
+  if (!seg.color && !seg.background) return undefined;
+  return {
+    ...(seg.color && { color: seg.color }),
+    ...(seg.background && { backgroundColor: seg.background }),
+  };
+}
 
 function clear(): void {
   lines.value = [];
@@ -141,16 +182,7 @@ function clear(): void {
 
 <template>
   <div class="flex h-full flex-col" data-testid="docker-logs">
-    <div class="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-1.5 py-1">
-      <Toggle
-        v-model="follow"
-        size="kira"
-        data-testid="docker-logs-follow"
-        :aria-label="t('docker.logs.follow.label')"
-        >{{
-          t('docker.logs.follow.label')
-        }}</Toggle
-      >
+    <ViewToolbar class="flex-wrap">
       <Toggle
         v-model="timestamps"
         size="kira"
@@ -176,121 +208,56 @@ function clear(): void {
       >
         <option v-for="n in TAILS" :key="n" :value="n">{{ tailLabel(n) }}</option>
       </NativeSelect>
-      <div class="w-56">
-        <SearchField
-          v-model="filter"
-          :placeholder="t('common.action.filter.label')"
-          data-testid="docker-logs-filter"
-        />
-      </div>
-      <span
-        v-if="needle"
-        class="text-kira-sm text-muted-foreground"
-        data-testid="docker-logs-count"
-        >{{
-          visible.length
-        }}</span
-      >
-      <Button
-        variant="ghost"
-        size="kira"
+      <TooltipIconButton
         class="ml-auto"
-        data-testid="docker-logs-clear"
-        @click="clear"
-        >{{
-          t('common.action.clear.label')
-        }}</Button
-      >
-    </div>
-    <div class="relative min-h-0 flex-1">
-      <div
-        ref="scrollEl"
-        class="h-full overflow-auto bg-bg py-1 font-data text-kira-sm"
-        data-testid="docker-logs-body"
-        @scroll="onVirtualScroll"
-      >
-        <div v-if="wrap" class="px-2">
-          <div
-            v-for="l in wrapped"
-            :key="l.n"
-            class="whitespace-pre-wrap break-all"
-            :class="l.stream === 'stderr' ? 'text-error' : ''"
-            data-testid="docker-log-line"
-            :data-stream="l.stream"
-          >
-            <span v-if="timestamps && l.ts" class="mr-2 text-muted-foreground">{{ l.ts }}</span>
-            <template v-for="(seg, i) in parseAnsi(l.text)" :key="i">
-              <span
-                :style="{ color: seg.color, background: seg.background }"
-                :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']"
-              >
-                <template v-for="(part, j) in splitMatches(seg.text, needle)" :key="j">
-                  <mark v-if="part.match" class="bg-search-match text-inherit">{{
-                    part.text
-                  }}</mark>
-                  <template v-else>{{ part.text }}</template>
-                </template>
-              </span>
-            </template>
-          </div>
-        </div>
-        <div v-else class="relative" :style="{ height: `${totalSize}px` }">
-          <div
-            v-for="vi in virtualItems"
-            :key="String(vi.key)"
-            :class="[VIRTUAL_ROW_CLASS, 'whitespace-pre px-2', visible[vi.index]?.stream === 'stderr' ? 'text-error' : '']"
-            :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
-            data-testid="docker-log-line"
-            :data-stream="visible[vi.index]?.stream"
-          >
-            <template v-if="visible[vi.index]">
-              <span v-if="timestamps && visible[vi.index]!.ts" class="mr-2 text-muted-foreground">{{
-                visible[vi.index]!.ts
-              }}</span>
-              <template v-for="(seg, i) in parseAnsi(visible[vi.index]!.text)" :key="i">
-                <span
-                  :style="{ color: seg.color, background: seg.background }"
-                  :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']"
-                >
-                  <template v-for="(part, j) in splitMatches(seg.text, needle)" :key="j">
-                    <mark v-if="part.match" class="bg-search-match text-inherit">{{
-                      part.text
-                    }}</mark>
-                    <template v-else>{{ part.text }}</template>
-                  </template>
-                </span>
-              </template>
-            </template>
-          </div>
-        </div>
-      </div>
-      <p
-        v-if="visible.length === 0"
-        class="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"
-        data-testid="docker-logs-empty"
-      >
-        {{ emptyText }}
-      </p>
-      <Button
-        v-if="!atBottom() && !follow"
-        variant="toolbar"
-        size="kira"
-        class="absolute bottom-2 right-4"
-        data-testid="docker-logs-jump"
-        @click="jumpToLatest"
-      >
-        {{ t('docker.logs.jumpToLatest.label') }}
-      </Button>
-    </div>
-    <FieldError
-      v-if="failure || (ended && streamError)"
-      class="shrink-0 border-t border-border bg-chrome px-2 py-0.5"
-      data-testid="docker-logs-ended"
+        icon="search"
+        :label="t('common.action.find.label')"
+        :pressed="findOpen"
+        data-testid="docker-logs-find"
+        @click="findOpen = !findOpen"
+      />
+      <Button variant="toolbar" size="kira" data-testid="docker-logs-clear" @click="clear">{{
+        t('common.action.clear.label')
+      }}</Button>
+    </ViewToolbar>
+    <FindBar
+      v-if="findOpen"
+      v-model="query"
+      testid-prefix="docker-logs-find-"
+      :position="matchLines.length === 0 ? 0 : current + 1"
+      :total="matchLines.length"
+      @query="onQuery"
+      @next="step(1)"
+      @prev="step(-1)"
+      @close="closeFind"
+    />
+    <LogLines
+      ref="logsEl"
+      testid="docker-log"
+      max-height="none"
+      class="rounded-none border-0"
+      :lines="lines"
+      :wrap="wrap"
+      :error="errorMessage || undefined"
     >
-      {{ failure || streamError }}
-    </FieldError>
+      <template #line="{ segments, index }">
+        <span v-if="timestamps && lines[index]?.ts" class="mr-2 text-muted-foreground">{{
+          lines[index]?.ts
+        }}</span>
+        <span
+          v-for="(seg, i) in segments"
+          :key="i"
+          :class="seg.bold && 'font-bold'"
+          :style="segmentStyle(seg)"
+          ><HighlightedText
+            :parts="splitMatches(seg.text, needle)"
+            :current="index === currentLine ? splitMatches(seg.text, needle).findIndex((p) => p.match) : undefined"
+          /></span
+        >
+      </template>
+    </LogLines>
     <div
-      v-else-if="ended"
+      v-if="ended && !errorMessage"
       class="shrink-0 border-t border-border bg-chrome px-2 py-0.5 text-kira-sm text-muted-foreground"
       data-testid="docker-logs-ended"
     >

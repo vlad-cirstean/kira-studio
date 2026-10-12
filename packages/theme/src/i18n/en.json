@@ -2866,18 +2866,6 @@
       }
     },
     "logs": {
-      "follow": {
-        "label": "Follow"
-      },
-      "jumpToLatest": {
-        "label": "Jump to latest"
-      },
-      "noMatches": {
-        "emptyHint": "No lines match the filter."
-      },
-      "none": {
-        "emptyHint": "No log output."
-      },
       "stopped": {
         "status": "Container stopped"
       },
@@ -2887,9 +2875,6 @@
       },
       "timestamps": {
         "label": "Timestamps"
-      },
-      "waiting": {
-        "loading": "Waiting for output…"
       },
       "wrap": {
         "label": "Wrap"
@@ -3111,10 +3096,10 @@
     },
     "unit": {
       "gib": {
-        "option": "GiB"
+        "option": "GB"
       },
       "mib": {
-        "option": "MiB"
+        "option": "MB"
       }
     },
     "volume": {

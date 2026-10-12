@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import Identifier from '@workbench/components/Identifier.vue';
 import { computed } from 'vue';
 import { useRetryStatus } from '../queries';
 import type { DockerStatus, UnavailableReason } from '../wire';
@@ -48,38 +49,25 @@ const copy = computed(() => {
 </script>
 
 <template>
-  <EmptyState
-    class="h-full"
-    data-testid="docker-unavailable"
-    :title="copy.title"
-    :description="copy.hint"
-  >
+  <EmptyState fill data-testid="docker-unavailable" :title="copy.title" :description="copy.hint">
     <template #media
       ><CodiconIcon name="debug-disconnect" :size="24" class="text-error" /></template
     >
-    <code
-      class="font-data text-kira-sm text-muted-foreground"
-      data-testid="docker-unavailable-endpoint"
-      >{{
-        status.endpoint.host
-      }}</code
-    >
-    <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{
-      status.message
-    }}</p>
+    <Identifier :value="status.endpoint.host" data-testid="docker-unavailable-endpoint" />
+    <FieldDescription v-if="status.message" class="max-w-md">{{ status.message }}</FieldDescription>
     <div class="flex items-center gap-2">
       <Button
         size="kira"
         variant="toolbar"
-        :disabled="retrying"
+        :pending="retrying"
         data-testid="docker-retry"
         @click="retry"
       >
-        <Spinner v-if="retrying" label="" /><CodiconIcon v-else name="refresh" :size="12" />
+        <CodiconIcon name="refresh" :size="12" />
         {{ t('common.action.retry.label') }}
       </Button>
       <EndpointChip />
     </div>
-    <p class="text-kira-sm text-muted-foreground">{{ t('docker.unavailable.recheck.hint') }}</p>
+    <FieldDescription>{{ t('docker.unavailable.recheck.hint') }}</FieldDescription>
   </EmptyState>
 </template>

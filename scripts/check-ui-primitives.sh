@@ -55,7 +55,6 @@ packages/docker-ui/src/components/ImageList.vue
 packages/docker-ui/src/components/VolumeList.vue
 packages/docker-ui/src/components/NetworkList.vue
 packages/docker-ui/src/components/VirtualList.vue
-packages/docker-ui/src/components/ListState.vue
 apps/kira-space/frontend/src/repo/RepoFileTree.vue
 apps/kira-space/frontend/src/repo/RepoTreeRow.vue
 apps/kira-space/frontend/src/repo/RepoSearchView.vue
@@ -115,7 +114,6 @@ U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into i
 # C (rest)
 U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
 U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
-U25 packages/docker-ui/src/components/LogsView.vue # stderr line colour is log data, not chrome
 U36 packages/workbench/src/components/InlineEditInput.vue # bare rename input, not a card
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus

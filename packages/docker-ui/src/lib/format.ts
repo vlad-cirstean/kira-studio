@@ -4,6 +4,9 @@ export function shortId(id: string): string {
   return id.replace(/^sha256:/, '').slice(0, 12);
 }
 
+/** A resource's name, or its short id while the name is unknown. */
+export const nameOrShortId = (name: string | undefined, id: string): string => name ?? shortId(id);
+
 export function isActiveState(state: ContainerState): boolean {
   return state === 'running' || state === 'paused' || state === 'restarting';
 }

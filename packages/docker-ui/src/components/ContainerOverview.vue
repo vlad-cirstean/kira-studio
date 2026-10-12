@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
@@ -51,12 +52,12 @@ const rows = (): Array<[string, string]> => [
     <div class="@container">
       <div class="grid grid-cols-1 items-start gap-3 @3xl:grid-cols-2">
         <DetailSection :title="t('common.details.title')">
-          <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+          <KeyValueList>
             <template v-for="[ k, v ] in rows()" :key="k">
-              <dt class="text-muted-foreground">{{ k }}</dt>
+              <dt>{{ k }}</dt>
               <dd class="break-all font-data">{{ v }}</dd>
             </template>
-          </dl>
+          </KeyValueList>
         </DetailSection>
 
         <div class="flex min-w-0 flex-col gap-3">

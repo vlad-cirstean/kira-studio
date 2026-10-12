@@ -83,9 +83,15 @@ function addMount(): void {
       mode="recreate"
       :changed="changed('image')"
       :error="errors['recreate.image']"
-      :hint="t('docker.edit.imagePresent.hint')"
+      :description="t('docker.edit.imagePresent.hint')"
+      v-slot="{ invalid }"
     >
-      <Input v-model="rc.image" :disabled="disabled" data-testid="docker-edit-image" />
+      <Input
+        v-model="rc.image"
+        :disabled="disabled"
+        data-testid="docker-edit-image"
+        v-bind="invalid"
+      />
     </EditField>
 
     <EditField
@@ -93,12 +99,14 @@ function addMount(): void {
       :label="t('common.user.label')"
       mode="recreate"
       :changed="changed('user')"
+      v-slot="{ invalid }"
     >
       <Input
         v-model="rc.user"
         :placeholder="t('docker.edit.imageDefault.placeholder')"
         :disabled="disabled"
         data-testid="docker-edit-user"
+        v-bind="invalid"
       />
     </EditField>
 
@@ -107,9 +115,15 @@ function addMount(): void {
       :label="t('docker.edit.hostname.label')"
       mode="recreate"
       :changed="changed('hostname')"
-      :hint="t('docker.edit.hostname.hint')"
+      :description="t('docker.edit.hostname.hint')"
+      v-slot="{ invalid }"
     >
-      <Input v-model="rc.hostname" :disabled="disabled" data-testid="docker-edit-hostname" />
+      <Input
+        v-model="rc.hostname"
+        :disabled="disabled"
+        data-testid="docker-edit-hostname"
+        v-bind="invalid"
+      />
     </EditField>
 
     <EditField
@@ -117,12 +131,14 @@ function addMount(): void {
       :label="t('docker.edit.entrypoint.label')"
       mode="recreate"
       :changed="changed('entrypoint')"
+      v-slot="{ invalid }"
     >
       <Textarea
         v-model="entrypointText"
         class="font-data"
         :disabled="disabled"
         data-testid="docker-edit-entrypoint"
+        v-bind="invalid"
       />
     </EditField>
 
@@ -131,12 +147,14 @@ function addMount(): void {
       :label="t('docker.edit.command.label')"
       mode="recreate"
       :changed="changed('cmd')"
+      v-slot="{ invalid }"
     >
       <Textarea
         v-model="cmdText"
         class="font-data"
         :disabled="disabled"
         data-testid="docker-edit-cmd"
+        v-bind="invalid"
       />
     </EditField>
 
@@ -146,6 +164,7 @@ function addMount(): void {
       mode="recreate"
       :changed="changed('env')"
       :error="errors['recreate.env']"
+      v-slot="{ invalid }"
     >
       <EditRows
         :items="rc.env"
@@ -163,6 +182,7 @@ function addMount(): void {
             :disabled="disabled"
             data-testid="docker-edit-env-key"
             @update:model-value="setEnv(index, String($event), split(item)[1])"
+            v-bind="invalid"
           />
           <Input
             class="min-w-0 flex-1"
@@ -181,6 +201,7 @@ function addMount(): void {
       :label="t('docker.field.labels.label')"
       mode="recreate"
       :changed="changed('labels')"
+      v-slot="{ invalid }"
     >
       <EditRows
         :items="labelEntries"
@@ -198,6 +219,7 @@ function addMount(): void {
             :disabled="disabled"
             data-testid="docker-edit-label-key"
             @update:model-value="setLabel(index, String($event), item[1])"
+            v-bind="invalid"
           />
           <Input
             class="min-w-0 flex-1"
@@ -218,6 +240,7 @@ function addMount(): void {
       :changed="changed('ports')"
       :error="errors['recreate.ports']"
       class="@2xl:col-span-2"
+      v-slot="{ invalid }"
     >
       <EditRows
         :items="rc.ports"
@@ -236,6 +259,7 @@ function addMount(): void {
             :disabled="disabled"
             data-testid="docker-edit-port-container"
             @update:model-value="item.containerPort = toNumber($event)"
+            v-bind="invalid"
           />
           <NativeSelect
             v-model="item.proto"
@@ -270,6 +294,7 @@ function addMount(): void {
       :changed="changed('mounts')"
       :error="errors['recreate.mounts']"
       class="@2xl:col-span-2"
+      v-slot="{ invalid }"
     >
       <datalist id="docker-edit-volumes">
         <option v-for="v in volumeNames" :key="v" :value="v" />
@@ -288,6 +313,7 @@ function addMount(): void {
             class="w-24"
             :disabled="disabled"
             data-testid="docker-edit-mount-type"
+            v-bind="invalid"
           >
             <option v-for="m in MOUNT_TYPES" :key="m" :value="m">{{ m }}</option>
           </NativeSelect>
@@ -323,6 +349,7 @@ function addMount(): void {
       :label="t('docker.edit.capAdd.label')"
       mode="recreate"
       :changed="changed('capAdd')"
+      v-slot="{ invalid }"
     >
       <EditRows
         :items="rc.capAdd"
@@ -339,6 +366,7 @@ function addMount(): void {
             v-model="rc.capAdd[index]"
             :disabled="disabled"
             data-testid="docker-edit-cap-add-input"
+            v-bind="invalid"
           />
         </template>
       </EditRows>
@@ -349,6 +377,7 @@ function addMount(): void {
       :label="t('docker.edit.capDrop.label')"
       mode="recreate"
       :changed="changed('capDrop')"
+      v-slot="{ invalid }"
     >
       <EditRows
         :items="rc.capDrop"
@@ -365,6 +394,7 @@ function addMount(): void {
             v-model="rc.capDrop[index]"
             :disabled="disabled"
             data-testid="docker-edit-cap-drop-input"
+            v-bind="invalid"
           />
         </template>
       </EditRows>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
-import { Badge } from '@theme/components/ui/badge';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
@@ -9,7 +9,6 @@ import QueryState from '@workbench/components/QueryState.vue';
 import { computed } from 'vue';
 import { useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
-import ListState from './ListState.vue';
 import VirtualList from './VirtualList.vue';
 
 const ui = useDockerUiStore();
@@ -19,7 +18,7 @@ const rows = computed(() => {
   return (volumes.data.value ?? [])
     .filter((v) => matchesQuery(v.name, ui.search))
     .map((volume) => ({ key: volume.name, volume }))
-    .sort((a, b) => compareNatural(a.volume.name, b.volume.name));
+    .sort((a, b) => compareNatural(a.volume.name, b.volume.name) || compareNatural(a.key, b.key));
 });
 
 function open(row: { volume: { name: string } }): void {
@@ -30,16 +29,17 @@ function open(row: { volume: { name: string } }): void {
 <template>
   <QueryState :query="volumes" :is-empty="() => rows.length === 0">
     <template #empty>
-      <ListState
+      <EmptyState
+        fill
+        data-testid="docker-list-empty"
         icon="database"
         :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.volume.none.empty')"
-        :hint="ui.search.trim() ? t('docker.volume.noMatches.emptyHint') : t('docker.volume.none.emptyHint')"
+        :description="ui.search.trim() ? t('docker.volume.noMatches.emptyHint') : t('docker.volume.none.emptyHint')"
       />
     </template>
-    <VirtualList :rows="rows" testid="docker-volume-list" :open="open">
+    <VirtualList :rows="rows" testid="docker-volume-list" :select="open" :open="open">
       <template #row="{ row, nav }">
         <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-        <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
         <div
           :class="
           cn(
@@ -53,18 +53,15 @@ function open(row: { volume: { name: string } }): void {
           role="option"
           :aria-selected="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name"
           v-bind="nav"
+          :tabindex="nav.tabindex"
           @click="open(row)"
         >
           <CodiconIcon name="database" :size="13" class="shrink-0 text-muted-foreground" />
-          <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-            row.volume.name
+          <span class="min-w-0 flex-1 truncate">{{ row.volume.name }}</span>
+          <span :class="cn('w-6 shrink-0 text-center', rowMeta)">{{
+            row.volume.usedBy.length > 0 ? row.volume.usedBy.length : ''
           }}</span>
-          <span class="flex w-6 shrink-0 justify-center"
-            ><Badge v-if="row.volume.usedBy.length > 0" variant="count">{{
-              row.volume.usedBy.length
-            }}</Badge></span
-          >
-          <span class="w-14 shrink-0 truncate text-right text-kira-sm text-muted-foreground">{{
+          <span class="w-14 shrink-0 truncate text-right" :class="rowMeta">{{
             row.volume.driver
           }}</span>
         </div>

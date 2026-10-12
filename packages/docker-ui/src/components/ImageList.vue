@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
+import Identifier from '@workbench/components/Identifier.vue';
 import QueryState from '@workbench/components/QueryState.vue';
 import { computed } from 'vue';
 import { useDocker } from '../context';
 import { shortId } from '../lib/format';
 import { useImages } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
-import ListState from './ListState.vue';
 import VirtualList from './VirtualList.vue';
 
 const ui = useDockerUiStore();
@@ -24,7 +24,7 @@ const rows = computed(() => {
   return (images.data.value ?? [])
     .filter((i) => matchesQuery(i.id, ui.search) || i.tags.some((t) => matchesQuery(t, ui.search)))
     .map((image) => ({ key: image.id, image, title: image.tags[0] ?? '<none>' }))
-    .sort((a, b) => compareNatural(a.title, b.title));
+    .sort((a, b) => compareNatural(a.title, b.title) || compareNatural(a.key, b.key));
 });
 
 function open(row: { image: { id: string } }): void {
@@ -39,16 +39,17 @@ function openRegistry(url: string): void {
 <template>
   <QueryState :query="images" :is-empty="() => rows.length === 0">
     <template #empty>
-      <ListState
+      <EmptyState
+        fill
+        data-testid="docker-list-empty"
         icon="package"
         :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.image.none.empty')"
-        :hint="ui.search.trim() ? t('docker.image.noMatches.emptyHint') : t('docker.image.none.emptyHint')"
+        :description="ui.search.trim() ? t('docker.image.noMatches.emptyHint') : t('docker.image.none.emptyHint')"
       />
     </template>
-    <VirtualList :rows="rows" testid="docker-image-list" :open="open">
+    <VirtualList :rows="rows" testid="docker-image-list" :select="open" :open="open">
       <template #row="{ row, nav }">
         <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-        <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
         <div
           :class="
           cn(
@@ -62,24 +63,26 @@ function openRegistry(url: string): void {
           role="option"
           :aria-selected="ui.selection?.kind === 'image' && ui.selection.id === row.image.id"
           v-bind="nav"
+          :tabindex="nav.tabindex"
           @click="open(row)"
         >
           <CodiconIcon name="package" :size="13" class="shrink-0 text-muted-foreground" />
-          <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+          <span class="min-w-0 flex-1 truncate">
             {{ row.title }}
             <span v-if="row.image.tags.length > 1" class="text-kira-sm text-muted-foreground"
               >+{{ row.image.tags.length - 1 }}</span
             >
-            <span v-if="row.image.dangling" class="font-data text-kira-sm text-muted-foreground">{{
-              shortId(row.image.id)
-            }}</span>
+            <Identifier
+              v-if="row.image.dangling"
+              :value="row.image.id"
+              :short="shortId"
+              :class="rowMeta"
+            />
           </span>
-          <span class="flex w-6 shrink-0 justify-center"
-            ><Badge v-if="row.image.containers > 0" variant="count">{{
-              row.image.containers
-            }}</Badge></span
-          >
-          <span class="w-14 shrink-0 text-right font-data text-kira-sm text-muted-foreground">{{
+          <span :class="cn('w-6 shrink-0 text-center', rowMeta)">{{
+            row.image.containers > 0 ? row.image.containers : ''
+          }}</span>
+          <span class="w-14 shrink-0 text-right font-data" :class="rowMeta">{{
             formatBytes(row.image.size)
           }}</span>
           <span class="flex w-6 shrink-0 justify-center">
@@ -87,7 +90,7 @@ function openRegistry(url: string): void {
               v-if="row.image.registryUrl"
               icon="link-external"
               :label="t('docker.detail.openRegistry.tooltip')"
-              class="hidden group-hover/row:flex group-focus-within/row:flex"
+              :class="cn('flex', rowActions)"
               data-testid="docker-image-registry"
               @click.stop="openRegistry(row.image.registryUrl)"
             />

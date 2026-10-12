@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -16,7 +17,6 @@ import { isActiveState, publishedPorts, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
-import ListState from './ListState.vue';
 import OriginIcon from './OriginIcon.vue';
 import VirtualList from './VirtualList.vue';
 
@@ -190,8 +190,12 @@ function menuItems(c: DockerContainer): MenuItem[] {
   return items;
 }
 
-function onContextMenu(e: MouseEvent, c: DockerContainer): void {
-  contextMenu.openContextMenu(e, menuItems(c));
+function menuFor(row: Row): MenuItem[] {
+  return row.kind === 'container' ? menuItems(row.container) : [];
+}
+
+function selectRow(row: Row): void {
+  if (row.kind === 'container') ui.select({ kind: 'container', id: row.container.id });
 }
 
 function onKeyMenu(row: Row, rect: DOMRect): void {
@@ -201,7 +205,7 @@ function onKeyMenu(row: Row, rect: DOMRect): void {
 
 function openRow(row: Row): void {
   if (row.kind === 'group') ui.toggleGroup(row.name);
-  else ui.select({ kind: 'container', id: row.container.id });
+  else ui.select({ kind: 'container', id: row.container.id }, 'logs');
 }
 
 const groupTree = {
@@ -220,12 +224,20 @@ const groupTree = {
 <template>
   <QueryState :query="containers" :is-empty="() => rows.length === 0">
     <template #empty>
-      <ListState icon="server" :title="emptyCopy.title" :hint="emptyCopy.hint" />
+      <EmptyState
+        fill
+        data-testid="docker-list-empty"
+        icon="server"
+        :title="emptyCopy.title"
+        :description="emptyCopy.hint"
+      />
     </template>
     <VirtualList
       :rows="rows"
       :row-heights="rowHeights"
       testid="docker-container-list"
+      :select="selectRow"
+      :menu-for="menuFor"
       :open="openRow"
       :menu="onKeyMenu"
       :tree="groupTree"
@@ -234,6 +246,7 @@ const groupTree = {
         <div
           v-if="row.kind === 'group'"
           v-bind="nav"
+          :tabindex="nav.tabindex"
           :class="cn(rowVariants({ layout: 'tree' }), 'group/row h-full')"
           :style="rowIndent(0)"
           data-testid="docker-group"
@@ -247,35 +260,32 @@ const groupTree = {
           <OriginIcon origin="compose" data-testid="docker-group-icon" />
           <button
             type="button"
-            class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
+            class="min-w-0 flex-1 cursor-default truncate border-0 bg-transparent p-0 text-left font-medium text-inherit"
             :aria-expanded="isOpen(row.name)"
             @click="ui.toggleGroup(row.name)"
             >{{
               row.name
             }}</button
           >
-          <span class="text-kira-sm text-muted-foreground group-hover/row:hidden"
-            >{{ runningCount(row) }}/{{ row.members.length }}</span
-          >
-          <span class="hidden items-center group-hover/row:flex">
+          <span :class="rowMeta">{{ runningCount(row) }}/{{ row.members.length }}</span>
+          <span :class="cn('flex items-center', rowActions)">
             <TooltipIconButton
               icon="play"
               :label="t('common.action.startAll.label')"
-              class="text-ok hover:text-ok"
+              tone="ok"
               data-testid="docker-group-start"
               @click="groupAction(row, 'start')"
             />
             <TooltipIconButton
               icon="debug-stop"
               :label="t('common.action.stopAll.label')"
-              class="text-error hover:text-error"
+              tone="error"
               data-testid="docker-group-stop"
               @click="groupAction(row, 'stop')"
             />
           </span>
         </div>
         <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-        <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex comes from the row props. -->
         <div
           v-else
           :class="
@@ -292,9 +302,9 @@ const groupTree = {
           role="option"
           :aria-selected="isSelected(row.container)"
           v-bind="nav"
+          :tabindex="nav.tabindex"
           @click="ui.select({ kind: 'container', id: row.container.id })"
           @dblclick="ui.select({ kind: 'container', id: row.container.id }, 'logs')"
-          @contextmenu.prevent="onContextMenu($event, row.container)"
         >
           <StatusDot :tone="stateDotTone(row.container.state)" data-testid="docker-state-dot" />
           <span class="flex min-w-0 items-center gap-1.5">
@@ -314,7 +324,7 @@ const groupTree = {
           </span>
           <span
             v-if="row.container.state !== 'running'"
-            class="text-right text-kira-sm text-muted-foreground"
+            :class="cn('text-right', rowMeta)"
             data-testid="docker-row-state"
             >{{
               row.container.state
@@ -323,12 +333,12 @@ const groupTree = {
           <span v-else />
           <span class="row-span-2 flex items-center justify-end">
             <Spinner v-if="actions.isBusy(row.container.id)" label="" />
-            <span v-else class="hidden group-hover/row:flex group-focus-within/row:flex">
+            <span v-else :class="cn('flex', rowActions)">
               <TooltipIconButton
                 v-if="row.container.state !== 'running'"
                 icon="play"
                 :label="t('common.action.start.label')"
-                class="text-ok hover:text-ok"
+                tone="ok"
                 data-testid="docker-row-start"
                 @click.stop="act(row.container, 'start')"
               />
@@ -336,7 +346,7 @@ const groupTree = {
                 v-else
                 icon="debug-stop"
                 :label="t('common.action.stop.label')"
-                class="text-error hover:text-error"
+                tone="error"
                 data-testid="docker-row-stop"
                 @click.stop="act(row.container, 'stop')"
               />

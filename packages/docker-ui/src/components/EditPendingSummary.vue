@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed } from 'vue';
@@ -23,8 +24,8 @@ const groups = computed(() => [
 <template>
   <div v-if="changes.length" class="flex flex-col gap-2" data-testid="docker-edit-summary">
     <template v-for="g in groups" :key="g.mode">
-      <div v-if="g.rows.length" class="flex flex-col gap-0.5">
-        <h4 class="text-kira-sm uppercase tracking-wider text-muted-foreground">{{ g.title }}</h4>
+      <FieldSet v-if="g.rows.length">
+        <FieldLegend>{{ g.title }}</FieldLegend>
         <div
           v-for="(c, i) in g.rows"
           :key="`${c.field}:${i}`"
@@ -37,7 +38,7 @@ const groups = computed(() => [
             <template #from><span class="text-muted-foreground">{{ c.from }}</span></template>
           </CatalogText>
         </div>
-      </div>
+      </FieldSet>
     </template>
   </div>
 </template>
