@@ -92,6 +92,8 @@ export interface TabsStoreActions<K extends string, R extends TabRecordLike> {
   /** With a dirty tab among those closing, the reader confirms the discard first; declining closes
    *  nothing. With none dirty they close synchronously, before the promise returns. */
   closeTab(id: string): Promise<void>;
+  /** System-initiated cleanup (a deleted connection's tabs): closes without the discard prompt. */
+  dropTabs(ids: readonly string[]): void;
   closeOthers(id: string): Promise<void>;
   closeToTheRight(id: string): Promise<void>;
   closeAll(key: K): Promise<void>;
@@ -509,6 +511,12 @@ export function createTabsStore<
       saveNow();
     }
 
+    function dropTabs(ids: readonly string[]): void {
+      if (ids.length === 0) return;
+      for (const id of ids) closeTabInternal(id);
+      saveNow();
+    }
+
     async function closeOthers(id: string): Promise<void> {
       const dirty = dirtyCount(othersToClose(id));
       if (dirty > 0 && !(await askDiscard(dirty))) return;
@@ -671,6 +679,7 @@ export function createTabsStore<
       dropPageStoresForTab,
       dropAllPagesForTab,
       closeTab,
+      dropTabs,
       closeOthers,
       closeToTheRight,
       closeAll,

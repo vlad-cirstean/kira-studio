@@ -169,14 +169,15 @@ export const useTabsStore = createTabsStore({
     // D7: main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
     // are already gone server-side — a tab this store still holds for it is a row that can never
     // be re-inserted (every later debounced save would throw FOREIGN KEY constraint failed and get
-    // silently discarded, F7). Closing routes through the same closeTab() a manual close uses, so
-    // pages and runtime are freed by one code path rather than a second one to keep in sync.
+    // silently discarded, F7). Closing skips the discard prompt (the connection is gone; a declined or
+    // superseded prompt would keep the orphan) but shares closeTabInternal with a manual close, so
+    // pages and runtime are freed by one code path.
     control.onConnectionsChanged((records) => {
       const liveIds = new Set(records.map((r) => r.id));
       const stale = actions.tabs.value
         .filter((t) => t.connectionId && !liveIds.has(t.connectionId))
         .map((t) => t.id);
-      for (const id of stale) actions.closeTab(id);
+      actions.dropTabs(stale);
       recentTablesStore.pruneRecent(liveIds);
     });
 
