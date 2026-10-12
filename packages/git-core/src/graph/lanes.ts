@@ -33,7 +33,7 @@
  * routed into) stays, so an edge that branched out into lane N and later converges into lane C
  * keeps running in N and bends into C in its last row, instead of collapsing onto its source lane.
  */
-import { assert } from '../util/assert.ts';
+import { assert } from '../lib/assert.ts';
 import { advanceColorState, allocateColor, initialColorState } from './colors.ts';
 import { EdgeBuffer } from './edges.ts';
 import {

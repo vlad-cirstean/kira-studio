@@ -1,7 +1,7 @@
 /**
  * The date column's two renderings (`docs/plans/P4.md` W6, §6.2: "clicking toggles relative/
  * absolute for every row and persists"). P62 D2: `formatRelativeDate`/`formatAbsoluteDate`
- * themselves moved to `@kira/git-core/src/util/dateFormat.ts` (no DOM dependency, and already
+ * themselves moved to `@kira/git-core/src/lib/dateFormat.ts` (no DOM dependency, and already
  * eager in every host that needs them) — re-exported here so this package's own existing importers
  * (`CommitGrid.vue`, `columns.ts`, `ReviewCommitRow.vue`) need no change. `measureAbsoluteDateWidth`
  * stays: it is canvas measurement, DOM-bound, and git-core has none.

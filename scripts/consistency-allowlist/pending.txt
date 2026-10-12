@@ -1,5 +1,3 @@
-N3 packages/git-core/src/util
-N3 packages/workbench/src/util
 N4 apps/kira-space/frontend/mobile/state/auth.ts
 N4 apps/kira-space/frontend/src/state/coderepos.ts
 N4 apps/kira-studio/frontend/src/state/dbmcp.ts

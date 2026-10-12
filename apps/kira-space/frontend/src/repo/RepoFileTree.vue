@@ -5,8 +5,8 @@ import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { TIMING } from '@workbench/behaviour/timing';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useRowHeight } from '@workbench/util/rowHeight';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { menuForRepoRow } from './menus';
@@ -169,7 +169,7 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
     </div>
   </div>
   <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
-       (packages/workbench/src/util/virtualRows.ts) -- see kira-studio's ProjectTree.vue's
+       (packages/workbench/src/lib/virtualRows.ts) -- see kira-studio's ProjectTree.vue's
        identical note. -->
 </template>
 

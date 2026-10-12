@@ -5,8 +5,8 @@
  * `ShaTable` (W3) and `StringInterner`/`SubjectBuffer` (W2).
  */
 import type { LayoutInput } from '../graph/types.ts';
+import { assert, assertDefined } from '../lib/assert.ts';
 import type { CommitIdentity, CommitRecord, DecorationRef } from '../model/commit.ts';
-import { assert, assertDefined } from '../util/assert.ts';
 import { StringInterner, SubjectBuffer } from './intern.ts';
 import { bytesToHex, hexToBytes, ShaTable } from './shaTable.ts';
 

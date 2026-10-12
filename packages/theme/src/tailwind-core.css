@@ -154,7 +154,7 @@
 
 /* P110 I2-15: `virtual-row`/`sticky-row` (the 9+3 file scoped-copy duplicate B34 tried and
    reverted here, see git history) now live as plain exported string constants --
-   VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts) -- bound
+   VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS (packages/workbench/src/lib/virtualRows.ts) -- bound
    directly on each row's own `class`/`:class`, never as a `@utility`. I2-14 already dropped every
    row component's own unlayered `.tree-row { position: relative }` in favour of a plain `relative`
    Tailwind utility merged through `cn()`/`tailwind-merge`, which resolves the position conflict

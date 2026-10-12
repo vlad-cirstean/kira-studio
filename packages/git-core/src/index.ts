@@ -47,6 +47,8 @@ export {
   PATCH_UNCHANGED,
   UNRESOLVED_ROW,
 } from './graph/types.ts';
+export { AssertionError, assert, assertDefined } from './lib/assert.ts';
+export { formatAbsoluteDate, formatRelativeDate } from './lib/dateFormat.ts';
 export type {
   CommitDetail,
   CommitIdentity,
@@ -169,7 +171,5 @@ export { CommitStore } from './store/commitStore.ts';
 export { StringInterner, SubjectBuffer } from './store/intern.ts';
 export type { ShaTableOptions } from './store/shaTable.ts';
 export { bytesToHex, hexToBytes, ShaTable } from './store/shaTable.ts';
-export { AssertionError, assert, assertDefined } from './util/assert.ts';
-export { formatAbsoluteDate, formatRelativeDate } from './util/dateFormat.ts';
 export type { WorktreeLabelInput } from './worktree/label.ts';
 export { worktreeLabel } from './worktree/label.ts';

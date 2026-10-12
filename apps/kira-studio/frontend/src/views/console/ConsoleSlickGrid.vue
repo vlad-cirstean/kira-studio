@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { TabularPage } from '@shared/protocol/page';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useRowHeight } from '@workbench/util/rowHeight';
 import type {
   Column,
   CustomDataView,

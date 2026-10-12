@@ -10,7 +10,7 @@
  * here is an open-addressed hash table over the binary shas themselves: at 100k commits that
  * is roughly a 1 MB table plus 2 MB of shas.
  */
-import { assert } from '../util/assert.ts';
+import { assert } from '../lib/assert.ts';
 
 const HEX_PATTERN = /^[0-9a-fA-F]+$/;
 

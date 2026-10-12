@@ -1,6 +1,6 @@
 import { t } from '@theme/i18n';
 import { useLocalStorage } from '@vueuse/core';
-import { windowKey } from '@workbench/util/window';
+import { windowKey } from '@workbench/lib/window';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';

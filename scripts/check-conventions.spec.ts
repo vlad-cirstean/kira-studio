@@ -29,7 +29,7 @@ describe('N2/N3', () => {
   test('flags .test.ts and helper folders', () => {
     expect(testSuffixHit('a/b.spec.ts')?.rule).toBe('N2');
     expect(testSuffixHit('a/b.spec.ts')).toBeUndefined();
-    expect(folderHits('p/workbench/src/util/x.ts').map((h) => h.path)).toEqual([
+    expect(folderHits('p/workbench/src/lib/x.ts').map((h) => h.path)).toEqual([
       'p/workbench/src/util',
     ]);
     expect(folderHits('p/workbench/src/lib/x.ts')).toEqual([]);

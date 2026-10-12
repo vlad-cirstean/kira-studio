@@ -10,8 +10,8 @@ import { copyText } from '../behaviour/clipboard';
 import { revealElement } from '../behaviour/focus';
 import { useSortableReorder } from '../behaviour/sortableReorder';
 import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
+import { wheelToHorizontal } from '../lib/wheelScroll';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import { wheelToHorizontal } from '../util/wheelScroll';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.
 // The strip, drag-reorder (vue-draggable-plus since P137), wheel-scroll, keyboard-scroll-into-view

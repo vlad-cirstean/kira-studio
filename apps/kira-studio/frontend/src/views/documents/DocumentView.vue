@@ -1215,6 +1215,6 @@ onUnmounted(() => {
        carries that literal class, same compound-selector effect, compile-verified. `.doc-preview-
        match mark` moved onto the template `<mark>` itself (`rounded-kira-sm bg-warn text-bg`) --
        a real template element here (not v-html), so no `[&_mark]:` indirection needed.
-       P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+       P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/lib/
        virtualRows.ts), bound on DocumentRow's own `:class` -- see ProjectTree.vue's identical note. -->
 </template>

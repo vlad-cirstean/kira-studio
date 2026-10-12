@@ -13,7 +13,7 @@
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Events } from '/wails/runtime.js';
-import { windowKey as windowKeyValue } from '../util/window';
+import { windowKey as windowKeyValue } from '../lib/window';
 import { toCodedError } from './codedError';
 
 // P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is

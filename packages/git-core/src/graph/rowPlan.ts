@@ -1,5 +1,5 @@
+import { assert } from '../lib/assert.ts';
 import type { CommitStore } from '../store/commitStore.ts';
-import { assert } from '../util/assert.ts';
 import type { LayoutInput } from './types.ts';
 
 /**

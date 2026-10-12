@@ -9,7 +9,7 @@ import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
-import { useRowHeight } from '@workbench/util/rowHeight';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { computed, ref, useTemplateRef } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import RepoSearchRow from './RepoSearchRow.vue';
@@ -211,7 +211,7 @@ const nav = useListNavigation<RepoSearchRowVm>({
       </div>
     </div>
   </div>
-  <!-- P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+  <!-- P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/lib/
        virtualRows.ts) -- see kira-studio's ProjectTree.vue's identical note. -->
 </template>
 

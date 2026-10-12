@@ -4,8 +4,8 @@
  * concern: the sort invariant, the CSR index and the global-numbering-across-chunks scheme
  * belong here, not in lane bookkeeping.
  */
-import { assert } from '../util/assert.ts';
-import { growUint32 } from '../util/typed.ts';
+import { assert } from '../lib/assert.ts';
+import { growUint32 } from '../lib/typed.ts';
 import {
   EDGE_COLOR,
   EDGE_FROM_LANE,

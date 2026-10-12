@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { t } from '@theme/i18n';
-import { wheelToHorizontal } from '@workbench/util/wheelScroll';
+import { wheelToHorizontal } from '@workbench/lib/wheelScroll';
 import { computed, ref } from 'vue';
 import { useDocumentRowsStore } from './rows';
 

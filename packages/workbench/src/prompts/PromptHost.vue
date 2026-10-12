@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PromptKind, RoutedPrompt } from '@shared/domain/prompts';
 import { compareNatural } from '@workbench/behaviour/match';
-import { windowKey } from '@workbench/util/window';
+import { windowKey } from '@workbench/lib/window';
 import { type Component, computed, onScopeDispose, watch } from 'vue';
 import { usePrompts, usePromptsControl, usePromptVisibility } from './promptsQueries';
 

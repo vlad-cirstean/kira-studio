@@ -1,8 +1,8 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import { i18n, installCopyTestHook } from '@theme/i18n';
 import { bootstrapShell } from '@workbench/bootstrapShell';
+import { windowKey } from '@workbench/lib/window';
 import { queryClient } from '@workbench/state/queryClient';
-import { windowKey } from '@workbench/util/window';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { installAdeSignals } from './ade/queries';

@@ -5,8 +5,8 @@
  * into one concatenated `Uint8Array` with an offset index rather than 100k separate string
  * objects).
  */
-import { assert } from '../util/assert.ts';
-import { growUint32 } from '../util/typed.ts';
+import { assert } from '../lib/assert.ts';
+import { growUint32 } from '../lib/typed.ts';
 
 /** Rough per-string retained-heap estimate: a UTF-16 char is 2 bytes in V8, plus a fixed
  *  string-object overhead. Not exact — exactness would need engine internals no public API

@@ -7,7 +7,7 @@
  * with its own consumer; the schema's value is being the one place, not being complete on day
  * one.
  */
-import { assert } from '../util/assert.ts';
+import { assert } from '../lib/assert.ts';
 
 /** `docs/plans/P7.md` W7/D43: `"stringArray"` is the first array-valued setting type — added for
  *  `kiraSpace.review.baseCandidates` (§6.8) exclusively; nothing else in the schema needs it

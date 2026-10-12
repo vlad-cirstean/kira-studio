@@ -6,10 +6,10 @@ import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { useRowHeight } from '@workbench/util/rowHeight';
 import { computed, ref, useTemplateRef } from 'vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
@@ -250,6 +250,6 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
     </div>
   </div>
   <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
-       (packages/workbench/src/util/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
+       (packages/workbench/src/lib/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
 </template>
 

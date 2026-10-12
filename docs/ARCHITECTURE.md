@@ -2785,7 +2785,7 @@ call: the shell mints a UUID per window (`internal/shell/openwindow.go`'s `Windo
 alias of repo-root `internal/appstorage.WindowRecord` — Kira Studio's own
 `internal/storage/model.WindowRecord` stays its own type only because it carries an extra `Mode`
 field the shared one doesn't) and builds `WebviewWindowOptions{URL: "/?window=" + key, Name: key}`,
-so `packages/workbench/src/util/window.ts` can read it **synchronously**, at module load, with
+so `packages/workbench/src/lib/window.ts` can read it **synchronously**, at module load, with
 `new URLSearchParams(location.search).get('window')`
 — before `hydrateTabs()` (or anything else window-scoped) ever runs. Absent or unrecognised falls
 back to the key `"main"`, which is what `tests/ui`'s static file server and `tests/e2e-real`'s plain
@@ -3955,7 +3955,7 @@ existing `pendingReviewTargetByCodeRepoId`), consumed once by `RepoGraphView.vue
 use.
 
 **The date formatters live in `@kira/git-core`.** `formatRelativeDate`/`formatAbsoluteDate` are in
-`packages/git-core/src/util/dateFormat.ts` (no DOM dependency); `packages/git-ui/src/components/dateFormat.ts`
+`packages/git-core/src/lib/dateFormat.ts` (no DOM dependency); `packages/git-ui/src/components/dateFormat.ts`
 re-exports them and keeps only the DOM-bound `measureAbsoluteDateWidth`. A second copy in the VS Code
 extension's `blameAge.ts` went away with the extension (P243 Part 2).
 

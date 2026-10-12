@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends { key: string }">
 import { type ListNavigationOptions, useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
-import { useRowHeight } from '@workbench/util/rowHeight';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { computed, ref } from 'vue';
 
 const props = withDefaults(

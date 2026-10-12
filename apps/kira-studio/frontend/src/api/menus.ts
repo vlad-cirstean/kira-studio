@@ -1,6 +1,6 @@
 import { t } from '@theme/i18n';
+import { type CollectionChoice, moveToCollectionMenu } from '@workbench/lib/collectionMenu';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { type CollectionChoice, moveToCollectionMenu } from '@workbench/util/collectionMenu';
 import type { CollectionRowVm } from './state/collections';
 
 // P4 D13: the row and background context menus, built with the existing MenuItem type from

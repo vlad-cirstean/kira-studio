@@ -12,9 +12,9 @@ import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { useRowHeight } from '@workbench/util/rowHeight';
 import type {
   Column,
   CustomDataView,

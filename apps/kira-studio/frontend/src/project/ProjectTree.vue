@@ -5,9 +5,9 @@ import { useEventListener } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { useRowHeight } from '@workbench/lib/rowHeight';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { useRowHeight } from '@workbench/util/rowHeight';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
@@ -277,7 +277,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
     </Alert>
   </div>
   <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
-       (packages/workbench/src/util/virtualRows.ts), bound directly as TreeRow's own `class` prop
+       (packages/workbench/src/lib/virtualRows.ts), bound directly as TreeRow's own `class` prop
        -- `cn()` resolves the position conflict against TreeRow's own `relative` (I2-14 dropped the
        old unlayered `.tree-row { position: relative }` this used to have to out-specificity). -->
 </template>
