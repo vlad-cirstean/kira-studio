@@ -2,11 +2,11 @@ package ade
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // reviewStageID is the id of the sample workflows' review stage; ▶ Review there opens the review agent.
@@ -44,7 +44,7 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 		if err := b.deps.Sessions.ClearPurpose(row.ID); err != nil {
 			return adewire.Launch{}, false, "", err
 		}
-		note = fmt.Sprintf("The previous review conversation ran in %s, which no longer exists. Started a new one.", row.Cwd)
+		note = i18n.T("backend.space.ade.reviewConversationReset.body", map[string]string{"path": row.Cwd})
 	}
 	if message == "" {
 		title := taskTitle(tc.task, tc.branches)

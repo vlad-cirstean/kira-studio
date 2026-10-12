@@ -32,13 +32,13 @@ const (
 // own (an unresolved branch comes back `exists: false` rather than erroring here).
 func validateAdeBranchName(value, field string) error {
 	if value == "" {
-		return ipcerr.New("E_INVALID", field+" is required")
+		return ipcerr.Required(field)
 	}
 	if len(value) > adeMaxBranchBytes {
-		return ipcerr.New("E_INVALID", field+" is too long")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.branchNameTooLong.body", nil)
 	}
 	if strings.ContainsAny(value, "\x00 :") || strings.HasPrefix(value, "-") {
-		return ipcerr.New("E_INVALID", field+" is invalid")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.branchNameInvalid.body", nil)
 	}
 	return nil
 }
@@ -49,27 +49,27 @@ func validateAdeBranchName(value, field string) error {
 // kind of item, never only a branch).
 func validateAdeItemID(value, field string) error {
 	if value == "" {
-		return ipcerr.New("E_INVALID", field+" is required")
+		return ipcerr.Required(field)
 	}
 	if len(value) > adeMaxBranchBytes {
-		return ipcerr.New("E_INVALID", field+" is too long")
+		return ipcerr.Contract("%s is too long", field)
 	}
 	if strings.ContainsAny(value, "\x00\n") {
-		return ipcerr.New("E_INVALID", field+" must not contain NUL or newline")
+		return ipcerr.Contract("%s must not contain NUL or newline", field)
 	}
 	return nil
 }
 
 func validateAdeName(value, field string) error {
 	if len(value) > adeMaxNameBytes {
-		return ipcerr.New("E_INVALID", field+" is too long")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.nameTooLong.body", nil)
 	}
 	return nil
 }
 
 func validateAdeNotes(notes string) error {
 	if len(notes) > adeMaxNotesBytes {
-		return ipcerr.New("E_INVALID", "notes is too long")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.notesTooLong.body", nil)
 	}
 	return nil
 }
@@ -79,10 +79,10 @@ func validateAdeEst(est string) error {
 		return nil
 	}
 	if !adeEstRe.MatchString(est) {
-		return ipcerr.New("E_INVALID", "est is invalid")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.estimateInvalid.body", nil)
 	}
 	if repos.EstOverCap(est) {
-		return ipcerr.New("E_INVALID", "est is too long: at most 480h or 60d")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.estimateTooLong.body", nil)
 	}
 	return nil
 }
@@ -92,24 +92,24 @@ func validateAdeURL(value, field string) error {
 		return nil
 	}
 	if len(value) > adeMaxURLBytes {
-		return ipcerr.New("E_INVALID", field+" is too long")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.urlTooLong.body", nil)
 	}
 	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-		return ipcerr.New("E_INVALID", field+" must be http or https")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.urlScheme.body", nil)
 	}
 	return nil
 }
 
 func validateAdeJira(key, url string) error {
 	if key != "" && !adeJiraKeyRe.MatchString(key) {
-		return ipcerr.New("E_INVALID", "jiraKey is invalid")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.jiraKeyInvalid.body", nil)
 	}
 	return validateAdeURL(url, "jiraUrl")
 }
 
 func validateAdeISODate(value string) error {
 	if _, err := time.Parse("2006-01-02", value); err != nil {
-		return ipcerr.New("E_INVALID", "date must be YYYY-MM-DD")
+		return ipcerr.Contract("date must be YYYY-MM-DD")
 	}
 	return nil
 }

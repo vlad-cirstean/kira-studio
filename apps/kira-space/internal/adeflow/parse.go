@@ -15,6 +15,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 const maxSmartScriptName = 200
@@ -45,7 +46,7 @@ func Parse(src []byte) (adewire.Workflow, *adewire.WorkflowError) {
 		return adewire.Workflow{}, &adewire.WorkflowError{Line: line, Message: syntaxMessage}
 	}
 	if doc.Kind == 0 || len(doc.Content) == 0 {
-		return adewire.Workflow{}, &adewire.WorkflowError{Message: "the file is empty"}
+		return adewire.Workflow{}, &adewire.WorkflowError{Message: i18n.T("backend.space.ade.workflowEmpty.body", nil)}
 	}
 	v := &validator{}
 	wf := v.workflow(doc.Content[0])

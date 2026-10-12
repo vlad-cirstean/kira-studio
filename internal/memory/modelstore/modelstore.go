@@ -15,6 +15,8 @@ import (
 	"sync"
 
 	"github.com/gomlx/go-huggingface/hub"
+
+	"github.com/google/renameio/v2"
 )
 
 const manifestName = "installed.json"
@@ -93,11 +95,7 @@ func WriteManifest(dir, id string, files []File) error {
 	if err != nil {
 		return err
 	}
-	tmp := filepath.Join(dir, manifestName+".tmp")
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return fmt.Errorf("model: write manifest: %w", err)
-	}
-	if err := os.Rename(tmp, filepath.Join(dir, manifestName)); err != nil {
+	if err := renameio.WriteFile(filepath.Join(dir, manifestName), b, 0o600); err != nil {
 		return fmt.Errorf("model: write manifest: %w", err)
 	}
 	return nil

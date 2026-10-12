@@ -24,7 +24,7 @@ func mapDetailError(err error) error {
 	case errors.Is(err, gitsession.ErrPathEscapesRoot):
 		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.pathEscapesRoot.body", nil)
 	case errors.Is(err, gitsession.ErrBranchNotFound):
-		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.branchNotFound.body", nil)
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.branchMissing.body", nil)
 	case errors.Is(err, gitsession.ErrUnrelatedHistories):
 		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.noSharedHistory.body", nil)
 	case errors.Is(err, gitsession.ErrRangedMarkOnNonText):

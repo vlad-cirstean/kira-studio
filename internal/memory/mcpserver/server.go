@@ -208,7 +208,7 @@ func recovering[In, Out any](name string, h func(context.Context, *mcp.CallToolR
 	return func(ctx context.Context, req *mcp.CallToolRequest, in In) (res *mcp.CallToolResult, out Out, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("memory: tool panicked", "tool", name, "panic", fmt.Sprintf("%v", r), "stack", string(debug.Stack()))
+				slog.Error("memory: tool panicked", "scope", "memory", "tool", name, "panic", fmt.Sprintf("%v", r), "stack", string(debug.Stack()))
 				res, err = nil, errors.New("internal error handling this tool call")
 			}
 		}()

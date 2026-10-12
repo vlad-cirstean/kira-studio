@@ -45,7 +45,7 @@ func (s *GitHubService) OpenPullRequestURL(args GitHubOpenPullRequestURLArgs) er
 	u, err := url.Parse(args.URL)
 	if err != nil || u.Scheme != "https" || !gitsession.IsGitHubHost(u.Host, s.knownGhHosts()) ||
 		!pullRequestPath.MatchString(u.Path) {
-		return ipcerr.BadRequest("bridge: OpenPullRequestURL: not a GitHub pull request URL")
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.github.notPullRequestUrl.body", nil)
 	}
 	return ipcerr.InternalErr(s.Browser.OpenURL(args.URL))
 }

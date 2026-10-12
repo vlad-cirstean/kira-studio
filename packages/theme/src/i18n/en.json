@@ -964,10 +964,118 @@
       }
     },
     "space": {
-      "gitrpc": {
-        "branchNotFound": {
+      "ade": {
+        "backlogGone": {
+          "body": "That backlog item no longer exists."
+        },
+        "branchMissing": {
           "body": "That branch no longer exists."
         },
+        "branchNameInvalid": {
+          "body": "That branch name isn’t valid."
+        },
+        "branchNameTooLong": {
+          "body": "That branch name is too long."
+        },
+        "branchNotCreated": {
+          "body": "The branch isn’t created yet."
+        },
+        "branchOnTask": {
+          "body": "That branch is already on a task."
+        },
+        "estimateInvalid": {
+          "body": "Enter an estimate like 2h or 3d."
+        },
+        "estimateShrink": {
+          "body": "An estimate can only grow once it’s set."
+        },
+        "estimateTooLong": {
+          "body": "An estimate can be at most 480h or 60d."
+        },
+        "jiraKeyInvalid": {
+          "body": "That Jira key isn’t valid."
+        },
+        "nameTooLong": {
+          "body": "That name is too long."
+        },
+        "notesTooLong": {
+          "body": "The notes are too long."
+        },
+        "repoOnTask": {
+          "body": "This task already has a branch in that repository."
+        },
+        "resumeCwdNotDir": {
+          "body": "The folder to resume in is a file, not a folder."
+        },
+        "reviewConversationReset": {
+          "body": "The previous review conversation ran in {path}, which no longer exists. Started a new one."
+        },
+        "runNotFound": {
+          "body": "That run no longer exists."
+        },
+        "sessionNotFound": {
+          "body": "That session no longer exists."
+        },
+        "sessionNotRunning": {
+          "body": "That session isn’t running."
+        },
+        "sessionRunning": {
+          "body": "That session is already running."
+        },
+        "setupPending": {
+          "body": "The worktree is still being set up."
+        },
+        "taskMoved": {
+          "body": "The task moved on. Refresh and retry."
+        },
+        "taskNotFound": {
+          "body": "That task no longer exists."
+        },
+        "unchecked": {
+          "body": "Couldn’t be checked."
+        },
+        "urlScheme": {
+          "body": "A link must start with http:// or https://."
+        },
+        "urlTooLong": {
+          "body": "That link is too long."
+        },
+        "workflowChanged": {
+          "body": "The workflow changed. Refresh and retry."
+        },
+        "workflowEmpty": {
+          "body": "The file is empty."
+        },
+        "workflowIdMismatch": {
+          "body": "The ID must equal the file name without its extension."
+        },
+        "workflowUnreadable": {
+          "body": "Can’t read the file ({detail})."
+        }
+      },
+      "codeWorkspace": {
+        "alreadyImported": {
+          "body": "That repository is already imported."
+        },
+        "bareRepo": {
+          "body": "A bare repository has no files to browse."
+        },
+        "notRepo": {
+          "body": "That folder isn’t a Git repository."
+        },
+        "repoNotFound": {
+          "body": "That repository isn’t in the workspace."
+        },
+        "workspaceClosed": {
+          "body": "The workspace was closed. Reopen it and retry."
+        }
+      },
+      "github": {
+        "notPullRequestUrl": {
+          "body": "That isn’t a GitHub pull request link."
+        }
+      },
+      "gitrpc": {
         "commentEmpty": {
           "body": "A comment can’t be empty."
         },
@@ -979,6 +1087,9 @@
         },
         "commentTooLong": {
           "body": "A comment can’t be longer than 8,192 bytes."
+        },
+        "fieldUnavailable": {
+          "body": "This setting isn’t available from the graph."
         },
         "fileNotInCommit": {
           "body": "This commit doesn’t change that file."
@@ -1015,6 +1126,28 @@
         },
         "unknownMethod": {
           "body": "Git doesn’t support {method}."
+        }
+      },
+      "memory": {
+        "alreadyDownloading": {
+          "body": "The semantic model is already downloading."
+        },
+        "importCannotRead": {
+          "body": "Can’t read {path}."
+        },
+        "importPathCount": {
+          "body": "Choose 1 to {max} files or folders."
+        },
+        "serviceClosed": {
+          "body": "Memory is closed. Reopen it and retry."
+        }
+      },
+      "mobileLaunch": {
+        "noWindow": {
+          "body": "Open Kira Space on the computer first, then retry."
+        },
+        "timeout": {
+          "body": "The computer didn’t open the terminal in time."
         }
       },
       "mobileterm": {
@@ -1101,6 +1234,11 @@
       },
       "seed": {
         "body": "Space seed placeholder."
+      },
+      "update": {
+        "noNewerRelease": {
+          "body": "No newer release is available."
+        }
       }
     },
     "studio": {

@@ -3,6 +3,7 @@ package bridge
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
@@ -67,7 +68,7 @@ func (s *MemoryImportService) Choose(args MemoryImportChooseArgs) (MemoryImportC
 			paths = []string{dir}
 		}
 	default:
-		return MemoryImportChoice{}, ipcerr.BadRequest("kind must be files or folder")
+		return MemoryImportChoice{}, ipcerr.Contract("kind must be files or folder")
 	}
 	if len(paths) == 0 {
 		return MemoryImportChoice{Canceled: true, Paths: []string{}}, nil
@@ -78,14 +79,14 @@ func (s *MemoryImportService) Choose(args MemoryImportChooseArgs) (MemoryImportC
 // Create scans the paths in the background. The returned job is scanning; wait for awaiting.
 func (s *MemoryImportService) Create(args MemoryImportCreateArgs) (importer.Job, error) {
 	if n := len(args.Paths); n < 1 || n > maxImportPaths {
-		return importer.Job{}, ipcerr.BadRequest("pick 1 to 100 files or folders")
+		return importer.Job{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.memory.importPathCount.body", map[string]string{"max": strconv.Itoa(maxImportPaths)})
 	}
 	for _, p := range args.Paths {
 		if !filepath.IsAbs(p) {
-			return importer.Job{}, ipcerr.BadRequest("paths must be absolute")
+			return importer.Job{}, ipcerr.Contract("paths must be absolute")
 		}
 		if _, err := os.Stat(p); err != nil {
-			return importer.Job{}, ipcerr.BadRequest("cannot read " + p)
+			return importer.Job{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.memory.importCannotRead.body", map[string]string{"path": p})
 		}
 	}
 	e, err := s.mem.importer()

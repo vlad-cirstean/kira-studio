@@ -203,7 +203,7 @@ type MobileLaunchOpenedArgs struct {
 // LaunchOpened is the desktop window's answer to a phone-started launch (ChannelMobileOpenLaunch).
 func (s *MobileAccessService) LaunchOpened(args MobileLaunchOpenedArgs) error {
 	if args.TerminalID == "" {
-		return ipcerr.BadRequest("terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	if s.Launches != nil {
 		s.Launches.Ack(args.TerminalID, args.Error)
@@ -303,7 +303,7 @@ type MobileDevicePermissionsArgs struct {
 // SetDevicePermissions stores one phone's two permission flags.
 func (s *MobileAccessService) SetDevicePermissions(args MobileDevicePermissionsArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Deps.Repos.MobileDevices.SetPermissions(args.ID, args.Write, args.AgentInput); err != nil {
 		return ipcerr.InternalErr(err)
@@ -336,7 +336,7 @@ type MobileReclaimArgs struct {
 // 0,0 keeps the last size the window reported.
 func (s *MobileAccessService) ReclaimTerminal(args MobileReclaimArgs) error {
 	if args.TerminalID == "" {
-		return ipcerr.BadRequest("terminalId is required")
+		return ipcerr.Required("terminalId")
 	}
 	if s.Terminals != nil {
 		s.Terminals.Reclaim(args.TerminalID, args.Cols, args.Rows)
@@ -376,7 +376,7 @@ type MobileIDArgs struct {
 // Revoke ends a phone's access and open streams.
 func (s *MobileAccessService) Revoke(args MobileIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	s.embedded.Mu.Lock()
 	srv := s.embedded.Server
@@ -400,14 +400,14 @@ func (s *MobileAccessService) PendingPairing() MobilePairingSnapshot {
 
 func (s *MobileAccessService) Approve(args MobileIDArgs) (MobilePairingActionResult, error) {
 	if args.ID == "" {
-		return MobilePairingActionResult{}, ipcerr.BadRequest("id is required")
+		return MobilePairingActionResult{}, ipcerr.Required("id")
 	}
 	return toWireMobileResult(s.Broker.Approve(args.ID)), nil
 }
 
 func (s *MobileAccessService) Deny(args MobileIDArgs) (MobilePairingActionResult, error) {
 	if args.ID == "" {
-		return MobilePairingActionResult{}, ipcerr.BadRequest("id is required")
+		return MobilePairingActionResult{}, ipcerr.Required("id")
 	}
 	return toWireMobileResult(s.Broker.Deny(args.ID)), nil
 }

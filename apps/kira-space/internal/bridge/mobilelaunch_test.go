@@ -69,11 +69,11 @@ func TestMobileLaunches_WindowFailureAndNoWindow(t *testing.T) {
 	done := openAsync(m, context.Background())
 	<-em.sent
 	m.Ack("t1", "launch failed")
-	if code := errCodeOf(t, <-done); code != "E_INVALID" {
+	if code := errCodeOf(t, <-done); code != "E_BAD_REQUEST" {
 		t.Errorf("window error maps to %s", code)
 	}
 	none, _ := newLaunches(false)
-	if code := errCodeOf(t, none.Open(context.Background(), adewire.Launch{TerminalID: "t2"}, "", "")); code != "E_NO_WINDOW" {
+	if code := errCodeOf(t, none.Open(context.Background(), adewire.Launch{TerminalID: "t2"}, "", "")); code != "E_UNAVAILABLE" {
 		t.Errorf("no window maps to %s", code)
 	}
 	m.Ack("late", "") // an ack nobody waits for is a no-op
@@ -85,7 +85,7 @@ func TestMobileLaunches_TimeoutAndCancelledContext(t *testing.T) {
 	slow.Timeout = 30 * time.Millisecond
 	done := openAsync(slow, context.Background())
 	<-slowEm.sent
-	if code := errCodeOf(t, <-done); code != "E_LAUNCH_TIMEOUT" {
+	if code := errCodeOf(t, <-done); code != "E_TIMEOUT" {
 		t.Errorf("unanswered launch maps to %s", code)
 	}
 

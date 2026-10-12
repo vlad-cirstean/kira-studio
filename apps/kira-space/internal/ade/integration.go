@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // patchIDScan is how many recent target commits are patch-id'd to spot a squash merge.
@@ -176,8 +177,8 @@ func (b *TaskBoard) integrationFacts(ctx context.Context, sc *boardCtx, sb model
 	for _, target := range sc.targets {
 		row, err := b.integrationRow(ctx, sc, sb, baseTip, tip, target)
 		if err != nil {
-			slog.Warn("ade board: integration", "repo", sc.repoID, "branch", sb.Name, "target", target, "err", err)
-			row = adewire.Integration{Target: target, Status: "not merged", Note: "could not be checked"}
+			slog.Warn("ade board: integration", "scope", "ade", "repo", sc.repoID, "branch", sb.Name, "target", target, "err", err)
+			row = adewire.Integration{Target: target, Status: "not merged", Note: i18n.T("backend.space.ade.unchecked.body", nil)}
 		}
 		out = append(out, row)
 	}
@@ -244,7 +245,7 @@ func (b *TaskBoard) saveMark(sc *boardCtx, branchID, kind, name, tip string) {
 		BranchID: branchID, Kind: kind, Name: name, MergedTip: tip, UpdatedAt: sc.nowMs,
 	})
 	if err != nil {
-		slog.Warn("ade board: save mark", "repo", sc.repoID, "branch", branchID, "err", err)
+		slog.Warn("ade board: save mark", "scope", "ade", "repo", sc.repoID, "branch", branchID, "err", err)
 	}
 }
 

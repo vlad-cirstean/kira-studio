@@ -56,8 +56,8 @@ func TestImportViaFolderPicker(t *testing.T) {
 		if _, err := app.W.CodeWorkspace.RenameRepo(bridge.CodeWorkspaceRenameArgs{ID: rec.ID, Name: "renamed"}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := app.W.CodeWorkspace.SetRepoColor(bridge.CodeWorkspaceSetColorArgs{ID: rec.ID, Color: "not-a-colour"}); errCode(err) != "E_BAD_REQUEST" {
-			t.Fatalf("bad colour err = %v, want E_BAD_REQUEST", err)
+		if _, err := app.W.CodeWorkspace.SetRepoColor(bridge.CodeWorkspaceSetColorArgs{ID: rec.ID, Color: "not-a-colour"}); errCode(err) != "E_CONTRACT" {
+			t.Fatalf("bad colour err = %v, want E_CONTRACT", err)
 		}
 		order, err := app.W.CodeWorkspace.ReorderRepos(bridge.CodeWorkspaceReorderArgs{IDs: []string{rec2.ID, rec.ID}})
 		if err != nil || len(order) != 2 || order[0].ID != rec2.ID {
@@ -81,15 +81,15 @@ func TestImportEdgeCases(t *testing.T) {
 		plain := filepath.Join(app.Work, "plain")
 		mustWrite(t, filepath.Join(plain, "f.txt"), []byte("x"))
 		_, err := app.W.CodeWorkspace.ImportRepo(ctx, bridge.CodeWorkspaceImportArgs{Path: plain})
-		if errCode(err) != "E_INVALID" {
-			t.Fatalf("err = %v, want E_INVALID", err)
+		if errCode(err) != "E_BAD_REQUEST" {
+			t.Fatalf("err = %v, want E_BAD_REQUEST", err)
 		}
 	})
 
 	t.Run("empty path refused", func(t *testing.T) {
 		_, err := app.W.CodeWorkspace.ImportRepo(ctx, bridge.CodeWorkspaceImportArgs{})
-		if errCode(err) != "E_BAD_REQUEST" {
-			t.Fatalf("err = %v, want E_BAD_REQUEST", err)
+		if errCode(err) != "E_CONTRACT" {
+			t.Fatalf("err = %v, want E_CONTRACT", err)
 		}
 	})
 
@@ -114,8 +114,8 @@ func TestImportEdgeCases(t *testing.T) {
 	t.Run("bare refused", func(t *testing.T) {
 		bare := app.NewBare("remote.git")
 		_, err := app.W.CodeWorkspace.ImportRepo(ctx, bridge.CodeWorkspaceImportArgs{Path: bare.Dir})
-		if errCode(err) != "E_INVALID" {
-			t.Fatalf("err = %v, want E_INVALID", err)
+		if errCode(err) != "E_BAD_REQUEST" {
+			t.Fatalf("err = %v, want E_BAD_REQUEST", err)
 		}
 	})
 

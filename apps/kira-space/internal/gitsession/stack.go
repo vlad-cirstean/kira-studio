@@ -738,7 +738,7 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 	// record that cannot be pinned is withheld.
 	armed := true
 	if err := e.stampExpectedTips(ctx, prep.undo, restackTipRefs(prep.pf.Plan)); err != nil {
-		slog.Warn("gitsession: pin restack undo tips failed; undo withheld", "repo", e.Summary.RepoID, "err", err)
+		slog.Warn("gitsession: pin restack undo tips failed; undo withheld", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 		armed = false
 	}
 	if armed {

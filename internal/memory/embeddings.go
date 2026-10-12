@@ -66,7 +66,7 @@ func (s *Service) embedDoc(ctx context.Context, fact string) []float32 {
 	defer cancel()
 	vecs, err := emb.Embed(dctx, []string{fact}, false)
 	if err != nil || len(vecs) != 1 {
-		slog.Debug("memory: fact embedding failed; backfill will retry", "err", err)
+		slog.Debug("memory: fact embedding failed; backfill will retry", "scope", "memory", "err", err)
 		return nil
 	}
 	return vecs[0]
@@ -120,7 +120,7 @@ func (s *Service) backfillOnce(ctx context.Context) bool {
 	pending, err := s.store.missingEmbeddings(ctx, model, backfillBatch)
 	if err != nil || len(pending) == 0 {
 		if err != nil && ctx.Err() == nil {
-			slog.Debug("memory: backfill lookup failed", "err", err)
+			slog.Debug("memory: backfill lookup failed", "scope", "memory", "err", err)
 		}
 		return false
 	}
@@ -131,7 +131,7 @@ func (s *Service) backfillOnce(ctx context.Context) bool {
 	vecs, err := emb.Embed(ctx, facts, false)
 	if err != nil || len(vecs) != len(pending) {
 		if ctx.Err() == nil {
-			slog.Debug("memory: backfill embed failed", "err", err)
+			slog.Debug("memory: backfill embed failed", "scope", "memory", "err", err)
 		}
 		return false
 	}
@@ -139,7 +139,7 @@ func (s *Service) backfillOnce(ctx context.Context) bool {
 		pending[i].vec = embed.Encode(vecs[i])
 	}
 	if err := s.store.putEmbeddings(ctx, model, pending); err != nil {
-		slog.Debug("memory: backfill write failed", "err", err)
+		slog.Debug("memory: backfill write failed", "scope", "memory", "err", err)
 		return false
 	}
 	if s.opts.OnSemantic != nil {

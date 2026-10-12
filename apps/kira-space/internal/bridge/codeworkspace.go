@@ -95,11 +95,11 @@ func (s *CodeWorkspaceService) session(ctx context.Context, id string) (*codewor
 		return nil, nil, ipcerr.Internal(err.Error())
 	}
 	if repo == nil {
-		return nil, nil, ipcerr.New("E_NOT_FOUND", "codeworkspace: repository not found")
+		return nil, nil, ipcerr.T(ipcerr.CodeNotFound, "backend.space.codeWorkspace.repoNotFound.body", nil)
 	}
 	status := s.Discovery.Status(ctx, s.gitPathSetting())
 	if status.Kind != "ok" {
-		return nil, nil, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
+		return nil, nil, ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 	return s.Registry.Open(repo.ID, repo.Root, s.Runner, status.Path), repo, nil
 }
@@ -155,7 +155,7 @@ func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeads
 
 	status := s.Discovery.Status(ctx, s.gitPathSetting())
 	if status.Kind != "ok" {
-		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
+		return nil, ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 
 	results := make([]CodeRepoHead, len(repos))
@@ -203,7 +203,7 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 
 	status := s.Discovery.Status(ctx, s.gitPathSetting())
 	if status.Kind != "ok" {
-		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
+		return nil, ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 
 	// CodeRepos.List() orders by (sort_order, name), which is not the total order §3's rule-2
@@ -285,16 +285,18 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 // constraint-violation text when repo_id is already stored.
 func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspaceImportArgs) (model.CodeRepo, error) {
 	if args.Path == "" {
-		return model.CodeRepo{}, ipcerr.BadRequest("path is required")
+		return model.CodeRepo{}, ipcerr.Required("path")
 	}
 	status := s.Discovery.Status(ctx, s.gitPathSetting())
 	if status.Kind != "ok" {
-		return model.CodeRepo{}, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
+		return model.CodeRepo{}, ipcerr.T(ipcerr.CodeGitUnavailable, "backend.space.gitrpc.gitUnavailable.body", nil)
 	}
 	rec, err := codeworkspace.Import(ctx, s.Deps.Repos.CodeRepos, s.Runner, status.Path, args.Path, codeworkspace.ImportOptions{})
 	switch {
-	case errors.Is(err, codeworkspace.ErrNotRepo), errors.Is(err, codeworkspace.ErrBare):
-		return model.CodeRepo{}, ipcerr.New("E_INVALID", err.Error())
+	case errors.Is(err, codeworkspace.ErrNotRepo):
+		return model.CodeRepo{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.codeWorkspace.notRepo.body", nil)
+	case errors.Is(err, codeworkspace.ErrBare):
+		return model.CodeRepo{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.codeWorkspace.bareRepo.body", nil)
 	case errors.Is(err, codeworkspace.ErrAlreadyImported):
 		if existing, ok := codeworkspace.ExistingRecord(err); ok && existing.Hidden {
 			shown, serr := s.Deps.Repos.CodeRepos.SetHidden(existing.ID, false)
@@ -303,7 +305,7 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 			}
 			return ipcerr.InternalResult(shown, serr)
 		}
-		return model.CodeRepo{}, ipcerr.New("E_ALREADY_IMPORTED", err.Error())
+		return model.CodeRepo{}, ipcerr.T(ipcerr.CodeAlreadyImported, "backend.space.codeWorkspace.alreadyImported.body", nil)
 	}
 	if err == nil {
 		s.reposChanged()
@@ -313,10 +315,10 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 
 func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.CodeRepo, error) {
 	if args.ID == "" {
-		return model.CodeRepo{}, ipcerr.BadRequest("id is required")
+		return model.CodeRepo{}, ipcerr.Required("id")
 	}
 	if args.Name == "" {
-		return model.CodeRepo{}, ipcerr.BadRequest("name is required")
+		return model.CodeRepo{}, ipcerr.Required("name")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name)
 	if err == nil {
@@ -327,14 +329,14 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 
 func (s *CodeWorkspaceService) SetRepoColor(args CodeWorkspaceSetColorArgs) (model.CodeRepo, error) {
 	if args.ID == "" {
-		return model.CodeRepo{}, ipcerr.BadRequest("id is required")
+		return model.CodeRepo{}, ipcerr.Required("id")
 	}
 	if !palette.Valid(args.Color) {
-		return model.CodeRepo{}, ipcerr.BadRequest("invalid colour")
+		return model.CodeRepo{}, ipcerr.Contract("invalid colour")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.SetColor(args.ID, args.Color)
 	if errors.Is(err, repos.ErrCodeRepoNotFound) {
-		return model.CodeRepo{}, ipcerr.NotFound("code repo not found")
+		return model.CodeRepo{}, ipcerr.T(ipcerr.CodeNotFound, "backend.space.codeWorkspace.repoNotFound.body", nil)
 	}
 	if err == nil {
 		s.reposChanged()
@@ -345,11 +347,11 @@ func (s *CodeWorkspaceService) SetRepoColor(args CodeWorkspaceSetColorArgs) (mod
 // SetRepoHidden hides a repo from the Git panel list; the repo stays imported and usable.
 func (s *CodeWorkspaceService) SetRepoHidden(args CodeWorkspaceSetHiddenArgs) (model.CodeRepo, error) {
 	if args.ID == "" {
-		return model.CodeRepo{}, ipcerr.BadRequest("id is required")
+		return model.CodeRepo{}, ipcerr.Required("id")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.SetHidden(args.ID, args.Hidden)
 	if errors.Is(err, repos.ErrCodeRepoNotFound) {
-		return model.CodeRepo{}, ipcerr.NotFound("code repo not found")
+		return model.CodeRepo{}, ipcerr.T(ipcerr.CodeNotFound, "backend.space.codeWorkspace.repoNotFound.body", nil)
 	}
 	if err == nil {
 		s.reposChanged()
@@ -361,12 +363,12 @@ func (s *CodeWorkspaceService) SetRepoHidden(args CodeWorkspaceSetHiddenArgs) (m
 // Git panel read.
 func (s *CodeWorkspaceService) ReorderRepos(args CodeWorkspaceReorderArgs) ([]model.CodeRepo, error) {
 	if len(args.IDs) == 0 {
-		return nil, ipcerr.BadRequest("ids is required")
+		return nil, ipcerr.Required("ids")
 	}
 	seen := make(map[string]bool, len(args.IDs))
 	for _, id := range args.IDs {
 		if seen[id] {
-			return nil, ipcerr.BadRequest("ids must be unique")
+			return nil, ipcerr.Contract("ids must be unique")
 		}
 		seen[id] = true
 	}
@@ -382,7 +384,7 @@ func (s *CodeWorkspaceService) ReorderRepos(args CodeWorkspaceReorderArgs) ([]mo
 // TS side; this is the storage/session half.
 func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if err := s.Deps.Repos.CodeRepos.Remove(args.ID); err != nil {
 		return ipcerr.InternalErr(err)
@@ -394,7 +396,7 @@ func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 
 func (s *CodeWorkspaceService) ListFiles(ctx context.Context, args CodeWorkspaceIDArgs) (codeworkspace.FileListing, error) {
 	if args.ID == "" {
-		return codeworkspace.FileListing{}, ipcerr.BadRequest("id is required")
+		return codeworkspace.FileListing{}, ipcerr.Required("id")
 	}
 	sess, _, err := s.session(ctx, args.ID)
 	if err != nil {
@@ -409,10 +411,10 @@ func (s *CodeWorkspaceService) ListFiles(ctx context.Context, args CodeWorkspace
 // machine.
 func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceReadFileArgs) (codeworkspace.FileContent, error) {
 	if args.ID == "" {
-		return codeworkspace.FileContent{}, ipcerr.BadRequest("id is required")
+		return codeworkspace.FileContent{}, ipcerr.Required("id")
 	}
 	if args.Path == "" {
-		return codeworkspace.FileContent{}, ipcerr.BadRequest("path is required")
+		return codeworkspace.FileContent{}, ipcerr.Required("path")
 	}
 	sess, _, err := s.session(ctx, args.ID)
 	if err != nil {
@@ -420,7 +422,7 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 	}
 	absPath, err := codeworkspace.ValidateRelPath(sess.Root, args.Path)
 	if err != nil {
-		return codeworkspace.FileContent{}, ipcerr.New("E_INVALID", err.Error())
+		return codeworkspace.FileContent{}, ipcerr.Contract("%s", err.Error())
 	}
 	return ipcerr.InternalResult(codeworkspace.ReadFile(absPath, args.Path))
 }
@@ -429,7 +431,7 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 // with.
 func (s *CodeWorkspaceService) OpenWorkspace(ctx context.Context, args CodeWorkspaceIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	_, _, err := s.session(ctx, args.ID)
 	return err
@@ -440,7 +442,7 @@ func (s *CodeWorkspaceService) OpenWorkspace(ctx context.Context, args CodeWorks
 // drops the repository's own storage row).
 func (s *CodeWorkspaceService) CloseWorkspace(args CodeWorkspaceIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	s.Registry.Close(args.ID)
 	return nil
@@ -451,10 +453,10 @@ func (s *CodeWorkspaceService) CloseWorkspace(args CodeWorkspaceIDArgs) error {
 // ReadFile classification every other read does.
 func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceReadFileArgs) (codeworkspace.DiffContent, error) {
 	if args.ID == "" {
-		return codeworkspace.DiffContent{}, ipcerr.BadRequest("id is required")
+		return codeworkspace.DiffContent{}, ipcerr.Required("id")
 	}
 	if args.Path == "" {
-		return codeworkspace.DiffContent{}, ipcerr.BadRequest("path is required")
+		return codeworkspace.DiffContent{}, ipcerr.Required("path")
 	}
 	sess, _, err := s.session(ctx, args.ID)
 	if err != nil {
@@ -466,7 +468,7 @@ func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceR
 		// git.path edit through Registry.Open) by the time this reached readHeadSide — a clean
 		// "reopen the workspace" outcome for the caller, not an internal failure.
 		if errors.Is(err, codeworkspace.ErrSessionClosed) {
-			return codeworkspace.DiffContent{}, ipcerr.New("E_WORKSPACE_CLOSED", "codeworkspace: workspace was closed")
+			return codeworkspace.DiffContent{}, ipcerr.T(ipcerr.CodeConflict, "backend.space.codeWorkspace.workspaceClosed.body", nil)
 		}
 		return codeworkspace.DiffContent{}, ipcerr.InternalErr(err)
 	}
@@ -576,13 +578,13 @@ type CodeWorkspaceSearchHandle struct {
 // longer than an IPC call may (OpenWorkspace's own posture).
 func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspaceSearchArgs) (CodeWorkspaceSearchHandle, error) {
 	if args.ID == "" {
-		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("id is required")
+		return CodeWorkspaceSearchHandle{}, ipcerr.Required("id")
 	}
 	if args.WindowKey == "" {
-		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("windowKey is required")
+		return CodeWorkspaceSearchHandle{}, ipcerr.Required("windowKey")
 	}
 	if args.Query == "" {
-		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("query is required")
+		return CodeWorkspaceSearchHandle{}, ipcerr.Required("query")
 	}
 	req := codeworkspace.SearchRequest{
 		Query:         args.Query,
@@ -591,7 +593,7 @@ func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspa
 		WholeWord:     args.WholeWord,
 	}
 	if err := codeworkspace.ValidatePattern(req); err != nil {
-		return CodeWorkspaceSearchHandle{}, ipcerr.New("E_INVALID", err.Error())
+		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest(err.Error())
 	}
 
 	sess, _, err := s.session(ctx, args.ID)
@@ -615,7 +617,7 @@ func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspa
 		// searchCtx the same way (StartSearch's own doc comment), and gets the identical clean
 		// treatment here for the same reason: nothing is left to show it to by then anyway.
 		if err != nil && !errors.Is(err, context.Canceled) {
-			coalescer.finish(&stats, &CodeSearchEventErr{Code: "E_INTERNAL", Message: err.Error()})
+			coalescer.finish(&stats, &CodeSearchEventErr{Code: string(ipcerr.CodeInternal), Message: err.Error()})
 			return
 		}
 		coalescer.finish(&stats, nil)
@@ -632,7 +634,7 @@ func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspa
 // reachable right now the way every read path's own availability check does.
 func (s *CodeWorkspaceService) CancelSearch(args CodeWorkspaceIDArgs) error {
 	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
+		return ipcerr.Required("id")
 	}
 	if sess := s.Registry.Peek(args.ID); sess != nil {
 		sess.CancelSearch()

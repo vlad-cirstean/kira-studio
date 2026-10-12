@@ -37,8 +37,8 @@ func TestHideRepo(t *testing.T) {
 
 	t.Run("empty id refused", func(t *testing.T) {
 		_, err := app.W.CodeWorkspace.SetRepoHidden(bridge.CodeWorkspaceSetHiddenArgs{Hidden: true})
-		if errCode(err) != "E_BAD_REQUEST" {
-			t.Fatalf("err = %v, want E_BAD_REQUEST", err)
+		if errCode(err) != "E_CONTRACT" {
+			t.Fatalf("err = %v, want E_CONTRACT", err)
 		}
 	})
 

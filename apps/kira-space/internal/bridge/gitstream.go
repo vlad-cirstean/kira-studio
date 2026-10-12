@@ -62,8 +62,7 @@ func repoSettingsSetTouchesRestrictedField(params json.RawMessage) bool {
 func guardRepoSettingsSet(next requestFn) requestFn {
 	return func(ctx context.Context, method string, params json.RawMessage) (any, error) {
 		if method == "repoSettings.set" && repoSettingsSetTouchesRestrictedField(params) {
-			return nil, ipcerr.New("E_READ_ONLY",
-				"gitstream: repoSettings.set: this field is not available from the native graph surface")
+			return nil, ipcerr.T(ipcerr.CodeReadOnly, "backend.space.gitrpc.fieldUnavailable.body", nil)
 		}
 		return next(ctx, method, params)
 	}

@@ -72,29 +72,49 @@ func AdeTaskWorkflowsChanged(ev *Events) { ev.Broadcast(adewire.ChannelWorkflows
 // AdeTaskReposChanged is TaskBoard.OnRepos' target: payload-free.
 func AdeTaskReposChanged(ev *Events) { ev.Broadcast(adewire.ChannelRepos) }
 
+// adeTaskCatalog maps store and engine sentinels a person can meet to their wire code and catalog
+// text. Sentinels that mean a caller bug are in adeTaskContract.
+var adeTaskCatalog = []struct {
+	err  error
+	code ipcerr.Code
+	key  string
+}{
+	{ade.ErrStale, ipcerr.CodeConflict, "backend.space.ade.taskMoved.body"},
+	{ade.ErrWorkflowChanged, ipcerr.CodeConflict, "backend.space.ade.workflowChanged.body"},
+	{ade.ErrSetupPending, ipcerr.CodePreparing, "backend.space.ade.setupPending.body"},
+	{repos.ErrEstimateShrink, ipcerr.CodeBadRequest, "backend.space.ade.estimateShrink.body"},
+	{repos.ErrBranchOnTask, ipcerr.CodeConflict, "backend.space.ade.branchOnTask.body"},
+	{repos.ErrRepoOnTask, ipcerr.CodeConflict, "backend.space.ade.repoOnTask.body"},
+	{ade.ErrSessionRunning, ipcerr.CodeConflict, "backend.space.ade.sessionRunning.body"},
+	{ade.ErrSessionNotRunning, ipcerr.CodeConflict, "backend.space.ade.sessionNotRunning.body"},
+	{ade.ErrResumeCwdNotDir, ipcerr.CodeConflict, "backend.space.ade.resumeCwdNotDir.body"},
+	{repos.ErrTaskNotFound, ipcerr.CodeNotFound, "backend.space.ade.taskNotFound.body"},
+	{repos.ErrBranchMissing, ipcerr.CodeNotFound, "backend.space.ade.branchMissing.body"},
+	{repos.ErrBacklogGone, ipcerr.CodeNotFound, "backend.space.ade.backlogGone.body"},
+	{repos.ErrRunNotFound, ipcerr.CodeNotFound, "backend.space.ade.runNotFound.body"},
+	{ade.ErrSessionNotFound, ipcerr.CodeNotFound, "backend.space.ade.sessionNotFound.body"},
+}
+
+var adeTaskContract = []error{repos.ErrReviewKind, ade.ErrSessionWrongTask, ade.ErrCommandMismatch}
+
 // adeTaskError maps store and engine sentinels to wire codes.
 func adeTaskError(err error) error {
-	switch {
-	case err == nil:
+	if err == nil {
 		return nil
-	case errors.Is(err, ade.ErrStale):
-		return ipcerr.New("E_STALE", err.Error())
-	case errors.Is(err, ade.ErrWorkflowChanged):
-		return ipcerr.New("E_CONFLICT", err.Error())
-	case errors.Is(err, ade.ErrSetupPending):
-		return ipcerr.New("E_PREPARING", err.Error())
-	case errors.Is(err, ade.ErrInvalidInput), errors.Is(err, repos.ErrEstimateShrink),
-		errors.Is(err, repos.ErrBranchOnTask), errors.Is(err, repos.ErrRepoOnTask),
-		errors.Is(err, repos.ErrReviewKind):
-		return ipcerr.New("E_INVALID", err.Error())
-	case errors.Is(err, ade.ErrSessionWrongTask), errors.Is(err, ade.ErrSessionRunning),
-		errors.Is(err, ade.ErrSessionNotRunning), errors.Is(err, ade.ErrCommandMismatch),
-		errors.Is(err, ade.ErrResumeCwdNotDir):
-		return ipcerr.New("E_INVALID", err.Error())
-	case errors.Is(err, repos.ErrTaskNotFound), errors.Is(err, repos.ErrBranchMissing),
-		errors.Is(err, repos.ErrBacklogGone), errors.Is(err, repos.ErrRunNotFound),
-		errors.Is(err, ade.ErrSessionNotFound):
-		return ipcerr.New("E_NOT_FOUND", err.Error())
+	}
+	for _, c := range adeTaskCatalog {
+		if errors.Is(err, c.err) {
+			return ipcerr.T(c.code, c.key, nil)
+		}
+	}
+	if errors.Is(err, ade.ErrInvalidInput) {
+		// The detail is a refusal the person can act on (a cycle, a missing base), not a bug.
+		return ipcerr.BadRequest(strings.TrimPrefix(err.Error(), ade.ErrInvalidInput.Error()+": "))
+	}
+	for _, c := range adeTaskContract {
+		if errors.Is(err, c) {
+			return ipcerr.Contract("%s", err.Error())
+		}
 	}
 	return ipcerr.InternalErr(err)
 }
@@ -109,7 +129,7 @@ func validateAdeFromStage(id string) error {
 	return validateAdeItemID(id, "fromStageId")
 }
 
-func adeTaskInvalid(msg string) error { return ipcerr.New("E_INVALID", msg) }
+func adeTaskInvalid(msg string) error { return ipcerr.Contract("%s", msg) }
 
 func validateAdeTaskID(value, field string) error { return validateAdeItemID(value, field) }
 

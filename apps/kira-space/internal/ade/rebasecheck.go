@@ -231,9 +231,10 @@ func logRebase(j rebaseJob, outcome string, conflicts int, reason string, cached
 	}
 	attrs := []any{"repo", j.repoID, "branch", j.branch, "base", j.base, "baseTip", gitclient.ShortSHA(j.key.BaseTip),
 		"tip", gitclient.ShortSHA(j.key.Tip), "result", result, "cached", cached, "ms", time.Since(start).Milliseconds()}
+	rebaseLog := slog.With("scope", "ade")
 	if outcome == "failed" {
-		slog.Warn("ade rebase check", append(attrs, "reason", reason)...)
+		rebaseLog.Warn("ade rebase check", append(attrs, "reason", reason)...)
 		return
 	}
-	slog.Info("ade rebase check", attrs...)
+	rebaseLog.Info("ade rebase check", attrs...)
 }

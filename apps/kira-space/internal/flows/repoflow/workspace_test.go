@@ -106,8 +106,8 @@ func TestBrowseReadDiff(t *testing.T) {
 
 	t.Run("escapes refused", func(t *testing.T) {
 		for _, p := range []string{"escape", "../outside.txt", "src/../../outside.txt", outside} {
-			if c, err := read(p); errCode(err) != "E_INVALID" {
-				t.Errorf("read %q = %+v, %v, want E_INVALID", p, c, err)
+			if c, err := read(p); errCode(err) != "E_CONTRACT" {
+				t.Errorf("read %q = %+v, %v, want E_CONTRACT", p, c, err)
 			}
 			_, err := cw.ReadDiff(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: p})
 			if err == nil {
@@ -142,7 +142,7 @@ func TestBrowseReadDiff(t *testing.T) {
 		if _, err := cw.ListFiles(ctx, idArgs("nope")); errCode(err) != "E_NOT_FOUND" {
 			t.Fatalf("unknown id err = %v", err)
 		}
-		if _, err := cw.ListFiles(ctx, idArgs("")); errCode(err) != "E_BAD_REQUEST" {
+		if _, err := cw.ListFiles(ctx, idArgs("")); errCode(err) != "E_CONTRACT" {
 			t.Fatalf("empty id err = %v", err)
 		}
 	})
@@ -221,8 +221,8 @@ func TestCodeSearch(t *testing.T) {
 
 	t.Run("bad regex refused up front", func(t *testing.T) {
 		_, err := cw.StartSearch(ctx, bridge.CodeWorkspaceSearchArgs{ID: rec.ID, WindowKey: "w2", Query: "(", Regex: true})
-		if errCode(err) != "E_INVALID" {
-			t.Fatalf("err = %v, want E_INVALID", err)
+		if errCode(err) != "E_BAD_REQUEST" {
+			t.Fatalf("err = %v, want E_BAD_REQUEST", err)
 		}
 	})
 
@@ -294,8 +294,8 @@ func TestCloseWorkspaceStopsSearch(t *testing.T) {
 	if err := cw.CloseWorkspace(idArgs(rec.ID)); err != nil {
 		t.Fatalf("second CloseWorkspace = %v", err)
 	}
-	if err := cw.CloseWorkspace(idArgs("")); errCode(err) != "E_BAD_REQUEST" {
-		t.Fatalf("CloseWorkspace with no id = %v, want E_BAD_REQUEST", err)
+	if err := cw.CloseWorkspace(idArgs("")); errCode(err) != "E_CONTRACT" {
+		t.Fatalf("CloseWorkspace with no id = %v, want E_CONTRACT", err)
 	}
 	if _, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "d0/f0.txt"}); err != nil {
 		t.Fatalf("ReadFile after close: %v", err)

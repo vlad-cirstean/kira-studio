@@ -1239,7 +1239,7 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 		// An unguarded absolute-position replay could drop commits made outside the app, so a
 		// record that cannot be pinned is not armed.
 		if err := e.stampExpectedTips(ctx, prep.undo, prep.expectRefs); err != nil {
-			slog.Warn("gitsession: pin undo tips failed; undo withheld", "repo", e.Summary.RepoID, "err", err)
+			slog.Warn("gitsession: pin undo tips failed; undo withheld", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 			armed = false
 		}
 	}
@@ -1288,12 +1288,12 @@ func (e *RepoEntry) autoStashFailureNote(ctx context.Context) string {
 func (e *RepoEntry) readBackAfterWrite(ctx context.Context) (porcelain.StatusResult, *gitpreflight.InProgressOperation, gitclient.HeadState, bool) {
 	statusResult, inProgress, err := e.statusAndInProgress(ctx)
 	if err != nil {
-		slog.Warn("gitsession: read-back after write failed", "repo", e.Summary.RepoID, "err", err)
+		slog.Warn("gitsession: read-back after write failed", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 		return porcelain.StatusResult{}, nil, e.lastKnownHead(), false
 	}
 	head, err := e.Head(ctx)
 	if err != nil {
-		slog.Warn("gitsession: head read-back after write failed", "repo", e.Summary.RepoID, "err", err)
+		slog.Warn("gitsession: head read-back after write failed", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 		return statusResult, inProgress, e.lastKnownHead(), true
 	}
 	return statusResult, inProgress, head, true

@@ -257,14 +257,14 @@ func (s *MemoryService) setDownload(active bool, done, total int64) {
 func (s *MemoryService) InstallSemanticModel(ctx context.Context) error {
 	s.service()
 	if !s.installing.TryLock() {
-		return ipcerr.BadRequest("already downloading")
+		return ipcerr.T(ipcerr.CodeConflict, "backend.space.memory.alreadyDownloading.body", nil)
 	}
 	defer s.installing.Unlock()
 	s.mu.Lock()
 	client, svc := s.embedder, s.svc
 	s.mu.Unlock()
 	if client == nil || svc == nil {
-		return ipcerr.Internal("memory service closed")
+		return ipcerr.T(ipcerr.CodeUnavailable, "backend.space.memory.serviceClosed.body", nil)
 	}
 
 	s.setDownload(true, 0, embed.Default.TotalSize())

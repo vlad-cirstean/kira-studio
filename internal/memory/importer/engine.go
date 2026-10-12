@@ -192,7 +192,7 @@ func (e *Engine) scan(id string, paths []string) {
 	res, err := Scan(e.ctx, paths, e.opts.Caps)
 	if err != nil {
 		if e.ctx.Err() == nil {
-			slog.Warn("memory import: scan failed", "err", err)
+			slog.Warn("memory import: scan failed", "scope", "memory", "err", err)
 			_ = e.st.failScan(id, err.Error())
 		}
 		return
@@ -202,7 +202,7 @@ func (e *Engine) scan(id string, paths []string) {
 		err = e.st.scanned(id, res.Base, res.Truncated, res.Ignored, files)
 	}
 	if err != nil && e.ctx.Err() == nil {
-		slog.Warn("memory import: scan failed", "err", err)
+		slog.Warn("memory import: scan failed", "scope", "memory", "err", err)
 		_ = e.st.failScan(id, err.Error())
 	}
 }
@@ -397,14 +397,14 @@ func (e *Engine) schedule() {
 		it, ok, err := e.st.claimChunk()
 		if err != nil {
 			e.extractSem.Release(1)
-			slog.Error("memory import: claim chunk", "err", err)
+			slog.Error("memory import: claim chunk", "scope", "memory", "err", err)
 			break
 		}
 		if !ok {
 			e.extractSem.Release(1)
 			progressed, err := e.materialiseNext()
 			if err != nil {
-				slog.Error("memory import: materialise", "err", err)
+				slog.Error("memory import: materialise", "scope", "memory", "err", err)
 				break
 			}
 			if progressed {
@@ -426,7 +426,7 @@ func (e *Engine) schedule() {
 		if err != nil || !ok {
 			e.finalizing.Store(false)
 			if err != nil {
-				slog.Error("memory import: claim finalize", "err", err)
+				slog.Error("memory import: claim finalize", "scope", "memory", "err", err)
 			}
 			return
 		}
@@ -509,7 +509,7 @@ func (e *Engine) retry(ctx context.Context, op func() error) error {
 		if errors.Is(err, memory.ErrClaudeRateLimited) {
 			e.cooldown(next)
 		}
-		slog.Warn("memory import: retrying", "err", err, "in", next)
+		slog.Warn("memory import: retrying", "scope", "memory", "err", err, "in", next)
 	})
 }
 
@@ -541,7 +541,7 @@ func (e *Engine) waitCooldown(ctx context.Context) error {
 
 func (e *Engine) pauseFatal(jobID string, err error) {
 	if paused, perr := e.st.pauseIfRunning(jobID, err.Error()); perr != nil {
-		slog.Error("memory import: pause", "err", perr)
+		slog.Error("memory import: pause", "scope", "memory", "err", perr)
 	} else if paused {
 		e.disarm(jobID)
 	}
@@ -583,7 +583,7 @@ func (e *Engine) runExtract(ctx context.Context, it chunkItem) {
 		err = e.settle(it.JobID)
 	}
 	if err != nil {
-		slog.Error("memory import: extract result", "err", err)
+		slog.Error("memory import: extract result", "scope", "memory", "err", err)
 	}
 }
 
@@ -636,7 +636,7 @@ func (e *Engine) runFinalize(ctx context.Context, it finalItem) {
 		err = e.settle(it.JobID)
 	}
 	if err != nil {
-		slog.Error("memory import: finalize result", "err", err)
+		slog.Error("memory import: finalize result", "scope", "memory", "err", err)
 	}
 }
 

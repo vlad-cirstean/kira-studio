@@ -18,6 +18,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // envScriptTimeout is the fixed cap on one deploy-sha script (P145 F10).
@@ -157,8 +158,8 @@ func (b *TaskBoard) deploymentFacts(ctx context.Context, sc *boardCtx, sb model.
 		}
 		d, err := b.deploymentRow(ctx, sc, sb, baseTip, tip, env.Name, st)
 		if err != nil {
-			slog.Warn("ade board: deployment", "repo", sc.repoID, "branch", sb.Name, "env", env.Name, "err", err)
-			d = adewire.Deployment{Env: env.Name, DeployedSha: st.Sha, CheckedAt: st.CheckedAt, Status: "unknown", Error: "could not be checked"}
+			slog.Warn("ade board: deployment", "scope", "ade", "repo", sc.repoID, "branch", sb.Name, "env", env.Name, "err", err)
+			d = adewire.Deployment{Env: env.Name, DeployedSha: st.Sha, CheckedAt: st.CheckedAt, Status: "unknown", Error: i18n.T("backend.space.ade.unchecked.body", nil)}
 		}
 		out = append(out, d)
 	}

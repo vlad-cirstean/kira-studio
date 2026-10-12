@@ -655,7 +655,7 @@ func (e *RepoEntry) eagerResolveClosedBranches() {
 		if ctx.Err() != nil {
 			return
 		}
-		slog.Warn("ghclient: list review branches for eager re-resolve", "repo", e.Summary.RepoID, "err", err)
+		slog.Warn("ghclient: list review branches for eager re-resolve", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 		return
 	}
 	if len(branches) > maxEagerPurgeBranches {
@@ -679,6 +679,6 @@ func (e *RepoEntry) maybePurgeClosed(ctx context.Context, branch string, pr *ghc
 		return
 	}
 	if err := e.review.Purge(ctx, e.Summary.RepoID, branch); err != nil {
-		slog.Warn("ghclient: purge review session", "repo", e.Summary.RepoID, "branch", branch, "err", err)
+		slog.Warn("ghclient: purge review session", "scope", "gitsession", "repo", e.Summary.RepoID, "branch", branch, "err", err)
 	}
 }

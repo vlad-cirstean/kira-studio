@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Store persists the last valid workflow per file so a file broken on disk keeps its previous
@@ -49,7 +50,7 @@ func (r *Reader) List(usedBy func(id string) int) adewire.WorkflowsResult {
 	entries, err := os.ReadDir(r.Dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			slog.Warn("ade workflows: read dir", "dir", r.Dir, "err", err)
+			slog.Warn("ade workflows: read dir", "scope", "ade", "dir", r.Dir, "err", err)
 		}
 		return out
 	}
@@ -83,7 +84,7 @@ func (l *lastValid) get() map[string]string {
 		l.loaded = true
 		m, err := l.store.LastValid()
 		if err != nil {
-			slog.Warn("ade workflows: read last valid", "err", err)
+			slog.Warn("ade workflows: read last valid", "scope", "ade", "err", err)
 			m = map[string]string{}
 		}
 		l.m = m
@@ -100,11 +101,11 @@ func (r *Reader) entryFor(name string, lv *lastValid) adewire.WorkflowEntry {
 	entry.Hash = textHash(src)
 	switch {
 	case err != nil:
-		werr = &adewire.WorkflowError{Message: "cannot read the file: " + err.Error()}
+		werr = &adewire.WorkflowError{Message: i18n.T("backend.space.ade.workflowUnreadable.body", map[string]string{"detail": err.Error()})}
 	default:
 		wf, werr = Parse(src)
 		if werr == nil && wf.ID != strings.TrimSuffix(name, ".yaml") {
-			werr = &adewire.WorkflowError{Message: "id must equal the file name without .yaml"}
+			werr = &adewire.WorkflowError{Message: i18n.T("backend.space.ade.workflowIdMismatch.body", nil)}
 		}
 	}
 	if werr == nil {
@@ -144,7 +145,7 @@ func readCapped(path string) ([]byte, error) {
 func (r *Reader) record(file string, wf *adewire.Workflow, lv *lastValid) {
 	js, err := json.Marshal(wf)
 	if err != nil {
-		slog.Warn("ade workflows: encode", "file", file, "err", err)
+		slog.Warn("ade workflows: encode", "scope", "ade", "file", file, "err", err)
 		return
 	}
 	last := lv.get()
@@ -152,7 +153,7 @@ func (r *Reader) record(file string, wf *adewire.Workflow, lv *lastValid) {
 		return
 	}
 	if err := r.Store.RecordLastValid(file, string(js), r.now().UnixMilli()); err != nil {
-		slog.Warn("ade workflows: record last valid", "file", file, "err", err)
+		slog.Warn("ade workflows: record last valid", "scope", "ade", "file", file, "err", err)
 		return
 	}
 	last[file] = string(js)

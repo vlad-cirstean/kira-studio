@@ -53,7 +53,7 @@ type GitCredentialProvideArgs struct {
 // an error.
 func (s *GitCredentialService) Provide(args GitCredentialProvideArgs) (bool, error) {
 	if args.RequestID == "" {
-		return false, ipcerr.BadRequest("requestId is required")
+		return false, ipcerr.Required("requestId")
 	}
 	return s.Relay.Provide(args.RequestID, args.Secret), nil
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // board.go is the ADE v2 engine: tasks hold branches across repos; this type assembles the
@@ -506,7 +507,7 @@ func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun) adewir
 			}
 			out.CurrentStage = &st
 		} else {
-			slog.Warn("ade board: unreadable current stage", "task", t.ID, "err", err)
+			slog.Warn("ade board: unreadable current stage", "scope", "ade", "task", t.ID, "err", err)
 		}
 	}
 	for _, r := range runs {
@@ -574,7 +575,7 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 		g.Go(func() error {
 			entry, err := b.openRepo(gctx, id)
 			if err != nil {
-				slog.Warn("ade board: prs open repo", "repo", id, "err", err)
+				slog.Warn("ade board: prs open repo", "scope", "ade", "repo", id, "err", err)
 				mu.Lock()
 				rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: "unavailable"}
 				mu.Unlock()
@@ -802,7 +803,7 @@ func (b *TaskBoard) ForcePush(ctx context.Context, branchID string) (adewire.For
 	}
 	out := adewire.ForcePushResult{BranchID: branchID}
 	if br.Name == "" {
-		out.Error = &adewire.RemoteOpError{Kind: "Unknown", Message: "the branch is not created yet"}
+		out.Error = &adewire.RemoteOpError{Kind: "Unknown", Message: i18n.T("backend.space.ade.branchNotCreated.body", nil)}
 		return out, nil
 	}
 	mu := b.repoMutex(br.CodeRepoID)

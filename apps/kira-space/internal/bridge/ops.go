@@ -17,7 +17,7 @@ type OpsRecentArgs struct {
 
 func (s *OpsService) Recent(args OpsRecentArgs) ([]oplog.Record, error) {
 	if args.Limit <= 0 {
-		return nil, ipcerr.BadRequest("limit must be positive")
+		return nil, ipcerr.Contract("limit must be positive")
 	}
 	return s.Log.Recent(args.Limit), nil
 }
@@ -29,7 +29,7 @@ type OpsCancelArgs struct {
 // Cancel is not an error when the op already finished or is not cancellable.
 func (s *OpsService) Cancel(args OpsCancelArgs) error {
 	if args.OpID == "" {
-		return ipcerr.BadRequest("opId is required")
+		return ipcerr.Required("opId")
 	}
 	s.Log.Cancel(args.OpID)
 	return nil

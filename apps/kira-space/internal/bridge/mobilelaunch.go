@@ -39,7 +39,7 @@ type MobileLaunches struct {
 func (m *MobileLaunches) Open(ctx context.Context, launch adewire.Launch, taskID, branchID string) error {
 	key, ok := m.Window()
 	if !ok {
-		return ipcerr.New("E_NO_WINDOW", "Open Kira Space on the computer first, then try again.")
+		return ipcerr.T(ipcerr.CodeUnavailable, "backend.space.mobileLaunch.noWindow.body", nil)
 	}
 	ch := make(chan string, 1)
 	m.mu.Lock()
@@ -64,11 +64,11 @@ func (m *MobileLaunches) Open(ctx context.Context, launch adewire.Launch, taskID
 	select {
 	case msg := <-ch:
 		if msg != "" {
-			return ipcerr.New("E_INVALID", msg)
+			return ipcerr.BadRequest(msg)
 		}
 		return nil
 	case <-timeout.C:
-		return ipcerr.New("E_LAUNCH_TIMEOUT", "The computer did not open the terminal in time.")
+		return ipcerr.T(ipcerr.CodeTimeout, "backend.space.mobileLaunch.timeout.body", nil)
 	case <-ctx.Done():
 		return ctx.Err()
 	}

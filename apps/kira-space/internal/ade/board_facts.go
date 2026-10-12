@@ -167,14 +167,14 @@ func (b *TaskBoard) repoFacts(ctx context.Context, codeRepoID string, branches [
 	}
 	entry, err := b.openRepo(ctx, codeRepoID)
 	if err != nil {
-		slog.Warn("ade board: open repo", "repo", codeRepoID, "err", err)
+		slog.Warn("ade board: open repo", "scope", "ade", "repo", codeRepoID, "err", err)
 		fallback()
 		return res
 	}
 	remote, _ := entry.DefaultRemote(ctx)
 	res.state.Remote, res.state.LastFetchAt = remote, lastFetchAt(entry)
 	if err := b.collectRepo(ctx, entry, codeRepoID, branches, setupOf, res); err != nil {
-		slog.Warn("ade board: repo facts", "repo", codeRepoID, "err", err)
+		slog.Warn("ade board: repo facts", "scope", "ade", "repo", codeRepoID, "err", err)
 		res.hadCommits, res.merged, res.jobs, res.pairs = nil, map[string]int64{}, map[string]rebaseJob{}, []adewire.Pair{}
 		fallback()
 	}

@@ -1,35 +1,5 @@
-G1 apps/kira-space/internal/bridge/adetask_validate.go
-G1 apps/kira-space/internal/bridge/codeworkspace.go
-G1 apps/kira-space/internal/bridge/gitcredential.go
-G1 apps/kira-space/internal/bridge/github.go
-G1 apps/kira-space/internal/bridge/gitstream.go
-G1 apps/kira-space/internal/bridge/memory.go
-G1 apps/kira-space/internal/bridge/memoryimport.go
-G1 apps/kira-space/internal/bridge/mobile.go
-G1 apps/kira-space/internal/bridge/mobilelaunch.go
-G1 apps/kira-space/internal/bridge/ops.go
-G1 apps/kira-space/internal/bridge/update.go
-G2 apps/kira-space/internal/bridge/adetask.go
-G2 apps/kira-space/internal/bridge/adetask_validate.go
-G2 apps/kira-space/internal/bridge/codeworkspace.go
-G2 apps/kira-space/internal/bridge/gitstream.go
-G2 apps/kira-space/internal/bridge/mobilelaunch.go
-G3 apps/kira-space/internal/ade/board.go
-G3 apps/kira-space/internal/ade/board_facts.go
-G3 apps/kira-space/internal/ade/deploy.go
-G3 apps/kira-space/internal/ade/integration.go
-G3 apps/kira-space/internal/ade/rebasecheck.go
-G3 apps/kira-space/internal/adeflow/reader.go
-G3 apps/kira-space/internal/gitsession/gh.go
-G3 apps/kira-space/internal/gitsession/ops.go
-G3 apps/kira-space/internal/gitsession/stack.go
-G3 internal/memory/embeddings.go
-G3 internal/memory/hybrid.go
-G3 internal/memory/importer/engine.go
-G3 internal/memory/mcpserver/server.go
-G3 internal/memory/vectors.go
+# PERMANENT G4 apps/kira-space/internal/flowharness/*.go: test tooling writes throwaway fixtures; no reader to protect from a torn write.
 G4 apps/kira-space/internal/flowharness/gitrepo.go
 G4 apps/kira-space/internal/flowharness/harness.go
-G4 apps/kira-space/internal/gitaskpass/broker.go
+# PERMANENT G4 gitsession/incremental.go: writes temp files into a per-call os.MkdirTemp dir that is deleted before return; nothing else reads them.
 G4 apps/kira-space/internal/gitsession/incremental.go
-G4 internal/memory/modelstore/modelstore.go

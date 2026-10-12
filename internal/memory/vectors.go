@@ -56,7 +56,7 @@ func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, inclu
 		}
 		if err := embed.DecodeInto(buf, blob); err != nil {
 			if warnedBadVector.CompareAndSwap(false, true) {
-				slog.Warn("memory: skipping malformed embedding", "seq", seq, "err", err)
+				slog.Warn("memory: skipping malformed embedding", "scope", "memory", "seq", seq, "err", err)
 			}
 			continue
 		}
