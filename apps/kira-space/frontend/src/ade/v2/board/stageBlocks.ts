@@ -25,6 +25,7 @@ interface RunLine {
   /** Log (agent) / Output (script) opens the run's log: shown once the run started. */
   hasLog: boolean;
   canRetry: boolean;
+  canResume: boolean;
 }
 
 interface StepView {
@@ -132,6 +133,7 @@ function runLine(r: StepRun, max: number): RunLine {
     note: r.reason || r.note || fixRound(r.loops, max),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
+    canResume: r.resumable,
   };
 }
 

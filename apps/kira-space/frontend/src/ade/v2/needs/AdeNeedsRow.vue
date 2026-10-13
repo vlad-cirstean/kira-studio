@@ -20,7 +20,8 @@ const hasLog = computed(
     props.item.runIds.length > 0,
 );
 const buttonClass = computed(() => {
-  if (props.item.action === 'Take over') return ACTION_CLASS.claude;
+  if (props.item.action === 'Take over' || props.item.action === 'Resume')
+    return ACTION_CLASS.claude;
   return props.item.tone === 'grey'
     ? 'bg-border-strong text-fg'
     : TONE_SOLID_CLASS[props.item.tone];

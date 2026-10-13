@@ -238,6 +238,8 @@ export interface Run {
   outcome: AdeRunOutcome | null;
   /** 'rebase' for a rebase run (outside the workflow), '' for a step run. */
   purpose: '' | 'rebase';
+  /** A restart stopped the run mid-session: Resume continues its Claude conversation. */
+  resumable: boolean;
 }
 /** What the agent reported beyond status and summary. */
 interface AgentReport {

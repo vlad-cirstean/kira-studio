@@ -17,7 +17,7 @@ import type { StepRun } from '../board/progress';
 import { WAITING_SETUP_NOTES } from '../board/setupGate';
 import { nextStageId, type StageBlock } from '../board/stageBlocks';
 import { type CardModel, usePlanModel } from '../plan/usePlanModel';
-import { useApprove, useRetryRun, useSetTaskStage } from '../queries';
+import { useApprove, useResumeRun, useRetryRun, useSetTaskStage } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
@@ -33,6 +33,7 @@ const ui = useAdeBoardUiStore();
 const takeOver = useAdeTakeOverStore();
 const approve = useApprove();
 const retry = useRetryRun();
+const resume = useResumeRun();
 const setStage = useSetTaskStage();
 const contextMenu = useContextMenuStore();
 const reviewCode = useReviewCode();
@@ -145,6 +146,7 @@ const onApprove = (stepId: string): Promise<void> =>
     approve.mutateAsync({ taskId: props.card.task.id, stageId: props.block.stage.id, stepId }),
   );
 const onRetry = (runId: string): Promise<void> => run(() => retry.mutateAsync({ runId }));
+const onResume = (runId: string): Promise<void> => run(() => resume.mutateAsync({ runId }));
 
 const canTakeOver = (r: StepRun): boolean =>
   props.block.stage.kind === 'agent' &&
@@ -322,6 +324,19 @@ function logToggleLabel(runId: string): string {
           >
             {{ logToggleLabel(rl.run.runId) }}
           </Button>
+          <AdeTip v-if="rl.canResume" :text="t('space.ade.stageBlock.resume.tooltip')">
+            <Button
+              variant="dialog"
+              size="kira"
+              class="shrink-0"
+              :class="ACTION_CLASS.claude"
+              :pending="resume.isPending.value"
+              data-testid="ade-run-resume"
+              @click="onResume(rl.run.runId)"
+            >
+              {{ t('common.action.resume.label') }}
+            </Button>
+          </AdeTip>
           <Button
             variant="dialog"
             v-if="canTakeOver(rl.run)"

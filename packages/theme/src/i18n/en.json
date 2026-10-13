@@ -1865,6 +1865,9 @@
       "restore": {
         "label": "Restore"
       },
+      "resume": {
+        "label": "Resume"
+      },
       "retry": {
         "label": "Retry"
       },
@@ -5667,9 +5670,6 @@
       "project": {
         "label": "Project key"
       },
-      "resume": {
-        "label": "Resume"
-      },
       "scope": {
         "company": {
           "label": "Company"
@@ -7738,6 +7738,9 @@
         },
         "report": {
           "title": "{stage} report"
+        },
+        "resume": {
+          "tooltip": "Continue the interrupted Claude session"
         },
         "skipThis": {
           "label": "Skip this stage"

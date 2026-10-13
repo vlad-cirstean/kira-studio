@@ -134,7 +134,7 @@ async function discard(): Promise<void> {
           data-testid="import-resume"
           @click="run('resume')"
           >{{
-            t('memory.common.resume.label')
+            t('common.action.resume.label')
           }}</Button
         >
         <Button

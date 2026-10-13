@@ -26,10 +26,9 @@ export const NEEDS_RANK: readonly NeedsKind[] = [
   'stale merge',
 ];
 
-const ACTION: Record<
-  NeedsKind,
-  'Take over' | 'Retry' | 'Open' | 'Approve' | 'See error' | 'Re-merge'
-> = {
+type NeedsAction = 'Take over' | 'Retry' | 'Resume' | 'Open' | 'Approve' | 'See error' | 'Re-merge';
+
+const ACTION: Record<NeedsKind, NeedsAction> = {
   'stuck run': 'Take over',
   failed: 'Retry',
   rebase: 'Open',
@@ -52,11 +51,12 @@ const KIND_LABEL = {
 const ACTION_LABEL = {
   'Take over': 'common.action.takeOver.label',
   Retry: 'common.action.retry.label',
+  Resume: 'common.action.resume.label',
   Open: 'common.action.open.label',
   Approve: 'common.action.approve.label',
   'See error': 'space.ade.needs.action.seeError.label',
   'Re-merge': 'space.ade.needs.action.reMerge.label',
-} as const satisfies Record<(typeof ACTION)[NeedsKind], MessageKey>;
+} as const satisfies Record<NeedsAction, MessageKey>;
 
 /** Shown name of a kind; the kind itself stays the id. */
 export function needsKindLabel(kind: NeedsKind): string {
@@ -83,7 +83,7 @@ export interface NeedsItem {
   id: string;
   kind: NeedsKind;
   tone: 'red' | 'amber' | 'grey';
-  action: (typeof ACTION)[NeedsKind];
+  action: NeedsAction;
   taskId: string;
   /** `''` for a task-level item (spec session, failed step). */
   branchId: string;
@@ -169,8 +169,8 @@ function stepItems(c: Ctx): NeedsItem[] {
             branchId: r.branchId,
             stepId: step.id,
             sessionId: r.sessionId,
-            // A script run has no session to take over: it is retried.
-            action: r.sessionId ? 'Take over' : 'Retry',
+            // A script run has no session to take over: it is retried. A restart-stopped one resumes.
+            action: r.resumable ? 'Resume' : r.sessionId ? 'Take over' : 'Retry',
             runIds: r.runId ? [r.runId] : [],
             scope: c.nick(r.branchId),
             what: t('space.ade.needs.what.stuck.label', {

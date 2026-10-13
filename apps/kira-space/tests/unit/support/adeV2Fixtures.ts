@@ -80,6 +80,7 @@ export function mkRun(
     finishedAt: null,
     outcome: null,
     purpose: '',
+    resumable: false,
     ...over,
   };
 }

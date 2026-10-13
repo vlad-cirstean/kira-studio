@@ -2,7 +2,7 @@ import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { errorText } from '@workbench/bridge/codedError';
 import { useTerminalsStore } from '../../../state/terminals';
 import type { NeedsItem } from '../board/needsYou';
-import { useApprove, useFocusSession, useRetryRun } from '../queries';
+import { useApprove, useFocusSession, useResumeRun, useRetryRun } from '../queries';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -18,6 +18,7 @@ export function useNeedsAction() {
   const terminals = useTerminalsStore();
   const { sessions } = useSessionViews();
   const retry = useRetryRun();
+  const resume = useResumeRun();
   const approve = useApprove();
   const focus = useFocusSession();
 
@@ -43,6 +44,8 @@ export function useNeedsAction() {
       } else if (n.action === 'Take over') await takeOver.request(n.sessionId);
       else if (n.action === 'Retry') {
         await Promise.all(n.runIds.map((runId) => retry.mutateAsync({ runId })));
+      } else if (n.action === 'Resume') {
+        await Promise.all(n.runIds.map((runId) => resume.mutateAsync({ runId })));
       } else if (n.action === 'Open') await openSession(n.sessionId, n.taskId, n.branchId);
       else if (n.action === 'Approve') {
         await approve.mutateAsync({ taskId: n.taskId, stageId: n.stageId, stepId: n.stepId });

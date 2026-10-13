@@ -34,6 +34,7 @@ export interface StepRun {
   runId: string;
   sessionId: string;
   finishedAt: number | null;
+  resumable: boolean;
 }
 
 export interface StepProgress {
@@ -178,6 +179,7 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
     runId: best.id,
     sessionId: best.sessionId,
     finishedAt: best.finishedAt,
+    resumable: best.resumable,
   };
 }
 
@@ -236,6 +238,7 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
           runId: '',
           sessionId: '',
           finishedAt: null,
+          resumable: false,
         },
     );
     const state = aggregate(runs.map((r) => r.state));

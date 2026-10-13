@@ -251,6 +251,10 @@ export function useRetryRun() {
   return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskRetryRun(args) });
 }
 
+export function useResumeRun() {
+  return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskResumeRun(args) });
+}
+
 export function useStageDone() {
   return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStageDone(args) });
 }
