@@ -455,7 +455,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | Claude config isolation: anything that composes a `claude` argv or env, `apps/kira-space/internal/appwire/wire.go` | `bun run test:claude:space -run TestRealClaudeSettingsUntouched` |
 | ADE runs and sessions: `apps/kira-space/internal/{ade,adeflow}/**, internal/claudeheadless/**` | `bun run test:claude:space -run 'TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun'` |
 | Smart scripts: `internal/{claudeheadless,scriptruns,scripts}/**` (incl. `scheduler.go`, `confirm.go`), `apps/kira-space/internal/ade/automation.go` | `bun run test:claude:space -run TestSmartScriptRun` and `bun run test:claude:studio -run TestSmartScriptRun` |
-| Memory MCP and install: `internal/memory/memorycli/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters'` |
+| Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters'` |
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
 | Memory import: `internal/memory/importer/**` | `bun run test:claude:space -run TestMemoryImport` (about 50 s, 0.14 USD, P211) |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |

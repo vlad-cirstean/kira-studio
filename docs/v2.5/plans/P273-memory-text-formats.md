@@ -512,3 +512,35 @@ Test edits:
 - `--install-hook` refuses a foreign hook; hook skips when the app is missing: safe for teammates.
 - Install instructions in Settings > Memory with copy buttons: same pattern as the MCP command.
 - One sequential implementer: one dependency chain, SPEC Process.
+
+## 9. Result
+
+### 9.1 Test run
+
+- Green: `lint`, `lint:go`, `typecheck`, `go test ./... -count=1` (after fix below), `test:flows:space`,
+  `test:flows:studio`, `test:unit` 1902 pass, `test:ui:space` 566 pass, `test:ui:space-mobile` 81 pass 1 skipped,
+  `test:visual:space` 12 pass after baseline regen, `test:ui:studio` ui project 540 pass.
+- Fix: `TestGoConventions` G4 flagged `os.WriteFile` in `memcheck/run.go`; hook install now uses `renameio.WriteFile`.
+- Fix: real-claude `asComment` step asserted the text prefix; claude shows the structured JSON result, so the
+  test now reads `status` and `comment` from it.
+- Visual: `settings-memory` diff was the new "Check memory comments" section only (3634 px, scroll bar appears);
+  baseline regenerated.
+- Flake, not P273: `adapters/clickhouse` `QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING` once under load; passes on rerun.
+- Not green, not P273: `ui-timing` project, `budgets.spec.ts:382` and `perf.spec.ts:105` (scroll and frame budgets).
+  No Studio, api-core or docker-ui file differs from `ccf3b8e80`. Budgets untouched.
+- Real `claude` 2.1.296 (env auth): `TestMemoryGate` (wordy item) 22 s, `TestMemoryImport` 78 s (0.162 USD),
+  `TestMemoryMcpThroughClaude` incl. `asComment` 33 s, `TestMemoryInstallRegisters` 2 s, Ade and SmartScript rows
+  pass, `test:claude:studio` pass. Spend about 0.20 USD.
+- Observed: claude receives the structured JSON (`status`, `comment`, `prepared`) for tool results, not the
+  text content, so the grep-first `meta` text and the prepared line reach claude only where a client reads text.
+- §7: 1-4 clean (`memfmt` callers in `ids.go`, `service.go`, `mcpserver/server.go`, `memcheck`; shim case
+  `wire.go:59`; `rg "keep the author.s wording" internal/llmprompts` no hit); 5: comment regex 3 of 4 lines,
+  doc regex 12 of 13 (prose line unmatched); 6 by hand below; 7 no `<style` in `memory/`; 8 count 76 = `TestList`.
+- By hand, temp repo: `--install-hook` wrote an executable `pre-commit`; legacy comment commit passed;
+  orphan `km_` line blocked (`bad.go:2: fact line without kira-memory header`, exit 1); valid block committed;
+  foreign hook made install exit 1 and print the hook line.
+
+### 9.2 Close-out
+
+`docs/ARCHITECTURE.md` memory section (formats, regexes, style rule, `Prepare`/`asComment`, `memory-check`,
+grep-first MCP text), `docs/DEV_ENVIRONMENT.md` real-claude row (`mcpserver/**`, `memfmt/**`). SPEC P273 Done.
