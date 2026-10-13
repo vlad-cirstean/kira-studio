@@ -77,15 +77,29 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 			"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools,
 			"--output-format", "stream-json", "--verbose")
 		msgs := parseStream(out)
+		for _, m := range msgs {
+			if m.Type != "assistant" {
+				continue
+			}
+			for _, b := range blocks(m) {
+				if b.Type == "tool_use" {
+					t.Logf("tool use %s %s", b.Name, tail(string(b.Input), 200))
+				}
+			}
+		}
 		uses := toolUses(msgs, "mcp__"+memoryServer+"__ingest_files")
 		if len(uses) == 0 {
 			t.Fatalf("no ingest_files tool use in the stream:\n%s", tail(out, 1500))
 		}
 		var in struct {
-			Paths []string `json:"paths"`
+			Paths   []string `json:"paths"`
+			Project string   `json:"project"`
 		}
 		if err := json.Unmarshal(uses[0].Input, &in); err != nil {
 			t.Fatal(err)
+		}
+		if in.Project != "" && in.Project != "github.com/acme/billing" {
+			t.Errorf("ingest_files project = %q, want it omitted or github.com/acme/billing", in.Project)
 		}
 		var byPath bool
 		for _, p := range in.Paths {

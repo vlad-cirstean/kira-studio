@@ -405,7 +405,7 @@ Never drop a reason, origin or scope to tidy a fact. Never store secrets.
 Origins rank user, external, agent; an agent fact never replaces a user fact.
 A challenge stores nothing: ask the user the returned questions or fix the items, then call again with the answers in clarifications.
 
-Files (repo docs, a Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read or paste the content; Kira reads the files. Save external material to a .md, .txt or .json file first.
+Files (repo docs, a Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
 
 Recall: search_memories matches words and meaning, best first, and returns loosely related results; drop what is unrelated. Cite a memory by its fact id (km_...). ctx=N in a result's meta means memory_context has N facts stored with it; memory_history shows its versions.`,
 }, NoVars{})
@@ -423,7 +423,7 @@ var (
 	_ = arg(MemoryToolStoreMemory.id, "items.origin", spaceApp, NewSession, `who decided it: user (the user stated or confirmed it), agent (you concluded it) or external (a source outside this conversation; set sourceTag)`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "items.sourceTag", spaceApp, NewSession, `source name, only for origin external: lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "items.scope", spaceApp, NewSession, `where it holds: company, project or personal (the user only)`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit for this repo's project; only for scope project`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.project", spaceApp, NewSession, `project key host/owner/repo, such as github.com/acme/billing, never a bare name; omit to use this repo's project; only for scope project`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "clarifications", spaceApp, NewSession, `question and answer pairs answering an earlier challenge`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every item joins, besides its session and request; memory_context reads a group's facts`, MaxVars{Max: 5})
@@ -478,7 +478,7 @@ var (
 	_ = arg(MemoryToolIngestFiles.id, "origin", spaceApp, NewSession, `who decided the content: user, agent or external (an outside source such as a Slack export; set sourceTag)`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "sourceTag", spaceApp, NewSession, `source name, only for origin external: lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "scope", spaceApp, NewSession, `where the facts hold: company, project or personal (the user only)`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit for the first path's project; only for scope project`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "project", spaceApp, NewSession, `project key host/owner/repo, such as github.com/acme/billing, never a bare name; omit to use the first path's project; only for scope project`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every fact joins, besides each file's document group; memory_context reads a group's facts`, MaxVars{Max: 4})
 	_ = arg(MemoryToolIngestFiles.id, "groups.kind", spaceApp, NewSession, `task or thread`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "groups.key", spaceApp, NewSession, `stable identifier: a task id such as PROJ-123 or a thread URL`, NoVars{})
