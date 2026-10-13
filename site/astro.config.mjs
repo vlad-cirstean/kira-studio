@@ -23,6 +23,7 @@ export default defineConfig({
         ThemeProvider: './src/components/Empty.astro',
       },
       sidebar: [
+        { label: 'Overview', link: '/docs/' },
         { label: 'Start', items: [{ autogenerate: { directory: 'docs/start' } }] },
         { label: 'Kira Studio', items: [{ autogenerate: { directory: 'docs/studio' } }] },
         { label: 'Kira Space', items: [{ autogenerate: { directory: 'docs/space' } }] },
