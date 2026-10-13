@@ -280,13 +280,11 @@ test("a merge's second-parent line keeps its own lane, before and after Load mor
 const handle = (p: Page, name: string) =>
   p.getByRole('separator', { name: `Resize ${name} column`, exact: true });
 
-/** Closes the detail pane. The author and date handles are not rendered while it is open, and a
- *  lone Escape pressed before the pane has opened is lost, so press until the handle is there. */
+/** Closes the detail pane. The author and date handles are not rendered while it is open. */
 async function closeDetail(p: Page): Promise<void> {
-  await expect(async () => {
-    await p.keyboard.press('Escape');
-    await expect(handle(p, 'author')).toBeVisible({ timeout: 1000 });
-  }).toPass();
+  await expect(p.locator('[data-testid="detail-region"]')).toBeVisible();
+  await p.keyboard.press('Escape');
+  await expect(handle(p, 'author')).toBeVisible();
 }
 
 async function drag(p: Page, name: string, dx: number): Promise<void> {
@@ -325,7 +323,10 @@ async function diagonalWheel(p: Page): Promise<void> {
   const box = (await p.locator(VIEWPORT).boundingBox())!;
   await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   for (let i = 0; i < 10; i++) await p.mouse.wheel(40, 60);
-  await p.waitForTimeout(100);
+  await p.evaluate(
+    () =>
+      new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+  );
 }
 
 test('columns resized wide never push the graph out of view', async ({ relaunch }) => {
