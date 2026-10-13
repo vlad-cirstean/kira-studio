@@ -109,6 +109,17 @@ export function useContainerDetail(id: Ref<string>) {
   });
 }
 
+/** The registry page of one image; the client default never refetches it. */
+export function useImageRegistry(imageId: MaybeRefOrGetter<string>) {
+  const { control } = useDocker();
+  const { scope, ready } = useScope();
+  return useQuery({
+    queryKey: computed(() => ['docker', scope.value, 'image-registry', toValue(imageId)] as const),
+    queryFn: () => control.imageRegistry(toValue(imageId)),
+    enabled: computed(() => ready.value && toValue(imageId) !== ''),
+  });
+}
+
 export function useContainerEditSpec(id: Ref<string>) {
   const { control } = useDocker();
   const { scope, ready } = useScope();

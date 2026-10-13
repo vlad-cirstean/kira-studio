@@ -76,7 +76,6 @@ const IMAGES = [
     created: 1_700_000_000,
     containers: 1,
     dangling: false,
-    registryUrl: 'https://hub.docker.com/_/alpine',
   },
 ];
 const VOLUMES = [
@@ -122,7 +121,6 @@ function detail(c: Json): Json {
     labels: {},
     networkAttachments: [],
     raw: '{"Id":"x"}',
-    registryUrl: 'https://hub.docker.com/_/alpine',
   };
 }
 

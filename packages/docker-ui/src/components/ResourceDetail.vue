@@ -11,7 +11,14 @@ import { displayValue, formatBytes, formatDateTime } from '@workbench/behaviour/
 import { computed } from 'vue';
 import { useDocker } from '../context';
 import { nameOrShortId, stateDotTone } from '../lib/format';
-import { useContainers, useImages, useInspect, useNetworks, useVolumes } from '../queries';
+import {
+  useContainers,
+  useImageRegistry,
+  useImages,
+  useInspect,
+  useNetworks,
+  useVolumes,
+} from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { InspectKind } from '../wire';
 import DetailSection from './DetailSection.vue';
@@ -52,9 +59,8 @@ const title = computed(() => {
   return nameOrShortId(network.value?.name, props.id);
 });
 
-const registryUrl = computed(() =>
-  props.kind === 'image' ? (image.value?.registryUrl ?? '') : '',
-);
+const registry = useImageRegistry(() => (props.kind === 'image' ? props.id : ''));
+const registryUrl = computed(() => registry.data.value?.url ?? '');
 
 function openRegistry(): void {
   void docker.openExternal(registryUrl.value);

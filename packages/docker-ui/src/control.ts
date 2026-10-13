@@ -15,6 +15,7 @@ import {
   type DockerNetwork,
   type DockerRecreateArgs,
   type DockerRecreateResult,
+  type DockerRegistryLink,
   type DockerStatsEvent,
   type DockerStatus,
   type DockerUpdateArgs,
@@ -34,6 +35,7 @@ export interface DockerBindings {
   Volumes(): Promise<unknown>;
   Networks(): Promise<unknown>;
   InspectContainer(a: { id: string }): Promise<unknown>;
+  ImageRegistry(a: { id: string }): Promise<unknown>;
   Inspect(a: { kind: string; id: string }): Promise<unknown>;
   DiskUsage(): Promise<unknown>;
   ContainerSize(a: { id: string }): Promise<unknown>;
@@ -77,6 +79,7 @@ export interface DockerControl {
   volumes(): Promise<DockerVolume[]>;
   networks(): Promise<DockerNetwork[]>;
   inspectContainer(id: string): Promise<DockerContainerDetail>;
+  imageRegistry(id: string): Promise<DockerRegistryLink>;
   inspect(kind: InspectKind, id: string): Promise<{ raw: string }>;
   diskUsage(): Promise<DockerDiskUsage>;
   containerSize(id: string): Promise<DockerContainerSize>;
@@ -135,6 +138,8 @@ export function createDockerControl(
     networks: () => list<DockerNetwork>(b.Networks()),
     inspectContainer: (id) =>
       unwrap(b.InspectContainer({ id })).then((r) => trust<DockerContainerDetail>(r)),
+    imageRegistry: (id) =>
+      unwrap(b.ImageRegistry({ id })).then((r) => trust<DockerRegistryLink>(r)),
     inspect: (kind, id) => unwrap(b.Inspect({ kind, id })).then((r) => trust<{ raw: string }>(r)),
     diskUsage: () => unwrap(b.DiskUsage()).then((r) => trust<DockerDiskUsage>(r)),
     containerSize: (id) =>

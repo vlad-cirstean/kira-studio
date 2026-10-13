@@ -177,6 +177,7 @@ export const IPC = {
   dockerExecOpen: 'kira:docker:execOpen',
   dockerExecResize: 'kira:docker:execResize',
   dockerExecWrite: 'kira:docker:execWrite',
+  dockerImageRegistry: 'kira:docker:imageRegistry',
   dockerImages: 'kira:docker:images',
   dockerInspect: 'kira:docker:inspect',
   dockerInspectContainer: 'kira:docker:inspectContainer',

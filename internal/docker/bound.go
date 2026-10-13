@@ -14,9 +14,19 @@ type BoundService struct {
 	m *Manager
 }
 
+// Option tweaks NewBoundService.
+type Option func(*Manager)
+
+// WithHubAPI points the Docker Hub repository check at base (a flow-test seam).
+func WithHubAPI(base string) Option { return func(m *Manager) { m.HubAPI = base } }
+
 // NewBoundService builds the service over the real process environment.
-func NewBoundService(emit appevent.Emitter) *BoundService {
-	return &BoundService{m: NewManager(emit)}
+func NewBoundService(emit appevent.Emitter, opts ...Option) *BoundService {
+	m := NewManager(emit)
+	for _, o := range opts {
+		o(m)
+	}
+	return &BoundService{m: m}
 }
 
 // CloseWindowBound ends every stream windowKey started. A package function, not a method: Wails
@@ -122,6 +132,11 @@ func (b *BoundService) Containers(args ListArgs) ([]Container, error) {
 }
 
 func (b *BoundService) Images() ([]Image, error) { return b.m.images(context.Background()) }
+
+// ImageRegistry resolves one image's registry page lazily; the image list stays free of Hub calls.
+func (b *BoundService) ImageRegistry(args IDArgs) (RegistryLink, error) {
+	return b.m.imageRegistry(context.Background(), args.ID)
+}
 
 func (b *BoundService) Volumes() ([]Volume, error) { return b.m.volumes(context.Background()) }
 

@@ -36,9 +36,9 @@ func splitRef(ref string) (host, path string) {
 	return host, path
 }
 
-// registryURL returns the web page of the image's registry repository, or "" when the
-// image has no digest (never pushed or pulled) or the registry has no known page layout.
-func registryURL(tags, repoDigests []string) string {
+// pickRef returns the repo digest naming the same repository as the first tag, else the first
+// digest; "" when the image has no digest (never pushed or pulled).
+func pickRef(tags, repoDigests []string) string {
 	if len(repoDigests) == 0 {
 		return ""
 	}
@@ -52,6 +52,45 @@ func registryURL(tags, repoDigests []string) string {
 			}
 		}
 	}
+	return ref
+}
+
+// impliedHub reports whether ref names no registry host, so Docker Hub is only implied.
+func impliedHub(ref string) bool {
+	parts := strings.Split(ref, "/")
+	return len(parts) == 1 || !(strings.ContainsAny(parts[0], ".:") || parts[0] == "localhost")
+}
+
+// registryURL returns the web page of the image's registry repository, or "" when the
+// image has no digest or the registry has no known page layout.
+func registryURL(tags, repoDigests []string) string {
+	ref := pickRef(tags, repoDigests)
+	if ref == "" {
+		return ""
+	}
+	return pageURL(ref)
+}
+
+// registryLink applies the store-aware rule: a containerd store gives locally built images a
+// digest too, so an implied Docker Hub name links only when hub confirms the repository.
+func registryLink(containerd bool, tags, repoDigests []string, hub func(repoPath string) (bool, error)) (string, error) {
+	ref := pickRef(tags, repoDigests)
+	if ref == "" {
+		return "", nil
+	}
+	url := pageURL(ref)
+	if url == "" || !containerd || !impliedHub(ref) {
+		return url, nil
+	}
+	_, path := splitRef(ref)
+	ok, err := hub(path)
+	if err != nil || !ok {
+		return "", err
+	}
+	return url, nil
+}
+
+func pageURL(ref string) string {
 	host, path := splitRef(ref)
 	segs := strings.Split(path, "/")
 	switch {

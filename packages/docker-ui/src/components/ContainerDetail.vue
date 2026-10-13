@@ -18,7 +18,7 @@ import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { publishedPorts, shortId, stateDotTone } from '../lib/format';
 import type { ContainerAction } from '../queries';
-import { useContainerAction, useContainerDetail } from '../queries';
+import { useContainerAction, useContainerDetail, useImageRegistry } from '../queries';
 import { useDockerEditStore } from '../state/dockerEdit';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { type DockerDetailTab, useDockerUiStore } from '../state/dockerUi';
@@ -41,7 +41,8 @@ const detail = useContainerDetail(id);
 const actions = useContainerAction();
 
 const c = computed(() => detail.data.value?.container);
-const registryUrl = computed(() => detail.data.value?.registryUrl ?? '');
+const registry = useImageRegistry(() => c.value?.imageId ?? '');
+const registryUrl = computed(() => registry.data.value?.url ?? '');
 const running = computed(() => c.value?.state === 'running');
 const isUp = running;
 const live = computed(() => (running.value ? stats.latest.get(props.containerId) : undefined));

@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
-import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
+import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { formatBytes } from '@workbench/behaviour/format';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import Identifier from '@workbench/components/Identifier.vue';
 import QueryState from '@workbench/components/QueryState.vue';
 import { computed } from 'vue';
-import { useDocker } from '../context';
 import { shortId } from '../lib/format';
 import { useImages } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import VirtualList from './VirtualList.vue';
 
 const ui = useDockerUiStore();
-const docker = useDocker();
 const images = useImages();
 
 const rows = computed(() => {
@@ -29,10 +26,6 @@ const rows = computed(() => {
 
 function open(row: { image: { id: string } }): void {
   ui.select({ kind: 'image', id: row.image.id });
-}
-
-function openRegistry(url: string): void {
-  void docker.openExternal(url);
 }
 </script>
 
@@ -85,16 +78,6 @@ function openRegistry(url: string): void {
           <span class="w-14 shrink-0 text-right font-data" :class="rowMeta">{{
             formatBytes(row.image.size)
           }}</span>
-          <span class="flex w-6 shrink-0 justify-center">
-            <TooltipIconButton
-              v-if="row.image.registryUrl"
-              icon="link-external"
-              :label="t('docker.detail.openRegistry.tooltip')"
-              :class="cn('flex', rowActions)"
-              data-testid="docker-image-registry"
-              @click.stop="openRegistry(row.image.registryUrl)"
-            />
-          </span>
         </div>
       </template>
     </VirtualList>

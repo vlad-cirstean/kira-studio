@@ -203,6 +203,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dockerExecOpen: 'DockerService.ExecOpen',
   dockerExecResize: 'DockerService.ExecResize',
   dockerExecWrite: 'DockerService.ExecWrite',
+  dockerImageRegistry: 'DockerService.ImageRegistry',
   dockerImages: 'DockerService.Images',
   dockerInspect: 'DockerService.Inspect',
   dockerInspectContainer: 'DockerService.InspectContainer',

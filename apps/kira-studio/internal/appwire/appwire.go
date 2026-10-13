@@ -55,6 +55,8 @@ type Options struct {
 	// scheduler and the run times (flow-test seams); production leaves both zero.
 	ScheduleTimeout time.Duration
 	Clock           scriptruns.Clock
+	// DockerHubAPI replaces the Docker Hub base URL the image registry check calls (flow-test seam); empty keeps the default.
+	DockerHubAPI string
 }
 
 // Wired is the built object graph.

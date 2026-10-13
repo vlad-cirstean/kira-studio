@@ -182,7 +182,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 		slog.Warn("recover script runs", "scope", "startup", "err", err)
 	}
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs}}
-	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events)}
+	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts)...)}
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
@@ -272,4 +272,11 @@ func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, e
 			return err != nil || s.Advanced.NotifyPrompts
 		},
 	})
+}
+
+func dockerOptions(opts Options) []docker.Option {
+	if opts.DockerHubAPI == "" {
+		return nil
+	}
+	return []docker.Option{docker.WithHubAPI(opts.DockerHubAPI)}
 }

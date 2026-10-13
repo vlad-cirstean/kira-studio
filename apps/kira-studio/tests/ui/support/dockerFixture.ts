@@ -99,7 +99,6 @@ export const IMAGES = [
     created: 1_700_000_000,
     containers: 2,
     dangling: false,
-    registryUrl: 'https://hub.docker.com/_/alpine',
   },
   {
     id: 'sha256:img2',
@@ -108,7 +107,6 @@ export const IMAGES = [
     created: 1_700_000_000,
     containers: 0,
     dangling: false,
-    registryUrl: '',
   },
 ];
 
@@ -156,7 +154,6 @@ export function containerDetailWithSecret(c: ReturnType<typeof container>) {
     labels: {},
     networkAttachments: [],
     raw: '{"Id":"x"}',
-    registryUrl: c.image === 'alpine:3.20' ? 'https://hub.docker.com/_/alpine' : '',
   };
 }
 
@@ -180,6 +177,7 @@ export async function setupDocker(
           ? containerDetailWithSecret(c)
           : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
+      ImageRegistry: () => ({ url: '' }),
       Inspect: () => ({ raw: '{"Id":"x"}' }),
       Stop: (a) => {
         const c = state.containers.find((x) => x.id === (a as { id: string }).id);
@@ -210,7 +208,6 @@ export function containerDetail(c: ReturnType<typeof container>) {
     labels: {},
     networkAttachments: [],
     raw: '{"Id":"x"}',
-    registryUrl: '',
   };
 }
 

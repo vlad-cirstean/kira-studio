@@ -75,6 +75,12 @@ type Manager struct {
 	logs   *logRegistry
 	execs  *execRegistry
 
+	// containerd caches whether the engine uses the containerd image store; reset with the client.
+	containerd *bool
+	// HubAPI is the Docker Hub web API base; a flow-test seam, production keeps DefaultHubAPI.
+	HubAPI string
+	hub    hubCache
+
 	flight singleflight.Group
 	// editing holds the container IDs with an edit in flight.
 	editing sync.Map
@@ -86,7 +92,7 @@ func NewManager(emit appevent.Emitter) *Manager {
 }
 
 func newManager(emit appevent.Emitter, env resolveEnv) *Manager {
-	m := &Manager{Emit: emit, env: env}
+	m := &Manager{Emit: emit, env: env, HubAPI: DefaultHubAPI}
 	m.events = newEventsWatcher(m)
 	m.logs = newLogRegistry()
 	m.execs = newExecRegistry()
@@ -157,6 +163,7 @@ func (m *Manager) resetLocked() {
 	if m.cli != nil {
 		_ = m.cli.Close()
 		m.cli = nil
+		m.containerd = nil
 	}
 }
 

@@ -53,6 +53,7 @@ type options struct {
 	smartTimeout    time.Duration
 	scheduleTimeout time.Duration
 	clock           scriptruns.Clock
+	dockerHubAPI    string
 }
 
 // Opt tweaks New.
@@ -66,6 +67,9 @@ func WithScheduleTimeout(d time.Duration) Opt { return func(o *options) { o.sche
 
 // WithClock drives the scheduler and the run times with c.
 func WithClock(c scriptruns.Clock) Opt { return func(o *options) { o.clock = c } }
+
+// WithDockerHubAPI points the Docker image registry check at base instead of Docker Hub.
+func WithDockerHubAPI(base string) Opt { return func(o *options) { o.dockerHubAPI = base } }
 
 // App is one booted Kira Studio.
 type App struct {
@@ -169,7 +173,7 @@ func (a *App) build() {
 		Authorizer: localauth.New(time.Now, a.OSAuth.evaluate, a.OSAuth.isAvailable),
 		Emitter:    a.Events, Browser: a.Browser, Dialogs: a.Dialogs, KeepAwakeDriver: a.KeepAwake, McpInstaller: a.McpInstaller,
 		AppName: "Kira Studio", Version: "flowtest", SmartTimeout: a.opts.smartTimeout,
-		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock,
+		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, DockerHubAPI: a.opts.dockerHubAPI,
 	})
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)

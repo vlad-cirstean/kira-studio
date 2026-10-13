@@ -152,17 +152,22 @@ test('LinkService.OpenExternal rejection is announced in the live region', async
     created: 1_700_000_000,
     containers: 0,
     dangling: false,
-    registryUrl: 'https://hub.docker.com/_/alpine',
   };
   const page = await openDockerWith(
     relaunch,
-    { Containers: () => [], Images: () => [image], Volumes: () => [], Networks: () => [] },
+    {
+      Containers: () => [],
+      Images: () => [image],
+      ImageRegistry: () => ({ url: 'https://hub.docker.com/_/alpine' }),
+      Volumes: () => [],
+      Networks: () => [],
+    },
     [{ channel: IPC.linkOpenExternal, error: { code: 'E_INTERNAL', message: 'no handler' } }],
   );
   await page.locator('[data-testid="docker-section-images"]').click();
   const row = page.locator('[data-testid="docker-row"]', { hasText: 'alpine:3.20' });
-  await row.hover();
-  await row.locator('[data-testid="docker-image-registry"]').click();
+  await row.click();
+  await page.locator('[data-testid="docker-resource-registry"]').click();
 
   await expect(page.locator('[data-testid="app-live-region"]')).toHaveText(
     'Couldn’t open the link',
