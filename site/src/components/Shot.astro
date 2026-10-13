@@ -22,6 +22,7 @@ const { shot, eager = false } = Astro.props;
       <img
         src={shot.detailPng}
         alt={shot.alt}
+        data-shot={shot.id}
         width={shot.detailWidth}
         height={shot.detailHeight}
         loading={eager ? 'eager' : 'lazy'}
