@@ -11,6 +11,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
@@ -38,8 +39,14 @@ func RunIngest(args []string, promptsPath string) int {
 	if promptsPath != "" {
 		prompts = llmprompts.NewStore(promptsPath)
 	}
+	claude := memory.NewCLIRunner()
+	svc := memory.NewService(store, claude, memory.ServiceOptions{
+		Embedder: embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home()}), Prompts: prompts,
+	})
+	defer svc.Close()
 	runner, err := importer.NewRunner(store, importer.RunnerOptions{
-		Agent: importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(), Prompts: prompts},
+		Agent: importer.ClaudeAgent{Runner: claude, Executable: exe, Home: memory.Home(), Prompts: prompts},
+		Docs:  svc,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "memory-ingest:", err)

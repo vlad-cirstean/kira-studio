@@ -21,6 +21,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/filelock"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const (
@@ -50,6 +51,7 @@ type RunnerOptions struct {
 	Budget     Budget        // zero means DefaultBudget
 	Tick       time.Duration // how often the runner re-reads job states; 0 means 500 ms
 	IdleExit   time.Duration // no scanning or running job for this long ends the runner; 0 means 30 s
+	Docs       DocApplier    // applies kira-memory docs; nil fails such files
 }
 
 func defaultBackoff() backoff.BackOff {
@@ -378,6 +380,11 @@ func (r *Runner) plan(jobID string, res ScanResult) ([]newFile, error) {
 			files = append(files, nf)
 			continue
 		}
+		if isMemdoc(c.Kind, text) {
+			nf.Kind, nf.State = KindMemdoc, FilePending
+			files = append(files, nf)
+			continue
+		}
 		chunks, title, err := chunkFile(c.Kind, text, c.Rel, r.opts.Budget)
 		if err != nil {
 			nf.State, nf.Reason = FileFailed, err.Error()
@@ -533,6 +540,13 @@ func (r *Runner) materialiseNext() (bool, error) {
 		return false, err
 	} else if done {
 		return end(FileSkipped, "unchanged since import on "+strings.SplitN(at, "T", 2)[0])
+	}
+	if isMemdoc(ref.Kind, text) || ref.Kind == KindMemdoc {
+		doc, _, problems := memfmt.ParseDoc([]byte(text))
+		if len(problems) > 0 {
+			return end(FileFailed, docError(problems))
+		}
+		return true, r.st.storeDoc(ref.FileID, hash, doc.Title)
 	}
 	chunks, title, err := chunkFile(ref.Kind, text, ref.Rel, r.opts.Budget)
 	if err != nil {
@@ -739,6 +753,8 @@ func (r *Runner) runFinalize(ctx context.Context, it finalItem) {
 	var u usage
 	var err error
 	switch {
+	case it.Kind == KindMemdoc:
+		err = r.finalizeDoc(ctx, it)
 	case len(it.Facts) == 0:
 		err = r.st.finishFile(it, FinalizeOutput{}, u)
 	case tooManyFacts(it.Facts):

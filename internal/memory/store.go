@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 	"github.com/kirathecat/kira-studio/internal/memory/migrations"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
@@ -340,21 +342,81 @@ func (s *Store) Projects(ctx context.Context) ([]string, error) {
 	return out, rows.Err()
 }
 
-// ImportDocument names the import file ref points at: its absolute path and its path relative to the
-// import root. ErrNotFound when the file row is gone.
-func (s *Store) ImportDocument(ctx context.Context, ref string) (path, relPath string, err error) {
+// ImportProvenance is what an import-mode store call forces onto every fact: the job's provenance and
+// groups, plus the file's absolute and relative paths.
+type ImportProvenance struct {
+	Path, RelPath                              string
+	Origin, SourceTag, Scope, Project, Session string
+	Groups                                     []GroupRef
+}
+
+// ImportProvenance reads the import file ref and its job. ErrNotFound when the file row is gone.
+func (s *Store) ImportProvenance(ctx context.Context, ref string) (ImportProvenance, error) {
 	db, err := s.conn()
 	if err != nil {
-		return "", "", err
+		return ImportProvenance{}, err
 	}
-	err = db.QueryRowContext(ctx, `SELECT path, rel_path FROM import_files WHERE id = ?`, ref).Scan(&path, &relPath)
+	var p ImportProvenance
+	var groups string
+	err = db.QueryRowContext(ctx, `SELECT f.path, f.rel_path, j.origin, COALESCE(j.source_tag, ''), j.scope, COALESCE(j.project, ''),
+		COALESCE(j.session_id, ''), j.groups_json FROM import_files f JOIN import_jobs j ON j.id = f.job_id WHERE f.id = ?`, ref).
+		Scan(&p.Path, &p.RelPath, &p.Origin, &p.SourceTag, &p.Scope, &p.Project, &p.Session, &groups)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", ErrNotFound
+		return ImportProvenance{}, ErrNotFound
 	}
 	if err != nil {
-		return "", "", fmt.Errorf("memory: import document: %w", err)
+		return ImportProvenance{}, fmt.Errorf("memory: import provenance: %w", err)
 	}
-	return path, relPath, nil
+	if err := json.Unmarshal([]byte(groups), &p.Groups); err != nil {
+		return ImportProvenance{}, fmt.Errorf("memory: import groups: %w", err)
+	}
+	return p, nil
+}
+
+// currentOf returns the current version of a fact id.
+func (s *Store) currentOf(ctx context.Context, lineage string) (Memory, bool, error) {
+	db, err := s.conn()
+	if err != nil {
+		return Memory{}, false, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+` FROM memories m WHERE m.lineage_id = ? AND m.status = 'current'`, lineage)
+	if err != nil {
+		return Memory{}, false, fmt.Errorf("memory: current version: %w", err)
+	}
+	ms, err := collect(rows, false)
+	if err != nil || len(ms) == 0 {
+		return Memory{}, false, err
+	}
+	return ms[0], true, nil
+}
+
+// orphans counts the facts of group id that listed does not name.
+func (s *Store) orphans(ctx context.Context, groupID string, listed []memfmt.Fact) (int, error) {
+	db, err := s.conn()
+	if err != nil {
+		return 0, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT m.lineage_id FROM memory_group_members gm
+		JOIN memories m ON m.lineage_id = gm.lineage_id AND m.status = 'current' WHERE gm.group_id = ?`, groupID)
+	if err != nil {
+		return 0, fmt.Errorf("memory: orphans: %w", err)
+	}
+	defer rows.Close()
+	named := make(map[string]struct{}, len(listed))
+	for _, f := range listed {
+		named[f.ID] = struct{}{}
+	}
+	n := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		if _, ok := named[id]; !ok {
+			n++
+		}
+	}
+	return n, rows.Err()
 }
 
 // ErrNotFound is returned when an id names no memory.
@@ -413,6 +475,7 @@ type commitInput struct {
 	Revision  int64
 	Action    string
 	TargetID  string // update/noop: version id of the current version
+	FactID    string // add: the fact id to use (a doc's); empty generates one
 	Fact      string
 	Reason    string
 	Keywords  []string
@@ -522,16 +585,19 @@ func (s *Store) commitFact(ctx context.Context, in commitInput) (commitResult, e
 // second one implausible.
 func commitAdd(ctx context.Context, tx *sql.Tx, in commitInput, now string) (commitResult, error) {
 	for attempt := 0; ; attempt++ {
-		id, err := newFactID()
-		if err != nil {
-			return commitResult{}, fmt.Errorf("memory: new id: %w", err)
+		id := in.FactID
+		if id == "" {
+			var err error
+			if id, err = newFactID(); err != nil {
+				return commitResult{}, fmt.Errorf("memory: new id: %w", err)
+			}
 		}
 		res := commitResult{ID: versionID(id, 1), LineageID: id, Version: 1}
-		err = insertMemory(ctx, tx, res, in, "", now)
+		err := insertMemory(ctx, tx, res, in, "", now)
 		if err == nil {
 			return res, nil
 		}
-		if !isUnique(err) || attempt == 1 {
+		if !isUnique(err) || attempt == 1 || in.FactID != "" {
 			return commitResult{}, err
 		}
 	}
@@ -576,10 +642,17 @@ func commitNoop(ctx context.Context, tx *sql.Tx, in commitInput) (commitResult, 
 // survives new versions. An existing group keeps its first title.
 func joinGroup(ctx context.Context, tx *sql.Tx, g GroupRef, lineage string, ms int64) error {
 	var id string
-	err := tx.QueryRowContext(ctx, `SELECT id FROM memory_groups WHERE kind = ? AND key = ?`, g.Kind, g.Key).Scan(&id)
+	var err error
+	if g.ID != "" {
+		err = tx.QueryRowContext(ctx, `SELECT id FROM memory_groups WHERE id = ?`, g.ID).Scan(&id)
+	} else {
+		err = tx.QueryRowContext(ctx, `SELECT id FROM memory_groups WHERE kind = ? AND key = ?`, g.Kind, g.Key).Scan(&id)
+	}
 	if errors.Is(err, sql.ErrNoRows) {
-		if id, err = newGroupID(); err != nil {
-			return fmt.Errorf("memory: new group id: %w", err)
+		if id = g.ID; id == "" {
+			if id, err = newGroupID(); err != nil {
+				return fmt.Errorf("memory: new group id: %w", err)
+			}
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO memory_groups (id, kind, key, title, created_at) VALUES (?, ?, ?, ?, ?)`,
 			id, g.Kind, g.Key, g.Title, ms)

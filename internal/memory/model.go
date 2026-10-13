@@ -106,6 +106,9 @@ type GroupRef struct {
 	Kind  string `json:"kind"`
 	Key   string `json:"key"`
 	Title string `json:"title,omitempty"`
+	// ID, set by the server only, names an existing group by its kg_ id (a doc's header group): the
+	// group is found by id first and created with this id when absent.
+	ID string `json:"-"`
 }
 
 // GroupContext is one group of a fact with its other current facts, newest first. Total counts every

@@ -143,6 +143,7 @@ type harness struct {
 	t     *testing.T
 	ms    *memory.Store
 	agent *fakeAgent
+	svc   *memory.Service
 	e     *Engine
 	dir   string
 
@@ -168,6 +169,7 @@ func newHarness(t *testing.T, files int) *harness {
 	t.Cleanup(func() { _ = h.ms.Close() })
 	svc := memory.NewService(h.ms, acceptRunner{}, memory.ServiceOptions{})
 	t.Cleanup(svc.Close)
+	h.svc = svc
 	h.agent = &fakeAgent{svc: svc}
 	h.e = h.open()
 	return h
@@ -175,7 +177,7 @@ func newHarness(t *testing.T, files int) *harness {
 
 func (h *harness) runnerOpts() RunnerOptions {
 	return RunnerOptions{
-		Agent: h.agent, Budget: smallBudget, Tick: 20 * time.Millisecond,
+		Agent: h.agent, Docs: h.svc, Budget: smallBudget, Tick: 20 * time.Millisecond,
 		Backoff: func() backoff.BackOff { return backoff.NewConstantBackOff(0) },
 	}
 }

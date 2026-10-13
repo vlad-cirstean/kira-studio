@@ -896,6 +896,13 @@ func (s *store) finishFile(it finalItem, out FinalizeOutput, u usage) error {
 	})
 }
 
+// storeDoc records a materialised memdoc: no chunks, straight to extracted.
+func (s *store) storeDoc(fileID, hash, title string) error {
+	_, err := s.db.Exec(`UPDATE import_files SET kind = 'memdoc', content_hash = ?, title = ?, chunk_count = 0, est_tokens = 0,
+		state = 'extracted', updated_at = ? WHERE id = ? AND state = 'extracting'`, hash, title, s.now(), fileID)
+	return err
+}
+
 func nonNil[T any](v []T) []T {
 	if v == nil {
 		return []T{}

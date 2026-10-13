@@ -62,9 +62,9 @@ type contextInput struct {
 
 // Options tune a server instance.
 type Options struct {
-	// ImportRef puts the server in import mode: every stored memory is external with source tag
-	// "doc", personal, source "import" and this import file id, and joins the file's document group,
-	// whatever provenance the caller sends.
+	// ImportRef puts the server in import mode: every stored memory takes the provenance, groups and
+	// session of the import job that owns this file id, source "import", and joins the file's document
+	// group, whatever the caller sends. An external job never challenges.
 	ImportRef string
 	// SessionID is the Claude Code session of this server; a store call without a session argument
 	// uses it. Empty stores no session.
@@ -199,20 +199,25 @@ func requestFor(ctx context.Context, svc *memory.Service, opts Options, in store
 	if opts.ImportRef == "" {
 		return sr, nil
 	}
-	sr.Source, sr.SourceRef, sr.Session = memory.SourceImport, opts.ImportRef, ""
-	for i := range sr.Items {
-		sr.Items[i].Origin, sr.Items[i].SourceTag = memory.OriginExternal, "doc"
-		sr.Items[i].Scope, sr.Items[i].Project = memory.ScopePersonal, ""
-	}
-	doc := memory.GroupRef{Kind: memory.GroupDocument, Key: opts.ImportRef}
-	path, rel, err := svc.ImportDocument(ctx, opts.ImportRef)
+	ip, err := svc.ImportProvenance(ctx, opts.ImportRef)
 	switch {
 	case err == nil:
-		doc.Key, doc.Title = path, rel
-	case !errors.Is(err, memory.ErrNotFound):
+	case errors.Is(err, memory.ErrNotFound):
+		ip = memory.ImportProvenance{Origin: memory.OriginExternal, SourceTag: "doc", Scope: memory.ScopePersonal}
+	default:
 		return memory.StoreRequest{}, err
 	}
-	sr.Groups = []memory.GroupRef{doc}
+	sr.Source, sr.SourceRef, sr.Session = memory.SourceImport, opts.ImportRef, ip.Session
+	sr.NoChallenge = ip.Origin == memory.OriginExternal
+	for i := range sr.Items {
+		sr.Items[i].Origin, sr.Items[i].SourceTag = ip.Origin, ip.SourceTag
+		sr.Items[i].Scope, sr.Items[i].Project = ip.Scope, ip.Project
+	}
+	doc := memory.GroupRef{Kind: memory.GroupDocument, Key: opts.ImportRef}
+	if ip.Path != "" {
+		doc.Key, doc.Title = ip.Path, ip.RelPath
+	}
+	sr.Groups = append([]memory.GroupRef{doc}, ip.Groups...)
 	return sr, nil
 }
 
@@ -305,6 +310,9 @@ func renderStore(src llmprompts.Source, res memory.StoreResult) string {
 		default:
 			fmt.Fprintf(&b, "Failed: %s: %s\n", o.Fact, o.Error)
 		}
+	}
+	for _, c := range res.Challenges {
+		fmt.Fprintf(&b, "Not stored (nobody can answer): %s: %s\n", c.Fact, strings.Join(c.Questions, " "))
 	}
 	return b.String()
 }

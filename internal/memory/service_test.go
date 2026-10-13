@@ -7,6 +7,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -410,5 +412,81 @@ func TestPrepareMapsDecisionsToIDs(t *testing.T) {
 	r.Groups = []GroupRef{{Kind: GroupTask, Key: "x"}}
 	if _, err := svc.Prepare(ctx, r, memfmt.Marker{Open: "//"}); !errors.Is(err, ErrInvalid) {
 		t.Errorf("groups must be refused: %v", err)
+	}
+}
+
+func TestNoChallengeStoresAcceptedItems(t *testing.T) {
+	var sawFlag bool
+	fr := &fakeRunner{gate: func(in gateInput) string {
+		sawFlag = in.Challenge != nil && !*in.Challenge
+		return `{"items":[{"index":0,"verdict":"accept","questions":[],"facts":[{"fact":"a clear fact","reason":"r","keywords":[]}]},
+			{"index":1,"verdict":"challenge","questions":["Which project?"],"facts":[]}]}`
+	}}
+	svc, _ := newService(t, fr)
+	r := req(it("a clear fact", "r"), it("it uses 8080", "because"))
+	r.NoChallenge = true
+	res, err := svc.Store(context.Background(), r)
+	if err != nil || res.Status != "stored" || len(res.Outcomes) != 1 || len(res.Challenges) != 1 || res.Challenges[0].Index != 1 || !sawFlag {
+		t.Fatalf("res=%+v err=%v flag=%v", res, err, sawFlag)
+	}
+}
+
+func TestApplyDocDecisions(t *testing.T) {
+	svc, st := newService(t, &fakeRunner{})
+	ctx := context.Background()
+	const (
+		group = "kg_0123456789ab"
+		a, b  = "km_0123456789ab", "km_0123456789ac"
+		c, d  = "km_0123456789ad", "km_0123456789ae"
+	)
+	doc := func(origin string, facts ...memfmt.Fact) memfmt.Doc {
+		p := memfmt.Provenance{Origin: origin, Scope: ScopePersonal}
+		if origin == OriginExternal {
+			p.Source = "doc"
+		}
+		return memfmt.Doc{Group: group, Title: "Notes", Provenance: p, Facts: facts}
+	}
+	apply := func(dc memfmt.Doc) map[string]string {
+		t.Helper()
+		res, err := svc.ApplyDoc(ctx, ApplyDocRequest{Doc: dc, FileID: "file-1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]string{"orphaned": strconv.Itoa(res.Orphaned)}
+		for _, o := range res.Outcomes {
+			got[o.ID] = o.Action
+		}
+		return got
+	}
+	same := func(got map[string]string, want map[string]string) {
+		t.Helper()
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+
+	same(apply(doc(OriginExternal,
+		memfmt.Fact{ID: a, Fact: "api port is 8080", Reason: "ops"},
+		memfmt.Fact{ID: b, Fact: "cache is redis", Reason: "ops"},
+		memfmt.Fact{ID: c, Fact: "queue is nats", Reason: "ops"})),
+		map[string]string{a: "add", b: "add", c: "add", "orphaned": "0"})
+	same(apply(doc(OriginExternal,
+		memfmt.Fact{ID: a, Fact: "API port is 8080", Reason: "ops"},
+		memfmt.Fact{ID: b, Fact: "cache is valkey", Reason: "ops"})),
+		map[string]string{a: "noop", b: "update", "orphaned": "1"})
+
+	// A user fact outranks an agent doc; an equal or higher doc still updates.
+	same(apply(doc(OriginUser, memfmt.Fact{ID: d, Fact: "deploys run on friday", Reason: "team rule"})),
+		map[string]string{d: "add", "orphaned": "3"})
+	same(apply(doc(OriginAgent, memfmt.Fact{ID: d, Fact: "deploys never run on friday", Reason: "guess"})),
+		map[string]string{d: DocSkipped, "orphaned": "3"})
+
+	h, err := svc.History(ctx, b)
+	if err != nil || len(h.Memories) != 2 || h.Memories[1].Fact != "cache is valkey" || h.Events[0].Source != SourceImport ||
+		h.Events[0].SourceRef == nil || *h.Events[0].SourceRef != "file-1" {
+		t.Fatalf("history=%+v err=%v", h, err)
+	}
+	if rows, _ := st.Recent(ctx, 10); len(rows) != 4 {
+		t.Errorf("rows = %v", facts(rows))
 	}
 }

@@ -74,6 +74,9 @@ type StoreRequest struct {
 	Source string // "mcp" | "ui" | "import"
 	// SourceRef names the import file for Source "import"; it must be empty otherwise.
 	SourceRef string
+	// NoChallenge stores the items the gate accepts even when it challenges others: the source is an
+	// outside one nobody can ask. Challenged items come back in Challenges with status "stored".
+	NoChallenge bool
 	// Progress, when set, is told the stage: "checking", "reconciling", "saving".
 	Progress func(stage string)
 }
@@ -199,6 +202,15 @@ func checkProvenance(label string, it Item) error {
 	return nil
 }
 
+// CheckJobGroups validates the caller groups of an ingest job. One of the store's group slots is the
+// file's own document group.
+func CheckJobGroups(groups []GroupRef) error {
+	if len(groups) > maxGroups-1 {
+		return invalid("send at most %d groups; each file also joins its own document group", maxGroups-1)
+	}
+	return validateGroups(groups)
+}
+
 func validateGroups(groups []GroupRef) error {
 	if len(groups) > maxGroups {
 		return invalid("send at most %d groups", maxGroups)
@@ -275,7 +287,8 @@ func (s *Service) progress(req StoreRequest, stage string) {
 }
 
 // decide runs the read-only front of the pipeline: gate, then candidate lookup and reconcile. The
-// caller holds the semaphore. A challenge returns early with Status "challenged" and no works.
+// caller holds the semaphore. A challenge returns early with Status "challenged" and no works,
+// unless the request is NoChallenge: then the accepted items go on.
 func (s *Service) decide(ctx context.Context, req StoreRequest) (works []*work, rev int64, res StoreResult, err error) {
 	s.progress(req, "checking")
 	verdicts, err := s.runGate(ctx, req)
@@ -288,7 +301,7 @@ func (s *Service) decide(ctx context.Context, req StoreRequest) (works []*work, 
 			res.Challenges = append(res.Challenges, ItemChallenge{Index: v.Index, Fact: req.Items[v.Index].Fact, Questions: v.Questions})
 		}
 	}
-	if len(res.Challenges) > 0 {
+	if len(res.Challenges) > 0 && !req.NoChallenge {
 		res.Status = "challenged"
 		return nil, 0, res, nil
 	}
@@ -579,7 +592,7 @@ func (s *Service) Context(ctx context.Context, id string, limit int) (Context, e
 // Projects lists the project keys of current facts.
 func (s *Service) Projects(ctx context.Context) ([]string, error) { return s.store.Projects(ctx) }
 
-// ImportDocument names the import file ref points at, for the document group of import mode.
-func (s *Service) ImportDocument(ctx context.Context, ref string) (path, relPath string, err error) {
-	return s.store.ImportDocument(ctx, ref)
+// ImportProvenance reads the job and file an import-mode store call belongs to.
+func (s *Service) ImportProvenance(ctx context.Context, ref string) (ImportProvenance, error) {
+	return s.store.ImportProvenance(ctx, ref)
 }

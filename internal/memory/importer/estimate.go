@@ -20,6 +20,9 @@ func EstimateWork(chunkCounts []int, tokens int) Estimate {
 	e := Estimate{Files: len(chunkCounts), Tokens: tokens}
 	finalize := 0
 	for _, c := range chunkCounts {
+		if c == 0 {
+			continue // a kira-memory doc: parsed, no Claude call
+		}
 		batches := int(math.Ceil(float64(c*factsPerChunk) / factsPerBatch))
 		e.Chunks += c
 		e.Calls += c + 1 + 2*batches

@@ -13,6 +13,8 @@ type gateInput struct {
 	Items          []gateInputItem `json:"items"`
 	Clarifications []gateClarify   `json:"clarifications,omitempty"`
 	Related        []gateRelated   `json:"relatedMemories"`
+	// Challenge is sent as false only when nobody can answer a question.
+	Challenge *bool `json:"challenge,omitempty"`
 }
 
 type gateInputItem struct {
@@ -55,6 +57,10 @@ func (s *Service) runGate(ctx context.Context, req StoreRequest) ([]gateVerdict,
 	for i, it := range req.Items {
 		in.Items = append(in.Items, gateInputItem{Index: i, Fact: it.Fact, Reason: it.Reason, Origin: it.Origin, SourceTag: it.SourceTag, Scope: it.Scope})
 		text = append(text, it.Fact, it.Reason)
+	}
+	if req.NoChallenge {
+		no := false
+		in.Challenge = &no
 	}
 	for _, c := range req.Clarifications {
 		in.Clarifications = append(in.Clarifications, gateClarify(c))
