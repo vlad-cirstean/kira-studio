@@ -120,8 +120,7 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
 
   // Type a two-table DDL script, assert the live parse summary, then discard it.
   await openSchemaDialog();
-  await dialog.locator('.view-lines').click();
-  await page.keyboard.type(TWO_TABLE_DDL);
+  await typeInto(dialog, page, TWO_TABLE_DDL, { paste: true });
   await expect(summary).toContainText('2 tables, 5 columns');
   await page.locator('[data-slot="dialog-footer"] button', { hasText: 'Cancel' }).click();
   await expect(dialog).toHaveCount(0);
@@ -133,8 +132,7 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
   await expect(summary).not.toContainText('tables');
 
   // Type it again and Save this time.
-  await dialog.locator('.view-lines').click();
-  await page.keyboard.type(TWO_TABLE_DDL);
+  await typeInto(dialog, page, TWO_TABLE_DDL, { paste: true });
   const opsBeforeSave = control.log().length;
   await page.locator('[data-slot="dialog-footer"] button', { hasText: /^Save$/ }).click();
   await expect(dialog).toHaveCount(0);
