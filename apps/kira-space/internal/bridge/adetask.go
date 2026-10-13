@@ -116,7 +116,7 @@ func adeTaskError(err error) error {
 			return ipcerr.Contract("%s", err.Error())
 		}
 	}
-	return ipcerr.InternalErr(err)
+	return ipcerr.Wrap(err)
 }
 
 var adeWorkflowIDRe = regexp.MustCompile(`^[a-z0-9_-]{1,64}$`)

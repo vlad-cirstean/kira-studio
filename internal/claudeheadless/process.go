@@ -11,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/linewriter"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/procgroup"
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // gracefulStopDelay is SIGTERM's grace window before SIGKILL; a var so a test can shorten it.
@@ -137,6 +139,13 @@ func Script(s Spec) string {
 func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	if spec.Timeout <= 0 {
 		return Exit{}, errors.New("claudeheadless: Spec.Timeout must be positive")
+	}
+	if _, err := toolexec.RequireClaude(ctx, toolexec.ClaudeDeps{Bin: spec.ClaudeBin}); err != nil {
+		var ie *ipcerr.Error
+		if errors.As(err, &ie) {
+			return Exit{}, errors.New(ie.Message)
+		}
+		return Exit{}, err
 	}
 	runCtx, cancel := context.WithTimeout(ctx, spec.Timeout)
 	defer cancel()

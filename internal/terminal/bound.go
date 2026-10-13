@@ -1,10 +1,12 @@
 package terminal
 
 import (
+	"context"
 	"errors"
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // BoundService is the one Wails-bound terminal surface both apps embed (P128 §2.1). Each app's own
@@ -136,6 +138,9 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	// own claude-code launches are composed and tracked; Kira Studio leaves it nil, so its Open is
 	// unchanged.
 	agent := args.LaunchKind == LaunchKindClaudeCode
+	if err := requireClaudeFor(agent); err != nil {
+		return OpenResult{}, err
+	}
 
 	var scriptRun string
 	var scriptEnv []string
@@ -243,4 +248,12 @@ func (b *BoundService) Resize(args ResizeArgs) error {
 // Close kills args.TerminalID's own session — idempotent, per Session.Close.
 func (b *BoundService) Close(args CloseArgs) error {
 	return b.svc().Close(args.TerminalID)
+}
+
+func requireClaudeFor(agent bool) error {
+	if !agent {
+		return nil
+	}
+	_, err := toolexec.RequireClaude(context.Background(), toolexec.ClaudeDeps{})
+	return err
 }

@@ -5,6 +5,7 @@
 package ade
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // defaultGrace/defaultPendingTTL are TrackerDeps' own zero-value defaults, applied by NewTracker.
@@ -236,6 +238,9 @@ func (t *Tracker) releaseExpired(recordIDs []string) {
 func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	if args.TaskID == "" {
 		return PrepareResult{}, fmt.Errorf("%w: taskId is required", ErrInvalidInput)
+	}
+	if _, err := toolexec.RequireClaude(context.Background(), toolexec.ClaudeDeps{Bin: t.deps.ClaudeBin}); err != nil {
+		return PrepareResult{}, err
 	}
 	now := t.deps.Now()
 

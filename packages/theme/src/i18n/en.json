@@ -519,6 +519,11 @@
           "body": "The update took too long and was stopped."
         }
       },
+      "claude": {
+        "missing": {
+          "body": "Claude Code CLI not found. Install it, then retry. Looked in: {probed}."
+        }
+      },
       "docker": {
         "edit": {
           "aliasesUnsupported": {
