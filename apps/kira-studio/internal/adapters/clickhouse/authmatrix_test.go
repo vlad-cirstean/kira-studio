@@ -16,6 +16,7 @@ import (
 func TestClickHouse_AuthMatrix(t *testing.T) {
 	testsupport.RequireMatrix(t)
 	f := testsupport.StartClickHouse(t)
+	testsupport.ClickHouseRun(t, f)
 
 	database := *f.Config.Database
 	uri := fmt.Sprintf("clickhouse://kira:%s@%s:%d/%s", testsupport.FixturePassword, *f.Config.Host, *f.Config.Port, database)
@@ -47,7 +48,7 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 				{
 					Name: "Children includes system",
 					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
-						children, err := a.Children(context.Background(), testsupport.NodePath(cfg.ID), adapters.NewOpCtx("matrix-children"))
+						children, err := a.Children(context.Background(), testsupport.NodePath(cfg.ID), opCtx(t, "matrix-children"))
 						if err != nil {
 							t.Fatalf("Children: %v", err)
 						}

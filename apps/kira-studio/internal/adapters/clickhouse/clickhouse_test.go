@@ -50,7 +50,18 @@ func newAdapter(t *testing.T) adapters.Adapter {
 	return a
 }
 
-var connectCounter atomic.Int64
+var (
+	connectCounter atomic.Int64
+	opNonce        = strconv.FormatInt(time.Now().UnixNano(), 36)
+	opCounter      atomic.Int64
+)
+
+// opCtx returns an OpCtx whose id is unique per call and per process run: ClickHouse rejects a
+// query id still registered from an earlier run (QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING).
+func opCtx(t *testing.T, name string) *adapters.OpCtx {
+	t.Helper()
+	return adapters.NewOpCtx(name + "-" + opNonce + "-" + strconv.FormatInt(opCounter.Add(1), 10))
+}
 
 func connectedAdapter(t *testing.T, cfg model.ResolvedConnectionConfig) adapters.Adapter {
 	t.Helper()
@@ -64,7 +75,7 @@ func connectedAdapter(t *testing.T, cfg model.ResolvedConnectionConfig) adapters
 	// file's own convenience helper was violating, not a production adapter bug: a real op.OpID is
 	// always unique per operation). t.Name() alone is not enough either: a subtest connecting twice
 	// (the cancel test's own `a` and `side`) shares one t.Name() for both calls.
-	opID := "connect-" + t.Name() + "-" + strconv.FormatInt(connectCounter.Add(1), 10)
+	opID := "connect-" + t.Name() + "-" + opNonce + "-" + strconv.FormatInt(connectCounter.Add(1), 10)
 	if _, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx(opID)); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -83,11 +94,12 @@ func derefStr(s *string) string {
 
 func TestClickHouse(t *testing.T) {
 	fixture := testsupport.StartClickHouse(t)
+	testsupport.ClickHouseRun(t, fixture)
 	cfg := fixture.Config
 
 	t.Run("connect/disconnect, real server version", func(t *testing.T) {
 		a := newAdapter(t)
-		info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-1"))
+		info, err := a.Connect(context.Background(), cfg, opCtx(t, "op-1"))
 		if err != nil {
 			t.Fatalf("Connect: %v", err)
 		}
@@ -104,7 +116,7 @@ func TestClickHouse(t *testing.T) {
 		bad := cfg
 		wrong := "definitely-wrong"
 		bad.Password = &wrong
-		_, err := a.Connect(context.Background(), bad, adapters.NewOpCtx("op-2"))
+		_, err := a.Connect(context.Background(), bad, opCtx(t, "op-2"))
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeAuth {
 			t.Fatalf("got %v, want an E_AUTH *adapters.Error", err)
@@ -115,7 +127,7 @@ func TestClickHouse(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		ctx := context.Background()
 
-		dbs, err := a.Children(ctx, nodePath(cfg.ID), adapters.NewOpCtx("op-3a"))
+		dbs, err := a.Children(ctx, nodePath(cfg.ID), opCtx(t, "op-3a"))
 		if err != nil {
 			t.Fatalf("Children(root): %v", err)
 		}
@@ -125,7 +137,7 @@ func TestClickHouse(t *testing.T) {
 			t.Errorf("databases = %v, want kira_test, default and system all present", dbNames)
 		}
 
-		objects, err := a.Children(ctx, nodePath(cfg.ID, seg("database", "kira_test")), adapters.NewOpCtx("op-3b"))
+		objects, err := a.Children(ctx, nodePath(cfg.ID, seg("database", "kira_test")), opCtx(t, "op-3b"))
 		if err != nil {
 			t.Fatalf("Children(database): %v", err)
 		}
@@ -145,7 +157,7 @@ func TestClickHouse(t *testing.T) {
 
 	t.Run("describe: no primary key, a sparse primary index, no foreign keys", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
-		meta, err := a.Describe(context.Background(), nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")), adapters.NewOpCtx("op-5"))
+		meta, err := a.Describe(context.Background(), nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")), opCtx(t, "op-5"))
 		if err != nil {
 			t.Fatalf("Describe: %v", err)
 		}
@@ -177,7 +189,7 @@ func TestClickHouse(t *testing.T) {
 		if !a.Caps().SchemaColumns {
 			t.Error("Caps().SchemaColumns = false, want true")
 		}
-		relations, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "kira_test")), adapters.NewOpCtx("op-schema-columns-1"))
+		relations, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "kira_test")), opCtx(t, "op-schema-columns-1"))
 		if err != nil {
 			t.Fatalf("SchemaColumns: %v", err)
 		}
@@ -208,7 +220,7 @@ func TestClickHouse(t *testing.T) {
 			}
 		}
 
-		meta, err := a.Describe(ctx, nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")), adapters.NewOpCtx("op-schema-columns-2"))
+		meta, err := a.Describe(ctx, nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")), opCtx(t, "op-schema-columns-2"))
 		if err != nil {
 			t.Fatalf("Describe: %v", err)
 		}
@@ -229,7 +241,7 @@ func TestClickHouse(t *testing.T) {
 
 		// An empty container ("default" — nothing is ever created there by the seed) returns an
 		// empty slice, not an error.
-		empty, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "default")), adapters.NewOpCtx("op-schema-columns-3"))
+		empty, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "default")), opCtx(t, "op-schema-columns-3"))
 		if err != nil {
 			t.Fatalf("SchemaColumns(default): %v", err)
 		}
@@ -240,7 +252,7 @@ func TestClickHouse(t *testing.T) {
 
 	t.Run("row estimate on big_rows", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
-		objects, err := a.Children(context.Background(), nodePath(cfg.ID, seg("database", "kira_test")), adapters.NewOpCtx("op-6"))
+		objects, err := a.Children(context.Background(), nodePath(cfg.ID, seg("database", "kira_test")), opCtx(t, "op-6"))
 		if err != nil {
 			t.Fatalf("Children: %v", err)
 		}
@@ -254,7 +266,7 @@ func TestClickHouse(t *testing.T) {
 
 	t.Run("definition renders create_table_query verbatim, plus Table properties", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
-		def, err := a.Definition(context.Background(), nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")), adapters.NewOpCtx("op-7"))
+		def, err := a.Definition(context.Background(), nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")), opCtx(t, "op-7"))
 		if err != nil {
 			t.Fatalf("Definition: %v", err)
 		}
@@ -273,7 +285,7 @@ func TestClickHouse(t *testing.T) {
 		p1, err := a.Read(ctx, adapters.ReadRequest{
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "weird`name")),
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-8a"))
+		}, opCtx(t, "op-8a"))
 		if err != nil {
 			t.Fatalf("Read(weird`name): %v", err)
 		}
@@ -284,7 +296,7 @@ func TestClickHouse(t *testing.T) {
 		p2, err := a.Read(ctx, adapters.ReadRequest{
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "Order Items")),
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-8b"))
+		}, opCtx(t, "op-8b"))
 		if err != nil {
 			t.Fatalf("Read(Order Items): %v", err)
 		}
@@ -302,7 +314,7 @@ func TestClickHouse(t *testing.T) {
 		p, err := a.Read(context.Background(), adapters.ReadRequest{
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", `trail\`)),
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-8c"))
+		}, opCtx(t, "op-8c"))
 		if err != nil {
 			t.Fatalf(`Read(trail\): %v`, err)
 		}
@@ -316,7 +328,7 @@ func TestClickHouse(t *testing.T) {
 		p, err := a.Read(context.Background(), adapters.ReadRequest{
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-9"))
+		}, opCtx(t, "op-9"))
 		if err != nil {
 			t.Fatalf("Read: %v", err)
 		}
@@ -330,7 +342,7 @@ func TestClickHouse(t *testing.T) {
 		_, err := a.Read(context.Background(), adapters.ReadRequest{
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
 			PageSize: 10, Cursor: model.PageCursor{Mode: "after", Token: "whatever"},
-		}, adapters.NewOpCtx("op-10"))
+		}, opCtx(t, "op-10"))
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
 			t.Fatalf("got %v, want E_UNSUPPORTED (D20: no total order to build a keyset cursor on)", err)
@@ -341,7 +353,7 @@ func TestClickHouse(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		result, err := a.Count(context.Background(), adapters.CountRequest{
 			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
-		}, adapters.NewOpCtx("op-11"))
+		}, opCtx(t, "op-11"))
 		if err != nil {
 			t.Fatalf("Count: %v", err)
 		}
@@ -383,7 +395,7 @@ func TestClickHouse(t *testing.T) {
 		pages, err := a.Execute(ctx, model.ConsoleRequest{
 			Path:       databasePath,
 			Statements: []string{"CREATE TABLE kira_test.p26_scratch (id UInt32, name String) ENGINE = MergeTree ORDER BY id"},
-		}, adapters.NewOpCtx("op-ddl-1"))
+		}, opCtx(t, "op-ddl-1"))
 		if err != nil {
 			t.Fatalf("Execute(CREATE TABLE): %v", err)
 		}
@@ -392,7 +404,7 @@ func TestClickHouse(t *testing.T) {
 			t.Errorf("CREATE TABLE page = %+v, want a status page, not a row page", created.Columns)
 		}
 
-		children, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-2"))
+		children, err := a.Children(ctx, databasePath, opCtx(t, "op-ddl-2"))
 		if err != nil {
 			t.Fatalf("Children: %v", err)
 		}
@@ -400,7 +412,7 @@ func TestClickHouse(t *testing.T) {
 			t.Fatalf("Children(kira_test) = %v, want p26_scratch present", childNames(t, children))
 		}
 
-		meta, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-3"))
+		meta, err := a.Describe(ctx, tablePath, opCtx(t, "op-ddl-3"))
 		if err != nil {
 			t.Fatalf("Describe: %v", err)
 		}
@@ -420,10 +432,10 @@ func TestClickHouse(t *testing.T) {
 		if _, err := a.Execute(ctx, model.ConsoleRequest{
 			Path:       databasePath,
 			Statements: []string{"ALTER TABLE kira_test.p26_scratch ADD COLUMN note String"},
-		}, adapters.NewOpCtx("op-ddl-4")); err != nil {
+		}, opCtx(t, "op-ddl-4")); err != nil {
 			t.Fatalf("Execute(ALTER TABLE): %v", err)
 		}
-		meta2, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-5"))
+		meta2, err := a.Describe(ctx, tablePath, opCtx(t, "op-ddl-5"))
 		if err != nil {
 			t.Fatalf("Describe after ALTER: %v", err)
 		}
@@ -434,10 +446,10 @@ func TestClickHouse(t *testing.T) {
 		if _, err := a.Execute(ctx, model.ConsoleRequest{
 			Path:       databasePath,
 			Statements: []string{"DROP TABLE kira_test.p26_scratch"},
-		}, adapters.NewOpCtx("op-ddl-6")); err != nil {
+		}, opCtx(t, "op-ddl-6")); err != nil {
 			t.Fatalf("Execute(DROP TABLE): %v", err)
 		}
-		childrenAfter, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-7"))
+		childrenAfter, err := a.Children(ctx, databasePath, opCtx(t, "op-ddl-7"))
 		if err != nil {
 			t.Fatalf("Children after DROP: %v", err)
 		}
@@ -461,7 +473,7 @@ func TestClickHouse(t *testing.T) {
 		if len(statements) != 1 {
 			t.Fatalf("statements = %v, want exactly 1", statements)
 		}
-		count, err := a.Count(context.Background(), adapters.CountRequest{Path: plan.Path}, adapters.NewOpCtx("op-12-count"))
+		count, err := a.Count(context.Background(), adapters.CountRequest{Path: plan.Path}, opCtx(t, "op-12-count"))
 		if err != nil {
 			t.Fatalf("Count: %v", err)
 		}
@@ -478,7 +490,7 @@ func TestClickHouse(t *testing.T) {
 				Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("50")}, {Name: "name", Value: strp("LATAM")}},
 			}},
 		}
-		result, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-13"))
+		result, err := a.Mutate(context.Background(), plan, opCtx(t, "op-13"))
 		if err != nil {
 			t.Fatalf("Mutate: %v", err)
 		}
@@ -493,7 +505,7 @@ func TestClickHouse(t *testing.T) {
 			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "regions")),
 			Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "id", Value: strp("1")}}}},
 		}
-		_, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-14"))
+		_, err := a.Mutate(context.Background(), plan, opCtx(t, "op-14"))
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
 			t.Fatalf("got %v, want E_UNSUPPORTED", err)
@@ -508,7 +520,7 @@ func TestClickHouse(t *testing.T) {
 				Kind: "insert", Values: model.RowValues{{Name: "no_such_column", Value: strp("x")}},
 			}},
 		}
-		_, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-15"))
+		_, err := a.Mutate(context.Background(), plan, opCtx(t, "op-15"))
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeNotFound {
 			t.Fatalf("got %v, want E_NOT_FOUND", err)
@@ -523,7 +535,7 @@ func TestClickHouse(t *testing.T) {
 				Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("60")}, {Name: "name", Value: strp("nope")}},
 			}},
 		}
-		_, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-16"))
+		_, err := a.Mutate(context.Background(), plan, opCtx(t, "op-16"))
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
 			t.Fatalf("got %v, want E_UNSUPPORTED", err)
@@ -538,7 +550,7 @@ func TestClickHouse(t *testing.T) {
 				"SELECT id, name FROM customers ORDER BY id",
 				"INSERT INTO regions (id, name) VALUES (70, 'console-insert')",
 			},
-		}, adapters.NewOpCtx("op-17"))
+		}, opCtx(t, "op-17"))
 		if err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -564,16 +576,16 @@ func TestClickHouse(t *testing.T) {
 			"DROP TABLE IF EXISTS p168_sentinel",
 			"CREATE TABLE p168_sentinel (id UInt8, n Nullable(String), s String) ENGINE = Memory",
 			"INSERT INTO p168_sentinel VALUES (1, NULL, 'ᴺᵁᴸᴸ'), (2, 'ᴺᵁᴸᴸ', 'x')",
-		}}, adapters.NewOpCtx("op-sentinel-setup")); err != nil {
+		}}, opCtx(t, "op-sentinel-setup")); err != nil {
 			t.Fatalf("setup: %v", err)
 		}
-		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE p168_sentinel"}}, adapters.NewOpCtx("op-sentinel-cleanup")) //nolint:errcheck
+		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE p168_sentinel"}}, opCtx(t, "op-sentinel-cleanup")) //nolint:errcheck
 
 		p, err := a.Read(ctx, adapters.ReadRequest{
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "p168_sentinel")),
 			Sort:     &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "id", Direction: "asc"}}},
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-sentinel-read"))
+		}, opCtx(t, "op-sentinel-read"))
 		if err != nil {
 			t.Fatalf("Read: %v", err)
 		}
@@ -591,7 +603,7 @@ func TestClickHouse(t *testing.T) {
 			t.Errorf("columns = %d, want 3 (the isNull flag is not a visible column)", len(tp.Columns))
 		}
 
-		pages, err := a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"SELECT s FROM p168_sentinel ORDER BY id"}}, adapters.NewOpCtx("op-sentinel-console"))
+		pages, err := a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"SELECT s FROM p168_sentinel ORDER BY id"}}, opCtx(t, "op-sentinel-console"))
 		if err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -607,7 +619,7 @@ func TestClickHouse(t *testing.T) {
 		pages, err := a.Execute(context.Background(), model.ConsoleRequest{
 			Path:       nodePath(cfg.ID, seg("database", "kira_test")),
 			Statements: []string{"# note\nSELECT 42", "(SELECT 43)", "FROM system.one SELECT 44"},
-		}, adapters.NewOpCtx("op-rowreturning"))
+		}, opCtx(t, "op-rowreturning"))
 		if err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -629,15 +641,15 @@ func TestClickHouse(t *testing.T) {
 			"DROP TABLE IF EXISTS `p168_tab\\tnew\\nline`",
 			"CREATE TABLE `p168_tab\\tnew\\nline` (x UInt8) ENGINE = Memory",
 			"INSERT INTO `p168_tab\\tnew\\nline` VALUES (7)",
-		}}, adapters.NewOpCtx("op-tabname-setup")); err != nil {
+		}}, opCtx(t, "op-tabname-setup")); err != nil {
 			t.Fatalf("setup: %v", err)
 		}
-		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE `p168_tab\\tnew\\nline`"}}, adapters.NewOpCtx("op-tabname-cleanup")) //nolint:errcheck
+		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE `p168_tab\\tnew\\nline`"}}, opCtx(t, "op-tabname-cleanup")) //nolint:errcheck
 		path := nodePath(cfg.ID, seg("database", "kira_test"), seg("table", table))
-		if _, err := a.Describe(ctx, path, adapters.NewOpCtx("op-tabname-describe")); err != nil {
+		if _, err := a.Describe(ctx, path, opCtx(t, "op-tabname-describe")); err != nil {
 			t.Fatalf("Describe: %v", err)
 		}
-		count, err := a.Count(ctx, adapters.CountRequest{Path: path}, adapters.NewOpCtx("op-tabname-count"))
+		count, err := a.Count(ctx, adapters.CountRequest{Path: path}, opCtx(t, "op-tabname-count"))
 		if err != nil || count.Value != 1 {
 			t.Fatalf("Count = %+v, %v, want 1", count, err)
 		}
@@ -648,7 +660,7 @@ func TestClickHouse(t *testing.T) {
 		_, err := a.Execute(context.Background(), model.ConsoleRequest{
 			Path:       nodePath(cfg.ID, seg("database", "kira_test")),
 			Statements: []string{"SELECT 1", "SELECT * FROM no_such_table_at_all"},
-		}, adapters.NewOpCtx("op-18"))
+		}, opCtx(t, "op-18"))
 		if err == nil {
 			t.Fatal("expected the second (invalid) statement to fail the whole call")
 		}
@@ -661,7 +673,7 @@ func TestClickHouse(t *testing.T) {
 			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "wide_types")),
 			Sort:     &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "id", Direction: "asc"}}},
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-19"))
+		}, opCtx(t, "op-19"))
 		if err != nil {
 			t.Fatalf("Read(wide_types): %v", err)
 		}
@@ -720,7 +732,7 @@ func TestClickHouse(t *testing.T) {
 		side := connectedAdapter(t, cfg)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		op := adapters.NewOpCtx("op-cancel")
+		op := opCtx(t, "op-cancel")
 
 		errCh := make(chan error, 1)
 		go func() {
@@ -741,7 +753,7 @@ func TestClickHouse(t *testing.T) {
 		time.Sleep(1500 * time.Millisecond) // let the statement actually reach the server
 		cancel()                            // unblocks the local wait only — see query.go's own doc comment
 
-		ok, err := a.Cancel(context.Background(), "op-cancel")
+		ok, err := a.Cancel(context.Background(), op.OpID)
 		if err != nil {
 			t.Fatalf("Cancel: %v", err)
 		}
@@ -761,7 +773,7 @@ func TestClickHouse(t *testing.T) {
 		// literally contains the substring being searched for), producing a permanent false
 		// positive that never clears. Caught by adding temporary debug output during this
 		// milestone's own verification — the KILL QUERY mechanism itself was correct throughout.
-		waitForProcessesClean(t, side, "kira-op-cancel-0", 5*time.Second)
+		waitForProcessesClean(t, side, "kira-"+op.OpID+"-0", 5*time.Second)
 	})
 }
 
@@ -774,7 +786,7 @@ func waitForProcessesClean(t *testing.T, side adapters.Adapter, queryID string, 
 	for {
 		pages, err := side.Execute(context.Background(), model.ConsoleRequest{
 			Statements: []string{"SELECT count() AS n FROM system.processes WHERE query_id = '" + queryID + "'"},
-		}, adapters.NewOpCtx("op-processes-check"))
+		}, opCtx(t, "op-processes-check"))
 		if err != nil {
 			t.Fatalf("system.processes check: %v", err)
 		}
