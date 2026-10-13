@@ -118,4 +118,12 @@ describe('GraphOrderState tips that run ahead of the store', () => {
     expect(order.plan.value.length).toBeGreaterThan(0);
     expect(order.plan.value.storeRowAt(0)).toBe(0);
   });
+
+  test('a tip with no object id does not throw', () => {
+    const store = loaded();
+    const order = build([main(0)], store);
+
+    order.setTips([{ sha: '', key: 'ref:main', label: 'main' }]);
+    expect(() => order.rebuild(store, 0)).not.toThrow();
+  });
 });

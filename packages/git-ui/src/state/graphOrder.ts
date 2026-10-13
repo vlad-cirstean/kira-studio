@@ -8,6 +8,8 @@ import {
 } from '@kira/git-core';
 import { type ShallowRef, shallowRef } from 'vue';
 
+const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
 /**
  * P93 §7: the branch-grouped row plan as reactive UI state — `GraphViewState`'s own `order`
  * (optional; `GraphViewState` falls back to the identity plan when none is given, §5.4). Owns
@@ -105,15 +107,17 @@ export class GraphOrderState {
    *  other row falls into a contracted group. Keep the sha the group last used while the store
    *  still holds it. */
   #effectiveTips(store: CommitStore): readonly TipRef[] {
+    // A ref can carry no object id (unborn branch); `rowOfSha` throws on a malformed one.
+    const holds = (sha: string) => FULL_SHA.test(sha) && store.rowOfSha(sha) >= 0;
     const appliedByKey = new Map(this.#applied.map((tip) => [tip.key, tip]));
     const previousHead = this.#applied[0];
     return this.#tips.map((tip, index) => {
-      if (store.rowOfSha(tip.sha) >= 0) return tip;
-      if (index === 0 && previousHead !== undefined && store.rowOfSha(previousHead.sha) >= 0) {
+      if (holds(tip.sha)) return tip;
+      if (index === 0 && previousHead !== undefined && holds(previousHead.sha)) {
         return { ...tip, sha: previousHead.sha };
       }
       const sameKey = appliedByKey.get(tip.key);
-      if (sameKey !== undefined && store.rowOfSha(sameKey.sha) >= 0) {
+      if (sameKey !== undefined && holds(sameKey.sha)) {
         return { ...tip, sha: sameKey.sha };
       }
       return tip;

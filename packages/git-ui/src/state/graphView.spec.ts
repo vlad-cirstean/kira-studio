@@ -285,20 +285,26 @@ describe('GraphViewState — corrupted chunk recovery is bounded', () => {
 });
 
 describe('GraphViewState — restart from row 0', () => {
-  test('the plan never outlives the store rows it describes', async () => {
+  const sha = (n: number) => n.toString(16).padStart(2, '0').repeat(20);
+  const chunk = (
+    repoId: string,
+    count: number,
+    base: number,
+    exhausted = true,
+  ): GraphStreamChunk => ({
+    ...chunkFor(repoId, sha(base), { exhausted }),
+    to: count,
+    commits: buildPackedChunk(
+      Array.from({ length: count }, (_, i) => ({ sha: sha(base + i), subject: `c${base + i}` })),
+    ),
+  });
+
+  test('the old history stays whole while the re-walk streams, then swaps in at once', async () => {
     const transport = new RaceTransport();
     const graphView = new GraphViewState(new BridgeClient(transport), fakeLayoutClient());
-    const sha = (n: number) => n.toString(16).padStart(2, '0').repeat(20);
-    const chunk = (count: number, base: number): GraphStreamChunk => ({
-      ...chunkFor(REPO_A, sha(base)),
-      to: count,
-      commits: buildPackedChunk(
-        Array.from({ length: count }, (_, i) => ({ sha: sha(base + i), subject: `c${base + i}` })),
-      ),
-    });
     const open = graphView.openStream(REPO_A);
     await sleep();
-    transport.streamOpens[0]?.push(chunk(10, 1));
+    transport.streamOpens[0]?.push(chunk(REPO_A, 10, 1));
     await sleep();
     expect(graphView.plan.value.length).toBe(10);
 
@@ -312,12 +318,92 @@ describe('GraphViewState — restart from row 0', () => {
       },
       { flush: 'sync' },
     );
-    transport.streamOpens[0]?.push(chunk(3, 50));
+    const generation = graphView.generation.value;
+    transport.streamOpens[0]?.push(chunk(REPO_A, 3, 50, false));
     await sleep();
-    expect(overruns).toEqual([]);
-    expect(graphView.plan.value.length).toBe(3);
+    expect(graphView.plan.value.length).toBe(10);
+    expect(graphView.store.rowCount).toBe(10);
+    expect(graphView.loadedRows.value).toBe(10);
+    expect(graphView.generation.value).toBe(generation);
 
     transport.streamOpens[0]?.end();
+    await open;
+    expect(overruns).toEqual([]);
+    expect(graphView.plan.value.length).toBe(3);
+    expect(graphView.store.rowCount).toBe(3);
+    expect(graphView.loadedRows.value).toBe(3);
+    expect(graphView.store.shaAt(0)).toBe(sha(50));
+    expect(graphView.generation.value).toBe(generation + 1);
+    graphView.dispose();
+  });
+
+  test('rebuildOrder racing the staged swap still swaps', async () => {
+    const pending: Array<{
+      to: number;
+      resolve: (chunk: LayoutChunk) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    const client: LayoutClient = {
+      submit: (input) =>
+        new Promise<LayoutChunk>((resolve, reject) => {
+          pending.push({ to: input.to, resolve, reject });
+        }),
+      reset: () => {
+        for (const request of pending.splice(0)) request.reject(new LayoutClientStaleError(0));
+      },
+      dispose: () => {},
+    };
+    const transport = new RaceTransport();
+    const graphView = new GraphViewState(
+      new BridgeClient(transport),
+      client,
+      new GraphOrderState(),
+    );
+    const open = graphView.openStream(REPO_A);
+    await sleep();
+    transport.streamOpens[0]?.push(chunk(REPO_A, 10, 1));
+    await sleep();
+    pending[0]?.resolve(fakeLayoutChunk(0, 10));
+    await sleep();
+    expect(graphView.plan.value.length).toBe(10);
+
+    transport.streamOpens[0]?.push(chunk(REPO_A, 3, 50, false));
+    transport.streamOpens[0]?.end();
+    await sleep();
+    expect(pending).toHaveLength(1);
+    const racing = graphView.rebuildOrder(); // stales the swap's own submit
+    await sleep();
+    expect(pending).toHaveLength(1);
+    pending[0]?.resolve(fakeLayoutChunk(0, 3));
+    await racing;
+    await open;
+    expect(graphView.store.rowCount).toBe(3);
+    expect(graphView.plan.value.length).toBe(3);
+    graphView.dispose();
+  });
+
+  test('reset() during staging discards it and the new repo streams progressively', async () => {
+    const transport = new RaceTransport();
+    const graphView = new GraphViewState(new BridgeClient(transport), fakeLayoutClient());
+    const open = graphView.openStream(REPO_A);
+    await sleep();
+    transport.streamOpens[0]?.push(chunk(REPO_A, 10, 1));
+    await sleep();
+    transport.streamOpens[0]?.push(chunk(REPO_A, 3, 50, false));
+    await sleep();
+
+    graphView.reset();
+    expect(graphView.store.rowCount).toBe(0);
+    const reopened = graphView.openStream(REPO_B);
+    await sleep();
+    transport.streamOpens[1]?.push(chunk(REPO_B, 2, 80, false));
+    await sleep();
+    expect(graphView.loadedRows.value).toBe(2);
+    expect(graphView.plan.value.length).toBe(2);
+    expect(graphView.store.shaAt(0)).toBe(sha(80));
+
+    transport.streamOpens[1]?.end();
+    await reopened;
     await open;
     graphView.dispose();
   });

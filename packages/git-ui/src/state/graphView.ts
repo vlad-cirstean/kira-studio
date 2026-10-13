@@ -121,7 +121,7 @@ export class GraphViewState {
     this.#layoutClient = layoutClient;
     this.#order = order;
     this.#layoutPlan = this.plan.value;
-    this.#packed = new PackedStreamState();
+    this.#packed = new PackedStreamState({ stageRestarts: true });
     this.store = this.#packed.store;
     this.loadedRows = this.#packed.loadedRows;
     this.remaining = this.#packed.remaining;
@@ -155,7 +155,8 @@ export class GraphViewState {
    * holds N rows) resume from N instead of re-fetching them.
    *
    * Supersedes any still-open stream on this instance: aborting the previous
-   * `#abortController` ends it.
+   * `#abortController` ends it. A restart at row 0 streams into a staging store; the list swaps
+   * to it in one step once it holds as many rows as before or the stream ends.
    */
   async openStream(
     repoId: string,
@@ -166,6 +167,7 @@ export class GraphViewState {
     const controller = new AbortController();
     this.#abortController = controller;
     if (this.loading.value === 'idle') this.loading.value = 'streaming';
+    let ended = false;
     try {
       await this.#bridge.stream(
         'graph.stream',
@@ -173,7 +175,15 @@ export class GraphViewState {
         (chunk) => this.#applyChunk(chunk),
         controller.signal,
       );
+      ended = !controller.signal.aborted;
     } finally {
+      if (this.#abortController === controller) {
+        if (ended) {
+          if (this.#packed.finishStaging()) this.#queueLayoutRebuild();
+        } else {
+          this.#packed.discardStaging();
+        }
+      }
       // The plan lags the store by the in-flight relayout; going idle first would let the
       // viewport restore on `loading` -> 'idle' (App.vue) run against a plan that is too short.
       await this.#layoutDrain;
@@ -290,10 +300,9 @@ export class GraphViewState {
   /**
    * §6.2's refresh action: forces a full re-query bypassing every cache. `graph.refresh` only
    * marks the host's session stale — the actual re-walk happens on the `graph.stream` re-open
-   * that follows, whose first chunk lands with `from: 0`, which `#applyChunk`'s own
-   * restart-at-zero detection turns into a reset (clearing `store`/`layout`, resetting the
-   * `LayoutClient`'s frontier, bumping `generation`) before folding the re-walked history back
-   * in. Idempotent while already refreshing (§6.2: "a second press while running is a no-op").
+   * that follows, whose first chunk lands with `from: 0`, which starts a staged restart: the
+   * old history stays on screen until the re-walked one is ready, then replaces it at once
+   * (`PackedStreamState.commitStaged`, bumping `generation`). Idempotent while already refreshing (§6.2: "a second press while running is a no-op").
    * Not cancellable — unlike `loadMore`/`loadAll`, §6.2 describes no cancel affordance for
    * refresh, only a spinner, so this does not touch `#loadController`.
    */
@@ -505,9 +514,12 @@ export class GraphViewState {
    * watch over `#order.revision` to do the same work twice.
    */
   async #rebuildLayout(): Promise<void> {
-    this.#order?.rebuild(this.store, this.generation.value);
-    const plan = this.#order?.plan.value ?? identityRowPlan(this.store.rowCount);
-    const input = projectLayoutInput(plan, this.store.layoutInput(0, this.store.rowCount));
+    const pending = this.#packed.pendingStore;
+    const source = pending ?? this.store;
+    const pendingRows = source.rowCount;
+    this.#order?.rebuild(source, this.generation.value);
+    const plan = this.#order?.plan.value ?? identityRowPlan(source.rowCount);
+    const input = projectLayoutInput(plan, source.layoutInput(0, source.rowCount));
 
     // W15's `layoutSubmitMs` — the worker round trip for the *first* relayout only, so a
     // first-paint `firstPageMs`/`worstFrameMs` miss is attributable to this hop or not in one
@@ -536,7 +548,13 @@ export class GraphViewState {
     }
     // Plan and layout publish together: a row never renders against a plan whose lanes are not
     // yet in `layout` (it drew an empty graph column for the whole stream otherwise).
-    this.#publish(plan, layoutChunk);
+    if (pending === undefined) {
+      this.#publish(plan, layoutChunk);
+      return;
+    }
+    // A chunk or a newer restart changed staging meanwhile; the rebuild it queued lays out the new one.
+    if (this.#packed.pendingStore !== pending || pending.rowCount !== pendingRows) return;
+    this.#packed.commitStaged(() => this.#publish(plan, layoutChunk));
   }
 
   /** `App.vue`'s own entry point after `#order.setTips`/`.toggleGroup`/`.setCollapseEnabled` —
@@ -568,6 +586,7 @@ export class GraphViewState {
     });
     if (!range) return; // corrupted — already re-opening from row 0, nothing to lay out
     this.streamFailure.value = undefined;
+    if (range.staged && this.#packed.pendingStore === undefined) return; // still filling
 
     // F11: folds `range` in and returns WITHOUT awaiting its own relayout — `rpc.ts`'s per-chunk
     // credit gate (`INITIAL_STREAM_CREDIT`) waits on this method's own promise before letting the

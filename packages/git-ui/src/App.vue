@@ -256,6 +256,8 @@ const pendingSelectionSha = ref<string | null>(null);
 watch(graphView.generation, () => {
   const sha = selection.sha.value;
   pendingSelectionSha.value = sha;
+  // A staged swap can leave `loadedRows` unchanged, which would never re-resolve the selection.
+  resolvePendingSelection();
   // P108 F2: a re-walk (auto-refresh restart, repo switch, reconnect) invalidates any row a menu
   // captured before this point — close both context menus rather than let a select act on
   // whatever now happens to sit at the old row/sha.
@@ -310,7 +312,7 @@ function retryGraph(): void {
   graphView.refresh().catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.reloadGraph));
 }
 
-watch(graphView.loadedRows, () => {
+function resolvePendingSelection(): void {
   const sha = pendingSelectionSha.value;
   if (sha === null) return;
   const found = graphView.store.rowOfSha(sha) !== -1;
@@ -323,7 +325,9 @@ watch(graphView.loadedRows, () => {
       ?.scrollToRow(selection.row.value)
       .catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.scrollToSelected));
   }
-});
+}
+
+watch(graphView.loadedRows, resolvePendingSelection);
 
 // ---------------------------------------------------------------------------------------
 // P93 §3.2: the priority-ordered tip list driving `graphOrder`'s branch grouping.
@@ -985,14 +989,15 @@ let loadedRowsBeforeLoad = 0;
 // then it may already have been reset). Both the viewport restore and the announcement gate below
 // key off this one captured flag rather than the live ref.
 let refreshWasAuto = false;
-let autoRefreshViewportRow: number | undefined;
+let autoRefreshViewportSha: string | undefined;
 
 watch(graphView.loading, (state, previous) => {
   if (state === 'loadingMore' || state === 'refreshing') {
     loadedRowsBeforeLoad = graphView.loadedRows.value;
     if (state === 'refreshing') {
       refreshWasAuto = graphView.autoRefreshing.value;
-      autoRefreshViewportRow = refreshWasAuto ? commitGridRef.value?.getViewportTop() : undefined;
+      const top = refreshWasAuto ? commitGridRef.value?.getViewportTop() : undefined;
+      autoRefreshViewportSha = top === undefined ? undefined : graphView.store.shaAt(top);
     }
     return;
   }
@@ -1007,8 +1012,9 @@ watch(graphView.loading, (state, previous) => {
       // A background refresh must neither speak on every commit nor move the user's viewport —
       // it wins over the selection's own `scrollRowIntoView` (this watcher runs after the
       // `pendingSelectionSha` re-resolution above, which is what would otherwise re-scroll).
-      if (autoRefreshViewportRow !== undefined) {
-        commitGridRef.value?.scrollToTopRow(autoRefreshViewportRow);
+      if (autoRefreshViewportSha !== undefined) {
+        const row = graphView.store.rowOfSha(autoRefreshViewportSha);
+        if (row >= 0) commitGridRef.value?.scrollToTopRow(row);
       }
     } else {
       announce(composeRefreshAnnouncement(graphView.loadedRows.value));

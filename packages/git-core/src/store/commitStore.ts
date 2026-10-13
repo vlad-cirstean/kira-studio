@@ -138,26 +138,26 @@ export interface CommitStoreStats {
 const UNRESOLVED_PARENT_ROW = -1;
 
 export class CommitStore {
-  readonly #shas = new ShaTable();
-  readonly #interner = new StringInterner();
-  readonly #subjects = new SubjectBuffer();
+  #shas = new ShaTable();
+  #interner = new StringInterner();
+  #subjects = new SubjectBuffer();
 
-  readonly #authorName = new GrowableColumn(Uint32Array);
-  readonly #authorEmail = new GrowableColumn(Uint32Array);
-  readonly #authorTime = new GrowableColumn(Uint32Array);
-  readonly #committerName = new GrowableColumn(Uint32Array);
-  readonly #committerEmail = new GrowableColumn(Uint32Array);
-  readonly #committerTime = new GrowableColumn(Uint32Array);
+  #authorName = new GrowableColumn(Uint32Array);
+  #authorEmail = new GrowableColumn(Uint32Array);
+  #authorTime = new GrowableColumn(Uint32Array);
+  #committerName = new GrowableColumn(Uint32Array);
+  #committerEmail = new GrowableColumn(Uint32Array);
+  #committerTime = new GrowableColumn(Uint32Array);
 
-  readonly #parentOffsets = new GrowableColumn(Uint32Array);
-  readonly #parentRows = new GrowableColumn(Int32Array);
+  #parentOffsets = new GrowableColumn(Uint32Array);
+  #parentRows = new GrowableColumn(Int32Array);
 
-  readonly #decorations = new Map<number, readonly DecorationRef[]>();
+  #decorations = new Map<number, readonly DecorationRef[]>();
   /** Parent slots not yet resolvable to a row, keyed by slot index, value the parent's hex sha
    *  — bounded by the walk's open frontier (typically well under a hundred), never by row
    *  count. Also what lets `commitAt()` reconstruct an unresolved parent's sha exactly, since
    *  `parentsOf()`'s `-1` alone would otherwise lose it. */
-  readonly #pendingParents = new Map<number, string>();
+  #pendingParents = new Map<number, string>();
 
   #rowCount = 0;
   #clampedTimestampCount = 0;
@@ -588,6 +588,34 @@ export class CommitStore {
       clampedTimestampCount: this.#clampedTimestampCount,
       totalBytes: shaTableBytes + columnBytes + subjectBufferBytes + internedStringBytes,
     };
+  }
+
+  /** Takes over every row of `other` and leaves it empty. This instance keeps its identity, so every
+   *  reference captured to it (a formatter, a selection, a PR state) sees the new history. */
+  replaceWith(other: CommitStore): void {
+    [this.#shas, other.#shas] = [other.#shas, this.#shas];
+    [this.#interner, other.#interner] = [other.#interner, this.#interner];
+    [this.#subjects, other.#subjects] = [other.#subjects, this.#subjects];
+    [this.#authorName, other.#authorName] = [other.#authorName, this.#authorName];
+    [this.#authorEmail, other.#authorEmail] = [other.#authorEmail, this.#authorEmail];
+    [this.#authorTime, other.#authorTime] = [other.#authorTime, this.#authorTime];
+    [this.#committerName, other.#committerName] = [other.#committerName, this.#committerName];
+    [this.#committerEmail, other.#committerEmail] = [other.#committerEmail, this.#committerEmail];
+    [this.#committerTime, other.#committerTime] = [other.#committerTime, this.#committerTime];
+    [this.#parentOffsets, other.#parentOffsets] = [other.#parentOffsets, this.#parentOffsets];
+    [this.#parentRows, other.#parentRows] = [other.#parentRows, this.#parentRows];
+    [this.#decorations, other.#decorations] = [other.#decorations, this.#decorations];
+    [this.#pendingParents, other.#pendingParents] = [other.#pendingParents, this.#pendingParents];
+    [this.#rowCount, other.#rowCount] = [other.#rowCount, this.#rowCount];
+    [this.#clampedTimestampCount, other.#clampedTimestampCount] = [
+      other.#clampedTimestampCount,
+      this.#clampedTimestampCount,
+    ];
+    [this.#resolvedSinceLastLayoutInput, other.#resolvedSinceLastLayoutInput] = [
+      other.#resolvedSinceLastLayoutInput,
+      this.#resolvedSinceLastLayoutInput,
+    ];
+    other.clear();
   }
 
   clear(): void {
