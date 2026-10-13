@@ -111,7 +111,7 @@ export function useContainerDetail(id: Ref<string>) {
 }
 
 /** The registry page of one image; the client default never refetches it. */
-export function useImageRegistry(imageId: MaybeRefOrGetter<string>) {
+function useImageRegistry(imageId: MaybeRefOrGetter<string>) {
   const { control } = useDocker();
   const { scope, ready } = useScope();
   return useQuery({
