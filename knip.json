@@ -112,7 +112,6 @@
         "src/pages/**/*.astro",
         "src/pages/**/*.ts",
         "tests/**/*.spec.ts",
-        "scripts/check-docs.ts",
         "scripts/**/*.spec.ts"
       ],
       "project": ["src/**/*.{ts,astro,mdx}", "tests/**/*.ts", "scripts/**/*.ts"]
