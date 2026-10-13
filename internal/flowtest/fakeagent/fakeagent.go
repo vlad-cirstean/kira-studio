@@ -2,7 +2,7 @@
 // re-executed test binary (flowharness.Main) or as the cmd/fakeclaude binary; the behaviour comes
 // from scenario data in KIRA_FAKE_SCEN (JSON, or the path of a JSON file), so a stream extends it with testdata, not code.
 //
-// Every call writes its argv, cwd and stdin under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
+// Every call writes its argv (last, atomically: it marks the call as fully recorded), cwd and stdin under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
 // (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args. A claude call also
 // keeps its KIRA_* environment (one Go-quoted entry per line) as <repo>-<n>.env and a copy of each --mcp-config file as
 // <repo>-<n>.mcp<i>. Run as "fake-mcp" it is a stdio MCP server with tools echo and ping. A scripted Action.MCP
@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/renameio/v2"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -141,20 +142,32 @@ func Run(name string, args []string) int {
 	return 127
 }
 
+// nextCount claims the next call number for stem. O_EXCL on <stem>-<n>.claim makes concurrent fake
+// processes take distinct numbers; <stem>.count mirrors the claimed number for tests that read it.
 func nextCount(dir, stem string) int {
-	counter := filepath.Join(dir, stem+".count")
-	n := 0
-	if raw, err := os.ReadFile(counter); err == nil {
-		_, _ = fmt.Sscanf(string(raw), "%d", &n)
+	n := 1
+	for ; ; n++ {
+		f, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("%s-%d.claim", stem, n)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if err == nil {
+			_ = f.Close()
+			break
+		}
+		if !os.IsExist(err) {
+			break
+		}
 	}
-	n++
-	_ = os.WriteFile(counter, []byte(fmt.Sprint(n)), 0o644)
+	_ = renameio.WriteFile(filepath.Join(dir, stem+".count"), []byte(fmt.Sprint(n)), 0o644)
 	return n
+}
+
+// writeFile writes atomically: a reader sees the whole file or none.
+func writeFile(path string, data []byte) {
+	_ = renameio.WriteFile(path, data, 0o644)
 }
 
 func runGh(scen Scenario, dir string, args []string) int {
 	n := nextCount(dir, "gh")
-	_ = os.WriteFile(filepath.Join(dir, fmt.Sprintf("gh-%d.args", n)), []byte(strings.Join(args, "\n")), 0o644)
+	writeFile(filepath.Join(dir, fmt.Sprintf("gh-%d.args", n)), []byte(strings.Join(args, "\n")))
 	joined := strings.Join(args, " ")
 	for _, r := range scen.Gh {
 		if !strings.Contains(joined, r.Match) {
@@ -212,14 +225,14 @@ func pickAction(scen Scenario, dir, repo, cwd string, args []string) pickedActio
 		action = actions[min(n, len(actions))-1]
 	}
 	stem := filepath.Join(dir, fmt.Sprintf("%s-%d", repo, n))
-	_ = os.WriteFile(stem+".args", []byte(strings.Join(args, "\n")), 0o644)
-	_ = os.WriteFile(stem+".cwd", []byte(cwd), 0o644)
+	writeFile(stem+".cwd", []byte(cwd))
 	recordEnv(stem)
 	for i, cfg := range argsAfter(args, "--mcp-config") {
 		if raw, err := os.ReadFile(cfg); err == nil {
-			_ = os.WriteFile(fmt.Sprintf("%s.mcp%d", stem, i), raw, 0o644)
+			writeFile(fmt.Sprintf("%s.mcp%d", stem, i), raw)
 		}
 	}
+	writeFile(stem+".args", []byte(strings.Join(args, "\n"))) // marker: the call is fully recorded
 	return pickedAction{Action: action, stem: stem}
 }
 
@@ -397,7 +410,7 @@ func recordEnv(stem string) {
 		}
 	}
 	sort.Strings(lines)
-	_ = os.WriteFile(stem+".env", []byte(strings.Join(lines, "\n")), 0o644)
+	writeFile(stem+".env", []byte(strings.Join(lines, "\n")))
 }
 
 func argAfter(args []string, flag string) string {
