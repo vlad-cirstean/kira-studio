@@ -180,6 +180,14 @@ test('studio api request', async ({ relaunch, consoleErrors }) => {
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-status"]')).toHaveText('200 OK');
   await expect(page.locator('[data-testid="http-request-view"]')).toContainText('Ana Pop');
+  // Monaco tokenizes JSON asynchronously; an uncoloured body would differ between runs.
+  await expect
+    .poll(() =>
+      page
+        .locator('[data-testid="http-request-view"] .view-line span[class^="mtk"]')
+        .evaluateAll((els) => new Set(els.map((el) => el.className)).size),
+    )
+    .toBeGreaterThan(2);
 
   await captureShot(page, { id: 'studio-api', detail: { x: 270, y: 310 }, consoleErrors });
 });

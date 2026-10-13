@@ -119,6 +119,8 @@ async function frame(page: Page, raw: Buffer): Promise<Buffer> {
 export async function captureShot(page: Page, options: ShotOptions): Promise<void> {
   const { id, detail, consoleErrors } = options;
   await page.mouse.move(0, 0);
+  // Monaco fades its scrollbars on a JS timer, which `animations: 'disabled'` cannot freeze.
+  await page.addStyleTag({ content: '.monaco-editor .scrollbar { opacity: 0 !important; }' });
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('13px Inter'))).toBe(true);
   expect(consoleErrors).toEqual([]);
