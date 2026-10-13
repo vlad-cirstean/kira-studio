@@ -25,10 +25,9 @@ func splitTerms(s string) []string {
 	})
 }
 
-// BuildMatch turns free text into an FTS5 MATCH expression that favours recall: every term is a
-// quoted prefix term OR-ed together, plus the whole phrase so exact phrases rank first. User input
-// never reaches the FTS5 parser as syntax. ok is false when no usable term remains.
-func BuildMatch(query string) (match string, ok bool) {
+// matchTerms are the query terms search keeps: lowercased, deduplicated, at least 2 runes, stopwords
+// dropped (kept when nothing else remains), at most maxMatchTerms.
+func matchTerms(query string) []string {
 	var all, kept []string
 	seen := map[string]struct{}{}
 	for _, t := range splitTerms(query) {
@@ -47,11 +46,19 @@ func BuildMatch(query string) (match string, ok bool) {
 	if len(kept) == 0 {
 		kept = all
 	}
-	if len(kept) == 0 {
-		return "", false
-	}
 	if len(kept) > maxMatchTerms {
 		kept = kept[:maxMatchTerms]
+	}
+	return kept
+}
+
+// BuildMatch turns free text into an FTS5 MATCH expression that favours recall: every term is a
+// quoted prefix term OR-ed together, plus the whole phrase so exact phrases rank first. User input
+// never reaches the FTS5 parser as syntax. ok is false when no usable term remains.
+func BuildMatch(query string) (match string, ok bool) {
+	kept := matchTerms(query)
+	if len(kept) == 0 {
+		return "", false
 	}
 	parts := make([]string, 0, len(kept)+1)
 	for _, t := range kept {

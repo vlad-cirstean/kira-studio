@@ -72,6 +72,10 @@ type Memory struct {
 	Versions     int      `json:"versions"`
 	// Match is how a search found this memory: keyword, semantic or both. Empty outside search.
 	Match string `json:"match,omitempty"`
+	// Score explains the rank of a search result. Nil outside search.
+	Score *Score `json:"score,omitempty"`
+	// ContextCount is the other current facts sharing a non-session group; memory_context lists them.
+	ContextCount int `json:"contextCount,omitempty"`
 
 	seq int64
 }

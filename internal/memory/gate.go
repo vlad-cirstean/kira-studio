@@ -65,7 +65,11 @@ func (s *Service) runGate(ctx context.Context, req StoreRequest) ([]gateVerdict,
 	for _, c := range req.Clarifications {
 		in.Clarifications = append(in.Clarifications, gateClarify(c))
 	}
-	related, err := s.Search(ctx, SearchArgs{Query: strings.Join(text, " "), Limit: gateRelatedLimit})
+	args := SearchArgs{Query: strings.Join(text, " "), Limit: gateRelatedLimit}
+	if len(req.Items) > 0 && req.Items[0].Scope == ScopeProject {
+		args.Project = req.Items[0].Project
+	}
+	related, err := s.Search(ctx, args)
 	if err != nil {
 		return nil, err
 	}

@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	defaultSearchLimit = 25
-	maxSearchLimit     = 100
+	defaultSearchLimit = 40
+	maxSearchLimit     = 200
 
 	// DefaultSearchLimit and MaxSearchLimit bound a search; the MCP tool description states them.
 	DefaultSearchLimit = defaultSearchLimit
@@ -95,7 +95,13 @@ func (s *Store) Close() error {
 type SearchArgs struct {
 	Query          string
 	IncludeHistory bool
-	Limit          int // clamped to [1, 100]; 0 means 25
+	Limit          int // clamped to [1, 200]; 0 means 40
+
+	// Scopes and Origins hard-filter results; empty means all.
+	Scopes  []string
+	Origins []string
+	// Project is the rank boost target, not a filter. Empty means no boost.
+	Project string
 
 	// within limits matches to one scope and project. Reconcile only; not on the MCP surface.
 	within *scopeKey
@@ -134,18 +140,11 @@ func scanMemory(r rowScanner, extra ...any) (Memory, error) {
 	return m, nil
 }
 
-func collect(rows *sql.Rows, withRank bool) ([]Memory, error) {
+func collect(rows *sql.Rows) ([]Memory, error) {
 	defer rows.Close()
 	out := []Memory{}
 	for rows.Next() {
-		var rank float64
-		var m Memory
-		var err error
-		if withRank {
-			m, err = scanMemory(rows, &rank)
-		} else {
-			m, err = scanMemory(rows)
-		}
+		m, err := scanMemory(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -164,28 +163,94 @@ func clampLimit(n int) int {
 	return n
 }
 
-// searchFTS is the keyword half of search, recall-first (BuildMatch): bm25 orders results, nothing
-// is cut by score. Service.Search fuses it with the vector list.
+// filter is the hard part of a search: which rows may match at all.
+type filter struct {
+	includeHistory bool
+	scopes         []string
+	origins        []string
+	within         *scopeKey
+}
+
+func (a SearchArgs) filter() filter {
+	return filter{includeHistory: a.IncludeHistory, scopes: a.Scopes, origins: a.Origins, within: a.within}
+}
+
+// where is an " AND ..." clause over alias m, with anonymous placeholders.
+func (f filter) where() (string, []any) {
+	var b strings.Builder
+	var args []any
+	if !f.includeHistory {
+		b.WriteString(" AND m.status = 'current'")
+	}
+	in := func(col string, vals []string) {
+		if len(vals) == 0 {
+			return
+		}
+		b.WriteString(" AND " + col + " IN (?" + strings.Repeat(",?", len(vals)-1) + ")")
+		for _, v := range vals {
+			args = append(args, v)
+		}
+	}
+	in("m.scope", f.scopes)
+	in("m.origin", f.origins)
+	if f.within != nil {
+		scope, project := f.within.args()
+		b.WriteString(" AND m.scope = ? AND m.project IS ?")
+		args = append(args, scope, project)
+	}
+	return b.String(), args
+}
+
+// ftsRow is a keyword match with its bm25 relevance (higher is better).
+type ftsRow struct {
+	Memory
+	bm25 float64
+}
+
+// searchFTSRows is the keyword half of search, recall-first (BuildMatch): bm25 orders results and
+// nothing is cut by score. Column weights: fact 10, reason 3, keywords 6.
+func (s *Store) searchFTSRows(ctx context.Context, match string, f filter, pool int) ([]ftsRow, error) {
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	where, args := f.where()
+	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+`, bm25(memories_fts, 10.0, 3.0, 6.0) AS rank
+		FROM memories_fts JOIN memories m ON m.seq = memories_fts.rowid
+		WHERE memories_fts MATCH ?`+where+`
+		ORDER BY rank, m.seq DESC
+		LIMIT ?`, append(append([]any{match}, args...), pool)...)
+	if err != nil {
+		return nil, fmt.Errorf("memory: search: %w", err)
+	}
+	defer rows.Close()
+	out := []ftsRow{}
+	for rows.Next() {
+		var rank float64
+		m, err := scanMemory(rows, &rank)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ftsRow{Memory: m, bm25: -rank})
+	}
+	return out, rows.Err()
+}
+
+// searchFTS lists keyword matches only, best first; reconcile uses it.
 func (s *Store) searchFTS(ctx context.Context, a SearchArgs) ([]Memory, error) {
 	match, ok := BuildMatch(a.Query)
 	if !ok {
 		return []Memory{}, nil
 	}
-	db, err := s.conn()
+	rows, err := s.searchFTSRows(ctx, match, a.filter(), clampLimit(a.Limit))
 	if err != nil {
 		return nil, err
 	}
-	scope, project := a.within.args()
-	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+`, bm25(memories_fts, 10.0, 2.0, 4.0) AS rank
-		FROM memories_fts JOIN memories m ON m.seq = memories_fts.rowid
-		WHERE memories_fts MATCH ?1 AND (?2 OR m.status = 'current')
-		AND (?4 IS NULL OR (m.scope = ?4 AND m.project IS ?5))
-		ORDER BY rank, m.seq DESC
-		LIMIT ?3`, match, a.IncludeHistory, clampLimit(a.Limit), scope, project)
-	if err != nil {
-		return nil, fmt.Errorf("memory: search: %w", err)
+	out := make([]Memory, len(rows))
+	for i, r := range rows {
+		out[i] = r.Memory
 	}
-	return collect(rows, true)
+	return out, nil
 }
 
 // Recent lists current memories, newest first.
@@ -199,7 +264,7 @@ func (s *Store) Recent(ctx context.Context, limit int) ([]Memory, error) {
 	if err != nil {
 		return nil, fmt.Errorf("memory: recent: %w", err)
 	}
-	return collect(rows, false)
+	return collect(rows)
 }
 
 // lineageOf resolves a fact id, a version id or a legacy uuid to its fact id.
@@ -233,7 +298,7 @@ func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 	if err != nil {
 		return History{}, fmt.Errorf("memory: lineage: %w", err)
 	}
-	mems, err := collect(rows, false)
+	mems, err := collect(rows)
 	if err != nil {
 		return History{}, err
 	}
@@ -276,7 +341,7 @@ func (s *Store) Context(ctx context.Context, id string, limit int) (Context, err
 	if err != nil {
 		return Context{}, fmt.Errorf("memory: context: %w", err)
 	}
-	cur, err := collect(rows, false)
+	cur, err := collect(rows)
 	if err != nil {
 		return Context{}, err
 	}
@@ -312,7 +377,7 @@ func (s *Store) Context(ctx context.Context, id string, limit int) (Context, err
 		if err != nil {
 			return Context{}, fmt.Errorf("memory: context facts: %w", err)
 		}
-		if out.Groups[i].Facts, err = collect(frows, false); err != nil {
+		if out.Groups[i].Facts, err = collect(frows); err != nil {
 			return Context{}, err
 		}
 	}
@@ -383,7 +448,7 @@ func (s *Store) currentOf(ctx context.Context, lineage string) (Memory, bool, er
 	if err != nil {
 		return Memory{}, false, fmt.Errorf("memory: current version: %w", err)
 	}
-	ms, err := collect(rows, false)
+	ms, err := collect(rows)
 	if err != nil || len(ms) == 0 {
 		return Memory{}, false, err
 	}
@@ -404,7 +469,7 @@ func (s *Store) DocumentFacts(ctx context.Context, fileID string) ([]Memory, err
 	if err != nil {
 		return nil, fmt.Errorf("memory: document facts: %w", err)
 	}
-	return collect(rows, false)
+	return collect(rows)
 }
 
 // orphans counts the facts of group id that listed does not name.
@@ -451,7 +516,7 @@ func (s *Store) currentByHash(ctx context.Context, h string, within *scopeKey) (
 	if err != nil {
 		return nil, fmt.Errorf("memory: hash lookup: %w", err)
 	}
-	return collect(rows, false)
+	return collect(rows)
 }
 
 // Revision is the insert counter reconcile decisions are checked against at commit.

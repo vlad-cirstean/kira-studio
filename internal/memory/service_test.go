@@ -254,7 +254,7 @@ type fakeEmbedder struct {
 }
 
 func (f *fakeEmbedder) Spec() embed.Spec {
-	return embed.Spec{ID: "fake", Dim: 3, QueryPrefix: "q: ", DocFloor: 0.85}
+	return embed.Spec{ID: "fake", Dim: 3, QueryPrefix: "q: ", DocFloor: 0.85, QueryFloor: 0, QueryCeil: 1}
 }
 
 func (f *fakeEmbedder) Status() embed.Status { return embed.Status{State: embed.StateReady} }
@@ -311,12 +311,15 @@ func TestHybridSearchUnionsKeywordAndSemantic(t *testing.T) {
 		t.Fatalf("union: %+v", got)
 	}
 	if got[0].Fact != "uses postgres for billing" {
-		t.Errorf("keyword rank breaks the tie: %v", facts(got))
+		t.Errorf("keyword part breaks the relevance tie: %v", facts(got))
 	}
 
 	got, _ = svc.Search(ctx, SearchArgs{Query: "tabs", Limit: 1})
 	if len(got) != 1 || got[0].Match != matchBoth {
 		t.Fatalf("both: %+v", got)
+	}
+	if sc := got[0].Score; sc == nil || sc.Keyword <= 0 || sc.Semantic != 1 || sc.Relevance <= sc.Keyword*0.45 || sc.Total < sc.Relevance {
+		t.Fatalf("both-source score parts: %+v", sc)
 	}
 
 	emb.err = errors.New("worker down")

@@ -102,7 +102,7 @@ func (s *Service) candidates(ctx context.Context, w *work) ([]Memory, error) {
 	if err != nil || w.vec == nil {
 		return cands, err
 	}
-	top, err := s.store.vectorTopK(ctx, s.opts.Embedder.Spec().ID, w.vec, false, reconcileVectorCandidates, w.within())
+	top, err := s.store.vectorTopK(ctx, s.opts.Embedder.Spec().ID, w.vec, reconcileVectorCandidates, filter{within: w.within()})
 	if err != nil {
 		return nil, err
 	}

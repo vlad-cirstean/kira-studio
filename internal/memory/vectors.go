@@ -33,17 +33,16 @@ func (h *minHeap) Pop() any {
 
 var warnedBadVector atomic.Bool
 
-// vectorTopK scans every stored vector of model (within one scope and project when set) and returns the k best by dot product with q,
-// best first. A row whose length does not match q is skipped and logged once.
-func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, includeHistory bool, k int, within *scopeKey) ([]scored, error) {
+// vectorTopK scans every stored vector of model that passes f and returns the k best by dot product
+// (cosine) with q, best first. A row whose length does not match q is skipped and logged once.
+func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, k int, f filter) ([]scored, error) {
 	db, err := s.conn()
 	if err != nil {
 		return nil, err
 	}
-	scope, project := within.args()
+	where, args := f.where()
 	rows, err := db.QueryContext(ctx, `SELECT e.seq, e.vec FROM memory_embeddings e JOIN memories m ON m.seq = e.seq
-		WHERE e.model = ?1 AND (?2 OR m.status = 'current') AND (?3 IS NULL OR (m.scope = ?3 AND m.project IS ?4))`,
-		model, includeHistory, scope, project)
+		WHERE e.model = ?`+where, append([]any{model}, args...)...)
 	if err != nil {
 		return nil, fmt.Errorf("memory: vector scan: %w", err)
 	}
@@ -100,7 +99,7 @@ func (s *Store) memoriesBySeq(ctx context.Context, seqs []int64) (map[int64]Memo
 	if err != nil {
 		return nil, fmt.Errorf("memory: load by seq: %w", err)
 	}
-	ms, err := collect(rows, false)
+	ms, err := collect(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -174,4 +173,78 @@ func (s *Store) embeddingCounts(ctx context.Context, model string) (have, total 
 		return 0, 0, fmt.Errorf("memory: embedding counts: %w", err)
 	}
 	return have, total, nil
+}
+
+// groupStat is a result's group signals: other result lineages sharing a group with it, and other
+// current facts across its groups. Session groups mix topics and never count.
+type groupStat struct{ peers, context int }
+
+// groupStats computes groupStat for each lineage of a result list in two aggregate queries.
+func (s *Store) groupStats(ctx context.Context, lineages []string) (map[string]groupStat, error) {
+	out := make(map[string]groupStat, len(lineages))
+	if len(lineages) == 0 {
+		return out, nil
+	}
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	in := `(?` + strings.Repeat(",?", len(lineages)-1) + `)`
+	args := make([]any, len(lineages))
+	for i, l := range lineages {
+		args[i] = l
+	}
+	rows, err := db.QueryContext(ctx, `SELECT gm.lineage_id, gm.group_id FROM memory_group_members gm
+		JOIN memory_groups g ON g.id = gm.group_id
+		WHERE g.kind <> 'session' AND gm.lineage_id IN `+in, args...)
+	if err != nil {
+		return nil, fmt.Errorf("memory: group stats: %w", err)
+	}
+	byGroup := map[string][]string{}
+	groupsOf := map[string][]string{}
+	for rows.Next() {
+		var lineage, group string
+		if err := rows.Scan(&lineage, &group); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		byGroup[group] = append(byGroup[group], lineage)
+		groupsOf[lineage] = append(groupsOf[lineage], group)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	_ = rows.Close()
+	for lineage, groups := range groupsOf {
+		peers := map[string]struct{}{}
+		for _, g := range groups {
+			for _, p := range byGroup[g] {
+				if p != lineage {
+					peers[p] = struct{}{}
+				}
+			}
+		}
+		out[lineage] = groupStat{peers: len(peers)}
+	}
+	crows, err := db.QueryContext(ctx, `SELECT gm.lineage_id, count(DISTINCT x.lineage_id)
+		FROM memory_group_members gm JOIN memory_groups g ON g.id = gm.group_id
+		JOIN memory_group_members x ON x.group_id = gm.group_id AND x.lineage_id <> gm.lineage_id
+		JOIN memories xm ON xm.lineage_id = x.lineage_id AND xm.status = 'current'
+		WHERE g.kind <> 'session' AND gm.lineage_id IN `+in+` GROUP BY gm.lineage_id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("memory: group context: %w", err)
+	}
+	defer crows.Close()
+	for crows.Next() {
+		var lineage string
+		var n int
+		if err := crows.Scan(&lineage, &n); err != nil {
+			return nil, err
+		}
+		st := out[lineage]
+		st.context = n
+		out[lineage] = st
+	}
+	return out, crows.Err()
 }

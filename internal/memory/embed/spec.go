@@ -18,7 +18,11 @@ type Spec struct {
 	MaxTokens   int
 	// DocFloor is the doc-to-doc cosine at or above which two facts count as paraphrases.
 	DocFloor float32
-	Files    []File
+	// QueryFloor and QueryCeil are the query-to-fact cosines of an unrelated pair and of a
+	// near-certain match; search maps cosine linearly between them to a [0, 1] semantic score.
+	QueryFloor float32
+	QueryCeil  float32
+	Files      []File
 }
 
 // ModelFile and TokenizerFile name the two files every Spec carries.
@@ -34,6 +38,8 @@ var Default = Spec{
 	QueryPrefix: "Represent this sentence for searching relevant passages: ",
 	MaxTokens:   512,
 	DocFloor:    0.85,
+	QueryFloor:  0.55,
+	QueryCeil:   0.70,
 	Files: []File{
 		{
 			Name:   ModelFile,
