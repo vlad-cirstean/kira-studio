@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
@@ -239,7 +238,7 @@ func (r *AdeRepoConfigRepo) SetFolderHidden(path string, hidden bool) (bool, err
 	if n == 0 {
 		return false, nil
 	}
-	if _, err := tx.Exec(`UPDATE code_repos SET hidden = ? WHERE id IN
+	if _, err := tx.Exec(`UPDATE code_repos SET hidden = ?, hidden_rev = hidden_rev + 1 WHERE id IN
 		(SELECT code_repo_id FROM ade_repo_config WHERE source = ?)`, boolInt(hidden), path); err != nil {
 		return false, fmt.Errorf("repos: hide folder repos: %w", err)
 	}
@@ -249,21 +248,33 @@ func (r *AdeRepoConfigRepo) SetFolderHidden(path string, hidden bool) (bool, err
 	return true, nil
 }
 
-// ApplyFolderHidden writes the folder's stored hidden flag onto the given repos in one statement. It
-// never writes ade_folders, so a flag changed since the caller read it is not overwritten.
-func (r *AdeRepoConfigRepo) ApplyFolderHidden(path string, ids []string) error {
-	if len(ids) == 0 {
+// ImportedRepo is a repo a folder scan imported and the hidden_rev it was stored with.
+type ImportedRepo struct {
+	ID  string
+	Rev int
+}
+
+// ApplyFolderHidden writes the folder's stored hidden flag onto the imported repos whose hidden_rev
+// still equals the one at import, in one transaction. A repo written since (the folder flip's own
+// bulk UPDATE, a per-repo toggle) is skipped. It never writes ade_folders, so a flag changed since
+// the caller read it is not overwritten.
+func (r *AdeRepoConfigRepo) ApplyFolderHidden(path string, imported []ImportedRepo) error {
+	if len(imported) == 0 {
 		return nil
 	}
-	args := make([]any, 0, len(ids)+1)
-	args = append(args, path)
-	for _, id := range ids {
-		args = append(args, id)
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin apply ade folder hidden: %w", err)
 	}
-	q := `UPDATE code_repos SET hidden = COALESCE((SELECT hidden FROM ade_folders WHERE path = ?), hidden)
-		WHERE id IN (?` + strings.Repeat(",?", len(ids)-1) + `)`
-	if _, err := r.DB.Exec(q, args...); err != nil {
-		return fmt.Errorf("repos: apply ade folder hidden: %w", err)
+	defer tx.Rollback() //nolint:errcheck
+	for _, in := range imported {
+		if _, err := tx.Exec(`UPDATE code_repos SET hidden = COALESCE((SELECT hidden FROM ade_folders WHERE path = ?), hidden),
+			hidden_rev = hidden_rev + 1 WHERE id = ? AND hidden_rev = ?`, path, in.ID, in.Rev); err != nil {
+			return fmt.Errorf("repos: apply ade folder hidden: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit apply ade folder hidden: %w", err)
 	}
 	return nil
 }

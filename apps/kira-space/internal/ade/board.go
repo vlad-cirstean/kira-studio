@@ -115,12 +115,14 @@ type TaskBoard struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 
-	importMu  sync.Mutex // serializes repo imports (folder add, folder watch rescans)
-	folderWMu sync.Mutex
-	folderW   map[string]*folderWatcher
-	stopFlowW func()
-	wfTimer   *time.Timer
-	startOnce sync.Once
+	importMu sync.Mutex // serializes repo imports (folder add, folder watch rescans)
+	// afterImport runs after each repo a folder scan imports; tests flip state mid-scan with it.
+	afterImport func(codeRepoID string)
+	folderWMu   sync.Mutex
+	folderW     map[string]*folderWatcher
+	stopFlowW   func()
+	wfTimer     *time.Timer
+	startOnce   sync.Once
 
 	mu          sync.Mutex
 	repoMus     map[string]*sync.Mutex

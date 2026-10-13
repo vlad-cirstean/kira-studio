@@ -148,3 +148,42 @@ func TestFolderWatch_importsNewRepo(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+func TestImportFolder_midScanChangesKeepUnhiddenRepo(t *testing.T) {
+	skipWithoutGitQueue(t)
+	h := newBoardHarness(t)
+	root := t.TempDir()
+	for _, name := range []string{"one", "two"} {
+		_, dir := initQueueRepo(t)
+		if err := os.Rename(dir, filepath.Join(root, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := context.Background()
+	first := true
+	h.board.afterImport = func(id string) {
+		if !first {
+			return
+		}
+		first = false
+		if _, err := h.board.SetFolderHidden(ctx, root, true); err != nil {
+			t.Error(err)
+		}
+		if _, err := h.repos.CodeRepos.SetHidden(id, false); err != nil {
+			t.Error(err)
+		}
+		h.mid = id
+	}
+	if _, err := h.board.AddFolder(ctx, root, false); err != nil {
+		t.Fatal(err)
+	}
+	list, err := h.repos.CodeRepos.List()
+	if err != nil || len(list) != 2 {
+		t.Fatalf("repos = %+v, %v", list, err)
+	}
+	for _, r := range list {
+		if want := r.ID != h.mid; r.Hidden != want {
+			t.Errorf("repo %s hidden = %v, want %v", r.Name, r.Hidden, want)
+		}
+	}
+}

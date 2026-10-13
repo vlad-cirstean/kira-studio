@@ -22,6 +22,7 @@ type boardHarness struct {
 	board   *TaskBoard
 	emitted atomic.Int32
 	status  atomic.Value // gitclient.GitStatus
+	mid     string
 }
 
 func newBoardHarness(t *testing.T) *boardHarness {

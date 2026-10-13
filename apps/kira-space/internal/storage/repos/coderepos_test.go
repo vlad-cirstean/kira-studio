@@ -77,3 +77,47 @@ func TestCodeReposRepo_Reorder(t *testing.T) {
 		t.Fatalf("order after reopen = %v", order(reread))
 	}
 }
+
+func TestApplyFolderHiddenSkipsChangedRepos(t *testing.T) {
+	db, err := storage.OpenAt(t.TempDir())
+	if err != nil {
+		t.Fatalf("storage.OpenAt: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	codeRepos := &CodeReposRepo{DB: db.DB}
+	cfg := &AdeRepoConfigRepo{DB: db.DB}
+	const folder = "/work"
+	if err := cfg.AddFolder(folder, false); err != nil {
+		t.Fatal(err)
+	}
+	var imported []ImportedRepo
+	for _, id := range []string{"A", "B"} {
+		rec, err := codeRepos.Create(model.CodeRepo{ID: id, Name: id, Root: "/" + id, RepoID: "r" + id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		imported = append(imported, ImportedRepo{ID: id, Rev: rec.HiddenRev})
+	}
+	// The flip lands mid-scan: A has its source set, B not yet.
+	if err := cfg.SetSource("A", folder); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := cfg.SetFolderHidden(folder, true); err != nil || !ok {
+		t.Fatalf("SetFolderHidden = %v, %v", ok, err)
+	}
+	if _, err := codeRepos.SetHidden("A", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.SetSource("B", folder); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.ApplyFolderHidden(folder, imported); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]bool{"A": false, "B": true} {
+		got, err := codeRepos.Get(id)
+		if err != nil || got == nil || got.Hidden != want {
+			t.Errorf("repo %s hidden = %+v, %v, want %v", id, got, err, want)
+		}
+	}
+}

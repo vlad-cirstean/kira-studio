@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const codeReposSelectColumns = `id, name, root, repo_id, sort_order, color, created_at, hidden`
+const codeReposSelectColumns = `id, name, root, repo_id, sort_order, color, created_at, hidden, hidden_rev`
 
 // CodeReposRepo reads and writes the `code_repos` table (C5 §3.1) — the repo-import store.
 type CodeReposRepo struct {
@@ -20,7 +20,7 @@ type CodeReposRepo struct {
 func scanCodeRepoRow(row rowScanner) (model.CodeRepo, error) {
 	var r model.CodeRepo
 	var hidden int
-	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.Color, &r.CreatedAt, &hidden); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.Color, &r.CreatedAt, &hidden, &r.HiddenRev); err != nil {
 		return model.CodeRepo{}, err
 	}
 	r.Hidden = hidden != 0
@@ -124,7 +124,7 @@ func (r *CodeReposRepo) SetColor(id, color string) (model.CodeRepo, error) {
 
 // SetHidden updates only the hidden flag.
 func (r *CodeReposRepo) SetHidden(id string, hidden bool) (model.CodeRepo, error) {
-	if _, err := r.DB.Exec(`UPDATE code_repos SET hidden = ? WHERE id = ?`, boolInt(hidden), id); err != nil {
+	if _, err := r.DB.Exec(`UPDATE code_repos SET hidden = ?, hidden_rev = hidden_rev + 1 WHERE id = ?`, boolInt(hidden), id); err != nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s hidden: %w", id, err)
 	}
 	rec, err := r.Get(id)

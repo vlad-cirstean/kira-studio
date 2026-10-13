@@ -322,6 +322,7 @@ func (b *TaskBoard) importFolder(ctx context.Context, path string) ([]string, er
 	defer b.importMu.Unlock()
 	scan := scanFolder(path)
 	imported := make([]string, 0, len(scan.repos))
+	revs := make([]repos.ImportedRepo, 0, len(scan.repos))
 	if len(scan.repos) == 0 {
 		return imported, nil
 	}
@@ -349,12 +350,17 @@ func (b *TaskBoard) importFolder(ctx context.Context, path string) ([]string, er
 			return nil, err
 		}
 		imported = append(imported, rec.ID)
+		revs = append(revs, repos.ImportedRepo{ID: rec.ID, Rev: rec.HiddenRev})
+		if b.afterImport != nil {
+			b.afterImport(rec.ID)
+		}
 	}
 	// SetFolderHidden does not wait for a scan: a flag flipped mid-scan is re-applied to the repos
-	// this scan imported, which the flip's own UPDATE could not have seen. The flag is read inside
-	// the UPDATE, so a later flip is never overwritten.
+	// this scan imported, which the flip's own UPDATE could not have seen. Only repos untouched
+	// since import (same hidden_rev) are written, so a repo the user toggled meanwhile keeps its
+	// state; the flag is read inside the UPDATE, so a later flip is never overwritten.
 	if now, err := b.deps.RepoConfig.FolderHidden(path); err == nil && now != folderHidden {
-		if err := b.deps.RepoConfig.ApplyFolderHidden(path, imported); err != nil {
+		if err := b.deps.RepoConfig.ApplyFolderHidden(path, revs); err != nil {
 			return nil, err
 		}
 	}

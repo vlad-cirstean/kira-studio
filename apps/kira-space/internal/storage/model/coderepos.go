@@ -18,6 +18,8 @@ type CodeRepo struct {
 	Color     string `json:"color"`
 	CreatedAt string `json:"createdAt"`
 	Hidden    bool   `json:"hidden"`
+	// HiddenRev counts writes of Hidden; storage-only.
+	HiddenRev int `json:"-"`
 }
 
 // Validate asserts the identity fields no SQL constraint covers, the same discipline
