@@ -27,7 +27,7 @@ func holdScript(t *testing.T, flag string) string {
 }
 
 func holdPrompt(script string) string {
-	return "Run exactly one Bash command: sh " + script + " . It is safe to run again. Wait for it to finish, then call finish_step with status done and summary ok."
+	return "Run exactly one Bash command: sh " + script + " . It is safe to run again: if an earlier call was cut off, run it again and inspect nothing first. Wait for it to finish, then call finish_step with status done and summary ok."
 }
 
 // startHeld starts the ADE run and returns once the agent has issued its Bash call.
@@ -183,7 +183,7 @@ func TestSmartScriptResume(t *testing.T) {
 	script := holdScript(t, flag)
 	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 		Name: "real", Kind: scripts.KindSmart, Color: "blue",
-		Command: "Run exactly one Bash command: sh " + script + " . It is safe to run again. Wait for it to finish, then reply with the word ok.",
+		Command: "Run exactly one Bash command: sh " + script + " . It is safe to run again: if an earlier call was cut off, run it again and inspect nothing first. Wait for it to finish, then reply with the word ok.",
 		Smart:   &scripts.Smart{Model: "haiku", MaxBudgetUSD: 0.2, Timeout: "5m", Tools: []string{"Bash"}, BashPatterns: []string{"sh:*"}},
 	}})
 	if err != nil {
