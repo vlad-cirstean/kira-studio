@@ -452,4 +452,25 @@ theme; capturing screenshots in CI; Space phone app screenshots.
 
 ## 13. Result
 
-Pending.
+Done. Base `v2.0` after P278 close-out `18c1af43b`.
+
+- Site: `site/` workspace, Astro 7.3.8, Tailwind 4 via `@tailwindcss/vite`, zero client JavaScript.
+  `bun run site:check`: 12 tests pass (phone 375 px, desktop 1280 px).
+- Screenshots: six shots, `bun run screenshots`, byte-identical across three reruns. 2.8 MB total,
+  each PNG under 260 KB. Fixes found while capturing:
+  - `captureShot` framing opened its page on the shot's context; `browser.newPage` pages own their
+    context, so framing now uses a fresh context at scale 2.
+  - Space shots needed fixtures for `adeTaskRepos`, `codeWorkspaceRepoHeads`, `memoryImportJobs`,
+    `memorySemanticStatus`, `memoryHistory`, `memoryContext` (each unmocked call is an HTTP 422 console error).
+  - `studio-api` varied between runs: Monaco tokenizes JSON asynchronously (shot waits for
+    coloured tokens) and fades scrollbars on a JS timer (capture hides them).
+  - Detail crop origins retuned; memory shot selects a fact; hash-like fake SHAs.
+- Page fixes from visual review: hero shot no longer repeats in the Studio section; header brand text
+  hidden below 640 px.
+- Licences: astro, `@astrojs/check`, `@tailwindcss/vite` MIT; sharp Apache-2.0 (prebuilt libvips
+  LGPL-3.0, open source); both Fontsource packages OFL-1.1.
+- Serial suites in this worktree: lint, typecheck, test:unit, test:ui:space, test:ui:studio,
+  test:visual:space, test:visual:studio. Results in the final report.
+- README images: all six `screenshots/framed/*.png` paths exist (2048 x 1280, transparent corners).
+  Remote GitHub render check is the user's (`gh api` blocked here).
+- Left for the user: `pages.yml` go-live (DEV_ENVIRONMENT.md).

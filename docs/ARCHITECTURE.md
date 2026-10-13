@@ -5552,6 +5552,37 @@ tmux and kitty. A sweep of the session's groups cannot tell a disowned job from 
 exists. On Linux the session ends `exitDrain` (200 ms) after the shell exits, not when the last
 slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exited tab open.
 
+## Presentation site (P280)
+
+Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Static, zero client JavaScript.
+
+- `site/` is a Bun workspace member (`@kira/site`): Astro 7, Tailwind 4 through `@tailwindcss/vite`
+  (`@astrojs/tailwind` is Tailwind 3 only). `astro.config.mjs` sets `base: '/kira-studio'`. Every link
+  and asset goes through `import.meta.env.BASE_URL` or `astro:assets`; never a hard-coded `/` path.
+- Palette comes from `packages/theme/src/tokens.css` (`global.css` maps tokens into `@theme`). Fonts
+  are Inter and JetBrains Mono (Fontsource), the same pair the screenshots use.
+- Page copy lives in `site/src/data/`. Copy follows `CLAUDE.md` "Communication style".
+- Deploy: `pages.yml` (Actions: `configure-pages`, `upload-pages-artifact`, `deploy-pages`) builds
+  `site/dist` only. No capture, no Playwright in the Action. Go-live steps: `docs/DEV_ENVIRONMENT.md`.
+- Check: `bun run site:check` builds, then runs `site/tests/site.spec.ts` in WebKit at 375 px (phone)
+  and 1280 px (desktop). It asserts no horizontal scroll, every image loads, every link answers 200,
+  no console errors, crop on phone and framed window on desktop, 16 px text, 44 px tap targets.
+- Screenshots: `bun run screenshots` drives the production frontend bundles of both apps against the
+  mocked Wails runtime (same fixtures stack as the `ui` tier; no backend, no credentials). Window
+  1024 x 640 (the apps' minimum), scale 2, WebKit, pinned clock and `en-US`/UTC. Inter and JetBrains
+  Mono replace `-apple-system` and Menlo, which Linux lacks. Output: raw `screenshots/<id>.png`,
+  phone crop `<id>-detail.png` (440 x 330 CSS px), `framed/<id>.png`. Framing composites
+  `screenshots/assets/traffic-lights.svg` over a rounded transparent frame, so README and page match.
+  Raw captures never contain window buttons.
+- Determinism is byte-identical: a rerun must leave `git status screenshots/` clean. Nondeterminism
+  found so far: Monaco tokenizes JSON asynchronously (shot waits for coloured tokens) and fades its
+  scrollbars on a JS timer (capture hides them).
+- Starlight (P284): add the `docs` content collection and Starlight's Tailwind layer in `global.css`;
+  append Docs to `src/data/nav.ts`. `src/lib/shots.ts` already serves screenshot imports to any page.
+- Declined (library rule): Jekyll, because its Ruby toolchain sits beside Bun and Go and it has no
+  component model. VitePress, because its docs-centric default theme fights a landing page and the
+  Vue SFC docs model is not needed for one page.
+
 ## Known open items
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in

@@ -44,7 +44,26 @@ means it hasn't been applied yet; don't recreate one that already exists for the
 and don't let this workaround become an excuse to touch workflow files more often than the task
 needs.
 
-Nothing pending now — no file under `docs/pending-changes/` or `docs/pending-workflows/`.
+Pending now: `docs/pending-workflows/pages.yml` (P280, GitHub Pages deploy). Go live:
+
+1. On a Mac session, move it to `.github/workflows/pages.yml` in one commit; push.
+2. In GitHub: Settings > Pages > Build and deployment > Source = GitHub Actions.
+3. Merge the chapter branch to `main`, or run the "Pages" workflow by hand on `main`. The
+   `github-pages` environment accepts deployments from `main` only, by default. A run from another
+   branch fails unless that branch is added under Settings > Environments > github-pages.
+4. Open `https://vlad-cirstean.github.io/kira-studio/`.
+
+## Presentation screenshots and site check (P280)
+
+- `bun run screenshots` rebuilds both `frontend/dist` (test bundles), then captures six shots in
+  WebKit into `screenshots/`. Never run it beside a UI suite in the same checkout. Not in hooks, CI or
+  the Pages Action. Run it by hand when a shown UI changes, then commit the PNGs.
+- Rerun it and check `git status --porcelain screenshots/` is empty. A diff means a nondeterministic
+  input; fix the cause, never add tolerance.
+- Shot flows: `apps/*/tests/screenshots/*.shot.ts`. A shot fails on a console error, so a mocked
+  channel without a fixture (`E_FIXTURE_MISS`, HTTP 422) shows up as one; add the snapshot.
+- `bun run site:check` builds the site, then runs the 375 px and 1280 px WebKit checks.
+  `bun run site:dev` serves it locally.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`, and Docker flow tests)
 
