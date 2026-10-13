@@ -3,6 +3,7 @@ package claude
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,7 +27,7 @@ func holdScript(t *testing.T, flag string) string {
 }
 
 func holdPrompt(script string) string {
-	return "Run exactly one Bash command: sh " + script + " . Wait for it to finish, then call finish_step with status done and summary ok."
+	return "Run exactly one Bash command: sh " + script + " . It is safe to run again. Wait for it to finish, then call finish_step with status done and summary ok."
 }
 
 // startHeld starts the ADE run and returns once the agent has issued its Bash call.
@@ -35,7 +36,7 @@ func (f *adeFixture) startHeld(t *testing.T, script string) (adewire.Task, adewi
 	stage := "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
 		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 5m\n" +
 		"        allowed_tools: [\"Bash(sh:*)\"]\n" +
-		"        prompt: " + holdPrompt(script) + "\n"
+		"        prompt: " + strconv.Quote(holdPrompt(script)) + "\n"
 	f.saveWorkflow(t, "flow", stage+userStageYAML)
 	task := f.createTask(t, "flow")
 	b, err := f.W.AdeTask.Board(ctx)
@@ -59,6 +60,22 @@ func (f *adeFixture) startHeld(t *testing.T, script string) (adewire.Task, adewi
 	return task, run
 }
 
+// claudeSession returns Claude's session id of an ADE session row.
+func (f *adeFixture) claudeSession(t *testing.T, sessionID string) string {
+	t.Helper()
+	res, err := f.W.AdeTask.Sessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range res.Sessions {
+		if s.ID == sessionID {
+			return s.ClaudeSessionID
+		}
+	}
+	t.Fatalf("no session %s in %+v", sessionID, res.Sessions)
+	return ""
+}
+
 func (f *adeFixture) stepRun(t *testing.T, taskID string) adewire.Run {
 	t.Helper()
 	b, err := f.W.AdeTask.Board(ctx)
@@ -80,7 +97,8 @@ func (f *adeFixture) stepRun(t *testing.T, taskID string) adewire.Run {
 }
 
 // TestAdeResumeRun cuts a real agent off mid Bash call with an app restart, resumes it, releases the
-// call and expects the same Claude session to finish through finish_step.
+// call and expects the same Claude session to finish through finish_step. The CLI's interrupted tool_result
+// line is not in the run log, so the check is the shared Claude session id.
 func TestAdeResumeRun(t *testing.T) {
 	f := newAdeFixture(t, nil)
 	flag := filepath.Join(t.TempDir(), "flag")
@@ -107,8 +125,8 @@ func TestAdeResumeRun(t *testing.T) {
 	if resumed.State != "done" || resumed.Outcome == nil || !resumed.Outcome.Reported {
 		t.Fatalf("resumed run = %+v, want done through finish_step; log:\n%s", resumed, tail(log, 1500))
 	}
-	if !strings.Contains(strings.ToLower(log), "interrupted") {
-		t.Fatalf("resumed run log lacks the CLI's interrupted tool_result line:\n%s", tail(log, 1500))
+	if got, want := f.claudeSession(t, resumed.SessionID), f.claudeSession(t, run.SessionID); got == "" || got != want {
+		t.Fatalf("resumed run on claude session %q, want the interrupted run's %q", got, want)
 	}
 	f.requireCostUnder(t)
 }
@@ -140,7 +158,7 @@ func TestAdeResumeLost(t *testing.T) {
 		stuck = f.stepRun(t, task.ID)
 		return stuck.ID == run.ID && stuck.State == "stuck" && stuck.Resumable
 	})
-	removeTranscript(t, f.Home, run.SessionID)
+	removeTranscript(t, f.Home, f.claudeSession(t, run.SessionID))
 	if err := f.W.AdeTask.ResumeRun(ctx, adewire.RunArgs{RunID: stuck.ID}); err != nil {
 		t.Fatalf("ResumeRun: %v", err)
 	}
@@ -165,7 +183,7 @@ func TestSmartScriptResume(t *testing.T) {
 	script := holdScript(t, flag)
 	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 		Name: "real", Kind: scripts.KindSmart, Color: "blue",
-		Command: "Run exactly one Bash command: sh " + script + " . Wait for it to finish, then reply with the word ok.",
+		Command: "Run exactly one Bash command: sh " + script + " . It is safe to run again. Wait for it to finish, then reply with the word ok.",
 		Smart:   &scripts.Smart{Model: "haiku", MaxBudgetUSD: 0.2, Timeout: "5m", Tools: []string{"Bash"}, BashPatterns: []string{"sh:*"}},
 	}})
 	if err != nil {
