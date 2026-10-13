@@ -332,4 +332,34 @@ value. Delete the temporary spec; record counts in section 11.
 
 ## 11. Result
 
-Pending.
+Done. Commits after the plan: `68afae2ed` spec, `1e24d236f` spec fix (scroll to top before the collapsed
+check), `ae47af170` height-only resize, `b473dcce0` tips reconciled, `8c19cf097` single publish step,
+`c6be9d66b` staged refresh swap, `c3aebd891` architecture notes.
+
+Base failures (spec alone, commit 1 body has the full lines):
+
+- Test 1: `host bottom is 30px below the viewport bottom` after Show more (cause 3).
+- Test 2: `aria-rowcount 886 -> 54, scrollTop 3000 -> 786` (cause 1).
+- Test 3: same 30px gap (cause 3 masks the refresh assertions on base).
+- Test 4: failed at base too (plan expected a pass): `depth 1, clicked "commit 815", selected "commit 141"`.
+  Cause 4: click between plan publish and grid repaint.
+
+Per commit: after the resize fix test 1 passes; after the tips fix test 2 keeps its list but moves the
+viewport by one row; after the publish step test 4 passes; after the staged swap with the sha anchor
+all 4 pass (3 green runs in a row).
+
+Deviations: test 2 scrolls before `freezeClock` (a frozen clock fakes rAF) and resumes the clock after
+the refresh; the worker probe installs through `page.evaluate` after boot, not `addInitScript`.
+`GraphOrderState` skips malformed tip shas (a ref with no object id threw in `rowOfSha`; caught by
+`repo-graph-refresh` "branch behind its upstream"). `trackErrors` moved to `support/pageErrors.ts`
+(convention N8).
+
+Suites: `lint`, `lint:go`, `typecheck`, `test:unit` (1910) clean; `test:ui:space` 580 passed;
+`test:ui:studio` 538 passed, 1 load flake (`cell-editor` autodetect, passes alone); `test:visual:space`
+13 passed, no baseline change. No Go change.
+
+Real-backend recheck (temporary spec, deleted): clone of this repo, 5000 rows, 6 empty commits, 8 wheel
+steps 120 ms apart plus a click each, 56 samples. Collapse off: 0 bad, `aria-rowcount` 5000 throughout.
+Collapse on: 0 render problems; the collapsed row count moves 1319 to 459 on the first commit and stays.
+A fresh page load shows 1319 before the commits and 459 after, so the live list equals a fresh load.
+Raw history stays 5000 rows.
