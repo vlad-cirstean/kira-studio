@@ -1,18 +1,5 @@
 @import "tailwindcss";
-@import "../../../packages/theme/src/tokens.css";
-
-@theme inline {
-  --color-bg: var(--kira-bg);
-  --color-elevated: var(--kira-bg-elevated);
-  --color-chrome: var(--kira-bg-chrome);
-  --color-fg: var(--kira-fg);
-  --color-muted: var(--kira-fg-muted);
-  --color-accent: var(--kira-accent);
-  --color-accent-fg: var(--kira-accent-fg);
-  --color-border: var(--kira-border);
-  --font-sans: "Inter Variable", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-}
+@import "./theme.css";
 
 html {
   scroll-behavior: smooth;

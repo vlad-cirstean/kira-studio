@@ -31,7 +31,7 @@ async function urls(src: ImageMetadata) {
 }
 
 /** Resolves one listed shot; throws at build time when a file is missing. */
-async function resolveShot(id: string): Promise<ResolvedShot> {
+export async function resolveShot(id: string): Promise<ResolvedShot> {
   const def = SHOTS.find((s) => s.id === id);
   if (!def) throw new Error(`Unknown shot ${id}`);
   const f = await urls(find(framed, `${id}.png`));

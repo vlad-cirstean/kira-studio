@@ -10,5 +10,6 @@ export const NAV: readonly NavLink[] = [
   { label: 'Studio', href: '#studio' },
   { label: 'Space', href: '#space' },
   { label: 'Install', href: '#install' },
+  { label: 'Docs', href: `${import.meta.env.BASE_URL.replace(/\/$/, '')}/docs/` },
   { label: 'GitHub', href: REPO_URL, external: true },
 ];
