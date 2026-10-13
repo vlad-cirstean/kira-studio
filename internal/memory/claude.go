@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/renameio/v2"
+
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
@@ -144,7 +146,7 @@ func (r *CLIRunner) RunResult(ctx context.Context, c Call) (Result, error) {
 	}
 	defer os.RemoveAll(dir)
 	for name, data := range c.Files {
-		if err := os.WriteFile(filepath.Join(dir, filepath.Base(name)), data, 0o600); err != nil {
+		if err := renameio.WriteFile(filepath.Join(dir, filepath.Base(name)), data, 0o600); err != nil {
 			return Result{}, fmt.Errorf("memory: seed temp dir: %w", err)
 		}
 	}
