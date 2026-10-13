@@ -1043,13 +1043,16 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	}
 	line := llmprompts.RunResumeLine.Text(b.prompts(), llmprompts.ResumeVars{App: appName})
 	spec := model.AdeRunLaunch{ResumeID: run.Launch.ResumeID, Prompt: line, Note: noteResumed}
+	if _, err := b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops, Launch: spec}); err != nil {
+		return err
+	}
+	// Clear only after queueing: a failed queue keeps the stuck run resumable.
 	cleared, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{Launch: &model.AdeRunLaunch{}})
 	if err != nil {
 		return err
 	}
 	b.emitRuns(cleared)
-	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops, Launch: spec})
-	return err
+	return nil
 }
 
 // StageDone moves the task to the next stage, or finishes the workflow after the last.
