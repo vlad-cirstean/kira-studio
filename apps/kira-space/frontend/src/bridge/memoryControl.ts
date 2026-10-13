@@ -25,7 +25,6 @@ import { z } from 'zod';
 const memoriesSchema = memorySchema.array();
 
 const IMPORT_ACTIONS = {
-  start: MemoryImportService.Start,
   pause: MemoryImportService.Pause,
   resume: MemoryImportService.Resume,
   cancel: MemoryImportService.Cancel,
@@ -77,6 +76,18 @@ export const memoryControl: MemoryControl = {
     importJobSchema.array().parse((await unwrap(MemoryImportService.Jobs())) ?? []),
   memoryImportJob: async (id) =>
     importJobDetailSchema.parse(await unwrap(MemoryImportService.Job({ id }))),
+  memoryImportStart: async ({ id, origin, sourceTag, scope, project, writeDoc }) => {
+    await unwrap(
+      MemoryImportService.Start({
+        id,
+        origin: origin ?? '',
+        sourceTag: sourceTag ?? '',
+        scope: scope ?? '',
+        project: project ?? '',
+        writeDoc: writeDoc ?? false,
+      }),
+    );
+  },
   memoryImportAction: async (action, id) => {
     await unwrap(IMPORT_ACTIONS[action]({ id }));
   },

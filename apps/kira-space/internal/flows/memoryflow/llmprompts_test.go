@@ -51,7 +51,7 @@ func TestImportGateUsesEditedPrompt(t *testing.T) {
 	app := importAppGate(t, gateMarker)
 	overrideGate(t, app)
 	job := createJob(t, app, importDir(t))
-	if err := app.W.MemoryImport.Start(bridge.MemoryImportJobArgs{ID: job.Job.ID}); err != nil {
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: job.Job.ID}); err != nil {
 		t.Fatal(err)
 	}
 	done := waitJob(t, app, job.Job.ID, importer.JobDone)

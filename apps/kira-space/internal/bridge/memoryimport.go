@@ -76,7 +76,7 @@ func (s *MemoryImportService) Choose(args MemoryImportChooseArgs) (MemoryImportC
 	return MemoryImportChoice{Paths: paths}, nil
 }
 
-// Create scans the paths in the background. The returned job is scanning; wait for awaiting.
+// Create scans the paths in the background (channel ui). The returned job is scanning; wait for awaiting.
 func (s *MemoryImportService) Create(args MemoryImportCreateArgs) (importer.Job, error) {
 	if n := len(args.Paths); n < 1 || n > maxImportPaths {
 		return importer.Job{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.memory.importPathCount.body", map[string]string{"max": strconv.Itoa(maxImportPaths)})
@@ -125,8 +125,24 @@ func (s *MemoryImportService) act(id string, do func(*importer.Engine, string) e
 	return memoryErr(do(e, id))
 }
 
-func (s *MemoryImportService) Start(args MemoryImportJobArgs) error {
-	return s.act(args.ID, func(e *importer.Engine, id string) error { return e.Start(id, importer.StartArgs{}) })
+// MemoryImportStartArgs confirms an awaiting job. An empty Origin keeps the job's own provenance and
+// doc write-back; otherwise Origin, SourceTag, Scope and Project replace the job's provenance.
+type MemoryImportStartArgs struct {
+	ID        string `json:"id"`
+	Origin    string `json:"origin"`
+	SourceTag string `json:"sourceTag"`
+	Scope     string `json:"scope"`
+	Project   string `json:"project"`
+	WriteDoc  bool   `json:"writeDoc"`
+}
+
+func (s *MemoryImportService) Start(args MemoryImportStartArgs) error {
+	var a importer.StartArgs
+	if args.Origin != "" {
+		a.Provenance = &importer.Provenance{Origin: args.Origin, SourceTag: args.SourceTag, Scope: args.Scope, Project: args.Project}
+		a.WriteDoc = &args.WriteDoc
+	}
+	return s.act(args.ID, func(e *importer.Engine, id string) error { return e.Start(id, a) })
 }
 
 func (s *MemoryImportService) Pause(args MemoryImportJobArgs) error {

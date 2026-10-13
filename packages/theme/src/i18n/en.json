@@ -5665,6 +5665,14 @@
       "back": {
         "label": "Back to memories"
       },
+      "channel": {
+        "agent": {
+          "description": "Started by Claude session {session}."
+        },
+        "ui": {
+          "label": "Manual"
+        }
+      },
       "confirm": {
         "calls": {
           "label": "{count} Claude call | {count} Claude calls"
@@ -5687,14 +5695,24 @@
         "nothingSkipped": {
           "description": "No importable files found. {count} skipped."
         },
+        "origin": {
+          "label": "Origin"
+        },
         "scanning": {
           "loading": "Scanning files…"
         },
         "skipped": {
           "label": "{count} file skipped | {count} files skipped"
         },
+        "sourceTag": {
+          "error": "Use 1 to 32 lowercase letters, digits or dashes.",
+          "label": "Source tag"
+        },
         "truncated": {
           "description": "Too many files. Only the first file is included. | Too many files. Only the first {count} files are included."
+        },
+        "writeDoc": {
+          "label": "Write a kira-memory doc beside each file"
         }
       },
       "discardConfirm": {
@@ -5705,8 +5723,34 @@
         "label": "Import documents"
       },
       "file": {
+        "docError": {
+          "label": "Doc not written: {error}"
+        },
+        "docPath": {
+          "label": "Doc"
+        },
         "dropped": {
           "label": "Dropped: {why}"
+        },
+        "group": {
+          "label": "Group"
+        },
+        "kind": {
+          "jsonl": {
+            "label": "JSON lines"
+          },
+          "markdown": {
+            "label": "Markdown"
+          },
+          "memdoc": {
+            "label": "Memory doc"
+          }
+        },
+        "orphaned": {
+          "label": "{count} no longer in the doc"
+        },
+        "verified": {
+          "label": "{count} cross-checked"
         }
       },
       "fileState": {
@@ -5719,7 +5763,10 @@
         "finalizing": {
           "status": "Finalising"
         },
-        "skipped": {}
+        "skipped": {},
+        "verifying": {
+          "status": "Cross-checking"
+        }
       },
       "files": {
         "label": "Import files…"
@@ -5762,6 +5809,9 @@
       "totals": {
         "added": {
           "label": "{count} added"
+        },
+        "dropped": {
+          "label": "{count} not stored"
         },
         "files": {
           "label": "{done} / {count} file | {done} / {count} files"

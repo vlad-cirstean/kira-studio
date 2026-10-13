@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import type { MemoryOrigin, MemoryScope } from '@shared/domain/memory';
 import type { ImportAction } from '@shared/domain/memoryImport';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Progress } from '@theme/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -11,10 +14,12 @@ import { storeToRefs } from 'pinia';
 import { computed, useTemplateRef } from 'vue';
 import { useVirtualRows } from '../../behaviour/virtualRows';
 import { errorText } from '../../bridge/codedError';
+import Identifier from '../../components/Identifier.vue';
 import { useRowHeight } from '../../lib/rowHeight';
+import { originText, SCOPE_LABEL } from '../labels';
 import ImportFileRow from './ImportFileRow.vue';
 import { JOB_STATE_LABEL, jobTitle } from './importFormat';
-import { useImportAction, useImportJob, useRetryImportFile } from './importQueries';
+import { useImportAction, useImportJob, useRetryImportFile, useStartImport } from './importQueries';
 import { useImportUiStore } from './importStore';
 
 // P211: one import — state, totals, job actions and its virtualized file list.
@@ -23,6 +28,7 @@ const ui = useImportUiStore();
 const { selectedFileId } = storeToRefs(ui);
 const detail = useImportJob(() => props.jobId);
 const act = useImportAction();
+const start = useStartImport();
 const retryFile = useRetryImportFile();
 const { confirm } = useConfirmDialogStore();
 
@@ -41,7 +47,14 @@ const { virtualItems, totalSize } = useVirtualRows({
   rowHeight: () => rowHeight.value,
   scrollElement: scrollRef,
 });
-const actError = computed(() => (act.isError.value ? errorText(act.error.value) : ''));
+const actError = computed(() => {
+  if (act.isError.value) return errorText(act.error.value);
+  return start.isError.value ? errorText(start.error.value) : '';
+});
+
+function startJob(): void {
+  start.mutate({ id: props.jobId });
+}
 
 function run(action: ImportAction): void {
   act.mutate({ action, id: props.jobId });
@@ -78,12 +91,28 @@ async function discard(): Promise<void> {
         <span class="text-kira-sm text-muted-foreground" data-testid="import-job-state">{{
           t(JOB_STATE_LABEL[job.state])
         }}</span>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Badge variant="default" data-testid="import-job-channel">{{
+              t(job.channel === 'mcp' ? 'memory.common.origin.agent.label' : 'memory.import.channel.ui.label')
+            }}</Badge>
+          </TooltipTrigger>
+          <TooltipContent v-if="job.sessionId">{{
+            t('memory.import.channel.agent.description', { session: job.sessionId })
+          }}</TooltipContent>
+        </Tooltip>
+        <Badge variant="default" data-testid="import-job-origin">{{
+          originText(job.origin as MemoryOrigin, job.sourceTag)
+        }}</Badge>
+        <Badge variant="default" data-testid="import-job-scope">{{
+          job.project ? job.project : t(SCOPE_LABEL[job.scope as MemoryScope])
+        }}</Badge>
         <Button
           v-if="job.state === 'awaiting'"
           variant="toolbar"
           size="kira"
           data-testid="import-start"
-          @click="run('start')"
+          @click="startJob"
           >{{
             t('common.action.start.label')
           }}</Button
@@ -169,6 +198,9 @@ async function discard(): Promise<void> {
         <span>{{ t('memory.import.totals.added.label', { count: job.totals.added }) }}</span>
         <span>{{ t('memory.import.totals.updated.label', { count: job.totals.updated }) }}</span>
         <span>{{ t('memory.import.totals.known.label', { count: job.totals.noop }) }}</span>
+        <span v-if="job.totals.dropped > 0">{{
+          t('memory.import.totals.dropped.label', { count: job.totals.dropped })
+        }}</span>
         <span v-if="job.totals.unresolved > 0">{{
           t('common.unresolved.label', { count: job.totals.unresolved })
         }}</span>
@@ -212,6 +244,33 @@ async function discard(): Promise<void> {
           selectedFile.reason
         }}</p
       >
+      <div
+        v-if="selectedFile.groupId"
+        class="flex items-center gap-1.5 text-kira-sm text-muted-foreground"
+        data-testid="import-file-group"
+      >
+        <span>{{ t('memory.import.file.group.label') }}</span>
+        <Identifier :value="selectedFile.groupId" copyable />
+      </div>
+      <FieldDescription v-if="selectedFile.orphaned > 0" data-testid="import-file-orphaned">{{
+        t('memory.import.file.orphaned.label', { count: selectedFile.orphaned })
+      }}</FieldDescription>
+      <div
+        v-if="selectedFile.docPath"
+        class="flex items-center gap-1.5 text-kira-sm text-muted-foreground"
+        data-testid="import-file-doc"
+      >
+        <span>{{ t('memory.import.file.docPath.label') }}</span>
+        <Identifier :value="selectedFile.docPath" split="path" copyable />
+      </div>
+      <Alert
+        v-if="selectedFile.docError"
+        variant="warn"
+        :icon="null"
+        data-testid="import-file-doc-error"
+      >
+        <span>{{ t('memory.import.file.docError.label', { error: selectedFile.docError }) }}</span>
+      </Alert>
       <Alert v-for="(u, i) in selectedFile.unresolved" :key="`u${i}`" variant="warn" :icon="null">
         <span>{{ u.fact }}</span>
         <span v-for="q in u.questions" :key="q" class="text-kira-sm text-muted-foreground">{{

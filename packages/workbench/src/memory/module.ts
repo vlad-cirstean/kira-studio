@@ -16,6 +16,7 @@ import type {
   ImportChoice,
   ImportJob,
   ImportJobDetail,
+  ImportStartArgs,
 } from '@shared/domain/memoryImport';
 import { type InjectionKey, inject } from 'vue';
 
@@ -56,6 +57,7 @@ export interface MemoryControl {
   memoryImportCreate(paths: string[]): Promise<ImportJob>;
   memoryImportJobs(): Promise<ImportJob[]>;
   memoryImportJob(id: string): Promise<ImportJobDetail>;
+  memoryImportStart(args: ImportStartArgs): Promise<void>;
   memoryImportAction(action: ImportAction, id: string): Promise<void>;
   memoryImportRetryFile(fileId: string): Promise<void>;
   onMemoryImport(cb: () => void): () => void;

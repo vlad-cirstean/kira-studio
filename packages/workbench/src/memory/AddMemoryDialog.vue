@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import type { MemoryClarification, MemoryScope, MemoryStoreResult } from '@shared/domain/memory';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
-import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@theme/components/ui/command';
 import {
   Dialog,
   DialogBody,
@@ -22,34 +13,25 @@ import {
 } from '@theme/components/ui/dialog';
 import { FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { computed, reactive, ref } from 'vue';
 import { errorText } from '../bridge/codedError';
-import { SCOPE_LABEL } from './labels';
-import { useMemoryProjects, useStoreMemory } from './queries';
+import { useStoreMemory } from './queries';
+import ScopeField from './ScopeField.vue';
 import { useMemoryUiStore } from './store';
 
 // P214: free-text Add memory through the MCP store_memory gate. A challenge stores nothing; answer or edit, resubmit.
 const emit = defineEmits<{ close: [] }>();
 const ui = useMemoryUiStore();
 const store = useStoreMemory();
-const projects = useMemoryProjects();
 
 const MAX_TEXT = 1000;
 const MANUAL_REASON = 'Stated by the user, added manually in the Memory module.';
 const text = ref('');
 const scope = ref<MemoryScope>('personal');
 const project = ref('');
-const projectOpen = ref(false);
-const projectSearch = ref('');
 const SCOPES: MemoryScope[] = ['personal', 'project', 'company'];
-const scopeItems = SCOPES.map((value) => ({
-  value,
-  label: t(SCOPE_LABEL[value]),
-  testid: `add-memory-scope-${value}`,
-}));
 const result = ref<MemoryStoreResult | null>(null);
 const answers = reactive<Record<string, string>>({});
 const asked = ref<MemoryClarification[]>([]);
@@ -60,24 +42,12 @@ const storeError = computed(() => (store.isError.value ? errorText(store.error.v
 const challenged = computed(() => result.value?.status === 'challenged');
 const stored = computed(() => result.value?.status === 'stored');
 const projectKey = computed(() => (scope.value === 'project' ? project.value.trim() : ''));
-const known = computed(() => projects.data.value ?? []);
-const typed = computed(() => projectSearch.value.trim());
 const canSubmit = computed(
   () =>
     !busy.value &&
     text.value.trim() !== '' &&
     (scope.value !== 'project' || projectKey.value !== ''),
 );
-
-function onScope(value: string): void {
-  scope.value = value as MemoryScope;
-}
-
-function pickProject(key: string): void {
-  project.value = key;
-  projectOpen.value = false;
-  projectSearch.value = '';
-}
 
 function answerKey(index: number, q: number): string {
   return `${index}:${q}`;
@@ -186,68 +156,12 @@ function select(id: string): void {
               >{{ text.length }}
               / {{ MAX_TEXT }}</span
             >
-            <div class="flex flex-col gap-1">
-              <Label>{{ t('common.field.scope.label') }}</Label>
-              <SecondaryTabs
-                :model-value="scope"
-                :items="scopeItems"
-                variant="segmented"
-                size="kira-lg"
-                :aria-label="t('common.field.scope.label')"
-                data-testid="add-memory-scope"
-                @update:model-value="onScope"
-              />
-            </div>
-            <div v-if="scope === 'project'" class="flex flex-col gap-1">
-              <Label for="memory-project">{{ t('memory.common.project.label') }}</Label>
-              <Popover v-model:open="projectOpen">
-                <PopoverTrigger as-child>
-                  <Button
-                    id="memory-project"
-                    variant="dialog"
-                    size="kira-lg"
-                    class="justify-between"
-                    data-testid="add-memory-project"
-                  >
-                    <span class="truncate font-data">{{
-                      project || t('memory.add.project.placeholder')
-                    }}</span>
-                    <CodiconIcon name="chevron-down" :size="12" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent class="w-96 p-0">
-                  <Command
-                    :model-value="project"
-                    @update:model-value="(v) => pickProject(String(v))"
-                  >
-                    <CommandInput
-                      v-model="projectSearch"
-                      :placeholder="t('memory.add.findProject.placeholder')"
-                      data-testid="add-memory-project-search"
-                    />
-                    <CommandList>
-                      <CommandGroup>
-                        <CommandItem
-                          v-if="typed !== '' && !known.includes(typed)"
-                          :value="typed"
-                          data-testid="add-memory-project-custom"
-                        >
-                          {{ t('memory.add.useProject.label', { project: typed }) }}
-                        </CommandItem>
-                        <CommandItem
-                          v-for="key in known"
-                          :key="key"
-                          :value="key"
-                          :data-testid="`add-memory-project-option-${key}`"
-                        >
-                          <span class="font-data">{{ key }}</span>
-                        </CommandItem>
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+            <ScopeField
+              v-model:scope="scope"
+              v-model:project="project"
+              prefix="add-memory"
+              :scopes="SCOPES"
+            />
             <template v-if="challenged">
               <Alert
                 v-for="c in result?.challenges.filter((x) => x.index === 0)"

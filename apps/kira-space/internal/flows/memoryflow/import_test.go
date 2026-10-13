@@ -136,7 +136,7 @@ func TestImportLifecycle(t *testing.T) {
 	// Contract memory-import: tests/ui/memory-import.spec.ts reads the estimate and the finished job.
 	app.Contract(t, "memory-import", "MemoryImportService.Job#awaiting", awaiting, importMask)
 	mark := app.Events.Mark()
-	if err := app.W.MemoryImport.Start(bridge.MemoryImportJobArgs{ID: awaiting.Job.ID}); err != nil {
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: awaiting.Job.ID}); err != nil {
 		t.Fatal(err)
 	}
 	done := waitJob(t, app, awaiting.Job.ID, importer.JobDone)
@@ -183,7 +183,7 @@ func TestImportLifecycle(t *testing.T) {
 	}
 	second := createJob(t, app, docs)
 	id := bridge.MemoryImportJobArgs{ID: second.Job.ID}
-	if err := app.W.MemoryImport.Start(id); err != nil {
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: id.ID}); err != nil {
 		t.Fatal(err)
 	}
 	waitJob(t, app, id.ID, importer.JobRunning)
@@ -235,7 +235,7 @@ func TestImportRetries(t *testing.T) {
 	app := importApp(t, fakeagent.PromptRule{System: extractSystem, Doc: "release.md", Fail: 2})
 	job := createJob(t, app, importDir(t))
 	id := bridge.MemoryImportJobArgs{ID: job.Job.ID}
-	if err := app.W.MemoryImport.Start(id); err != nil {
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: id.ID}); err != nil {
 		t.Fatal(err)
 	}
 	failed := waitJob(t, app, id.ID, importer.JobDone, importer.JobFailed)

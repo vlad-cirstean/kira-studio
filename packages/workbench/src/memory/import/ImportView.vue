@@ -23,7 +23,10 @@ const current = computed(
 const jobItems = computed(() =>
   listed.value.map((job) => ({
     value: job.id,
-    label: jobTitle(job),
+    label:
+      job.channel === 'mcp'
+        ? `${jobTitle(job)} · ${t('memory.common.origin.agent.label')}`
+        : jobTitle(job),
     testid: `import-job-${job.id}`,
   })),
 );

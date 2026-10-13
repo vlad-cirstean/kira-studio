@@ -18,12 +18,16 @@ export const importFileStateSchema = /*#__PURE__*/ z.enum([
   'skipped',
   'extracting',
   'extracted',
+  'verifying',
   'finalizing',
   'done',
   'failed',
   'cancelled',
 ]);
 export type ImportFileState = z.infer<typeof importFileStateSchema>;
+
+export const importChannelSchema = /*#__PURE__*/ z.enum(['ui', 'mcp']);
+export type ImportChannel = z.infer<typeof importChannelSchema>;
 
 export const importJobSchema = /*#__PURE__*/ z.object({
   id: z.string(),
@@ -50,10 +54,20 @@ export const importJobSchema = /*#__PURE__*/ z.object({
     added: z.number().int(),
     updated: z.number().int(),
     noop: z.number().int(),
+    dropped: z.number().int(),
     unresolved: z.number().int(),
     failedFiles: z.number().int(),
     skippedFiles: z.number().int(),
   }),
+  channel: importChannelSchema,
+  origin: z.string(),
+  sourceTag: z.string().nullable(),
+  scope: z.string(),
+  project: z.string().nullable(),
+  sessionId: z.string().nullable(),
+  groups: z.array(z.object({ kind: z.string(), key: z.string(), title: z.string().optional() })),
+  autoStart: z.boolean(),
+  writeDoc: z.boolean(),
   calls: z.number().int(),
   costUsd: z.number(),
   createdAt: z.string(),
@@ -65,7 +79,7 @@ export type ImportJob = z.infer<typeof importJobSchema>;
 export const importFileSchema = /*#__PURE__*/ z.object({
   id: z.string(),
   relPath: z.string(),
-  kind: z.string(),
+  kind: z.enum(['markdown', 'text', 'json', 'jsonl', 'memdoc']),
   size: z.number().int(),
   state: importFileStateSchema,
   reason: z.string(),
@@ -79,6 +93,21 @@ export const importFileSchema = /*#__PURE__*/ z.object({
   unresolved: z.array(z.object({ fact: z.string(), questions: z.array(z.string()) })),
   dropped: z.array(z.object({ fact: z.string(), why: z.string() })),
   costUsd: z.number(),
+  verified: z.number().int(),
+  orphaned: z.number().int(),
+  groupId: z.string(),
+  prov: z
+    .object({
+      origin: z.string(),
+      sourceTag: z.string(),
+      scope: z.string(),
+      project: z.string(),
+      session: z.string(),
+    })
+    .nullable(),
+  docPath: z.string(),
+  docError: z.string(),
+  factIds: z.array(z.string()).optional(),
 });
 export type ImportFile = z.infer<typeof importFileSchema>;
 
@@ -94,11 +123,16 @@ export const importChoiceSchema = /*#__PURE__*/ z.object({
 });
 export type ImportChoice = z.infer<typeof importChoiceSchema>;
 
-export type ImportAction =
-  | 'start'
-  | 'pause'
-  | 'resume'
-  | 'cancel'
-  | 'discard'
-  | 'dismiss'
-  | 'retryFailed';
+export type ImportAction = 'pause' | 'resume' | 'cancel' | 'discard' | 'dismiss' | 'retryFailed';
+
+// Start confirms an awaiting job. No origin keeps the job's own provenance and doc write-back.
+export interface ImportStartArgs {
+  id: string;
+  origin?: 'user' | 'external';
+  sourceTag?: string;
+  scope?: 'personal' | 'project';
+  project?: string;
+  writeDoc?: boolean;
+}
+
+export const SOURCE_TAG_PATTERN = /^[a-z0-9-]{1,32}$/;

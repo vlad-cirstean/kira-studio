@@ -1,4 +1,4 @@
-import type { ImportAction } from '@shared/domain/memoryImport';
+import type { ImportAction, ImportStartArgs } from '@shared/domain/memoryImport';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { tryOnScopeDispose } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
@@ -64,6 +64,18 @@ export function useImportAction() {
       mutationKey: [...IMPORT_KEY, 'action'],
       mutationFn: (vars: { action: ImportAction; id: string }) =>
         control.memoryImportAction(vars.action, vars.id),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: IMPORT_KEY }),
+    },
+    queryClient,
+  );
+}
+
+export function useStartImport() {
+  const { control } = useMemoryModule();
+  return useMutation(
+    {
+      mutationKey: [...IMPORT_KEY, 'start'],
+      mutationFn: (args: ImportStartArgs) => control.memoryImportStart(args),
       onSettled: () => queryClient.invalidateQueries({ queryKey: IMPORT_KEY }),
     },
     queryClient,
