@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/renameio/v2"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
@@ -60,7 +61,7 @@ func runFakeClaude(args []string) int {
 		fmt.Sscanf(string(raw), "%d", &n)
 	}
 	n++
-	_ = os.WriteFile(counter, []byte(fmt.Sprint(n)), 0o644)
+	_ = renameio.WriteFile(counter, []byte(fmt.Sprint(n)), 0o644)
 	action := "done"
 	if len(actions) > 0 {
 		action = actions[min(n, len(actions))-1]
