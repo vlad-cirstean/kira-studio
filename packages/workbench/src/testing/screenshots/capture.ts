@@ -92,9 +92,12 @@ export interface ShotOptions {
 
 async function frame(page: Page, raw: Buffer): Promise<Buffer> {
   const lights = await readFile(join(OUT_DIR, 'assets', 'traffic-lights.svg'));
-  const shot = await page.context().newPage();
+  const browser = page.context().browser();
+  if (!browser) throw new Error('captureShot needs a page from browser.newPage');
+  // A page made by browser.newPage owns its context, so framing needs a fresh one at the same scale.
+  const context = await browser.newContext({ viewport: WINDOW, deviceScaleFactor: SCALE });
+  const shot = await context.newPage();
   try {
-    await shot.setViewportSize(WINDOW);
     await shot.setContent(`<!doctype html>
 <html><body style="margin:0;background:transparent">
 <div id="frame" style="position:relative;width:${WINDOW.width}px;height:${WINDOW.height}px;border-radius:10px;overflow:hidden">
@@ -107,7 +110,7 @@ async function frame(page: Page, raw: Buffer): Promise<Buffer> {
       .locator('#frame')
       .screenshot({ omitBackground: true, animations: 'disabled' });
   } finally {
-    await shot.close();
+    await context.close();
   }
 }
 

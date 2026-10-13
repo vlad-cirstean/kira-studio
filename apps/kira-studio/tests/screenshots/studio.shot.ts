@@ -68,7 +68,7 @@ test('studio data grid', async ({ relaunch, consoleErrors }) => {
   await expect(grid).toContainText('Ana Pop');
   await rows.nth(2).click();
 
-  await captureShot(page, { id: 'studio-data-grid', detail: { x: 250, y: 60 }, consoleErrors });
+  await captureShot(page, { id: 'studio-data-grid', detail: { x: 265, y: 130 }, consoleErrors });
 });
 
 const QUERY = [
@@ -136,7 +136,7 @@ test('studio sql console', async ({ relaunch, consoleErrors }) => {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expect(view.locator('.monaco-editor.focused')).toHaveCount(0);
 
-  await captureShot(page, { id: 'studio-sql-console', detail: { x: 250, y: 60 }, consoleErrors });
+  await captureShot(page, { id: 'studio-sql-console', detail: { x: 265, y: 150 }, consoleErrors });
 });
 
 test('studio api request', async ({ relaunch, consoleErrors }) => {
@@ -181,5 +181,5 @@ test('studio api request', async ({ relaunch, consoleErrors }) => {
   await expect(page.locator('[data-testid="http-status"]')).toHaveText('200 OK');
   await expect(page.locator('[data-testid="http-request-view"]')).toContainText('Ana Pop');
 
-  await captureShot(page, { id: 'studio-api', detail: { x: 60, y: 60 }, consoleErrors });
+  await captureShot(page, { id: 'studio-api', detail: { x: 270, y: 310 }, consoleErrors });
 });

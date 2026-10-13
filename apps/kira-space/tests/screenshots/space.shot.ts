@@ -24,7 +24,11 @@ const REPO = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
-const sha = (n: number) => (n + 1).toString(16).padStart(2, '0').repeat(20);
+// Deterministic hex that reads like a real hash, not a repeated byte.
+const sha = (n: number) =>
+  Array.from({ length: 5 }, (_, i) =>
+    ((Math.imul(n + 1, 2654435761) + Math.imul(i + 1, 40503)) >>> 0).toString(16).padStart(8, '0'),
+  ).join('');
 const COMMIT_SECONDS = Math.floor(CAPTURE_NOW / 1000) - 3.5 * 3600;
 const IDENTITY = { name: 'Ana Pop', email: 'ana.pop@acme.example', timestamp: COMMIT_SECONDS };
 
@@ -159,6 +163,12 @@ const VIEW_STATE = {
 test('space git graph', async ({ relaunch, consoleErrors }) => {
   const control: ControlSnapshot[] = [
     { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+    { channel: IPC.adeTaskRepos, response: { repos: [], folders: [] } },
+    {
+      channel: IPC.codeWorkspaceRepoHeads,
+      args: { ids: [REPO.id] },
+      response: [{ id: REPO.id, head: { kind: 'branch', name: 'main' } }],
+    },
     {
       channel: IPC.codeWorkspaceListFiles,
       args: { id: REPO.id },
@@ -206,7 +216,7 @@ test('space git graph', async ({ relaunch, consoleErrors }) => {
   await expect(detail).toBeVisible();
   await expect(detail.locator('[data-testid="file-tree-row"]').first()).toBeVisible();
 
-  await captureShot(win, { id: 'space-git-graph', detail: { x: 20, y: 60 }, consoleErrors });
+  await captureShot(win, { id: 'space-git-graph', detail: { x: 265, y: 130 }, consoleErrors });
 });
 
 test('space agents board', async ({ relaunch, consoleErrors }) => {
@@ -219,7 +229,7 @@ test('space agents board', async ({ relaunch, consoleErrors }) => {
     ),
   ).toHaveText('Implement 3/5');
 
-  await captureShot(win, { id: 'space-agents-board', detail: { x: 20, y: 60 }, consoleErrors });
+  await captureShot(win, { id: 'space-agents-board', detail: { x: 290, y: 180 }, consoleErrors });
 });
 
 interface Fact {
@@ -296,6 +306,14 @@ test('space memory', async ({ relaunch, consoleErrors }) => {
     control: [
       { channel: IPC.memoryRecent, response: MEMORIES },
       { channel: IPC.memoryProjects, response: [PROJECT] },
+      { channel: IPC.adeTaskRepos, response: { repos: [], folders: [] } },
+      { channel: IPC.memoryImportJobs, response: [] },
+      { channel: IPC.memoryContext, response: { memory: MEMORIES[0], groups: [] } },
+      { channel: IPC.memoryHistory, response: { memories: [MEMORIES[0]], events: [] } },
+      {
+        channel: IPC.memorySemanticStatus,
+        response: { state: 'installed', message: '', model: '', done: 0, total: 0 },
+      },
     ],
   });
   await openMemory(win);
@@ -304,5 +322,8 @@ test('space memory', async ({ relaunch, consoleErrors }) => {
   await expect(first.locator('[data-testid="memory-row-origin"]')).toHaveText('User');
   await expect(win.locator('[data-testid="memory-row-m2.1"]')).toContainText('PostgreSQL 16');
 
-  await captureShot(win, { id: 'space-memory', detail: { x: 20, y: 60 }, consoleErrors });
+  await first.click();
+  await expect(win.locator('[data-testid="memory-detail"]')).toBeVisible();
+
+  await captureShot(win, { id: 'space-memory', detail: { x: 0, y: 130 }, consoleErrors });
 });
