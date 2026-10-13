@@ -149,7 +149,7 @@
         "filesTotal": 1
       },
       "project": "github.com/acme/billing",
-      "reason": "Needs confirmation in Kira Space: 1 kira-memory docs claim a higher origin or company scope",
+      "reason": "Needs confirmation in Kira Space: 1 kira-memory docs claim a higher origin or another scope or project",
       "roots": [],
       "scope": "project",
       "sessionId": "flow-session",

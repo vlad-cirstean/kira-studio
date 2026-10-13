@@ -381,7 +381,7 @@ func (r *Runner) plan(jobID string, res ScanResult) ([]newFile, error) {
 		}
 		if doc, ok := parseMemdoc(c.Kind, text); ok {
 			nf.Kind, nf.State = KindMemdoc, FilePending
-			nf.DocOrigin, nf.DocScope = doc.Origin, doc.Scope
+			nf.DocOrigin, nf.DocScope, nf.DocProject = doc.Origin, doc.Scope, doc.Project
 			files = append(files, nf)
 			continue
 		}

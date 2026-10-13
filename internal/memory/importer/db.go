@@ -144,8 +144,8 @@ type newFile struct {
 	ID, Path, Rel, Kind, Hash, State, Reason, Title string
 	Size                                            int64
 	Chunks, Tokens                                  int
-	// DocOrigin and DocScope are the header provenance of a memdoc; scan-time only, not stored.
-	DocOrigin, DocScope string
+	// DocOrigin, DocScope and DocProject are the header provenance of a memdoc; scan-time only, not stored.
+	DocOrigin, DocScope, DocProject string
 }
 
 // scanned stores a finished scan and moves the job to awaiting, then applies the agent auto-start
@@ -155,13 +155,13 @@ func (s *store) scanned(jobID, base string, truncated bool, ignored int, files [
 	return s.tx(func(tx *sql.Tx) error {
 		tokens, chunks := 0, 0
 		now := s.now()
-		var jobOrigin, jobScope string
-		if err := tx.QueryRow(`SELECT origin, scope FROM import_jobs WHERE id = ?`, jobID).Scan(&jobOrigin, &jobScope); err != nil {
+		var jobOrigin, jobScope, jobProject string
+		if err := tx.QueryRow(`SELECT origin, scope, COALESCE(project, '') FROM import_jobs WHERE id = ?`, jobID).Scan(&jobOrigin, &jobScope, &jobProject); err != nil {
 			return err
 		}
 		claims := 0
 		for _, f := range files {
-			if f.Kind == KindMemdoc && f.State == FilePending && docClaimsMore(f, jobOrigin, jobScope) {
+			if f.Kind == KindMemdoc && f.State == FilePending && docClaimsMore(f, jobOrigin, jobScope, jobProject) {
 				claims++
 			}
 			if _, err := tx.Exec(`INSERT INTO import_files
@@ -188,11 +188,17 @@ func (s *store) scanned(jobID, base string, truncated bool, ignored int, files [
 	})
 }
 
-// docClaimsMore reports whether a memdoc header claims a higher origin grade or a company scope
-// than its job holds: header provenance wins on apply, so an unattended job must not start on it.
-func docClaimsMore(f newFile, jobOrigin, jobScope string) bool {
-	return memory.GradeOf(f.DocOrigin) > memory.GradeOf(jobOrigin) ||
-		(f.DocScope == memory.ScopeCompany && jobScope != memory.ScopeCompany)
+// docClaimsMore reports whether a memdoc header claims a higher origin grade, another scope or
+// another project than its job holds: header provenance wins on apply, so an unattended job must
+// not start on it. Narrowing to project scope of the job's own project is allowed.
+func docClaimsMore(f newFile, jobOrigin, jobScope, jobProject string) bool {
+	if memory.GradeOf(f.DocOrigin) > memory.GradeOf(jobOrigin) {
+		return true
+	}
+	if f.DocScope == "" || (f.DocScope == jobScope && (f.DocScope != memory.ScopeProject || f.DocProject == jobProject)) {
+		return false
+	}
+	return !(f.DocScope == memory.ScopeProject && jobProject != "" && f.DocProject == jobProject)
 }
 
 // moveJob changes a job's state when it is in one of from; otherwise it reports why not.
@@ -271,7 +277,7 @@ func autoStartTx(tx *sql.Tx, now func() string, id string, chunkCap, docClaims i
 	}
 	var why []string
 	if docClaims > 0 {
-		why = append(why, fmt.Sprintf("%d kira-memory docs claim a higher origin or company scope", docClaims))
+		why = append(why, fmt.Sprintf("%d kira-memory docs claim a higher origin or another scope or project", docClaims))
 	}
 	if chunks > chunkCap {
 		counts, err := pendingChunkCounts(tx, id)
@@ -705,13 +711,14 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 		if err := rows.Scan(&idx, &text, &raw); err != nil {
 			return f, err
 		}
+		norm := normalizeQuote(text)
 		var facts []Fact
 		if err := json.Unmarshal([]byte(raw), &facts); err != nil {
 			return f, fmt.Errorf("import: chunk facts: %w", err)
 		}
 		for n, fact := range facts {
 			ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Fact: fact}
-			if Questionable(text, fact) {
+			if questionableIn(norm, fact) {
 				if _, judged := f.verdicts[ff.ID]; !judged {
 					f.Verify = append(f.Verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Evidence: fact.Evidence, Section: fact.Section, Unresolved: fact.Unresolved})
 				}

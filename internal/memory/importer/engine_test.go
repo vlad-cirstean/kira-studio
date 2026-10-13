@@ -556,22 +556,27 @@ func TestImportCrossChecksQuestionableFacts(t *testing.T) {
 // A kira-memory doc header wins on apply, so an unattended MCP job must not start on a header that
 // claims more than the job holds.
 func TestAutoStartWaitsOnMemdocHeaderClaims(t *testing.T) {
-	doc := func(origin, scope string) string {
-		return "---\nkira-memory: 1\ngroup: kg_4m9xq2c7v8ab\ntitle: Billing deploys\norigin: " + origin + "\nscope: " + scope + "\nupdated: 2026-10-12\n---\n\n## Ports\n\n" +
+	doc := func(origin, scope, project string) string {
+		if project != "" {
+			project = "project: " + project + "\n"
+		}
+		return "---\nkira-memory: 1\ngroup: kg_4m9xq2c7v8ab\ntitle: Billing deploys\norigin: " + origin + "\nscope: " + scope + "\n" + project + "updated: 2026-10-12\n---\n\n## Ports\n\n" +
 			"km_7h3kq9x2mfa4 fact: Billing API listens on port 9090 in production.\nkm_7h3kq9x2mfa4 reason: Deploy manifest changed in March release.\n"
 	}
 	cases := []struct {
-		name, origin, scope string
-		wait                bool
+		name, origin, scope, project string
+		wait                         bool
 	}{
-		{"origin above job", "user", "project", true},
-		{"company scope above job", "agent", "company", true},
-		{"within job trust", "agent", "project", false},
+		{"origin above job", "user", "project", "github.com/acme/billing", true},
+		{"company scope above job", "agent", "company", "", true},
+		{"other project", "agent", "project", "github.com/acme/payments", true},
+		{"personal scope", "agent", "personal", "", true},
+		{"within job trust", "agent", "project", "github.com/acme/billing", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			h := newHarness(t, 0)
-			if err := os.WriteFile(filepath.Join(h.dir, "mem.md"), []byte(doc(c.origin, c.scope)), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(h.dir, "mem.md"), []byte(doc(c.origin, c.scope, c.project)), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			j, err := h.e.Create(CreateArgs{Paths: []string{h.dir}, Channel: ChannelMCP, AutoStart: true,

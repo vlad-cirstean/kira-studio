@@ -55,7 +55,7 @@ Store the facts of files and folders by path, in the background. Send absolute p
 - `writeDoc`: also write `<name>.memory.md` beside each file. Default false.
 - `session`: a Claude Code session id.
 
-A large job waits for you to start it in Kira Space. So does a job holding a kira-memory doc whose header claims a higher origin or the company scope than the job. A doc's header provenance wins on import, so you confirm it first.
+A large job waits for you to start it in Kira Space. So does a job holding a kira-memory doc whose header claims a higher origin, or another scope or project, than the job. A doc's header provenance wins on import, so you confirm it first.
 
 ### ingest_status
 

@@ -4936,9 +4936,9 @@ replies and full terminal attach for Claude Code sessions.
   doc's id, equal text noops, an edit updates when the doc grade is at least the stored grade, else
   skipped. Facts the doc no longer lists stay stored and count as orphaned. `GroupRef.ID` joins or
   creates the group by the doc's `kg_` id.
-  Header provenance wins on apply, so a memdoc whose header origin grades above the job's origin, or claims
-  `company` scope for a non-company job, holds an MCP job at `awaiting` ("N kira-memory docs claim a higher
-  origin or company scope"); the user confirms in the import view.
+  Header provenance wins on apply, so a memdoc whose header origin grades above the job's origin, or names
+  another scope or project than the job's (narrowing to `project` of the job's own project passes), holds an
+  MCP job at `awaiting` ("N kira-memory docs claim a higher origin or another scope or project"); the user confirms in the import view.
 - Write-back: opt-in per job (`writeDoc`, confirm-dialog checkbox). Writes `<dir>/<stem>.memory.md`
   beside the source with `renameio`, never over the source. An existing target is overwritten only when
   it is a kira-memory doc with the same group; otherwise the file stays `done` with `doc_error`. Holds
