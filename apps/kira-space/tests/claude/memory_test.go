@@ -49,7 +49,57 @@ func TestMemoryMcpThroughClaude(t *testing.T) {
 		t.Fatalf("claude run ended in error: %+v", res)
 	}
 	storeThroughClaude(t, app, cfg)
+	searchScoredThroughClaude(t, app, cfg)
 	asCommentThroughClaude(t, app, cfg)
+}
+
+// searchScoredThroughClaude has claude search from the billing repo: every meta line carries the
+// score parts and claude's call is not rejected by the new filter arguments.
+func searchScoredThroughClaude(t *testing.T, app *realApp, cfg string) {
+	t.Helper()
+	out, _ := app.claudeP(t, filepath.Join(app.Work, "billing"), nil,
+		"Call the search_memories tool once with the query \"billing-api port\" and no other argument, then reply with the word done.",
+		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__search_memories",
+		"--output-format", "stream-json", "--verbose")
+	msgs := parseStream(out)
+	uses := toolUses(msgs, "mcp__"+memoryServer+"__search_memories")
+	if len(uses) == 0 {
+		t.Fatalf("no search_memories tool use in the stream:\n%s", tail(out, 1500))
+	}
+	text, isErr, ok := toolResult(msgs, uses[0].ID)
+	if !ok || isErr {
+		t.Fatalf("search_memories result missing or an error (ok=%v, text=%q)", ok, text)
+	}
+	// Claude Code may hand the model the structured JSON instead of the text; check whichever it got.
+	var body struct {
+		Memories []struct {
+			Score *struct{ Total float64 } `json:"score"`
+		} `json:"memories"`
+	}
+	if json.Unmarshal([]byte(text), &body) == nil {
+		if len(body.Memories) == 0 {
+			t.Fatalf("search_memories result = %q, want the stored fact", text)
+		}
+		for _, m := range body.Memories {
+			if m.Score == nil || m.Score.Total <= 0 {
+				t.Fatalf("search_memories result = %q, want a score on every memory", text)
+			}
+		}
+		return
+	}
+	metas := 0
+	for _, l := range strings.Split(text, "\n") {
+		if !strings.Contains(l, " meta: ") {
+			continue
+		}
+		metas++
+		if !strings.Contains(l, " score=") {
+			t.Fatalf("meta line %q lacks score=", l)
+		}
+	}
+	if metas == 0 {
+		t.Fatalf("search_memories result = %q, want the stored fact with a meta line", text)
+	}
 }
 
 // asCommentThroughClaude has claude call store_memory with asComment: the comment comes back,

@@ -88,12 +88,12 @@ const BASE: ControlSnapshot[] = [
   { channel: IPC.memoryRecent, response: [CURRENT] },
   {
     channel: IPC.memorySearch,
-    args: { query: 'billing', includeHistory: false },
+    args: { query: 'billing', includeHistory: false, scopes: [], origins: [], project: '' },
     response: [CURRENT],
   },
   {
     channel: IPC.memorySearch,
-    args: { query: 'billing', includeHistory: true },
+    args: { query: 'billing', includeHistory: true, scopes: [], origins: [], project: '' },
     response: [CURRENT, OLD],
   },
   { channel: IPC.memoryHistory, response: HISTORY },
