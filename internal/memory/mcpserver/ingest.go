@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -112,7 +113,11 @@ func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallTo
 		prov.Session = opts.SessionID
 	}
 	if prov.Scope == memory.ScopeProject && prov.Project == "" {
-		prov.Project = projectOf(ctx, in.Paths[0], opts.Project)
+		key, err := projectOf(ctx, in.Paths[0], opts.Project)
+		if err != nil {
+			return nil, ingestOutput{}, badIngest("project of %s: %v", in.Paths[0], err)
+		}
+		prov.Project = key
 	}
 	job, err := opts.Ingest.Create(importer.CreateArgs{Paths: in.Paths, Channel: importer.ChannelMCP, Provenance: prov,
 		Groups: in.Groups, AutoStart: true, WriteDoc: in.WriteDoc})
@@ -128,16 +133,18 @@ func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallTo
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, ingestOutput{JobID: job.ID, State: job.State, Reason: job.Reason}, nil
 }
 
-// projectOf is the project key of the first path's directory, else the server's own project.
-func projectOf(ctx context.Context, first, fallback string) string {
+// projectOf is the project key of the first path's directory. Outside a git repository it falls
+// back to the server's own project; an unusable key is an error, never a silent fallback.
+func projectOf(ctx context.Context, first, fallback string) (string, error) {
 	dir := first
 	if info, err := os.Stat(first); err == nil && !info.IsDir() {
 		dir = filepath.Dir(first)
 	}
-	if key, err := memory.DetectProject(ctx, dir); err == nil {
-		return key
+	key, err := memory.DetectProject(ctx, dir)
+	if errors.Is(err, memory.ErrNotGitRepo) {
+		return fallback, nil
 	}
-	return fallback
+	return key, err
 }
 
 const maxStatusFiles = 100

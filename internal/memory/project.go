@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -65,8 +66,29 @@ func gitOutput(ctx context.Context, dir string, args ...string) (string, error) 
 	return strings.TrimSpace(string(out)), nil
 }
 
+// ErrNotGitRepo means the directory is not inside a git repository.
+var ErrNotGitRepo = errors.New("memory: not in a git repository")
+
+// localKey is "local:" plus path with whitespace percent-escaped, so a path such as
+// "/Users/me/My Projects/app" stays a valid, stable key.
+func localKey(path string) string {
+	var b strings.Builder
+	b.WriteString("local:")
+	for _, r := range path {
+		if !unicode.IsSpace(r) {
+			b.WriteRune(r)
+			continue
+		}
+		for _, c := range []byte(string(r)) {
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+	return b.String()
+}
+
 // DetectProject returns dir's project key: the normalised origin remote, else "local:" plus the
-// main worktree path. An error means dir is not in a git repository or the key is unusable.
+// main worktree path with whitespace percent-escaped. The error wraps ErrNotGitRepo outside a git
+// repository; any other error means the key is unusable.
 func DetectProject(ctx context.Context, dir string) (string, error) {
 	key := ""
 	if remote, err := gitOutput(ctx, dir, "remote", "get-url", "origin"); err == nil {
@@ -75,9 +97,9 @@ func DetectProject(ctx context.Context, dir string) (string, error) {
 	if key == "" {
 		common, err := gitOutput(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 		if err != nil || common == "" {
-			return "", fmt.Errorf("memory: %s is not in a git repository", dir)
+			return "", fmt.Errorf("%w: %s", ErrNotGitRepo, dir)
 		}
-		key = "local:" + filepath.Dir(filepath.Clean(common))
+		key = localKey(filepath.Dir(filepath.Clean(common)))
 	}
 	if err := checkProject(key); err != nil {
 		return "", err
