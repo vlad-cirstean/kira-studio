@@ -179,11 +179,21 @@ func spawn(ctx context.Context, sp spec) ([]byte, error) {
 	return nil, err
 }
 
+var systemClaudePaths = []string{"/usr/local/bin/claude", "/opt/homebrew/bin/claude"}
+
+// SetSystemClaudePaths replaces the system-wide candidates and returns the restore func. A flow
+// test passes none so the host's own install cannot change its outcome.
+func SetSystemClaudePaths(paths ...string) (restore func()) {
+	prev := systemClaudePaths
+	systemClaudePaths = paths
+	return func() { systemClaudePaths = prev }
+}
+
 // ClaudeCandidates is the probe order after PATH for the `claude` CLI: the well-known absolute
 // paths a Finder-launched app's launchd-inherited PATH (/usr/bin:/bin:/usr/sbin:/sbin) never
 // includes.
 func ClaudeCandidates() []string {
-	candidates := []string{"/usr/local/bin/claude", "/opt/homebrew/bin/claude"}
+	candidates := append([]string(nil), systemClaudePaths...)
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		candidates = append([]string{
 			filepath.Join(home, ".claude", "local", "claude"),

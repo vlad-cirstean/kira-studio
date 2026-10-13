@@ -6,9 +6,9 @@
     "finishedAt": 0,
     "id": "<id:2>",
     "loops": 0,
-    "note": "could not start: Claude Code CLI not found. Install it, then retry. Looked in: claude (on PATH), <home>/.claude/local/claude, <home>/.local/bin/claude, /usr/local/bin/claude, /opt/homebrew/bin/claude.",
+    "note": "could not start: Claude Code CLI not found. Install it, then retry. Looked in: claude (on PATH), <home>/.claude/local/claude, <home>/.local/bin/claude.",
     "outcome": {
-      "reason": "could not start: Claude Code CLI not found. Install it, then retry. Looked in: claude (on PATH), <home>/.claude/local/claude, <home>/.local/bin/claude, /usr/local/bin/claude, /opt/homebrew/bin/claude.",
+      "reason": "could not start: Claude Code CLI not found. Install it, then retry. Looked in: claude (on PATH), <home>/.claude/local/claude, <home>/.local/bin/claude.",
       "reported": false,
       "result": "failed",
       "route": "stop",

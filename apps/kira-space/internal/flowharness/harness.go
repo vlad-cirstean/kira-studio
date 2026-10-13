@@ -39,6 +39,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 type options struct {
@@ -132,6 +133,9 @@ func New(t *testing.T, opts ...Opt) *App {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	if o.noClaude {
+		t.Cleanup(toolexec.SetSystemClaudePaths())
+	}
 	a := &App{
 		t: t, Root: root,
 		Home: filepath.Join(root, "home"), SpaceHome: filepath.Join(root, "space"),

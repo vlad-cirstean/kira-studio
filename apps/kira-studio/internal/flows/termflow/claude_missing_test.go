@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // A Claude Code launch without the CLI fails with the Kira error and opens no session.
@@ -23,6 +24,7 @@ func TestClaudeCodeLaunchWithoutClaude(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("SHELL", stub)
+	t.Cleanup(toolexec.SetSystemClaudePaths())
 	t.Setenv("PATH", app.BinDir)
 
 	_, err := app.W.Terminal.Open(terminal.OpenArgs{
