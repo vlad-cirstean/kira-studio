@@ -169,35 +169,54 @@ func resetKafka(f *KafkaFixture) error {
 	}
 	defer client.Close()
 	admin := kadm.NewClient(client)
+	if err := deleteKafkaGroups(ctx, admin); err != nil {
+		return err
+	}
+	if err := deleteKafkaTopics(ctx, admin); err != nil {
+		return err
+	}
+	return seedKafka(ctx, admin, client)
+}
+
+func deleteKafkaGroups(ctx context.Context, admin *kadm.Client) error {
 	groups, err := admin.ListGroups(ctx)
 	if err != nil {
 		return err
 	}
-	if names := groups.Groups(); len(names) > 0 {
-		resp, err := admin.DeleteGroups(ctx, names...)
-		if err != nil {
-			return err
-		}
-		for _, g := range resp.Sorted() {
-			if g.Err != nil {
-				return fmt.Errorf("delete group %s: %w", g.Group, g.Err)
-			}
+	names := groups.Groups()
+	if len(names) == 0 {
+		return nil
+	}
+	resp, err := admin.DeleteGroups(ctx, names...)
+	if err != nil {
+		return err
+	}
+	for _, g := range resp.Sorted() {
+		if g.Err != nil {
+			return fmt.Errorf("delete group %s: %w", g.Group, g.Err)
 		}
 	}
-	userTopics := func() ([]string, error) {
-		td, err := admin.ListTopics(ctx)
-		if err != nil {
-			return nil, err
-		}
-		var out []string
-		for _, n := range td.Names() {
-			if !strings.HasPrefix(n, "__") {
-				out = append(out, n)
-			}
-		}
-		return out, nil
+	return nil
+}
+
+func userKafkaTopics(ctx context.Context, admin *kadm.Client) ([]string, error) {
+	td, err := admin.ListTopics(ctx)
+	if err != nil {
+		return nil, err
 	}
-	topics, err := userTopics()
+	var out []string
+	for _, n := range td.Names() {
+		if !strings.HasPrefix(n, "__") {
+			out = append(out, n)
+		}
+	}
+	return out, nil
+}
+
+// deleteKafkaTopics returns once the broker lists no user topic: deletion is asynchronous, and
+// recreating a name too early answers "already exists".
+func deleteKafkaTopics(ctx context.Context, admin *kadm.Client) error {
+	topics, err := userKafkaTopics(ctx, admin)
 	if err != nil {
 		return err
 	}
@@ -214,19 +233,18 @@ func resetKafka(f *KafkaFixture) error {
 	}
 	deadline := time.Now().Add(kafkaReadyTimeout)
 	for {
-		left, err := userTopics()
+		left, err := userKafkaTopics(ctx, admin)
 		if err != nil {
 			return err
 		}
 		if len(left) == 0 {
-			break
+			return nil
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("topics still listed after delete: %v", left)
 		}
 		time.Sleep(kafkaReadyPollInterval)
 	}
-	return seedKafka(ctx, admin, client)
 }
 
 // createSeedTopic reports the broker's per-topic answer, which CreateTopics returns beside a nil error.
