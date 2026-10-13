@@ -592,3 +592,54 @@ func TestAutoStartWaitsOnMemdocHeaderClaims(t *testing.T) {
 		})
 	}
 }
+
+// Finalize/verify claims must not rescan extracted files per tick: once verify_pending is settled,
+// an idle tick is an indexed lookup, not a reload of every chunk (P281 A1).
+func TestIdleClaimsDoNotScaleWithExtractedFiles(t *testing.T) {
+	const files, chunks = 300, 10
+	h := newHarness(t, 1)
+	j := h.create()
+	text := strings.Repeat("alpha beta gamma delta ", 80)
+	facts := `[{"fact":"x","evidence":"no such quote","section":"s"},{"fact":"y","evidence":"nowhere","section":"s"}]`
+	tx, err := h.e.st.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`UPDATE import_jobs SET state = 'running' WHERE id = ?`, j.ID); err != nil {
+		t.Fatal(err)
+	}
+	for f := 0; f < files; f++ {
+		id := fmt.Sprintf("bulk%d", f)
+		if _, err := tx.Exec(`INSERT INTO import_files (id, job_id, path, rel_path, kind, size, state, chunk_count, updated_at)
+			VALUES (?, ?, ?, ?, 'markdown', 1, 'extracted', ?, 'now')`, id, j.ID, id, id, chunks); err != nil {
+			t.Fatal(err)
+		}
+		for c := 0; c < chunks; c++ {
+			if _, err := tx.Exec(`INSERT INTO import_chunks (file_id, idx, text, tokens, state, facts) VALUES (?, ?, ?, 1, 'done', ?)`,
+				id, c, text, facts); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	// Every file has questionable facts without verdicts, so finalize has nothing to claim.
+	start := time.Now()
+	if _, ok, err := h.e.st.claimFinalize(); err != nil || ok {
+		t.Fatalf("first claimFinalize ok=%v err=%v", ok, err)
+	}
+	settle := time.Since(start)
+	const ticks = 200
+	start = time.Now()
+	for i := 0; i < ticks; i++ {
+		if _, ok, err := h.e.st.claimFinalize(); err != nil || ok {
+			t.Fatalf("idle claimFinalize ok=%v err=%v", ok, err)
+		}
+	}
+	idle := time.Since(start) / ticks
+	t.Logf("files=%d chunks=%d settle(first tick)=%s idle tick=%s", files, chunks, settle, idle)
+	if idle*10 > settle {
+		t.Errorf("idle tick %s is not far below the one-off settle %s: claims scan files per tick", idle, settle)
+	}
+}
