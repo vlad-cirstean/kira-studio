@@ -75,6 +75,7 @@ type armedJob struct {
 // lives in memory.db, so a halted runner resumes from disk.
 type Runner struct {
 	st       *store
+	ms       *memory.Store
 	agent    Agent
 	opts     RunnerOptions
 	lockPath string
@@ -126,7 +127,7 @@ func NewRunner(ms *memory.Store, opts RunnerOptions) (*Runner, error) {
 		return nil, err
 	}
 	return &Runner{
-		st: &store{db: db, now: func() string { return kiratime.FormatISO(opts.Now()) }}, agent: opts.Agent, opts: opts,
+		ms: ms, st: &store{db: db, now: func() string { return kiratime.FormatISO(opts.Now()) }}, agent: opts.Agent, opts: opts,
 		lockPath: lockPath(ms), wake: make(chan struct{}, 1), ready: make(chan struct{}),
 		extractSem: semaphore.NewWeighted(int64(opts.Extractors)), armed: map[string]armedJob{}, scanning: map[string]bool{},
 	}, nil
@@ -752,19 +753,26 @@ func (r *Runner) runFinalize(ctx context.Context, it finalItem) {
 
 	var u usage
 	var err error
+	finish := func(out FinalizeOutput) error {
+		err := r.st.finishFile(it, out, u)
+		if err == nil {
+			r.writeBack(r.ctx, it)
+		}
+		return err
+	}
 	switch {
 	case it.Kind == KindMemdoc:
 		err = r.finalizeDoc(ctx, it)
 	case len(it.Facts) == 0:
-		err = r.st.finishFile(it, FinalizeOutput{}, u)
+		err = finish(FinalizeOutput{})
 	case tooManyFacts(it.Facts):
 		err = r.st.failFinalize(it, fmt.Sprintf("Too many facts (%d) for one pass. Split the file.", len(it.Facts)), u)
 	default:
 		var out FinalizeOutput
 		runErr := r.retry(ctx, func() error {
 			u.Calls++
-			o, err := r.agent.Finalize(ctx, FinalizeInput{FileID: it.FileID, Path: it.Path, Title: it.Title,
-				ChunkCount: it.ChunkCount, Facts: it.Facts})
+			o, err := r.agent.Finalize(ctx, FinalizeInput{FileID: it.FileID, Path: it.Rel, Title: it.Title,
+				ChunkCount: it.ChunkCount, Prov: it.Prov, Facts: it.Facts})
 			u.CostUSD += o.CostUSD
 			if err == nil {
 				out = o
@@ -773,7 +781,7 @@ func (r *Runner) runFinalize(ctx context.Context, it finalItem) {
 		})
 		switch {
 		case runErr == nil:
-			err = r.st.finishFile(it, out, u)
+			err = finish(out)
 		case ctx.Err() != nil:
 			err = r.st.releaseFinalize(it, u)
 		case isFatal(runErr):

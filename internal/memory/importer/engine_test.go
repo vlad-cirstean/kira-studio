@@ -130,12 +130,17 @@ func (a *fakeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOut
 			return FinalizeOutput{}, err
 		}
 	}
+	ip, err := a.svc.ImportProvenance(ctx, in.FileID)
+	if err != nil {
+		return FinalizeOutput{}, err
+	}
 	var items []memory.Item
 	for _, f := range in.Facts {
 		items = append(items, memory.Item{Fact: f.Fact.Fact, Reason: "Stated in " + in.Path,
-			Origin: memory.OriginExternal, SourceTag: "doc", Scope: memory.ScopePersonal})
+			Origin: ip.Origin, SourceTag: ip.SourceTag, Scope: ip.Scope, Project: ip.Project})
 	}
-	_, err := a.svc.Store(ctx, memory.StoreRequest{Items: items, Source: memory.SourceImport, SourceRef: in.FileID})
+	_, err = a.svc.Store(ctx, memory.StoreRequest{Items: items, Source: memory.SourceImport, SourceRef: in.FileID, Session: ip.Session,
+		Groups: append([]memory.GroupRef{{Kind: memory.GroupDocument, Key: ip.Path, Title: ip.RelPath}}, ip.Groups...), NoChallenge: ip.Origin == memory.OriginExternal})
 	return FinalizeOutput{CostUSD: 0.02}, err
 }
 

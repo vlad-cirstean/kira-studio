@@ -390,6 +390,23 @@ func (s *Store) currentOf(ctx context.Context, lineage string) (Memory, bool, er
 	return ms[0], true, nil
 }
 
+// DocumentFacts lists the current versions of the facts the import file's events touched (add, update,
+// noop), in the order of their first event.
+func (s *Store) DocumentFacts(ctx context.Context, fileID string) ([]Memory, error) {
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT `+memoryColumns+` FROM memories m
+		JOIN (SELECT lineage_id, min(seq) AS first FROM memory_events WHERE source = 'import' AND source_ref = ? GROUP BY lineage_id) e
+			ON e.lineage_id = m.lineage_id
+		WHERE m.status = 'current' ORDER BY e.first`, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("memory: document facts: %w", err)
+	}
+	return collect(rows, false)
+}
+
 // orphans counts the facts of group id that listed does not name.
 func (s *Store) orphans(ctx context.Context, groupID string, listed []memfmt.Fact) (int, error) {
 	db, err := s.conn()
