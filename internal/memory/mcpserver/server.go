@@ -72,6 +72,8 @@ type Options struct {
 	// Project is the project key of the server's working directory; an item of scope project without
 	// a project uses it. Empty means undetected.
 	Project string
+	// Ingest, when set, adds the ingest_files and ingest_status tools. Import mode leaves it nil.
+	Ingest Ingestor
 	// Prompts resolves the texts the server shows; nil means the registry defaults. Instructions,
 	// tool and argument descriptions are read once here, so an edit reaches the next session.
 	Prompts llmprompts.Source
@@ -141,6 +143,10 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 		}
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderContext(c)}}}, c, nil
 	}))
+
+	if opts.Ingest != nil {
+		addIngestTools(srv, opts)
+	}
 
 	srv.AddPrompt(&mcp.Prompt{
 		Name:        "remember",

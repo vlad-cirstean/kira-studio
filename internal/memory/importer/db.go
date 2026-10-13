@@ -903,6 +903,25 @@ func (s *store) storeDoc(fileID, hash, title string) error {
 	return err
 }
 
+// factIDs lists the fact ids a file's events touched, oldest first.
+func (s *store) factIDs(fileID string, limit int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT lineage_id FROM memory_events WHERE source = 'import' AND source_ref = ?
+		GROUP BY lineage_id ORDER BY min(seq) LIMIT ?`, fileID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func nonNil[T any](v []T) []T {
 	if v == nil {
 		return []T{}

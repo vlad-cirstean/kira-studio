@@ -5310,6 +5310,20 @@
           "body": "Sent as the system prompt of the Claude run that reads the source file to confirm, rewrite or reject doubtful facts during a memory import."
         }
       },
+      "memoryMcpIngestAwaiting": {
+        "description": "Tells the agent an ingest job is waiting for the user to start it, and why.",
+        "title": "Ingest waits for the user",
+        "usedBy": {
+          "body": "Returned by the ingest_files tool when the job needs confirmation before it spends anything."
+        }
+      },
+      "memoryMcpIngestStarted": {
+        "description": "Tells the agent an ingest job runs in the background and how to follow it.",
+        "title": "Ingest started",
+        "usedBy": {
+          "body": "Returned by the ingest_files tool after it creates a job."
+        }
+      },
       "memoryMcpInstructions": {
         "description": "Tells an agent when to store a memory and how to search the store.",
         "title": "Memory server instructions",

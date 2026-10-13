@@ -124,6 +124,9 @@ func (e *Engine) Create(a CreateArgs) (Job, error) {
 			return Job{}, fmt.Errorf("%w: session must be 1 to 128 characters from A-Z, a-z, 0-9 and ._:-", memory.ErrInvalid)
 		}
 	}
+	if err := memory.CheckJobGroups(a.Groups); err != nil {
+		return Job{}, err
+	}
 	id, err := e.st.createJob(uuid.NewString(), a)
 	if err != nil {
 		return Job{}, err
@@ -234,6 +237,26 @@ func (e *Engine) RetryFile(fileID string) error {
 
 func (e *Engine) Jobs() ([]Job, error)             { return e.st.listJobs() }
 func (e *Engine) Job(id string) (JobDetail, error) { return e.st.jobDetail(id) }
+
+// maxFactIDs bounds the stored fact ids a status reply lists per file.
+const maxFactIDs = 50
+
+// JobWithFacts is Job plus up to 50 stored fact ids per finished file.
+func (e *Engine) JobWithFacts(id string) (JobDetail, error) {
+	d, err := e.st.jobDetail(id)
+	if err != nil {
+		return d, err
+	}
+	for i := range d.Files {
+		if d.Files[i].State != FileDone {
+			continue
+		}
+		if d.Files[i].FactIDs, err = e.st.factIDs(d.Files[i].ID, maxFactIDs); err != nil {
+			return d, err
+		}
+	}
+	return d, nil
+}
 
 // DefaultLogPath is where the spawned runner appends its stderr.
 func DefaultLogPath(ms *memory.Store) string {

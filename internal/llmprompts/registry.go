@@ -404,7 +404,9 @@ store_memory challenges an item that is ambiguous, has no real reason or does no
 
 search_memories is recall-oriented: it matches words and meaning, and returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.
 
-Cite a memory by its fact id (km_...). Pass a fact id to memory_context to read the facts stored alongside it: same session, request, task, document or thread.`,
+Cite a memory by its fact id (km_...). Pass a fact id to memory_context to read the facts stored alongside it: same session, request, task, document or thread.
+
+To store the contents of files or folders (a repo's docs, a Slack or Jira export), call ingest_files with their paths and never read and paste them: it costs no tokens and runs in the background. Follow it with ingest_status. Put material from an external source in a file first.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
@@ -461,6 +463,34 @@ var (
 	_ = arg(MemoryToolMemoryContext.id, "limit", spaceApp, NewSession, `maximum facts per group, default {{.Default}}, maximum {{.Max}}`, LimitVars{Default: 20, Max: 100})
 )
 
+// MemoryToolIngestFiles describes the ingest_files tool.
+var MemoryToolIngestFiles = define(Entry{
+	ID: "memory.mcp.tool.ingest_files", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_files",
+	Default: `Store the facts of files and folders by path, in the background. Kira reads the files itself: you send paths, never contents. Markdown, text, JSON and JSON Lines are read; a file already in the kira-memory doc format is stored as it is. Every fact takes the origin, scope and groups you give. Returns a job id; call ingest_status to follow it. A large job waits for the user to start it in Kira Space.`,
+}, NoVars{})
+
+var (
+	_ = arg(MemoryToolIngestFiles.id, "paths", spaceApp, NewSession, `absolute file or folder paths, 1 to {{.Max}}; a folder is read recursively, skipping ignored and binary files`, MaxVars{Max: 100})
+	_ = arg(MemoryToolIngestFiles.id, "origin", spaceApp, NewSession, `who decided the facts: user, agent or external (the files hold material from a source outside this conversation, such as a Slack export; set sourceTag)`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "sourceTag", spaceApp, NewSession, `required for origin external, forbidden otherwise; the source name in lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "scope", spaceApp, NewSession, `how far the facts hold: company (the whole company), project (one project) or personal (the user only)`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit it to use the project of the first path; forbidden for other scopes`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every fact joins, besides each file's own document group; memory_context reads a group's other facts`, MaxVars{Max: 4})
+	_ = arg(MemoryToolIngestFiles.id, "groups.kind", spaceApp, NewSession, `task or thread`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "groups.key", spaceApp, NewSession, `stable identifier: a task id such as PROJ-123 or a thread URL`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "groups.title", spaceApp, NewSession, `optional label shown to people`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as a kira-memory doc named <name>.memory.md; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit it to use this session's id`, NoVars{})
+)
+
+// MemoryToolIngestStatus describes the ingest_status tool.
+var MemoryToolIngestStatus = define(Entry{
+	ID: "memory.mcp.tool.ingest_status", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_status",
+	Default: `Return the state of an ingest job: progress, totals, cost and one line per file with its state, document group id and counts of stored, updated, unchanged, dropped and unresolved facts. The structured result lists up to 50 stored fact ids per file; pass one to memory_context to read the facts stored with it.`,
+}, NoVars{})
+
+var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id returned by ingest_files`, NoVars{})
+
 // MemoryRememberDescription describes the remember prompt of the memory MCP server.
 var MemoryRememberDescription = define(Entry{
 	ID: "memory.mcp.remember.description", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "remember",
@@ -497,6 +527,24 @@ var MemoryStorePrepared = define(Entry{
 	UsedByKey:  "llmPrompts.entry.memoryMcpStorePrepared.usedBy.body",
 	Default:    `Nothing was stored. Paste this comment above the code it explains; keep every id as it is:`,
 }, NoVars{})
+
+// MemoryIngestStarted tells the agent an ingest job runs on its own.
+var MemoryIngestStarted = define(Entry{
+	ID: "memory.mcp.ingest.started", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.memoryMcpIngestStarted.title",
+	PurposeKey: "llmPrompts.entry.memoryMcpIngestStarted.description",
+	UsedByKey:  "llmPrompts.entry.memoryMcpIngestStarted.usedBy.body",
+	Default:    `Ingestion runs in the background. Do not read these files. Call ingest_status with this job id for progress.`,
+}, NoVars{})
+
+// MemoryIngestAwaiting tells the agent an ingest job waits for the user.
+var MemoryIngestAwaiting = define(Entry{
+	ID: "memory.mcp.ingest.awaiting", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.memoryMcpIngestAwaiting.title",
+	PurposeKey: "llmPrompts.entry.memoryMcpIngestAwaiting.description",
+	UsedByKey:  "llmPrompts.entry.memoryMcpIngestAwaiting.usedBy.body",
+	Default:    `The job waits for the user: {{.Cause}}. Ask the user to start it in Kira Space, Memory, Import. Do not read these files. Call ingest_status with this job id for progress.`,
+}, CauseVars{Cause: "Needs confirmation in Kira Space: 400 chunks, about 500 calls"})
 
 // MemorySemanticNotInstalled is appended to search results while semantic search is not installed.
 var MemorySemanticNotInstalled = define(Entry{

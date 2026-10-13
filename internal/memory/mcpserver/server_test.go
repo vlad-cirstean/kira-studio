@@ -12,6 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/importer"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -214,5 +215,90 @@ func TestAsCommentPersistsNothingAndTextIsGrepFirst(t *testing.T) {
 	}
 	if n != 3 {
 		t.Errorf("want fact, reason and meta lines, got %d", n)
+	}
+}
+
+type fakeIngest struct{ got importer.CreateArgs }
+
+func (f *fakeIngest) Create(a importer.CreateArgs) (importer.Job, error) {
+	f.got = a
+	return importer.Job{ID: "job-1", State: importer.JobScanning}, nil
+}
+
+func (f *fakeIngest) JobWithFacts(string) (importer.JobDetail, error) {
+	return importer.JobDetail{Job: importer.Job{ID: "job-1", State: importer.JobDone}, Files: []importer.File{
+		{RelPath: "slack.json", State: importer.FileDone, Kind: importer.KindJSON, GroupID: "kg_0123456789ab", Added: 2},
+	}}, nil
+}
+
+func TestIngestToolsOverMCP(t *testing.T) {
+	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
+	defer store.Close()
+	svc := memory.NewService(store, acceptRunner{}, memory.ServiceOptions{})
+	ctx := context.Background()
+	connect := func(opts Options) *mcp.ClientSession {
+		t.Helper()
+		ct, st := mcp.NewInMemoryTransports()
+		if _, err := Build(svc, opts).Connect(ctx, st, nil); err != nil {
+			t.Fatal(err)
+		}
+		cs, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "1"}, nil).Connect(ctx, ct, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = cs.Close() })
+		return cs
+	}
+	text := func(r *mcp.CallToolResult) string { return r.Content[0].(*mcp.TextContent).Text }
+	has := func(cs *mcp.ClientSession) bool {
+		tools, err := cs.ListTools(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tl := range tools.Tools {
+			if tl.Name == "ingest_files" {
+				return true
+			}
+		}
+		return false
+	}
+	if has(connect(Options{})) {
+		t.Fatal("ingest tools offered without a control")
+	}
+
+	fi := &fakeIngest{}
+	cs := connect(Options{Ingest: fi, SessionID: "sess-1"})
+	dir := t.TempDir()
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "ingest_files", Arguments: map[string]any{
+		"paths": []string{dir}, "origin": "external", "sourceTag": "Slack", "scope": "company", "writeDoc": true,
+		"groups": []map[string]any{{"kind": "thread", "key": "https://x/t/1"}},
+	}})
+	if err != nil || res.IsError {
+		t.Fatalf("err=%v res=%+v", err, res)
+	}
+	g := fi.got
+	if g.Channel != importer.ChannelMCP || !g.AutoStart || !g.WriteDoc || g.Provenance.SourceTag != "slack" || g.Provenance.Session != "sess-1" ||
+		len(g.Groups) != 1 || !strings.HasPrefix(text(res), "job job-1 scanning\nIngestion runs in the background.") {
+		t.Fatalf("got=%+v text=%q", g, text(res))
+	}
+
+	for name, args := range map[string]map[string]any{
+		"relative path": {"paths": []string{"docs"}, "origin": "user", "scope": "company"},
+		"missing path":  {"paths": []string{filepath.Join(dir, "nope")}, "origin": "user", "scope": "company"},
+		"document kind": {"paths": []string{dir}, "origin": "user", "scope": "company", "groups": []map[string]any{{"kind": "document", "key": "x"}}},
+	} {
+		if r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "ingest_files", Arguments: args}); err == nil && !r.IsError {
+			t.Errorf("%s accepted", name)
+		}
+	}
+
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{Name: "ingest_status", Arguments: map[string]any{"id": "job-1"}})
+	if err != nil || res.IsError {
+		t.Fatalf("err=%v res=%+v", err, res)
+	}
+	lines := strings.Split(strings.TrimSpace(text(res)), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], "job job-1 done files 0/0") ||
+		lines[1] != "slack.json done json group kg_0123456789ab added 2 updated 0 noop 0 verified 0 dropped 0 unresolved 0" {
+		t.Errorf("status = %q", lines)
 	}
 }

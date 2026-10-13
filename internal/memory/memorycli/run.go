@@ -16,6 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
+	"github.com/kirathecat/kira-studio/internal/memory/importer"
 	"github.com/kirathecat/kira-studio/internal/memory/mcpserver"
 )
 
@@ -48,6 +49,14 @@ func Run(args []string, promptsPath string) int {
 	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
 	defer svc.Close()
 	opts := mcpserver.Options{ImportRef: *importRef, Prompts: prompts, Project: detectProject(ctx)}
+	if *importRef == "" {
+		if ing, err := openIngest(store); err != nil {
+			fmt.Fprintln(os.Stderr, "kira-memory: ingest tools off:", err)
+		} else {
+			defer ing.Close()
+			opts.Ingest = ing
+		}
+	}
 	if id := os.Getenv("CLAUDE_CODE_SESSION_ID"); memory.ValidSession(id) {
 		opts.SessionID = id
 	}
@@ -69,4 +78,17 @@ func detectProject(ctx context.Context) string {
 		return ""
 	}
 	return key
+}
+
+// openIngest is the control side of the import runner for this session's ingest tools. The runner it
+// launches is a detached process: it outlives this session.
+func openIngest(store *memory.Store) (*importer.Engine, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	return importer.Open(store, importer.Options{
+		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(store)},
+		Available: memory.NewCLIRunner().Available,
+	})
 }
