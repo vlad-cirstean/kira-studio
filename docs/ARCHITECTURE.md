@@ -4641,7 +4641,7 @@ replies and full terminal attach for Claude Code sessions.
   (FTS5 external content, `porter unicode61 remove_diacritics 2`, prefix 2 3), `memory_revision`
   (insert counter), `memory_events` (every add/update/noop with origin, source tag, session, source, request id, rationale).
 - Search is recall-first: every term a quoted prefix term OR-ed, plus the whole phrase; stopwords
-  dropped; gate-written keywords indexed; bm25 `(10, 2, 4)` orders only; no score cutoff. One builder
+  dropped; gate-written keywords indexed; bm25 `(10, 3, 6)` feeds the keyword part; see Ranking. One builder
   (`memory.BuildMatch`) serves MCP, module and reconcile candidates. User input never reaches FTS5 as syntax.
 - Semantic search (P210): `memory_embeddings` (migration 2; `seq` PK, `model`, little-endian float32
   `vec`, L2-normalised) holds one vector per memory version, superseded ones too. One model at a time;
@@ -4666,13 +4666,36 @@ replies and full terminal attach for Claude Code sessions.
   bundled arm64-only by `darwin:package` (`scripts/fetch-onnxruntime.sh`, checksum-pinned; native code is
   never downloaded at runtime). ORT 1.29.1 has no x86_64 macOS build, so a universal bundle's x86_64
   slice reports embeddings `unavailable`; keyword search is unaffected.
-- Hybrid search, `Service.Search`: FTS top N plus vector top N (brute-force dot product in Go over the
-  stored vectors, bounded min-heap; N is the clamped limit), reciprocal rank fusion `k = 60` over the
-  union, truncated to the limit. No score cutoff on the vector list (cosine scores are compressed:
-  related 0.52-0.76, unrelated 0.39-0.58), so a small store returns nearly everything, ranked.
-  `Memory.match` is `keyword | semantic | both`; the MCP text marks `[semantic]`. The query embeds with
-  a 5 s timeout. Any embedder failure leaves the keyword results unchanged. The gate's related-memory
-  lookup uses the same search.
+- Ranking, `Service.Search` (P275; constants and arithmetic in `internal/memory/rank.go`, one block, each
+  with its why):
+  - Pools: `clamp(4 x limit, 100, 400)` candidates from each source, unioned by `seq`. Limit default 40,
+    max 200 (Space panel search uses 200).
+  - Parts, each in 0..1. Keyword: bm25 (columns fact 10, keywords 6, reason 3) divided by the pool best,
+    `0.7 x bnorm + 0.3 x term coverage` (coverage restores order under the OR query). Semantic: cosine
+    mapped linearly between `embed.Spec.QueryFloor` and `QueryCeil`.
+  - Fusion: both sources `rel = 0.45 kw + 0.45 sem + 0.10 min(kw, sem)`; no semantic `rel = kw`. RRF is
+    gone: it kept rank only.
+  - Boosts, multiplicative and near 1: grade user 1.10, external 1.05, agent 1.00; scope against the
+    target project (same 1.15, company 1.05, personal 1.00, other project 0.85; none without a target);
+    recency `1 + 0.05 x 2^(-ageDays/90)`; superseded 0.60; group `1 + 0.05 x min(n, 3)` for other
+    result lineages sharing a document, thread, task or request group (session groups never count).
+  - Floor: only a semantic-only row at or below `QueryFloor` is dropped; nothing else is cut by score.
+    `QueryFloor 0.55` / `QueryCeil 0.70` for arctic-embed-s int8, calibrated (unrelated cosine p90 0.550,
+    paraphrase median 0.602, max 0.698); the plan's 0.20/0.60 defaults sat inside the unrelated band.
+  - Filters: `scopes` and `origins` are hard filters (closed sets, else `ErrInvalid`). `project` is a
+    boost target, not a filter; MCP defaults it to the server's project, `""` opts out. The gate passes
+    the first item's project.
+  - Output: `Memory.Score` (total, relevance, keyword, semantic, grade, scope, recency, history, group,
+    `boost` name) rounded to 3 decimals; `Memory.ContextCount` counts other current facts across the
+    result's non-session groups (MCP `ctx=N`: a hint that `memory_context` is worth a call). No inline
+    sibling expansion.
+  - Order: score, relevance, keyword, then newer `seq`. `Memory.match` is `keyword | semantic | both`.
+  - Vectors: exact scan over a per-process decoded cache of the model's vectors (`Store.vectors`, keyed on
+    model, dim, row count and max seq; migration 6 indexes `memory_embeddings(model)` so the stamp is
+    index-only). About 1.5 KB per fact resident (150 MB at 100k). Measured p50 of 20 runs, fake 384-dim
+    vectors: 77 ms at 20k facts, 434 ms at 100k (252 ms and 1261 ms uncached); budget 150 ms and 600 ms.
+  The query embeds with a 5 s timeout. Any embedder failure leaves the keyword results unchanged. The
+  gate's related-memory lookup uses the same search (limit 10).
 - Writes embed in the same transaction as the insert (best effort, 10 s). Reconcile candidates are FTS
   top 10 plus up to 5 vector neighbours with doc-to-doc cosine at least 0.85 (measured paraphrases
   0.89-0.94, unrelated at most 0.82); without the floor every store would reach the Sonnet call.
