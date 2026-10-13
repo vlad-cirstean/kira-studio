@@ -4296,6 +4296,16 @@ and `docs/v2.0/plans/`.
 - The agent-hooks `Stop` event ends a dialog turn; the renderer's `turnWatch` then calls `RecordMerge`
   (merge dialog) or `ArchiveTask` (send-then-archive). That pending state lives in the renderer.
 
+### Claude launch check and folder-scan hiding (P277)
+
+- `toolexec.ResolveClaude` finds `claude` before any launch: `PATH`, well-known install paths (`ClaudeCandidates`;
+  tests replace the system ones with `SetSystemClaudePaths`), then the user's login shell, since a GUI app's `PATH`
+  can differ. A miss is `ErrClaudeMissing` listing every probed place. `ade.Tracker.Prepare`, the terminal
+  claude-code path and `claudeheadless` call `RequireClaude`, so a missing CLI shows a Kira error, not the shell's text.
+- `code_repos.hidden_rev` (migration `0034`) counts writes of `hidden`. A folder scan applies its stored hidden flag
+  (`ApplyFolderHidden`) only to repos whose `hidden_rev` still equals the one stored at import, in one transaction.
+  A repo unhidden or toggled meanwhile is never re-hidden.
+
 ### Agent notifications (P238)
 
 Desktop notification when a Kira Space agent finishes or needs input. Package `internal/agentnotify`,
@@ -4633,6 +4643,9 @@ replies and full terminal attach for Claude Code sessions.
 
 ## Memory MCP server and module (P201, Kira Space)
 
+- Semantic model source (P277): `appwire.Options.EmbedSpec` (nil means `embed.Default`) reaches `MemoryService`;
+  `embed.Spec.WithBaseURL` swaps the scheme and host of the pinned file URLs, path and checksums kept. Flow tests serve
+  the files from a local server and cover install, progress, checksum failure and cancel.
 - Storage: `$KIRA_MEMORY_HOME/memory.db` (default `~/.kira-memory/memory.db`), its own SQLite file and
   migration sequence (`internal/memory/migrations`), shared by Kira Space and the stdio server. Opened
   lazily with `_txlock=immediate`; WAL, `busy_timeout` 5000.
@@ -4936,9 +4949,12 @@ replies and full terminal attach for Claude Code sessions.
   detached, not deleted. No image pull. Swarm and Kubernetes containers are read-only. `mapErr` maps
   engine conflict to `E_CONFLICT`, permission denied to `E_INVALID`.
 - P260 polish. Edit view: two shadcn `Tabs` (In place, Recreate), neutral dirty dot, no per-field mode badge;
-  an In place field whose mode resolves to recreate shows a plain hint. `Image.registryUrl` and
-  `ContainerDetail.registryUrl` are computed in Go (`registry.go`) from tags and RepoDigests; empty means no
-  button (limit: Known open items). The button opens through
+  an In place field whose mode resolves to recreate shows a plain hint. The registry link is lazy: `DockerService.ImageRegistry` (`imageregistry.go`) resolves one image's page on
+  demand, so the image list makes no Hub call. `registryLink` (`registry.go`) picks the repo digest naming the first tag's
+  repository. A containerd image store (`DriverStatus` `driver-type` `io.containerd.snapshotter.v1`, cached per client) gives
+  locally built images a digest too, so an implied Docker Hub name links only when `hub.docker.com` confirms the repository;
+  a Hub error or 404 gives no button. A named registry host links without a check. Flow tests set `WithHubAPI` to a fake.
+  The button opens through
   `LinkService.OpenExternal` (Studio binds it again, 30 services); docker-ui takes `openExternal` in its
   context options. Container size lives in the Stats tab, which also opens for stopped containers.
   Start uses `text-ok`, stop `text-error` module-wide. Selected rows use neutral `bg-select`. Left-panel
@@ -5533,10 +5549,8 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **`adapters/clickhouse` tests fail at `-count>1` (P272).** Runs share one container state. `-count=1` passes. Owned by P277.
 
 - **Quit discards staged grid edits and dirty edit buffers (P267).** Tab close and dialogs guard unsaved edits; app quit does not. Accepted by the user (P266 decision).
-- **Space review window sync popover never positions under WebKit (P267).** `ade-v2-review` sync popover: reka popper keeps its initial `translate(0px, -200%)`, box at y=-274. Same at P267 base `795948768`. Spec clicks with `dispatchEvent`. Other popovers position fine. Root cause open; delete once found. P277 closes it.
 - **Backend, git-core and flow engine text is English-only (P265).** Accepted by the user. Go errors outside the catalog, `packages/git-core` strings and `@vue-flow`'s hardcoded `vue-flow__*` ARIA hints stay English; `copyCoverage` skips the vue-flow subtree.
 - **Claude Code usage limits show only what Kira-started sessions report (P239).** Claude Code sends
   `rate_limits` only for claude.ai Pro and Max plans and only after the first API response of a
@@ -5571,7 +5585,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
 - **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
-  switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-194 ms and
+  switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-363 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's
   `@property` fallback, live only on WebKit builds without `margin-trim`, doubles every restyle.
   Real WKWebView is unmeasured. Delete once the Mac check in `docs/PERF.md` §3 settles it.
@@ -5772,13 +5786,9 @@ Performance:
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
-- **Registry button links local images to Docker Hub when the containerd image store keeps a RepoDigest (P260).** `registryURL` (`internal/docker/registry.go`) treats any digest as pushed, so an unqualified local name (`myapp:dev`) gets a Hub link that may 404. Delete once the engine's store type or a pull-origin signal separates local builds. P277 closes it.
-- **Semantic model download has no URL seam (P210).** The Hugging Face URLs are constants in `internal/memory/embed/spec.go`, so tests cannot point `Install` at a local server; the flow test covers cancel and not-installed only. Delete once the base URL is injectable. P277 closes it.
-- **A missing `claude` shows the shell's raw text (P250).** Kira runs a bare `claude` through the user's shell (`ade/command.go`), so a missing CLI surfaces as the shell's own "command not found" in the tab, with no Kira message. Delete once launch checks the CLI first. P277 closes it.
-- **`ui-timing` budgets fail on slow or loaded hosts (P250, P264, P266, P267).** Console keystroke p50 (53 ms vs 50), scroll frame p95 (81-134 ms vs 80), cached tree expand p95 (53 vs 50) and `perf.spec.ts` scroll p95 (112 vs 80) fail on a host about 2x slower than the budgets assume or under load average above ~9, and at the pre-P263 base `d381439d6` and the P267 base `ae1bb8648` (worse there). Not a regression. Budgets are never loosened. Run `--project=ui-timing` on an idle machine; delete once the project passes on the CI runner or a quiet host. P277 closes it.
+- **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. Delete once the project passes on the CI runner, a Mac or a faster host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
 - **Visual baseline of the ADE workflow graph shows the Preview placeholder (P271).** The finish note is rendered by `LlmPromptsService.Preview`, unmocked in that spec. The PNG does not show the real note text.
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
-- **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251, P264).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), Space repo-graph refresh, paging, columns, badges and workspace specs (1 s-class budgets), `ade-v2-panel` handle-drag width, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked. P277 closes it.
-- **Unhiding one imported repo mid-folder-scan can be re-hidden (v2.2 code review R2).** Unhide right after the folder flag flips, while the scan runs: `ApplyFolderHidden` re-hides it. No timestamp separates the unhide from the scan's own import. Detail: `docs/v2.2/plans/CODE-REVIEW-R2-result.md`. P277 closes it.
+- **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) the app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Measured: `repo-graph-refresh` scroll test 8+ of 40 failed, all on that wait; `repo-graph-paging` 9 of 48 on the `graph-svg` wait in `openRepo`; `repo-graph-columns` 3 of 400; `repo-workspace` 4 of 252. All four pass on an idle machine (`test:ui:space`: 576 passed). Cause is CPU starvation of the whole app boot, not a step in the test. Closed by P277 with 0 failures at the same load: `refsChanged` (0 of 40, fake clock), `sql-schema` D3 (0 of 40, was 36), `tooltips` a11y (0 of 40, was 20), `TestScheduleADE` (0 of 40), `TestDescribeCancel` and `TestUnaryDeadline` (0 of 40). Unreproduced even before the fixes: `repo-graph-badges` (0 of 120), `ade-v2-panel` (0 of 40), `http-timeline` (0 of 40), `grid-commit-in-flight` (0 of 80), `ui-leftovers` (0 of 40). Run these suites alone; delete once the boot is cheaper or the machine is faster.

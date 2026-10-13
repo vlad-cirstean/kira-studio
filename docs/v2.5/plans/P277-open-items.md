@@ -389,4 +389,28 @@ No new unit tests beyond item 7's concurrency test and, only if it qualifies, it
 
 ## 14. Result
 
-Pending.
+Landed in 23 commits (before this one) after `f5b8ffab2` (streams A and B, then step C and test-and-fix). Counts are
+failures out of runs; load recipe is `docs/DEV_ENVIRONMENT.md` "Load repro recipe".
+
+| Item | Outcome |
+|---|---|
+| 1 sync popover | Fixed (`f72d38f14`), real click in the spec. Entry deleted. |
+| 2 UI entries | `refsChanged` 0/40 after fix (fake clock); `sql-schema` D3 36/40 to 0/40 (paste, not `keyboard.type`); `tooltips` a11y 20/40 to 0/40 (fake clock); `closeDetail` and `diagonalWheel` wait on state. Open: scroll test (8+/40 at 8 loops, 8 workers; row 0 wait 5-11 s vs 1.3 s idle), paging 9/48, columns 3/400, workspace 4/252; all pass idle. Unreproduced: badges 0/120, `ade-v2-panel` 0/40, `http-timeline` 0/40, `grid-commit-in-flight` 0/80, `ui-leftovers` 0/40. |
+| 2 Go | `TestScheduleADE` 0/40 under load (fake agent writes its counter atomically, claims call numbers atomically). `TestUnaryDeadline` fixed in product (`2d04ebd02`). `TestDescribeCancel` only made deterministic (waits for the connection, no sleep); no product repro. `scriptruns/headless.go` fix verified by its tests (`8de5ec167`). |
+| 3 `ui-timing` | Not fixed. Two Studio tests fail idle by 1-12 percent: scroll work p50 17-18 vs 16, `perf.spec.ts` frame p95 89-96 vs 80, tab switch p95 up to 363 vs 300, tree expand p95 58 vs 50, keystroke p50 55 vs 50. Cause: WebKit here runs JS 1.8x and DOM 2.9x slower than Chromium; Chromium passes with margin. No leftover process at start. No hot-path change found; no `perf` commit. Budgets untouched. |
+| 4 registry link | Lazy `ImageRegistry`, containerd store plus Hub check (`d4f09e3f3`). |
+| 5 model seam | `EmbedSpec` option, install flow test (`e0de971c3`). |
+| 6 missing `claude` | `toolexec.ResolveClaude` before launch (`0979f22f6`); contracts machine-independent (`bfe4b55bf`). |
+| 7 folder-scan unhide | `hidden_rev` compare-and-set (`241e4b5fa`). |
+| 8 clickhouse `-count` | Isolated per run (`5307b3201`) and, for mongo, redis, s3, sqs, kafka, a reset on rerun (`38413ceb8`, `1c58b1bf8`). MySQL and MariaDB `ANALYZE` of all seeded tables (`c1f39b95c`, `29320cd4b`). |
+| Found in test | Memory ingest scan raced the auto-start rule; now one transaction (`3bac1fcfe`). |
+
+Studio Wails bindings regenerated with `wails3 task common:generate:bindings` (gitignored).
+`assertTooltipShows` retry loop and `toPass` helpers left: no failure in 40 runs each.
+
+Suites, all from an idle start: `lint`, `lint:go`, `typecheck`, `go test ./... -count=1`, flows space and
+studio, docker flows with `KIRA_FLOW_DOCKER=require`, clickhouse `-count=3`, `test:unit`, `test:ui:space`
+(576 passed), `test:ui:studio` (541 passed, 2 `ui-timing` failures above). Real `claude` rows pass:
+space 0.0142 USD for `claude -p` results (TUI sessions not counted), studio 0.0003 USD for the smart-script row (the db-mcp rows do not print cost).
+A `go test ./...` started under `nohup` fails two `internal/terminal` Close tests: `nohup` makes children
+inherit an ignored SIGHUP. Not a product bug; run suites without `nohup`.

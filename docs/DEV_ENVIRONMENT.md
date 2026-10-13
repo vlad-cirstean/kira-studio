@@ -476,14 +476,20 @@ Sandbox notes:
 ## Load, disk and test scope (P236-P251)
 
 - **Run one heavy suite at a time.** The sandbox has 4 CPUs. Two Go suites, or a Go suite beside Playwright,
-  push load above 20 and flake specs that pass alone (list in `ARCHITECTURE.md` Known open items). Rerun
-  the single test alone (`-count=3`, `--repeat-each`) before calling it broken.
+  push load above 20. The specs that still fail under load are listed in `ARCHITECTURE.md` Known open items;
+  rerun one of those alone before calling it broken.
+- **Load repro recipe (P277).** Start 8 busy loops (`for i in $(seq 8); do (while :; do :; done) & done`), wait 15 s,
+  then run the one spec with `--repeat-each=40 --workers=8` (project `ui`, WebKit), or the Go test with `-count=40`.
+  Kill the loops after. Count failures out of runs and compare with the same run at the base commit.
+  Never answer a load failure with a longer wait or a retry; find what the step waits on.
 - **`golangci-lint` refuses parallel instances** (two runs fail on the lock). Run it alone. On a lock error
   wait 60 s and retry. This covers `bun run lint:go`, `lint:claude` and the pre-push hook.
 - **`bun run lint:go` needs `bun run build:space-mobile` once per checkout** (`main.go` embeds
   `frontend/dist-mobile`; absent, typecheck of the Go module fails).
-- **`ui-timing` needs an idle machine.** `--project=ui-timing` also runs the whole `ui` project; with load
-  above ~9 `perf.spec.ts` and `budgets.spec.ts` fail on p95 budgets that pass quiet. Start it alone.
+- **`ui-timing` needs an idle machine** (load below ~1, nothing else running). `--project=ui-timing` also runs the
+  whole `ui` project first. Check no `playwright`, `chrome` or `webkit` process is left before it starts.
+  The WebKit sandbox is slow (measured 1.8x on JS and 2.9x on DOM work against Chromium on the same host), so a few p50/p95 budgets
+  fail even idle; the list is in `ARCHITECTURE.md` Known open items.
 - **Docker flow tests need `dockerd` started by hand** (section above) and `KIRA_FLOW_DOCKER=require`, or
   they skip and report green.
 - **Check `df -h /` before a build.** Aim for 6 GB free. The Go build cache once reached 8 GB and filled the
