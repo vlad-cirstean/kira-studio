@@ -1,0 +1,97 @@
+---
+title: Git
+description: The commit graph, branch review and remote operations in Kira Space.
+sources:
+  - apps/kira-space/README.md
+  - packages/git-ui/src
+  - packages/git-core/src
+  - apps/kira-space/internal/gitsession
+  - packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue
+  - packages/theme/src/i18n/en.json
+sidebar:
+  order: 1
+---
+
+import DocShot from '../../../../components/DocShot.astro';
+
+<DocShot id="space-git-graph" />
+
+## Requirements
+
+- Git 2.38 or newer on `PATH`. Conflict prediction needs `git merge-tree --write-tree`. Below 2.38 the Git module shows a blocked state.
+- Optional: the GitHub CLI (`gh`), logged in, for PR links.
+
+## Commit graph
+
+The graph is virtualized and lane-drawn over the whole ref set. It shows ref badges per lane and a checked-out `HEAD` indicator. Search runs in the graph.
+
+Open a commit to see its file tree and diffs. **Go to file** works on historical content that is not checked out. Opening a commit's changes opens every changed file as one replaceable preview group. Double-click a tab to keep it.
+
+## Refs and history rewriting
+
+- Create, rename and delete branches and tags, local and remote.
+- Check out, revert, cherry-pick, and reset in all three modes.
+- A banner for a merge, rebase or cherry-pick in progress offers Continue, Skip and Abort.
+
+Resolve conflicts in your own external editor, then continue.
+
+## Pre-flight and undo
+
+The backend classifies every hazardous operation before it runs. Hazards: uncommitted work, a detached `HEAD`, a protected branch, a conflicting pop.
+
+A single-slot undo covers the last undoable operation per repository.
+
+## Remote operations
+
+- Fetch, push, force-with-lease and pull with a strategy picker.
+- Background auto-fetch. The interval is in `Settings > Git`.
+- Real cancellation.
+- A credential prompt opens in the app for HTTPS remotes.
+
+## Stash
+
+The full stack: push, apply, pop, drop, branch from stash. Pop prediction uses `merge-tree`.
+
+Extras: auto-stash on checkout tagged with its branch, cross-branch apply, and a global stash under the app's own `refs/kira/*` namespace. That namespace never appears in your graph.
+
+## Branch review
+
+A review keeps what you last reviewed per file as a compressed content snapshot. A rebase, squash or amend still diffs correctly.
+
+Mark files reviewed with the checkbox in the file tree. A partly reviewed file shows an indeterminate state.
+
+AI review comments form a flat list of file and line notes. Export them as plain text and paste them into a chat.
+
+## Search
+
+A cancellable `git log` scan runs on the server. A client scan covers loaded rows.
+
+A literal query runs no regex engine. A regex query is translated construct by construct. Lookaround and backreferences are refused with a named result.
+
+## Worktrees and stacks
+
+- Create, list, switch and remove worktrees.
+- An optional prepare script per repository runs after you approve it once.
+- Stacked branches restack and navigate as a stack.
+- **Create worktree** is on the context menu of a branch, a remote branch and a commit row.
+
+## PR links
+
+PR links resolve per commit, not per branch tip. The commit detail shows the PR state: open, closed or merged. The link opens in your browser.
+
+The app never holds a GitHub token. Authentication goes through the `gh` CLI. GitHub Enterprise hosts work if `gh` is logged in to them.
+
+## Repository settings
+
+Open **Repository settings** from the Git toolbar. Each setting applies to one repository:
+
+- Graph scope: all refs, or ancestors of the checked-out commit only.
+- The page size of **Load more**.
+- Automatic stash when local changes block a branch switch.
+- Stash entries as nodes in the graph.
+- The untracked files option in the stash dialog.
+- Candidate base branches for branch review, one per line.
+- Pull request status for this repository.
+- The pull strategy.
+
+`Settings > Git` holds the global settings: protected branches, the auto-fetch interval, the git path and the graph font size.

@@ -1,0 +1,76 @@
+---
+title: Memory
+description: Store facts once and let Claude Code recall them across sessions.
+sources:
+  - apps/kira-space/README.md
+  - docs/ARCHITECTURE.md
+  - internal/memory/memfmt
+  - internal/memory/importer
+  - internal/memory/embed
+  - packages/workbench/src/memory
+  - apps/kira-space/frontend/src/workbench/settings/MemoryPane.vue
+  - packages/theme/src/i18n/en.json
+sidebar:
+  order: 5
+---
+
+import DocShot from '../../../../components/DocShot.astro';
+
+<DocShot id="space-memory" />
+
+Memory is a store of short facts with an MCP server for Claude Code. It needs an authenticated `claude` CLI.
+
+## What a memory holds
+
+- **Fact**: one claim.
+- **Reason**: why the fact is true.
+- **Origin**: who stated it. User facts are challenged by a human and correct. External facts are correct, probably incomplete, and carry a source tag. Agent facts are reference only.
+- **Scope**: Company, Project or Personal. A project is identified by the repository's `origin` remote.
+- **Groups**: facts stored together share a session, request, document, task or thread.
+
+A memory is never edited in place. A change adds a new version, and the detail view shows the version trail.
+
+## Add a memory
+
+Click **Add memory** and write facts in your own words. Claude splits them into single facts and checks them. If the check challenges a fact, answer and choose **Resubmit**.
+
+Pick a scope. The default is Personal.
+
+## Import files
+
+Use **Import files…** or **Import folder…** in the panel header.
+
+1. The app scans the selection and shows an estimate: files, chunks, Claude calls and time.
+2. Set the origin and, for an external origin, a source tag.
+3. Click **Start import**.
+
+The import runs on your Claude subscription.
+
+Tick **Write a kira-memory doc beside each file** to save the extracted facts as `<name>.memory.md` next to the source. The app never overwrites the source. See [Memory formats](../../reference/memory-formats/).
+
+Files an earlier import already finished are skipped when unchanged.
+
+## Search
+
+The search box finds facts by keyword. Semantic search adds matches by meaning.
+
+- Open `Settings > Memory` and choose **Download model**. The model is about 35 MB and runs locally.
+- A result shows whether it matched by keyword, by meaning or both.
+- **Include history** adds older versions.
+- **Boost project** ranks one project's facts higher. It does not hide the others.
+
+Without the model, search stays keyword only. Nothing else changes.
+
+## Connect Claude Code
+
+Open `Settings > Memory` and choose **Connect Claude Code**. This registers the `kira-memory` MCP server in your user scope. Claude Code then stores and searches memories. See [MCP tools](../../reference/mcp-tools/).
+
+The server works with the app open or closed.
+
+## Check comment memories
+
+`Settings > Memory` also shows a pre-commit hook that checks memory comments and doc files in a git repository.
+
+## Where data lives
+
+Memories live in `~/.kira-memory/memory.db`. The downloaded model lives in `~/.kira-memory/models`. Set `KIRA_MEMORY_HOME` to move the folder.

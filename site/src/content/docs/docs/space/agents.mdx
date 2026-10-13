@@ -1,0 +1,102 @@
+---
+title: Agents
+description: Plan tasks, run Claude Code on them, and review the result in Kira Space.
+sources:
+  - apps/kira-space/README.md
+  - docs/ARCHITECTURE.md
+  - apps/kira-space/internal/ade
+  - apps/kira-space/internal/adeflow
+  - apps/kira-space/internal/adeflow/testdata
+  - apps/kira-space/frontend/src/ade
+  - internal/claudeheadless
+  - packages/theme/src/i18n/en.json
+sidebar:
+  order: 3
+---
+
+import DocShot from '../../../../components/DocShot.astro';
+
+<DocShot id="space-agents-board" />
+
+Agents needs an authenticated `claude` CLI. Hooks ride each session's own `--settings` file. Your Claude Code settings files are never touched.
+
+## Tasks and branches
+
+A task owns branches across repositories. A branch is one of:
+
+- `mine`: created here, with a name.
+- `review`: another author's branch.
+- A placeholder with no branch yet.
+
+Task status derives from the workflow and its runs. You never type it.
+
+Backlog items stay off the plan until you promote them.
+
+## Base branch and stacking
+
+A task picks its base branch per repository: the repository's main, any branch, or another planner branch to stack on. A headless run rebases the branch when the base changes. **Change base…** and **Rebase onto** start that run.
+
+No rebase starts on its own when a base moves.
+
+## Workflows
+
+A workflow is a YAML file in the `workflows` folder of the Space home, `~/.kira-space/workflows`. No workflow ships preinstalled. Sample files live in `apps/kira-space/internal/adeflow/testdata`.
+
+The app watches the folder. A broken edit keeps the last valid version and reports the line.
+
+A workflow holds stages. A stage has a kind:
+
+- `user`: you do the work.
+- `agent`: Claude Code runs each step headless.
+- `script`: a shell command runs each step.
+
+A step runs once, for each repository, or for one named repository.
+
+### Results and routes
+
+An agent step can declare 1 to 12 results. Each result has an `id`, an `ok` flag and a `next` route:
+
+- `next`: the next step.
+- A step id: that step. A later step skips the steps between. An earlier step makes a loop.
+- `end`: the end of the stage.
+- `stop`: stop the task.
+
+A loop edge has a `max` from 1 to 10. The default is 3.
+
+A run that ends with no report takes the step's `failed` result. A step without one stops.
+
+### Graph editor
+
+The Workflows page edits a workflow as a graph or as YAML. Save with `Cmd+S`. Nothing saves automatically. Leaving with unsaved edits asks first.
+
+A task follows the live file until its first run, session or stage move. After that it keeps a snapshot, and an updated file applies to new work only.
+
+## Runs
+
+A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `ended without finish_step`.
+
+A step starts automatically or waits for your approval.
+
+### Agent tools
+
+A workflow with `kira_space_mcp: true` gives its runs extra tools on the `kira-ade` MCP server. See [MCP tools](../../reference/mcp-tools/).
+
+Branches and repositories an agent adds carry an `agent` chip.
+
+## Interactive sessions
+
+Start Claude Code in a branch worktree from the board. **Take over** turns a headless run into an interactive session. A taken-over run can still call `finish_step`.
+
+A branch holds one session at a time.
+
+## Review code
+
+**Review code** opens the per-branch review in one step: `Cmd+Shift+R`.
+
+## Notifications
+
+A desktop notification fires when a session finishes, a session needs input, or a background run ends. Click it to open that session or task.
+
+Configure each kind in `Settings > Claude Code`. The same pane has **Keep this Mac awake while a Claude Code session is running**.
+
+The status bar shows Claude Code's five-hour and weekly usage for sessions that Kira starts. Turn it off in `Settings > Claude Code`.
