@@ -127,10 +127,10 @@ Per-engine adapter facts).
 - **Staged SQL edits** — add, delete and edit rows as a pending change set with an exact command
   preview; nothing reaches the database until you commit. Document, key/value and stream writes
   apply immediately.
-- **Cell editor** — a Monaco panel that detects JSON, XML, SQL, base64, hex, epoch, ISO-8601, UUID,
-  URL and CSV, with beautify and compact.
+- **Cell editor** — a Monaco panel that detects JSON, XML, SQL, base64, hex, epoch seconds and
+  milliseconds, ISO-8601 and CSV, with beautify and compact.
 - **Foreign-key navigation** — preview a referenced row in a popover, then open it in a pre-filtered
-  tab or jump straight to editing it (PostgreSQL/MariaDB).
+  tab or jump straight to editing it (PostgreSQL, MySQL, MariaDB, SQLite).
 - **Query console** — per-connection consoles with run-statement/run-all, saved queries, a Format
   action, EXPLAIN plans for every SQL dialect, and optional auto-explain that flags expensive
   queries. SQL completions, diagnostics and hovers come from a DDL document you paste in.
