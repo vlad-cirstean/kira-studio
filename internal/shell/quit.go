@@ -10,6 +10,27 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// QuitGate lets a quit ask first when agents or runs are live.
+type QuitGate interface {
+	// Live counts the work a quit would stop.
+	Live() int
+	// Ask raises the confirmation popup; count is the Live value that triggered it.
+	Ask(count int)
+	// Withdraw drops the popup.
+	Withdraw()
+}
+
+// QuitStatus is what the confirmation dialog shows: the live work a quit would stop.
+type QuitStatus struct {
+	Asking  bool `json:"asking"`
+	Agents  int  `json:"agents"`
+	Runs    int  `json:"runs"`
+	Scripts int  `json:"scripts"`
+}
+
+// Total is the number of live items.
+func (s QuitStatus) Total() int { return s.Agents + s.Runs + s.Scripts }
+
 // Quitter is the Go analogue of src/main/index.ts:151-163's before-quit handler. It is wired
 // three ways: application.Options.ShouldQuit (which covers Cmd+Q, the Apple menu, the Dock and
 // App.Quit() alike — §1.3), application.Options.OnShutdown, and the menu's own Quit item.
@@ -29,6 +50,9 @@ type Quitter struct {
 	app     atomic.Pointer[application.App] // written by Attach on main, read from other goroutines
 	started atomic.Bool
 	done    atomic.Bool
+	// asking is true while the gate's popup is up.
+	asking atomic.Bool
+	gate   atomic.Pointer[QuitGate]
 
 	mu        sync.Mutex
 	pending   map[string]struct{} // window keys still owing an ack; nil until flushThenQuit runs
@@ -54,6 +78,47 @@ func NewQuitter(events Signaller, beforeFlush, teardown func(), flushTimeout tim
 	}
 }
 
+// SetGate makes a quit with live work ask first. Call it once, after construction.
+func (q *Quitter) SetGate(g QuitGate) { q.gate.Store(&g) }
+
+func (q *Quitter) gateOf() QuitGate {
+	if g := q.gate.Load(); g != nil {
+		return *g
+	}
+	return nil
+}
+
+// Asking reports whether the confirmation popup is up.
+func (q *Quitter) Asking() bool { return q.asking.Load() }
+
+// ConfirmQuit is the popup's "Quit anyway": the quit proceeds without asking again. It does nothing
+// when no popup is up.
+func (q *Quitter) ConfirmQuit() {
+	if !q.asking.Swap(false) {
+		return
+	}
+	if g := q.gateOf(); g != nil {
+		g.Withdraw()
+	}
+	q.start()
+}
+
+// CancelQuit drops the popup; a later quit asks again.
+func (q *Quitter) CancelQuit() {
+	if !q.asking.Swap(false) {
+		return
+	}
+	if g := q.gateOf(); g != nil {
+		g.Withdraw()
+	}
+}
+
+func (q *Quitter) start() {
+	if q.started.CompareAndSwap(false, true) {
+		go q.flushThenQuit()
+	}
+}
+
 // Attach supplies the app once application.New has returned. ShouldQuit is passed to
 // application.New as a method value before that, which is why the app cannot be a constructor
 // argument.
@@ -70,9 +135,18 @@ func (q *Quitter) ShouldQuit() bool {
 	if q.done.Load() {
 		return true
 	}
-	if q.started.CompareAndSwap(false, true) {
-		go q.flushThenQuit()
+	if g := q.gateOf(); g != nil && !q.started.Load() {
+		if n := g.Live(); n > 0 {
+			if q.asking.CompareAndSwap(false, true) {
+				go g.Ask(n)
+			}
+			return false
+		}
+		if q.asking.Swap(false) {
+			g.Withdraw()
+		}
 	}
+	q.start()
 	return false // NSTerminateCancel — Electron's event.preventDefault()
 }
 

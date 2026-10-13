@@ -940,6 +940,15 @@ func (r *AdeTaskRepo) SetPendingNote(branchID, note string) ([]model.AdeRun, err
 	})
 }
 
+// CountRunning counts runs in the running state.
+func (r *AdeTaskRepo) CountRunning() (int, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE state = 'running'`).Scan(&n); err != nil {
+		return 0, fmt.Errorf("repos: count running ade runs: %w", err)
+	}
+	return n, nil
+}
+
 // RecoverRunning turns every running run stuck, with out as its outcome and its reason as the note,
 // and returns them (boot recovery). A step run with a Claude session keeps that session as its
 // launch spec's ResumeID, so a Resume can continue it; every other launch column is cleared.

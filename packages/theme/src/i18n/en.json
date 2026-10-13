@@ -1006,6 +1006,9 @@
       "open": {
         "body": "Open Kira {app} to answer."
       },
+      "quit": {
+        "title": "Kira {app} waits to quit"
+      },
       "schedule": {
         "title": "Run {name}"
       },

@@ -37,6 +37,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -145,6 +146,19 @@ func agentSessionCount(repositories *repos.Repos, registry *terminal.Registry) f
 		}
 		n += headless
 		return n
+	}
+}
+
+// liveWork counts what a quit stops: agent PTYs, running ADE runs, and smart and headless script runs.
+func liveWork(repositories *repos.Repos, registry *terminal.Registry, runs *scriptruns.Service) func() shell.QuitStatus {
+	return func() shell.QuitStatus {
+		st := shell.QuitStatus{Agents: len(registry.AgentSessions()), Scripts: runs.Live()}
+		n, err := repositories.AdeTasks.CountRunning()
+		if err != nil {
+			slog.Warn("quit: count ade runs", "scope", "lifecycle", "err", err)
+		}
+		st.Runs = n
+		return st
 	}
 }
 

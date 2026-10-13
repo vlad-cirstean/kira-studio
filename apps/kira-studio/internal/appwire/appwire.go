@@ -175,6 +175,11 @@ func Build(opts Options) (*Wired, error) {
 		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.sched.Start()
 
+	live := func() shell.QuitStatus {
+		return shell.QuitStatus{Agents: len(embedded.terminalSvc.Registry.AgentSessions()), Scripts: embedded.runs.Live()}
+	}
+	lifecycle.quitter.SetGate(prompts.QuitGate{R: promptRouter, LiveFn: func() int { return live().Total() }})
+
 	*w = Wired{
 		Prompts:    promptRouter,
 		PromptsSvc: &bridge.PromptsService{Bound: &prompts.Bound{R: promptRouter}},
@@ -222,7 +227,7 @@ func Build(opts Options) (*Wired, error) {
 		Update: &bridge.UpdateService{
 			Checker: updateChecker, Installer: updateInstaller, Quit: lifecycle.quitter.RequestQuit,
 		},
-		Lifecycle: &bridge.LifecycleService{Flusher: lifecycle.quitter, WindowFlusher: lifecycle.closeFlush},
+		Lifecycle: &bridge.LifecycleService{Flusher: lifecycle.quitter, WindowFlusher: lifecycle.closeFlush, Quit: lifecycle.quitter, Live: live},
 
 		beforeFlushOnce: lifecycle.beforeFlush,
 		teardownOnce:    lifecycle.teardown,

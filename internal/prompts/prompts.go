@@ -12,6 +12,7 @@ const (
 	KindGitCredential Kind = "git-credential"
 	KindMobilePairing Kind = "mobile-pairing"
 	KindUpdate        Kind = "update"
+	KindQuit          Kind = "quit"
 )
 
 // Prompt is one popup. It never carries a statement, git prompt text, pairing code or params.

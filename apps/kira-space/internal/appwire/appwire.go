@@ -324,7 +324,9 @@ func Build(opts Options) *Wired {
 	w.Files = &bridge.FilesService{Dialogs: opts.Dialogs}
 	w.CustomScripts = &bridge.CustomScriptsService{Deps: deps, Changed: w.sched.Reload}
 	w.Ops = &bridge.OpsService{Log: git.opLog}
-	w.Lifecycle = &bridge.LifecycleService{Flusher: w.Quitter, WindowFlusher: w.CloseFlush}
+	live := liveWork(repositories, terminalRegistry, runs)
+	w.Quitter.SetGate(prompts.QuitGate{R: w.Prompts, LiveFn: func() int { return live().Total() }})
+	w.Lifecycle = &bridge.LifecycleService{Flusher: w.Quitter, WindowFlusher: w.CloseFlush, Quit: w.Quitter, Live: live}
 	w.MemoryImport = bridge.NewMemoryImportService(w.Memory, opts.Dialogs)
 	w.Update = &bridge.UpdateService{Checker: updateChecker, Installer: updateInstaller, Quit: w.Quitter.RequestQuit}
 	return w

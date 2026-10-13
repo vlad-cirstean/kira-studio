@@ -1,5 +1,7 @@
 package bridge
 
+import "github.com/kirathecat/kira-studio/internal/shell"
+
 // Flusher is the quit-handshake ack seam. *shell.Quitter satisfies it — its own quit_test.go
 // covers the ordering and cancellation rules this seam exists for (there is no lifecycle_test.go
 // in this package; the comment that used to claim one was stale prose left behind after P56's own
@@ -18,6 +20,16 @@ type WindowFlusher interface{ Ack(windowKey string) }
 type LifecycleService struct {
 	Flusher       Flusher
 	WindowFlusher WindowFlusher
+	// Quit answers the quit confirmation popup; Live counts the work a quit would stop.
+	Quit QuitControl
+	Live func() shell.QuitStatus
+}
+
+// QuitControl is the quit-confirmation seam. *shell.Quitter satisfies it.
+type QuitControl interface {
+	ConfirmQuit()
+	CancelQuit()
+	Asking() bool
 }
 
 type LifecycleFlushedArgs struct {
@@ -38,4 +50,28 @@ func (s *LifecycleService) WindowFlushed(args LifecycleWindowFlushedArgs) {
 	if s.WindowFlusher != nil {
 		s.WindowFlusher.Ack(args.WindowKey)
 	}
+}
+
+// ConfirmQuit is the popup's "Quit anyway". Fire-and-forget like Flushed.
+func (s *LifecycleService) ConfirmQuit() {
+	if s.Quit != nil {
+		s.Quit.ConfirmQuit()
+	}
+}
+
+// CancelQuit is the popup's Cancel.
+func (s *LifecycleService) CancelQuit() {
+	if s.Quit != nil {
+		s.Quit.CancelQuit()
+	}
+}
+
+// QuitStatus is the live work the confirmation popup lists.
+func (s *LifecycleService) QuitStatus() (shell.QuitStatus, error) {
+	var st shell.QuitStatus
+	if s.Live != nil {
+		st = s.Live()
+	}
+	st.Asking = s.Quit != nil && s.Quit.Asking()
+	return st, nil
 }
