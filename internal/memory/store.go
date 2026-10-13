@@ -36,6 +36,9 @@ type Store struct {
 
 	mu sync.Mutex
 	db *sql.DB
+
+	vecMu sync.Mutex
+	vecs  *vecCache
 }
 
 func NewStore(path string) *Store { return &Store{path: path} }

@@ -36,8 +36,8 @@ func (s *Service) semanticPool(ctx context.Context, a SearchArgs, f filter, pool
 		return nil, spec, false, nil
 	}
 	spec = emb.Spec()
-	have, _, err := s.store.embeddingCounts(ctx, spec.ID)
-	if err != nil || have == 0 {
+	cache, err := s.store.vectors(ctx, spec.ID, spec.Dim)
+	if err != nil || len(cache.seqs) == 0 {
 		return nil, spec, false, err
 	}
 	qctx, cancel := context.WithTimeout(ctx, queryEmbedTimeout)
@@ -50,7 +50,7 @@ func (s *Service) semanticPool(ctx context.Context, a SearchArgs, f filter, pool
 		slog.Debug("memory: query embedding failed; keyword results only", "scope", "memory", "err", err)
 		return nil, spec, false, nil
 	}
-	top, err = s.store.vectorTopK(ctx, spec.ID, vecs[0], pool, f)
+	top, err = s.store.scanVectors(ctx, cache, vecs[0], pool, f)
 	return top, spec, err == nil, err
 }
 

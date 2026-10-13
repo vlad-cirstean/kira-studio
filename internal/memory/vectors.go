@@ -33,22 +33,43 @@ func (h *minHeap) Pop() any {
 
 var warnedBadVector atomic.Bool
 
-// vectorTopK scans every stored vector of model that passes f and returns the k best by dot product
-// (cosine) with q, best first. A row whose length does not match q is skipped and logged once.
-func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, k int, f filter) ([]scored, error) {
+// vecCache holds the decoded vectors of one model, ascending by seq, in one flat slice. Valid while
+// the model's row count and highest seq are unchanged: embeddings are only appended, and a model
+// change overwrites under a new model id.
+type vecCache struct {
+	model  string
+	dim    int
+	count  int64
+	maxSeq int64
+	seqs   []int64
+	flat   []float32
+}
+
+// vectors returns the decoded vectors of model, rebuilding when rows were added. Why a cache: an
+// exact scan decoding every blob took about 250 ms at 20k facts; a decoded scan is a tight dot loop.
+func (s *Store) vectors(ctx context.Context, model string, dim int) (*vecCache, error) {
 	db, err := s.conn()
 	if err != nil {
 		return nil, err
 	}
-	where, args := f.where()
-	rows, err := db.QueryContext(ctx, `SELECT e.seq, e.vec FROM memory_embeddings e JOIN memories m ON m.seq = e.seq
-		WHERE e.model = ?`+where, append([]any{model}, args...)...)
+	var count, maxSeq int64
+	if err := db.QueryRowContext(ctx, `SELECT count(*), coalesce(max(seq), 0) FROM memory_embeddings WHERE model = ?`,
+		model).Scan(&count, &maxSeq); err != nil {
+		return nil, fmt.Errorf("memory: vector stamp: %w", err)
+	}
+	s.vecMu.Lock()
+	defer s.vecMu.Unlock()
+	if c := s.vecs; c != nil && c.model == model && c.dim == dim && c.count == count && c.maxSeq == maxSeq {
+		return c, nil
+	}
+	rows, err := db.QueryContext(ctx, `SELECT seq, vec FROM memory_embeddings WHERE model = ? ORDER BY seq`, model)
 	if err != nil {
-		return nil, fmt.Errorf("memory: vector scan: %w", err)
+		return nil, fmt.Errorf("memory: vector load: %w", err)
 	}
 	defer rows.Close()
-	buf := make([]float32, len(q))
-	h := make(minHeap, 0, k+1)
+	c := &vecCache{model: model, dim: dim, count: count, maxSeq: maxSeq,
+		seqs: make([]int64, 0, count), flat: make([]float32, 0, int(count)*dim)}
+	buf := make([]float32, dim)
 	for rows.Next() {
 		var seq int64
 		var blob []byte
@@ -61,7 +82,58 @@ func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, k int
 			}
 			continue
 		}
-		sc := embed.Dot(q, buf)
+		c.seqs = append(c.seqs, seq)
+		c.flat = append(c.flat, buf...)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	s.vecs = c
+	return c, nil
+}
+
+// vectorTopK scans the vectors of model whose memory passes f and returns the k best by dot product
+// (cosine) with q, best first. A row whose length does not match q is skipped and logged once.
+func (s *Store) vectorTopK(ctx context.Context, model string, q []float32, k int, f filter) ([]scored, error) {
+	c, err := s.vectors(ctx, model, len(q))
+	if err != nil {
+		return nil, err
+	}
+	return s.scanVectors(ctx, c, q, k, f)
+}
+
+// scanVectors is vectorTopK over an already loaded cache.
+func (s *Store) scanVectors(ctx context.Context, c *vecCache, q []float32, k int, f filter) ([]scored, error) {
+	if len(q) != c.dim {
+		return nil, fmt.Errorf("memory: query vector has %d dims, cache %d", len(q), c.dim)
+	}
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	where, args := f.where()
+	rows, err := db.QueryContext(ctx, `SELECT m.seq FROM memories m WHERE 1 = 1`+where+` ORDER BY m.seq`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("memory: vector filter: %w", err)
+	}
+	defer rows.Close()
+	h := make(minHeap, 0, k+1)
+	i, dim := 0, c.dim
+	for rows.Next() {
+		var seq int64
+		if err := rows.Scan(&seq); err != nil {
+			return nil, err
+		}
+		for i < len(c.seqs) && c.seqs[i] < seq {
+			i++
+		}
+		if i == len(c.seqs) {
+			break
+		}
+		if c.seqs[i] != seq {
+			continue
+		}
+		sc := embed.Dot(q, c.flat[i*dim:(i+1)*dim])
 		switch {
 		case len(h) < k:
 			heap.Push(&h, scored{seq, sc})
