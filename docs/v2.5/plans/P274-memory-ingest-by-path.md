@@ -545,3 +545,22 @@ Real `claude` 2.1.296, haiku, temp `HOME`, cwd a temp dir holding `source.md`, n
   records why. Cost per probe call under 0.002 USD.
 - Variadic flags (`--tools`, `--allowedTools`) swallow a trailing prompt argument; the call sends the prompt on
   stdin, as `memory.Call` already does.
+
+### Implementation notes (commits 1 to 9)
+
+Deviations from the plan, all small:
+
+- Finalize input carried the absolute path and no provenance after commit 4; fixed in commit 6 (`Path: it.Rel`, `Prov`).
+- Job groups cap at 4 for ingest jobs; the file's own document group takes the fifth slot (`memory.CheckJobGroups`).
+- `Start` takes a flat `MemoryImportStartArgs`; an empty `origin` keeps the job's provenance. `ImportAction` loses `start`;
+  the UI starts through `useStartImport`.
+- Group ids are generated per run, so contracts mask `groupId`; the UI mask reader blanks masked values. The ingest spec
+  injects fixed group ids instead of asserting the contract's.
+- `TestMemoryIngestThroughClaude` has claude call `ingest_status` once; the test then waits on the job through the app.
+  No `main_test.go` logic change: `flowharness.Main` already serves `memory-ingest` through `RunArgvShim`.
+- File kind label for memdoc reads "Memory doc".
+- `TestExternalIngestNeverChallenges` scripts the finalize agent's `dropped` answer; the store result (status stored,
+  challenge reported, one memory) is the real assertion.
+- Targeted runs after commit 9: `go test ./apps/kira-space/internal/flows/memoryflow` (twice, green),
+  `llmpromptsflow`, Playwright `memory-import`, `memory-ingest`, `copy-wording`, `memory-provenance`, `memory-module` (green).
+  Full suites, visual baselines and the real `claude` rows stay for 3.2.

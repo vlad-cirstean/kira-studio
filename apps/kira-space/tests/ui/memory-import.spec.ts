@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
+import { openMemory } from './support/memoryNav';
 import type { ControlSnapshot } from './support/types';
 
 // P211: bulk memory import against a mocked bridge — pick, scan confirmation with the estimate,
@@ -135,11 +136,6 @@ const BASE: ControlSnapshot[] = [
   { channel: IPC.memoryImportRetryFile },
 ];
 
-async function openMemory(page: Page): Promise<void> {
-  await page.locator('[data-testid="mode-tab"][data-mode="memory"]').click();
-  await expect(page.locator('[data-testid="memory-panel"]')).toBeVisible();
-}
-
 test('contract: import: pick a folder, confirm the estimate, start', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [...BASE, { channel: IPC.memoryImportJobs, response: [SCANNED] }],
@@ -206,4 +202,127 @@ test('contract: import: a paused job shows its reason, per-file results, retry a
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.memoryImportResume)?.args)
     .toMatchObject({ id: 'J2' });
+});
+
+// P274: provenance, doc write-back, parsed docs and the cross-check, from the Go flows' contracts.
+const running = (d: ImportDetail) => ({ ...d.job, state: 'running' });
+
+async function openImports(page: Page, detail: ImportDetail): Promise<void> {
+  await openMemory(page);
+  await page.locator('[data-testid="memory-import-open"]').click();
+  await expect(page.locator('[data-testid="import-job"]')).toBeVisible();
+  expect(detail.files.length).toBeGreaterThan(0);
+}
+
+function withDetail(detail: ImportDetail): ControlSnapshot[] {
+  return [
+    ...BASE,
+    { channel: IPC.memoryImportJobs, response: [running(detail)] },
+    { channel: IPC.memoryImportJob, args: { id: detail.job.id }, response: detail },
+  ];
+}
+
+test('contract: import: the confirm dialog sends the chosen provenance and doc write-back', async ({
+  relaunch,
+}) => {
+  const sent = contract<{
+    origin: string;
+    sourceTag: string;
+    scope: string;
+    project: string;
+    writeDoc: boolean;
+  }>('memory-import', 'args:MemoryImportService.Start#provenance');
+  const { window: page, control } = await relaunch({
+    control: [
+      ...BASE,
+      { channel: IPC.memoryImportJobs, response: [SCANNED] },
+      { channel: IPC.memoryProjects, response: [sent.project] },
+    ],
+  });
+  await openMemory(page);
+  await page.locator('[data-testid="memory-import"]').click();
+  await page.locator('[data-testid="memory-import-folder"]').click();
+
+  const dialog = page.locator('[data-testid="import-confirm-dialog"]');
+  const start = dialog.locator('[data-testid="import-confirm-start"]');
+  const tag = dialog.locator('[data-testid="import-source-tag"]');
+  await expect(tag).toHaveValue('doc');
+  await tag.fill('Not A Tag');
+  await expect(dialog.locator('[data-testid="import-source-tag-error"]')).toBeVisible();
+  await expect(start).toBeDisabled();
+
+  await dialog.locator(`[data-testid="import-origin-${sent.origin}"]`).click();
+  await expect(tag).toHaveCount(0);
+  await dialog.locator(`[data-testid="import-scope-${sent.scope}"]`).click();
+  await expect(start).toBeDisabled();
+  await dialog.locator('[data-testid="import-project"]').click();
+  await page.locator(`[data-testid="import-project-option-${sent.project}"]`).click();
+  await expect(start).toBeEnabled();
+  if (sent.writeDoc) await dialog.locator('[data-testid="import-write-doc"]').click();
+  await start.click();
+
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.memoryImportStart)?.args)
+    .toMatchObject({
+      origin: sent.origin,
+      sourceTag: sent.sourceTag,
+      scope: sent.scope,
+      project: sent.project,
+      writeDoc: sent.writeDoc,
+    });
+});
+
+test('contract: import: a finished file with a written doc shows the doc path', async ({
+  relaunch,
+}) => {
+  const written = contract<ImportDetail>('memory-import', 'MemoryImportService.Job#writeDoc');
+  const { window: page } = await relaunch({ control: withDetail(written) });
+  await openImports(page, written);
+
+  await expect(page.locator('[data-testid="import-job-origin"]')).toHaveText('User');
+  await expect(page.locator('[data-testid="import-job-scope"]')).toHaveText(
+    String(written.job.project),
+  );
+  await page.locator('[data-testid="import-files"] button').first().click();
+  await expect(page.locator('[data-testid="import-file-doc"]')).toBeVisible();
+  await expect(page.locator('[data-testid="import-file-doc-error"]')).toHaveCount(0);
+});
+
+test('contract: import: a kira-memory doc shows as a parsed file with its counts', async ({
+  relaunch,
+}) => {
+  const parsed = contract<ImportDetail>('memory-import', 'MemoryImportService.Job#memdoc');
+  const doc = parsed.files[0] as { relPath: string; added: number; groupId: string };
+  const { window: page } = await relaunch({ control: withDetail(parsed) });
+  await openImports(page, parsed);
+
+  const row = page.locator(`[data-testid="import-file-${doc.relPath}"]`);
+  await expect(row.locator('[data-testid="import-file-kind"]')).toHaveText('Memory doc');
+  await expect(row).toContainText(`+${doc.added}`);
+  await row.locator('button').first().click();
+  await expect(page.locator('[data-testid="import-file-group"]')).toContainText(doc.groupId);
+});
+
+test('contract: import: cross-checked facts count and the unsupported one is dropped with why', async ({
+  relaunch,
+}) => {
+  const checked = contract<ImportDetail>('memory-import', 'MemoryImportService.Job#verified');
+  const f = checked.files[0] as {
+    relPath: string;
+    verified: number;
+    dropped: { fact: string; why: string }[];
+  };
+  const { window: page } = await relaunch({ control: withDetail(checked) });
+  await openImports(page, checked);
+
+  const row = page.locator(`[data-testid="import-file-${f.relPath}"]`);
+  await expect(row.locator('[data-testid="import-file-verified"]')).toContainText(
+    String(f.verified),
+  );
+  await row.locator('button').first().click();
+  const detail = page.locator('[data-testid="import-file-detail"]');
+  for (const d of f.dropped) {
+    await expect(detail).toContainText(d.fact);
+    await expect(detail).toContainText(d.why);
+  }
 });

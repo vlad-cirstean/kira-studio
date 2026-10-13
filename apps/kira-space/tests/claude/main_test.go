@@ -14,7 +14,8 @@ import (
 )
 
 // TestMain serves two re-executions of the test binary: as the `memory-mcp` server of the import
-// agent (KIRA_TEST_MEMORY_MCP), and through flowharness.Main as memory-mcp, askpass and the fake gh.
+// agent (KIRA_TEST_MEMORY_MCP), and through flowharness.Main as memory-mcp, memory-ingest (the
+// detached import runner), askpass and the fake gh.
 func TestMain(m *testing.M) {
 	if os.Getenv("KIRA_TEST_MEMORY_MCP") == "1" {
 		os.Exit(memorycli.Run(os.Args[2:], ""))

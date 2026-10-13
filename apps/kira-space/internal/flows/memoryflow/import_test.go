@@ -75,6 +75,11 @@ func jobDetail(t *testing.T, app *flowharness.App, id string) importer.JobDetail
 func waitJob(t *testing.T, app *flowharness.App, id string, states ...string) importer.JobDetail {
 	t.Helper()
 	var got importer.JobDetail
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("last job state of %s: %+v files %+v", id, got.Job, got.Files)
+		}
+	})
 	testx.WaitUntil(t, waitFor, func() bool {
 		got = jobDetail(t, app, id)
 		for _, s := range states {

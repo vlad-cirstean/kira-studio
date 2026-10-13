@@ -12,7 +12,13 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
+// noLauncher stands in for the runner process: the test runs its own runner in a goroutine.
+type noLauncher struct{}
+
+func (noLauncher) Launch() error { return nil }
+
 // The finalize agent's MCP server is this test binary re-executed as `memory-mcp` (see TestMain).
+// The runner runs in this process; the production runner process is covered by TestMemoryIngestThroughClaude.
 func TestMemoryImport(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err != nil {
 		t.Skip("real claude tests: no claude on PATH")
@@ -28,15 +34,25 @@ func TestMemoryImport(t *testing.T) {
 	agent := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(),
 		Env: map[string]string{"KIRA_TEST_MEMORY_MCP": "1"}}
 	// A small budget forces billing.md's second section into its own chunk, so "It restarts..."
-	// reaches step 1 without the service name.
-	e, err := importer.Open(ms, importer.Options{Agent: agent, Budget: importer.Budget{Target: 150, Max: 250, MinFill: 40, MinTail: 1, Context: 60}})
+	// reaches step 1 without the service name; releases.md's last sentence leaves its references open,
+	// which sends its facts through the cross-check.
+	runner, err := importer.NewRunner(ms, importer.RunnerOptions{Agent: agent, Docs: svc,
+		Budget: importer.Budget{Target: 150, Max: 250, MinFill: 40, MinTail: 1, Context: 60}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runCtx, stop := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); _ = runner.Run(runCtx) }()
+	defer func() { stop(); <-done }()
+	e, err := importer.Open(ms, importer.Options{Launcher: noLauncher{}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e.Close()
 
 	begin := time.Now()
-	job, err := e.Create([]string{"testdata/smoke"})
+	job, err := e.Create(importer.CreateArgs{Paths: []string{"testdata/smoke"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +77,17 @@ func TestMemoryImport(t *testing.T) {
 	}
 	d := waitFor(importer.JobAwaiting)
 	t.Logf("estimate: %+v", d.Job.Estimate)
-	if err := e.Start(job.ID); err != nil {
+	if err := e.Start(job.ID, importer.StartArgs{}); err != nil {
 		t.Fatal(err)
 	}
 	d = waitFor(importer.JobDone)
+	verified := 0
+	for _, f := range d.Files {
+		verified += f.Verified
+	}
+	if verified < 1 {
+		t.Errorf("verified = %d, want at least one fact cross-checked against its source file", verified)
+	}
 	t.Logf("done in %s: calls=%d cost=$%.3f totals=%+v", time.Since(begin).Round(time.Second), d.Job.Calls, d.Job.CostUSD, d.Job.Totals)
 	for _, f := range d.Files {
 		t.Logf("file %s: %s chunks=%d facts=%d added=%d updated=%d noop=%d cost=$%.3f unresolved=%+v dropped=%+v reason=%q",
