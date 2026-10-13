@@ -54,6 +54,7 @@ test('contract: a restart-stopped run offers Resume on its step line and in Need
     page.locator(`${t('ade-needs-item')}[data-kind="stuck run"] ${t('ade-needs-action')}`),
   ).toHaveText('Resume');
 
+  await page.locator(t('ade-tab-plan')).click();
   await openCart(page);
   await release(page).locator(t('ade-run-resume')).click();
   await expect.poll(() => calls(control, IPC.adeTaskResumeRun)).toHaveLength(1);
@@ -77,7 +78,7 @@ test('contract: a lost conversation shows its reason and Retry, no Resume', asyn
   await expect(block.locator(t('ade-run-note')).first()).toContainText('could not resume');
 });
 
-test('contract: a refused Resume shows its error in the panel', async ({ relaunch }) => {
+test('contract: a refused Resume shows its error on the step', async ({ relaunch }) => {
   const refused = JSON.parse(
     contract<string>('ade-resume', 'AdeTaskService.ResumeRun#refused'),
   ) as {
@@ -90,5 +91,5 @@ test('contract: a refused Resume shows its error in the panel', async ({ relaunc
   ]);
   await openCart(page);
   await release(page).locator(t('ade-run-resume')).click();
-  await expect(page.locator(t('ade-panel-action-error'))).toContainText(refused.message);
+  await expect(release(page).locator(t('ade-stage-block-error'))).toContainText(refused.message);
 });
