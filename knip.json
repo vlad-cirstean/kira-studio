@@ -106,6 +106,10 @@
     "packages/docker-ui": {
       "entry": ["src/testing/**/*.ts"],
       "project": ["src/**/*.{ts,vue,css}"]
+    },
+    "site": {
+      "entry": ["src/pages/**/*.astro", "playwright.config.ts", "tests/**/*.spec.ts"],
+      "project": ["src/**/*.{ts,astro}", "tests/**/*.ts"]
     }
   }
 }

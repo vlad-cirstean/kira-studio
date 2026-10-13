@@ -14,7 +14,8 @@
     "packages/git-ipc",
     "packages/git-core",
     "packages/git-ui",
-    "packages/docker-ui"
+    "packages/docker-ui",
+    "site"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
@@ -23,6 +24,9 @@
     "dev:studio": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task dev'",
     "predev:space": "bun run setup",
     "dev:space": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-space && wails3 task dev'",
+    "site:dev": "cd site && bun run dev",
+    "site:build": "cd site && bun run check && bun run build",
+    "site:check": "bun run site:build && playwright test --config=site/playwright.config.ts",
     "build:studio": "cd apps/kira-studio/frontend && bun run build",
     "build:space": "cd apps/kira-space/frontend && bun run build && bun run build:mobile",
     "build:space-mobile": "cd apps/kira-space/frontend && bun run build:mobile",
@@ -40,7 +44,8 @@
     "lint:dead": "knip",
     "lint:all": "bun run lint && bun run lint:go && bun run lint:dead",
     "format": "biome check --write .",
-    "typecheck": "sh -c 'bun run typecheck:tests:studio & p1=$!; bun run typecheck:web:studio & p2=$!; bun run typecheck:space-web & p6=$!; bun run typecheck:space-mobile & p11=$!; bun run typecheck:unit:studio & p3=$!; bun run typecheck:space-unit & p7=$!; bun run typecheck:api-core:studio & p4=$!; bun run typecheck:git & p5=$!; bun run typecheck:space-tests & p8=$!; bun run typecheck:proto:studio & p9=$!; bun run typecheck:docker & p10=$!; bun run typecheck:copy & p12=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p6 || fail=1; wait $p11 || fail=1; wait $p3 || fail=1; wait $p7 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; wait $p8 || fail=1; wait $p9 || fail=1; wait $p10 || fail=1; wait $p12 || fail=1; exit $fail'",
+    "typecheck": "sh -c 'bun run typecheck:tests:studio & p1=$!; bun run typecheck:web:studio & p2=$!; bun run typecheck:space-web & p6=$!; bun run typecheck:space-mobile & p11=$!; bun run typecheck:unit:studio & p3=$!; bun run typecheck:space-unit & p7=$!; bun run typecheck:api-core:studio & p4=$!; bun run typecheck:git & p5=$!; bun run typecheck:space-tests & p8=$!; bun run typecheck:proto:studio & p9=$!; bun run typecheck:docker & p10=$!; bun run typecheck:copy & p12=$!; bun run typecheck:site & p13=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p6 || fail=1; wait $p11 || fail=1; wait $p3 || fail=1; wait $p7 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; wait $p8 || fail=1; wait $p9 || fail=1; wait $p10 || fail=1; wait $p12 || fail=1; wait $p13 || fail=1; exit $fail'",
+    "typecheck:site": "cd site && bun run check",
     "typecheck:copy": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/scripts-copy.tsbuildinfo -p scripts/copy/tsconfig.json",
     "typecheck:tests:studio": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/apps-kira-studio-tsconfig-tests.tsbuildinfo -p apps/kira-studio/tsconfig.tests.json",
     "typecheck:space-tests": "tsgo --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsbuildinfo/apps-kira-space-tsconfig-tests.tsbuildinfo -p apps/kira-space/tsconfig.tests.json",

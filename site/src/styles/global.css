@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "../../../packages/theme/src/tokens.css";
+
+@theme inline {
+  --color-bg: var(--kira-bg);
+  --color-fg: var(--kira-fg);
+  --color-muted: var(--kira-fg-muted);
+  --color-accent: var(--kira-accent);
+  --color-border: var(--kira-border);
+}
