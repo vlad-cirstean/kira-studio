@@ -33,7 +33,8 @@
     "tests/visual/**/*.ts",
     "../../packages/db-fixtures/support/**/*.ts",
     "tests/ipc/**/*.ts",
-    "tests/support/**/*.ts"
+    "tests/support/**/*.ts",
+    "tests/screenshots/**/*.ts"
   ],
   // P103 Part 1: testing/unit/* imports `bun:test` (this project's own `types` is `["node"]`,
   // for tests/ui's Playwright surface, not `bun-types`) — apps/*/tests/unit/tsconfig.json is

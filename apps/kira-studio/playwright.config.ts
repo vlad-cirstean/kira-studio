@@ -109,6 +109,17 @@ export default defineConfig({
         },
       },
     },
+    // P280: presentation screenshots (`bun run screenshots`). `.shot.ts` keeps these out of `ui` and
+    // `visual`. Serial: the output files are shared.
+    {
+      name: 'screenshots',
+      testDir: './tests/screenshots',
+      testMatch: '**/*.shot.ts',
+      use: { browserName: 'webkit' },
+      fullyParallel: false,
+      workers: 1,
+      retries: 0,
+    },
     // P57-e2e-revisit.md §6/§8: a real Go backend (`go build -tags server`), a real embedded
     // engine and a real database adapter, reached over plain HTTP/WebSocket by a plain Chromium
     // tab — no mock, no native window. A *wiring* tier, not a UI-fidelity one (D5): `chromium`,

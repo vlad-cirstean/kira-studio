@@ -68,5 +68,16 @@ export default defineConfig({
         },
       },
     },
+    // P280: presentation screenshots (`bun run screenshots`). `.shot.ts` keeps these out of `ui` and
+    // `visual`. Serial: the output files are shared.
+    {
+      name: 'screenshots',
+      testDir: './tests/screenshots',
+      testMatch: '**/*.shot.ts',
+      use: { browserName: 'webkit' },
+      fullyParallel: false,
+      workers: 1,
+      retries: 0,
+    },
   ],
 });

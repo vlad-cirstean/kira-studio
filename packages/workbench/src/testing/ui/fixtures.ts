@@ -20,6 +20,14 @@ export interface UiFixturesOptions {
    *  `useIntervalFn` ticks) keep advancing at 1x from that pinned start, rather than freezing —
    *  only "which real day is `today`" is pinned, not "does time pass". */
   readonly clockTime?: number | string | Date;
+  /** Replaces the default 1440 x 960 window. Used by the presentation screenshots (P280). */
+  readonly viewport?: { readonly width: number; readonly height: number };
+  /** Playwright's `deviceScaleFactor`; browser default when unset. */
+  readonly deviceScaleFactor?: number;
+  /** Playwright's `locale`; browser default when unset. */
+  readonly locale?: string;
+  /** Runs before the first navigation, after the clock and before the mocks (e.g. `addInitScript`). */
+  readonly prepare?: (page: Page) => Promise<void>;
 }
 
 export interface UiFixturesConfig<TExtra extends object, TOptions extends UiFixturesOptions> {
@@ -77,11 +85,16 @@ export function createUiFixtures<
 
       const launch = async (options?: TOptions): Promise<KiraApp<TExtra>> => {
         if (current) await current.close();
-        const page = await browser.newPage({ timezoneId: options?.timezoneId });
+        const page = await browser.newPage({
+          timezoneId: options?.timezoneId,
+          locale: options?.locale,
+          deviceScaleFactor: options?.deviceScaleFactor,
+          viewport: options?.viewport,
+        });
         page.on('console', (msg) => {
           if (msg.type() === 'error') consoleErrors.push(msg.text());
         });
-        await page.setViewportSize({ width: 1440, height: 960 });
+        if (!options?.viewport) await page.setViewportSize({ width: 1440, height: 960 });
 
         // Must land before the first navigation — same rule as installMocks below, and in the same
         // order every original per-app relaunch() already required for it.
@@ -89,6 +102,8 @@ export function createUiFixtures<
           await page.clock.install({ time: options.clockTime });
           await page.clock.resume();
         }
+
+        await options?.prepare?.(page);
 
         // Must land before the first navigation — every original per-app relaunch()'s own rule.
         const extra = await config.installMocks(page, options);
