@@ -28,6 +28,9 @@ export const IPC = {
   appFlushed: 'kira:app:flushed',
   windowFlushBeforeClose: 'kira:window:flushBeforeClose',
   windowFlushed: 'kira:window:flushed',
+  lifecycleConfirmQuit: 'kira:lifecycle:confirmQuit',
+  lifecycleCancelQuit: 'kira:lifecycle:cancelQuit',
+  lifecycleQuitStatus: 'kira:lifecycle:quitStatus',
 
   filesChooseSave: 'kira:files:chooseSave',
   filesChooseOpen: 'kira:files:chooseOpen',
@@ -237,6 +240,7 @@ export const IPC = {
   llmPromptsPreview: 'kira:llmPrompts:preview',
   scriptRunsGet: 'kira:scriptRuns:get',
   scriptRunsStop: 'kira:scriptRuns:stop',
+  scriptRunsResume: 'kira:scriptRuns:resume',
   scriptRunsResolveDir: 'kira:scriptRuns:resolveDir',
   scriptRunsPreview: 'kira:scriptRuns:preview',
   scriptRunsStart: 'kira:scriptRuns:start',

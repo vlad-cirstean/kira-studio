@@ -20,6 +20,9 @@ export const IPC = {
   appFlushed: 'kira:app:flushed',
   windowFlushBeforeClose: 'kira:window:flushBeforeClose',
   windowFlushed: 'kira:window:flushed',
+  lifecycleConfirmQuit: 'kira:lifecycle:confirmQuit',
+  lifecycleCancelQuit: 'kira:lifecycle:cancelQuit',
+  lifecycleQuitStatus: 'kira:lifecycle:quitStatus',
 
   filesChooseFolder: 'kira:files:chooseFolder',
 
@@ -69,6 +72,7 @@ export const IPC = {
   llmPromptsPreview: 'kira:llmPrompts:preview',
   scriptRunsGet: 'kira:scriptRuns:get',
   scriptRunsStop: 'kira:scriptRuns:stop',
+  scriptRunsResume: 'kira:scriptRuns:resume',
   scriptRunsResolveDir: 'kira:scriptRuns:resolveDir',
   scriptRunsPreview: 'kira:scriptRuns:preview',
   scriptRunsStart: 'kira:scriptRuns:start',
@@ -189,6 +193,7 @@ export const IPC = {
   adeTaskSetTaskWorkflow: 'kira:adetask:setTaskWorkflow',
   adeTaskApprove: 'kira:adetask:approve',
   adeTaskRetryRun: 'kira:adetask:retryRun',
+  adeTaskResumeRun: 'kira:adetask:resumeRun',
   adeTaskStageDone: 'kira:adetask:stageDone',
   adeTaskSetTaskStage: 'kira:adetask:setTaskStage',
   adeTaskRetrySetup: 'kira:adetask:retrySetup',
