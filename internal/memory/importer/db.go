@@ -144,6 +144,8 @@ type newFile struct {
 	ID, Path, Rel, Kind, Hash, State, Reason, Title string
 	Size                                            int64
 	Chunks, Tokens                                  int
+	// DocOrigin and DocScope are the header provenance of a memdoc; scan-time only, not stored.
+	DocOrigin, DocScope string
 }
 
 // scanned stores a finished scan and moves the job to awaiting, then applies the agent auto-start
@@ -153,7 +155,15 @@ func (s *store) scanned(jobID, base string, truncated bool, ignored int, files [
 	return s.tx(func(tx *sql.Tx) error {
 		tokens, chunks := 0, 0
 		now := s.now()
+		var jobOrigin, jobScope string
+		if err := tx.QueryRow(`SELECT origin, scope FROM import_jobs WHERE id = ?`, jobID).Scan(&jobOrigin, &jobScope); err != nil {
+			return err
+		}
+		claims := 0
 		for _, f := range files {
+			if f.Kind == KindMemdoc && f.State == FilePending && docClaimsMore(f, jobOrigin, jobScope) {
+				claims++
+			}
 			if _, err := tx.Exec(`INSERT INTO import_files
 				(id, job_id, path, rel_path, kind, size, content_hash, state, reason, title, chunk_count, est_tokens, updated_at)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -173,9 +183,16 @@ func (s *store) scanned(jobID, base string, truncated bool, ignored int, files [
 		if rowsAffected(res) == 0 {
 			return errors.New("import: job left scanning state")
 		}
-		_, err = autoStartTx(tx, s.now, jobID, chunkCap)
+		_, err = autoStartTx(tx, s.now, jobID, chunkCap, claims)
 		return err
 	})
+}
+
+// docClaimsMore reports whether a memdoc header claims a higher origin grade or a company scope
+// than its job holds: header provenance wins on apply, so an unattended job must not start on it.
+func docClaimsMore(f newFile, jobOrigin, jobScope string) bool {
+	return memory.GradeOf(f.DocOrigin) > memory.GradeOf(jobOrigin) ||
+		(f.DocScope == memory.ScopeCompany && jobScope != memory.ScopeCompany)
 }
 
 // moveJob changes a job's state when it is in one of from; otherwise it reports why not.
@@ -240,8 +257,9 @@ func (s *store) startJob(id string, a StartArgs) error {
 }
 
 // autoStartTx runs an awaiting MCP job whose scan found work within the chunk cap; over it, the job
-// keeps waiting with the reason. It reports whether the job started.
-func autoStartTx(tx *sql.Tx, now func() string, id string, chunkCap int) (bool, error) {
+// keeps waiting with the reason, as does one holding docClaims memdocs that claim more provenance
+// than the job. It reports whether the job started.
+func autoStartTx(tx *sql.Tx, now func() string, id string, chunkCap, docClaims int) (bool, error) {
 	var chunks int
 	var auto bool
 	err := tx.QueryRow(`SELECT est_chunks, auto_start FROM import_jobs WHERE id = ? AND state = 'awaiting'`, id).Scan(&chunks, &auto)
@@ -251,13 +269,19 @@ func autoStartTx(tx *sql.Tx, now func() string, id string, chunkCap int) (bool, 
 	if err != nil {
 		return false, err
 	}
+	var why []string
+	if docClaims > 0 {
+		why = append(why, fmt.Sprintf("%d kira-memory docs claim a higher origin or company scope", docClaims))
+	}
 	if chunks > chunkCap {
 		counts, err := pendingChunkCounts(tx, id)
 		if err != nil {
 			return false, err
 		}
-		_, err = tx.Exec(`UPDATE import_jobs SET reason = ? WHERE id = ?`,
-			fmt.Sprintf("Needs confirmation in Kira Space: %d chunks, about %d calls", chunks, EstimateWork(counts, 0).Calls), id)
+		why = append(why, fmt.Sprintf("%d chunks, about %d calls", chunks, EstimateWork(counts, 0).Calls))
+	}
+	if len(why) > 0 {
+		_, err = tx.Exec(`UPDATE import_jobs SET reason = ? WHERE id = ?`, "Needs confirmation in Kira Space: "+strings.Join(why, "; "), id)
 		return false, err
 	}
 	_, err = tx.Exec(`UPDATE import_jobs SET state = 'running', reason = '', started_at = ? WHERE id = ?`, now(), id)

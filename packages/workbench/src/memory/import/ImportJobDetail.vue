@@ -178,8 +178,8 @@ async function discard(): Promise<void> {
         >
       </div>
       <Alert
-        v-if="job.reason && (job.state === 'paused' || job.state === 'failed')"
-        variant="error"
+        v-if="job.reason && (job.state === 'paused' || job.state === 'failed' || job.state === 'awaiting')"
+        :variant="job.state === 'awaiting' ? 'warn' : 'error'"
         data-testid="import-reason"
       >
         <AlertDescription>{{ job.reason }}</AlertDescription>

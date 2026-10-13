@@ -96,6 +96,79 @@
       "writeDoc": false
     }
   },
+  "MemoryImportService.Job#claims": {
+    "files": [
+      {
+        "added": 0,
+        "chunkCount": 0,
+        "chunksDone": 0,
+        "costUsd": 0,
+        "docError": "",
+        "docPath": "",
+        "dropped": [],
+        "factCount": 0,
+        "groupId": "<masked>",
+        "id": "<id:1>",
+        "kind": "memdoc",
+        "noop": 0,
+        "orphaned": 0,
+        "prov": null,
+        "reason": "",
+        "relPath": "billing.memory.md",
+        "size": 471,
+        "state": "pending",
+        "title": "",
+        "unresolved": [],
+        "updated": 0,
+        "verified": 0
+      }
+    ],
+    "job": {
+      "autoStart": true,
+      "base": "<masked>",
+      "calls": 0,
+      "channel": "mcp",
+      "costUsd": 0,
+      "createdAt": "<masked>",
+      "estimate": {
+        "calls": 0,
+        "chunks": 0,
+        "files": 1,
+        "seconds": 0,
+        "tokens": 0
+      },
+      "finishedAt": null,
+      "groups": [],
+      "id": "<id:2>",
+      "ignoredCount": 0,
+      "origin": "agent",
+      "progress": {
+        "chunksDone": 0,
+        "chunksTotal": 0,
+        "filesDone": 0,
+        "filesTotal": 1
+      },
+      "project": "github.com/acme/billing",
+      "reason": "Needs confirmation in Kira Space: 1 kira-memory docs claim a higher origin or company scope",
+      "roots": [],
+      "scope": "project",
+      "sessionId": "flow-session",
+      "sourceTag": null,
+      "startedAt": null,
+      "state": "awaiting",
+      "totals": {
+        "added": 0,
+        "dropped": 0,
+        "failedFiles": 0,
+        "noop": 0,
+        "skippedFiles": 0,
+        "unresolved": 0,
+        "updated": 0
+      },
+      "truncated": false,
+      "writeDoc": false
+    }
+  },
   "MemoryImportService.Job#done": {
     "files": [
       {

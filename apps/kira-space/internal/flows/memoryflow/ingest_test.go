@@ -501,6 +501,30 @@ func TestIngestAwaitsOverChunkCap(t *testing.T) {
 	}
 }
 
+// A doc header claiming more than the agent's job holds must wait for the user: header provenance
+// wins on apply, so an unattended start would let an agent raise its own facts to user grade.
+func TestIngestAwaitsOnMemdocHeaderClaim(t *testing.T) {
+	app := ingestApp(t, "")
+	dir := copyTestdata(t, app, "docs", "memdoc/billing.memory.md")
+	sess := memorySession(t, app)
+
+	started := ingestFiles(t, sess, map[string]any{"paths": []string{dir}, "origin": "agent", "scope": "project", "project": billingKey})
+	waiting := waitIngest(t, sess, started.JobID, importer.JobAwaiting)
+	if !strings.Contains(waiting.Job.Reason, "Needs confirmation in Kira Space: 1 kira-memory docs claim") {
+		t.Fatalf("job = %+v, want awaiting with the header-claim reason", waiting.Job)
+	}
+	app.Contract(t, "memory-import", "MemoryImportService.Job#claims", waiting, ingestMask)
+	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
+		t.Fatalf("Recent = %+v, %v, want nothing stored before the user confirms", recent, err)
+	}
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: started.JobID}); err != nil {
+		t.Fatal(err)
+	}
+	if done := waitJob(t, app, started.JobID, importer.JobDone, importer.JobFailed); done.Job.State != importer.JobDone {
+		t.Fatalf("job after Start = %+v, want done", done.Job)
+	}
+}
+
 func TestIngestIdempotentCall(t *testing.T) {
 	hold := filepath.Join(t.TempDir(), "release")
 	app := ingestApp(t, "", fakeagent.PromptRule{System: extractSystem, Doc: "notes.md", WaitFile: hold, Emit: extractAnswer(t)})

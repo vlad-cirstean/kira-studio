@@ -20,11 +20,17 @@ const maxDocProblems = 5
 // isMemdoc reports whether a markdown or text file is a kira-memory doc: lines 1 and 2 are the
 // fences the format requires.
 func isMemdoc(kind, text string) bool {
-	if kind != KindMarkdown && kind != KindText {
-		return false
-	}
-	_, ok, _ := memfmt.ParseDoc([]byte(text))
+	_, ok := parseMemdoc(kind, text)
 	return ok
+}
+
+// parseMemdoc is isMemdoc plus the parsed doc, whose header provenance may be incomplete if the doc has problems.
+func parseMemdoc(kind, text string) (memfmt.Doc, bool) {
+	if kind != KindMarkdown && kind != KindText {
+		return memfmt.Doc{}, false
+	}
+	doc, ok, _ := memfmt.ParseDoc([]byte(text))
+	return doc, ok
 }
 
 // docError renders the first problems of a doc as one file reason.

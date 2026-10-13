@@ -303,6 +303,22 @@ test('contract: import: a kira-memory doc shows as a parsed file with its counts
   await expect(page.locator('[data-testid="import-file-group"]')).toContainText(doc.groupId);
 });
 
+test('contract: import: an agent job awaiting confirmation shows why and starts on the user', async ({
+  relaunch,
+}) => {
+  const claims = contract<ImportDetail>('memory-import', 'MemoryImportService.Job#claims');
+  const { window: page, control } = await relaunch({ control: withDetail(claims) });
+  await openImports(page, claims);
+
+  await expect(page.locator('[data-testid="import-reason"]')).toContainText(
+    String(claims.job.reason),
+  );
+  await page.locator('[data-testid="import-start"]').click();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.memoryImportStart).length)
+    .toBe(1);
+});
+
 test('contract: import: cross-checked facts count and the unsupported one is dropped with why', async ({
   relaunch,
 }) => {

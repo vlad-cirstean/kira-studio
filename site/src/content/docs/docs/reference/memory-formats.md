@@ -92,6 +92,6 @@ km_7h3kq9x2mfa4 reason: The ledger rejects fractional values.
 km_7h3kq9x2mfa4 keywords: cents, amount
 ```
 
-One doc has one provenance. Importing a doc needs no Claude call: the parser reads it directly.
+One doc has one provenance. Importing a doc needs no Claude call: the parser reads it directly. The header wins over the job's origin and scope. An agent's import waits for your confirmation when a header claims a higher origin or the company scope than the job.
 
 An import job can write each source's stored facts to `<name>.memory.md` beside it. Doc sources are skipped. An existing target is overwritten only when it is a valid doc with the same group. Facts with another provenance than the job are left out.
