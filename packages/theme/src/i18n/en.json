@@ -5377,6 +5377,13 @@
         "usedBy": {
           "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
         }
+      },
+      "runResumeLine": {
+        "description": "First message of a run resumed after Kira quit or crashed.",
+        "title": "Resume after restart",
+        "usedBy": {
+          "body": "Task runs and smart scripts, resume action."
+        }
       }
     },
     "fragments": {

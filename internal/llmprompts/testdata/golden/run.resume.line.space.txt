@@ -1,0 +1,1 @@
+Kira Space closed while you worked, so your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check the current state of that action (files, git, running processes) before you redo or skip it. Then carry on with the task.
