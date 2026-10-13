@@ -98,6 +98,65 @@ for (const key of ['not-installed', 'cancelled'] as const) {
   });
 }
 
+// Contract memory-settings. Backend half: memoryflow TestInstallSemanticModel.
+test('contract: semantic install shows the download progress, then the installed state', async ({
+  relaunch,
+}) => {
+  const notInstalled = contract<{ state: string }>(
+    'memory-settings',
+    'MemoryService.SemanticStatus#not-installed',
+  );
+  const downloading = contract<{ state: string }>(
+    'memory-settings',
+    'MemoryService.SemanticStatus#downloading',
+  );
+  const installed = contract<{ state: string }>(
+    'memory-settings',
+    'MemoryService.SemanticStatus#installed',
+  );
+  expect(downloading.state).toBe('downloading');
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.memorySemanticStatus, response: notInstalled },
+      { channel: IPC.memorySemanticStatus, response: downloading },
+      { channel: IPC.memorySemanticStatus, response: installed },
+      { channel: IPC.memorySemanticInstall, response: undefined, hold: true },
+    ],
+  });
+  await openMemorySettings(page);
+  const section = page.locator('[data-testid="memory-semantic"]');
+  await expect(section).toHaveAttribute('data-state', 'notInstalled');
+  await page.locator('[data-testid="memory-semantic-download"]').click();
+  await emitWailsEvent(page, IPC.memorySemantic, undefined);
+  await expect(section).toHaveAttribute('data-state', 'downloading');
+  await expect(page.locator('[data-testid="memory-semantic-cancel"]')).toBeVisible();
+  control.release(IPC.memorySemanticInstall);
+  await expect(section).toHaveAttribute('data-state', installed.state);
+});
+
+// Contract memory-settings. Backend half: memoryflow TestInstallSemanticModelChecksum.
+test('contract: semantic install checksum failure shows the error', async ({ relaunch }) => {
+  const failure = contract<{ code: string; message: string }>(
+    'memory-settings',
+    'MemoryService.InstallSemanticModel#checksum',
+  );
+  const status = contract<{ state: string }>(
+    'memory-settings',
+    'MemoryService.SemanticStatus#not-installed',
+  );
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.memorySemanticStatus, response: status },
+      { channel: IPC.memorySemanticInstall, error: failure },
+    ],
+  });
+  await openMemorySettings(page);
+  await page.locator('[data-testid="memory-semantic-download"]').click();
+  await expect(page.locator('[data-testid="memory-semantic-error"]')).toContainText(
+    failure.message,
+  );
+});
+
 test('semantic unavailable: shows the reason and a retry', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [

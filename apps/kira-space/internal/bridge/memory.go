@@ -55,6 +55,7 @@ type MemoryService struct {
 	svc       *memory.Service
 	store     *memory.Store
 	embedder  *embed.Client
+	spec      embed.Spec
 	stopWatch context.CancelFunc
 
 	// installing serialises model downloads; progress is read by SemanticStatus.
@@ -70,8 +71,9 @@ type MemoryService struct {
 	engine         *importer.Engine
 }
 
-func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source) *MemoryService {
-	s := &MemoryService{events: events, installer: installer, prompts: prompts}
+// NewMemoryService wires the module; spec is the embedding model it installs and runs.
+func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source, spec embed.Spec) *MemoryService {
+	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec}
 	s.semanticEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemorySemantic, struct{}{}) })
 	s.importEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemoryImport, struct{}{}) })
 	return s
@@ -84,7 +86,7 @@ func (s *MemoryService) service() *memory.Service {
 		return s.svc
 	}
 	s.store = memory.OpenDefault()
-	s.embedder = embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home(), OnState: s.emitSemantic})
+	s.embedder = embed.NewClient(embed.ClientOptions{Spec: s.spec, Home: memory.Home(), OnState: s.emitSemantic})
 	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{
 		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic, Prompts: s.prompts,
 	})
@@ -312,8 +314,8 @@ func (s *MemoryService) InstallSemanticModel(ctx context.Context) error {
 		return ipcerr.T(ipcerr.CodeUnavailable, "backend.space.memory.serviceClosed.body", nil)
 	}
 
-	s.setDownload(true, 0, embed.Default.TotalSize())
-	err := embed.Install(ctx, client.Dir(), embed.Default, func(done, total int64) {
+	s.setDownload(true, 0, s.spec.TotalSize())
+	err := embed.Install(ctx, client.Dir(), s.spec, func(done, total int64) {
 		s.dlMu.Lock()
 		s.dlDone, s.dlTotal = done, total
 		s.dlMu.Unlock()

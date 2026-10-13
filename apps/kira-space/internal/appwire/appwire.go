@@ -37,6 +37,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -80,6 +81,8 @@ type Options struct {
 	// scheduler and the run times (flow-test seams); production leaves both zero.
 	ScheduleTimeout time.Duration
 	Clock           scriptruns.Clock
+	// EmbedSpec is the semantic-search model; nil means embed.Default (a flow-test seam).
+	EmbedSpec *embed.Spec
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -256,7 +259,11 @@ func Build(opts Options) *Wired {
 	}
 	w.Settings.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(w.KeepAwake) }
 	// memory.db opens on the Memory module's first call.
-	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}), promptStore)
+	embedSpec := embed.Default
+	if opts.EmbedSpec != nil {
+		embedSpec = *opts.EmbedSpec
+	}
+	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}), promptStore, embedSpec)
 	removeLegacyGitSocket()
 	go removeRetiredModels()
 

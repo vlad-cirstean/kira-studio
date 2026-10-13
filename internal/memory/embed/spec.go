@@ -3,9 +3,16 @@
 // It imports nothing from package memory.
 package embed
 
-import "github.com/kirathecat/kira-studio/internal/memory/modelstore"
+import (
+	"net/url"
+
+	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
+)
 
 const hfRevision = "e596f507467533e48a2e17c007f0e1dacc837b33"
+
+// HFBaseURL is where the pinned model files are served from.
+const HFBaseURL = "https://huggingface.co"
 
 // File is one downloadable model file, pinned by size and SHA-256.
 type File = modelstore.File
@@ -43,17 +50,36 @@ var Default = Spec{
 	Files: []File{
 		{
 			Name:   ModelFile,
-			URL:    "https://huggingface.co/Snowflake/snowflake-arctic-embed-s/resolve/" + hfRevision + "/onnx/model_int8.onnx",
+			URL:    HFBaseURL + "/Snowflake/snowflake-arctic-embed-s/resolve/" + hfRevision + "/onnx/model_int8.onnx",
 			SHA256: "f93ff225320628d2e88baf2a395cae791b0e3b27edf5c70bf7b312a4d3260c14",
 			Size:   34015111,
 		},
 		{
 			Name:   TokenizerFile,
-			URL:    "https://huggingface.co/Snowflake/snowflake-arctic-embed-s/resolve/" + hfRevision + "/tokenizer.json",
+			URL:    HFBaseURL + "/Snowflake/snowflake-arctic-embed-s/resolve/" + hfRevision + "/tokenizer.json",
 			SHA256: "91f1def9b9391fdabe028cd3f3fcc4efd34e5d1f08c3bf2de513ebb5911a1854",
 			Size:   711649,
 		},
 	},
+}
+
+// WithBaseURL returns a copy whose file URLs point at base (scheme and host replaced, path kept).
+// A bad base returns the spec unchanged.
+func (s Spec) WithBaseURL(base string) Spec {
+	b, err := url.Parse(base)
+	if err != nil || b.Host == "" {
+		return s
+	}
+	files := make([]File, len(s.Files))
+	for i, f := range s.Files {
+		if u, err := url.Parse(f.URL); err == nil {
+			u.Scheme, u.Host = b.Scheme, b.Host
+			f.URL = u.String()
+		}
+		files[i] = f
+	}
+	s.Files = files
+	return s
 }
 
 // TotalSize is the sum of the spec's file sizes.

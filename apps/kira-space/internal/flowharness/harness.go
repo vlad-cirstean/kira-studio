@@ -36,6 +36,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -50,6 +51,7 @@ type options struct {
 	rebaseTimeout   time.Duration
 	mobilePoll      time.Duration
 	seed            func(*App)
+	embedSpec       *embed.Spec
 }
 
 // Opt tweaks New.
@@ -79,6 +81,9 @@ func WithMobilePoll(d time.Duration) Opt { return func(o *options) { o.mobilePol
 
 // WithRebaseTimeout bounds an ADE rebase run (20 minutes by default).
 func WithRebaseTimeout(d time.Duration) Opt { return func(o *options) { o.rebaseTimeout = d } }
+
+// WithEmbedSpec replaces the semantic-search model, so a test serves its files from a fake host.
+func WithEmbedSpec(s embed.Spec) Opt { return func(o *options) { o.embedSpec = &s } }
 
 // WithSeed runs seed on the isolated homes before the first boot. Startup work that runs in the
 // background (sweeps) would race a seed written after New.
@@ -261,7 +266,7 @@ func (a *App) build() {
 		ghLocator = noGhLocator{}
 	}
 	a.W = appwire.Build(appwire.Options{
-		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, MobilePoll: a.opts.mobilePoll,
+		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},
