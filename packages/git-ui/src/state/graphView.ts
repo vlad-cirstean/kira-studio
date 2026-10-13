@@ -23,13 +23,6 @@ import { AUTO_REFRESH_COALESCE_MS, AUTO_REFRESH_MIN_GAP_MS } from './refreshTimi
 export type { ChunkSource };
 export type LoadingState = 'idle' | 'streaming' | 'loadingMore' | 'refreshing';
 
-/** The row range a just-applied chunk gained lane layout for — what `onChunkLayout` hands its
- *  subscribers. Absolute row indices, matching `LayoutChunk`'s own `from`/`to`. */
-export interface LayoutRange {
-  readonly from: number;
-  readonly to: number;
-}
-
 /**
  * The UI-side half of §5.4's cache/rehydration story (P3 W9), rebuilt for P4 W5 into the module
  * every component reads (docs/plans/P4.md W5). `store` is the client's own `CommitStore`, fed
@@ -48,15 +41,14 @@ export interface LayoutRange {
  * would keep showing the old history. Every consumer that caches anything derived from the
  * store invalidates on `generation`.
  *
- * **Layout is driven from the append, not from the render.** After each chunk lands,
- * `layoutClient.submit(store.layoutInput(from, to))` runs and its `LayoutChunk` goes into
- * `layout`; `laneCount` updates once the submission resolves. `onChunkLayout` is the extension
- * point W6's `CommitGrid.vue` subscribes through to invalidate exactly the rows that just
- * gained lanes (`grid.invalidateRows(rows); grid.render()`) — kept as a plain subscribe/
- * unsubscribe callback (mirroring `BridgeClient.on`) rather than a direct reference to the grid,
- * so this file stays ignorant of SlickGrid entirely. This means rows can be *listed* before
- * their lanes exist, which is correct and is what makes the ≤ 300 ms first-paint budget
- * reachable: text first, graph a frame later, never a blank list waiting on a worker.
+ * **Layout is driven from the append, not from the render.** After each chunk lands, the whole
+ * list is laid out again and `#publish` swaps `layout`, `plan` and `laneCount` in one synchronous
+ * step. `onPlanPublished` is the extension point W6's `CommitGrid.vue` subscribes through to
+ * repaint inside that same step — kept as a plain subscribe/unsubscribe callback (mirroring
+ * `BridgeClient.on`) rather than a direct reference to the grid, so this file stays ignorant of
+ * SlickGrid entirely. Rows can be *listed* before their lanes exist, which is correct and is what
+ * makes the ≤ 300 ms first-paint budget reachable: text first, graph a frame later, never a blank
+ * list waiting on a worker.
  */
 export class GraphViewState {
   readonly store: CommitStore;
@@ -72,9 +64,7 @@ export class GraphViewState {
   /** P93 §7: the current `RowPlan` (branch-grouped, or `identityRowPlan` with no `#order`
    *  attached, §5.4) — `CommitGrid.vue`'s own translation sites and `columns.ts`/`graphColumn.ts`
    *  read this to convert between display rows (SlickGrid's own indexing) and store rows
-   *  (`CommitStore`/`SelectionState`'s). A fresh object on every `#rebuildLayout()` call, so a
-   *  plain `watch(() => graphView.plan.value, ...)` already sees every rebuild — no separate
-   *  revision counter needed for that. */
+   *  (`CommitStore`/`SelectionState`'s). A fresh object on every publish. */
   readonly plan: ShallowRef<RowPlan> = shallowRef(identityRowPlan(0));
   readonly loading: ShallowRef<LoadingState> = shallowRef('idle');
   readonly generation: ShallowRef<number>;
@@ -93,7 +83,7 @@ export class GraphViewState {
   readonly #bridge: BridgeClient;
   readonly #layoutClient: LayoutClient;
   readonly #order: GraphOrderState | undefined;
-  readonly #layoutListeners = new Set<(range: LayoutRange) => void>();
+  readonly #planListeners = new Set<(plan: RowPlan) => void>();
   #abortController: AbortController | undefined;
   #loadController: AbortController | undefined;
   #repoId: string | undefined;
@@ -103,9 +93,9 @@ export class GraphViewState {
    *  it, so its captured `repoId` is now stale and its resync must be skipped rather than
    *  reopening/resyncing the *old* repo's stream over the new one. */
   #loadGeneration = 0;
-  /** F11: the union of every `#applyChunk` range folded in since the last relayout actually
-   *  ran — `#queueLayoutRebuild`'s own doc comment. */
-  #pendingLayoutRange: LayoutRange | undefined;
+  /** F11: a chunk folded in since the last relayout started — `#queueLayoutRebuild`'s own doc
+   *  comment. */
+  #layoutPending = false;
   #layoutDraining = false;
   #layoutDrain: Promise<void> | undefined;
 
@@ -381,12 +371,12 @@ export class GraphViewState {
     this.#loadController?.abort();
   }
 
-  /** Registers a handler for "this row range just gained lane layout" — W6's `CommitGrid.vue`
-   *  extension point (see this class's own doc comment). Returns an unsubscribe function,
-   *  mirroring `BridgeClient.on`. */
-  onChunkLayout(handler: (range: LayoutRange) => void): () => void {
-    this.#layoutListeners.add(handler);
-    return () => this.#layoutListeners.delete(handler);
+  /** Registers a handler called synchronously inside every publish of `plan`, `layout` and
+   *  `laneCount` — W6's `CommitGrid.vue` extension point (see this class's own doc comment).
+   *  Returns an unsubscribe function, mirroring `BridgeClient.on`. */
+  onPlanPublished(handler: (plan: RowPlan) => void): () => void {
+    this.#planListeners.add(handler);
+    return () => this.#planListeners.delete(handler);
   }
 
   /** Clears every loaded row. Call before opening a stream for a newly *selected* repo — never
@@ -406,12 +396,11 @@ export class GraphViewState {
     this.#loadGeneration++;
     this.loading.value = 'idle';
     this.streamFailure.value = undefined;
-    // F11: an old repo's own not-yet-applied merged range must never reach a listener after this
-    // point — `#resetLayout()`'s own `#layoutClient.reset()` below already turns any relayout
-    // still in flight into a no-op `LayoutClientStaleError` (`#rebuildLayout`'s own catch), so a
-    // `#drainLayoutRebuilds` loop already running simply sees no pending range left once that
-    // settles and exits; a fresh one starts the moment the new repo's own stream applies a chunk.
-    this.#pendingLayoutRange = undefined;
+    // F11: `#resetLayout()`'s own `#layoutClient.reset()` below turns any relayout still in flight
+    // into a no-op `LayoutClientStaleError` (`#rebuildLayout`'s own catch), so a
+    // `#drainLayoutRebuilds` loop already running simply sees nothing pending once that settles and
+    // exits; a fresh one starts the moment the new repo's own stream applies a chunk.
+    this.#layoutPending = false;
     this.#resetLayout();
     this.#packed.reset();
     this.#cancelAutoRefresh();
@@ -484,12 +473,21 @@ export class GraphViewState {
   }
 
   #resetLayout(): void {
-    this.layout.clear();
     this.#layoutClient.reset();
-    this.laneCount.value = 0;
-    const empty = identityRowPlan(0);
-    this.#layoutPlan = empty;
-    this.plan.value = empty;
+    this.#publish(identityRowPlan(0), undefined);
+  }
+
+  /** The one place `layout`, `#layoutPlan`, `plan` and `laneCount` change, and the grid repaints
+   *  inside it, never later: a click or scroll in the same task as a publish always meets a grid
+   *  that already shows the new plan. `clear()` and `append()` in the same synchronous block, so
+   *  `laneCount` never observably passes through 0 the way it would if `clear()` ran on its own. */
+  #publish(plan: RowPlan, layoutChunk: LayoutChunk | undefined): void {
+    this.layout.clear();
+    if (layoutChunk) this.layout.append(layoutChunk);
+    this.#layoutPlan = plan;
+    this.plan.value = plan;
+    this.laneCount.value = this.layout.laneCount;
+    for (const listener of this.#planListeners) listener(plan);
   }
 
   /**
@@ -536,39 +534,22 @@ export class GraphViewState {
         'kira:layout-submit-end',
       );
     }
-    // `clear()` and `append()` in the same synchronous block: `laneCount` never observably
-    // passes through 0 the way it would if `clear()` ran on its own, earlier.
-    this.layout.clear();
-    this.layout.append(layoutChunk);
     // Plan and layout publish together: a row never renders against a plan whose lanes are not
     // yet in `layout` (it drew an empty graph column for the whole stream otherwise).
-    this.#layoutPlan = plan;
-    this.plan.value = plan;
-    this.laneCount.value = this.layout.laneCount;
+    this.#publish(plan, layoutChunk);
   }
 
   /** `App.vue`'s own entry point after `#order.setTips`/`.toggleGroup`/`.setCollapseEnabled` —
    *  the "a collapse toggle, a refs/HEAD change" triggers §5.1 names beside a page landing. A
-   *  no-op when this instance has no `#order` attached.
-   *
-   *  Notifies `#layoutListeners` itself, covering the whole display-row range — unlike
-   *  `#applyChunk`, which notifies for the one range its own caller already has in hand, nothing
-   *  here already knows "what changed" (a full relayout can move any row), and every row's own
-   *  graph column reads through the same `layout`/`plan` pair regardless. Without this,
-   *  `CommitGrid.vue`'s `plan` watcher fires `grid.invalidate()` before `#rebuildLayout`'s own
-   *  `await` resolves (a Vue watcher is a microtask, the layout worker round trip is not) and
-   *  paints against the *previous* `layout` state; nothing else was watching `laneCount`/`layout`
-   *  themselves to repaint once the real one landed. */
+   *  no-op when this instance has no `#order` attached. */
   async rebuildOrder(): Promise<void> {
     await this.#rebuildLayout();
-    const to = this.plan.value.length;
-    for (const listener of this.#layoutListeners) listener({ from: 0, to });
   }
 
   async #applyChunk(chunk: StreamChunkOf<'graph.stream'>): Promise<void> {
     const range = await this.#packed.applyChunk(chunk, {
       onReset: () => {
-        this.#pendingLayoutRange = undefined;
+        this.#layoutPending = false;
         this.#resetLayout();
       },
       onCorrupted: () => {
@@ -593,38 +574,28 @@ export class GraphViewState {
     // host send the next wire chunk, so a fast return here is what lets a large load (a 200k-row
     // rehydration is 400 500-row chunks) pipeline many wire chunks per relayout instead of paying
     // one full main-thread plan rebuild plus worker round trip per chunk.
-    this.#queueLayoutRebuild(range);
+    this.#queueLayoutRebuild();
   }
 
-  /** F11: merges `range` into whatever range is still waiting on its own relayout, and starts a
-   *  drain loop if none is already running. A relayout always lays out the WHOLE store
-   *  (`#rebuildLayout`'s own doc comment) — `range` only ever tells `#layoutListeners` which rows
-   *  are new since the listeners' own last look, so merging ranges is exactly the union of every
-   *  chunk folded into the store since the last relayout actually landed. */
-  #queueLayoutRebuild(range: LayoutRange): void {
-    this.#pendingLayoutRange = this.#pendingLayoutRange
-      ? {
-          from: Math.min(this.#pendingLayoutRange.from, range.from),
-          to: Math.max(this.#pendingLayoutRange.to, range.to),
-        }
-      : range;
-    if (this.#layoutDraining) return; // an already-running drain picks up the merge on its next loop
+  /** F11: marks a relayout owed and starts a drain loop if none is already running. A relayout
+   *  always lays out the WHOLE store (`#rebuildLayout`'s own doc comment), so chunks folded in
+   *  while one runs need no bookkeeping beyond this flag. */
+  #queueLayoutRebuild(): void {
+    this.#layoutPending = true;
+    if (this.#layoutDraining) return; // an already-running drain picks it up on its next loop
     this.#layoutDrain = this.#drainLayoutRebuilds();
   }
 
   /** F11: keeps relaying out until no further chunk landed while the last relayout was running —
    *  a stream burst that outpaces the layout worker (chunk after 500-row chunk, `loadAll`'s own
    *  loop; a cached rehydration replaying hundreds of chunks) coalesces into however many
-   *  relayouts the worker actually had time to run, never one per wire chunk. Listeners fire once
-   *  per relayout that actually landed, with the full merged range since the previous one. */
+   *  relayouts the worker actually had time to run, never one per wire chunk. */
   async #drainLayoutRebuilds(): Promise<void> {
     this.#layoutDraining = true;
     try {
-      while (this.#pendingLayoutRange) {
-        const range = this.#pendingLayoutRange;
-        this.#pendingLayoutRange = undefined;
+      while (this.#layoutPending) {
+        this.#layoutPending = false;
         await this.#rebuildLayout();
-        for (const listener of this.#layoutListeners) listener(range);
       }
     } catch (error) {
       // F11: `#applyChunk` no longer awaits this loop (that is the whole point — see its own

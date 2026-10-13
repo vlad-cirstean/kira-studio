@@ -62,13 +62,13 @@ const emit = defineEmits<{
  *  glyph until it does — see `headRow` below. */
 const HEAD_SCAN_LIMIT = 200;
 
-/** `GraphViewState.layout` is driven by `onChunkLayout` callbacks, not a reactive ref (that
+/** `GraphViewState.layout` is driven by `onPlanPublished` callbacks, not a reactive ref (that
  *  class's own doc comment: "Layout is driven from the append, not from the render") — bumped on
- *  every applied chunk so `headLane`/`headColor` below recompute once a row's lane actually
+ *  every publish so `headLane`/`headColor` below recompute once a row's lane actually
  *  arrives, which can land a tick after the row's own text does (W5's "text first, graph a frame
  *  later"). */
 const layoutTick = ref(0);
-const unsubscribeLayout = props.graphView.onChunkLayout(() => {
+const unsubscribeLayout = props.graphView.onPlanPublished(() => {
   layoutTick.value++;
 });
 onBeforeUnmount(unsubscribeLayout);

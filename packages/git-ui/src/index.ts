@@ -10,7 +10,7 @@ export type { IconAction } from './icons/index.ts';
 export { ACTION_ICONS } from './icons/index.ts';
 export type { MountHandle, MountOptions } from './main.ts';
 export { mount } from './main.ts';
-export type { LayoutRange, LoadingState } from './state/graphView.ts';
+export type { LoadingState } from './state/graphView.ts';
 export { GraphViewState } from './state/graphView.ts';
 export type { AppliedChunkRange, ApplyChunkHooks, ChunkSource } from './state/packedStream.ts';
 export { PackedStreamState } from './state/packedStream.ts';

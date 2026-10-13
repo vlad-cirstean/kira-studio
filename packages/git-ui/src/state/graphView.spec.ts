@@ -348,6 +348,14 @@ describe('GraphViewState — plan and layout publish together', () => {
       new GraphOrderState(),
     );
     const sha = (n: number) => n.toString(16).padStart(2, '0').repeat(20);
+    const seen: Array<{ published: number; current: number; layoutCurrent: boolean }> = [];
+    graphView.onPlanPublished((published) =>
+      seen.push({
+        published: published.length,
+        current: graphView.plan.value.length,
+        layoutCurrent: graphView.layoutCurrent,
+      }),
+    );
     const open = graphView.openStream(REPO_A);
     await sleep();
     transport.streamOpens[0]?.push({
@@ -368,10 +376,14 @@ describe('GraphViewState — plan and layout publish together', () => {
     expect(graphView.plan.value.length).toBe(0);
     expect(graphView.layoutCurrent).toBe(true);
 
+    expect(seen).toEqual([]);
+
     pending[0]?.resolve(fakeLayoutChunk(0, 5));
     await second;
     expect(graphView.plan.value.length).toBe(5);
     expect(graphView.layoutCurrent).toBe(true);
+    // The listener runs inside the publish, so it already sees the new plan and its layout.
+    expect(seen).toEqual([{ published: 5, current: 5, layoutCurrent: true }]);
 
     transport.streamOpens[0]?.end();
     await open;

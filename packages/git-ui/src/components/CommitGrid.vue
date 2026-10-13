@@ -46,7 +46,7 @@ import { measureAbsoluteDateWidth } from '../lib/dateFormat.ts';
 import { type GridKeyboardDeps, handleGridKeyDown } from '../lib/gridKeyboard.ts';
 import { composeRowLabel } from '../lib/rowAccessibility.ts';
 import type { GraphOrderState } from '../state/graphOrder.ts';
-import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
+import type { GraphViewState } from '../state/graphView.ts';
 import type { PrState } from '../state/pr.ts';
 import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
@@ -255,7 +255,7 @@ let pendingFocusRow: number | null = null;
 // W14: the row index that currently, genuinely holds real DOM focus, independent of
 // `pendingFocusRow` above. A row's DOM node is destroyed and recreated by *any*
 // `invalidateRows`/`render()` call that touches it, not only the selection-driven one
-// `moveSelection`/`handleClick` trigger — `handleChunkLayout` (graph layout streaming in from
+// `moveSelection`/`handleClick` trigger — `handlePlanPublished` (graph layout streaming in from
 // the layout worker, W5) does the same for whatever range it touches, entirely independently and
 // asynchronously of any selection change. When a `hugeRepo`-sized scenario's layout worker is
 // still delivering chunks well after the grid is already interactable, one of those chunks can
@@ -688,35 +688,26 @@ function raiseLaneFloor(): void {
   if (graphWidth() !== before) rebuildColumns();
 }
 
-/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5); `raiseLaneFloor`
- *  widens the graph column when the new lanes need it. Layout never changes row heights, so the
- *  row-position index stays; only rendered rows inside `range` are rebuilt.
- *
- *  Repaints directly and synchronously here, rather than leaning on the `plan` watcher below —
- *  `graphView.ts`'s own `rebuildOrder()` doc comment already states why that watcher alone is not
- *  enough: it is a Vue microtask, so by the time it fires, a click or scroll that lands in the gap
- *  reads a grid whose row count/content is still the previous plan's. A prior pass dropped this
- *  direct repaint believing the watcher already covered it (`43c8f760d`), reintroducing exactly
- *  that race — commits going blank on click/scroll, `Show more` and refresh appearing to do
- *  nothing until some later, unrelated invalidate happened to land. */
-function handleChunkLayout(range: LayoutRange): void {
+/** `GraphViewState` just published a plan with its layout, synchronously inside the publish: the
+ *  grid repaints here, never later, so a click or scroll in the same task never meets a grid sized
+ *  for the previous plan. `raiseLaneFloor` widens the graph column when the new lanes need it;
+ *  `invalidate()` takes the new row count, the row-height index and every rendered row, since a
+ *  grouped plan can move any display row. */
+function handlePlanPublished(): void {
   if (!grid) return;
-  raiseLaneFloor();
-  const { top, bottom } = grid.getRenderedRange();
-  const stale: number[] = [];
-  for (let displayRow = top; displayRow <= bottom && displayRow < plan().length; displayRow++) {
-    const entry = plan().entryAt(displayRow);
-    if (entry.kind === 'collapsed' || (entry.storeRow >= range.from && entry.storeRow < range.to)) {
-      stale.push(displayRow);
-    }
+  // Backgrounded: a hidden grid takes no input; the catch-up watch below replays the repaint.
+  if (!graphVisible.value) {
+    pendingRebuildOnVisible = true;
+    return;
   }
-  if (stale.length > 0) grid.invalidateRows(stale);
-  grid.render();
-  if (!layoutCompleteMarked) {
+  raiseLaneFloor();
+  grid.invalidate();
+  if (!layoutCompleteMarked && plan().length > 0) {
     layoutCompleteMarked = true;
     performance.mark('kira:layout-complete');
     performance.measure('kira:layout-complete', undefined, 'kira:layout-complete');
   }
+  if (props.initialScrollRow !== undefined) applyInitialScrollRow(props.initialScrollRow);
 }
 
 function scheduleResize(): void {
@@ -1030,7 +1021,7 @@ onMounted(() => {
   // of `host`, not descendants — a plain SVG/DOM-tree ancestor listener would miss those) and
   // every other focusable element in the panel (the toolbar, the detail pane).
 
-  unsubscribeLayout = props.graphView.onChunkLayout(handleChunkLayout);
+  unsubscribeLayout = props.graphView.onPlanPublished(handlePlanPublished);
 
   unsubscribeTokens = tokenReader.onChange(() => {
     // G21 D6b: a font-size/family change (now tracked alongside row-height, readTokens.ts) can
@@ -1059,7 +1050,7 @@ onMounted(() => {
   previousSelectedRow = props.selection.row.value;
 });
 
-// `GraphViewState`'s data changes are driven entirely through `onChunkLayout` (registered in
+// `GraphViewState`'s data changes are driven entirely through `onPlanPublished` (registered in
 // `onMounted` above) rather than a `watch()` on its scalars — one obvious path for "new rows
 // landed" instead of two that could race. `SelectionState.row` is watched here because it can
 // change from *outside* this component too (`selectBySha` re-resolving a selection after a
@@ -1099,22 +1090,6 @@ watch(
     if (props.pr) scheduleAncestryRebuild();
   },
 );
-// P93 §7: the plan changes on every relayout — a page landing (already covered by `loadedRows`
-// above, but `plan` always changes right alongside it, §5.3, so `invalidate()` belongs here
-// instead of being called from both) and, later, a collapse toggle or `App.vue`'s own tips
-// watcher recomputing the order with the row count unchanged, which `loadedRows` alone would
-// never catch. `invalidate()`, not `render()` alone: a plan rebuild can move which store row a
-// given display row shows, and `updateRowCount()`'s own index rebuild (`invalidate()`'s contract,
-// P92 item 4's own comment) must run whether or not the row *count* moved.
-watch(
-  () => props.graphView.plan.value,
-  () => {
-    grid?.invalidate();
-    // P108 F1: a plan rebuild landing is exactly "a plan that might now cover `initialScrollRow`"
-    // — retry here rather than only once at mount.
-    if (props.initialScrollRow !== undefined) applyInitialScrollRow(props.initialScrollRow);
-  },
-);
 // P108 F1: a plan rebuild does not necessarily accompany the LAST chunk of a load (`loading`
 // flips back to `'idle'` after it, with no further plan change) — this is what lets
 // `applyInitialScrollRow` clamp a genuinely-uncovered row once loading has actually settled,
@@ -1128,15 +1103,13 @@ watch(
 watch(
   () => props.graphView.generation.value,
   () => {
-    // P79 review fix: a generation bump while backgrounded marks the rebuild owed instead of
+    // The grid itself repaints inside every publish (`handlePlanPublished`), which accompanies every
+    // reset. P79 review fix: a generation bump while backgrounded marks the rebuild owed instead of
     // doing it now — the catch-up watch below replays it, once, on the next reactivate.
     if (!graphVisible.value) {
       pendingRebuildOnVisible = true;
       return;
     }
-    grid?.invalidateAllRows();
-    grid?.updateRowCount();
-    grid?.render();
     // P79 fix (Functional MEDIUM): a restart-at-row-0 re-walk is the other shape of "the loaded
     // window changed" `rebuildAncestry` must track — see the `loadedRows` watcher directly above.
     if (props.pr) scheduleAncestryRebuild();
@@ -1199,6 +1172,7 @@ watch(graphVisible, (visible) => {
   if (!visible || !pendingRebuildOnVisible) return;
   pendingRebuildOnVisible = false;
   if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
+  raiseLaneFloor();
   grid?.invalidateRowHeights();
   grid?.invalidateAllRows();
   grid?.updateRowCount();
