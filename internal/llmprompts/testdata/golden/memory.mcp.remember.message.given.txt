@@ -1,4 +1,4 @@
-Extract the durable facts from the text below, each with the reason it is true, and store them with the store_memory tool. Give each fact an origin ("user" for what the user stated, "agent" for what you concluded, "external" with a sourceTag for what a source such as slack or jira states) and a scope ("company", "project" or "personal"). If store_memory returns questions, ask the user those questions, then call it again with the revised items and the answers as clarifications. Report what was stored.
+Store the durable facts from the text below with store_memory. Give every item its reason, origin (user: the user stated it; agent: you concluded it; external with a sourceTag: a source such as slack or jira states it) and scope (company, project or personal). Rough wording is fine: the store splits and rewords facts. If store_memory returns questions, ask the user, then call it again with the answers as clarifications. Report what was stored.
 
 We use pnpm, not npm.
 CI runs on Linux.

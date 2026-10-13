@@ -47,7 +47,7 @@ type ingestStatusInput struct {
 func ingestSchema(src llmprompts.Source) *jsonschema.Schema {
 	sch := llmprompts.InputSchema[ingestInput](src, llmprompts.MemoryToolIngestFiles.ID(), map[string]any{
 		"paths":  llmprompts.MaxVars{Max: maxIngestPaths},
-		"groups": llmprompts.MaxVars{Max: 4},
+		"groups": llmprompts.MaxVars{Max: memory.MaxGroups - 1},
 	})
 	enum := func(prop *jsonschema.Schema, values ...string) {
 		for _, v := range values {

@@ -181,7 +181,8 @@ func rememberText(src llmprompts.Source, text string) string {
 // kind as enums.
 func storeSchema(src llmprompts.Source) *jsonschema.Schema {
 	sch := llmprompts.InputSchema[storeInput](src, llmprompts.MemoryToolStoreMemory.ID(), map[string]any{
-		"items": llmprompts.MaxVars{Max: memory.MaxItems},
+		"items":  llmprompts.MaxVars{Max: memory.MaxItems},
+		"groups": llmprompts.MaxVars{Max: memory.MaxGroups},
 	})
 	enum := func(prop *jsonschema.Schema, values ...string) {
 		for _, v := range values {

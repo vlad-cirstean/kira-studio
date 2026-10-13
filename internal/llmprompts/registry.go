@@ -394,102 +394,103 @@ var MemoryMcpInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpInstructions.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpInstructions.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpInstructions.usedBy.body",
-	Default: `Long-term memory for the user and their agents.
+	Default: `Long-term memory shared by the user and their agents, across sessions and projects.
 
-Store a memory when the user states a durable fact, or when you learn one worth keeping across sessions, with the reason it is true. Call store_memory with one item per fact. Each item names its origin: "user" when the user decided or stated it, "agent" when you concluded it, "external" with a sourceTag when it comes from a source such as slack, jira or a doc. Each item also names its scope: "company", "project" or "personal". Never store secrets.
+Store a durable fact or decision when the user states one or you learn one worth keeping. Call store_memory; each item needs:
+- fact: what is true. Rough or compound text is fine: the store splits it into atomic facts and rewords them.
+- reason: why it is true or was decided. Never invent one.
+- origin: who decided it. "user" (the user stated or confirmed it), "agent" (you concluded it) or "external" with a sourceTag (a source such as slack, jira or a doc says it).
+- scope: "company", "project" (this repo unless project is set) or "personal".
+Never drop a reason, origin or scope to tidy a fact. Never store secrets.
+Origins rank user, external, agent; an agent fact never replaces a user fact.
+A challenge stores nothing: ask the user the returned questions or fix the items, then call again with the answers in clarifications.
 
-Origins rank user, then external, then agent. An agent fact never replaces a user fact.
+Files (repo docs, a Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read or paste the content; Kira reads the files. Save external material to a .md, .txt or .json file first.
 
-store_memory challenges an item that is ambiguous, has no real reason or does not make sense. A challenge stores nothing: ask the user the returned questions, or fix the item yourself, then call store_memory again with the revised items and the answers in "clarifications".
-
-search_memories is recall-oriented: it matches words and meaning, and returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.
-
-Cite a memory by its fact id (km_...). Pass a fact id to memory_context to read the facts stored alongside it: same session, request, task, document or thread.
-
-To store the contents of files or folders (a repo's docs, a Slack or Jira export), call ingest_files with their paths and never read and paste them: it costs no tokens and runs in the background. Follow it with ingest_status. Put material from an external source in a file first.`,
+Recall: search_memories matches words and meaning, best first, and returns loosely related results; drop what is unrelated. Cite a memory by its fact id (km_...). ctx=N in a result's meta means memory_context has N facts stored with it; memory_history shows its versions.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store one or more facts, each with its reason. Every item names its origin and scope and is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored in the same scope updates it, unless the stored fact ranks higher by origin; the old version stays as history. Returns the fact id of each stored fact. With asComment, stores nothing and returns the facts as a kira-memory comment for that file.`,
+	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits compound text into atomic facts, rewords them, and updates a matching fact in the same scope unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing is stored and questions come back. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
 }, NoVars{})
 
 var (
-	_ = arg(MemoryToolStoreMemory.id, "items", spaceApp, NewSession, `facts to store, 1 to {{.Max}}; each with its reason, origin and scope`, MaxVars{Max: 20})
-	_ = arg(MemoryToolStoreMemory.id, "items.fact", spaceApp, NewSession, `one claim, written to stand alone`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.reason", spaceApp, NewSession, `why the fact is true`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.origin", spaceApp, NewSession, `who decided the fact: user (the user stated or confirmed it), agent (you concluded it) or external (it comes from a source outside this conversation; set sourceTag)`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.sourceTag", spaceApp, NewSession, `required for origin external, forbidden otherwise; the source name in lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.scope", spaceApp, NewSession, `how far the fact holds: company (the whole company), project (one project) or personal (the user only)`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit it to use the project of the current directory; forbidden for other scopes`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "clarifications", spaceApp, NewSession, `question and answer pairs resolving an earlier challenge`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "session", spaceApp, NewSession, `Claude Code session id; omit it to use this session's id`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "groups", spaceApp, NewSession, `up to 5 groups every item joins, besides the automatic session and request groups; memory_context reads a group's other facts`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items", spaceApp, NewSession, `facts to store, 1 to {{.Max}}; each needs fact, reason, origin and scope`, MaxVars{Max: 20})
+	_ = arg(MemoryToolStoreMemory.id, "items.fact", spaceApp, NewSession, `what is true; rough or compound text is fine, the store splits and rewords it`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.reason", spaceApp, NewSession, `why it is true or was decided; never invented`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.origin", spaceApp, NewSession, `who decided it: user (the user stated or confirmed it), agent (you concluded it) or external (a source outside this conversation; set sourceTag)`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.sourceTag", spaceApp, NewSession, `source name, only for origin external: lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.scope", spaceApp, NewSession, `where it holds: company, project or personal (the user only)`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit for this repo's project; only for scope project`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "clarifications", spaceApp, NewSession, `question and answer pairs answering an earlier challenge`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every item joins, besides its session and request; memory_context reads a group's facts`, MaxVars{Max: 5})
 	_ = arg(MemoryToolStoreMemory.id, "groups.kind", spaceApp, NewSession, `task, document or thread`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "groups.key", spaceApp, NewSession, `stable identifier: a task id such as PROJ-123, an absolute document path or a thread URL`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "asComment", spaceApp, NewSession, `path or extension of the file the comment goes in, such as internal/billing/api.go or py; when set, nothing is stored and the facts come back as a comment; groups are not allowed`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "groups.title", spaceApp, NewSession, `optional label shown to people`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups.key", spaceApp, NewSession, `stable id: a task id such as PROJ-123, an absolute document path or a thread URL`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "asComment", spaceApp, NewSession, `path or extension of the target file, such as internal/billing/api.go or py; stores nothing and returns a code comment; no groups`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "groups.title", spaceApp, NewSession, `optional label for people`, NoVars{})
 )
 
 // MemoryToolSearchMemories describes the search_memories tool.
 var MemoryToolSearchMemories = define(Entry{
 	ID: "memory.mcp.tool.search_memories", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "search_memories",
-	Default: `Search stored memories by keyword and by meaning. Recall-oriented: returns loosely related results, best first. In meta, score is relevance times provenance boosts. Superseded versions are included only with includeHistory and are flagged historical.`,
+	Default: `Search memories by words and meaning, best first. Recall-biased: drop unrelated results. Meta lines show provenance, score parts (score is relevance times boosts) and ctx=N for memory_context. Superseded versions only with includeHistory.`,
 }, NoVars{})
 
 var (
-	_ = arg(MemoryToolSearchMemories.id, "query", spaceApp, NewSession, `free text; matched by words (prefixes, word forms) and by meaning`, NoVars{})
+	_ = arg(MemoryToolSearchMemories.id, "query", spaceApp, NewSession, `free text, matched by words, prefixes, word forms and meaning`, NoVars{})
 	_ = arg(MemoryToolSearchMemories.id, "includeHistory", spaceApp, NewSession, `also return superseded versions, flagged historical`, NoVars{})
 	_ = arg(MemoryToolSearchMemories.id, "limit", spaceApp, NewSession, `maximum results, default {{.Default}}, maximum {{.Max}}`, LimitVars{Default: 40, Max: 200})
 	_ = arg(MemoryToolSearchMemories.id, "scopes", spaceApp, NewSession, `only these scopes: company, project, personal`, NoVars{})
 	_ = arg(MemoryToolSearchMemories.id, "origins", spaceApp, NewSession, `only these origins: user, agent, external`, NoVars{})
-	_ = arg(MemoryToolSearchMemories.id, "project", spaceApp, NewSession, `project key whose facts rank first; default: the project of this server's working directory`, NoVars{})
+	_ = arg(MemoryToolSearchMemories.id, "project", spaceApp, NewSession, `project key whose facts rank first; omit for this repo's project, "" for none`, NoVars{})
 )
 
 // MemoryToolMemoryHistory describes the memory_history tool.
 var MemoryToolMemoryHistory = define(Entry{
 	ID: "memory.mcp.tool.memory_history", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "memory_history",
-	Default: `Return every version of one memory, oldest first, each flagged historical when replaced, with the events that explain each change.`,
+	Default: `Every version of one memory, oldest first, with the event that explains each change.`,
 }, NoVars{})
 
-var _ = arg(MemoryToolMemoryHistory.id, "id", spaceApp, NewSession, `fact id of the memory, or the id of any version`, NoVars{})
+var _ = arg(MemoryToolMemoryHistory.id, "id", spaceApp, NewSession, `fact id, or the id of any version`, NoVars{})
 
 // MemoryToolMemoryContext describes the memory_context tool.
 var MemoryToolMemoryContext = define(Entry{
 	ID: "memory.mcp.tool.memory_context", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "memory_context",
-	Default: `Return the facts stored alongside one fact. For each group the fact belongs to (session, request, task, document, thread) it lists the group's other current facts, newest first. Use it as a second step when a fact from search_memories needs its surroundings.`,
+	Default: `The facts stored with one fact, per group (session, request, task, document, thread), newest first. Call it after search_memories when a result shows ctx=N or needs its surroundings.`,
 }, NoVars{})
 
 var (
-	_ = arg(MemoryToolMemoryContext.id, "id", spaceApp, NewSession, `fact id of the memory, or the id of any version`, NoVars{})
+	_ = arg(MemoryToolMemoryContext.id, "id", spaceApp, NewSession, `fact id, or the id of any version`, NoVars{})
 	_ = arg(MemoryToolMemoryContext.id, "limit", spaceApp, NewSession, `maximum facts per group, default {{.Default}}, maximum {{.Max}}`, LimitVars{Default: 20, Max: 100})
 )
 
 // MemoryToolIngestFiles describes the ingest_files tool.
 var MemoryToolIngestFiles = define(Entry{
 	ID: "memory.mcp.tool.ingest_files", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_files",
-	Default: `Store the facts of files and folders by path, in the background. Kira reads the files itself: you send paths, never contents. Markdown, text, JSON and JSON Lines are read; a file already in the kira-memory doc format is stored as it is. Every fact takes the origin, scope and groups you give. Returns a job id; call ingest_status to follow it. A large job waits for the user to start it in Kira Space.`,
+	Default: `Store the facts of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a file in kira-memory doc format is applied as is. Every fact gets the origin, scope and groups given. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space.`,
 }, NoVars{})
 
 var (
 	_ = arg(MemoryToolIngestFiles.id, "paths", spaceApp, NewSession, `absolute file or folder paths, 1 to {{.Max}}; a folder is read recursively, skipping ignored and binary files`, MaxVars{Max: 100})
-	_ = arg(MemoryToolIngestFiles.id, "origin", spaceApp, NewSession, `who decided the facts: user, agent or external (the files hold material from a source outside this conversation, such as a Slack export; set sourceTag)`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "sourceTag", spaceApp, NewSession, `required for origin external, forbidden otherwise; the source name in lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "scope", spaceApp, NewSession, `how far the facts hold: company (the whole company), project (one project) or personal (the user only)`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit it to use the project of the first path; forbidden for other scopes`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every fact joins, besides each file's own document group; memory_context reads a group's other facts`, MaxVars{Max: 4})
+	_ = arg(MemoryToolIngestFiles.id, "origin", spaceApp, NewSession, `who decided the content: user, agent or external (an outside source such as a Slack export; set sourceTag)`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "sourceTag", spaceApp, NewSession, `source name, only for origin external: lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "scope", spaceApp, NewSession, `where the facts hold: company, project or personal (the user only)`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "project", spaceApp, NewSession, `project key for scope project, such as github.com/acme/billing; omit for the first path's project; only for scope project`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every fact joins, besides each file's document group; memory_context reads a group's facts`, MaxVars{Max: 4})
 	_ = arg(MemoryToolIngestFiles.id, "groups.kind", spaceApp, NewSession, `task or thread`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "groups.key", spaceApp, NewSession, `stable identifier: a task id such as PROJ-123 or a thread URL`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "groups.title", spaceApp, NewSession, `optional label shown to people`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as a kira-memory doc named <name>.memory.md; default false`, NoVars{})
-	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit it to use this session's id`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "groups.title", spaceApp, NewSession, `optional label for people`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as <name>.memory.md in kira-memory doc format; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
 )
 
 // MemoryToolIngestStatus describes the ingest_status tool.
 var MemoryToolIngestStatus = define(Entry{
 	ID: "memory.mcp.tool.ingest_status", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_status",
-	Default: `Return the state of an ingest job: progress, totals, cost and one line per file with its state, document group id and counts of stored, updated, unchanged, dropped and unresolved facts. The structured result lists up to 50 stored fact ids per file; pass one to memory_context to read the facts stored with it.`,
+	Default: `State of an ingest job: progress, totals, cost, and per file its state, document group and counts of stored, updated, unchanged, dropped and unresolved facts. The structured result lists stored fact ids per file; pass one to memory_context to read that file's facts.`,
 }, NoVars{})
 
 var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id returned by ingest_files`, NoVars{})
@@ -497,10 +498,10 @@ var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id retur
 // MemoryRememberDescription describes the remember prompt of the memory MCP server.
 var MemoryRememberDescription = define(Entry{
 	ID: "memory.mcp.remember.description", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "remember",
-	Default: `Store the durable facts from some text or from this conversation in long-term memory.`,
+	Default: `Store durable facts from given text or the recent conversation.`,
 }, NoVars{})
 
-var _ = arg(MemoryRememberDescription.id, "text", spaceApp, NewSession, `What to remember; defaults to the recent conversation`, NoVars{})
+var _ = arg(MemoryRememberDescription.id, "text", spaceApp, NewSession, `what to remember; omit for the recent conversation`, NoVars{})
 
 // MemoryRememberMessage is the message the remember prompt sends to the agent.
 var MemoryRememberMessage = define(Entry{
@@ -508,7 +509,7 @@ var MemoryRememberMessage = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpRememberMessage.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpRememberMessage.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpRememberMessage.usedBy.body",
-	Default: `Extract the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}}, each with the reason it is true, and store them with the store_memory tool. Give each fact an origin ("user" for what the user stated, "agent" for what you concluded, "external" with a sourceTag for what a source such as slack or jira states) and a scope ("company", "project" or "personal"). If store_memory returns questions, ask the user those questions, then call it again with the revised items and the answers as clarifications. Report what was stored.{{if .Text}}
+	Default: `Store the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}} with store_memory. Give every item its reason, origin (user: the user stated it; agent: you concluded it; external with a sourceTag: a source such as slack or jira states it) and scope (company, project or personal). Rough wording is fine: the store splits and rewords facts. If store_memory returns questions, ask the user, then call it again with the answers as clarifications. Report what was stored.{{if .Text}}
 
 {{.Text}}{{end}}`,
 }, RememberVars{Text: "We use pnpm, not npm."})

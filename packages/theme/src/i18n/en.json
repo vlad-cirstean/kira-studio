@@ -5325,7 +5325,7 @@
         }
       },
       "memoryMcpInstructions": {
-        "description": "Tells an agent when to store a memory and how to search the store.",
+        "description": "Tells an agent what each stored fact needs, how to send files by path and how to search.",
         "title": "Memory server instructions",
         "usedBy": {
           "body": "Sent to Claude when a session connects to the memory MCP server. A change applies to new sessions."

@@ -21,7 +21,9 @@ import (
 const (
 	maxItems = 20
 	// MaxItems is the most facts one store call takes; the MCP tool description states it.
-	MaxItems          = maxItems
+	MaxItems = maxItems
+	// MaxGroups is the most groups one store call takes; the MCP tool descriptions state it.
+	MaxGroups         = maxGroups
 	maxClarifications = 10
 	maxClarifyLen     = 1000
 	maxPipelines      = 2
