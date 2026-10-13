@@ -144,6 +144,13 @@ func (s *Service) runHeadless(ctx context.Context, br *bgRun, p *planned, runID 
 	if err := cmd.Start(); err != nil {
 		sink.flush()
 		proc.End, proc.Err = runoutcome.EndStartErr, err
+		// A stop that landed before the process started cancelled the context, so Start fails.
+		switch br.endedBy() {
+		case endUser:
+			proc.End, proc.Err = runoutcome.EndUser, nil
+		case endQuit:
+			proc.End, proc.Err = runoutcome.EndQuit, nil
+		}
 		return runoutcome.ForProcess(proc), sink
 	}
 	waitErr := cmd.Wait()
