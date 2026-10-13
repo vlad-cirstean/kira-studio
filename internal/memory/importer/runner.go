@@ -82,6 +82,7 @@ type Runner struct {
 	wg     sync.WaitGroup
 	busy   atomic.Int32 // in-flight goroutines of this runner
 	wake   chan struct{}
+	ready  chan struct{} // closed once the runner holds the lock and has recovered
 
 	extractSem *semaphore.Weighted
 	finalizing atomic.Bool
@@ -124,7 +125,7 @@ func NewRunner(ms *memory.Store, opts RunnerOptions) (*Runner, error) {
 	}
 	return &Runner{
 		st: &store{db: db, now: func() string { return kiratime.FormatISO(opts.Now()) }}, agent: opts.Agent, opts: opts,
-		lockPath: lockPath(ms), wake: make(chan struct{}, 1),
+		lockPath: lockPath(ms), wake: make(chan struct{}, 1), ready: make(chan struct{}),
 		extractSem: semaphore.NewWeighted(int64(opts.Extractors)), armed: map[string]armedJob{}, scanning: map[string]bool{},
 	}, nil
 }
@@ -152,6 +153,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("importer: recover: %w", err)
 	}
 	r.ctx, r.cancel = context.WithCancel(ctx)
+	close(r.ready)
 	tick := time.NewTicker(r.opts.Tick)
 	defer tick.Stop()
 	var idleSince time.Time
@@ -376,7 +378,12 @@ func (r *Runner) plan(jobID string, res ScanResult) ([]newFile, error) {
 			files = append(files, nf)
 			continue
 		}
-		chunks, title := chunkFile(c.Kind, text, c.Rel, r.opts.Budget)
+		chunks, title, err := chunkFile(c.Kind, text, c.Rel, r.opts.Budget)
+		if err != nil {
+			nf.State, nf.Reason = FileFailed, err.Error()
+			files = append(files, nf)
+			continue
+		}
 		nf.State, nf.Title, nf.Chunks = FilePending, title, len(chunks)
 		for _, ch := range chunks {
 			nf.Tokens += ch.Tokens
@@ -400,19 +407,28 @@ func orReason(reason string, err error) string {
 	return "unreadable: " + err.Error()
 }
 
-func chunkFile(kind, text, rel string, b Budget) ([]Chunk, string) {
+func chunkFile(kind, text, rel string, b Budget) ([]Chunk, string, error) {
 	var chunks []Chunk
+	var err error
 	title := ""
-	if kind == KindMarkdown {
+	switch kind {
+	case KindMarkdown:
 		chunks, title = ChunkMarkdown(text, b)
-	} else {
+	case KindJSON:
+		chunks, err = ChunkJSON(text, b)
+	case KindJSONL:
+		chunks, err = ChunkJSONLines(text, b)
+	default:
 		chunks = ChunkText(text, b)
+	}
+	if err != nil {
+		return nil, "", err
 	}
 	if title == "" {
 		name := path.Base(filepath.ToSlash(rel))
 		title = strings.TrimSuffix(name, path.Ext(name))
 	}
-	return chunks, title
+	return chunks, title, nil
 }
 
 // schedule starts as much work as the slots allow: extract workers for pending chunks (reading and
@@ -491,7 +507,10 @@ func (r *Runner) materialiseNext() (bool, error) {
 	} else if done {
 		return end(FileSkipped, "unchanged since import on "+strings.SplitN(at, "T", 2)[0])
 	}
-	chunks, title := chunkFile(ref.Kind, text, ref.Rel, r.opts.Budget)
+	chunks, title, err := chunkFile(ref.Kind, text, ref.Rel, r.opts.Budget)
+	if err != nil {
+		return end(FileFailed, err.Error())
+	}
 	if len(chunks) == 0 {
 		return end(FileSkipped, "empty")
 	}

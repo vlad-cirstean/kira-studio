@@ -18,7 +18,7 @@ type Caps struct {
 	MaxFiles     int
 }
 
-var DefaultCaps = Caps{MaxFileBytes: 256 << 10, MaxFiles: 2000}
+var DefaultCaps = Caps{MaxFileBytes: 1 << 20, MaxFiles: 2000}
 
 // Candidate is a file that can be imported. Hash is the SHA-256 of its normalised text.
 type Candidate struct {
@@ -46,6 +46,7 @@ type ScanResult struct {
 var kindByExt = map[string]string{
 	".md": KindMarkdown, ".markdown": KindMarkdown, ".mdx": KindMarkdown,
 	".txt": KindText, ".text": KindText, ".rst": KindText, ".adoc": KindText,
+	".json": KindJSON, ".jsonl": KindJSONL, ".ndjson": KindJSONL,
 }
 
 var skippedDirs = map[string]bool{

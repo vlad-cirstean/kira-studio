@@ -13,7 +13,7 @@ import (
 const (
 	maxImportPaths = 100
 	// importFilter is the native picker's file filter: the extensions the importer reads.
-	importFilter = "*.md;*.markdown;*.mdx;*.txt;*.text;*.rst;*.adoc"
+	importFilter = "*.md;*.markdown;*.mdx;*.txt;*.text;*.rst;*.adoc;*.json;*.jsonl;*.ndjson"
 )
 
 // MemoryImportService is the Memory module's bulk document import. A separate bound service from

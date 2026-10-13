@@ -39,7 +39,7 @@ func TestScanWalkRules(t *testing.T) {
 	write(t, root, "latin1.md", []byte{'c', 'a', 'f', 0xe9, '\n'})
 	write(t, root, "empty.md", nil)
 	write(t, root, "blank.md", []byte("  \n\n"))
-	write(t, root, "big.md", bytes.Repeat([]byte("x"), 300<<10))
+	write(t, root, "big.md", bytes.Repeat([]byte("x"), 1100<<10))
 	write(t, root, "bom.md", append([]byte("\xef\xbb\xbf"), "a\r\nb\r\n"...))
 	if err := os.Symlink(filepath.Join(root, "keep.md"), filepath.Join(root, "link.md")); err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func TestScanWalkRules(t *testing.T) {
 	}
 	for rel, want := range map[string]string{
 		"bin.md": "binary", "latin1.md": "not UTF-8 text", "empty.md": "empty", "blank.md": "empty",
-		"big.md": "too large (limit 256 KB)", "link.md": "symlink",
+		"big.md": "too large (limit 1024 KB)", "link.md": "symlink",
 	} {
 		if reasons[rel] != want {
 			t.Errorf("%s reason = %q, want %q", rel, reasons[rel], want)
@@ -91,7 +91,7 @@ func TestScanWalkRules(t *testing.T) {
 		}
 	}
 
-	capped, err := Scan(context.Background(), []string{root}, Caps{MaxFileBytes: 256 << 10, MaxFiles: 3})
+	capped, err := Scan(context.Background(), []string{root}, Caps{MaxFileBytes: 1 << 20, MaxFiles: 3})
 	if err != nil || !capped.Truncated || len(capped.Files) != 3 {
 		t.Errorf("cap: err=%v truncated=%v files=%d", err, capped.Truncated, len(capped.Files))
 	}

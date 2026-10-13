@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/internal/filelock"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -19,7 +18,7 @@ func (noLauncher) Launch() error { return nil }
 func TestOneRunnerPerStore(t *testing.T) {
 	h := newHarness(t, 1)
 	opts := h.runnerOpts()
-	opts.IdleExit = 200 * time.Millisecond
+	opts.IdleExit = time.Second
 
 	first, err := NewRunner(h.ms, opts)
 	if err != nil {
@@ -27,13 +26,11 @@ func TestOneRunnerPerStore(t *testing.T) {
 	}
 	firstDone := make(chan error, 1)
 	go func() { firstDone <- first.Run(context.Background()) }()
-	testx.WaitUntil(t, 5*time.Second, func() bool {
-		f, free, _ := filelock.TryLock(first.lockPath)
-		if free {
-			_ = f.Close()
-		}
-		return !free
-	})
+	select {
+	case <-first.ready:
+	case err := <-firstDone:
+		t.Fatalf("first runner ended early: %v", err)
+	}
 
 	second, err := NewRunner(h.ms, opts)
 	if err != nil {
