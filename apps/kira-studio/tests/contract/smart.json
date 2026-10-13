@@ -26,7 +26,11 @@
       "mcp": [],
       "model": "sonnet",
       "timeout": "15m",
-      "tools": ["Read", "Grep", "Glob"]
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
     },
     "sortOrder": 0,
     "updatedAt": "<time>",
@@ -50,7 +54,11 @@
       "mcp": [],
       "model": "sonnet",
       "timeout": "15m",
-      "tools": ["Read", "Grep", "Glob"]
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
     },
     "sortOrder": 0,
     "updatedAt": "<time>",
@@ -83,6 +91,8 @@
       }
     ],
     "prompt": "Say hi about cats\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "resumable": false,
+    "resumedFrom": "",
     "scriptId": "<id:1>",
     "scriptName": "ask",
     "sessionId": "<id:3>",
@@ -92,9 +102,18 @@
     "taskTitle": "",
     "terminalId": "",
     "tools": {
-      "allowedTools": ["Read", "Grep", "Glob", "mcp__kira-ade__finish_step"],
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "mcp__kira-ade__finish_step"
+      ],
       "mcpServers": [],
-      "tools": ["Read", "Grep", "Glob"]
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
     },
     "trigger": "manual"
   },
@@ -119,6 +138,8 @@
     },
     "params": [],
     "prompt": "go\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "resumable": false,
+    "resumedFrom": "",
     "scriptId": "<id:1>",
     "scriptName": "ask",
     "sessionId": "<id:3>",
@@ -128,15 +149,29 @@
     "taskTitle": "",
     "terminalId": "",
     "tools": {
-      "allowedTools": ["Read", "Grep", "Glob", "mcp__kira-ade__finish_step"],
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "mcp__kira-ade__finish_step"
+      ],
       "mcpServers": [],
-      "tools": ["Read", "Grep", "Glob"]
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
     },
     "trigger": "manual"
   },
   "ScriptRunsService.Preview": {
     "ade": null,
-    "allowedTools": ["Read", "Grep", "Glob", "mcp__kira-ade__finish_step"],
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "mcp__kira-ade__finish_step"
+    ],
     "blocker": "",
     "body": "Say hi about {topic}",
     "command": "",
@@ -180,7 +215,11 @@
     ],
     "suffix": "When you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
     "timeout": "15m",
-    "tools": ["Read", "Grep", "Glob"]
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob"
+    ]
   },
   "ScriptRunsService.ReadLog": {
     "chunks": [
@@ -207,7 +246,9 @@
     "hash": "<masked>",
     "listTasks": false,
     "params": {
-      "topic": ["cats"]
+      "topic": [
+        "cats"
+      ]
     },
     "prompt": null,
     "scriptId": "<id:1>",

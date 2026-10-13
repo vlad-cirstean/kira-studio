@@ -1,0 +1,95 @@
+{
+  "ScriptRunsService.Get#interrupted": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "kind": "smart",
+    "model": "sonnet",
+    "outcome": {
+      "reason": "Kira Studio quit while it ran",
+      "reported": false,
+      "source": "restart",
+      "status": "failed"
+    },
+    "params": [],
+    "prompt": "Say hi\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "resumable": true,
+    "resumedFrom": "",
+    "scriptId": "<id:1>",
+    "scriptName": "ask",
+    "sessionId": "<id:3>",
+    "startedAt": 0,
+    "state": "failed",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "mcp__kira-ade__finish_step"
+      ],
+      "mcpServers": [],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
+    },
+    "trigger": "manual"
+  },
+  "ScriptRunsService.Get#resumed": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": 0,
+    "id": "<id:4>",
+    "kind": "smart",
+    "model": "sonnet",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "params": [],
+    "prompt": "Kira Studio closed while you worked, so your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check the current state of that action (files, git, running processes) before you redo or skip it. Then carry on with the task.\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "resumable": false,
+    "resumedFrom": "<id:2>",
+    "scriptId": "<id:1>",
+    "scriptName": "ask",
+    "sessionId": "<id:3>",
+    "startedAt": 0,
+    "state": "done",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "mcp__kira-ade__finish_step"
+      ],
+      "mcpServers": [],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
+    },
+    "trigger": "manual"
+  },
+  "ScriptRunsService.Resume#missing": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"Resume needs values for: token. Run it again instead.\"}"
+}

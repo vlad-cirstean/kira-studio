@@ -16,6 +16,7 @@
       "status": "failed"
     },
     "purpose": "",
+    "resumable": false,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,

@@ -98,6 +98,8 @@
       }
     ],
     "prompt": "Say hi about cats\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "resumable": false,
+    "resumedFrom": "",
     "scriptId": "<id:1>",
     "scriptName": "ask",
     "sessionId": "<id:3>",
@@ -146,6 +148,8 @@
     },
     "params": [],
     "prompt": "Say hi\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "resumable": false,
+    "resumedFrom": "",
     "scriptId": "<id:1>",
     "scriptName": "ask",
     "sessionId": "<id:3>",

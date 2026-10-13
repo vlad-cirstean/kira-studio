@@ -18,6 +18,8 @@
     },
     "params": [],
     "prompt": "",
+    "resumable": false,
+    "resumedFrom": "",
     "scriptId": "<id:2>",
     "scriptName": "tick",
     "sessionId": "<masked>",

@@ -39,6 +39,8 @@
     "outcome": null,
     "params": [],
     "prompt": "",
+    "resumable": false,
+    "resumedFrom": "",
     "scriptId": "<id:1>",
     "scriptName": "tick",
     "sessionId": "",

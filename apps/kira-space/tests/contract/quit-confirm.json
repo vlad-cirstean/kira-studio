@@ -1,0 +1,8 @@
+{
+  "LifecycleService.QuitStatus#asking": {
+    "agents": 1,
+    "asking": true,
+    "runs": 1,
+    "scripts": 0
+  }
+}

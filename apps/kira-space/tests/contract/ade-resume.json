@@ -1,0 +1,82 @@
+{
+  "AdeTaskService.ResumeRun#refused": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"Only a run Kira Space interrupted can resume.\"}",
+  "AdeTaskService.Run#lost": {
+    "attempt": 2,
+    "branchId": "<id:1>",
+    "exitCode": null,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "could not resume: Claude has no saved conversation for this run; use Retry",
+    "outcome": {
+      "lastError": "No conversation found with session ID: <id:3>",
+      "reason": "could not resume: Claude has no saved conversation for this run; use Retry",
+      "reported": false,
+      "result": "failed",
+      "route": "stop",
+      "source": "start",
+      "status": "failed"
+    },
+    "purpose": "",
+    "resumable": false,
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "failed",
+    "stepId": "one",
+    "summary": "",
+    "taskId": "<id:4>"
+  },
+  "AdeTaskService.Run#resumed": {
+    "attempt": 2,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:4>",
+    "loops": 0,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "result": "done",
+      "route": "next",
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "purpose": "",
+    "resumable": false,
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "one",
+    "summary": "summary-done",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#stuck": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": null,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "interrupted: Kira Space closed while it ran",
+    "outcome": {
+      "reason": "interrupted: Kira Space closed while it ran",
+      "reported": false,
+      "source": "restart",
+      "status": "failed"
+    },
+    "purpose": "",
+    "resumable": true,
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "stuck",
+    "stepId": "one",
+    "summary": "",
+    "taskId": "<id:3>"
+  }
+}

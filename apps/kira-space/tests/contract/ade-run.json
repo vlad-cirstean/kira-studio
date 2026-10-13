@@ -18,6 +18,7 @@
       "summary": "summary-done"
     },
     "purpose": "",
+    "resumable": false,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -45,6 +46,7 @@
       "summary": "summary-done"
     },
     "purpose": "",
+    "resumable": false,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,

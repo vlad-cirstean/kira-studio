@@ -166,6 +166,9 @@ func TestQuitHandshake(t *testing.T) {
 		t.Fatal("first ShouldQuit allowed the quit before the flush")
 	}
 	app.Events.Wait(t, appevent.ChannelFlushBeforeClose, nil, wait)
+	if p := quitPrompts(app); p != nil {
+		t.Fatalf("quit prompts with nothing live = %+v, want none", p)
+	}
 	testx.WaitUntil(t, wait, app.W.Quitter.ShouldQuit)
 }
 

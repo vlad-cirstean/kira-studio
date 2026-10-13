@@ -165,6 +165,7 @@
       "summary": "conflict"
     },
     "purpose": "rebase",
+    "resumable": false,
     "sessionId": "<masked>",
     "stageId": "",
     "startedAt": 0,
@@ -218,6 +219,7 @@
       "summary": "conflict"
     },
     "purpose": "rebase",
+    "resumable": false,
     "sessionId": "<masked>",
     "stageId": "",
     "startedAt": 0,
@@ -262,6 +264,7 @@
       "summary": "rebased"
     },
     "purpose": "rebase",
+    "resumable": false,
     "sessionId": "<masked>",
     "stageId": "",
     "startedAt": 0,
