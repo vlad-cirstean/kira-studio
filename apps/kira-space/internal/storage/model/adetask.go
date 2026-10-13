@@ -209,8 +209,8 @@ type AdeRebaseStack struct {
 	Before       string `json:"before"`
 }
 
-// AdeRunLaunch is a held run's launch spec: what the run needs once its worktree gate opens. Non-empty
-// only on a never-launched row; launch clears it.
+// AdeRunLaunch is a run's launch spec. Non-empty on a never-launched row (what the run needs once its
+// worktree gate opens) and on a run a restart stopped (ResumeID only, for Resume); launch clears it.
 type AdeRunLaunch struct {
 	// Note stays on the run while it runs.
 	Note string

@@ -68,7 +68,8 @@ func composePrompt(src llmprompts.Source, in promptInput) string {
 	return llmprompts.AdeStepPrompt.Text(src, stepVars(in))
 }
 
-// composeResumePrompt is the message a resumed run gets: the line, then the finish_step instruction.
+// composeResumePrompt is the message a resumed run gets, after a send-back or a restart: the line, then
+// the finish_step instruction, which follows the current step results.
 func composeResumePrompt(src llmprompts.Source, line string, results []adewire.StepResult) string {
 	return line + "\n\n" + claudeheadless.FinishInstruction(src, resultSpecs(results)) + "\n"
 }

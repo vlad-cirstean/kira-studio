@@ -16,8 +16,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // runs.go is the run engine: StartRun, the step machine's side effects (start, retry, advance),
@@ -28,6 +30,7 @@ const (
 	defaultStepTimeout = 30 * time.Minute
 	noteWaitingSetup   = "waiting for worktree setup"
 	noteSetupFailed    = "worktree setup failed"
+	noteResumed        = "resumed after restart"
 	noteWorktreeGone   = "worktree missing"
 	settingSourcesUser = "user"
 	settingSourcesAll  = "user,project,local"
@@ -694,10 +697,10 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	if l.smart != nil {
-		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr()))
+		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), l.resume != ""))
 		return
 	}
-	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr()))
+	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""))
 }
 
 // sessionClaudeID reads the Claude session id stored with the ade_sessions row.
@@ -709,10 +712,22 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 	return rec.ClaudeSessionID
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, def stepDef, lastErr string) outcome {
+// lostOutcome is the outcome of a resume whose Claude conversation is gone.
+func lostOutcome(resumed bool, lastErr string) (outcome, bool) {
+	if !resumed || !claudeheadless.IsNoConversation(lastErr) {
+		return outcome{}, false
+	}
+	o := runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
+	return fromOutcome(model.AdeRunFailed, o), true
+}
+
+func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, def stepDef, lastErr string, resumed bool) outcome {
 	code := exit.Code
 	f, finished := b.takeFinish(runID)
 	if !finished {
+		if out, ok := lostOutcome(resumed, lastErr); ok {
+			return out
+		}
 		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(lastErr)
 		return fromOutcome(model.AdeRunFailed, o)
 	}
@@ -983,6 +998,57 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 		opts.Launch = run.Launch
 	}
 	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", opts)
+	return err
+}
+
+// runResumable says a restart stopped the run mid-session, so its Claude conversation can continue.
+func runResumable(run model.AdeRun) bool {
+	return run.Purpose != model.AdeRunPurposeRebase && run.State == model.AdeRunStuck && run.Launch.ResumeID != "" && run.StartedAt != nil
+}
+
+// ResumeRun continues the Claude session of a run a restart stopped, as a new attempt.
+func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
+	run, err := b.deps.Tasks.GetRun(runID)
+	if err != nil {
+		return err
+	}
+	mu := b.taskMu(run.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	run, err = b.deps.Tasks.GetRun(runID)
+	if err != nil {
+		return err
+	}
+	if !runResumable(run) {
+		return invalid("%s", i18n.T("backend.space.ade.resumeNotResumable.body", nil))
+	}
+	tc, err := b.loadTaskCtx(run.TaskID)
+	if err != nil {
+		return err
+	}
+	if tc.stage == nil || tc.stage.ID != run.StageID {
+		return invalid("the run's stage is no longer current")
+	}
+	plan, err := b.plan(tc)
+	if err != nil {
+		return err
+	}
+	idx := stepIndex(plan, run.StepID)
+	if idx < 0 {
+		return invalid("the run's step is no longer in the stage")
+	}
+	latest, ok := plan[idx].Runs[run.BranchID]
+	if !ok || latest.ID != run.ID {
+		return invalid("run %s is not the latest attempt", runID)
+	}
+	line := llmprompts.RunResumeLine.Text(b.prompts(), llmprompts.ResumeVars{App: appName})
+	spec := model.AdeRunLaunch{ResumeID: run.Launch.ResumeID, Prompt: line, Note: noteResumed}
+	cleared, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{Launch: &model.AdeRunLaunch{}})
+	if err != nil {
+		return err
+	}
+	b.emitRuns(cleared)
+	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops, Launch: spec})
 	return err
 }
 

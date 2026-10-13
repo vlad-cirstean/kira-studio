@@ -112,11 +112,13 @@ func (s *smartStep) spec(base claudeheadless.Spec, space bool) claudeheadless.Sp
 
 // smartOutcome is a smart step's outcome: a finish_step call wins, then the result event (budget,
 // turn limit, error), then how the process ended. The cost and denials of the result event are added.
-func (b *TaskBoard) smartOutcome(runID string, exit claudeheadless.Exit, runErr error, res *claudeheadless.Result, step *smartStep, results []adewire.StepResult, lastErr string) outcome {
+func (b *TaskBoard) smartOutcome(runID string, exit claudeheadless.Exit, runErr error, res *claudeheadless.Result, step *smartStep, results []adewire.StepResult, lastErr string, resumed bool) outcome {
 	var out outcome
 	if f, finished := b.takeFinish(runID); finished {
 		code := exit.Code
 		out = fromFinish(f, &code, results)
+	} else if lost, ok := lostOutcome(resumed, lastErr); ok {
+		out = lost
 	} else if o, ok := claudeheadless.ResultOutcome(res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
 		out = fromOutcome(model.AdeRunFailed, o.WithLastError(lastErr))
 	} else {

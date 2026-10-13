@@ -1074,6 +1074,9 @@
         "resumeCwdNotDir": {
           "body": "The folder to resume in is a file, not a folder."
         },
+        "resumeNotResumable": {
+          "body": "Only a run Kira Space interrupted can resume."
+        },
         "reviewConversationReset": {
           "body": "The previous review conversation ran in {path}, which no longer exists. Started a new one."
         },

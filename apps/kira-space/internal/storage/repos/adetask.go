@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -940,36 +941,27 @@ func (r *AdeTaskRepo) SetPendingNote(branchID, note string) ([]model.AdeRun, err
 }
 
 // RecoverRunning turns every running run stuck, with out as its outcome and its reason as the note,
-// and returns them (boot recovery).
+// and returns them (boot recovery). A step run with a Claude session keeps that session as its
+// launch spec's ResumeID, so a Resume can continue it; every other launch column is cleared.
 func (r *AdeTaskRepo) RecoverRunning(now int64, out model.AdeRunOutcome) ([]model.AdeRun, error) {
 	outcome, err := encodeOutcome(&out)
 	if err != nil {
 		return nil, err
 	}
-	note := out.Reason
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("repos: begin recover ade runs: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-	rows, err := tx.Query(`SELECT ` + adeRunColumns + ` FROM ade_runs WHERE state = 'running' ORDER BY id`)
+	rows, err := r.DB.Query(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ?, outcome_json = ?,
+		launch_note = '', launch_prompt = '', launch_extra = '',
+		launch_resume_id = CASE WHEN purpose = '' AND session_id <> '' THEN
+			COALESCE((SELECT claude_session_id FROM ade_sessions s WHERE s.id = ade_runs.session_id), '') ELSE '' END
+		WHERE state = 'running' RETURNING `+adeRunColumns,
+		model.AdeRunStuck, out.Reason, now, outcome)
 	runs, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
 		run, err := scanAdeRun(rows)
 		return run, true, err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("repos: select running ade runs: %w", err)
-	}
-	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ?, outcome_json = ? WHERE state = 'running'`,
-		model.AdeRunStuck, note, now, outcome); err != nil {
 		return nil, fmt.Errorf("repos: recover ade runs: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("repos: commit recover ade runs: %w", err)
-	}
-	for i := range runs {
-		runs[i].State, runs[i].Note, runs[i].FinishedAt, runs[i].Outcome = model.AdeRunStuck, note, &now, &out
-	}
+	slices.SortFunc(runs, func(a, b model.AdeRun) int { return strings.Compare(a.ID, b.ID) })
 	return runs, nil
 }
 

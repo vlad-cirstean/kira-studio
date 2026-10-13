@@ -260,6 +260,8 @@ type Run struct {
 	StartedAt  *int64   `json:"startedAt"`
 	FinishedAt *int64   `json:"finishedAt"`
 	Purpose    string   `json:"purpose"` // '' step run | 'rebase'
+	// Resumable says a restart stopped the run mid-session; ResumeRun continues it.
+	Resumable bool `json:"resumable"`
 
 	Outcome *model.AdeRunOutcome `json:"outcome"`
 }

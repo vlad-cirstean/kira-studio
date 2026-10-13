@@ -728,6 +728,13 @@ func (s *AdeTaskService) RetryRun(ctx context.Context, args adewire.RunArgs) err
 	return adeTaskError(s.Engine.RetryRun(ctx, args.RunID))
 }
 
+func (s *AdeTaskService) ResumeRun(ctx context.Context, args adewire.RunArgs) error {
+	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.ResumeRun(ctx, args.RunID))
+}
+
 func (s *AdeTaskService) StageDone(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err

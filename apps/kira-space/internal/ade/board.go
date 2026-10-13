@@ -534,6 +534,7 @@ func toWireRun(r model.AdeRun) adewire.Run {
 		ID: r.ID, TaskID: r.TaskID, StageID: r.StageID, StepID: r.StepID, BranchID: r.BranchID, Attempt: r.Attempt,
 		State: r.State, Loops: r.Loops, Note: r.Note, Summary: r.Summary, SessionID: r.SessionID,
 		ExitCode: r.ExitCode, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, Outcome: r.Outcome, Purpose: r.Purpose,
+		Resumable: runResumable(r),
 	}
 	return run
 }

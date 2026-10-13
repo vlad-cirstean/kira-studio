@@ -16,6 +16,7 @@
       "startedAt": 1790035200000,
       "finishedAt": null,
       "purpose": "",
+      "resumable": false,
       "outcome": null
     }
   ]
