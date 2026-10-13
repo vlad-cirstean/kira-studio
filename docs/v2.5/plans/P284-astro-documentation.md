@@ -449,9 +449,16 @@ Fixed or removed:
 
 Verified, no change: docker, workspace, phone, memory, settings, prompts, mcp-tools (memory, database, agent tools: names, args, limits), schedule semantics, budget rule.
 
-Not code-verified (README-derived): git hazard list, review snapshot, AI comments; databases and database-mcp pages spot-read only.
+Second accuracy pass (this round, `codegraph_explore` calls plus targeted reads):
 
-Out of docs scope, reported: `README.md` still lists UUID/URL cell formats and "(PostgreSQL/MariaDB)" FK; `docs/ARCHITECTURE.md` calls the third branch kind "a placeholder with no branch yet"; Studio Settings footer shows `kira.sqlite`, real file `kira.db` (Known open items).
+- memory-formats: verified against `memfmt` (ids, text rules, header and front matter rules, marker table, scope rule) and `importer` (`memdoc.go`, `writedoc.go`). Changed: write-back is per job, skips doc sources, overwrites only a valid same-group doc, leaves out facts with other provenance.
+- databases: verified engine table against each adapter `caps` (Redis edits string keys, delete any type; ClickHouse insert only; Kafka produce; SQS send and delete; S3 file transfer), `PageKindKeyValue` plus key browser for S3, explain support for five SQL kinds, six mask kinds, pre-connect limit 2000, UI labels in `en.json`. No change.
+- database-mcp: verified loopback `127.0.0.1:8766`, bind failure with no fallback, bearer token (7 day TTL), deny-by-default exposure, defaults read allow, write prompt, DDL deny, strictest mode for unclassified statements, six tools, masking in `render.go`. No change.
+- git: hazard list is illustrative in code (also worktree conflict, staged changes, untracked collisions, non-fast-forward, protected push), so now "Examples". Snapshot claim confirmed (`gitreview/store.go`, compressed blobs, text only). AI comments corrected: added with the gutter `+`, listed grouped by file, delete and clear all, "Copy as prompt". Banner now includes revert.
+- README: cell formats and FK database list fixed. Engine table, six MCP tools, defaults, mask count checked against code.
+- `docs/ARCHITECTURE.md`: third branch kind is `parked` (kept out of merge order, shown as Not merging).
+
+Still unverified: Touch ID wording (README only; `localauth` exists, no UI string found), Keychain behaviour (darwin only), `Settings > Git` and database MCP panel layout beyond label strings. Studio Settings footer shows `kira.sqlite`, real file `kira.db` (Known open items).
 
 ## 13. Risks and decided fallbacks
 
