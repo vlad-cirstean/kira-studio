@@ -1,4 +1,3 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
