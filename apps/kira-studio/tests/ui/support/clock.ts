@@ -1,4 +1,8 @@
 import type { Page } from '@playwright/test';
+import {
+  TOOLTIP_DELAY_MS,
+  TOOLTIP_SKIP_DELAY_MS,
+} from '../../../../../packages/theme/src/components/ui/tooltip/timing';
 
 // P81 §7.1 — a thin wrapper over `page.clock.install()`, kept for the doc comment: the one
 // non-obvious constraint below is written once instead of re-derived at each call site.
@@ -32,4 +36,18 @@ export async function installFakeTimers(page: Page): Promise<void> {
   // `install()` and this call (the debounce this helper exists for hasn't been armed yet), so
   // jumping past a few idle seconds fires nothing early.
   await page.clock.pauseAt(Date.now() + 10_000);
+}
+
+/** Runs out the tooltip provider's skip-delay window, so the next hover waits the full delay. */
+export async function settleTooltipSkipDelay(page: Page): Promise<void> {
+  await page.clock.runFor(TOOLTIP_SKIP_DELAY_MS);
+}
+
+/** Runs the clock up to, but not past, the tooltip open delay. */
+export async function runToJustBeforeTooltipDelay(page: Page): Promise<void> {
+  await page.clock.runFor(TOOLTIP_DELAY_MS - 1);
+}
+
+export async function runPastTooltipDelay(page: Page): Promise<void> {
+  await page.clock.runFor(1);
 }

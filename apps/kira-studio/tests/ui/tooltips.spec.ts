@@ -1,6 +1,12 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import {
+  installFakeTimers,
+  runPastTooltipDelay,
+  runToJustBeforeTooltipDelay,
+  settleTooltipSkipDelay,
+} from './support/clock';
 import { IPC } from './support/ipcChannels';
 import {
   COMPOSITE_PK_PATH,
@@ -168,12 +174,14 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   // A cold hover, not a scan: settle the pointer away from the tree first and outlast
   // TooltipProvider's own skipDelayDuration (300ms), or this hover lands in the rearm window left
   // by the dblclick above and opens immediately instead of waiting the full delayDuration.
+  await installFakeTimers(page);
   await page.mouse.move(4, 4);
-  await page.waitForTimeout(350);
+  await settleTooltipSkipDelay(page);
   const refreshButton = page.locator('[data-testid="toolbar-refresh"]');
   await refreshButton.hover();
-  await page.waitForTimeout(150);
+  await runToJustBeforeTooltipDelay(page);
   await expect(tooltipContent(page)).toHaveCount(0);
+  await runPastTooltipDelay(page);
   await expect(tooltipContent(page)).toBeVisible({ timeout: 3_000 });
   // reka's own TooltipContent renders a visually-hidden a11y mirror span alongside the visible
   // text, so a bare .textContent read (toHaveText) sees "RefreshRefresh" — toContainText reads
@@ -181,8 +189,8 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await expect(tooltipContent(page)).toContainText('Refresh');
 
   await page.mouse.move(4, 4);
-  await page.waitForTimeout(100);
   await expect(tooltipContent(page)).toHaveCount(0);
+  await page.clock.resume();
 
   // --- scenario 3: over an overlay — a popover's own backdrop must not swallow the hit test ---
   // (F3(a)). ColumnsMenu's PK checkbox carries a hint only when it's the locked one. Checkbox is
@@ -286,13 +294,15 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   // A hover elsewhere closes it — AttributeTooltip's own `leave()`, same rearm-window behaviour as
   // every other tooltip in this app (TooltipProvider's own skipDelayDuration).
   await page.mouse.move(4, 4);
-  await page.waitForTimeout(100);
   await expect(tooltipContent(page)).toHaveCount(0);
 
   // A plain-string tooltip elsewhere is unaffected — still one text node, no parts.
-  await page.mouse.move(4, 4);
-  await page.waitForTimeout(350);
-  await assertTooltipShows(page, refreshButton, 'Refresh');
+  await page.clock.pauseAt(Date.now() + 10_000);
+  await settleTooltipSkipDelay(page);
+  await refreshButton.hover();
+  await runToJustBeforeTooltipDelay(page);
+  await runPastTooltipDelay(page);
+  await expect(tooltipContent(page)).toContainText('Refresh');
   await expect(tooltipContent(page).locator('[data-testid="tooltip-title"]')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
