@@ -4246,7 +4246,8 @@ and `docs/v2.0/plans/`.
   (same Claude session), `loops` is the round epoch. The fix run's resume spec sits on its run row until launch, so a run held behind a setup resumes the same Claude session after restart. No report (crash, timeout) takes the step's `failed` result, else stops. `walkPath` follows the routes; `nextAction` and `chainRerun` use that path. The run outcome stores `result` and `route`. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
   with note `interrupted by restart`, running setups fail, task sessions stop, stale `*.mcp.json` files
-  are removed. Pending runs keep their launch spec and launch when their gate opens. Nothing auto-resumes.
+  are removed. Pending runs keep their launch spec and launch when their gate opens. Nothing auto-resumes;
+  a restart-stuck agent run offers Resume (next section).
 - Agent tools (P199, `ade/agenttools.go` implements `claudeheadless.SpaceTools` on `*ade.TaskBoard`): the
   loopback MCP server issues scoped grants (run, task, Space), one bearer token per launch. A
   workflow with `kira_space_mcp` gives headless runs and the task's TUI sessions the Space grant:
@@ -4259,6 +4260,36 @@ and `docs/v2.0/plans/`.
 - Git refresh (P191): the UI sends the explicit repo ids it shows; `refreshRepo` runs env scripts
   beside the fetch, not before it; `AdeReviewSync` shows a per-repo fetch error row. A repo with no
   remote gets a local rescan (P230), not an error row.
+
+### Resume after restart and quit confirmation (P279)
+
+- Probe (CLI 2.1.296, haiku): `claude --resume <id>` after a SIGKILL mid-turn works. The transcript ends on
+  an unanswered `tool_use`; the CLI appends a synthetic error `tool_result` ("outcome is unknown, check
+  whether it took effect") and carries on in the same session id. The turn in flight is lost; its tool
+  effects may be half-applied. An unknown id exits 1 with `No conversation found with session ID: <id>`.
+  `--resume` with `--session-id` is an error, so a resumed launch drops `--session-id`.
+- Spec: `AdeTaskRepo.RecoverRunning` writes `launch_resume_id` from `ade_sessions.claude_session_id` in the
+  same `UPDATE` that marks the run `stuck`, only for agent and smart-step runs (`purpose = ''` with a
+  session). Rebase and script-stage runs, user stops and `needs_input` runs get none. `adewire.Run.resumable`
+  is `stuck` plus that id.
+- `TaskBoard.ResumeRun` clears the old spec first (a second click refuses), then queues attempt+1 with
+  `Launch{ResumeID, Prompt: RunResumeLine, Note: "resumed after restart"}`; `startRun` reuses the Claude id
+  and `composeResumePrompt` appends the finish instruction. `RunResumeLine` (`run.resume.line`) is one shared
+  prompt for ADE and smart scripts.
+- Lost conversation: `claudeheadless.IsNoConversation` on the last stderr line turns the outcome into
+  `runoutcome.EndResumeLost` (failed, source `start`, no automatic fresh run). Retry or Run again starts anew.
+- Smart scripts (both apps): `script_runs.resume_id` and `resumed_from` (Studio 0038, Space 0035).
+  `Repo.FailRunning` and `finish` set `resume_id = session_id` for a smart run ended with source `restart`
+  (crash and graceful quit). `Service.Resume` re-plans from the current script, `TakeResume` compare-and-swaps
+  the id, and the new run row carries `resumedFrom` and the same session id. A secret param or a param added
+  since refuses (`resumeMissing`): secret values are never stored.
+- Quit gate: `shell.Quitter.SetGate(QuitGate)`. With live work `ShouldQuit` returns false and asks once;
+  `ConfirmQuit` runs the normal flush and teardown, `CancelQuit` withdraws. `prompts.QuitGate` (shared)
+  raises prompt kind `quit` through the router (reopens a window when none is open). Live is running smart
+  and headless script runs plus agent PTYs, plus running ADE runs in Space; plain shell tabs do not count.
+  `LifecycleService` gains `ConfirmQuit`, `CancelQuit`, `QuitStatus`; `QuitPrompt.vue` renders
+  `ConfirmDialogView` titled "Quit {app}?". Closing the last window and `OnShutdown` never ask.
+- Not solved: no detached runner and no PTY survival; see Known open items.
 
 ### Task base and rebase runs (P241)
 
@@ -5596,6 +5627,7 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **No detached runner (P279).** Quit or crash stops every agent and PTY. Resume restores the Claude conversation; the turn in flight is lost and its tool effects may be half-applied. The `kira-db` MCP stops with Studio. Resume needs the saved transcript under `~/.claude`; without it the run fails with "could not resume".
 
 - **Studio Settings footer shows `~/.kira-studio/kira.sqlite`; the real file is `kira.db`.** Label in `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue`. The docs say `kira.db`.
 - **Quit discards staged grid edits and dirty edit buffers (P267).** Tab close and dialogs guard unsaved edits; app quit does not. Accepted by the user (P266 decision).

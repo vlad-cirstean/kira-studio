@@ -417,4 +417,39 @@ apps share `internal/` and `packages/`. Commits (Conventional Commits, typecheck
 
 ## 14. Result
 
-(Filled at close-out.)
+Done. Commits: implementer 1-10, then serial test-and-fix and close-out on top.
+
+Suites (sandbox, load 9 to 22 from a parallel docs build):
+- `bun run lint`, `lint:go`, `lint:claude`, `typecheck`: clean. `test:unit`: 1910 pass.
+- `go test -p 2 ./...`: all packages ok (flows both apps, coverage gates) except two load flakes that pass
+  alone: `internal/appupdate` `TestInstaller_Cancel_KillsWholeGroup`, `internal/terminal`
+  `TestSessionCloseKillsProcessGroup`, `TestSessionCloseLeavesUnhungJobs`. P279 flows pass:
+  `TestResumeAfterRestart`, `TestResumeLostConversation`, `TestResumeRefused`, both `TestSmartScriptResume`,
+  `TestQuitConfirm`, `TestQuitWithoutLiveWorkAsksNothing`, Studio quit test.
+- `test:ui:space` 587 pass after fix; `test:ui:studio` 546 pass (cell-editor autodetect flake passed alone);
+  `test:visual:space` 13, `test:visual:studio` 13, no baseline changed.
+- `ui-timing` `budgets.spec` (cell to editor p95) and `perf.spec` (scroll p95) fail under load, as on plain
+  `v2.0`; no grid file touched. Budgets not loosened.
+
+Failures found and fixed:
+- `ade-v2-resume.spec.ts`: Needs tab hides cards (open the Plan tab first); a refused Resume error renders in
+  the step block (`ade-stage-block-error`), not the task panel.
+- `EndResumeLost` reason said "use Retry"; smart runs have "Run again". Now "start it again" (contract updated).
+- Real rows: workflow YAML `prompt:` held an unquoted `: ` (parse error line 14), now quoted. Transcript
+  delete used the ADE session row id; needs Claude's id (`Sessions` `claudeSessionId`). The resumed run log
+  does not contain "interrupted" (the CLI's synthetic `tool_result` stays in the transcript), so the row
+  checks the shared Claude session id. Haiku inspected state with `ps`, was denied and stopped as blocked;
+  the row prompts now say the call is safe to rerun and to inspect nothing first.
+
+Real `claude` (CLI 2.1.296, haiku): `TestAdeResumeRun`, `TestAdeResumeLost`, `TestSmartScriptResume` pass
+(smart 4 of 4 after the prompt fix, ADE 3 of 3); `TestAdeHeadlessRun`, `TestAdeStepResults`,
+`TestAdeStageSession`, `TestAdeRebaseRun`, `TestSmartScriptRun` pass in both apps. Spend about 0.09 USD in
+total across all runs. `TestAdeResumeLost` costs nothing.
+
+Verified assumptions: workflow YAML `allowed_tools: ["Bash(sh:*)"]` works; run log contains `Bash` after the
+tool call; the resumed run keeps the Claude session id. Wrong assumption: the resumed log does not hold the
+word "interrupted".
+
+Deviations: shared `prompts.QuitGate` (`internal/prompts/quitgate.go`) instead of a per-app `appwire.quitGate`;
+`internal/scriptruns/resume.go` split from `service.go`; dialog title "Quit {app}?".
+Not run: a real window quit on macOS; the smart-script lost-conversation path against the real CLI.
