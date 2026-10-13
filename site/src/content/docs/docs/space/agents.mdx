@@ -26,7 +26,7 @@ A task owns branches across repositories. A branch is one of:
 
 - `mine`: created here, with a name.
 - `review`: another author's branch.
-- A placeholder with no branch yet.
+- `parked`: kept out of the merge order. The plan shows it as Not merging.
 
 Task status derives from the workflow and its runs. You never type it.
 
@@ -48,9 +48,9 @@ A workflow holds stages. A stage has a kind:
 
 - `user`: you do the work.
 - `agent`: Claude Code runs each step headless.
-- `script`: a shell command runs each step.
+- `script`: one shell command, no steps.
 
-A step runs once, for each repository, or for one named repository.
+An agent step or a script stage runs `once`, for `each repo`, or `only <repo>`.
 
 ### Results and routes
 
@@ -59,11 +59,11 @@ An agent step can declare 1 to 12 results. Each result has an `id`, an `ok` flag
 - `next`: the next step.
 - A step id: that step. A later step skips the steps between. An earlier step makes a loop.
 - `end`: the end of the stage.
-- `stop`: stop the task.
+- `stop`: stop the task. Only a result that is not ok can use it.
 
 A loop edge has a `max` from 1 to 10. The default is 3.
 
-A run that ends with no report takes the step's `failed` result. A step without one stops.
+A run that ends with no report takes the step's `failed` result. A step without declared results stops on failure, or follows its `on_failure` rule: `stop`, `retry 1`, `retry 2` or `back:<step id>`.
 
 ### Graph editor
 
@@ -73,7 +73,7 @@ A task follows the live file until its first run, session or stage move. After t
 
 ## Runs
 
-A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `ended without finish_step`.
+A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `no report: Claude ended without calling finish_step`.
 
 A step starts automatically or waits for your approval.
 

@@ -27,7 +27,7 @@ A smart script runs a prompt in headless Claude Code instead of a shell command.
 
 A smart script sets:
 
-- Parameters of type text, select, multi-select or secret. Use a token in the prompt. A secret reaches the run as a variable only, never in the prompt.
+- Parameters: text, select or multi-select, each optionally secret. Use a token in the prompt. A secret reaches the run as a variable only, never in the prompt.
 - A model, a budget in dollars and a timeout. The budget must be above 0.
 - A list of tools and MCP servers the script may use. Bash commands take patterns such as `git status:*`.
 
