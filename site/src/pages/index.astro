@@ -1,14 +1,24 @@
 ---
-import '../styles/global.css';
+import AppSection from '../components/AppSection.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import Install from '../components/Install.astro';
+import { APPS, SITE } from '../data/content';
+import Base from '../layouts/Base.astro';
+import { resolveAllShots } from '../lib/shots';
+
+const shots = await resolveAllShots();
+const hero = shots.find((s) => s.id === 'studio-data-grid');
+if (!hero) throw new Error('Missing hero shot studio-data-grid');
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Kira Studio</title>
-  </head>
-  <body class="bg-bg text-fg">
-    <h1 class="p-4 text-2xl">Kira Studio</h1>
-  </body>
-</html>
+<Base title={SITE.title} description={SITE.description} image={hero.framedPng}>
+  <Header />
+  <main>
+    <Hero shot={hero} />
+    {APPS.map((app) => <AppSection app={app} shots={shots.filter((s) => s.app === app.id)} />)}
+    <Install />
+  </main>
+  <Footer />
+</Base>

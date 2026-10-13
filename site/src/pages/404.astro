@@ -1,0 +1,14 @@
+---
+import Base from '../layouts/Base.astro';
+
+const home = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
+---
+
+<Base title="Not found" description="Page not found.">
+  <main class="mx-auto max-w-5xl px-4 py-20">
+    <h1 class="text-3xl font-semibold">Page not found.</h1>
+    <p class="mt-4">
+      <a href={home} class="text-accent underline underline-offset-4">Back to Kira Studio</a>
+    </p>
+  </main>
+</Base>

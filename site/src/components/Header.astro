@@ -1,0 +1,32 @@
+---
+import { Image } from 'astro:assets';
+import appIcon from '../../../apps/kira-studio/build/appicon.png';
+import { NAV } from '../data/nav';
+
+const home = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
+---
+
+<header class="sticky top-0 z-10 border-b border-border bg-chrome/95 backdrop-blur">
+  <nav
+    class="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2"
+    aria-label="Main"
+  >
+    <a href={home} class="flex min-h-11 items-center gap-2 font-semibold text-fg">
+      <Image src={appIcon} alt="" width={56} height={56} format="png" class="size-7" />
+      <span>Kira Studio</span>
+    </a>
+    <ul class="flex items-center">
+      {NAV.map((link) => (
+        <li>
+          <a
+            href={link.href}
+            rel={link.external ? 'noopener' : undefined}
+            class="flex min-h-11 items-center px-2 text-muted hover:text-fg sm:px-3"
+          >
+            {link.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</header>

@@ -1,0 +1,34 @@
+---
+import type { ResolvedShot } from '../lib/shots';
+
+interface Props {
+  shot: ResolvedShot;
+  eager?: boolean;
+}
+
+const { shot, eager = false } = Astro.props;
+---
+
+<figure class="m-0">
+  <a
+    href={shot.framedPng}
+    class="block overflow-hidden rounded-lg border border-border bg-chrome"
+    aria-label={`Open full size: ${shot.title}`}
+  >
+    <picture>
+      <source media="(min-width: 768px)" srcset={shot.framedWebp} type="image/webp">
+      <source media="(min-width: 768px)" srcset={shot.framedPng} type="image/png">
+      <source srcset={shot.detailWebp} type="image/webp">
+      <img
+        src={shot.detailPng}
+        alt={shot.alt}
+        width={shot.detailWidth}
+        height={shot.detailHeight}
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        class="aspect-[4/3] h-auto w-full md:aspect-[8/5]"
+      >
+    </picture>
+  </a>
+  <figcaption class="mt-2 text-base text-muted">{shot.caption}</figcaption>
+</figure>
