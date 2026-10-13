@@ -19,6 +19,23 @@ export const memoryGroupKindSchema = /*#__PURE__*/ z.enum([
 ]);
 export type MemoryGroupKind = z.infer<typeof memoryGroupKindSchema>;
 
+// Why a search result ranks where it does: keyword and semantic scores in [0, 1], their fusion
+// (relevance), the provenance multipliers, and the total they give.
+export const memoryScoreSchema = /*#__PURE__*/ z.object({
+  total: z.number(),
+  relevance: z.number(),
+  keyword: z.number(),
+  semantic: z.number(),
+  grade: z.number(),
+  scope: z.number(),
+  recency: z.number(),
+  history: z.number(),
+  group: z.number(),
+  // Scope case against the boosted project; absent without one.
+  boost: /*#__PURE__*/ z.enum(['project', 'company', 'personal', 'other-project']).optional(),
+});
+export type MemoryScore = z.infer<typeof memoryScoreSchema>;
+
 export const memorySchema = /*#__PURE__*/ z.object({
   // Version id "<fact id>.<version>".
   id: z.string(),
@@ -47,6 +64,10 @@ export const memorySchema = /*#__PURE__*/ z.object({
   versions: z.number().int(),
   // How a search found this memory; absent outside search.
   match: /*#__PURE__*/ z.enum(['keyword', 'semantic', 'both']).optional(),
+  // Rank explanation; absent outside search.
+  score: memoryScoreSchema.optional(),
+  // Other current facts sharing a group with this one; absent when none.
+  contextCount: z.number().int().optional(),
 });
 export type Memory = z.infer<typeof memorySchema>;
 

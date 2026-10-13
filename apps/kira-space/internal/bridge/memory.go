@@ -195,8 +195,12 @@ func memoryErr(err error) error {
 
 // MemorySearchArgs is Search's argument shape.
 type MemorySearchArgs struct {
-	Query          string `json:"query"`
-	IncludeHistory bool   `json:"includeHistory"`
+	Query          string   `json:"query"`
+	IncludeHistory bool     `json:"includeHistory"`
+	Scopes         []string `json:"scopes"`
+	Origins        []string `json:"origins"`
+	// Project is the key whose facts rank first; empty boosts none.
+	Project string `json:"project"`
 }
 
 // MemoryIDArgs names one memory by any version's id.
@@ -232,7 +236,8 @@ func (s *MemoryService) Search(ctx context.Context, args MemorySearchArgs) ([]me
 		ms, err := svc.Recent(ctx, memoryUIListLimit)
 		return ms, memoryErr(err)
 	}
-	ms, err := svc.Search(ctx, memory.SearchArgs{Query: args.Query, IncludeHistory: args.IncludeHistory, Limit: memoryUIListLimit})
+	ms, err := svc.Search(ctx, memory.SearchArgs{Query: args.Query, IncludeHistory: args.IncludeHistory, Limit: memory.MaxSearchLimit,
+		Scopes: args.Scopes, Origins: args.Origins, Project: args.Project})
 	return ms, memoryErr(err)
 }
 

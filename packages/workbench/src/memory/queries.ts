@@ -3,22 +3,28 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { tryOnScopeDispose } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { type MaybeRefOrGetter, toValue } from 'vue';
-import { useMemoryModule } from './module';
+import { type MemorySearchFilters, useMemoryModule } from './module';
 
 // P201: server state for the Memory module. Keys are flat [domain, ...ids] tuples.
 const MEMORY_KEY = ['memory'] as const;
+const NO_FILTERS: MemorySearchFilters = { scopes: [], origins: [], project: '' };
 
 export function useMemorySearch(
   query: MaybeRefOrGetter<string>,
   includeHistory: MaybeRefOrGetter<boolean>,
+  filters: MaybeRefOrGetter<MemorySearchFilters> = NO_FILTERS,
 ) {
   const { control } = useMemoryModule();
   return useQuery(() => {
     const q = toValue(query).trim();
     const history = toValue(includeHistory);
+    const { scopes, origins, project } = toValue(filters);
     return {
-      queryKey: [...MEMORY_KEY, 'search', q, history] as const,
-      queryFn: () => (q === '' ? control.memoryRecent() : control.memorySearch(q, history)),
+      queryKey: [...MEMORY_KEY, 'search', q, history, scopes, origins, project] as const,
+      queryFn: () =>
+        q === ''
+          ? control.memoryRecent()
+          : control.memorySearch(q, history, { scopes, origins, project }),
       placeholderData: keepPreviousData,
       staleTime: 0,
     };

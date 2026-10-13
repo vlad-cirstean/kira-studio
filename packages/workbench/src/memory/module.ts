@@ -7,6 +7,7 @@ import type {
   MemoryInstallResult,
   MemoryItem,
   MemoryMcpStatus,
+  MemoryOrigin,
   MemoryScope,
   MemorySemanticStatus,
   MemoryStoreResult,
@@ -23,8 +24,19 @@ import { type InjectionKey, inject } from 'vue';
 // P201: the Memory module's injected context, the shared automations module's shape — the same
 // components mount in any app that provides a control.
 
+/** Search narrowing: empty `scopes`/`origins` mean all; `project` ranks its facts first, "" boosts none. */
+export interface MemorySearchFilters {
+  scopes: MemoryScope[];
+  origins: MemoryOrigin[];
+  project: string;
+}
+
 export interface MemoryControl {
-  memorySearch(query: string, includeHistory: boolean): Promise<Memory[]>;
+  memorySearch(
+    query: string,
+    includeHistory: boolean,
+    filters: MemorySearchFilters,
+  ): Promise<Memory[]>;
   memoryRecent(): Promise<Memory[]>;
   memoryHistory(id: string): Promise<MemoryHistory>;
   /** A fact with the facts stored alongside it, per group. `id` is a fact id or a version id. */

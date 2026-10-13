@@ -34,8 +34,10 @@ const IMPORT_ACTIONS = {
 } as const;
 
 export const memoryControl: MemoryControl = {
-  memorySearch: async (query, includeHistory) =>
-    memoriesSchema.parse(await unwrap(MemoryService.Search({ query, includeHistory }))),
+  memorySearch: async (query, includeHistory, { scopes, origins, project }) =>
+    memoriesSchema.parse(
+      await unwrap(MemoryService.Search({ query, includeHistory, scopes, origins, project })),
+    ),
   memoryRecent: async () => memoriesSchema.parse(await unwrap(MemoryService.Recent())),
   memoryHistory: async (id) =>
     memoryHistorySchema.parse(await unwrap(MemoryService.History({ id }))),
