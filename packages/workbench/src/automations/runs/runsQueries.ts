@@ -105,6 +105,21 @@ export function useStopScriptRun() {
   );
 }
 
+/** Resumes an interrupted smart run and opens the new run's tab. */
+export function useResumeScriptRun() {
+  const { runs, openRunTab } = useAutomationsModule();
+  return useMutation(
+    {
+      mutationKey: ['scriptRuns', 'resume'],
+      mutationFn: async (run: ScriptRun) => ({ run, started: await runs.resume(run.id) }),
+      onSuccess: ({ run, started }) => {
+        if (started.runId) openRunTab(started.runId, run.scriptName);
+      },
+    },
+    queryClient,
+  );
+}
+
 export function useResolveDir() {
   const { runs } = useAutomationsModule();
   return (scriptId: string): Promise<ScriptDir> => runs.resolveDir(scriptId);

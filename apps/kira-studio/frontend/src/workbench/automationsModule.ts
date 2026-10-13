@@ -45,6 +45,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
       onChanged: (cb) => control.onScriptRunsChanged(cb),
       preview: (args) => control.scriptRunsPreview(args),
       start: (args, hash) => control.scriptRunsStart(args, hash),
+      resume: (id) => control.scriptRunsResume(id),
       readLog: (id, afterSeq) => control.scriptRunsReadLog(id, afterSeq),
       onLog: (cb) => control.onScriptRunLog(cb),
       nextFires: (cron, timezone, count) => control.scriptRunsNextFires(cron, timezone, count),

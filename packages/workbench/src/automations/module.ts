@@ -49,6 +49,8 @@ export interface ScriptRunsSeam {
   preview(args: ScriptRunArgs): Promise<ScriptRunPreview>;
   /** `hash` is the preview's; a script edited since answers E_CONFLICT. */
   start(args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted>;
+  /** Continues the Claude session of a smart run a restart ended, as a new run. */
+  resume(id: string): Promise<ScriptRunStarted>;
   readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
   onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
   /** Next fire instants (unix ms) of a cron in a timezone; rejects with the Go validation text. */

@@ -117,6 +117,8 @@ const spaceControl = {
     unwrap(ScriptRunsService.Start({ ...args, listTasks: args.listTasks ?? false, hash })).then(
       (r) => trust<ScriptRunStarted>(r),
     ),
+  scriptRunsResume: (id: string): Promise<ScriptRunStarted> =>
+    unwrap(ScriptRunsService.Resume({ id })).then((r) => trust<ScriptRunStarted>(r)),
   scriptRunsReadLog: (id: string, afterSeq: number): Promise<ScriptRunLogPage> =>
     unwrap(ScriptRunsService.ReadLog({ id, afterSeq })).then((r) => {
       const page = trust<Partial<ScriptRunLogPage>>(r);

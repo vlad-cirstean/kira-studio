@@ -85,6 +85,14 @@ async function rerun(): Promise<void> {
         <span v-if="isSmart" class="font-data text-kira-sm text-muted-foreground">{{
           run.model
         }}</span>
+        <span
+          v-if="run.resumedFrom"
+          class="text-kira-sm text-muted-foreground"
+          data-testid="script-run-resumed-from"
+          >{{
+            t('automations.run.resumedFrom.label')
+          }}</span
+        >
         <Button
           v-if="run.state === 'waiting'"
           variant="dialog-primary"

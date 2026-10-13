@@ -52,6 +52,9 @@ export const scriptRunSchema = /*#__PURE__*/ z.object({
   taskTitle: z.string(),
   branchId: z.string(),
   branchLabel: z.string(),
+  // The interrupted run this one continues, and whether a restart ended this one mid-session.
+  resumedFrom: z.string(),
+  resumable: z.boolean(),
 });
 export type ScriptRun = z.infer<typeof scriptRunSchema>;
 

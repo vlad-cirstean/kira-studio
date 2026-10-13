@@ -249,6 +249,12 @@
       "reportCopied": {
         "announce": "Copied report"
       },
+      "resume": {
+        "tooltip": "Continue this run where the restart cut it off"
+      },
+      "resumedFrom": {
+        "label": "Resumes an interrupted run"
+      },
       "review": {
         "label": "Review and run"
       },
