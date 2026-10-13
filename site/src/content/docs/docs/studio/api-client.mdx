@@ -1,0 +1,63 @@
+---
+title: API client
+description: Build and send HTTP and gRPC requests, with collections and environments.
+sources:
+  - README.md
+  - packages/api-core/src
+  - apps/kira-studio/frontend/src/views/httprequest
+  - apps/kira-studio/frontend/src/views/grpcrequest
+  - apps/kira-studio/frontend/src/state/settingsDomain.ts
+  - packages/theme/src/i18n/en.json
+sidebar:
+  order: 4
+---
+
+import DocShot from '../../../../components/DocShot.astro';
+
+<DocShot id="studio-api" />
+
+Switch to Api mode with the mode button.
+
+## HTTP requests
+
+The request builder takes a method, URL, params, headers and body. Body kinds: raw, JSON, XML, HTML, JavaScript, form-urlencoded, multipart and binary file. A raw request editor sits alongside.
+
+## gRPC
+
+Unary and streaming calls. They share collections, environments and variables with HTTP.
+
+## Collections
+
+A collection is a tree of requests and folders. Import and export use the Postman format. Move a request or folder to another collection.
+
+**Export collection…** does not write secret values to the file.
+
+## Environments and variables
+
+- Variables belong to a collection or an environment.
+- Environments carry a colour.
+- Dynamic values come from Faker.
+- Secret values stay masked in history and logs.
+
+## curl
+
+**Import from curl…** builds a request from a pasted command. **Copy as curl** copies any request out. Secret values stay hidden until you choose **Show secret values**.
+
+## History and timeline
+
+The app keeps the last 30 responses per request. The timeline shows DNS, connect, TLS, first byte and download timings.
+
+## Incognito tabs
+
+Toggle incognito per tab. Nothing from that tab is saved: no history, no log, no variable writes.
+
+## Defaults
+
+`Settings > Api` holds the request defaults:
+
+- HTTP version: 2.
+- Request timeout: none.
+- Maximum response size: 5 MB.
+- SSL verification: on.
+- Redirects: followed, up to 10.
+- Cookie jar: disabled.
