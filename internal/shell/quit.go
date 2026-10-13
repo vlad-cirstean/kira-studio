@@ -137,9 +137,9 @@ func (q *Quitter) ShouldQuit() bool {
 	}
 	if g := q.gateOf(); g != nil && !q.started.Load() {
 		if n := g.Live(); n > 0 {
-			if q.asking.CompareAndSwap(false, true) {
-				go g.Ask(n)
-			}
+			// Re-ask when already asking: the user may have closed the popup window; Ask is idempotent.
+			q.asking.Store(true)
+			go g.Ask(n)
 			return false
 		}
 		if q.asking.Swap(false) {
