@@ -4781,11 +4781,11 @@ replies and full terminal attach for Claude Code sessions.
   MCP tool error; the gate can over-challenge; model latency is 5 to 20 s per store.
 
 - Bulk import (P211), `internal/memory/importer`, bound as `MemoryImportService` (own file, shares the
-  engine `MemoryService` opens lazily; `CloseMemory` closes it first). Flow: pick files or one folder
+  engine `MemoryService` opens lazily as a control; the scheduler runs in a detached runner, see P274 below). Flow: pick files or one folder
   (native picker, `shell.OpenMultipleFiles`), scan in the background, confirm the estimate (files,
   chunks, calls, time), Start, watch progress. `kira:memory:import` (empty payload, 250 ms coalesced)
   tells the UI to refetch jobs.
-- Scan: `.md .markdown .mdx .txt .text .rst .adoc`; at most 2000 files and 256 KiB each; skipped with a
+- Scan: `.md .markdown .mdx .txt .text .rst .adoc .json .jsonl .ndjson`; at most 2000 files and 1 MiB each (P274); skipped with a
   reason when binary, not UTF-8, empty or too large. Per-directory `.gitignore` honoured; dot
   directories and build directories skipped; symlinks never followed. Files whose content hash an
   earlier import already finished are skipped as unchanged.
@@ -4806,7 +4806,8 @@ replies and full terminal attach for Claude Code sessions.
 - State: `import_jobs`, `import_files`, `import_chunks` in `memory.db`. Job: scanning, awaiting,
   running, paused, done, cancelled, failed. File: pending, skipped, extracting, extracted, finalizing,
   done, failed, cancelled. Extracted facts persist per chunk, so a file resumes at the step it stopped.
-  Recovery: a job found `running` at open becomes `paused` ("Interrupted"); nothing resumes without a click.
+  Recovery: a runner taking the lock pauses `running` jobs ("Interrupted"); nothing resumes without a click.
+  P274 adds file state `verifying` and file kinds `json`, `jsonl`, `memdoc`.
 - Retries (`backoff/v4`): 3 per call; rate-limit errors share one cooldown across workers; usage-limit
   and auth errors pause the job; a budget error fails only that item. Added, updated and noop counts
   come from `memory_events` grouped by `source_ref`, never from the agent, so a re-run finalize
@@ -4816,6 +4817,55 @@ replies and full terminal attach for Claude Code sessions.
   the three-tool allowlist, forced attribution, the gate on every fact and the absence of shell, file
   or network tools. A hostile document can still make the agent store a false fact; the user sees every
   import in history with its source path.
+- Ingest by path (P274). MCP tools `ingest_files` (paths, origin, source tag, scope, project, groups,
+  `writeDoc`, session) and `ingest_status` (job id) on `kira-memory`. Content never crosses MCP: the tool
+  creates a job and returns its id, the runner reads the files. Origin is user, agent or external; UI jobs speak as
+  user or external. Facts carry the requesting session for MCP jobs, plus the file's `document` group
+  and the job's `task`/`thread` groups (job groups cap at 4). Scope `project` without `project` uses
+  `DetectProject` of the first path, then the server's project.
+- Runner: the scheduler is one detached `kira-space memory-ingest` process per `memory.db`
+  (`RunArgvShim` case, `memorycli.RunIngest`; `Setsid`, stderr appended to
+  `<memory home>/import-runner.log`, restarted over 1 MiB). Exclusive `flock` on
+  `<memory home>/import-runner.lock` (`internal/filelock`, shared with `config.AcquireLock`); a loser
+  exits 0. `Engine` is control only: DB writes plus `ensureRunner`. Control and runner talk through the
+  DB: runner ticks every 500 ms, arms `running` jobs and cancels in-flight calls of jobs that left
+  `running`. Idle exit after 30 s with no `scanning` or `running` job, or when the home is gone. A new
+  runner pauses `running` jobs as interrupted; `scanning` jobs rescan. App quit no longer pauses imports.
+  The app watcher polls `data_version` every 500 ms and emits `kira:memory:import` on every foreign
+  change, `kira:memory:changed` only when the revision moved.
+- JSON chunking: `ChunkJSON` walks `encoding/json` tokens and keeps raw elements (key order and number
+  spelling survive). Units are top-level array elements or object members; an over-size array/object
+  element recurses, an over-size string splits as text. `HeadingPath` is the JSON path (`$[12]`).
+  `.jsonl`/`.ndjson`: one unit per line. Invalid JSON or a bad line fails the file with byte or line.
+- Cross-check: a fact is questionable when extract marked it `unresolved` or its evidence is not in the
+  chunk (whitespace collapsed, case folded). Such files go `extracted` to `verifying`. One call per up to
+  40 facts, run with the source copied into an empty temp dir and `--restricted --tools Read,Grep
+  --allowedTools Read,Grep --max-turns N --permission-prompts none`. `--restricted` is required: with
+  `--safe-mode` and `--tools Read,Grep` alone a Read of an absolute path outside the cwd succeeds (probed
+  P274). No `--safe-mode` for this call. Verdicts: `confirmed` and `rewritten` clear `unresolved`,
+  `unsupported` drops the fact with a reason, `ambiguous` stays unresolved. Timeout 120 s + 10 s per
+  fact (max 10 min), budget 0.30 + 0.03 USD per fact (max 2.00), turns 3 + facts/4 (max 20).
+- External no-challenge: import mode sets `StoreRequest.NoChallenge` (Go-only) for origin `external`.
+  `decide` stores accepted items and returns challenged ones with status `stored`; the gate input carries
+  `challenge: false`; finalize lists what the store still challenged under `dropped`, never `unresolved`.
+  Live `store_memory` keeps challenges for every origin.
+- Formatted docs: a `.md`/`.txt` whose first two lines are `---` and `kira-memory: 1` is kind `memdoc`.
+  It parses with `memfmt.ParseDoc` (first 5 problems fail the file), no chunk, no claude call.
+  Provenance and group come from the doc header. `Service.ApplyDoc` per fact id: no lineage adds with the
+  doc's id, equal text noops, an edit updates when the doc grade is at least the stored grade, else
+  skipped. Facts the doc no longer lists stay stored and count as orphaned. `GroupRef.ID` joins or
+  creates the group by the doc's `kg_` id.
+- Write-back: opt-in per job (`writeDoc`, confirm-dialog checkbox). Writes `<dir>/<stem>.memory.md`
+  beside the source with `renameio`, never over the source. An existing target is overwritten only when
+  it is a kira-memory doc with the same group; otherwise the file stays `done` with `doc_error`. Holds
+  only facts with the job's provenance. Skipped for `memdoc` input.
+- Limits: MCP job over 300 chunks stops at `awaiting` for confirmation in the UI; at most 5 active MCP
+  jobs; same roots and provenance as an active job returns that job's id; relative or missing path
+  refused. `doneHash` skip matches content hash and provenance (origin, tag, scope, project).
+- Migration 5 (`0005_p274_ingest.sql`): job columns `channel`, `origin`, `source_tag`, `scope`,
+  `project`, `session_id`, `groups_json`, `auto_start`, `write_doc`; file columns `verify_json`,
+  `verified`, `group_id`, `doc_path`, `doc_error`. Rebuilds the three import tables through TEMP copies,
+  because `DROP TABLE` with foreign keys on cascades into fresh rows.
 - Speech to text was removed in P224. Kira Space deletes the leftover speech model directory
   (`models/whisper-small.en-q5_1-5359861`) at startup (`modelstore.RemoveRetired`).
 

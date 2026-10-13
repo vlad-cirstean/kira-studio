@@ -457,9 +457,9 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | Smart scripts: `internal/{claudeheadless,scriptruns,scripts}/**` (incl. `scheduler.go`, `confirm.go`), `apps/kira-space/internal/ade/automation.go` | `bun run test:claude:space -run TestSmartScriptRun` and `bun run test:claude:studio -run TestSmartScriptRun` |
 | Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters'` |
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
-| Memory import: `internal/memory/importer/**` | `bun run test:claude:space -run TestMemoryImport` (about 50 s, 0.14 USD, P211) |
+| Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest'` (import about 50 s, 0.14 USD, P211; ingest P274) |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
-| Prompt registry, store, templates: `internal/llmprompts/**` | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters\|TestMemoryImport\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestSmartScriptRun'` and `bun run test:claude:studio` |
+| Prompt registry, store, templates: `internal/llmprompts/**` | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestSmartScriptRun'` and `bun run test:claude:studio` |
 | Claude CLI upgrade | `bun run test:claude` |
 
 Sandbox notes:
@@ -551,6 +551,9 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   `bun run test:claude:space -run TestMemoryImport`. It runs the engine on
   `apps/kira-space/tests/claude/testdata/smoke` with a small chunk budget and re-executes the test binary as
   `memory-mcp` (set `KIRA_TEST_MEMORY_MCP=1`; `TestMain` in that module handles it), so no built app is needed.
+  P274: the import now runs in a detached `memory-ingest` runner (flow binary and `tests/claude` binary
+  serve it through `flowharness.Main`); its log is `$KIRA_MEMORY_HOME/import-runner.log`. Check no runner
+  outlives a suite: `pgrep -f '^.*memory-ingest$'` is empty 35 s after.
   Import UI states: `bun run build:test:space`, then Playwright `memory-import` (mock bridge).
 - MCP path: `go build -tags server ./apps/kira-space`, then `claude -p --mcp-config <file>
   --strict-mcp-config` with a `stdio` server `{command: <binary>, args: ["memory-mcp"], env:

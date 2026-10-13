@@ -564,3 +564,27 @@ Deviations from the plan, all small:
 - Targeted runs after commit 9: `go test ./apps/kira-space/internal/flows/memoryflow` (twice, green),
   `llmpromptsflow`, Playwright `memory-import`, `memory-ingest`, `copy-wording`, `memory-provenance`, `memory-module` (green).
   Full suites, visual baselines and the real `claude` rows stay for 3.2.
+
+### Test-and-fix and close-out (2026-10-13)
+
+Fixes:
+
+- `fix(memory)`: `Call.Files` seeding used `os.WriteFile`; `TestGoConventions` G4 failed. Now `renameio.WriteFile`.
+- `test(adapters)`: `ConsoleResultCap` reused one op id for its cap+1 and cap runs; ClickHouse rejected the second
+  (`QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING`). Predates P274. Op id now carries the row count; 3 reruns green.
+
+Suites, all green after the fixes: `lint`, `lint:go`, `lint:claude`, `typecheck`, `go test ./... -count=1` (129
+packages), `test:flows:space`, `test:flows:studio`, `test:ui:space` (571), `test:ui:studio` ui project (537 of 538),
+`test:unit` (1902), `test:ui:space-mobile` (81, 1 skipped), `test:visual:space` (13), `test:visual:studio` (13).
+No visual baseline changed: no Space baseline covers an import view. `ui-timing` not run.
+
+Load flakes, each green on rerun, none in P274 code: `termflow` `TestScheduleHeadless/stop` (once in a full
+`flows:space`; 3 isolated runs and a full rerun green) and Studio `grid-commit-in-flight` "inline edit open at
+Commit" (once in the full ui project; 3 repeats green). Studio and `termflow` are untouched by P274.
+
+Verification steps 1 to 10 hold by grep. Step 11 covered by `TestMemoryIngestThroughClaude` (runner spawned by the
+MCP call). No `memory-ingest` process 35 s after the suites.
+
+Real `claude` (CLI 2.1.296, temp `HOME`, no credential read): `TestMemoryGate`, `TestMemoryImport` (61 s, 0.179 USD,
+10 calls), `TestMemoryIngestThroughClaude` (68 s, 0.126 USD, 8 calls), `TestMemoryMcpThroughClaude`,
+`TestMemoryInstallRegisters`; Ade and smart-script rows (Space); Studio suite. All pass.
