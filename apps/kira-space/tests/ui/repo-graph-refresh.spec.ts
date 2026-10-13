@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { freezeClock, runCoalesceWindow } from './support/clock';
 import { contract } from './support/contract';
 import { gitStreamEmit, gitStreamRequests } from './support/gitStreamMock';
 import {
@@ -39,14 +40,15 @@ test('refsChanged for the open repo refreshes the graph; other kinds and other r
 }) => {
   const page = await bootOne(relaunch);
   const before = await refreshes(page);
+  await freezeClock(page);
 
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'worktreeChanged' });
   await gitStreamEmit(page, 'repo.changed', { repoId: '/tmp/elsewhere', kind: 'refsChanged' });
-  // Past the 250ms coalesce window: there is no signal that nothing will happen.
-  await page.waitForTimeout(600);
+  await runCoalesceWindow(page);
   expect(await refreshes(page)).toBe(before);
 
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
+  await runCoalesceWindow(page);
   await expect.poll(() => refreshes(page), { timeout: 1000 }).toBe(before + 1);
 });
 
@@ -68,7 +70,9 @@ test('a refresh keeps the scroll position', async ({ relaunch }) => {
   const before = await viewport(page).evaluate((el) => el.scrollTop);
   const calls = await refreshes(page);
 
+  await freezeClock(page);
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
+  await runCoalesceWindow(page);
   await expect.poll(() => refreshes(page), { timeout: 1000 }).toBe(calls + 1);
 
   const rowHeight = 28;

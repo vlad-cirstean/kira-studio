@@ -77,12 +77,15 @@ function installInBrowser({
     releaseOne?.();
   const openSockets: MockSocket[] = [];
   (
-    window as unknown as { __kiraGitEmit: (method: string, payload: unknown) => void }
-  ).__kiraGitEmit = (method, payload) => {
-    for (const socket of openSockets) {
-      deliver(socket, { version: wireVersion, body: { t: 'evt', method, payload } });
+    window as unknown as {
+      __kiraGitEmit: (method: string, payload: unknown) => Promise<void>;
     }
-  };
+  ).__kiraGitEmit = (method, payload) =>
+    Promise.all(
+      openSockets.map((socket) =>
+        deliver(socket, { version: wireVersion, body: { t: 'evt', method, payload } }),
+      ),
+    ).then(() => undefined);
 
   const CONNECTING = 0;
   const OPEN = 1;
@@ -99,9 +102,17 @@ function installInBrowser({
     close(): void;
   }
 
-  function deliver(socket: MockSocket, envelope: unknown): void {
+  // A test's fake clock replaces the global timers; the transport double keeps the real ones.
+  const nativeSetTimeout = window.setTimeout.bind(window);
+
+  function deliver(socket: MockSocket, envelope: unknown): Promise<void> {
     const bytes = new TextEncoder().encode(JSON.stringify(envelope));
-    setTimeout(() => socket.onmessage?.({ data: bytes.buffer }), 0);
+    return new Promise((resolve) => {
+      nativeSetTimeout(() => {
+        socket.onmessage?.({ data: bytes.buffer });
+        resolve();
+      }, 0);
+    });
   }
 
   // P92 item 5: `blobFrame.ts`'s own layout, assembled here rather than decoded — the real
@@ -141,7 +152,7 @@ function installInBrowser({
     view.setUint32(1, headerBytes.byteLength, false);
     out.set(headerBytes, 5);
     out.set(blobBytes, 5 + headerBytes.byteLength);
-    setTimeout(() => socket.onmessage?.({ data: out.buffer }), 0);
+    nativeSetTimeout(() => socket.onmessage?.({ data: out.buffer }), 0);
   }
 
   function createGitMockSocket(): MockSocket {
@@ -281,7 +292,7 @@ function installInBrowser({
     // code that sends before this fires is sending on a CONNECTING socket, exactly the window
     // bug 2 lived in.
     openSockets.push(socket);
-    setTimeout(() => {
+    nativeSetTimeout(() => {
       socket.readyState = OPEN;
       socket.onopen?.({});
     }, 0);
@@ -354,7 +365,9 @@ export async function gitStreamEmit(page: Page, method: string, payload: unknown
   await page.evaluate(
     ({ method, payload }) =>
       (
-        window as unknown as { __kiraGitEmit: (method: string, payload: unknown) => void }
+        window as unknown as {
+          __kiraGitEmit: (method: string, payload: unknown) => Promise<void>;
+        }
       ).__kiraGitEmit(method, payload),
     { method, payload },
   );

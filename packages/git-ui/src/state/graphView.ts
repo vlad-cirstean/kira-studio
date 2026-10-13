@@ -18,18 +18,10 @@ import { composeGraphFailureNotice, type FailureNotice } from './failureNotice.t
 import type { GraphOrderState } from './graphOrder.ts';
 import { composeRevealSearchHitAnnouncement, createAnnouncementRef } from './liveAnnouncements.ts';
 import { type ChunkSource, PackedStreamState } from './packedStream.ts';
+import { AUTO_REFRESH_COALESCE_MS, AUTO_REFRESH_MIN_GAP_MS } from './refreshTiming.ts';
 
 export type { ChunkSource };
 export type LoadingState = 'idle' | 'streaming' | 'loadingMore' | 'refreshing';
-
-/** G-UX item 2: the graph is the last piece of client state that did not follow the
- *  `repo.changed`/`refsChanged` watcher pipeline every other state class already subscribes to
- *  (`RefsState`/`StashState`/`WorktreeState`/`StackState`/`PrState`/`SearchState`/`OpsState`/
- *  `ReviewSessionState`/`ReviewCommentsState` — see this chapter's own ux-fixes plan, F3/D10).
- *  `RefreshButton.vue`'s pending-change dot stays — as the *backup* for the cases below that
- *  deliberately do not auto-refresh, not as the primary mechanism any more. */
-const AUTO_REFRESH_COALESCE_MS = 250; // on top of the server's own 200ms leading-window debounce
-const AUTO_REFRESH_MIN_GAP_MS = 1000; // a `git fetch --prune` storm must not re-walk continuously
 
 /** The row range a just-applied chunk gained lane layout for — what `onChunkLayout` hands its
  *  subscribers. Absolute row indices, matching `LayoutChunk`'s own `from`/`to`. */
