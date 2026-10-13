@@ -117,6 +117,8 @@ type harness struct {
 	agent *fakeAgent
 	e     *Engine
 	dir   string
+
+	launcher *inProcessLauncher
 }
 
 var smallBudget = Budget{Target: 60, Max: 100, MinFill: 15, MinTail: 1, Context: 5}
@@ -143,12 +145,17 @@ func newHarness(t *testing.T, files int) *harness {
 	return h
 }
 
+func (h *harness) runnerOpts() RunnerOptions {
+	return RunnerOptions{
+		Agent: h.agent, Budget: smallBudget, Tick: 20 * time.Millisecond,
+		Backoff: func() backoff.BackOff { return backoff.NewConstantBackOff(0) },
+	}
+}
+
 func (h *harness) open() *Engine {
 	h.t.Helper()
-	e, err := Open(h.ms, Options{
-		Agent: h.agent, Budget: smallBudget,
-		Backoff: func() backoff.BackOff { return backoff.NewConstantBackOff(0) },
-	})
+	h.launcher = newInProcessLauncher(h.t, h.ms, h.runnerOpts())
+	e, err := Open(h.ms, Options{Launcher: h.launcher})
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -158,7 +165,7 @@ func (h *harness) open() *Engine {
 
 func (h *harness) create() Job {
 	h.t.Helper()
-	j, err := h.e.Create([]string{h.dir})
+	j, err := h.e.Create(CreateArgs{Paths: []string{h.dir}})
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -186,7 +193,7 @@ func (h *harness) waitState(id, want string) JobDetail {
 
 func (h *harness) mustStart(id string) {
 	h.t.Helper()
-	if err := h.e.Start(id); err != nil {
+	if err := h.e.Start(id, StartArgs{}); err != nil {
 		h.t.Fatal(err)
 	}
 }
@@ -385,8 +392,8 @@ func TestImportResumesAfterRestart(t *testing.T) {
 		}
 	}
 	h.e = h.open()
-	d := h.detail(j.ID)
-	if d.Job.State != JobPaused || d.Job.Reason != interruptedReason {
+	d := h.waitState(j.ID, JobPaused)
+	if d.Job.Reason != interruptedReason {
 		t.Fatalf("job after reopen = %+v", d.Job)
 	}
 	if n := h.rows(`SELECT idx FROM import_chunks WHERE state = 'running'`); len(n) != 0 {

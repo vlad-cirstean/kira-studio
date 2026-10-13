@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
@@ -57,7 +58,13 @@ type CreateArgs struct {
 	WriteDoc  bool
 }
 
-func (s *store) insertJob(id string, a CreateArgs) error {
+// maxActiveMCPJobs bounds the jobs agents may have open at once (scanning, awaiting, running, paused).
+const maxActiveMCPJobs = 5
+
+// createJob inserts a scanning job and returns its id. An MCP job whose roots, provenance, groups and
+// write-back match an active one returns that job's id instead (a repeated call is idempotent) and a
+// sixth active MCP job is refused.
+func (s *store) createJob(id string, a CreateArgs) (string, error) {
 	raw, _ := json.Marshal(a.Paths)
 	groups, _ := json.Marshal(nonNil(a.Groups))
 	p := a.Provenance
@@ -68,12 +75,57 @@ func (s *store) insertJob(id string, a CreateArgs) error {
 	if channel == "" {
 		channel = ChannelUI
 	}
-	_, err := s.db.Exec(`INSERT INTO import_jobs
-		(id, roots, base, state, created_at, channel, origin, source_tag, scope, project, session_id, groups_json, auto_start, write_doc)
-		VALUES (?, ?, '', 'scanning', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, string(raw), s.now(), channel, p.Origin, nullable(p.SourceTag), p.Scope, nullable(p.Project), nullable(p.Session),
-		string(groups), a.AutoStart, a.WriteDoc)
-	return err
+	out := id
+	err := s.tx(func(tx *sql.Tx) error {
+		if channel == ChannelMCP {
+			if same, err := activeTwin(tx, a.Paths, p, string(groups), a.WriteDoc); err != nil || same != "" {
+				out = same
+				return err
+			}
+		}
+		_, err := tx.Exec(`INSERT INTO import_jobs
+			(id, roots, base, state, created_at, channel, origin, source_tag, scope, project, session_id, groups_json, auto_start, write_doc)
+			VALUES (?, ?, '', 'scanning', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, string(raw), s.now(), channel, p.Origin, nullable(p.SourceTag), p.Scope, nullable(p.Project), nullable(p.Session),
+			string(groups), a.AutoStart, a.WriteDoc)
+		return err
+	})
+	return out, err
+}
+
+// activeTwin returns the id of an active MCP job asking for exactly this, or "" after checking the
+// active-job cap.
+func activeTwin(tx *sql.Tx, paths []string, p Provenance, groups string, writeDoc bool) (string, error) {
+	rows, err := tx.Query(`SELECT id, roots, origin, COALESCE(source_tag, ''), scope, COALESCE(project, ''), COALESCE(session_id, ''),
+		groups_json, write_doc FROM import_jobs WHERE channel = 'mcp' AND state IN ('scanning', 'awaiting', 'running', 'paused')`)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	want := slices.Sorted(slices.Values(paths))
+	active := 0
+	for rows.Next() {
+		var id, roots, g string
+		var q Provenance
+		var w bool
+		if err := rows.Scan(&id, &roots, &q.Origin, &q.SourceTag, &q.Scope, &q.Project, &q.Session, &g, &w); err != nil {
+			return "", err
+		}
+		active++
+		var have []string
+		_ = json.Unmarshal([]byte(roots), &have)
+		slices.Sort(have)
+		if q == p && g == groups && w == writeDoc && slices.Equal(have, want) {
+			return id, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	if active >= maxActiveMCPJobs {
+		return "", fmt.Errorf("%w: Too many ingest jobs; wait or cancel one in Kira Space", memory.ErrInvalid)
+	}
+	return "", nil
 }
 
 func nullable(v string) any {
@@ -182,6 +234,90 @@ func (s *store) startJob(id string, a StartArgs) error {
 			WHERE job_id = ? AND state = 'skipped' AND reason LIKE 'unchanged since import%'`, s.now(), id)
 		return err
 	})
+}
+
+// autoStart runs an awaiting MCP job whose scan found work within the chunk cap; over it, the job
+// keeps waiting with the reason. It reports whether the job started.
+func (s *store) autoStart(id string, chunkCap int) (bool, error) {
+	var started bool
+	err := s.tx(func(tx *sql.Tx) error {
+		var chunks int
+		var auto bool
+		err := tx.QueryRow(`SELECT est_chunks, auto_start FROM import_jobs WHERE id = ? AND state = 'awaiting'`, id).Scan(&chunks, &auto)
+		if errors.Is(err, sql.ErrNoRows) || (err == nil && !auto) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if chunks > chunkCap {
+			counts, err := pendingChunkCounts(tx, id)
+			if err != nil {
+				return err
+			}
+			_, err = tx.Exec(`UPDATE import_jobs SET reason = ? WHERE id = ?`,
+				fmt.Sprintf("Needs confirmation in Kira Space: %d chunks, about %d calls", chunks, EstimateWork(counts, 0).Calls), id)
+			return err
+		}
+		started = true
+		_, err = tx.Exec(`UPDATE import_jobs SET state = 'running', reason = '', started_at = ? WHERE id = ?`, s.now(), id)
+		return err
+	})
+	return started, err
+}
+
+func pendingChunkCounts(tx *sql.Tx, jobID string) ([]int, error) {
+	rows, err := tx.Query(`SELECT chunk_count FROM import_files WHERE job_id = ? AND state = 'pending'`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var counts []int
+	for rows.Next() {
+		var n int
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		counts = append(counts, n)
+	}
+	return counts, rows.Err()
+}
+
+type activeJob struct {
+	ID, State string
+	Roots     []string
+}
+
+// activeJobs lists the jobs a runner works on: scanning and running.
+func (s *store) activeJobs() ([]activeJob, error) {
+	rows, err := s.db.Query(`SELECT id, state, roots FROM import_jobs WHERE state IN ('scanning', 'running') ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []activeJob
+	for rows.Next() {
+		var j activeJob
+		var roots string
+		if err := rows.Scan(&j.ID, &j.State, &roots); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(roots), &j.Roots)
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
+func (s *store) hasActiveJobs() (bool, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT count(*) FROM import_jobs WHERE state IN ('scanning', 'running')`).Scan(&n)
+	return n > 0, err
+}
+
+func (s *store) failJob(id, reason string) error {
+	_, err := s.db.Exec(`UPDATE import_jobs SET state = 'failed', reason = ?, finished_at = ? WHERE id = ? AND state IN ('scanning', 'running')`,
+		reason, s.now(), id)
+	return err
 }
 
 func (s *store) resumeJob(id string) error {

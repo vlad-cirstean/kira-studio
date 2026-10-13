@@ -159,32 +159,42 @@ func validateItem(i int, it Item) error {
 	if n := utf8.RuneCountInString(it.Reason); n < 1 || n > MaxReasonLen {
 		return invalid("item %d: reason must be 1 to %d characters", i, MaxReasonLen)
 	}
+	return checkProvenance(fmt.Sprintf("item %d", i), it)
+}
+
+// CheckProvenance validates the provenance fields alone (a job's, a doc's) with the rules every
+// stored item obeys. The error is ErrInvalid.
+func CheckProvenance(origin, sourceTag, scope, project string) error {
+	return checkProvenance("provenance", Item{Origin: origin, SourceTag: sourceTag, Scope: scope, Project: project})
+}
+
+func checkProvenance(label string, it Item) error {
 	switch it.Origin {
 	case OriginUser, OriginAgent:
 		if it.SourceTag != "" {
-			return invalid("item %d: sourceTag is only for origin %q", i, OriginExternal)
+			return invalid("%s: sourceTag is only for origin %q", label, OriginExternal)
 		}
 	case OriginExternal:
 		if !sourceTagPattern.MatchString(it.SourceTag) {
-			return invalid("item %d: origin %q needs a sourceTag of 1 to %d characters from a-z, 0-9 and -", i, OriginExternal, maxSourceTag)
+			return invalid("%s: origin %q needs a sourceTag of 1 to %d characters from a-z, 0-9 and -", label, OriginExternal, maxSourceTag)
 		}
 	default:
-		return invalid("item %d: origin must be %q, %q or %q", i, OriginUser, OriginAgent, OriginExternal)
+		return invalid("%s: origin must be %q, %q or %q", label, OriginUser, OriginAgent, OriginExternal)
 	}
 	switch it.Scope {
 	case ScopeProject:
 		if it.Project == "" {
-			return invalid("item %d: scope %q needs a project (the project could not be detected)", i, ScopeProject)
+			return invalid("%s: scope %q needs a project (the project could not be detected)", label, ScopeProject)
 		}
 		if err := checkProject(it.Project); err != nil {
-			return invalid("item %d: %s", i, strings.TrimPrefix(err.Error(), ErrInvalid.Error()+": "))
+			return invalid("%s: %s", label, strings.TrimPrefix(err.Error(), ErrInvalid.Error()+": "))
 		}
 	case ScopeCompany, ScopePersonal:
 		if it.Project != "" {
-			return invalid("item %d: project is only for scope %q", i, ScopeProject)
+			return invalid("%s: project is only for scope %q", label, ScopeProject)
 		}
 	default:
-		return invalid("item %d: scope must be %q, %q or %q", i, ScopeCompany, ScopeProject, ScopePersonal)
+		return invalid("%s: scope must be %q, %q or %q", label, ScopeCompany, ScopeProject, ScopePersonal)
 	}
 	return nil
 }

@@ -33,7 +33,7 @@ const ChannelMemoryImport = "kira:memory:import"
 const memoryServerName = "kira-memory"
 
 const (
-	memoryWatchInterval = 2 * time.Second
+	memoryWatchInterval = 500 * time.Millisecond
 	emitGap             = 250 * time.Millisecond
 	memoryUIListLimit   = 100
 )
@@ -115,20 +115,24 @@ func (s *MemoryService) importer() (*importer.Engine, error) {
 		return nil, err
 	}
 	s.engine, err = importer.Open(s.store, importer.Options{
-		Agent:    importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(), Prompts: s.prompts},
-		OnChange: s.emitImport,
+		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(s.store)},
+		Available: memory.NewCLIRunner().Available,
+		OnChange:  s.emitImport,
 	})
 	return s.engine, err
 }
 
 func (s *MemoryService) emitChanged() { s.events.Emit(ChannelMemoryChanged, struct{}{}) }
 
-// watch emits when another process commits: PRAGMA data_version moves only for foreign writes.
+// watch reacts when another process commits (the MCP server, the import runner): PRAGMA data_version
+// moves only for foreign writes. Every foreign commit refreshes import progress; memory lists
+// refetch only when facts changed (the store revision moved).
 func (s *MemoryService) watch(ctx context.Context, store *memory.Store) {
 	last, err := store.DataVersion(ctx)
 	if err != nil {
 		return
 	}
+	rev, _ := store.Revision(ctx)
 	t := time.NewTicker(memoryWatchInterval)
 	defer t.Stop()
 	for {
@@ -140,8 +144,13 @@ func (s *MemoryService) watch(ctx context.Context, store *memory.Store) {
 			if err != nil {
 				continue
 			}
-			if v != last {
-				last = v
+			if v == last {
+				continue
+			}
+			last = v
+			s.emitImport()
+			if r, err := store.Revision(ctx); err == nil && r != rev {
+				rev = r
 				s.emitChanged()
 			}
 		}

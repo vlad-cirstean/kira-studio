@@ -93,7 +93,7 @@ func (s *MemoryImportService) Create(args MemoryImportCreateArgs) (importer.Job,
 	if err != nil {
 		return importer.Job{}, memoryErr(err)
 	}
-	job, err := e.Create(args.Paths)
+	job, err := e.Create(importer.CreateArgs{Paths: args.Paths})
 	return job, memoryErr(err)
 }
 
@@ -126,7 +126,7 @@ func (s *MemoryImportService) act(id string, do func(*importer.Engine, string) e
 }
 
 func (s *MemoryImportService) Start(args MemoryImportJobArgs) error {
-	return s.act(args.ID, (*importer.Engine).Start)
+	return s.act(args.ID, func(e *importer.Engine, id string) error { return e.Start(id, importer.StartArgs{}) })
 }
 
 func (s *MemoryImportService) Pause(args MemoryImportJobArgs) error {

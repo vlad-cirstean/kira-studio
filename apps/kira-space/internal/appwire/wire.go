@@ -40,11 +40,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
-// RunArgvShim runs the askpass, memory-mcp, memory-embed and memory-check subcommands, before anything
+// RunArgvShim runs the askpass, memory-mcp, memory-ingest, memory-embed and memory-check subcommands, before anything
 // Wails-related, so they never start a window. memory-mcp is Claude Code's stdio MCP server; it runs
 // before startupfail and the single-instance lock, so it works while the window is open.
 // memory-embed is the ONNX embedding worker those processes and the app spawn; same ordering for
 // the same reason. memory-check is the kira-memory comment and doc validator, run as a git hook.
+// memory-ingest is the detached bulk-import runner (one per memory.db) that the app and the MCP server spawn.
 func RunArgvShim(args []string) (code int, ok bool) {
 	if len(args) < 2 {
 		return 0, false
@@ -54,6 +55,8 @@ func RunArgvShim(args []string) (code int, ok bool) {
 		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
 	case "memory-mcp":
 		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json")), true
+	case "memory-ingest":
+		return memorycli.RunIngest(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json")), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
 	case "memory-check":

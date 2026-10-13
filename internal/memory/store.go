@@ -38,6 +38,9 @@ type Store struct {
 
 func NewStore(path string) *Store { return &Store{path: path} }
 
+// Path is the memory.db file location.
+func (s *Store) Path() string { return s.path }
+
 // OpenDefault returns a Store at DefaultPath.
 func OpenDefault() *Store { return NewStore(DefaultPath()) }
 
