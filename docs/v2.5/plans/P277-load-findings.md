@@ -34,6 +34,14 @@ Left `toPass` (outside the plan's list, no repro, not touched): `repo-graph-badg
 Outside Stream B's row: `apps/kira-studio/tests/ui/support/tooltip.ts` `assertTooltipShows` retries a
 hover in a loop; other specs share it. Step C or close-out owns it.
 
-## Fix status
+## Fix status (same recipe: 8 loops, 8 workers; ambient load from Stream A)
 
-Filled in per fix commit.
+| Entry | After | Status |
+|---|---|---|
+| `refsChanged…` | 0/40 | fixed by code (was unreproduced at 0/40); 1 s poll kept |
+| `a refresh keeps the scroll position` | 16/40 at 4 loops, 4 workers, all `row 0` 5 s (base 13/40 same recipe); no 1 s poll failure | 1 s poll coupling fixed; first-paint capacity stays open: idle 1.3 s, 5-11 s under load, default 5 s wait cannot grow |
+| `repo-graph-paging` | 9/48 (12 repeats of 4 tests), all `graph-svg` visible within 5 s in `openRepo`; no 60 s timeout, no `closeDetail` failure | `closeDetail` and `diagonalWheel` fixed; boot capacity stays open |
+| `sql-schema` D3 | 0/40 (was 36/40) | fixed |
+| `tooltips` a11y | 1/40, 60 s test timeout of a 9 s-idle connect-and-grid test (was 20/40) | delay coupling fixed; the long setup under load stays open |
+| `columns`, `workspace` | not re-run: no code change | stay open: default 5 s waits (capacity) |
+| `badges`, `ade-v2-panel`, `http-timeline`, `grid-commit-in-flight`, `ui-leftovers` | 0 failures in 120, 40, 40, 80, 40 | unreproduced, entries stay open for the Known open items rewrite |
