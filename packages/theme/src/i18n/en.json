@@ -5303,6 +5303,13 @@
           "body": "Sent as the system prompt of the Claude run that finishes one file of a memory import."
         }
       },
+      "memoryImportVerifySystem": {
+        "description": "Checks doubtful facts of an imported file against the file itself.",
+        "title": "Import cross-check",
+        "usedBy": {
+          "body": "Sent as the system prompt of the Claude run that reads the source file to confirm, rewrite or reject doubtful facts during a memory import."
+        }
+      },
       "memoryMcpInstructions": {
         "description": "Tells an agent when to store a memory and how to search the store.",
         "title": "Memory server instructions",

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +45,11 @@ type Call struct {
 	AllowedTools []string
 	Timeout      time.Duration // 0 means claudeTimeout
 	Budget       string        // --max-budget-usd; empty means claudeCallBudget
+	// Tools, when set, are the built-in tools the call may use (read-only file tools), confined to
+	// its temp dir; Files seeds that dir. MaxTurns caps the tool loop (--max-turns); 0 leaves it off.
+	Tools    []string
+	Files    map[string][]byte
+	MaxTurns int
 }
 
 // Runner runs one Call and returns the structured_output object.
@@ -76,10 +83,22 @@ func claudeArgs(c Call) []string {
 		budget = claudeCallBudget
 	}
 	args := []string{"-p", "--model", claudeModel}
-	if c.MCPConfig == "" {
+	if c.MCPConfig == "" && len(c.Tools) == 0 {
 		args = append(args, "--safe-mode")
 	}
-	args = append(args, "--setting-sources", "", "--strict-mcp-config", "--tools", "")
+	args = append(args, "--setting-sources", "", "--strict-mcp-config")
+	if len(c.Tools) > 0 {
+		// --restricted confines Read and Grep to the working dir and drops code-running tools. Probed in
+		// P274: without it Read opens an absolute path outside cwd under --safe-mode. Not --safe-mode:
+		// it is kept off for tool calls, as for MCP calls.
+		tools := strings.Join(c.Tools, ",")
+		args = append(args, "--restricted", "--tools", tools, "--allowedTools", tools)
+		if c.MaxTurns > 0 {
+			args = append(args, "--max-turns", strconv.Itoa(c.MaxTurns))
+		}
+	} else {
+		args = append(args, "--tools", "")
+	}
 	if c.MCPConfig != "" {
 		// --safe-mode disables --mcp-config servers too (measured in P211), so an MCP call runs
 		// without it; --strict-mcp-config still keeps every other server out.
@@ -124,6 +143,11 @@ func (r *CLIRunner) RunResult(ctx context.Context, c Call) (Result, error) {
 		return Result{}, fmt.Errorf("memory: temp dir: %w", err)
 	}
 	defer os.RemoveAll(dir)
+	for name, data := range c.Files {
+		if err := os.WriteFile(filepath.Join(dir, filepath.Base(name)), data, 0o600); err != nil {
+			return Result{}, fmt.Errorf("memory: seed temp dir: %w", err)
+		}
+	}
 
 	timeout := c.Timeout
 	if timeout <= 0 {

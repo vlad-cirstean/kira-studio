@@ -431,53 +431,80 @@ func chunkFile(kind, text, rel string, b Budget) ([]Chunk, string, error) {
 	return chunks, title, nil
 }
 
-// schedule starts as much work as the slots allow: extract workers for pending chunks (reading and
-// chunking the next file when none is pending) and the single finalize worker.
+// schedule starts as much work as the slots allow: extract workers for pending chunks, then
+// cross-check workers, then reading and chunking the next file, and the single finalize worker.
 func (r *Runner) schedule() {
 	for r.ctx.Err() == nil && r.extractSem.TryAcquire(1) {
-		it, ok, err := r.st.claimChunk()
-		if err != nil {
-			r.extractSem.Release(1)
-			slog.Error("memory import: claim chunk", "scope", "memory", "err", err)
+		if !r.startSlotWork() {
 			break
 		}
-		if !ok {
-			r.extractSem.Release(1)
-			progressed, err := r.materialiseNext()
-			if err != nil {
-				slog.Error("memory import: materialise", "scope", "memory", "err", err)
-				break
-			}
-			if progressed {
-				continue
-			}
-			break
-		}
+	}
+	r.startFinalize()
+}
+
+// startSlotWork spends the extract slot the caller holds. It reports whether more work may follow;
+// when it returns false or starts nothing, the slot is released.
+func (r *Runner) startSlotWork() bool {
+	it, ok, err := r.st.claimChunk()
+	if err != nil {
+		r.extractSem.Release(1)
+		slog.Error("memory import: claim chunk", "scope", "memory", "err", err)
+		return false
+	}
+	if ok {
 		ctx, armed := r.jobCtx(it.JobID)
 		if !armed {
 			_ = r.st.releaseChunk(it, usage{})
 			r.extractSem.Release(1)
-			break
+			return false
 		}
 		r.spawn(func() { r.runExtract(ctx, it) })
+		return true
 	}
-	if r.ctx.Err() == nil && r.finalizing.CompareAndSwap(false, true) {
-		it, ok, err := r.st.claimFinalize()
-		if err != nil || !ok {
-			r.finalizing.Store(false)
-			if err != nil {
-				slog.Error("memory import: claim finalize", "scope", "memory", "err", err)
-			}
-			return
-		}
-		ctx, armed := r.jobCtx(it.JobID)
+	vit, ok, err := r.st.claimVerify()
+	if err != nil {
+		r.extractSem.Release(1)
+		slog.Error("memory import: claim verify", "scope", "memory", "err", err)
+		return false
+	}
+	if ok {
+		ctx, armed := r.jobCtx(vit.JobID)
 		if !armed {
-			_ = r.st.releaseFinalize(it, usage{})
-			r.finalizing.Store(false)
-			return
+			_ = r.st.endVerify(vit, usage{})
+			r.extractSem.Release(1)
+			return false
 		}
-		r.spawn(func() { r.runFinalize(ctx, it) })
+		r.spawn(func() { r.runVerify(ctx, vit) })
+		return true
 	}
+	r.extractSem.Release(1)
+	progressed, err := r.materialiseNext()
+	if err != nil {
+		slog.Error("memory import: materialise", "scope", "memory", "err", err)
+		return false
+	}
+	return progressed
+}
+
+func (r *Runner) startFinalize() {
+	if r.ctx.Err() != nil || !r.finalizing.CompareAndSwap(false, true) {
+		return
+	}
+	it, ok, err := r.st.claimFinalize()
+	if err != nil || !ok {
+		r.finalizing.Store(false)
+		if err != nil {
+			slog.Error("memory import: claim finalize", "scope", "memory", "err", err)
+		}
+		return
+	}
+	ctx, armed := r.jobCtx(it.JobID)
+	if !armed {
+		_ = r.st.releaseFinalize(it, usage{})
+		r.finalizing.Store(false)
+		return
+	}
+	r.spawn(func() { r.runFinalize(ctx, it) })
 }
 
 // materialiseNext reads, validates, hashes and chunks the next pending file. It reports whether it
@@ -634,6 +661,74 @@ func boundedMessage(err error) string {
 		msg = string(r[:300]) + "..."
 	}
 	return msg
+}
+
+// runVerify cross-checks a file's questionable facts against a copy of its source, one batch at a
+// time, saving each batch's verdicts before the next so an interrupted run keeps them.
+func (r *Runner) runVerify(ctx context.Context, it finalItem) {
+	defer r.kick()
+	defer r.extractSem.Release(1)
+	defer r.changed()
+
+	var u usage
+	err := r.verifyBatches(ctx, it, &u)
+	switch {
+	case err == nil || ctx.Err() != nil:
+		err = r.st.endVerify(it, u)
+	case isFatal(err):
+		cause := err
+		err = r.st.endVerify(it, u)
+		r.pauseFatal(it.JobID, cause)
+	default:
+		err = r.st.failVerify(it, boundedMessage(err), u)
+	}
+	if err == nil {
+		err = r.settle(it.JobID)
+	}
+	if err != nil {
+		slog.Error("memory import: verify result", "scope", "memory", "err", err)
+	}
+}
+
+func (r *Runner) verifyBatches(ctx context.Context, it finalItem, u *usage) error {
+	text, hash, skip, err := ReadText(it.Path, r.opts.Caps.MaxFileBytes)
+	switch {
+	case err != nil:
+		return fmt.Errorf("cannot read the source: %w", err)
+	case skip != "":
+		return errors.New(skip)
+	case hash != it.Hash:
+		return errors.New("the file changed since it was read; retry the file")
+	}
+	for start := 0; start < len(it.Verify); start += verifyBatch {
+		batch := it.Verify[start:min(start+verifyBatch, len(it.Verify))]
+		var out VerifyOutput
+		err := r.retry(ctx, func() error {
+			u.Calls++
+			o, err := r.agent.Verify(ctx, VerifyInput{Path: it.Rel, Title: it.Title, Source: []byte(text), Ext: path.Ext(it.Rel), Facts: batch})
+			u.CostUSD += o.CostUSD
+			if err == nil {
+				out = o
+			}
+			return err
+		})
+		if err != nil {
+			return err
+		}
+		verdicts := map[string]Verdict{}
+		for _, f := range batch {
+			v, ok := out.Verdicts[f.ID]
+			if !ok {
+				v = Verdict{Verdict: VerdictAmbiguous, Why: "No verdict returned."}
+			}
+			verdicts[f.ID] = v
+		}
+		if err := r.st.saveVerdicts(it, verdicts, *u); err != nil {
+			return err
+		}
+		*u = usage{}
+	}
+	return nil
 }
 
 func (r *Runner) runFinalize(ctx context.Context, it finalItem) {

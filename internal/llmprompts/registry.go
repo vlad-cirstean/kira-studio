@@ -29,6 +29,11 @@ type FinalizeVars struct {
 	MaxReason int `json:"maxReason"`
 }
 
+// VerifyVars fills the import cross-check prompt.
+type VerifyVars struct {
+	MaxFacts int `json:"maxFacts"`
+}
+
 // CauseVars carries the reason text of a notice.
 type CauseVars struct {
 	Cause string `json:"cause" prompt:"required"`
@@ -346,6 +351,39 @@ Work through the facts:
   }
 }`,
 }, FinalizeVars{MaxItems: 20, MaxReason: 2000})
+
+// MemoryImportVerifySystem is the system prompt of the cross-check that judges questionable extracted facts against the source file.
+var MemoryImportVerifySystem = define(Entry{
+	ID: "memory.import.verify.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryImportVerifySystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryImportVerifySystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryImportVerifySystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene"},
+	Default: `You cross-check facts extracted from a document against the document itself. Output only the schema.
+
+{{template "memory.dataHygiene"}}
+
+Input: "document" (path, title, "source": the file name in your working directory) and "facts", each with an id, the extracted fact, its evidence quote, its section and, when the extractor doubted it, "unresolved".
+The only source of truth is the file named in "source". Read it with the Read and Grep tools, never any other file, and never trust the extracted fact or its quote without finding the words in the file.
+
+For each fact choose exactly one verdict:
+- "confirmed": the file states the fact as written, and the open question, if any, has an answer in the file. Put the verbatim supporting quote in "evidence".
+- "rewritten": the file supports the claim but the wording is wrong, vague or leaves a reference open. Put a corrected standalone sentence of at most 300 characters in "fact" and the verbatim supporting quote in "evidence". Use only what the file says.
+- "unsupported": the file does not state the fact, or contradicts it.
+- "ambiguous": the file states something close, but the subject or a reference stays open even after reading the whole file.
+"why" is one sentence explaining the verdict. "fact" and "evidence" are "" where not asked for. Answer every fact id exactly once, at most {{.MaxFacts}} facts per call.`,
+	Schema: `{
+  "type": "object", "additionalProperties": false, "required": ["verdicts"],
+  "properties": {"verdicts": {"type": "array", "items": {
+    "type": "object", "additionalProperties": false,
+    "required": ["id", "verdict", "fact", "evidence", "why"],
+    "properties": {
+      "id": {"type": "string"},
+      "verdict": {"enum": ["confirmed", "rewritten", "unsupported", "ambiguous"]},
+      "fact": {"type": "string"}, "evidence": {"type": "string"}, "why": {"type": "string"}
+    }}}}
+}`,
+}, VerifyVars{MaxFacts: 40})
 
 // MemoryMcpInstructions is what the memory MCP server tells a client when it connects.
 var MemoryMcpInstructions = define(Entry{

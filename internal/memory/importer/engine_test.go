@@ -56,6 +56,8 @@ type fakeAgent struct {
 	mu          sync.Mutex
 	extractHook func(ctx context.Context, in ExtractInput) error
 	finalHook   func(ctx context.Context, in FinalizeInput) error
+	factsHook   func(in ExtractInput) []Fact
+	verifyHook  func(ctx context.Context, in VerifyInput) (VerifyOutput, error)
 	extracted   map[string]int // "rel#idx" -> successful calls
 	extractRuns int
 	finalInputs []FinalizeInput
@@ -86,7 +88,33 @@ func (a *fakeAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutput
 	}
 	a.extracted[fmt.Sprintf("%s#%d", in.Path, in.Index)]++
 	a.mu.Unlock()
-	return ExtractOutput{Facts: []Fact{{Fact: fmt.Sprintf("%s says part %d", in.Title, in.Index), Evidence: "e", Section: in.HeadingPath}}, CostUSD: 0.01}, nil
+	facts := []Fact{{Fact: fmt.Sprintf("%s says part %d", in.Title, in.Index), Evidence: firstWord(in.Text), Section: in.HeadingPath}}
+	if a.factsHook != nil {
+		facts = a.factsHook(in)
+	}
+	return ExtractOutput{Facts: facts, CostUSD: 0.01}, nil
+}
+
+func firstWord(s string) string {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return "x"
+	}
+	return f[0]
+}
+
+func (a *fakeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error) {
+	a.mu.Lock()
+	hook := a.verifyHook
+	a.mu.Unlock()
+	if hook != nil {
+		return hook(ctx, in)
+	}
+	out := VerifyOutput{Verdicts: map[string]Verdict{}, CostUSD: 0.01}
+	for _, f := range in.Facts {
+		out.Verdicts[f.ID] = Verdict{Verdict: VerdictConfirmed, Evidence: f.Evidence, Why: "found"}
+	}
+	return out, nil
 }
 
 func (a *fakeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error) {
@@ -475,5 +503,45 @@ func TestImportConcurrencyLimits(t *testing.T) {
 	}
 	if h.agent.maxFinal != 1 {
 		t.Errorf("max concurrent finalize = %d, want 1", h.agent.maxFinal)
+	}
+}
+
+func TestImportCrossChecksQuestionableFacts(t *testing.T) {
+	h := newHarness(t, 1)
+	h.agent.factsHook = func(in ExtractInput) []Fact {
+		if in.Index != 0 {
+			return nil
+		}
+		return []Fact{
+			{Fact: "It uses port 80.", Evidence: firstWord(in.Text), Section: "s", Unresolved: "which service"},
+			{Fact: "Invented claim.", Evidence: "a quote that is nowhere", Section: "s"},
+			{Fact: "Solid claim.", Evidence: firstWord(in.Text), Section: "s"},
+		}
+	}
+	h.agent.verifyHook = func(_ context.Context, in VerifyInput) (VerifyOutput, error) {
+		if len(in.Facts) != 2 || len(in.Source) == 0 {
+			return VerifyOutput{}, fmt.Errorf("verify input = %+v", in.Facts)
+		}
+		return VerifyOutput{Verdicts: map[string]Verdict{
+			"1.1": {Verdict: VerdictRewritten, Fact: "The web service uses port 80.", Evidence: "alpha", Why: "named"},
+			"1.2": {Verdict: VerdictUnsupported, Why: "no such text"},
+		}}, nil
+	}
+	j := h.create()
+	h.mustStart(j.ID)
+	f := fileByRel(h.waitState(j.ID, JobDone), "doc0.md")
+	if f.Verified != 2 || len(f.Dropped) != 1 || !strings.HasPrefix(f.Dropped[0].Why, "Not supported by the source: ") {
+		t.Fatalf("file = %+v", f)
+	}
+	var got []string
+	for _, in := range h.agent.finalInputs {
+		for _, ff := range in.Facts {
+			if ff.Chunk == 1 {
+				got = append(got, ff.Fact.Fact+"|"+ff.Unresolved)
+			}
+		}
+	}
+	if strings.Join(got, ";") != "The web service uses port 80.|;Solid claim.|" {
+		t.Errorf("finalize chunk 1 facts = %q", got)
 	}
 }

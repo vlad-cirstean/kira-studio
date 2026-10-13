@@ -2,12 +2,13 @@ package importer
 
 import "context"
 
-// Agent is the two Claude steps the engine drives. The real one shells out to Claude Code
-// (ClaudeAgent); engine tests script a fake.
+// Agent is the Claude steps the runner drives. The real one shells out to Claude Code
+// (ClaudeAgent); runner tests script a fake.
 type Agent interface {
 	// Available fails with a user-facing message when Claude Code cannot run.
 	Available() error
 	Extract(ctx context.Context, in ExtractInput) (ExtractOutput, error)
+	Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error)
 	Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error)
 }
 
@@ -38,6 +39,7 @@ type ExtractOutput struct {
 type FinalizeInput struct {
 	FileID, Path, Title string
 	ChunkCount          int
+	Prov                Provenance
 	Facts               []FinalFact
 }
 
@@ -63,4 +65,9 @@ type FinalizeOutput struct {
 	Unresolved []UnresolvedFact
 	Dropped    []DroppedFact
 	CostUSD    float64
+	// Prov, GroupID and Orphaned are a memdoc's own result: the doc header's provenance and group,
+	// and the stored facts it no longer lists.
+	Prov     *Provenance
+	GroupID  string
+	Orphaned int
 }

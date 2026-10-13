@@ -640,60 +640,225 @@ func (s *store) releaseChunk(it chunkItem, u usage) error {
 	})
 }
 
+// finalItem is one extracted file claimed for its verify or finalize step. Facts carry the cross-check
+// verdicts already applied; PreDropped lists facts the cross-check judged unsupported.
 type finalItem struct {
-	JobID, FileID, Path, Title string
-	ChunkCount                 int
-	Facts                      []FinalFact
+	JobID, FileID, Path, Rel, Title, Kind, Hash string
+	ChunkCount                                  int
+	Prov                                        Provenance
+	Facts                                       []FinalFact
+	PreDropped                                  []DroppedFact
+	// Verify lists the questionable facts without a verdict yet; set only for the verify step.
+	Verify []VerifyFact
 }
 
-func (s *store) claimFinalize() (finalItem, bool, error) {
-	var it finalItem
+// extractedFile is a file in state extracted with everything the next step needs.
+type extractedFile struct {
+	finalItem
+	verdicts map[string]Verdict
+}
+
+func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) {
+	var f extractedFile
+	var verify string
+	err := tx.QueryRow(`SELECT f.job_id, f.id, f.path, f.rel_path, f.title, f.kind, f.content_hash, f.chunk_count, f.verify_json,
+		j.origin, COALESCE(j.source_tag, ''), j.scope, COALESCE(j.project, ''), COALESCE(j.session_id, '')
+		FROM import_files f JOIN import_jobs j ON j.id = f.job_id WHERE f.id = ?`, fileID).
+		Scan(&f.JobID, &f.FileID, &f.Path, &f.Rel, &f.Title, &f.Kind, &f.Hash, &f.ChunkCount, &verify,
+			&f.Prov.Origin, &f.Prov.SourceTag, &f.Prov.Scope, &f.Prov.Project, &f.Prov.Session)
+	if err != nil {
+		return f, err
+	}
+	if json.Unmarshal([]byte(verify), &f.verdicts) != nil || f.verdicts == nil {
+		f.verdicts = map[string]Verdict{}
+	}
+	rows, err := tx.Query(`SELECT idx, text, facts FROM import_chunks WHERE file_id = ? ORDER BY idx`, fileID)
+	if err != nil {
+		return f, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var idx int
+		var text, raw string
+		if err := rows.Scan(&idx, &text, &raw); err != nil {
+			return f, err
+		}
+		var facts []Fact
+		if err := json.Unmarshal([]byte(raw), &facts); err != nil {
+			return f, fmt.Errorf("import: chunk facts: %w", err)
+		}
+		for n, fact := range facts {
+			ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Fact: fact}
+			if Questionable(text, fact) {
+				if _, judged := f.verdicts[ff.ID]; !judged {
+					f.Verify = append(f.Verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Evidence: fact.Evidence, Section: fact.Section, Unresolved: fact.Unresolved})
+				}
+			}
+			f.Facts = append(f.Facts, ff)
+		}
+	}
+	return f, rows.Err()
+}
+
+// applyVerdicts folds the cross-check verdicts into the facts: confirmed and rewritten facts are
+// resolved, unsupported ones leave for the dropped list, ambiguous ones stay unresolved.
+func (f *extractedFile) applyVerdicts() {
+	kept := f.Facts[:0:0]
+	for _, ff := range f.Facts {
+		v, judged := f.verdicts[ff.ID]
+		switch {
+		case !judged:
+		case v.Verdict == VerdictConfirmed:
+			ff.Unresolved = ""
+		case v.Verdict == VerdictRewritten:
+			if v.Fact != "" {
+				ff.Fact.Fact = v.Fact
+			}
+			if v.Evidence != "" {
+				ff.Evidence = v.Evidence
+			}
+			ff.Unresolved = ""
+		case v.Verdict == VerdictUnsupported:
+			f.PreDropped = append(f.PreDropped, DroppedFact{Fact: ff.Fact.Fact, Why: "Not supported by the source: " + v.Why})
+			continue
+		}
+		kept = append(kept, ff)
+	}
+	f.Facts = kept
+}
+
+// extractedIDs lists the extracted files of running jobs, in work order.
+func extractedIDs(tx *sql.Tx) ([]string, error) {
+	rows, err := tx.Query(`SELECT f.id FROM import_files f JOIN import_jobs j ON j.id = f.job_id
+		WHERE f.state = 'extracted' AND j.state = 'running' ORDER BY j.created_at, f.rel_path`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// claimVerify reserves the next extracted file that still has questionable facts without a verdict.
+func (s *store) claimVerify() (finalItem, bool, error) {
+	var out finalItem
 	found := false
 	err := s.tx(func(tx *sql.Tx) error {
-		err := tx.QueryRow(`SELECT f.job_id, f.id, f.rel_path, f.title, f.chunk_count FROM import_files f
-			JOIN import_jobs j ON j.id = f.job_id
-			WHERE f.state = 'extracted' AND j.state = 'running'
-			ORDER BY j.created_at, f.rel_path LIMIT 1`).Scan(&it.JobID, &it.FileID, &it.Path, &it.Title, &it.ChunkCount)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
+		ids, err := extractedIDs(tx)
 		if err != nil {
 			return err
 		}
-		found = true
-		if _, err := tx.Exec(`UPDATE import_files SET state = 'finalizing', finalize_attempts = finalize_attempts + 1, updated_at = ? WHERE id = ?`,
-			s.now(), it.FileID); err != nil {
-			return err
-		}
-		rows, err := tx.Query(`SELECT idx, facts FROM import_chunks WHERE file_id = ? ORDER BY idx`, it.FileID)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var idx int
-			var raw string
-			if err := rows.Scan(&idx, &raw); err != nil {
+		for _, id := range ids {
+			f, err := s.loadExtracted(tx, id)
+			if err != nil {
 				return err
 			}
-			var facts []Fact
-			if err := json.Unmarshal([]byte(raw), &facts); err != nil {
-				return fmt.Errorf("import: chunk facts: %w", err)
+			if f.Kind == KindMemdoc || len(f.Verify) == 0 {
+				continue
 			}
-			for n, f := range facts {
-				it.Facts = append(it.Facts, FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Fact: f})
+			if _, err := tx.Exec(`UPDATE import_files SET state = 'verifying', updated_at = ? WHERE id = ?`, s.now(), id); err != nil {
+				return err
 			}
+			out, found = f.finalItem, true
+			return nil
 		}
-		return rows.Err()
+		return nil
 	})
-	return it, found, err
+	return out, found, err
+}
+
+// claimFinalize reserves the next extracted file with nothing left to cross-check, verdicts applied.
+func (s *store) claimFinalize() (finalItem, bool, error) {
+	var out finalItem
+	found := false
+	err := s.tx(func(tx *sql.Tx) error {
+		ids, err := extractedIDs(tx)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			f, err := s.loadExtracted(tx, id)
+			if err != nil {
+				return err
+			}
+			if len(f.Verify) > 0 && f.Kind != KindMemdoc {
+				continue
+			}
+			f.applyVerdicts()
+			if _, err := tx.Exec(`UPDATE import_files SET state = 'finalizing', finalize_attempts = finalize_attempts + 1, updated_at = ? WHERE id = ?`,
+				s.now(), id); err != nil {
+				return err
+			}
+			out, found = f.finalItem, true
+			return nil
+		}
+		return nil
+	})
+	return out, found, err
+}
+
+// saveVerdicts records a batch of cross-check verdicts and counts them.
+func (s *store) saveVerdicts(it finalItem, batch map[string]Verdict, u usage) error {
+	return s.tx(func(tx *sql.Tx) error {
+		if err := addUsage(tx, it.JobID, it.FileID, u); err != nil {
+			return err
+		}
+		var raw string
+		if err := tx.QueryRow(`SELECT verify_json FROM import_files WHERE id = ?`, it.FileID).Scan(&raw); err != nil {
+			return err
+		}
+		all := map[string]Verdict{}
+		_ = json.Unmarshal([]byte(raw), &all)
+		for id, v := range batch {
+			all[id] = v
+		}
+		out, _ := json.Marshal(all)
+		_, err := tx.Exec(`UPDATE import_files SET verify_json = ?, verified = ?, updated_at = ? WHERE id = ? AND state = 'verifying'`,
+			string(out), len(all), s.now(), it.FileID)
+		return err
+	})
+}
+
+// endVerify moves a verifying file back to extracted, so the next claim sees its verdicts.
+func (s *store) endVerify(it finalItem, u usage) error {
+	return s.tx(func(tx *sql.Tx) error {
+		if err := addUsage(tx, it.JobID, it.FileID, u); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE import_files SET state = 'extracted', updated_at = ? WHERE id = ? AND state = 'verifying'`, s.now(), it.FileID)
+		return err
+	})
+}
+
+func (s *store) failVerify(it finalItem, msg string, u usage) error {
+	return s.tx(func(tx *sql.Tx) error {
+		if err := addUsage(tx, it.JobID, it.FileID, u); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE import_files SET state = 'failed', reason = ?, updated_at = ? WHERE id = ? AND state = 'verifying'`,
+			"Cross-check: "+msg, s.now(), it.FileID)
+		return err
+	})
 }
 
 // finishFile records a finalized file: counts from memory_events (the agent's own tally is never
-// trusted), the agent's unresolved and dropped lists, and drops the chunk rows.
+// trusted), the agent's unresolved and dropped lists plus what the cross-check dropped, and drops
+// the chunk rows. A memdoc passes its own result.
 func (s *store) finishFile(it finalItem, out FinalizeOutput, u usage) error {
 	unresolved, _ := json.Marshal(nonNil(out.Unresolved))
-	dropped, _ := json.Marshal(nonNil(out.Dropped))
+	dropped, _ := json.Marshal(nonNil(append(slices.Clone(it.PreDropped), out.Dropped...)))
+	var prov any
+	if out.Prov != nil {
+		raw, _ := json.Marshal(out.Prov)
+		prov = string(raw)
+	}
 	return s.tx(func(tx *sql.Tx) error {
 		if err := addUsage(tx, it.JobID, it.FileID, u); err != nil {
 			return err
@@ -713,9 +878,16 @@ func (s *store) finishFile(it finalItem, out FinalizeOutput, u usage) error {
 			counts[action] = n
 		}
 		_ = rows.Close()
+		group := out.GroupID
+		if group == "" {
+			if err := tx.QueryRow(`SELECT COALESCE((SELECT id FROM memory_groups WHERE kind = 'document' AND key = ?), '')`, it.Path).Scan(&group); err != nil {
+				return err
+			}
+		}
 		res, err := tx.Exec(`UPDATE import_files SET state = 'done', reason = '', added = ?, updated = ?, noop = ?,
-			unresolved = ?, dropped = ?, updated_at = ? WHERE id = ? AND state = 'finalizing'`,
-			counts["add"], counts["update"], counts["noop"], string(unresolved), string(dropped), s.now(), it.FileID)
+			unresolved = ?, dropped = ?, orphaned = ?, group_id = ?, prov_json = COALESCE(?, prov_json), updated_at = ?
+			WHERE id = ? AND state = 'finalizing'`,
+			counts["add"], counts["update"], counts["noop"], string(unresolved), string(dropped), out.Orphaned, group, prov, s.now(), it.FileID)
 		if err != nil || rowsAffected(res) == 0 {
 			return err
 		}

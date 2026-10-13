@@ -33,9 +33,19 @@ type finalizeDoc struct {
 	Chunks int    `json:"chunks"`
 }
 
+type finalizeProv struct {
+	Origin    string `json:"origin"`
+	SourceTag string `json:"sourceTag,omitempty"`
+	Scope     string `json:"scope"`
+	Project   string `json:"project,omitempty"`
+}
+
 type finalizeWire struct {
-	Document finalizeDoc `json:"document"`
-	Facts    []FinalFact `json:"facts"`
+	Document   finalizeDoc  `json:"document"`
+	Provenance finalizeProv `json:"provenance"`
+	// Challenge is false for an external source nobody can answer: the store accepts instead of asking.
+	Challenge bool        `json:"challenge"`
+	Facts     []FinalFact `json:"facts"`
 }
 
 // mcpConfig names the one MCP server the finalize agent may use: this binary in import mode, so
@@ -62,7 +72,9 @@ func finalizeLimits(facts int) (time.Duration, string) {
 
 func (a ClaudeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error) {
 	input, err := json.Marshal(finalizeWire{
-		Document: finalizeDoc{Path: in.Path, Title: in.Title, Chunks: in.ChunkCount}, Facts: in.Facts,
+		Document:   finalizeDoc{Path: in.Path, Title: in.Title, Chunks: in.ChunkCount},
+		Provenance: finalizeProv{Origin: in.Prov.Origin, SourceTag: in.Prov.SourceTag, Scope: in.Prov.Scope, Project: in.Prov.Project},
+		Challenge:  in.Prov.Origin != memory.OriginExternal, Facts: in.Facts,
 	})
 	if err != nil {
 		return FinalizeOutput{}, err
