@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,10 +67,14 @@ func asCommentThroughClaude(t *testing.T, app *realApp, cfg string) {
 		t.Fatalf("no store_memory tool use in the stream:\n%s", tail(out, 1500))
 	}
 	text, isErr, ok := toolResult(msgs, uses[0].ID)
-	if !ok || isErr || !strings.HasPrefix(text, "Nothing was stored.") {
-		t.Fatalf("store_memory asComment result = %q (ok=%v, err=%v), want the prepared line and a comment", text, ok, isErr)
+	var res struct {
+		Status  string `json:"status"`
+		Comment string `json:"comment"`
 	}
-	_, comment, _ := strings.Cut(text, "\n\n")
+	if !ok || isErr || json.Unmarshal([]byte(text), &res) != nil || res.Status != "prepared" || res.Comment == "" {
+		t.Fatalf("store_memory asComment result = %q (ok=%v, err=%v), want status prepared and a comment", text, ok, isErr)
+	}
+	comment := res.Comment
 	blocks, problems := memfmt.ParseComments("x.go", []byte(comment))
 	if len(problems) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 1 {
 		t.Fatalf("comment %q: blocks %+v, problems %v, want one clean block of one fact", comment, blocks, problems)
