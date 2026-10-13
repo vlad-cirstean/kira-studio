@@ -104,9 +104,7 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "search_memories",
 		Description: llmprompts.MemoryToolSearchMemories.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[searchInput](src, llmprompts.MemoryToolSearchMemories.ID(), map[string]any{
-			"limit": llmprompts.LimitVars{Default: memory.DefaultSearchLimit, Max: memory.MaxSearchLimit},
-		}),
+		InputSchema: searchSchema(src),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("search_memories", func(ctx context.Context, _ *mcp.CallToolRequest, in searchInput) (*mcp.CallToolResult, searchOutput, error) {
 		project := opts.Project

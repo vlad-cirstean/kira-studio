@@ -59,7 +59,7 @@ type rankingCase struct {
 }
 
 // rankingEmbedder maps the case query text to the case vector. Documents are pre-embedded.
-type rankingEmbedder struct{ query, vec []float32 }
+type rankingEmbedder struct{ vec []float32 }
 
 func (e *rankingEmbedder) Spec() embed.Spec {
 	return embed.Spec{ID: "ranking", Dim: 8, QueryFloor: 0.3, QueryCeil: 1}
