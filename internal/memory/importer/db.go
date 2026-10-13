@@ -423,7 +423,7 @@ func (s *store) retryFileTx(tx *sql.Tx, jobID, fileID string) error {
 			return err
 		}
 	}
-	if _, err := tx.Exec(`UPDATE import_files SET state = ?, reason = '', finalize_attempts = 0, updated_at = ? WHERE id = ?`,
+	if _, err := tx.Exec(`UPDATE import_files SET state = ?, reason = '', finalize_attempts = 0, verify_pending = -1, updated_at = ? WHERE id = ?`,
 		next, s.now(), fileID); err != nil {
 		return err
 	}
@@ -603,7 +603,7 @@ func (s *store) finishChunk(it chunkItem, facts []Fact, tries int, u usage) erro
 		if err != nil || rowsAffected(res) == 0 {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE import_files SET fact_count = fact_count + ?, updated_at = ? WHERE id = ?`, len(facts), s.now(), it.FileID); err != nil {
+		if _, err := tx.Exec(`UPDATE import_files SET fact_count = fact_count + ?, verify_pending = -1, updated_at = ? WHERE id = ?`, len(facts), s.now(), it.FileID); err != nil {
 			return err
 		}
 		_, err = tx.Exec(`UPDATE import_files SET state = 'extracted', updated_at = ? WHERE id = ? AND state = 'extracting'
@@ -725,23 +725,54 @@ func (f *extractedFile) applyVerdicts() {
 	f.Facts = kept
 }
 
-// extractedIDs lists the extracted files of running jobs, in work order.
-func extractedIDs(tx *sql.Tx) ([]string, error) {
+// settleVerifyPending computes verify_pending for extracted files that lack it, once per file.
+func settleVerifyPending(s *store, tx *sql.Tx) error {
 	rows, err := tx.Query(`SELECT f.id FROM import_files f JOIN import_jobs j ON j.id = f.job_id
-		WHERE f.state = 'extracted' AND j.state = 'running' ORDER BY j.created_at, f.rel_path`)
+		WHERE f.state = 'extracted' AND j.state = 'running' AND f.verify_pending < 0`)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
 	var ids []string
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			return nil, err
+			_ = rows.Close()
+			return err
 		}
 		ids = append(ids, id)
 	}
-	return ids, rows.Err()
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		f, err := s.loadExtracted(tx, id)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE import_files SET verify_pending = ? WHERE id = ?`, len(f.Verify), id); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
+// claimExtracted settles verify_pending, then loads the first extracted file of a running job that
+// matches cond (a WHERE fragment over f), in work order.
+func (s *store) claimExtracted(tx *sql.Tx, cond string) (extractedFile, bool, error) {
+	if err := settleVerifyPending(s, tx); err != nil {
+		return extractedFile{}, false, err
+	}
+	var id string
+	err := tx.QueryRow(`SELECT f.id FROM import_files f JOIN import_jobs j ON j.id = f.job_id
+		WHERE f.state = 'extracted' AND j.state = 'running' AND (` + cond + `) ORDER BY j.created_at, f.rel_path LIMIT 1`).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return extractedFile{}, false, nil
+	}
+	if err != nil {
+		return extractedFile{}, false, err
+	}
+	f, err := s.loadExtracted(tx, id)
+	return f, err == nil, err
 }
 
 // claimVerify reserves the next extracted file that still has questionable facts without a verdict.
@@ -749,24 +780,14 @@ func (s *store) claimVerify() (finalItem, bool, error) {
 	var out finalItem
 	found := false
 	err := s.tx(func(tx *sql.Tx) error {
-		ids, err := extractedIDs(tx)
-		if err != nil {
+		f, ok, err := s.claimExtracted(tx, `f.kind != 'memdoc' AND f.verify_pending > 0`)
+		if err != nil || !ok {
 			return err
 		}
-		for _, id := range ids {
-			f, err := s.loadExtracted(tx, id)
-			if err != nil {
-				return err
-			}
-			if f.Kind == KindMemdoc || len(f.Verify) == 0 {
-				continue
-			}
-			if _, err := tx.Exec(`UPDATE import_files SET state = 'verifying', updated_at = ? WHERE id = ?`, s.now(), id); err != nil {
-				return err
-			}
-			out, found = f.finalItem, true
-			return nil
+		if _, err := tx.Exec(`UPDATE import_files SET state = 'verifying', updated_at = ? WHERE id = ?`, s.now(), f.FileID); err != nil {
+			return err
 		}
+		out, found = f.finalItem, true
 		return nil
 	})
 	return out, found, err
@@ -777,26 +798,16 @@ func (s *store) claimFinalize() (finalItem, bool, error) {
 	var out finalItem
 	found := false
 	err := s.tx(func(tx *sql.Tx) error {
-		ids, err := extractedIDs(tx)
-		if err != nil {
+		f, ok, err := s.claimExtracted(tx, `f.kind = 'memdoc' OR f.verify_pending = 0`)
+		if err != nil || !ok {
 			return err
 		}
-		for _, id := range ids {
-			f, err := s.loadExtracted(tx, id)
-			if err != nil {
-				return err
-			}
-			if len(f.Verify) > 0 && f.Kind != KindMemdoc {
-				continue
-			}
-			f.applyVerdicts()
-			if _, err := tx.Exec(`UPDATE import_files SET state = 'finalizing', finalize_attempts = finalize_attempts + 1, updated_at = ? WHERE id = ?`,
-				s.now(), id); err != nil {
-				return err
-			}
-			out, found = f.finalItem, true
-			return nil
+		f.applyVerdicts()
+		if _, err := tx.Exec(`UPDATE import_files SET state = 'finalizing', finalize_attempts = finalize_attempts + 1, updated_at = ? WHERE id = ?`,
+			s.now(), f.FileID); err != nil {
+			return err
 		}
+		out, found = f.finalItem, true
 		return nil
 	})
 	return out, found, err
@@ -818,8 +829,14 @@ func (s *store) saveVerdicts(it finalItem, batch map[string]Verdict, u usage) er
 			all[id] = v
 		}
 		out, _ := json.Marshal(all)
-		_, err := tx.Exec(`UPDATE import_files SET verify_json = ?, verified = ?, updated_at = ? WHERE id = ? AND state = 'verifying'`,
-			string(out), len(all), s.now(), it.FileID)
+		pending := 0
+		for _, vf := range it.Verify {
+			if _, judged := all[vf.ID]; !judged {
+				pending++
+			}
+		}
+		_, err := tx.Exec(`UPDATE import_files SET verify_json = ?, verified = ?, verify_pending = ?, updated_at = ? WHERE id = ? AND state = 'verifying'`,
+			string(out), len(all), pending, s.now(), it.FileID)
 		return err
 	})
 }

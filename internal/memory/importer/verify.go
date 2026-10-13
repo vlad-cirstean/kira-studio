@@ -67,11 +67,16 @@ type VerifyOutput struct {
 // Questionable reports whether a fact needs the cross-check: the extractor doubted it, or its quote
 // is not in the chunk (whitespace and case aside), which catches an invented quote.
 func Questionable(chunkText string, f Fact) bool {
+	return questionableIn(normalizeQuote(chunkText), f)
+}
+
+// questionableIn is Questionable over chunk text already passed through normalizeQuote.
+func questionableIn(normChunk string, f Fact) bool {
 	if f.Unresolved != "" {
 		return true
 	}
 	ev := normalizeQuote(f.Evidence)
-	return ev == "" || !strings.Contains(normalizeQuote(chunkText), ev)
+	return ev == "" || !strings.Contains(normChunk, ev)
 }
 
 func normalizeQuote(s string) string {
