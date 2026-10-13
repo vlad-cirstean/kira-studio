@@ -228,9 +228,9 @@ test('rows stay painted through scroll, click and Show more, collapsed or not', 
   await setScrollTop(page, 'end');
   expect(await gridProblems(page, HISTORY_ROWS)).toEqual([]);
 
+  await setScrollTop(page, 0);
   await page.locator('[data-testid="graph-collapse-toggle"]').click();
   await expect(subjectOf(page, 14)).toHaveText('commit 14');
-  await setScrollTop(page, 0);
   for (let row = 0; row < 15; row++) await expect(subjectOf(page, row)).toHaveText(`commit ${row}`);
   expect(await gridProblems(page)).toEqual([]);
   expect(errors).toEqual([]);
