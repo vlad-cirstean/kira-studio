@@ -4720,11 +4720,16 @@ replies and full terminal attach for Claude Code sessions.
   `ErrClaudeOutdated` ("update Claude Code").
 - MCP server: `<Kira Space executable> memory-mcp`, stdio, spawned per session by Claude Code, so it works
   with the app closed or open. `main.go` calls `appwire.RunArgvShim` (`internal/appwire/wire.go`) before `startupfail` and
-  `acquireSingleInstance`. Tools `store_memory` (progress notifications `checking`,
-  `reconciling`, `saving`), `search_memories` (`includeHistory`), `memory_history`, `memory_context`; prompt `remember`
-  (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
+  `acquireSingleInstance`. Tools `store_memory` (progress `checking`, `reconciling`, `saving`;
+  `asComment`), `search_memories` (`includeHistory`, `scopes`, `origins`, `project`, `limit`), `memory_history`,
+  `memory_context`, plus `ingest_files` and `ingest_status` when `Options.Ingest` is set (never in import mode);
+  prompt `remember` (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
   from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
   script lives in Studio's `mcpauth`).
+- Agent docs (P276): texts live in `internal/llmprompts/registry.go` (`memory.mcp.*`), read once per session.
+  Contract: the store splits and rewords facts; the agent sends each with reason, origin and scope, never
+  inventing a reason; files go by path. Numbers in descriptions come from Go constants (`memory.MaxItems`,
+  `MaxGroups`, search and context limits, `maxIngestPaths`), never literals.
 - Space: `bridge.MemoryService` (`apps/kira-space/internal/bridge/memory.go`; teardown is the
   package-level `bridge.CloseMemory`) emits `kira:memory:changed` after its own writes and, via a 2 s
   `PRAGMA data_version` watcher, after the MCP subprocess writes. `memory` is the last mode in
@@ -4734,9 +4739,8 @@ replies and full terminal attach for Claude Code sessions.
   `packages/workbench/src/memory/settings/*`: Claude Code registration, semantic model).
   The module hosts no setup action; `MemorySetupHint` only links there through
   `MemoryModuleContext.openSettings`. `useModelDownloadsStore` holds the download `AbortController`, so
-  Cancel survives closing Settings. Open: no "registered with Claude Code" detection.
-- Memory UI adds `settings/SemanticModelSection.vue` (download button, progress, indexing, retry) and a `semantic`
-  badge on rows found by meaning only.
+  Cancel survives closing Settings. `settings/SemanticModelSection.vue` (download button, progress, indexing,
+  retry) adds a `semantic` badge on rows found by meaning only. Open: no "registered with Claude Code" detection.
 - Add memory is one free-text box (cap 1000 = `MaxFactLen`), sent as one item with a fixed manual
   reason. Gate splits it into atomic facts. Origin `user`, source `ui`, scope picker (default Personal) plus project combobox for Project.
 - Ids (P272): fact id = lineage id, `km_` + 12 Crockford base32 lowercase chars (`km_7h3kq9x2mfa4`; word-boundary
@@ -4792,7 +4796,8 @@ replies and full terminal attach for Claude Code sessions.
   `prepared` with `comment` and `prepared` facts; text is the `memory.mcp.store.prepared` line plus the
   comment. Refused with `groups`, import mode, `md`/`txt` or an unsupported extension.
 - MCP text output (`search_memories`, `memory_history`, `memory_context`): same grammar, `fact`, `reason`,
-  then `<id> meta: vN origin=... [source=...] scope=... [project=...] [match=...] [historical]`.
+  then `<id> meta: vN origin=... [source=...] scope=... [project=...] [match=...] [score parts] [historical] [ctx=N]`.
+  Ranking "Output" lists the score parts; neutral parts are omitted. `ctx=N`: `memory_context` has N facts stored with it.
 - Validator: `<Kira Space executable> memory-check` (`internal/memory/memcheck`, `appwire.RunArgvShim` case).
   `[paths]` scans git-tracked files (or walks outside git); `--staged` checks staged blobs and runs the
   cross-file check (one id, one text); `--install-hook` writes `pre-commit` (honours `core.hooksPath`) with a
@@ -4822,8 +4827,9 @@ replies and full terminal attach for Claude Code sessions.
   `mcp__kira-memory__*` tools, `--permission-prompts none`, `--setting-sources ""`. No `--safe-mode`:
   it disables MCP servers. User-level `CLAUDE.md` stays out through `--setting-sources ""` (canary
   checked), and a tool outside the list is denied.
-- Import mode: `memory-mcp --import-ref` forces origin `external` with source tag `doc`, scope `personal`, no session, source `import`, `source_ref` = file id
-  whatever the tool input says, and joins the file's `document` group. `memory_events` (migration 3) holds `source_ref`, checked as
+- Import mode: `memory-mcp --import-ref` sets provenance, groups and session from the import job, source `import`,
+  `source_ref` = file id whatever the tool input says, and joins the file's `document` group. A job no longer
+  found falls back to `external`/`doc`/`personal`. `memory_events` (migration 3) holds `source_ref`, checked as
   `(source = 'import') = (source_ref IS NOT NULL)`; history shows "via import (<path>)" through a join
   on `import_files`. The gate and reconcile run on every imported fact like any store.
 - State: `import_jobs`, `import_files`, `import_chunks` in `memory.db`. Job: scanning, awaiting,
