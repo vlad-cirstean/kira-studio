@@ -184,7 +184,7 @@ func TestDescribeSilentServer(t *testing.T) {
 
 func TestDescribeCancel(t *testing.T) {
 	app := flowharness.New(t)
-	addr := flowharness.Silent(t)
+	addr, accepted := flowharness.SilentAccepting(t)
 	args := describeArgs(addr)
 	args.OpID = newOp()
 
@@ -193,7 +193,11 @@ func TestDescribeCancel(t *testing.T) {
 		_, err := app.W.Grpc.Describe(ctx, args)
 		done <- err
 	}()
-	time.Sleep(300 * time.Millisecond)
+	select {
+	case <-accepted:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Describe never connected to the silent server")
+	}
 	if err := app.W.Ops.Cancel(bridge.OpsCancelArgs{OpID: args.OpID}); err != nil {
 		t.Fatal(err)
 	}

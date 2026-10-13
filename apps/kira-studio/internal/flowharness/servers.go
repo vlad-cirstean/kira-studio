@@ -135,10 +135,17 @@ func GRPC(t testing.TB, opts ...GRPCOpt) *GRPCServer {
 // Silent starts a TCP server that accepts connections and never writes; returns its address.
 func Silent(t testing.TB) string {
 	t.Helper()
+	addr, _ := SilentAccepting(t)
+	return addr
+}
+
+// SilentAccepting is Silent plus a channel that receives once per accepted connection.
+func SilentAccepting(t testing.TB) (string, <-chan struct{}) {
+	t.Helper()
 	s, err := servers.StartSilent()
 	if err != nil {
 		t.Fatalf("start silent server: %v", err)
 	}
 	t.Cleanup(s.Close)
-	return s.Addr
+	return s.Addr, s.Accepted
 }

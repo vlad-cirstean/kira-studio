@@ -401,9 +401,11 @@ func (f flowSvc) bidi(_ any, ss grpc.ServerStream) error {
 // Silent accepts TCP connections and never writes, to prove a client gives up.
 type Silent struct {
 	Addr string
-	ln   net.Listener
-	mu   sync.Mutex
-	open []net.Conn
+	// Accepted receives one value per accepted connection; sends never block.
+	Accepted chan struct{}
+	ln       net.Listener
+	mu       sync.Mutex
+	open     []net.Conn
 }
 
 // StartSilent listens on a free loopback port.
@@ -412,7 +414,7 @@ func StartSilent() (*Silent, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Silent{Addr: ln.Addr().String(), ln: ln}
+	s := &Silent{Addr: ln.Addr().String(), Accepted: make(chan struct{}, 16), ln: ln}
 	go func() {
 		for {
 			c, err := ln.Accept()
@@ -422,6 +424,10 @@ func StartSilent() (*Silent, error) {
 			s.mu.Lock()
 			s.open = append(s.open, c)
 			s.mu.Unlock()
+			select {
+			case s.Accepted <- struct{}{}:
+			default:
+			}
 		}
 	}()
 	return s, nil
