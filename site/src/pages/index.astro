@@ -17,7 +17,7 @@ if (!hero) throw new Error('Missing hero shot studio-data-grid');
   <Header />
   <main>
     <Hero shot={hero} />
-    {APPS.map((app) => <AppSection app={app} shots={shots.filter((s) => s.app === app.id)} />)}
+    {APPS.map((app) => <AppSection app={app} shots={shots.filter((s) => s.app === app.id && s.id !== hero.id)} />)}
     <Install />
   </main>
   <Footer />
