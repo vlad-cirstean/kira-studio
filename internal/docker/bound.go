@@ -133,9 +133,16 @@ func (b *BoundService) Containers(args ListArgs) ([]Container, error) {
 
 func (b *BoundService) Images() ([]Image, error) { return b.m.images(context.Background()) }
 
-// ImageRegistry resolves one image's registry page lazily; the image list stays free of Hub calls.
+// ImageRegistry resolves one image's registry page without any Hub call; an implied Docker Hub name
+// under the containerd store comes back Unconfirmed.
 func (b *BoundService) ImageRegistry(args IDArgs) (RegistryLink, error) {
-	return b.m.imageRegistry(context.Background(), args.ID)
+	return b.m.imageRegistry(context.Background(), args.ID, false)
+}
+
+// ConfirmImageRegistry is ImageRegistry plus the Docker Hub check (cached), for the user's click: URL
+// is empty when Hub has no such repository or cannot be reached.
+func (b *BoundService) ConfirmImageRegistry(args IDArgs) (RegistryLink, error) {
+	return b.m.imageRegistry(context.Background(), args.ID, true)
 }
 
 func (b *BoundService) Volumes() ([]Volume, error) { return b.m.volumes(context.Background()) }

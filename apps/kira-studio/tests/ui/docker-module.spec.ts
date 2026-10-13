@@ -336,16 +336,22 @@ test('engine overview tabulates containers with humanized stats; section tabs sh
 });
 
 const registryLink = (key: string) =>
-  contract<{ url: string }>('docker-registry', `DockerService.ImageRegistry#${key}`);
+  contract<{ url: string; unconfirmed: boolean }>('docker-registry', `DockerService.${key}`);
 
-test('contract: image detail registry button opens the resolved URL; local-only images get none', async ({
+test('contract: image detail registry button asks Hub only on click, then opens the URL', async ({
   relaunch,
 }) => {
-  const hub = registryLink('hub');
-  const local = registryLink('local');
+  const candidate = registryLink('ImageRegistry#unconfirmed');
+  const hub = registryLink('ConfirmImageRegistry#hub');
+  let confirms = 0;
   const { page, control } = await setupDocker(relaunch, {
     handlers: {
-      ImageRegistry: (a) => ((a as { id: string }).id === IMAGES[0].id ? hub : local),
+      ImageRegistry: (a) =>
+        (a as { id: string }).id === IMAGES[0].id ? candidate : { url: '', unconfirmed: false },
+      ConfirmImageRegistry: () => {
+        confirms += 1;
+        return hub;
+      },
     },
   });
   await openDocker(page);
@@ -358,21 +364,47 @@ test('contract: image detail registry button opens the resolved URL; local-only 
   await expect(page.locator('[data-testid="docker-resource-registry"]')).toHaveCount(0);
 
   await alpine.click();
+  await expect(page.locator('[data-testid="docker-resource-registry"]')).toBeVisible();
+  expect(confirms).toBe(0);
   await page.locator('[data-testid="docker-resource-registry"]').click();
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
     .toHaveLength(1);
+  expect(confirms).toBe(1);
   expect(control.log().find((e) => e.channel === IPC.linkOpenExternal)?.args).toMatchObject({
     url: hub.url,
   });
 });
 
-test('contract: container detail shows the registry button next to the image', async ({
+test('contract: registry button shows "No registry page found" when Hub has none', async ({
   relaunch,
 }) => {
-  const hub = registryLink('hub');
+  const candidate = registryLink('ImageRegistry#unconfirmed');
+  const none = registryLink('ConfirmImageRegistry#local');
   const { page, control } = await setupDocker(relaunch, {
-    handlers: { ImageRegistry: () => hub },
+    handlers: { ImageRegistry: () => candidate, ConfirmImageRegistry: () => none },
+  });
+  await openDocker(page);
+  await openContainer(page, 'solo');
+
+  await expect(page.locator('[data-testid="docker-registry-missing"]')).toHaveCount(0);
+  await page.locator('[data-testid="docker-detail-registry"]').click();
+  await expect(page.locator('[data-testid="docker-registry-missing"]')).toHaveText(
+    'No registry page found',
+  );
+  expect(control.log().filter((e) => e.channel === IPC.linkOpenExternal)).toHaveLength(0);
+});
+
+test('a named-registry image opens without a Hub check', async ({ relaunch }) => {
+  let confirms = 0;
+  const { page, control } = await setupDocker(relaunch, {
+    handlers: {
+      ImageRegistry: () => ({ url: 'https://ghcr.io/acme/app', unconfirmed: false }),
+      ConfirmImageRegistry: () => {
+        confirms += 1;
+        return { url: '', unconfirmed: false };
+      },
+    },
   });
   await openDocker(page);
   await openContainer(page, 'solo');
@@ -381,9 +413,7 @@ test('contract: container detail shows the registry button next to the image', a
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
     .toHaveLength(1);
-  expect(control.log().find((e) => e.channel === IPC.linkOpenExternal)?.args).toMatchObject({
-    url: hub.url,
-  });
+  expect(confirms).toBe(0);
 });
 
 test('start is green, stop is red, and a selected row has no bar', async ({ relaunch }) => {

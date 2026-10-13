@@ -15,10 +15,9 @@ import Identifier from '@workbench/components/Identifier.vue';
 import QueryState from '@workbench/components/QueryState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref, watch } from 'vue';
-import { useDocker } from '../context';
 import { publishedPorts, shortId, stateDotTone } from '../lib/format';
 import type { ContainerAction } from '../queries';
-import { useContainerAction, useContainerDetail, useImageRegistry } from '../queries';
+import { useContainerAction, useContainerDetail, useRegistryLink } from '../queries';
 import { useDockerEditStore } from '../state/dockerEdit';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { type DockerDetailTab, useDockerUiStore } from '../state/dockerUi';
@@ -33,7 +32,6 @@ import UsageBar from './UsageBar.vue';
 const props = defineProps<{ containerId: string }>();
 
 const ui = useDockerUiStore();
-const docker = useDocker();
 const stats = useDockerStatsStore();
 const edits = useDockerEditStore();
 const id = computed(() => props.containerId);
@@ -41,8 +39,7 @@ const detail = useContainerDetail(id);
 const actions = useContainerAction();
 
 const c = computed(() => detail.data.value?.container);
-const registry = useImageRegistry(() => c.value?.imageId ?? '');
-const registryUrl = computed(() => registry.data.value?.url ?? '');
+const registry = useRegistryLink(() => c.value?.imageId ?? '');
 const running = computed(() => c.value?.state === 'running');
 const isUp = running;
 const live = computed(() => (running.value ? stats.latest.get(props.containerId) : undefined));
@@ -100,10 +97,6 @@ watch([running, c], () => {
     ui.detailTab = 'overview';
   }
 });
-
-function openRegistry(url: string): void {
-  void docker.openExternal(url);
-}
 
 function act(action: ContainerAction): void {
   lastAction.value = action;
@@ -195,12 +188,16 @@ function act(action: ContainerAction): void {
           >
             <span class="min-w-0 truncate" data-testid="docker-detail-image">{{ c.image }}</span>
             <TooltipIconButton
-              v-if="registryUrl"
+              v-if="registry.url.value"
               icon="link-external"
               :label="t('docker.detail.openRegistry.tooltip')"
+              :disabled="registry.checking.value"
               data-testid="docker-detail-registry"
-              @click="openRegistry(registryUrl)"
+              @click="registry.open()"
             />
+            <span v-if="registry.missing.value" data-testid="docker-registry-missing">{{
+              t('docker.detail.registryMissing.status')
+            }}</span>
             <Identifier :value="c.id" :short="shortId" copyable data-testid="docker-detail-id" />
             <span v-if="c.status">{{ c.status }}</span>
             <span

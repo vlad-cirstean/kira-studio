@@ -8,6 +8,7 @@ import {
   onScopeDispose,
   type Ref,
   reactive,
+  ref,
   toValue,
   watch,
 } from 'vue';
@@ -118,6 +119,38 @@ export function useImageRegistry(imageId: MaybeRefOrGetter<string>) {
     queryFn: () => control.imageRegistry(toValue(imageId)),
     enabled: computed(() => ready.value && toValue(imageId) !== ''),
   });
+}
+
+/**
+ * The registry button of one image. An implied Docker Hub name is resolved only on click, so opening
+ * a detail view sends no local image name to Docker Hub; `missing` is set when Hub has no page.
+ */
+export function useRegistryLink(imageId: MaybeRefOrGetter<string>) {
+  const { control, openExternal } = useDocker();
+  const registry = useImageRegistry(imageId);
+  const missingFor = ref('');
+  const confirm = useMutation({
+    mutationFn: (id: string) => control.confirmImageRegistry(id),
+  });
+  const url = computed(() => registry.data.value?.url ?? '');
+  const missing = computed(() => missingFor.value !== '' && missingFor.value === toValue(imageId));
+  async function open(): Promise<void> {
+    const id = toValue(imageId);
+    let target = url.value;
+    if (registry.data.value?.unconfirmed) {
+      try {
+        target = (await confirm.mutateAsync(id)).url;
+      } catch {
+        target = '';
+      }
+    }
+    if (target === '') {
+      missingFor.value = id;
+      return;
+    }
+    await openExternal(target);
+  }
+  return { url, missing, checking: computed(() => confirm.isPending.value), open };
 }
 
 export function useContainerEditSpec(id: Ref<string>) {

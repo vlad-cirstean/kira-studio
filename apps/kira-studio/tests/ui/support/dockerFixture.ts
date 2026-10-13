@@ -177,7 +177,8 @@ export async function setupDocker(
           ? containerDetailWithSecret(c)
           : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
       },
-      ImageRegistry: () => ({ url: '' }),
+      ImageRegistry: () => ({ url: '', unconfirmed: false }),
+      ConfirmImageRegistry: () => ({ url: '', unconfirmed: false }),
       Inspect: () => ({ raw: '{"Id":"x"}' }),
       Stop: (a) => {
         const c = state.containers.find((x) => x.id === (a as { id: string }).id);

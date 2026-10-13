@@ -93,13 +93,24 @@ func TestImageRegistryURL(t *testing.T) {
 		flowharness.Replace(runIDOf(d), "run"),
 	}
 
-	got, err := svc.ImageRegistry(docker.IDArgs{ID: imageIDOf(t, svc, local)})
+	localID := imageIDOf(t, svc, local)
+	got, err := svc.ImageRegistry(docker.IDArgs{ID: localID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	app.Contract(t, "docker-registry", "DockerService.ImageRegistry#local", got, opts...)
-	if got.URL != "" {
-		t.Fatalf("registry URL of unpublished %s = %q, want empty", local, got.URL)
+	// Listing a detail view never asks Hub: a containerd store only marks the implied name unconfirmed.
+	if got.Unconfirmed != containerd || (!containerd && got.URL != "") {
+		t.Fatalf("registry link of %s = %+v, want unconfirmed=%v", local, got, containerd)
+	}
+	if stub.total() != 0 {
+		t.Fatalf("ImageRegistry called the Hub API %d times, want 0", stub.total())
+	}
+	if got, err = svc.ConfirmImageRegistry(docker.IDArgs{ID: localID}); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "docker-registry", "DockerService.ConfirmImageRegistry#local", got, opts...)
+	if got.URL != "" || got.Unconfirmed {
+		t.Fatalf("confirmed registry link of unpublished %s = %+v, want empty", local, got)
 	}
 
 	// An explicit registry host names the registry itself: linked without asking Hub.
@@ -108,8 +119,8 @@ func TestImageRegistryURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.URL != "https://hub.docker.com/_/alpine" {
-		t.Fatalf("registry URL of %s = %q, want the Hub page", flowharness.Image, got.URL)
+	if got.URL != "https://hub.docker.com/_/alpine" || got.Unconfirmed {
+		t.Fatalf("registry link of %s = %+v, want the Hub page", flowharness.Image, got)
 	}
 	if stub.total() != before {
 		t.Fatalf("explicit-host image called the Hub API %d times", stub.total()-before)
@@ -119,14 +130,21 @@ func TestImageRegistryURL(t *testing.T) {
 		return
 	}
 	knownID := imageIDOf(t, svc, known)
+	if got, err = svc.ImageRegistry(docker.IDArgs{ID: knownID}); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "docker-registry", "DockerService.ImageRegistry#unconfirmed", got, opts...)
+	if !got.Unconfirmed || got.URL == "" {
+		t.Fatalf("registry link of %s = %+v, want the unconfirmed candidate", known, got)
+	}
 	for range 2 {
-		if got, err = svc.ImageRegistry(docker.IDArgs{ID: knownID}); err != nil {
+		if got, err = svc.ConfirmImageRegistry(docker.IDArgs{ID: knownID}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	app.Contract(t, "docker-registry", "DockerService.ImageRegistry#hub", got, opts...)
-	if want := "https://hub.docker.com/_/" + d.Prefix() + "known"; got.URL != want {
-		t.Fatalf("registry URL of confirmed %s = %q, want %q", known, got.URL, want)
+	app.Contract(t, "docker-registry", "DockerService.ConfirmImageRegistry#hub", got, opts...)
+	if want := "https://hub.docker.com/_/" + d.Prefix() + "known"; got.URL != want || got.Unconfirmed {
+		t.Fatalf("registry link of confirmed %s = %+v, want %q", known, got, want)
 	}
 	stub.mu.Lock()
 	defer stub.mu.Unlock()

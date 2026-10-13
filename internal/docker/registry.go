@@ -72,22 +72,26 @@ func registryURL(tags, repoDigests []string) string {
 }
 
 // registryLink applies the store-aware rule: a containerd store gives locally built images a
-// digest too, so an implied Docker Hub name links only when hub confirms the repository.
-func registryLink(containerd bool, tags, repoDigests []string, hub func(repoPath string) (bool, error)) (string, error) {
+// digest too, so an implied Docker Hub name links only when hub confirms the repository. A nil hub
+// skips the check: the candidate URL comes back with unconfirmed set.
+func registryLink(containerd bool, tags, repoDigests []string, hub func(repoPath string) (bool, error)) (url string, unconfirmed bool, err error) {
 	ref := pickRef(tags, repoDigests)
 	if ref == "" {
-		return "", nil
+		return "", false, nil
 	}
-	url := pageURL(ref)
+	url = pageURL(ref)
 	if url == "" || !containerd || !impliedHub(ref) {
-		return url, nil
+		return url, false, nil
+	}
+	if hub == nil {
+		return url, true, nil
 	}
 	_, path := splitRef(ref)
 	ok, err := hub(path)
 	if err != nil || !ok {
-		return "", err
+		return "", false, err
 	}
-	return url, nil
+	return url, false, nil
 }
 
 func pageURL(ref string) string {

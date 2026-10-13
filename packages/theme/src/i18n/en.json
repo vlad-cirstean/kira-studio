@@ -2489,6 +2489,9 @@
       "recreating": {
         "loading": "Recreating…"
       },
+      "registryMissing": {
+        "status": "No registry page found"
+      },
       "sections": {
         "aria": "Container sections"
       }

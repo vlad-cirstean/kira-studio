@@ -158,7 +158,7 @@ test('LinkService.OpenExternal rejection is announced in the live region', async
     {
       Containers: () => [],
       Images: () => [image],
-      ImageRegistry: () => ({ url: 'https://hub.docker.com/_/alpine' }),
+      ImageRegistry: () => ({ url: 'https://hub.docker.com/_/alpine', unconfirmed: false }),
       Volumes: () => [],
       Networks: () => [],
     },

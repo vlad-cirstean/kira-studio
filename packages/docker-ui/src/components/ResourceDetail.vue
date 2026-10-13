@@ -9,14 +9,13 @@ import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { displayValue, formatBytes, formatDateTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
-import { useDocker } from '../context';
 import { nameOrShortId, stateDotTone } from '../lib/format';
 import {
   useContainers,
-  useImageRegistry,
   useImages,
   useInspect,
   useNetworks,
+  useRegistryLink,
   useVolumes,
 } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -39,7 +38,6 @@ const ICONS: Record<InspectKind, string> = {
 };
 
 const ui = useDockerUiStore();
-const docker = useDocker();
 const images = useImages();
 const volumes = useVolumes();
 const networks = useNetworks();
@@ -59,12 +57,7 @@ const title = computed(() => {
   return nameOrShortId(network.value?.name, props.id);
 });
 
-const registry = useImageRegistry(() => (props.kind === 'image' ? props.id : ''));
-const registryUrl = computed(() => registry.data.value?.url ?? '');
-
-function openRegistry(): void {
-  void docker.openExternal(registryUrl.value);
-}
+const registry = useRegistryLink(() => (props.kind === 'image' ? props.id : ''));
 
 const facts = computed<Array<[string, string]>>(() => {
   if (props.kind === 'image' && image.value) {
@@ -131,12 +124,21 @@ const usedByRows = computed(() =>
         title
       }}</span>
       <TooltipIconButton
-        v-if="registryUrl"
+        v-if="registry.url.value"
         icon="link-external"
         :label="t('docker.detail.openRegistry.tooltip')"
+        :disabled="registry.checking.value"
         data-testid="docker-resource-registry"
-        @click="openRegistry"
+        @click="registry.open()"
       />
+      <span
+        v-if="registry.missing.value"
+        class="text-kira-sm text-muted-foreground"
+        data-testid="docker-registry-missing"
+        >{{
+          t('docker.detail.registryMissing.status')
+        }}</span
+      >
       <Badge>{{ t(KIND_LABELS[kind]) }}</Badge>
     </div>
     <div class="@container p-3">

@@ -4991,8 +4991,9 @@ replies and full terminal attach for Claude Code sessions.
   an In place field whose mode resolves to recreate shows a plain hint. The registry link is lazy: `DockerService.ImageRegistry` (`imageregistry.go`) resolves one image's page on
   demand, so the image list makes no Hub call. `registryLink` (`registry.go`) picks the repo digest naming the first tag's
   repository. A containerd image store (`DriverStatus` `driver-type` `io.containerd.snapshotter.v1`, cached per client) gives
-  locally built images a digest too, so an implied Docker Hub name links only when `hub.docker.com` confirms the repository;
-  a Hub error or 404 gives no button. A named registry host links without a check. Flow tests set `WithHubAPI` to a fake.
+  locally built images a digest too, so an implied Docker Hub name is `Unconfirmed` (button shown, no Hub call); the click calls
+  `DockerService.ConfirmImageRegistry`, which asks `hub.docker.com`, opens the page on 200 and shows "No registry page found" on 404 or
+  error, so opening a detail view sends no local image name out. A named registry host links without a check. Flow tests set `WithHubAPI` to a fake.
   The button opens through
   `LinkService.OpenExternal` (Studio binds it again, 30 services); docker-ui takes `openExternal` in its
   context options. Container size lives in the Stats tab, which also opens for stopped containers.

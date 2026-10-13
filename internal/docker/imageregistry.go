@@ -19,9 +19,12 @@ const (
 	containerdStore = "io.containerd.snapshotter.v1"
 )
 
-// RegistryLink is the registry web page of one image; URL is empty when none is known.
+// RegistryLink is the registry web page of one image; URL is empty when none is known. Unconfirmed
+// marks an implied Docker Hub name not yet checked: URL is the candidate page, and ConfirmImageRegistry
+// asks Hub on the user's click.
 type RegistryLink struct {
-	URL string `json:"url"`
+	URL         string `json:"url"`
+	Unconfirmed bool   `json:"unconfirmed"`
 }
 
 // hubCache remembers Hub verdicts per repository path. Errors are never stored.
@@ -100,8 +103,9 @@ func (m *Manager) hubHasRepo(ctx context.Context, repoPath string) (bool, error)
 	return false, nil
 }
 
-// imageRegistry resolves one image's registry page. Hub failures mean "no link", never an error.
-func (m *Manager) imageRegistry(ctx context.Context, id string) (RegistryLink, error) {
+// imageRegistry resolves one image's registry page. Without confirm it never calls Hub, so opening a
+// detail view sends no local image name to a third party. Hub failures mean "no link", never an error.
+func (m *Manager) imageRegistry(ctx context.Context, id string, confirm bool) (RegistryLink, error) {
 	var out RegistryLink
 	err := m.call(ctx, callTimeout, func(ctx context.Context, cli *client.Client) error {
 		ii, err := cli.ImageInspect(ctx, id)
@@ -112,9 +116,11 @@ func (m *Manager) imageRegistry(ctx context.Context, id string) (RegistryLink, e
 		if err != nil {
 			return err
 		}
-		out.URL, _ = registryLink(containerd, ii.RepoTags, ii.RepoDigests, func(p string) (bool, error) {
-			return m.hubHasRepo(ctx, p)
-		})
+		var hub func(string) (bool, error)
+		if confirm {
+			hub = func(p string) (bool, error) { return m.hubHasRepo(ctx, p) }
+		}
+		out.URL, out.Unconfirmed, _ = registryLink(containerd, ii.RepoTags, ii.RepoDigests, hub)
 		return nil
 	})
 	return out, err

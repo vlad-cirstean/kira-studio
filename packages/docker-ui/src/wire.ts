@@ -142,6 +142,8 @@ export interface DockerImage {
 
 export interface DockerRegistryLink {
   url: string;
+  /** An implied Docker Hub name not yet checked: `url` is only a candidate. */
+  unconfirmed: boolean;
 }
 
 export interface DockerVolume {
