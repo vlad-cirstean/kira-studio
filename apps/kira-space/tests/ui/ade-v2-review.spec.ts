@@ -135,11 +135,12 @@ reviewTest(
     await page.locator(t('ade-review-sync')).click();
     const popover = page.locator(t('ade-review-sync-popover'));
     await expect(popover.locator(t('ade-review-sync-rows'))).toContainText('src/a.ts');
-    await popover
-      .locator(t('ade-review-sync-skipped'))
-      .getByRole('button')
-      .first()
-      .dispatchEvent('click');
+    const trigger = await page.locator(t('ade-review-sync')).boundingBox();
+    const box = await popover.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y - (trigger!.y + trigger!.height)).toBeLessThanOrEqual(16);
+    expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThanOrEqual(2);
+    await popover.locator(t('ade-review-sync-skipped')).getByRole('button').first().click();
     await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText(
       'Changed since review',
     );
@@ -168,7 +169,7 @@ reviewTest('a failed fetch from the sync popover shows its error', async ({ rela
     { channel: IPC.adeTaskGitHubSyncPlan, response: plan },
   ]);
   await page.locator(t('ade-review-sync')).click();
-  await page.locator(t('ade-review-sync-refresh')).dispatchEvent('click');
+  await page.locator(t('ade-review-sync-refresh')).click();
   await expect(page.locator(t('ade-review-sync-error'))).toHaveText('Could not fetch origin');
 });
 

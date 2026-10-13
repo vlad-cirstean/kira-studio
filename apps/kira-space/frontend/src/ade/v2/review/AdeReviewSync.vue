@@ -4,7 +4,12 @@ import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
 import { type MessageKey, t } from '@theme/i18n';
@@ -124,20 +129,27 @@ function onOpenChange(next: boolean): void {
 
 <template>
   <Popover v-if="visible" :open="open" @update:open="onOpenChange">
-    <Tooltip :disabled="!blocked">
-      <TooltipTrigger as-child>
-        <span>
-          <PopoverTrigger as-child>
-            <Button variant="dialog" size="kira" :disabled="blocked" data-testid="ade-review-sync">
-              {{
-                loadFailed ? t('space.ade.review.sync.button.label') : t('space.ade.review.sync.buttonCount.label', { count })
-              }}
-            </Button>
-          </PopoverTrigger>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{{ blockedMessage }}</TooltipContent>
-    </Tooltip>
+    <PopoverAnchor as-child>
+      <Tooltip :disabled="!blocked">
+        <TooltipTrigger as-child>
+          <span>
+            <PopoverTrigger as-child>
+              <Button
+                variant="dialog"
+                size="kira"
+                :disabled="blocked"
+                data-testid="ade-review-sync"
+              >
+                {{
+                  loadFailed ? t('space.ade.review.sync.button.label') : t('space.ade.review.sync.buttonCount.label', { count })
+                }}
+              </Button>
+            </PopoverTrigger>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{{ blockedMessage }}</TooltipContent>
+      </Tooltip>
+    </PopoverAnchor>
     <PopoverContent class="w-96 text-kira-md" align="end" data-testid="ade-review-sync-popover">
       <div class="flex flex-col gap-2">
         <FieldDescription v-if="data?.account" data-testid="ade-review-sync-account">
