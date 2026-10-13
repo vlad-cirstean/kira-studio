@@ -26,7 +26,9 @@ import ImportMenu from './import/ImportMenu.vue';
 import ImportStatus from './import/ImportStatus.vue';
 import { useImportChangeSync } from './import/importQueries';
 import { useImportUiStore } from './import/importStore';
-import { originText, SCOPE_LABEL } from './labels';
+import { MATCH_LABEL, originText, SCOPE_LABEL } from './labels';
+import MemoryFilters from './MemoryFilters.vue';
+import MemoryScore from './MemoryScore.vue';
 import MemorySetupHint from './MemorySetupHint.vue';
 import { useMemoryChangeSync, useMemorySearch, useMemorySemanticStatus } from './queries';
 import { useMemoryUiStore } from './store';
@@ -34,9 +36,13 @@ import { useMemoryUiStore } from './store';
 // P201: the Memory module's left panel — recall-first search over the shared memory store, the
 // same service the kira-memory MCP server writes through.
 const ui = useMemoryUiStore();
-const { query, includeHistory, selectedId, addOpen } = storeToRefs(ui);
+const { query, includeHistory, selectedId, addOpen, scopes, origins, project } = storeToRefs(ui);
 const debounced = refDebounced(query, TIMING.search);
-const search = useMemorySearch(debounced, includeHistory);
+const search = useMemorySearch(debounced, includeHistory, () => ({
+  scopes: scopes.value,
+  origins: origins.value,
+  project: project.value,
+}));
 useMemoryChangeSync();
 useImportChangeSync();
 const imports = useImportUiStore();
@@ -116,6 +122,7 @@ const historyToggleId = useId();
         />
         <Label :for="historyToggleId">{{ t('memory.panel.includeHistory.label') }}</Label>
       </div>
+      <MemoryFilters v-model:scopes="scopes" v-model:origins="origins" v-model:project="project" />
       <MemorySetupHint
         v-if="semanticNeedsSetup"
         :message="semanticState === 'notInstalled' ? t('memory.panel.semanticOff.hint') : t('memory.panel.semanticUnavailable.hint')"
@@ -182,13 +189,14 @@ const historyToggleId = useId();
                   t('memory.common.historical.status')
                 }}</Badge>
                 <Badge
-                  v-if="memory.match === 'semantic'"
-                  variant="info"
-                  data-testid="memory-match-semantic"
+                  v-if="memory.match"
+                  :variant="memory.match === 'keyword' ? 'default' : 'info'"
+                  :data-testid="`memory-match-${memory.match}`"
                   >{{
-                    t('memory.panel.semantic.status')
+                    t(MATCH_LABEL[memory.match])
                   }}</Badge
                 >
+                <MemoryScore v-if="memory.score" :score="memory.score" />
                 <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">{{
                   t('memory.common.version.label', { version: memory.version })
                 }}</span>

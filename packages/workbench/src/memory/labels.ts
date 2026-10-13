@@ -1,4 +1,5 @@
 import type {
+  Memory,
   MemoryEvent,
   MemoryGroupKind,
   MemoryOrigin,
@@ -25,6 +26,13 @@ export const GROUP_KIND_LABEL = {
   document: 'memory.common.groupKind.document.label',
   thread: 'memory.common.groupKind.thread.label',
 } as const satisfies Record<MemoryGroupKind, MessageKey>;
+
+/** How a search found a fact. */
+export const MATCH_LABEL = {
+  keyword: 'memory.panel.keyword.status',
+  semantic: 'memory.panel.semantic.status',
+  both: 'memory.panel.both.status',
+} as const satisfies Record<NonNullable<Memory['match']>, MessageKey>;
 
 /** How far to trust a fact, by origin: user above external above agent. */
 export const GRADE_TEXT = {

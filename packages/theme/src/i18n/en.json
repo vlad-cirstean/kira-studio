@@ -5837,11 +5837,26 @@
       }
     },
     "panel": {
+      "boostProject": {
+        "clear": {
+          "label": "Clear project"
+        },
+        "label": "Boost project"
+      },
+      "both": {
+        "status": "Both sources"
+      },
       "connectClaude": {
         "hint": "Connect Claude Code in the settings to let it store memories."
       },
+      "filter": {
+        "label": "Filters"
+      },
       "includeHistory": {
         "label": "Include history"
+      },
+      "keyword": {
+        "status": "Keyword"
       },
       "list": {
         "empty": "No memories yet",
@@ -5859,6 +5874,38 @@
       },
       "semanticUnavailable": {
         "hint": "Semantic search unavailable."
+      }
+    },
+    "score": {
+      "badge": {
+        "aria": "Rank score {value}"
+      },
+      "grade": {
+        "label": "Origin grade {value}"
+      },
+      "group": {
+        "label": "Shared context {value}"
+      },
+      "history": {
+        "label": "Superseded {value}"
+      },
+      "keyword": {
+        "label": "Keyword {value}"
+      },
+      "recency": {
+        "label": "Recent {value}"
+      },
+      "scopeCompany": {
+        "label": "Company {value}"
+      },
+      "scopeOtherProject": {
+        "label": "Other project {value}"
+      },
+      "scopeProject": {
+        "label": "Current project {value}"
+      },
+      "semantic": {
+        "label": "Meaning {value}"
       }
     },
     "semantic": {
