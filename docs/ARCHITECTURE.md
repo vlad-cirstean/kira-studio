@@ -3858,11 +3858,19 @@ its document-level height-chain/gutter reset onto Tailwind utilities applied in 
 own `mount()` — is deleted outright, along with its `main.ts` import and the now-unused
 `kv-mount-root` class.
 
-**Graph restart and PR facts (P203, P189).** `PackedStreamState`'s restart-at-zero reset (a re-walk
-from row 0 after `refsChanged` or Refresh) must drop the layout plan in the same synchronous step
-(`GraphViewState.#applyChunk` `onReset` clears `#pendingLayoutRange` and calls `#resetLayout()`).
-The plan never references store rows the store lacks; otherwise `CommitGrid`'s generation watcher
-throws `ShaTable: row N out of range` and SlickGrid half-updates (blank rows, missing commits).
+**Graph restart and PR facts (P203, P189, P278).** A restart at row 0 (a re-walk after `refsChanged`
+or Refresh) never empties the live list. `PackedStreamState({ stageRestarts: true })` streams it into a
+staging `CommitStore`; once staging holds as many rows as the live store or the stream ends,
+`GraphViewState.#rebuildLayout` lays staging out and `commitStaged` moves it in via
+`CommitStore.replaceWith`, publishing before `generation` bumps. Corruption and `reset()` discard
+staging. One synchronous `#publish` sets `layout`, `plan`, `laneCount` and runs `onPlanPublished`
+listeners; `CommitGrid` repaints inside it, so a click or scroll in the same task never meets a stale
+grid. The plan never references store rows the store lacks; otherwise `CommitGrid`'s generation
+watcher throws `ShaTable: row N out of range` and SlickGrid half-updates (blank rows, missing commits).
+`GraphOrderState.rebuild` reconciles tips against the store: refs reload before the graph re-walks,
+so a tip sha the store lacks keeps the sha its group last used (HEAD by index, others by key), else
+HEAD's group would empty and the whole history collapse. The auto-refresh viewport restore anchors on
+the top row's sha. `CommitGrid` also resizes the SlickGrid canvas on a height-only change.
 A walk reset remembers its loaded row count (`gitsession.Walk.keepRows`); the next `graph.stream`
 re-reads whole pages until the store holds that many again, so Refresh after Show more keeps the
 loaded depth (the newest commit shifts the last old row out) (P231).
