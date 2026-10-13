@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -215,6 +216,55 @@ func TestAsCommentPersistsNothingAndTextIsGrepFirst(t *testing.T) {
 	}
 	if n != 3 {
 		t.Errorf("want fact, reason and meta lines, got %d", n)
+	}
+}
+
+func TestSearchFiltersProjectDefaultAndScoreMeta(t *testing.T) {
+	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
+	defer store.Close()
+	svc := memory.NewService(store, acceptRunner{}, memory.ServiceOptions{})
+	ctx := context.Background()
+	const proj = "github.com/acme/billing"
+	ct, st := mcp.NewInMemoryTransports()
+	if _, err := Build(svc, Options{Project: proj}).Connect(ctx, st, nil); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	if _, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "store_memory", Arguments: map[string]any{"items": []map[string]any{
+		{"fact": "invoices go out monthly", "reason": "finance", "origin": "user", "scope": "project"},
+		{"fact": "invoices need a vat number", "reason": "law", "origin": "agent", "scope": "company"},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	search := func(args map[string]any) (string, error) {
+		res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "search_memories", Arguments: args})
+		if err != nil {
+			return "", err
+		}
+		if res.IsError {
+			return "", errors.New(res.Content[0].(*mcp.TextContent).Text)
+		}
+		return res.Content[0].(*mcp.TextContent).Text, nil
+	}
+
+	text, err := search(map[string]any{"query": "invoices"})
+	if err != nil || strings.Index(text, "invoices go out") > strings.Index(text, "invoices need") ||
+		!strings.Contains(text, " score=") || !strings.Contains(text, " kw=") || !strings.Contains(text, "scope=project:1.15") {
+		t.Fatalf("server project boosts its own facts: %q, %v", text, err)
+	}
+	if text, err = search(map[string]any{"query": "invoices", "project": ""}); err != nil || strings.Contains(text, "scope=project:") {
+		t.Fatalf("explicit empty project boosts nothing: %q, %v", text, err)
+	}
+	if text, err = search(map[string]any{"query": "invoices", "scopes": []string{"company"}, "origins": []string{"agent"}}); err != nil ||
+		strings.Contains(text, "invoices go out") || !strings.Contains(text, "invoices need") {
+		t.Fatalf("filters: %q, %v", text, err)
+	}
+	if _, err = search(map[string]any{"query": "invoices", "scopes": []string{"bogus"}}); err == nil {
+		t.Fatal("scope outside the enum accepted")
 	}
 }
 

@@ -40,9 +40,13 @@ type storeOutput struct {
 }
 
 type searchInput struct {
-	Query          string `json:"query"`
-	IncludeHistory bool   `json:"includeHistory,omitempty"`
-	Limit          int    `json:"limit,omitempty"`
+	Query          string   `json:"query"`
+	IncludeHistory bool     `json:"includeHistory,omitempty"`
+	Limit          int      `json:"limit,omitempty"`
+	Scopes         []string `json:"scopes,omitempty"`
+	Origins        []string `json:"origins,omitempty"`
+	// Project is the project key whose facts rank first. Absent uses the server's project; "" boosts none.
+	Project *string `json:"project,omitempty"`
 }
 
 type searchOutput struct {
@@ -105,7 +109,12 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 		}),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("search_memories", func(ctx context.Context, _ *mcp.CallToolRequest, in searchInput) (*mcp.CallToolResult, searchOutput, error) {
-		ms, err := svc.Search(ctx, memory.SearchArgs{Query: in.Query, IncludeHistory: in.IncludeHistory, Limit: in.Limit})
+		project := opts.Project
+		if in.Project != nil {
+			project = *in.Project
+		}
+		ms, err := svc.Search(ctx, memory.SearchArgs{Query: in.Query, IncludeHistory: in.IncludeHistory, Limit: in.Limit,
+			Scopes: in.Scopes, Origins: in.Origins, Project: project})
 		if err != nil {
 			return nil, searchOutput{}, err
 		}
@@ -185,6 +194,21 @@ func storeSchema(src llmprompts.Source) *jsonschema.Schema {
 	enum(item["origin"], memory.OriginUser, memory.OriginAgent, memory.OriginExternal)
 	enum(item["scope"], memory.ScopeCompany, memory.ScopeProject, memory.ScopePersonal)
 	enum(sch.Properties["groups"].Items.Properties["kind"], memory.GroupTask, memory.GroupDocument, memory.GroupThread)
+	return sch
+}
+
+// searchSchema is search_memories' input schema with scopes and origins limited to their closed sets.
+func searchSchema(src llmprompts.Source) *jsonschema.Schema {
+	sch := llmprompts.InputSchema[searchInput](src, llmprompts.MemoryToolSearchMemories.ID(), map[string]any{
+		"limit": llmprompts.LimitVars{Default: memory.DefaultSearchLimit, Max: memory.MaxSearchLimit},
+	})
+	enum := func(prop *jsonschema.Schema, values ...string) {
+		for _, v := range values {
+			prop.Items.Enum = append(prop.Items.Enum, v)
+		}
+	}
+	enum(sch.Properties["scopes"], memory.ScopeCompany, memory.ScopeProject, memory.ScopePersonal)
+	enum(sch.Properties["origins"], memory.OriginUser, memory.OriginAgent, memory.OriginExternal)
 	return sch
 }
 
@@ -351,10 +375,35 @@ func writeMemory(b *strings.Builder, m memory.Memory) {
 	if m.Match != "" {
 		meta = append(meta, "match="+m.Match)
 	}
+	meta = append(meta, scoreMeta(m)...)
 	if m.Historical {
 		meta = append(meta, "historical")
 	}
+	if m.ContextCount > 0 {
+		meta = append(meta, fmt.Sprintf("ctx=%d", m.ContextCount))
+	}
 	fmt.Fprintf(b, "%s fact: %s\n%s reason: %s\n%s meta: %s\n\n", m.LineageID, oneLine(m.Fact), m.LineageID, oneLine(m.Reason), m.LineageID, strings.Join(meta, " "))
+}
+
+// scoreMeta prints a search result's score parts: total and per-source scores, then the boosts that
+// are not neutral. Neutral 1.00 parts are left out to save tokens.
+func scoreMeta(m memory.Memory) []string {
+	sc := m.Score
+	if sc == nil {
+		return nil
+	}
+	out := []string{fmt.Sprintf("score=%.2f", sc.Total), fmt.Sprintf("kw=%.2f", sc.Keyword), fmt.Sprintf("sem=%.2f", sc.Semantic)}
+	boost := func(key string, v float64, label string) {
+		if x := fmt.Sprintf("%.2f", v); x != "1.00" {
+			out = append(out, key+"="+label+x)
+		}
+	}
+	boost("grade", sc.Grade, "")
+	boost("scope", sc.Scope, sc.Boost+":")
+	boost("recent", sc.Recency, "")
+	boost("hist", sc.History, "")
+	boost("group", sc.Group, "")
+	return out
 }
 
 // renderContext lists the fact, then one block per group with the group's other facts.

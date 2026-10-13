@@ -435,13 +435,16 @@ var (
 // MemoryToolSearchMemories describes the search_memories tool.
 var MemoryToolSearchMemories = define(Entry{
 	ID: "memory.mcp.tool.search_memories", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "search_memories",
-	Default: `Search stored memories by keyword and by meaning. Recall-oriented: returns loosely related results, best first. Superseded versions are included only with includeHistory and are flagged historical.`,
+	Default: `Search stored memories by keyword and by meaning. Recall-oriented: returns loosely related results, best first. In meta, score is relevance times provenance boosts. Superseded versions are included only with includeHistory and are flagged historical.`,
 }, NoVars{})
 
 var (
 	_ = arg(MemoryToolSearchMemories.id, "query", spaceApp, NewSession, `free text; matched by words (prefixes, word forms) and by meaning`, NoVars{})
 	_ = arg(MemoryToolSearchMemories.id, "includeHistory", spaceApp, NewSession, `also return superseded versions, flagged historical`, NoVars{})
-	_ = arg(MemoryToolSearchMemories.id, "limit", spaceApp, NewSession, `maximum results, default {{.Default}}, maximum {{.Max}}`, LimitVars{Default: 25, Max: 100})
+	_ = arg(MemoryToolSearchMemories.id, "limit", spaceApp, NewSession, `maximum results, default {{.Default}}, maximum {{.Max}}`, LimitVars{Default: 40, Max: 200})
+	_ = arg(MemoryToolSearchMemories.id, "scopes", spaceApp, NewSession, `only these scopes: company, project, personal`, NoVars{})
+	_ = arg(MemoryToolSearchMemories.id, "origins", spaceApp, NewSession, `only these origins: user, agent, external`, NoVars{})
+	_ = arg(MemoryToolSearchMemories.id, "project", spaceApp, NewSession, `project key whose facts rank first; default: the project of this server's working directory`, NoVars{})
 )
 
 // MemoryToolMemoryHistory describes the memory_history tool.
