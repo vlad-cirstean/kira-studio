@@ -136,6 +136,7 @@ export function useRegistryLink(imageId: MaybeRefOrGetter<string>) {
   const missing = computed(() => missingFor.value !== '' && missingFor.value === toValue(imageId));
   async function open(): Promise<void> {
     const id = toValue(imageId);
+    missingFor.value = '';
     let target = url.value;
     if (registry.data.value?.unconfirmed) {
       try {

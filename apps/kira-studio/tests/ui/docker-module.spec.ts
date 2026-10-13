@@ -395,6 +395,32 @@ test('contract: registry button shows "No registry page found" when Hub has none
   expect(control.log().filter((e) => e.channel === IPC.linkOpenExternal)).toHaveLength(0);
 });
 
+test('registry missing label clears after a later successful click', async ({ relaunch }) => {
+  const candidate = registryLink('ImageRegistry#unconfirmed');
+  const none = registryLink('ConfirmImageRegistry#local');
+  const hub = registryLink('ConfirmImageRegistry#hub');
+  let confirms = 0;
+  const { page, control } = await setupDocker(relaunch, {
+    handlers: {
+      ImageRegistry: () => candidate,
+      ConfirmImageRegistry: () => {
+        confirms += 1;
+        return confirms === 1 ? none : hub;
+      },
+    },
+  });
+  await openDocker(page);
+  await openContainer(page, 'solo');
+
+  await page.locator('[data-testid="docker-detail-registry"]').click();
+  await expect(page.locator('[data-testid="docker-registry-missing"]')).toBeVisible();
+  await page.locator('[data-testid="docker-detail-registry"]').click();
+  await expect(page.locator('[data-testid="docker-registry-missing"]')).toHaveCount(0);
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
+    .toHaveLength(1);
+});
+
 test('a named-registry image opens without a Hub check', async ({ relaunch }) => {
   let confirms = 0;
   const { page, control } = await setupDocker(relaunch, {
