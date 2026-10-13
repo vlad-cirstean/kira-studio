@@ -38,7 +38,7 @@ type SqsFixture struct {
 // ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
 func (f SqsFixture) ConnectionID() string { return f.Config.ID }
 
-var sqsMemo fixture[SqsFixture]
+var sqsMemo = fixture[SqsFixture]{reset: resetSqs}
 
 // StartSqs is support/sqs.ts's startSqs. Skips the test when Docker is unreachable.
 func StartSqs(t *testing.T) *SqsFixture {
@@ -78,17 +78,7 @@ func startSqs() (*SqsFixture, error) {
 	}
 	client := sqs.NewFromConfig(awsCfg, func(o *sqs.Options) { o.BaseEndpoint = aws.String(proxy.Endpoint) })
 
-	if err := seedSqsQueue(ctx, client, SQSOrdersQueue, SQSOrdersMessageCount); err != nil {
-		proxy.Close()
-		_ = c.Terminate(ctx)
-		return nil, err
-	}
-	if err := seedSqsQueue(ctx, client, SQSDrainQueue, SQSDrainMessageCount); err != nil {
-		proxy.Close()
-		_ = c.Terminate(ctx)
-		return nil, err
-	}
-	if _, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String(SQSEmptyQueue)}); err != nil {
+	if err := seedSqsQueues(ctx, client); err != nil {
 		proxy.Close()
 		_ = c.Terminate(ctx)
 		return nil, err
@@ -103,6 +93,39 @@ func startSqs() (*SqsFixture, error) {
 		Options: map[string]any{"endpoint": proxy.Endpoint},
 	}
 	return &SqsFixture{Config: cfg, Client: client, Proxy: proxy, container: c}, nil
+}
+
+func seedSqsQueues(ctx context.Context, client *sqs.Client) error {
+	if err := seedSqsQueue(ctx, client, SQSOrdersQueue, SQSOrdersMessageCount); err != nil {
+		return err
+	}
+	if err := seedSqsQueue(ctx, client, SQSDrainQueue, SQSDrainMessageCount); err != nil {
+		return err
+	}
+	_, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String(SQSEmptyQueue)})
+	return err
+}
+
+// resetSqs deletes every queue, then reseeds.
+func resetSqs(f *SqsFixture) error {
+	ctx := context.Background()
+	pager := sqs.NewListQueuesPaginator(f.Client, &sqs.ListQueuesInput{})
+	for pager.HasMorePages() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return err
+		}
+		for _, u := range page.QueueUrls {
+			if _, err := f.Client.DeleteQueue(ctx, &sqs.DeleteQueueInput{QueueUrl: aws.String(u)}); err != nil {
+				return err
+			}
+		}
+	}
+	if err := seedSqsQueues(ctx, f.Client); err != nil {
+		return err
+	}
+	f.Proxy.Reset()
+	return nil
 }
 
 func seedSqsQueue(ctx context.Context, client *sqs.Client, name string, count int) error {

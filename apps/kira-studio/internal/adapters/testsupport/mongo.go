@@ -46,7 +46,7 @@ type MongoFixture struct {
 // ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
 func (f MongoFixture) ConnectionID() string { return f.Config.ID }
 
-var mongoMemo fixture[MongoFixture]
+var mongoMemo = fixture[MongoFixture]{reset: resetMongo}
 
 // StartMongo is support/mongo.ts's startMongo. Skips the test when Docker is unreachable.
 func StartMongo(t *testing.T) *MongoFixture {
@@ -121,14 +121,7 @@ func startMongo() (*MongoFixture, error) {
 		return nil, err
 	}
 
-	if err := seedMongo(ctx, root.Database(MongoDatabase)); err != nil {
-		return nil, err
-	}
-	_, err = root.Database(MongoAnalyticsDatabase).Collection("events").InsertMany(ctx, []any{
-		bson.D{{Key: "name", Value: "signup"}},
-		bson.D{{Key: "name", Value: "login"}},
-	})
-	if err != nil {
+	if err := seedMongoDatabases(ctx, root); err != nil {
 		return nil, err
 	}
 
@@ -140,6 +133,40 @@ func startMongo() (*MongoFixture, error) {
 		Options: map[string]any{}, Password: Strp(mongoPassword),
 	}
 	return &MongoFixture{Config: cfg, Host: host, Port: port, RootURI: rootURI, container: container}, nil
+}
+
+func seedMongoDatabases(ctx context.Context, root *mongodriver.Client) error {
+	if err := seedMongo(ctx, root.Database(MongoDatabase)); err != nil {
+		return err
+	}
+	_, err := root.Database(MongoAnalyticsDatabase).Collection("events").InsertMany(ctx, []any{
+		bson.D{{Key: "name", Value: "signup"}},
+		bson.D{{Key: "name", Value: "login"}},
+	})
+	return err
+}
+
+// resetMongo drops every collection (not the databases: the kira user's grants stay) and reseeds.
+func resetMongo(f *MongoFixture) error {
+	ctx := context.Background()
+	root, err := mongodriver.Connect(options.Client().ApplyURI(f.RootURI))
+	if err != nil {
+		return err
+	}
+	defer root.Disconnect(ctx)
+	for _, name := range []string{MongoDatabase, MongoAnalyticsDatabase} {
+		db := root.Database(name)
+		cols, err := db.ListCollectionNames(ctx, bson.D{})
+		if err != nil {
+			return err
+		}
+		for _, c := range cols {
+			if err := db.Collection(c).Drop(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return seedMongoDatabases(ctx, root)
 }
 
 func intp(n int) *int { return &n }

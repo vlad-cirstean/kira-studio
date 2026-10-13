@@ -64,7 +64,7 @@ type S3Fixture struct {
 // ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
 func (f S3Fixture) ConnectionID() string { return f.Config.ID }
 
-var s3Memo fixture[S3Fixture]
+var s3Memo = fixture[S3Fixture]{reset: resetS3}
 
 // StartS3 is support/s3.ts's startS3. Skips the test when Docker is unreachable.
 func StartS3(t *testing.T) *S3Fixture {
@@ -110,6 +110,33 @@ func startS3() (*S3Fixture, error) {
 		Options: map[string]any{"endpoint": endpoint},
 	}
 	return &S3Fixture{Config: cfg, Client: client, Endpoint: endpoint, container: c}, nil
+}
+
+// resetS3 empties and deletes every bucket, then reseeds.
+func resetS3(f *S3Fixture) error {
+	ctx := context.Background()
+	buckets, err := f.Client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	if err != nil {
+		return err
+	}
+	for _, b := range buckets.Buckets {
+		pager := s3.NewListObjectsV2Paginator(f.Client, &s3.ListObjectsV2Input{Bucket: b.Name})
+		for pager.HasMorePages() {
+			page, err := pager.NextPage(ctx)
+			if err != nil {
+				return err
+			}
+			for _, o := range page.Contents {
+				if _, err := f.Client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: b.Name, Key: o.Key}); err != nil {
+					return err
+				}
+			}
+		}
+		if _, err := f.Client.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: b.Name}); err != nil {
+			return err
+		}
+	}
+	return seedS3(ctx, f.Client)
 }
 
 func seedS3(ctx context.Context, client *s3.Client) error {

@@ -1,6 +1,7 @@
 package testsupport
 
 import (
+	"strings"
 	"sync"
 	"testing"
 )
@@ -17,6 +18,27 @@ type fixture[T any] struct {
 	mu  sync.Mutex
 	val *T
 	err error
+	// reset returns the shared resource to its seeded state. start calls it when a top-level test
+	// runs again (`-count>1`), so an iteration never sees the previous one's writes. Nil: the
+	// resource needs no reset.
+	reset func(*T) error
+	seen  map[string]*testing.T
+}
+
+// rerun reports whether t is a top-level test that already ran in this process under another
+// *testing.T, meaning a later `-count` iteration. The same *testing.T asking twice is not one.
+func (f *fixture[T]) rerun(t *testing.T) bool {
+	if f.reset == nil || strings.Contains(t.Name(), "/") {
+		return false
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.seen == nil {
+		f.seen = map[string]*testing.T{}
+	}
+	prev, ok := f.seen[t.Name()]
+	f.seen[t.Name()] = t
+	return ok && prev != t
 }
 
 // get returns the memoized value, calling start() at most once. A prior failure from start() is
@@ -52,6 +74,11 @@ func (f *fixture[T]) start(t *testing.T, label string, startFn func() (*T, error
 	if err != nil {
 		t.Fatalf("%s: %v", label, err)
 	}
+	if f.rerun(t) {
+		if err := f.reset(val); err != nil {
+			t.Fatalf("%s reset: %v", label, err)
+		}
+	}
 	return val
 }
 
@@ -63,6 +90,7 @@ func (f *fixture[T]) stop(terminate func(*T)) {
 	val := f.val
 	f.val = nil
 	f.err = nil
+	f.seen = nil
 	f.mu.Unlock()
 	if val != nil {
 		terminate(val)

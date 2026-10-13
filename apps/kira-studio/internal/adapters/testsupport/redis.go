@@ -64,7 +64,7 @@ type RedisFixture struct {
 // ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
 func (f RedisFixture) ConnectionID() string { return f.Config.ID }
 
-var redisMemo fixture[RedisFixture]
+var redisMemo = fixture[RedisFixture]{reset: resetRedis}
 
 // StartRedis is support/redis.ts's startRedis. Skips the test when Docker is unreachable.
 func StartRedis(t *testing.T) *RedisFixture {
@@ -107,19 +107,7 @@ func startRedis() (*RedisFixture, error) {
 	}
 	port := int(mappedPort.Num())
 
-	primary := goredis.NewClient(&goredis.Options{
-		Addr: fmt.Sprintf("%s:%d", host, port), Password: RedisPassword, DB: RedisPrimaryDbIndex, Protocol: 2,
-	})
-	secondary := goredis.NewClient(&goredis.Options{
-		Addr: fmt.Sprintf("%s:%d", host, port), Password: RedisPassword, DB: RedisSecondaryDbIndex, Protocol: 2,
-	})
-	defer primary.Close()
-	defer secondary.Close()
-
-	if err := seedRedis(ctx, primary); err != nil {
-		return nil, err
-	}
-	if err := secondary.Set(ctx, RedisSecondaryDbKey, "present", 0).Err(); err != nil {
+	if err := seedRedisDatabases(ctx, host, port); err != nil {
 		return nil, err
 	}
 
@@ -131,6 +119,35 @@ func startRedis() (*RedisFixture, error) {
 		Options: map[string]any{}, Password: Strp(RedisPassword),
 	}
 	return &RedisFixture{Config: cfg, Host: host, Port: port, container: container}, nil
+}
+
+func seedRedisDatabases(ctx context.Context, host string, port int) error {
+	primary := goredis.NewClient(&goredis.Options{
+		Addr: fmt.Sprintf("%s:%d", host, port), Password: RedisPassword, DB: RedisPrimaryDbIndex, Protocol: 2,
+	})
+	secondary := goredis.NewClient(&goredis.Options{
+		Addr: fmt.Sprintf("%s:%d", host, port), Password: RedisPassword, DB: RedisSecondaryDbIndex, Protocol: 2,
+	})
+	defer primary.Close()
+	defer secondary.Close()
+
+	if err := seedRedis(ctx, primary); err != nil {
+		return err
+	}
+	return secondary.Set(ctx, RedisSecondaryDbKey, "present", 0).Err()
+}
+
+// resetRedis flushes every database and reseeds.
+func resetRedis(f *RedisFixture) error {
+	ctx := context.Background()
+	admin := goredis.NewClient(&goredis.Options{
+		Addr: fmt.Sprintf("%s:%d", f.Host, f.Port), Password: RedisPassword, Protocol: 2,
+	})
+	defer admin.Close()
+	if err := admin.FlushAll(ctx).Err(); err != nil {
+		return err
+	}
+	return seedRedisDatabases(ctx, f.Host, f.Port)
 }
 
 // RedisAclUser is a Principal that creates a Redis ACL user with the given rule tokens (bare ACL

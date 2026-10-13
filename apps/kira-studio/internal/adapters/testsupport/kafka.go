@@ -3,6 +3,7 @@ package testsupport
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ type KafkaFixture struct {
 // ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
 func (f KafkaFixture) ConnectionID() string { return f.Config.ID }
 
-var kafkaMemo fixture[KafkaFixture]
+var kafkaMemo = fixture[KafkaFixture]{reset: resetKafka}
 
 // StartKafka is support/kafka.ts's startKafka. Skips the test when Docker is unreachable.
 func StartKafka(t *testing.T) *KafkaFixture {
@@ -157,6 +158,91 @@ func startKafka() (*KafkaFixture, error) {
 	return &KafkaFixture{Config: cfg, Client: client, Admin: admin, container: c}, nil
 }
 
+// resetKafka deletes every user topic and consumer group, waits until the broker lists none, then
+// reseeds. It uses a fresh client: the shared client answers metadata from a 5 s cache, so it would
+// keep listing deleted topics and hide the new ones.
+func resetKafka(f *KafkaFixture) error {
+	ctx := context.Background()
+	client, err := kgo.NewClient(kgo.SeedBrokers(fmt.Sprintf("%s:%d", *f.Config.Host, *f.Config.Port)))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	admin := kadm.NewClient(client)
+	groups, err := admin.ListGroups(ctx)
+	if err != nil {
+		return err
+	}
+	if names := groups.Groups(); len(names) > 0 {
+		resp, err := admin.DeleteGroups(ctx, names...)
+		if err != nil {
+			return err
+		}
+		for _, g := range resp.Sorted() {
+			if g.Err != nil {
+				return fmt.Errorf("delete group %s: %w", g.Group, g.Err)
+			}
+		}
+	}
+	userTopics := func() ([]string, error) {
+		td, err := admin.ListTopics(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var out []string
+		for _, n := range td.Names() {
+			if !strings.HasPrefix(n, "__") {
+				out = append(out, n)
+			}
+		}
+		return out, nil
+	}
+	topics, err := userTopics()
+	if err != nil {
+		return err
+	}
+	if len(topics) > 0 {
+		resp, err := admin.DeleteTopics(ctx, topics...)
+		if err != nil {
+			return err
+		}
+		for _, r := range resp.Sorted() {
+			if r.Err != nil {
+				return fmt.Errorf("delete topic %s: %w", r.Topic, r.Err)
+			}
+		}
+	}
+	deadline := time.Now().Add(kafkaReadyTimeout)
+	for {
+		left, err := userTopics()
+		if err != nil {
+			return err
+		}
+		if len(left) == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("topics still listed after delete: %v", left)
+		}
+		time.Sleep(kafkaReadyPollInterval)
+	}
+	return seedKafka(ctx, admin, client)
+}
+
+// createSeedTopic reports the broker's per-topic answer, which CreateTopics returns beside a nil error.
+func createSeedTopic(ctx context.Context, admin *kadm.Client, partitions int32, name string) error {
+	resp, err := admin.CreateTopics(ctx, partitions, 1, nil, name)
+	if err != nil {
+		return fmt.Errorf("create topic %s: %w", name, err)
+	}
+	for _, r := range resp.Sorted() {
+		if r.Err != nil {
+			return fmt.Errorf("create topic %s: %w (%s)", r.Topic, r.Err, r.ErrMessage)
+		}
+	}
+	return nil
+}
+
 // seedKafka is the Go re-expression of 0005_kafka_seed.ts (P58e E25), seeded from the host with
 // kadm + kgo rather than the broker's own CLI run inside the container. Neither of the
 // TypeScript's own two reasons for the in-container CLI survives translation: this test binary
@@ -165,11 +251,11 @@ func startKafka() (*KafkaFixture, error) {
 // group" (kgo/config.go's own doc for ConsumePartitions points at exactly this use) — the same
 // committed-offsets-with-no-members state --reset-offsets --to-earliest --execute produced.
 func seedKafka(ctx context.Context, admin *kadm.Client, client *kgo.Client) error {
-	if _, err := admin.CreateTopics(ctx, KafkaOrdersPartitionCount, 1, nil, KafkaOrdersTopic); err != nil {
-		return fmt.Errorf("create topic %s: %w", KafkaOrdersTopic, err)
+	if err := createSeedTopic(ctx, admin, KafkaOrdersPartitionCount, KafkaOrdersTopic); err != nil {
+		return err
 	}
-	if _, err := admin.CreateTopics(ctx, 1, 1, nil, KafkaEmptyTopic); err != nil {
-		return fmt.Errorf("create topic %s: %w", KafkaEmptyTopic, err)
+	if err := createSeedTopic(ctx, admin, 1, KafkaEmptyTopic); err != nil {
+		return err
 	}
 
 	records := make([]*kgo.Record, KafkaOrdersMessageCount)
