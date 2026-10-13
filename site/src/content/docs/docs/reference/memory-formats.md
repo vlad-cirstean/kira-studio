@@ -94,4 +94,4 @@ km_7h3kq9x2mfa4 keywords: cents, amount
 
 One doc has one provenance. Importing a doc needs no Claude call: the parser reads it directly.
 
-An import with write-back creates `<name>.memory.md` beside each source. It overwrites a target only when that target is a doc with the same group.
+An import job can write each source's stored facts to `<name>.memory.md` beside it. Doc sources are skipped. An existing target is overwritten only when it is a valid doc with the same group. Facts with another provenance than the job are left out.
