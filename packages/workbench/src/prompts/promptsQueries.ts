@@ -1,4 +1,4 @@
-import type { RoutedPrompt } from '@shared/domain/prompts';
+import type { QuitStatus, RoutedPrompt } from '@shared/domain/prompts';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { createSharedComposable, useWindowFocus } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
@@ -11,6 +11,9 @@ import { type InjectionKey, inject, onScopeDispose, ref, watch } from 'vue';
 export interface PromptsControl {
   promptsList(): Promise<RoutedPrompt[]>;
   promptsClaim(id: string): Promise<void>;
+  quitStatus(): Promise<QuitStatus>;
+  quitConfirm(): Promise<void>;
+  quitCancel(): Promise<void>;
   onPromptsChanged(cb: (prompts: RoutedPrompt[]) => void): () => void;
   onPromptsReveal(cb: (event: { id: string }) => void): () => void;
 }

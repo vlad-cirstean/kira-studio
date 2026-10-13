@@ -16,6 +16,7 @@ import { llmPromptsControlKey } from '@workbench/llmPrompts/queries';
 import { memoryModuleKey } from '@workbench/memory/module';
 import PromptHost from '@workbench/prompts/PromptHost.vue';
 import { promptsControlKey } from '@workbench/prompts/promptsQueries';
+import QuitPrompt from '@workbench/prompts/QuitPrompt.vue';
 import UpdatePrompt from '@workbench/prompts/UpdatePrompt.vue';
 import CommandPalette from '@workbench/shortcuts/CommandPalette.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
@@ -68,6 +69,7 @@ const promptKinds = {
   'git-credential': markRaw(GitCredentialDialog),
   'mobile-pairing': markRaw(MobilePairingDialog),
   update: markRaw(UpdatePrompt),
+  quit: markRaw(QuitPrompt),
 };
 const reviewWindow = useAdeReviewWindowStore();
 

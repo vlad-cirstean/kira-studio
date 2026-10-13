@@ -8,7 +8,7 @@ import {
   llmPromptListSchema,
   llmPromptPreviewSchema,
 } from '@shared/domain/llmPrompts';
-import type { RoutedPrompt } from '@shared/domain/prompts';
+import type { QuitStatus, RoutedPrompt } from '@shared/domain/prompts';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from './rpc';
@@ -66,6 +66,9 @@ export interface CoreBindings {
   lifecycle: {
     Flushed(a: { windowKey: string }): void;
     WindowFlushed(a: { windowKey: string }): void;
+    ConfirmQuit(): Promise<void>;
+    CancelQuit(): Promise<void>;
+    QuitStatus(): Promise<unknown>;
   };
   terminal: {
     DefaultCwd(): Promise<unknown>;
@@ -220,6 +223,9 @@ export interface CoreControl<S, L, T, P, M> {
   promptsRaiseUpdate: (ref: string) => Promise<void>;
   promptsDismiss: (id: string) => Promise<void>;
   promptsSendTest: () => Promise<void>;
+  quitStatus: () => Promise<QuitStatus>;
+  quitConfirm: () => Promise<void>;
+  quitCancel: () => Promise<void>;
   onPromptsChanged: (cb: (prompts: RoutedPrompt[]) => void) => () => void;
   onPromptsReveal: (cb: (event: { id: string }) => void) => () => void;
   // The editable LLM prompt registry (internal/llmprompts) — see llmPrompts/queries.ts.
@@ -329,6 +335,10 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
       unwrap(b.prompts.Raise({ kind: 'update', ref })),
     promptsDismiss: (id: string): Promise<void> => unwrap(b.prompts.Dismiss({ id })),
     promptsSendTest: (): Promise<void> => unwrap(b.prompts.SendTest()),
+    quitStatus: (): Promise<QuitStatus> =>
+      unwrap(b.lifecycle.QuitStatus()).then((r) => trust<QuitStatus>(r)),
+    quitConfirm: (): Promise<void> => unwrap(b.lifecycle.ConfirmQuit()),
+    quitCancel: (): Promise<void> => unwrap(b.lifecycle.CancelQuit()),
     onPromptsChanged: (cb: (prompts: RoutedPrompt[]) => void): (() => void) =>
       on(CHANNEL.promptsChanged, (p) => cb(trust<RoutedPrompt[]>(p ?? []))),
     onPromptsReveal: (cb: (event: { id: string }) => void): (() => void) =>

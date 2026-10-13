@@ -12709,6 +12709,22 @@
         "empty": "No operations yet"
       }
     },
+    "quitConfirm": {
+      "agents": {
+        "label": "Claude sessions: {count}"
+      },
+      "body": "Running now: {count}. Quitting stops them. Resume each one later from its run.",
+      "quit": {
+        "label": "Quit anyway"
+      },
+      "runs": {
+        "label": "Task runs: {count}"
+      },
+      "scripts": {
+        "label": "Script runs: {count}"
+      },
+      "title": "Quit {app}?"
+    },
     "search": {
       "matchCase": {
         "label": "Match case"

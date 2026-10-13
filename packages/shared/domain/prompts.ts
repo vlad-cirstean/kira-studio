@@ -8,6 +8,7 @@ export const promptKindSchema = /*#__PURE__*/ z.enum([
   'git-credential',
   'mobile-pairing',
   'update',
+  'quit',
 ]);
 export type PromptKind = z.infer<typeof promptKindSchema>;
 
@@ -21,3 +22,11 @@ export const routedPromptSchema = /*#__PURE__*/ z.object({
   target: z.string(),
 });
 export type RoutedPrompt = z.infer<typeof routedPromptSchema>;
+
+// P279: the live work a quit would stop (internal/shell.QuitStatus).
+export interface QuitStatus {
+  asking: boolean;
+  agents: number;
+  runs: number;
+  scripts: number;
+}
