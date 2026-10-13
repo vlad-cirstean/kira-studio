@@ -2,6 +2,7 @@ package testsupport
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -19,11 +20,12 @@ func ConsoleResultCap(path model.NodePath, rowsSQL func(n int) string) Scenario 
 		Requires: func(c adapters.Caps) bool { return c.SQL },
 		Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
 			t.Helper()
+			// Distinct op ids: a capped run leaves its server-side query alive briefly, and ClickHouse rejects a reused query id.
 			run := func(n int) page.TabularPage {
 				t.Helper()
 				pages, err := a.Execute(context.Background(), model.ConsoleRequest{
 					Path: path, Statements: []string{rowsSQL(n)}, Cap: page.ResultCap{Rows: capRows},
-				}, adapters.NewOpCtx("scenario-console-result-cap"))
+				}, adapters.NewOpCtx(fmt.Sprintf("scenario-console-result-cap-%d", n)))
 				if err != nil {
 					t.Fatalf("Execute(%d rows): %v", n, err)
 				}
