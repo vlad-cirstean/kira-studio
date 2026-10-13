@@ -180,7 +180,7 @@ func Unary(ctx context.Context, req CallRequest) (CallResult, error) {
 		grpc.Header(&header), grpc.Trailer(&trailer), grpc.MaxCallRecvMsgSize(maxRecvMsgSize))
 	elapsed := time.Since(start)
 
-	if callErr != nil && ctx.Err() == nil && errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+	if callErr != nil && ctx.Err() == nil && callDeadlineExpired(callCtx) {
 		return CallResult{}, Timeout(fmt.Sprintf("no response from %s within %s", req.Target, timeout))
 	}
 	code, message, asError := terminalOutcome(callCtx, callErr)
@@ -204,6 +204,17 @@ func Unary(ctx context.Context, req CallRequest) (CallResult, error) {
 		result.MessageBytes = wire
 	}
 	return result, nil
+}
+
+// callDeadlineExpired reports whether ctx's deadline has passed, by the clock. The context's own
+// error lags the clock under load, and the server enforces the propagated deadline too, so its
+// DeadlineExceeded status can arrive first; it is still this call's deadline, not a server answer.
+func callDeadlineExpired(ctx context.Context) bool {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return true
+	}
+	d, ok := ctx.Deadline()
+	return ok && !time.Now().Before(d)
 }
 
 // ServerStream runs one server-streaming call (D8), delivering each message through onMessage as
