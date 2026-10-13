@@ -146,8 +146,10 @@ type newFile struct {
 	Chunks, Tokens                                  int
 }
 
-// scanned stores a finished scan and moves the job to awaiting.
-func (s *store) scanned(jobID, base string, truncated bool, ignored int, files []newFile) error {
+// scanned stores a finished scan and moves the job to awaiting, then applies the agent auto-start
+// rule in the same transaction so no reader sees an awaiting job that is about to start or whose
+// confirmation reason is not yet set.
+func (s *store) scanned(jobID, base string, truncated bool, ignored int, files []newFile, chunkCap int) error {
 	return s.tx(func(tx *sql.Tx) error {
 		tokens, chunks := 0, 0
 		now := s.now()
@@ -171,7 +173,8 @@ func (s *store) scanned(jobID, base string, truncated bool, ignored int, files [
 		if rowsAffected(res) == 0 {
 			return errors.New("import: job left scanning state")
 		}
-		return nil
+		_, err = autoStartTx(tx, s.now, jobID, chunkCap)
+		return err
 	})
 }
 
@@ -236,34 +239,29 @@ func (s *store) startJob(id string, a StartArgs) error {
 	})
 }
 
-// autoStart runs an awaiting MCP job whose scan found work within the chunk cap; over it, the job
+// autoStartTx runs an awaiting MCP job whose scan found work within the chunk cap; over it, the job
 // keeps waiting with the reason. It reports whether the job started.
-func (s *store) autoStart(id string, chunkCap int) (bool, error) {
-	var started bool
-	err := s.tx(func(tx *sql.Tx) error {
-		var chunks int
-		var auto bool
-		err := tx.QueryRow(`SELECT est_chunks, auto_start FROM import_jobs WHERE id = ? AND state = 'awaiting'`, id).Scan(&chunks, &auto)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && !auto) {
-			return nil
-		}
+func autoStartTx(tx *sql.Tx, now func() string, id string, chunkCap int) (bool, error) {
+	var chunks int
+	var auto bool
+	err := tx.QueryRow(`SELECT est_chunks, auto_start FROM import_jobs WHERE id = ? AND state = 'awaiting'`, id).Scan(&chunks, &auto)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !auto) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if chunks > chunkCap {
+		counts, err := pendingChunkCounts(tx, id)
 		if err != nil {
-			return err
+			return false, err
 		}
-		if chunks > chunkCap {
-			counts, err := pendingChunkCounts(tx, id)
-			if err != nil {
-				return err
-			}
-			_, err = tx.Exec(`UPDATE import_jobs SET reason = ? WHERE id = ?`,
-				fmt.Sprintf("Needs confirmation in Kira Space: %d chunks, about %d calls", chunks, EstimateWork(counts, 0).Calls), id)
-			return err
-		}
-		started = true
-		_, err = tx.Exec(`UPDATE import_jobs SET state = 'running', reason = '', started_at = ? WHERE id = ?`, s.now(), id)
-		return err
-	})
-	return started, err
+		_, err = tx.Exec(`UPDATE import_jobs SET reason = ? WHERE id = ?`,
+			fmt.Sprintf("Needs confirmation in Kira Space: %d chunks, about %d calls", chunks, EstimateWork(counts, 0).Calls), id)
+		return false, err
+	}
+	_, err = tx.Exec(`UPDATE import_jobs SET state = 'running', reason = '', started_at = ? WHERE id = ?`, now(), id)
+	return err == nil, err
 }
 
 func pendingChunkCounts(tx *sql.Tx, jobID string) ([]int, error) {

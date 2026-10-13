@@ -336,12 +336,10 @@ func (r *Runner) scan(id string, paths []string) {
 	}
 	files, err := r.plan(id, res)
 	if err == nil {
-		err = r.st.scanned(id, res.Base, res.Truncated, res.Ignored, files)
+		err = r.st.scanned(id, res.Base, res.Truncated, res.Ignored, files, autoStartChunks)
 	}
 	if err == nil {
-		if _, err = r.st.autoStart(id, autoStartChunks); err == nil {
-			r.kick()
-		}
+		r.kick()
 	}
 	if err != nil && r.ctx.Err() == nil {
 		slog.Warn("memory import: scan failed", "scope", "memory", "err", err)
