@@ -856,7 +856,7 @@ var RunResumeLine = define(Entry{
 	TitleKey:   "llmPrompts.entry.runResumeLine.title",
 	PurposeKey: "llmPrompts.entry.runResumeLine.description",
 	UsedByKey:  "llmPrompts.entry.runResumeLine.usedBy.body",
-	Default: `Kira {{.App}} closed while you worked, so your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check the current state of that action (files, git, running processes) before you redo or skip it. Then carry on with the task.`,
+	Default:    `Kira {{.App}} closed while you worked, so your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check the current state of that action (files, git, running processes) before you redo or skip it. Then carry on with the task.`,
 }, ResumeVars{App: "Space"})
 
 // Database MCP (Kira Studio).

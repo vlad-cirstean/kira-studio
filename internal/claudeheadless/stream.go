@@ -233,3 +233,10 @@ func parseResult(raw string) (Result, bool) {
 	}
 	return r, true
 }
+
+const noConversationPrefix = "No conversation found with session ID:"
+
+// IsNoConversation reports whether a stderr line is the CLI's answer to --resume of an unknown session.
+func IsNoConversation(line string) bool {
+	return strings.HasPrefix(strings.TrimSpace(line), noConversationPrefix)
+}

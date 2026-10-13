@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json, task_id, task_title, branch_id, branch_label`
+const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json, task_id, task_title, branch_id, branch_label, resume_id, resumed_from`
 
 // keepFinished is how many finished runs are retained.
 const keepFinished = 500
@@ -22,14 +22,15 @@ type rowScanner interface{ Scan(dest ...any) error }
 
 func scan(row rowScanner) (Run, error) {
 	var r Run
-	var outcome, paramsJSON, toolsJSON string
+	var outcome, paramsJSON, toolsJSON, resumeID string
 	var started, finished sql.NullInt64
 	if err := row.Scan(&r.ID, &r.ScriptID, &r.ScriptName, &r.Color, &r.Kind, &r.Trigger, &r.State, &r.TerminalID,
 		&r.Cwd, &r.Command, &outcome, &r.CreatedAt, &started, &finished,
 		&r.Model, &r.SessionID, &r.Prompt, &paramsJSON, &toolsJSON,
-		&r.TaskID, &r.TaskTitle, &r.BranchID, &r.BranchLabel); err != nil {
+		&r.TaskID, &r.TaskTitle, &r.BranchID, &r.BranchLabel, &resumeID, &r.ResumedFrom); err != nil {
 		return Run{}, err
 	}
+	r.Resumable = resumeID != ""
 	r.Params = []RunParam{}
 	if err := json.Unmarshal([]byte(paramsJSON), &r.Params); err != nil {
 		return Run{}, fmt.Errorf("scriptruns: decode run %s params: %w", r.ID, err)
@@ -79,11 +80,11 @@ func (r *Repo) Insert(run Run) error {
 	if err != nil {
 		return fmt.Errorf("scriptruns: encode tools: %w", err)
 	}
-	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`,
 		run.ID, run.ScriptID, run.ScriptName, run.Color, run.Kind, run.Trigger, run.State, run.TerminalID,
 		run.Cwd, run.Command, outcome, run.CreatedAt, run.StartedAt, run.FinishedAt,
 		run.Model, run.SessionID, run.Prompt, string(params), string(tools),
-		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel); err != nil {
+		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel, run.ResumedFrom); err != nil {
 		return fmt.Errorf("scriptruns: insert %s: %w", run.ID, err)
 	}
 	return nil
@@ -116,6 +117,10 @@ func (r *Repo) ListByTask(taskID string, limit int) ([]Run, error) {
 	})
 }
 
+// resumeExpr keeps a smart run's Claude session as resume_id when a restart ended it; the argument
+// is the source the outcome carries.
+const resumeExpr = `CASE WHEN kind = 'smart' AND ? = 'restart' THEN session_id ELSE '' END`
+
 // Finish ends the running run matched by where (a column and value) with out; it returns the updated
 // run, or (nil, nil) when no running row matches (a repeated exit).
 func (r *Repo) finish(column, value string, out runoutcome.Outcome, now int64) (*Run, error) {
@@ -124,8 +129,8 @@ func (r *Repo) finish(column, value string, out runoutcome.Outcome, now int64) (
 		return nil, err
 	}
 	var id string
-	err = r.DB.QueryRow(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?
-		WHERE `+column+` = ? AND state = 'running' RETURNING id`, string(out.Status), outcome, now, value).Scan(&id)
+	err = r.DB.QueryRow(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?, resume_id = `+resumeExpr+`
+		WHERE `+column+` = ? AND state = 'running' RETURNING id`, string(out.Status), outcome, now, string(out.Source), value).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -155,12 +160,33 @@ func (r *Repo) FailRunning(out runoutcome.Outcome, now int64) ([]Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := r.DB.Query(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?
-		WHERE state = 'running' RETURNING `+columns, string(out.Status), outcome, now)
+	rows, err := r.DB.Query(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?, resume_id = `+resumeExpr+`
+		WHERE state = 'running' RETURNING `+columns, string(out.Status), outcome, now, string(out.Source))
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Run, bool, error) {
 		run, err := scan(rows)
 		return run, true, err
 	})
+}
+
+// TakeResume claims a run's resume spec once: it clears resume_id and returns the Claude session
+// id, ok false when the run has none (already taken, or not resumable).
+func (r *Repo) TakeResume(id string) (sessionID string, ok bool, err error) {
+	err = r.DB.QueryRow(`UPDATE script_runs SET resume_id = '' WHERE id = ? AND resume_id <> '' RETURNING session_id`, id).Scan(&sessionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("scriptruns: take resume %s: %w", id, err)
+	}
+	return sessionID, true, nil
+}
+
+// RestoreResume puts a taken resume spec back when the launch failed before it began.
+func (r *Repo) RestoreResume(id, sessionID string) error {
+	if _, err := r.DB.Exec(`UPDATE script_runs SET resume_id = ? WHERE id = ?`, sessionID, id); err != nil {
+		return fmt.Errorf("scriptruns: restore resume %s: %w", id, err)
+	}
+	return nil
 }
 
 // Active returns the newest running or waiting run of a script other than exceptID, (nil, nil)

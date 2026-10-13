@@ -61,7 +61,7 @@ func (s Scenario) Encode() string {
 //
 // Named behaviours: "done", "needs_input" and "failed" call finish_step with that status (done also
 // prints one tool_use); "result:<id>" calls it with the step result id <id>; "fail" exits 1 with a message on stderr; "nofinish" ends without
-// finish_step; "sleep" blocks for an hour. The generic fields run first, in the order below, and
+// finish_step; "lost" exits 1 with the CLI's no-conversation error for the --resume id; "sleep" blocks for an hour. The generic fields run first, in the order below, and
 // compose with a name.
 type Action struct {
 	Name string `json:"name,omitempty"`
@@ -300,6 +300,9 @@ func finishAction(action Action, args []string, headless bool) int {
 		return finish(action.Name)
 	case "fail":
 		fmt.Fprintln(os.Stderr, "fake claude: scripted failure")
+		return 1
+	case "lost":
+		fmt.Fprintln(os.Stderr, "No conversation found with session ID: "+argAfter(args, "--resume"))
 		return 1
 	case "sleep":
 		time.Sleep(time.Hour)

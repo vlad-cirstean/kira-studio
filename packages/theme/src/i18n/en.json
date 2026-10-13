@@ -693,6 +693,12 @@
         "promptTooLong": {
           "body": "The prompt is longer than {max} characters."
         },
+        "resumeMissing": {
+          "body": "Resume needs values for: {names}. Run it again instead."
+        },
+        "resumeNotResumable": {
+          "body": "Only a run Kira {app} interrupted can resume."
+        },
         "runNotFound": {
           "body": "This run no longer exists."
         },

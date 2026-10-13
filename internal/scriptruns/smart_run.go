@@ -153,7 +153,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
 	env = append(env, p.envList...)
 	spec := claudeheadless.Spec{
-		Dir: p.dir.Path, Prompt: p.sent, SessionID: sessionID, MCPConfigPath: cfg, MCPConfigPaths: extra,
+		Dir: p.dir.Path, Prompt: p.sent, SessionID: sessionID, Resume: p.resume, MCPConfigPath: cfg, MCPConfigPaths: extra,
 		Model: p.smart.Model, MaxBudgetUSD: p.smart.MaxBudgetUSD, Tools: pv.Tools, AllowedTools: pv.Allowed,
 		Isolated: true, Timeout: timeout, Env: env,
 	}
@@ -170,7 +170,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		releaseUser()
 		out := decide(decision{
 			finish: s.takeFinishPtr(runID), res: res, exit: exit, runErr: runErr, end: sr.endedBy(),
-			timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(),
+			timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(), resumed: p.resume != "",
 		})
 		cancel()
 		done, ferr := s.Runs.FinishByRun(runID, out, s.now())
@@ -211,6 +211,13 @@ func (s *Service) stopHeadless(id string) {
 	}
 }
 
+// Live counts the smart and headless runs a quit would end.
+func (s *Service) Live() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.smart) + len(s.bg)
+}
+
 // Close ends every smart and headless run as interrupted by the quit and waits until each is recorded.
 func (s *Service) Close() {
 	s.mu.Lock()
@@ -246,6 +253,8 @@ type decision struct {
 	budget  float64
 	app     string
 	lastErr string
+	// resumed says the run continued an earlier Claude session.
+	resumed bool
 }
 
 // decide maps how a smart run ended to its outcome: the first matching row wins.
@@ -268,6 +277,8 @@ func decide(d decision) runoutcome.Outcome {
 			out.Status = runoutcome.StatusFailed
 			out.Reason = firstNonEmpty(d.finish.Reason, d.finish.Summary, "the agent reported failure without a reason")
 		}
+	case d.resumed && claudeheadless.IsNoConversation(d.lastErr):
+		out = runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndResumeLost})
 	case resultEnds(d):
 		out, _ = claudeheadless.ResultOutcome(d.res, code, d.budget)
 	default:

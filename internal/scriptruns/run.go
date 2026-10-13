@@ -62,6 +62,10 @@ type Run struct {
 	Prompt    string     `json:"prompt"`
 	Params    []RunParam `json:"params"`
 	Tools     RunTools   `json:"tools"`
+	// ResumedFrom is the run this one continues; Resumable says a restart interrupted this run and
+	// its Claude session can continue.
+	ResumedFrom string `json:"resumedFrom"`
+	Resumable   bool   `json:"resumable"`
 	// Set when the run was started for an ADE task (Kira Space); empty otherwise.
 	TaskID      string `json:"taskId"`
 	TaskTitle   string `json:"taskTitle"`

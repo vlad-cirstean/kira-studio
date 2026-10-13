@@ -104,6 +104,8 @@ type planned struct {
 	opts    planOpts
 	// trigger overrides runTrigger when the caller says what started the run.
 	trigger Trigger
+	// resume is the Claude session a resumed smart run continues, resumedFrom the run it continues.
+	resume, resumedFrom string
 	// timeout and timeoutText bound a headless normal run.
 	timeout     time.Duration
 	timeoutText string

@@ -96,6 +96,21 @@ func (b *Bound) Start(args StartArgs) (Started, error) {
 	return started, nil
 }
 
+// Resume continues a smart run a restart interrupted, as a new run.
+func (b *Bound) Resume(args IDArgs) (Started, error) {
+	if args.ID == "" {
+		return Started{}, ipcerr.Required("id")
+	}
+	started, err := b.Svc.Resume(args.ID)
+	if IsCallerError(err) {
+		return Started{}, ipcerr.T(ipcerr.CodeNotFound, "backend.core.scriptRun.runNotFound.body", nil)
+	}
+	if err != nil {
+		return Started{}, ipcerr.Wrap(err)
+	}
+	return started, nil
+}
+
 type ReadLogArgs struct {
 	ID       string `json:"id"`
 	AfterSeq int    `json:"afterSeq"`

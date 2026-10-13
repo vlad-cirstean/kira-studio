@@ -85,6 +85,8 @@ const (
 	EndWindow
 	EndQuit
 	EndRestart
+	// EndResumeLost is a resume whose Claude conversation is gone.
+	EndResumeLost
 )
 
 type Process struct {
@@ -110,6 +112,8 @@ func ForProcess(p Process) Outcome {
 		return fail(SourceTimeout, prefix+"timed out after "+p.Timeout)
 	case EndStartErr:
 		return fail(SourceStart, fmt.Sprintf("could not start: %v", p.Err))
+	case EndResumeLost:
+		return fail(SourceStart, "could not resume: Claude has no saved conversation for this run; use Retry")
 	case EndUser:
 		return Outcome{Status: StatusCancelled, Source: SourceUser, Reason: "stopped by you"}
 	case EndWindow:
