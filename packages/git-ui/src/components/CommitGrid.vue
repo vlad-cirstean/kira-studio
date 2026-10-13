@@ -403,6 +403,9 @@ function updateHandlePositions(): void {
 // closes that window by making the second pass a no-op instead of a second real rebuild.
 // P92 item 2: reads `availableWidth()` now, not `host.clientWidth` — same dedupe, correct box.
 let lastRebuiltWidth = -1;
+/** The host height SlickGrid's canvas was last sized to: a height-only change (a toolbar row
+ *  unmounting below the grid) needs `resizeCanvas()`, or rows past the old viewport never render. */
+let lastResizedHeight = -1;
 
 let lastEmittedGraphWidth = -1;
 
@@ -421,6 +424,7 @@ function rebuildColumns(): void {
   // rAF one frame later called resizeCanvas()+rebuildColumns() again (the true, final width) —
   // two different offsets painted a frame apart read as the columns sliding into place.
   grid?.resizeCanvas();
+  lastResizedHeight = host.value?.clientHeight ?? -1;
   grid?.setColumns(currentColumns());
   updateHandlePositions();
   lastRebuiltWidth = availableWidth();
@@ -737,8 +741,13 @@ function scheduleResize(): void {
     // only repeat one already done, synchronously, against this exact width — closing the detail
     // pane is the common case, but this covers any caller of `rebuildColumns()` racing this same
     // async callback for the same resize.
-    const width = availableWidth();
-    if (width === lastRebuiltWidth) return;
+    if (availableWidth() === lastRebuiltWidth) {
+      const height = host.value?.clientHeight ?? -1;
+      if (height === lastResizedHeight) return;
+      lastResizedHeight = height;
+      grid?.resizeCanvas();
+      return;
+    }
     grid?.resizeCanvas();
     rebuildColumns();
   });
