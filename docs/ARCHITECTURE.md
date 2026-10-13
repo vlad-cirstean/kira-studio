@@ -4809,8 +4809,8 @@ replies and full terminal attach for Claude Code sessions.
   `external`. Migration backfill: origin from old `author`, `external`/`doc` for import-created versions.
 - Scope (P272): each item names `scope` (required): `company`, `project`, `personal`. Project key =
   normalised `origin` remote, `host/path` lowercase, no scheme, credentials, port or `.git`
-  (`github.com/acme/billing`; `memory.NormalizeRemote`); no remote gives `local:<main worktree path>`
-  (`memory.DetectProject`). `memory-mcp` detects it once from its cwd; a `project` item without a key uses it.
+  (`github.com/acme/billing`; `memory.NormalizeRemote`); no remote gives `local:<main worktree path>` with whitespace percent-escaped
+  (`memory.DetectProject`; outside a repo it returns `ErrNotGitRepo`, and the MCP `ingest_files` falls back to the server's project only for that error). `memory-mcp` detects it once from its cwd; a `project` item without a key uses it.
   Hash noop and reconcile candidates stay within the same scope and project, so an
   update never crosses scopes. Backfill: every old row `personal`.
 - Session (P272): `memories.session_id` is the `session` tool argument, else `CLAUDE_CODE_SESSION_ID`
@@ -4936,6 +4936,9 @@ replies and full terminal attach for Claude Code sessions.
   doc's id, equal text noops, an edit updates when the doc grade is at least the stored grade, else
   skipped. Facts the doc no longer lists stay stored and count as orphaned. `GroupRef.ID` joins or
   creates the group by the doc's `kg_` id.
+  Header provenance wins on apply, so a memdoc whose header origin grades above the job's origin, or claims
+  `company` scope for a non-company job, holds an MCP job at `awaiting` ("N kira-memory docs claim a higher
+  origin or company scope"); the user confirms in the import view.
 - Write-back: opt-in per job (`writeDoc`, confirm-dialog checkbox). Writes `<dir>/<stem>.memory.md`
   beside the source with `renameio`, never over the source. An existing target is overwritten only when
   it is a kira-memory doc with the same group; otherwise the file stays `done` with `doc_error`. Holds
@@ -4947,6 +4950,9 @@ replies and full terminal attach for Claude Code sessions.
   `project`, `session_id`, `groups_json`, `auto_start`, `write_doc`; file columns `verify_json`,
   `verified`, `group_id`, `doc_path`, `doc_error`. Rebuilds the three import tables through TEMP copies,
   because `DROP TABLE` with foreign keys on cascades into fresh rows.
+- Migration 7 (`0007_p281_verify_pending.sql`): `import_files.verify_pending`, questionable facts without a
+  verdict (`-1` = not computed). Settled once per extracted file; verify and finalize claims query it, so an idle
+  scheduler tick does not reload any file.
 - Speech to text was removed in P224. Kira Space deletes the leftover speech model directory
   (`models/whisper-small.en-q5_1-5359861`) at startup (`modelstore.RemoveRetired`).
 
