@@ -37,16 +37,16 @@ Nothing reaches the database until you click **Commit pending changes**. Documen
 
 ## Cell editor
 
-A Monaco panel detects JSON, XML, SQL, base64, hex, epoch, ISO-8601, UUID, URL and CSV. It offers beautify and compact.
+A Monaco panel detects JSON, XML, CSV, SQL, ISO-8601 timestamps, epoch seconds, epoch milliseconds, base64 and hex. Pick a format by hand to override detection. Beautify and compact work for JSON and XML.
 
 ## Foreign keys
 
-Preview a referenced row in a popover. Then open it in a pre-filtered tab, or jump straight to editing it. This works on PostgreSQL and MariaDB.
+Preview a referenced row in a popover. Open it from there in a new pre-filtered tab. The cell menu has **Edit referenced row** to edit it in place. This works on engines that report foreign keys: PostgreSQL, MySQL, MariaDB and SQLite.
 
 ## Generate data
 
-Fill a SQL table with fake rows. Recipes per column come from the column types.
+Fill a SQL table with fake rows. The app proposes a recipe per column from its type. Read-only connections do not offer it.
 
 ## Operations panel
 
-The panel lists every database operation live. Each row shows duration, rows and command. You can cancel and re-run an operation. A persisted log keeps older operations; `Settings > Advanced` sets retention, 1 to 365 days, default 30.
+The panel lists every database operation live. Each row shows duration, rows and command. Cancel a running operation from its menu. Re-run a SQL operation from its menu; a truncated command cannot re-run. A persisted log keeps older operations; `Settings > Advanced` sets retention, 1 to 365 days, default 30.

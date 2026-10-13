@@ -24,11 +24,11 @@ The request builder takes a method, URL, params, headers and body. Body kinds: r
 
 ## gRPC
 
-Unary and streaming calls. They share collections, environments and variables with HTTP.
+Unary and server-streaming calls. Stop ends a stream. Client-streaming and bidirectional methods do not run. gRPC requests share collections, environments and variables with HTTP.
 
 ## Collections
 
-A collection is a tree of requests and folders. Import and export use the Postman format. Move a request or folder to another collection.
+A collection is a tree of requests and folders. Import and export use the Postman collection format. Export skips gRPC requests. Move a request or folder to another collection.
 
 **Export collection…** does not write secret values to the file.
 
@@ -37,7 +37,7 @@ A collection is a tree of requests and folders. Import and export use the Postma
 - Variables belong to a collection or an environment.
 - Environments carry a colour.
 - Dynamic values come from Faker.
-- Secret values stay masked in history and logs.
+- The app masks secret values before it saves a response to history.
 
 ## curl
 
@@ -45,11 +45,11 @@ A collection is a tree of requests and folders. Import and export use the Postma
 
 ## History and timeline
 
-The app keeps the last 30 responses per request. The timeline shows DNS, connect, TLS, first byte and download timings.
+The app keeps the last 30 responses per request. The timeline shows DNS, connect, TLS, wait, response headers and download timings.
 
 ## Incognito tabs
 
-Toggle incognito per tab. The app saves nothing from that tab: no history, no log, no variable writes.
+Toggle incognito per tab. The app saves nothing from that tab: no response history, no call history, no tab state. An environment you pick there stays in memory.
 
 ## Defaults
 

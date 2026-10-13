@@ -31,9 +31,9 @@ Saved queries live in the **Saved queries** menu.
 
 ## Explain
 
-**Explain** shows the plan for the statement under the cursor. It works for every SQL dialect. Put the cursor in a read query first.
+**Explain** shows the plan for the statement under the cursor. It works for `SELECT` and `WITH` statements on PostgreSQL, MySQL, MariaDB, SQLite and ClickHouse. Put the cursor in one first.
 
-Auto-explain checks SELECT queries before they run and flags expensive ones. Turn it on per connection. The threshold is estimated rows read: `Settings > Advanced`, 1000 to 1000000000, default 100000.
+Auto-explain checks `SELECT` and `WITH` statements before they run and flags expensive ones. It never blocks the run. It skips runs with more than 10 such statements. Turn it on per connection. The threshold is estimated rows read: `Settings > Advanced`, 1000 to 1000000000, default 100000.
 
 ## Completions
 
