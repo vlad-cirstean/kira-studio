@@ -113,7 +113,7 @@ func ForProcess(p Process) Outcome {
 	case EndStartErr:
 		return fail(SourceStart, fmt.Sprintf("could not start: %v", p.Err))
 	case EndResumeLost:
-		return fail(SourceStart, "could not resume: Claude has no saved conversation for this run; use Retry")
+		return fail(SourceStart, "could not resume: Claude has no saved conversation for this run; start it again")
 	case EndUser:
 		return Outcome{Status: StatusCancelled, Source: SourceUser, Reason: "stopped by you"}
 	case EndWindow:

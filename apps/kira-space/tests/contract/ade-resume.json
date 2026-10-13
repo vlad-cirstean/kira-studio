@@ -7,10 +7,10 @@
     "finishedAt": 0,
     "id": "<id:2>",
     "loops": 0,
-    "note": "could not resume: Claude has no saved conversation for this run; use Retry",
+    "note": "could not resume: Claude has no saved conversation for this run; start it again",
     "outcome": {
       "lastError": "No conversation found with session ID: <id:3>",
-      "reason": "could not resume: Claude has no saved conversation for this run; use Retry",
+      "reason": "could not resume: Claude has no saved conversation for this run; start it again",
       "reported": false,
       "result": "failed",
       "route": "stop",
