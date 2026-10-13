@@ -35,6 +35,8 @@ export class GraphOrderState {
   readonly revision: ShallowRef<number> = shallowRef(0);
 
   #tips: readonly TipRef[] = [];
+  /** The tips the last `rebuild` actually used: `#tips` with each sha swapped for one `store` holds. */
+  #applied: readonly TipRef[] = [];
   readonly #expandedKeys = new Set<string>();
   #collapseEnabled = false;
 
@@ -78,7 +80,9 @@ export class GraphOrderState {
   rebuild(store: CommitStore, _generation: number): void {
     const revision = this.revision.value + 1;
     this.revision.value = revision;
-    const plan = buildRowPlan(store, this.#tips, {
+    const tips = this.#effectiveTips(store);
+    this.#applied = tips;
+    const plan = buildRowPlan(store, tips, {
       expandedKeys: this.#expandedKeys,
       collapseEnabled: this.#collapseEnabled,
       revision,
@@ -96,6 +100,26 @@ export class GraphOrderState {
     }
   }
 
+  /** Refs reload before the graph re-walks, so a requested tip can name a commit `store` lacks. Such a
+   *  tip would own no rows and collapse the rows it should keep: HEAD's group empties and every
+   *  other row falls into a contracted group. Keep the sha the group last used while the store
+   *  still holds it. */
+  #effectiveTips(store: CommitStore): readonly TipRef[] {
+    const appliedByKey = new Map(this.#applied.map((tip) => [tip.key, tip]));
+    const previousHead = this.#applied[0];
+    return this.#tips.map((tip, index) => {
+      if (store.rowOfSha(tip.sha) >= 0) return tip;
+      if (index === 0 && previousHead !== undefined && store.rowOfSha(previousHead.sha) >= 0) {
+        return { ...tip, sha: previousHead.sha };
+      }
+      const sameKey = appliedByKey.get(tip.key);
+      if (sameKey !== undefined && store.rowOfSha(sameKey.sha) >= 0) {
+        return { ...tip, sha: sameKey.sha };
+      }
+      return tip;
+    });
+  }
+
   /** Called alongside `GraphViewState.reset()` on a repo switch (`App.vue:259`) — clears the
    *  tip list and every expanded group (both genuinely per-repo session data); `collapseEnabled`
    *  is a standing UI preference, not repo-scoped, so it survives. Sets `plan` to an empty
@@ -103,6 +127,7 @@ export class GraphOrderState {
    *  has no store to build one against yet. */
   reset(): void {
     this.#tips = [];
+    this.#applied = [];
     this.#expandedKeys.clear();
     const revision = this.revision.value + 1;
     this.revision.value = revision;
