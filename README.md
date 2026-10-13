@@ -12,6 +12,38 @@ workspace with coding agents (ADE), a memory store, a terminal and a phone view 
 network. This README covers Kira Studio; see
 [`apps/kira-space/README.md`](apps/kira-space/README.md) for Kira Space.
 
+See both apps on the [presentation page](https://vlad-cirstean.github.io/kira-studio/).
+
+## Screenshots
+
+### Kira Studio
+
+![Kira Studio data grid showing an orders table with one row selected.](screenshots/framed/studio-data-grid.png)
+
+The data grid: filter, sort, edit and commit rows.
+
+![Kira Studio SQL console with a join query and its result grid.](screenshots/framed/studio-sql-console.png)
+
+The SQL console: run a statement or the whole script.
+
+![Kira Studio Api mode showing an HTTP request and its JSON response.](screenshots/framed/studio-api.png)
+
+Api mode: HTTP and gRPC requests with a JSON response.
+
+### Kira Space
+
+![Kira Space commit graph with branches, tags and the commit detail pane open.](screenshots/framed/space-git-graph.png)
+
+The git graph: branches, tags and commit detail.
+
+![Kira Space agents board with tasks across stages and live runs.](screenshots/framed/space-agents-board.png)
+
+The agents board: tasks across stages, with runs live.
+
+![Kira Space memory list showing each fact with its origin and scope.](screenshots/framed/space-memory.png)
+
+Memory: every fact shows its origin and scope.
+
 ## Status
 
 - **Beta.** Expect bugs and breaking changes between builds.
@@ -178,6 +210,12 @@ bun run package:studio   # build and ad-hoc sign the .app and .dmg
 Other scripts you'll use most (all but the last three cover Kira Space too):
 
 - `bun run setup` — install dependencies without building or running anything.
+- `bun run screenshots` — regenerate the images in `screenshots/` from the built frontends against
+  the mocked runtime. Run it by hand when the UI changes, never beside a UI test run (it rebuilds
+  both `frontend/dist`). Run it a second time and `git diff --exit-code -- screenshots/` must pass:
+  the output is byte-identical.
+- `bun run site:dev` and `bun run site:check` — serve the presentation page from `site/`, and build
+  it and check its layout at phone and desktop widths.
 - `bun run lint` and `bun run typecheck` — Biome plus the repo's style guards; TypeScript for every
   package.
 - `bun run test:unit`, `bun run test:go` — the unit and Go suites (Go's real-engine cases need
@@ -220,7 +258,7 @@ docs                  architecture, packaging, performance and the per-chapter r
   limitations.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — building, releasing, install and update.
 - [`docs/DEV_ENVIRONMENT.md`](docs/DEV_ENVIRONMENT.md) — building and testing in a given sandbox.
-- [`docs/v2.2/`](docs/v2.2/) — the current development chapter's spec and phase plans. Earlier
+- [`docs/v2.5/`](docs/v2.5/) — the current development chapter's spec and phase plans. Earlier
   chapters live alongside it in `docs/`.
 - [`CLAUDE.md`](CLAUDE.md) — the working agreement for changes to this repo.
 

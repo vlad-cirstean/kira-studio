@@ -7,6 +7,9 @@ over a VS Code-adjacent workspace (file tree, Monaco viewer, diffs, search), wit
 memory store, a terminal and a phone view on your home network — built on Wails (Go)
 and Vue 3. Its modules are Git, Agents, Automations and Memory.
 
+[Presentation page](https://vlad-cirstean.github.io/kira-studio/) and
+[screenshots](../../README.md#screenshots).
+
 ## Status
 
 - **Beta, split out of Kira Studio as its own app at v1.9 P100.** The git backend, the native code
