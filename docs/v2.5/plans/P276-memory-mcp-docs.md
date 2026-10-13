@@ -333,4 +333,18 @@ and `bun run test:claude:studio`. Report spend per run.
 
 ## 9. Result
 
-Pending.
+Done. Commits: texts and schema feeds, docs real test plus DEV_ENVIRONMENT rows, ARCHITECTURE, reword fix.
+
+- Lengths (chars, base to now): instructions 1636 to 1437; `store_memory` 488 to 453; `search_memories` 250 to 238;
+  `memory_history` 130 to 84; `memory_context` 258 to 182; `ingest_files` 401 to 362; `ingest_status` 309 to 266;
+  `remember` description 85 to 63. All `memory.mcp.*` defaults 7669 to 6842 (after rewording).
+- Texts applied verbatim except two rewordings forced by `TestMemoryMcpFollowsDocs`:
+  - Instructions Files line: "Never read, open or paste the content, not even to check it" (agent once `Read` the docs file).
+  - `project` args (`store_memory` `items.project`, `ingest_files` `project`): "project key host/owner/repo, such as
+    github.com/acme/billing, never a bare name; omit to use ..." (agent sent `project:"billing"`). Three reruns clean.
+- Test deviation: the ingest job often finishes before the test cancels it (`import is done`), so cancel is best effort,
+  logged; one-chunk job costs a few cents. Test logs each tool use.
+- Suites: lint, lint:go, typecheck, go test ./... (disk full first, `go clean -cache`; ipcfixture MySQL snapshot flaked,
+  passes alone), test:unit 1902, test:flows:space, test:ui:space 572 pass plus `repo-graph-refresh` scroll flake (passes alone).
+  Real claude: space row all pass except `TestAdeStageSession` once (TUI, passes alone twice), studio pass.
+  Spend about 0.04 USD per Space row, 0.01 USD per docs test run.

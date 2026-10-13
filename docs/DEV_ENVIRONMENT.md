@@ -447,7 +447,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
   app-built launches), a temp `HOME`, `--max-budget-usd 0.05` and one-sentence prompts. A package preflight
   skips, not fails, when `claude` is missing or `claude -p` cannot run under the temp `HOME`.
 - Rule: after changing code in an area below, run that row before calling the change done.
-- Spend, measured on 2026-10-09 (CLI 2.1.295, haiku): `claude -p` results of the Space suite 0.014 USD, TUI sessions (about 4 at 1 to 2 haiku prompts) an estimated 0.02 USD, Studio suite under 0.01 USD, memory gate smoke a few cents, import smoke 0.14 USD (P211). Space suite about 75 s, Studio about 12 s. The Space run prints its measured `claude -p` spend.
+- Spend, measured on 2026-10-09 (CLI 2.1.295, haiku): `claude -p` results of the Space suite 0.014 USD, TUI sessions (about 4 at 1 to 2 haiku prompts) an estimated 0.02 USD, Studio suite under 0.01 USD, memory gate smoke a few cents, import smoke 0.14 USD (P211), memory docs test 0.01 USD (P276). Space suite about 75 s, Studio about 12 s. The Space run prints its measured `claude -p` spend.
 
 | Changed area (paths) | Command |
 |---|---|
