@@ -5577,8 +5577,16 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 - Determinism is byte-identical: a rerun must leave `git status screenshots/` clean. Nondeterminism
   found so far: Monaco tokenizes JSON asynchronously (shot waits for coloured tokens) and fades its
   scrollbars on a JS timer (capture hides them).
-- Starlight (P284): add the `docs` content collection and Starlight's Tailwind layer in `global.css`;
-  append Docs to `src/data/nav.ts`. `src/lib/shots.ts` already serves screenshot imports to any page.
+- Docs (P284): Starlight (MIT) serves 21 pages from `site/src/content/docs/docs/` at `/docs/`. The
+  `docs` collection extends `docsSchema` with a required `sources:` list of repo-relative paths.
+  Starlight's Tailwind layer is wired in `global.css`; Docs is in `src/data/nav.ts`.
+  `src/lib/shots.ts` serves screenshot imports to any page.
+- Docs lint: `site/scripts/check-docs.ts` (rules in `docsRules.ts`, spec beside it) parses each page
+  with unified and remark and enforces the `CLAUDE.md` style rules plus frontmatter and link checks.
+  Each `sources:` path must exist. It runs inside root `lint` and `site:build`.
+- Page ownership: a phase that changes a file listed in a page's `sources:` updates that page in the
+  same phase. Grep `sources:` for the changed path to find it. Claims come from code and
+  `packages/theme/src/i18n/en.json`, never from README wording alone.
 - Declined (library rule): Jekyll, because its Ruby toolchain sits beside Bun and Go and it has no
   component model. VitePress, because its docs-centric default theme fights a landing page and the
   Vue SFC docs model is not needed for one page.
@@ -5589,6 +5597,7 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 
+- **Studio Settings footer shows `~/.kira-studio/kira.sqlite`; the real file is `kira.db`.** Label in `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue`. The docs say `kira.db`.
 - **Quit discards staged grid edits and dirty edit buffers (P267).** Tab close and dialogs guard unsaved edits; app quit does not. Accepted by the user (P266 decision).
 - **Backend, git-core and flow engine text is English-only (P265).** Accepted by the user. Go errors outside the catalog, `packages/git-core` strings and `@vue-flow`'s hardcoded `vue-flow__*` ARIA hints stay English; `copyCoverage` skips the vue-flow subtree.
 - **Claude Code usage limits show only what Kira-started sessions report (P239).** Claude Code sends

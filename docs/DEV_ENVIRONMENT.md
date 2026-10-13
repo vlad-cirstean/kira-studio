@@ -64,6 +64,9 @@ Pending now: `docs/pending-workflows/pages.yml` (P280, GitHub Pages deploy). Go 
   channel without a fixture (`E_FIXTURE_MISS`, HTTP 422) shows up as one; add the snapshot.
 - `bun run site:check` builds the site, then runs the 375 px and 1280 px WebKit checks.
   `bun run site:dev` serves it locally.
+- `bun run site:build` runs `astro check`, then the build. Root `lint` runs `site/scripts/check-docs.ts`
+  (docs style lint); run it alone with `bun site/scripts/check-docs.ts`. Its spec runs in `test:unit`.
+  A `sources:` path that does not exist fails lint.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`, and Docker flow tests)
 

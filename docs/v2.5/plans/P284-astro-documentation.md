@@ -434,8 +434,24 @@ The fix is in `apps/**` (P279's area during this phase): report it for a named f
 
 ## 12. Result
 
-(Implementer fills in: installed versions, licences, manual pass per page, `codegraph_explore` use,
-test results, anything left for the user.)
+Accuracy pass (serial verifier). Implementer ran no `codegraph_explore`; it checked deep UI claims
+against README wording only. Verifier ran 15 `codegraph_explore` calls plus targeted grep of source
+and `packages/theme/src/i18n/en.json`.
+
+Fixed or removed:
+
+- data-grid: cell formats now text/json/xml/csv/sql/iso8601/epochSeconds/epochMillis/base64/hex (UUID and URL removed in P42). Beautify only for JSON and XML. FK works on PostgreSQL, MySQL, MariaDB, SQLite; popover opens a new tab, edit through cell menu. Generate data: read-only connections excluded. Operations: cancel and re-run wording.
+- sql-console: explain scope is SELECT/WITH on PostgreSQL, MySQL, MariaDB, SQLite, ClickHouse; auto-explain skips above 10 statements.
+- api-client: gRPC unary and server-streaming only; Postman export skips gRPC; timeline phases; incognito and history-masking wording.
+- git: Skip offered for rebase, cherry-pick, revert; not merge.
+- agents: `parked` branch kind; script stage has no steps; `runs_on` values; `stop` only for non-ok result; no-report string `no report: Claude ended without calling finish_step`; `on_failure` rules.
+- automations: params are text, select, multi-select, each optionally secret.
+
+Verified, no change: docker, workspace, phone, memory, settings, prompts, mcp-tools (memory, database, agent tools: names, args, limits), schedule semantics, budget rule.
+
+Not code-verified (README-derived): git hazard list, review snapshot, AI comments; databases and database-mcp pages spot-read only.
+
+Out of docs scope, reported: `README.md` still lists UUID/URL cell formats and "(PostgreSQL/MariaDB)" FK; `docs/ARCHITECTURE.md` calls the third branch kind "a placeholder with no branch yet"; Studio Settings footer shows `kira.sqlite`, real file `kira.db` (Known open items).
 
 ## 13. Risks and decided fallbacks
 
