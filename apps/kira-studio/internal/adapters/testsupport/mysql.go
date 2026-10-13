@@ -142,17 +142,17 @@ func seedMysqlExtras(ctx context.Context, host string, port int) error {
 	if _, err := db.ExecContext(ctx, "DROP TABLE digits"); err != nil {
 		return err
 	}
-	return analyzeMysqlTables(ctx, db)
+	return analyzeMysqlTables(ctx, db, mysqlDatabase, mysqlAnalyticsDB)
 }
 
 func quoteMysqlIdent(name string) string { return "`" + strings.ReplaceAll(name, "`", "``") + "`" }
 
-// analyzeMysqlTables computes statistics for every base table up front. InnoDB recalculates them in
+// analyzeMysqlTables (MySQL and MariaDB) computes statistics for every base table up front. InnoDB recalculates them in
 // a background thread, so under load a fixture read could see "~0 rows" for a freshly seeded table,
 // and information_schema caches that estimate.
-func analyzeMysqlTables(ctx context.Context, db *sql.DB) error {
+func analyzeMysqlTables(ctx context.Context, db *sql.DB, schemas ...string) error {
 	rows, err := db.QueryContext(ctx, "SELECT table_schema, table_name FROM information_schema.tables "+
-		"WHERE table_type = 'BASE TABLE' AND table_schema IN (?, ?)", mysqlDatabase, mysqlAnalyticsDB)
+		"WHERE table_type = 'BASE TABLE' AND table_schema IN (?, ?)", schemas[0], schemas[1])
 	if err != nil {
 		return err
 	}

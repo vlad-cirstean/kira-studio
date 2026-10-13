@@ -88,7 +88,7 @@ func RootMariaDSN(host string, port int, database string) string {
 
 // seedMariadbExtras is support/mariadb.ts's own root-connection block: the second database
 // (mirroring Postgres's analytics schema — MariaDB has no schema level, §6d), the GRANT, and the
-// big_rows bulk insert via the SEQUENCE engine's own seq_1_to_N pseudo-table, then ANALYZE TABLE.
+// big_rows bulk insert via the SEQUENCE engine's own seq_1_to_N pseudo-table, then ANALYZE TABLE on every table.
 func seedMariadbExtras(ctx context.Context, host string, port int) error {
 	db, err := sql.Open("mysql", rootMariaDSN(host, port, mariaDatabase))
 	if err != nil {
@@ -119,8 +119,5 @@ func seedMariadbExtras(ctx context.Context, host string, port int) error {
 	); err != nil {
 		return err
 	}
-	if _, err := db.ExecContext(ctx, "ANALYZE TABLE `"+mariaDatabase+"`.big_rows"); err != nil {
-		return err
-	}
-	return nil
+	return analyzeMysqlTables(ctx, db, mariaDatabase, mariaAnalyticsDB)
 }
