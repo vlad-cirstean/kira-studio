@@ -176,7 +176,7 @@ func (e *Engine) Create(paths []string) (Job, error) {
 		return Job{}, fmt.Errorf("%w: pick 1 to %d files or folders", memory.ErrInvalid, maxPaths)
 	}
 	id := uuid.NewString()
-	if err := e.st.insertJob(id, paths); err != nil {
+	if err := e.st.insertJob(id, CreateArgs{Paths: paths}); err != nil {
 		return Job{}, err
 	}
 	e.wg.Add(1)
@@ -197,7 +197,7 @@ func (e *Engine) scan(id string, paths []string) {
 		}
 		return
 	}
-	files, err := e.plan(res)
+	files, err := e.plan(id, res)
 	if err == nil {
 		err = e.st.scanned(id, res.Base, res.Truncated, res.Ignored, files)
 	}
@@ -209,7 +209,7 @@ func (e *Engine) scan(id string, paths []string) {
 
 // plan turns a scan into file rows: duplicates and already imported content are skipped with a
 // reason, the rest are chunked once to size the job.
-func (e *Engine) plan(res ScanResult) ([]newFile, error) {
+func (e *Engine) plan(jobID string, res ScanResult) ([]newFile, error) {
 	files := make([]newFile, 0, len(res.Files)+len(res.Skipped))
 	for _, sk := range res.Skipped {
 		files = append(files, newFile{ID: uuid.NewString(), Path: sk.Path, Rel: sk.Rel, Kind: orKind(sk.Kind), Size: sk.Size,
@@ -224,7 +224,7 @@ func (e *Engine) plan(res ScanResult) ([]newFile, error) {
 			continue
 		}
 		first[c.Hash] = c.Rel
-		at, done, err := e.st.doneHash(c.Hash)
+		at, done, err := e.st.doneHash(c.Hash, jobID)
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +284,7 @@ func (e *Engine) Start(id string) error {
 		return err
 	}
 	e.arm(id)
-	if err := e.st.startJob(id); err != nil {
+	if err := e.st.startJob(id, StartArgs{}); err != nil {
 		e.disarm(id)
 		return err
 	}
@@ -463,7 +463,7 @@ func (e *Engine) materialiseNext() (bool, error) {
 	case skip != "":
 		return end(FileSkipped, skip)
 	}
-	if at, done, err := e.st.doneHash(hash); err != nil {
+	if at, done, err := e.st.doneHash(hash, ref.JobID); err != nil {
 		return false, err
 	} else if done {
 		return end(FileSkipped, "unchanged since import on "+strings.SplitN(at, "T", 2)[0])

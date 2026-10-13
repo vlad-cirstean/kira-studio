@@ -527,3 +527,21 @@ Test edits:
 - Shared `ScopeField.vue` for add and import dialogs: no duplicate scope picker.
 - One sequential implementer: shared files and an ordered chain; the JSON chunker alone does not repay
   a stream.
+
+## Result
+
+### Commit 0 probe (2026-10-13)
+
+Real `claude` 2.1.296, haiku, temp `HOME`, cwd a temp dir holding `source.md`, no credential read by the probe:
+
+- `--safe-mode --tools Read,Grep --allowedTools Read,Grep --max-turns 6 --permission-prompts none`: Grep and Read of
+  `source.md` work. A Read of an absolute path outside cwd is **not** denied: it returned the file's content.
+  The plan's argv does not isolate.
+- Adding `--restricted` (confines file tools to the working directories; also drops code-running tools): Grep of
+  `source.md` works, the outside Read lands in `permission_denials`, the call reports DENIED.
+- `--restricted` with `--safe-mode` and `--permission-mode dontAsk`: same denial.
+- Decision: verify argv is `--restricted --tools Read,Grep --allowedTools Read,Grep --max-turns N
+  --permission-prompts none` (`--safe-mode` kept off for the tool call, as MCP calls do). `claudeArgs` comment
+  records why. Cost per probe call under 0.002 USD.
+- Variadic flags (`--tools`, `--allowedTools`) swallow a trailing prompt argument; the call sends the prompt on
+  stdin, as `memory.Call` already does.

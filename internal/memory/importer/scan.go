@@ -12,11 +12,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
-const (
-	KindMarkdown = "markdown"
-	KindText     = "text"
-)
-
 // Caps bound one scan.
 type Caps struct {
 	MaxFileBytes int64

@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
-const interruptedReason = "Interrupted: Kira Space closed during the import. Resume to continue."
+const interruptedReason = "Interrupted: the import runner stopped during the import. Resume to continue."
 
 // store is every SQL statement of the importer. Each method is one short transaction; the shared
 // handle has a single connection, so never hold rows open while calling another method.
@@ -43,11 +45,42 @@ func rowsAffected(res sql.Result) int64 {
 	return n
 }
 
-func (s *store) insertJob(id string, roots []string) error {
-	raw, _ := json.Marshal(roots)
-	_, err := s.db.Exec(`INSERT INTO import_jobs (id, roots, base, state, created_at) VALUES (?, ?, '', 'scanning', ?)`,
-		id, string(raw), s.now())
+// CreateArgs describes a new import job. Provenance may be the zero value for UI jobs, which choose
+// it at Start; MCP jobs always carry it.
+type CreateArgs struct {
+	Paths      []string
+	Channel    string // ChannelUI (default) or ChannelMCP
+	Provenance Provenance
+	Groups     []memory.GroupRef
+	// AutoStart makes the runner start the job once its scan ends, unless the estimate is over the cap.
+	AutoStart bool
+	WriteDoc  bool
+}
+
+func (s *store) insertJob(id string, a CreateArgs) error {
+	raw, _ := json.Marshal(a.Paths)
+	groups, _ := json.Marshal(nonNil(a.Groups))
+	p := a.Provenance
+	if p.Origin == "" {
+		p = DefaultProvenance
+	}
+	channel := a.Channel
+	if channel == "" {
+		channel = ChannelUI
+	}
+	_, err := s.db.Exec(`INSERT INTO import_jobs
+		(id, roots, base, state, created_at, channel, origin, source_tag, scope, project, session_id, groups_json, auto_start, write_doc)
+		VALUES (?, ?, '', 'scanning', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, string(raw), s.now(), channel, p.Origin, nullable(p.SourceTag), p.Scope, nullable(p.Project), nullable(p.Session),
+		string(groups), a.AutoStart, a.WriteDoc)
 	return err
+}
+
+func nullable(v string) any {
+	if v == "" {
+		return nil
+	}
+	return v
 }
 
 func (s *store) failScan(id, reason string) error {
@@ -120,9 +153,34 @@ func jobStateError(tx *sql.Tx, id string) error {
 
 func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }
 
-func (s *store) startJob(id string) error {
+// StartArgs set the provenance and write-back of an awaiting job at Start; nil keeps the job's own.
+type StartArgs struct {
+	Provenance *Provenance
+	WriteDoc   *bool
+}
+
+func (s *store) startJob(id string, a StartArgs) error {
 	return s.tx(func(tx *sql.Tx) error {
-		return s.moveJob(tx, id, []string{JobAwaiting}, `state = 'running', reason = '', started_at = ?`, s.now())
+		if err := s.moveJob(tx, id, []string{JobAwaiting}, `state = 'running', reason = '', started_at = ?`, s.now()); err != nil {
+			return err
+		}
+		if a.WriteDoc != nil {
+			if _, err := tx.Exec(`UPDATE import_jobs SET write_doc = ? WHERE id = ?`, *a.WriteDoc, id); err != nil {
+				return err
+			}
+		}
+		if a.Provenance == nil {
+			return nil
+		}
+		p := *a.Provenance
+		if _, err := tx.Exec(`UPDATE import_jobs SET origin = ?, source_tag = ?, scope = ?, project = ? WHERE id = ?`,
+			p.Origin, nullable(p.SourceTag), p.Scope, nullable(p.Project), id); err != nil {
+			return fmt.Errorf("%w: %v", memory.ErrInvalid, err)
+		}
+		// Files skipped as unchanged were judged under the scan's provenance; materialising rechecks them.
+		_, err := tx.Exec(`UPDATE import_files SET state = 'pending', reason = '', updated_at = ?
+			WHERE job_id = ? AND state = 'skipped' AND reason LIKE 'unchanged since import%'`, s.now(), id)
+		return err
 	})
 }
 
@@ -155,7 +213,7 @@ func (s *store) cancelJob(id string) error {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE import_files SET state = 'cancelled', updated_at = ?
-			WHERE job_id = ? AND state IN ('pending', 'extracting', 'extracted', 'finalizing')`, s.now(), id); err != nil {
+			WHERE job_id = ? AND state IN ('pending', 'extracting', 'extracted', 'verifying', 'finalizing')`, s.now(), id); err != nil {
 			return err
 		}
 		_, err := tx.Exec(`DELETE FROM import_chunks WHERE file_id IN
@@ -218,8 +276,14 @@ func (s *store) retryFileTx(tx *sql.Tx, jobID, fileID string) error {
 	if err := tx.QueryRow(`SELECT count(*) FROM import_chunks WHERE file_id = ? AND state != 'done'`, fileID).Scan(&failedChunks); err != nil {
 		return err
 	}
+	var chunks int
+	if err := tx.QueryRow(`SELECT count(*) FROM import_chunks WHERE file_id = ?`, fileID).Scan(&chunks); err != nil {
+		return err
+	}
 	next := FileExtracted
-	if failedChunks > 0 {
+	if chunks == 0 {
+		next = FilePending // failed before it had chunks (unreadable, invalid JSON, bad memdoc): start over
+	} else if failedChunks > 0 {
 		next = FileExtracting
 		if _, err := tx.Exec(`UPDATE import_chunks SET state = 'pending', attempts = 0, error = '' WHERE file_id = ? AND state != 'done'`, fileID); err != nil {
 			return err
@@ -276,10 +340,9 @@ func (s *store) recoverInterrupted() error {
 	return s.tx(func(tx *sql.Tx) error {
 		for _, q := range []string{
 			`UPDATE import_chunks SET state = 'pending' WHERE state = 'running'`,
-			`UPDATE import_files SET state = 'extracted' WHERE state = 'finalizing'`,
+			`UPDATE import_files SET state = 'extracted' WHERE state IN ('verifying', 'finalizing')`,
 			`UPDATE import_files SET state = 'pending' WHERE state = 'extracting'
 				AND NOT EXISTS (SELECT 1 FROM import_chunks c WHERE c.file_id = import_files.id)`,
-			`UPDATE import_jobs SET state = 'failed', reason = 'Scan interrupted. Import again.' WHERE state = 'scanning'`,
 		} {
 			if _, err := tx.Exec(q); err != nil {
 				return err
@@ -558,7 +621,7 @@ func (s *store) finishJobIfIdle(jobID string) (bool, error) {
 	var done bool
 	err := s.tx(func(tx *sql.Tx) error {
 		res, err := tx.Exec(`UPDATE import_jobs SET state = 'done', finished_at = ? WHERE id = ? AND state = 'running'
-			AND NOT EXISTS (SELECT 1 FROM import_files WHERE job_id = ? AND state IN ('pending', 'extracting', 'extracted', 'finalizing'))`,
+			AND NOT EXISTS (SELECT 1 FROM import_files WHERE job_id = ? AND state IN ('pending', 'extracting', 'extracted', 'verifying', 'finalizing'))`,
 			s.now(), jobID, jobID)
 		done = err == nil && rowsAffected(res) > 0
 		return err
@@ -566,10 +629,15 @@ func (s *store) finishJobIfIdle(jobID string) (bool, error) {
 	return done, err
 }
 
-// doneHash reports the date a done file with this content hash was imported.
-func (s *store) doneHash(hash string) (string, bool, error) {
+// doneHash reports the date a done file with this content hash was imported under the same
+// provenance as the job: the same file ingested into another scope is a different store.
+func (s *store) doneHash(hash, jobID string) (string, bool, error) {
 	var at string
-	err := s.db.QueryRow(`SELECT updated_at FROM import_files WHERE state = 'done' AND content_hash = ? ORDER BY updated_at DESC LIMIT 1`, hash).Scan(&at)
+	err := s.db.QueryRow(`SELECT f.updated_at FROM import_files f JOIN import_jobs j ON j.id = f.job_id
+		JOIN import_jobs cur ON cur.id = ?
+		WHERE f.state = 'done' AND f.content_hash = ? AND j.origin = cur.origin AND j.source_tag IS cur.source_tag
+			AND j.scope = cur.scope AND j.project IS cur.project
+		ORDER BY f.updated_at DESC LIMIT 1`, jobID, hash).Scan(&at)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
@@ -589,16 +657,22 @@ const jobColumns = `j.id, j.roots, j.base, j.state, j.reason, j.truncated, j.ign
 	(SELECT COALESCE(sum(f.noop), 0) FROM import_files f WHERE f.job_id = j.id),
 	(SELECT COALESCE(sum(json_array_length(f.unresolved)), 0) FROM import_files f WHERE f.job_id = j.id),
 	(SELECT count(*) FROM import_files f WHERE f.job_id = j.id AND f.state = 'failed'),
-	(SELECT count(*) FROM import_files f WHERE f.job_id = j.id AND f.state = 'skipped')`
+	(SELECT count(*) FROM import_files f WHERE f.job_id = j.id AND f.state = 'skipped'),
+	(SELECT COALESCE(sum(json_array_length(f.dropped)), 0) FROM import_files f WHERE f.job_id = j.id),
+	j.channel, j.origin, j.source_tag, j.scope, j.project, j.session_id, j.groups_json, j.auto_start, j.write_doc`
 
 func scanJobRow(r interface{ Scan(...any) error }) (Job, error) {
 	var j Job
-	var roots string
+	var roots, groups string
 	if err := r.Scan(&j.ID, &roots, &j.Base, &j.State, &j.Reason, &j.Truncated, &j.IgnoredCount, &j.Estimate.Tokens, &j.Calls, &j.CostUSD,
 		&j.CreatedAt, &j.StartedAt, &j.FinishedAt,
 		&j.Progress.FilesTotal, &j.Progress.FilesDone, &j.Progress.ChunksTotal, &j.Progress.ChunksDone,
-		&j.Totals.Added, &j.Totals.Updated, &j.Totals.Noop, &j.Totals.Unresolved, &j.Totals.FailedFiles, &j.Totals.SkippedFiles); err != nil {
+		&j.Totals.Added, &j.Totals.Updated, &j.Totals.Noop, &j.Totals.Unresolved, &j.Totals.FailedFiles, &j.Totals.SkippedFiles,
+		&j.Totals.Dropped, &j.Channel, &j.Origin, &j.SourceTag, &j.Scope, &j.Project, &j.SessionID, &groups, &j.AutoStart, &j.WriteDoc); err != nil {
 		return Job{}, err
+	}
+	if err := json.Unmarshal([]byte(groups), &j.Groups); err != nil || j.Groups == nil {
+		j.Groups = []memory.GroupRef{}
 	}
 	if err := json.Unmarshal([]byte(roots), &j.Roots); err != nil || j.Roots == nil {
 		j.Roots = []string{}
@@ -666,7 +740,8 @@ func (s *store) jobDetail(id string) (JobDetail, error) {
 	rows, err := s.db.Query(`SELECT f.id, f.rel_path, f.kind, f.size, f.state, f.reason, f.title, f.chunk_count,
 		CASE WHEN f.state = 'done' THEN f.chunk_count
 			ELSE (SELECT count(*) FROM import_chunks c WHERE c.file_id = f.id AND c.state = 'done') END,
-		f.fact_count, f.added, f.updated, f.noop, f.unresolved, f.dropped, f.cost_usd
+		f.fact_count, f.added, f.updated, f.noop, f.unresolved, f.dropped, f.cost_usd,
+		f.verified, f.orphaned, f.group_id, f.prov_json, f.doc_path, f.doc_error
 		FROM import_files f WHERE f.job_id = ? ORDER BY f.rel_path`, id)
 	if err != nil {
 		return JobDetail{}, err
@@ -675,10 +750,17 @@ func (s *store) jobDetail(id string) (JobDetail, error) {
 	d := JobDetail{Job: j, Files: []File{}}
 	for rows.Next() {
 		var f File
-		var unresolved, dropped string
+		var unresolved, dropped, prov string
 		if err := rows.Scan(&f.ID, &f.RelPath, &f.Kind, &f.Size, &f.State, &f.Reason, &f.Title, &f.ChunkCount, &f.ChunksDone,
-			&f.FactCount, &f.Added, &f.Updated, &f.Noop, &unresolved, &dropped, &f.CostUSD); err != nil {
+			&f.FactCount, &f.Added, &f.Updated, &f.Noop, &unresolved, &dropped, &f.CostUSD,
+			&f.Verified, &f.Orphaned, &f.GroupID, &prov, &f.DocPath, &f.DocError); err != nil {
 			return JobDetail{}, err
+		}
+		if prov != "" {
+			var p Provenance
+			if json.Unmarshal([]byte(prov), &p) == nil {
+				f.Prov = &p
+			}
 		}
 		if json.Unmarshal([]byte(unresolved), &f.Unresolved) != nil || f.Unresolved == nil {
 			f.Unresolved = []UnresolvedFact{}

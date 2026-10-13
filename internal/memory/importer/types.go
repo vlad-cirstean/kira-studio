@@ -24,10 +24,27 @@ const (
 	FileSkipped    = "skipped"
 	FileExtracting = "extracting"
 	FileExtracted  = "extracted"
+	FileVerifying  = "verifying"
 	FileFinalizing = "finalizing"
 	FileDone       = "done"
 	FileFailed     = "failed"
 	FileCancelled  = "cancelled"
+)
+
+// File kinds.
+const (
+	KindMarkdown = "markdown"
+	KindText     = "text"
+	KindJSON     = "json"
+	KindJSONL    = "jsonl"
+	// KindMemdoc is a file already in the kira-memory doc format: ingested by parse alone.
+	KindMemdoc = "memdoc"
+)
+
+// Job channels: who started the job.
+const (
+	ChannelUI  = "ui"
+	ChannelMCP = "mcp"
 )
 
 // ErrNotFound is returned when an id names no import job or file.
@@ -57,10 +74,24 @@ type Totals struct {
 	Added        int `json:"added"`
 	Updated      int `json:"updated"`
 	Noop         int `json:"noop"`
+	Dropped      int `json:"dropped"`
 	Unresolved   int `json:"unresolved"`
 	FailedFiles  int `json:"failedFiles"`
 	SkippedFiles int `json:"skippedFiles"`
 }
+
+// Provenance is who decided the facts of a job and where they apply. SourceTag is set exactly for
+// origin external; Project exactly for scope project; Session is the requesting Claude session.
+type Provenance struct {
+	Origin    string `json:"origin"`
+	SourceTag string `json:"sourceTag"`
+	Scope     string `json:"scope"`
+	Project   string `json:"project"`
+	Session   string `json:"session"`
+}
+
+// DefaultProvenance is what the UI import stored before provenance was chosen (P272's import mode).
+var DefaultProvenance = Provenance{Origin: memory.OriginExternal, SourceTag: "doc", Scope: memory.ScopePersonal}
 
 type Job struct {
 	ID           string   `json:"id"`
@@ -73,6 +104,16 @@ type Job struct {
 	Estimate     Estimate `json:"estimate"`
 	Progress     Progress `json:"progress"`
 	Totals       Totals   `json:"totals"`
+	Channel      string   `json:"channel"`
+	// Provenance fields are flat so the job JSON stays one level.
+	Origin    string            `json:"origin"`
+	SourceTag *string           `json:"sourceTag"`
+	Scope     string            `json:"scope"`
+	Project   *string           `json:"project"`
+	SessionID *string           `json:"sessionId"`
+	Groups    []memory.GroupRef `json:"groups"`
+	AutoStart bool              `json:"autoStart"`
+	WriteDoc  bool              `json:"writeDoc"`
 	// Calls and CostUSD cover the extract and finalize agents only, not the memory gate's own checks.
 	Calls      int     `json:"calls"`
 	CostUSD    float64 `json:"costUsd"`
@@ -98,6 +139,18 @@ type File struct {
 	Unresolved []UnresolvedFact `json:"unresolved"`
 	Dropped    []DroppedFact    `json:"dropped"`
 	CostUSD    float64          `json:"costUsd"`
+	// Verified counts facts the cross-check step judged; Orphaned counts stored facts a re-ingested
+	// memdoc no longer lists.
+	Verified int `json:"verified"`
+	Orphaned int `json:"orphaned"`
+	// GroupID is the file's document group ("kg_..."): the doc header's for memdoc, else the path's.
+	GroupID string `json:"groupId"`
+	// Prov is a memdoc file's own header provenance; nil for other kinds.
+	Prov     *Provenance `json:"prov"`
+	DocPath  string      `json:"docPath"`
+	DocError string      `json:"docError"`
+	// FactIDs are up to 50 stored fact ids of this file (status tool only).
+	FactIDs []string `json:"factIds,omitempty"`
 }
 
 type JobDetail struct {
