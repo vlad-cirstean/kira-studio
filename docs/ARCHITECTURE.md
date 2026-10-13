@@ -4090,7 +4090,7 @@ and `docs/v2.0/plans/`.
 ### Model and scope
 
 - A task owns branches across repos. A branch is `mine` (created here, has a name), `review` (another
-  author's) or a placeholder with no branch yet. A task follows a workflow of stages, kind `user`,
+  author's) or `parked` (kept out of the merge order; shown as Not merging). A task follows a workflow of stages, kind `user`,
   `agent` or `script`; each stage holds steps (agent stages: `claude -p` per step; script stages: a
   shell command). A step runs `once` (first mine branch in task order), `each repo` or `only <repo>`. One run per step and branch.
 - Task status is derived from the workflow and runs, never typed (D10): the Status field is read-only.
