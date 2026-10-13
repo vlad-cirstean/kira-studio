@@ -16,6 +16,7 @@ import {
   SHA_A,
   singleRowChunks,
 } from './support/gitUiPortFixtures';
+import { trackErrors } from './support/pageErrors';
 
 // How the shared git-ui graph reacts to daemon events and restored state inside Space: which
 // repo.changed kinds refresh, what a refresh does to scroll and menus, and the stopped auto-fetch
@@ -107,15 +108,6 @@ test('an autoFetch.changed event raises and clears the stopped marker', async ({
   await gitStreamEmit(page, 'autoFetch.changed', { repoId: PORT_REPO.repoId, autoFetch: null });
   await expect(marker).toHaveCount(0);
 });
-
-function trackErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('pageerror', (err) => errors.push(String(err)));
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
-  });
-  return errors;
-}
 
 test('a restored scrollRow of 0 does not crash a grid that mounts before its first chunk', async ({
   relaunch,

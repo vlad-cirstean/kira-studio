@@ -46,8 +46,10 @@ export interface GitStreamMockArgs {
   /** Per-open chunk lists: open N answers list N, the last list repeats. Wins over
    *  `graphStreamChunks` when both are given. */
   graphStreamOpens?: readonly (readonly GraphStreamChunkFixture[])[];
-  /** Chunks past this index of the first open are held until `gitStreamRelease`. */
+  /** Chunks past this index of the held open are held until `gitStreamRelease`. */
   graphStreamHoldAfter?: number;
+  /** Which open `graphStreamHoldAfter` applies to; the first by default. */
+  graphStreamHoldOpen?: number;
 }
 
 function installInBrowser({
@@ -56,6 +58,7 @@ function installInBrowser({
   graphStreamChunks,
   graphStreamOpens,
   graphStreamHoldAfter,
+  graphStreamHoldOpen,
 }: GitStreamMockArgs): void {
   const w =
     (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ?? {};
@@ -66,6 +69,8 @@ function installInBrowser({
   // `gitStreamRequests` below. Reset per install so a fresh `relaunch()` starts a fresh log.
   (window as unknown as { __kiraGitRequests: string[] }).__kiraGitRequests = [];
   (window as unknown as { __kiraGitParams: unknown[] }).__kiraGitParams = [];
+  const delivered: number[] = [];
+  (window as unknown as { __kiraGitDelivered: number[] }).__kiraGitDelivered = delivered;
 
   let streamOpenCount = 0;
   const seqCounts: Record<string, number> = {};
@@ -125,6 +130,7 @@ function installInBrowser({
     version: number,
     id: number,
     chunk: GraphStreamChunkFixture,
+    open: number,
   ): void {
     const blobBytes = Uint8Array.from(atob(chunk.blob), (c) => c.charCodeAt(0));
     const header = {
@@ -152,7 +158,10 @@ function installInBrowser({
     view.setUint32(1, headerBytes.byteLength, false);
     out.set(headerBytes, 5);
     out.set(blobBytes, 5 + headerBytes.byteLength);
-    nativeSetTimeout(() => socket.onmessage?.({ data: out.buffer }), 0);
+    nativeSetTimeout(() => {
+      delivered[open] = (delivered[open] ?? 0) + 1;
+      socket.onmessage?.({ data: out.buffer });
+    }, 0);
   }
 
   function createGitMockSocket(): MockSocket {
@@ -196,22 +205,23 @@ function installInBrowser({
           : graphStreamChunks;
         if (frame.t === 'open' && frame.method === 'graph.stream' && openChunks) {
           const id = frame.id;
-          const hold = streamOpenCount === 0 ? graphStreamHoldAfter : undefined;
+          const open = streamOpenCount;
+          const hold = open === (graphStreamHoldOpen ?? 0) ? graphStreamHoldAfter : undefined;
           streamOpenCount++;
           const now = hold === undefined ? openChunks : openChunks.slice(0, hold);
           for (const chunk of now) {
-            deliverGraphStreamChunk(socket, envelope.version, id, chunk);
+            deliverGraphStreamChunk(socket, envelope.version, id, chunk, open);
           }
           const held = openChunks.slice(now.length);
           const finish = (): void => {
             for (const chunk of held.splice(0)) {
-              deliverGraphStreamChunk(socket, envelope.version, id, chunk);
+              deliverGraphStreamChunk(socket, envelope.version, id, chunk, open);
             }
             deliver(socket, { version: envelope.version, body: { t: 'end', id } });
           };
           releaseOne = (): void => {
             const chunk = held.shift();
-            if (chunk) deliverGraphStreamChunk(socket, envelope.version, id, chunk);
+            if (chunk) deliverGraphStreamChunk(socket, envelope.version, id, chunk, open);
             if (held.length === 0)
               deliver(socket, { version: envelope.version, body: { t: 'end', id } });
           };
@@ -315,6 +325,7 @@ export async function installGitStreamMock(
   graphStreamChunks?: readonly GraphStreamChunkFixture[],
   graphStreamOpens?: readonly (readonly GraphStreamChunkFixture[])[],
   graphStreamHoldAfter?: number,
+  graphStreamHoldOpen?: number,
 ): Promise<void> {
   await page.evaluate(installInBrowser, {
     repoId: gitRepoId,
@@ -322,6 +333,7 @@ export async function installGitStreamMock(
     graphStreamChunks,
     graphStreamOpens,
     graphStreamHoldAfter,
+    graphStreamHoldOpen,
   });
 }
 
@@ -373,7 +385,15 @@ export async function gitStreamEmit(page: Page, method: string, payload: unknown
   );
 }
 
-/** Delivers the chunks `graphStreamHoldAfter` held back, then ends the first stream. */
+/** How many chunks the `open`th `graph.stream` open has delivered so far. */
+export async function gitStreamDelivered(page: Page, open: number): Promise<number> {
+  return page.evaluate(
+    (n) => (window as unknown as { __kiraGitDelivered?: number[] }).__kiraGitDelivered?.[n] ?? 0,
+    open,
+  );
+}
+
+/** Delivers the chunks `graphStreamHoldAfter` held back, then ends the held stream. */
 export async function gitStreamRelease(page: Page): Promise<void> {
   await page.evaluate(() =>
     (window as unknown as { __kiraGitRelease: () => void }).__kiraGitRelease(),
