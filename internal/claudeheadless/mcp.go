@@ -64,6 +64,9 @@ type Grant struct {
 	Results []ResultSpec
 	// Review, when set on a run grant, adds reply_review_comment for those comment ids.
 	Review *ReviewGrant
+	// Sandbox, when set on a run grant, adds fetch_remote and push_branch: the git operations a
+	// sandboxed agent cannot do itself.
+	Sandbox *SandboxGrant
 }
 
 // ResultSpec is one result a step may report.
@@ -106,6 +109,7 @@ type Server struct {
 	space    SpaceTools
 	outcomes Outcomes
 	review   ReviewReplier
+	sandbox  SandboxGit
 	prompts  llmprompts.Source
 
 	mu     sync.Mutex
@@ -115,7 +119,7 @@ type Server struct {
 	srv    *http.Server
 	closed bool
 	// shared holds the per-flags servers of the revision sharedRev; a prompt edit rebuilds them.
-	shared    map[[4]bool]*mcp.Server
+	shared    map[[5]bool]*mcp.Server
 	sharedRev uint64
 }
 
@@ -128,6 +132,8 @@ type Options struct {
 	Outcomes Outcomes
 	// Review answers reply_review_comment calls; nil refuses review grants.
 	Review ReviewReplier
+	// SandboxGit runs fetch_remote and push_branch; nil refuses sandbox grants.
+	SandboxGit SandboxGit
 	// Prompts resolves tool and instruction texts; nil means the registry defaults.
 	Prompts llmprompts.Source
 }
@@ -137,7 +143,7 @@ func NewServer(o Options) *Server {
 	if o.Prompts == nil {
 		o.Prompts = llmprompts.Defaults()
 	}
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, prompts: o.Prompts}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, prompts: o.Prompts}
 }
 
 type finishArgs struct {
@@ -198,7 +204,7 @@ func (s *Server) finishSchema(results []ResultSpec) (*jsonschema.Schema, error) 
 }
 
 // buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
-func (s *Server) buildMCPServer(finish, space, outcomes, git, review bool, results []ResultSpec) *mcp.Server {
+func (s *Server) buildMCPServer(finish, space, outcomes, git, review, sandbox bool, results []ResultSpec) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
 		opts.Instructions = llmprompts.HeadlessSpaceInstructions.Text(s.prompts, llmprompts.NoVars{})
@@ -226,6 +232,9 @@ func (s *Server) buildMCPServer(finish, space, outcomes, git, review bool, resul
 	}
 	if review {
 		s.addReviewTool(srv)
+	}
+	if sandbox {
+		s.addSandboxGitTools(srv)
 	}
 	return srv
 }
@@ -313,7 +322,7 @@ func (s *Server) startLocked() error {
 			return reg.server
 		}
 		g := reg.grant
-		return s.sharedServer([4]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil})
+		return s.sharedServer([5]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Sandbox != nil})
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
 	mux := http.NewServeMux()
@@ -325,16 +334,16 @@ func (s *Server) startLocked() error {
 }
 
 // sharedServer returns the tool set for a grant's flags, rebuilt when a prompt edit moved the revision.
-func (s *Server) sharedServer(key [4]bool) *mcp.Server {
+func (s *Server) sharedServer(key [5]bool) *mcp.Server {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if rev := s.prompts.Revision(); s.shared == nil || rev != s.sharedRev {
-		s.shared = map[[4]bool]*mcp.Server{}
+		s.shared = map[[5]bool]*mcp.Server{}
 		s.sharedRev = rev
 	}
 	srv := s.shared[key]
-	if srv == nil && (key[0] || key[1] || key[2] || key[3]) {
-		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], false, nil)
+	if srv == nil && (key[0] || key[1] || key[2] || key[3] || key[4]) {
+		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], false, key[4], nil)
 		s.shared[key] = srv
 	}
 	return srv
@@ -362,9 +371,15 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 		}
 		g.Review = &ReviewGrant{CommentIDs: slices.Clone(g.Review.CommentIDs)}
 	}
+	if g.Sandbox != nil {
+		if g.RunID == "" || s.sandbox == nil {
+			return "", nil, errors.New("claudeheadless: sandbox grant needs a run and sandbox git tools")
+		}
+		g.Sandbox = &SandboxGrant{Push: g.Sandbox.Push}
+	}
 	var perRun *mcp.Server
 	if g.RunID != "" && (!IsImplicit(g.Results) || g.Review != nil) {
-		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Review != nil, g.Results)
+		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Review != nil, g.Sandbox != nil, g.Results)
 	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
@@ -416,6 +431,19 @@ func (s *Server) forget(id uint64) {
 		}
 	}
 	s.tokens = kept
+}
+
+// Port is the loopback port the server listens on, 0 before the first Register.
+func (s *Server) Port() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ln == nil {
+		return 0
+	}
+	if a, ok := s.ln.Addr().(*net.TCPAddr); ok {
+		return a.Port
+	}
+	return 0
 }
 
 // Close stops the listener; later Register calls fail.
