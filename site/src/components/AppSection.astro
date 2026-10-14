@@ -17,7 +17,7 @@ const { app, shots } = Astro.props;
     <p class="mt-3 max-w-2xl text-fg">{app.summary}</p>
     <ul class="mt-6 grid gap-3 sm:grid-cols-2">
       {app.features.map((feature) => (
-        <li class="rounded-md border border-border bg-elevated px-4 py-3 text-base">{feature}</li>
+        <li class="rounded-md border border-border bg-elevated px-4 py-3 text-base">{feature.title}: {feature.body}</li>
       ))}
     </ul>
     <div class="mt-10 grid gap-8">

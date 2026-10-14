@@ -1,9 +1,9 @@
 ---
 import { Image } from 'astro:assets';
 import appIcon from '../../../apps/kira-studio/build/appicon.png';
-import { NAV } from '../data/nav';
+import { href, NAV } from '../data/nav';
 
-const home = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
+const home = href();
 ---
 
 <header class="sticky top-0 z-10 border-b border-border bg-chrome/95 backdrop-blur">

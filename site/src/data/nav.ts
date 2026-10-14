@@ -1,5 +1,10 @@
 export const REPO_URL = 'https://github.com/vlad-cirstean/kira-studio';
 
+/** Joins a site-relative path to the Pages base path. */
+export function href(path = ''): string {
+  return `${import.meta.env.BASE_URL.replace(/\/$/, '')}/${path}`;
+}
+
 export interface NavLink {
   readonly label: string;
   readonly href: string;
@@ -7,9 +12,7 @@ export interface NavLink {
 }
 
 export const NAV: readonly NavLink[] = [
-  { label: 'Studio', href: '#studio' },
-  { label: 'Space', href: '#space' },
   { label: 'Install', href: '#install' },
-  { label: 'Docs', href: `${import.meta.env.BASE_URL.replace(/\/$/, '')}/docs/` },
+  { label: 'Docs', href: href('docs/') },
   { label: 'GitHub', href: REPO_URL, external: true },
 ];

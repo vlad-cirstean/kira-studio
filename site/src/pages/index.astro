@@ -1,24 +1,5 @@
 ---
-import AppSection from '../components/AppSection.astro';
-import Footer from '../components/Footer.astro';
-import Header from '../components/Header.astro';
-import Hero from '../components/Hero.astro';
-import Install from '../components/Install.astro';
-import { APPS, SITE } from '../data/content';
-import Base from '../layouts/Base.astro';
-import { resolveAllShots } from '../lib/shots';
-
-const shots = await resolveAllShots();
-const hero = shots.find((s) => s.id === 'studio-data-grid');
-if (!hero) throw new Error('Missing hero shot studio-data-grid');
+import Landing from '../layouts/Landing.astro';
 ---
 
-<Base title={SITE.title} description={SITE.description} image={hero.framedPng}>
-  <Header />
-  <main>
-    <Hero shot={hero} />
-    {APPS.map((app) => <AppSection app={app} shots={shots.filter((s) => s.app === app.id && s.id !== hero.id)} />)}
-    <Install />
-  </main>
-  <Footer />
-</Base>
+<Landing app="studio" />

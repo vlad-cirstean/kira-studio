@@ -1,0 +1,33 @@
+---
+import AppSection from '../components/AppSection.astro';
+import AppTabs from '../components/AppTabs.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import Install from '../components/Install.astro';
+import { APPS } from '../data/content';
+import type { AppId } from '../data/shots';
+import { resolveAllShots } from '../lib/shots';
+import Base from './Base.astro';
+
+interface Props {
+  app: AppId;
+}
+
+const content = APPS.find((a) => a.id === Astro.props.app);
+if (!content) throw new Error(`Unknown app ${Astro.props.app}`);
+const shots = (await resolveAllShots()).filter((s) => s.app === content.id);
+const hero = shots.find((s) => s.id === content.hero);
+if (!hero) throw new Error(`Missing hero shot ${content.hero}`);
+---
+
+<Base title={content.pageTitle} description={content.description} image={hero.framedPng}>
+  <Header />
+  <main data-app={content.id}>
+    <AppTabs current={content.id} />
+    <Hero app={content} shot={hero} />
+    <AppSection app={content} shots={shots.filter((s) => s.id !== hero.id)} />
+    <Install app={content} />
+  </main>
+  <Footer />
+</Base>
