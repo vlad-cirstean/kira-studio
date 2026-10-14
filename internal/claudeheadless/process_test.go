@@ -14,3 +14,12 @@ func TestScriptSessionShapes(t *testing.T) {
 		t.Fatalf("resume:\n got %s\nwant %s", got, resumed)
 	}
 }
+
+func TestScriptSandboxWrap(t *testing.T) {
+	s := Spec{ClaudeBin: "claude", SessionID: "s-1", MCPConfigPath: "/c/run.mcp.json", SettingSources: "user",
+		Sandbox: &SandboxExec{Profile: "/p/it's.sb", Unset: []string{"SSH_AUTH_SOCK"}, Env: []string{"TMPDIR=/s/tmp", "GOFLAGS=-modcacherw"}}}
+	want := `exec /usr/bin/env -u 'SSH_AUTH_SOCK' 'TMPDIR=/s/tmp' 'GOFLAGS=-modcacherw' '/usr/bin/sandbox-exec' -f '/p/it'\''s.sb' claude -p --output-format stream-json --verbose --session-id 's-1' --mcp-config '/c/run.mcp.json' --setting-sources 'user'`
+	if got := Script(s); got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+}

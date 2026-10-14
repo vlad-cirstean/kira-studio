@@ -57,7 +57,23 @@ type Spec struct {
 	AddDirs []string
 	// Env is the full child environment; nil = os.Environ().
 	Env []string
+	// Sandbox wraps claude in sandbox-exec; nil runs it plain.
+	Sandbox *SandboxExec
 }
+
+// SandboxExec is the wrapper Script puts in front of claude. The login shell sources the user's
+// profile first, so the overrides go on an env command that runs after it.
+type SandboxExec struct {
+	// Bin defaults to /usr/bin/sandbox-exec (a test points it at a shim).
+	Bin     string
+	Profile string
+	// Env are K=V overrides; Unset are names removed from the environment.
+	Env   []string
+	Unset []string
+}
+
+// DefaultSandboxBin is macOS's profile runner.
+const DefaultSandboxBin = "/usr/bin/sandbox-exec"
 
 // Exit is how the process ended.
 type Exit struct {
@@ -69,7 +85,9 @@ type Exit struct {
 // Handler receives the parsed output. Its callback may run on any goroutine, never concurrently
 // with itself.
 type Handler struct {
-	OnLine func(Line)
+	// OnStart receives the child's pid right after it starts.
+	OnStart func(pid int)
+	OnLine  func(Line)
 	// OnRateLimits receives the account's rate-limit windows from a rate_limit_event line.
 	OnRateLimits func(RateLimits)
 	// OnResult receives the run's closing result line.
@@ -92,7 +110,23 @@ func Script(s Spec) string {
 	if s.Resume != "" {
 		session = []string{"--resume", quotePOSIX(s.Resume)}
 	}
-	words := append([]string{"exec", bin, "-p", "--output-format", "stream-json", "--verbose"}, session...)
+	words := []string{"exec"}
+	if sb := s.Sandbox; sb != nil {
+		words = append(words, "/usr/bin/env")
+		for _, name := range sb.Unset {
+			words = append(words, "-u", quotePOSIX(name))
+		}
+		for _, kv := range sb.Env {
+			words = append(words, quotePOSIX(kv))
+		}
+		sbin := sb.Bin
+		if sbin == "" {
+			sbin = DefaultSandboxBin
+		}
+		words = append(words, quotePOSIX(sbin), "-f", quotePOSIX(sb.Profile))
+	}
+	words = append(words, bin, "-p", "--output-format", "stream-json", "--verbose")
+	words = append(words, session...)
 	words = append(words, "--mcp-config", quotePOSIX(s.MCPConfigPath))
 	for _, p := range s.MCPConfigPaths {
 		words = append(words, "--mcp-config", quotePOSIX(p))
@@ -195,6 +229,9 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 
 	if err := cmd.Start(); err != nil {
 		return Exit{}, err
+	}
+	if h.OnStart != nil {
+		h.OnStart(cmd.Process.Pid)
 	}
 	waitErr := cmd.Wait()
 	stopEscalate()
