@@ -1,0 +1,6 @@
+{"time":"2026-10-14T10:28:42Z","round":"round-p3-smoke","kind":"pipeline","id":"json-ade-errors","usd":0.05322280000000001}
+{"time":"2026-10-14T10:28:42Z","round":"round-p3-smoke","kind":"gate","id":"json-ade-errors","usd":0.0147359}
+{"time":"2026-10-14T10:28:52Z","round":"round-p3-smoke","kind":"pipeline","id":"cmt-claude-go","usd":0.07586780000000001}
+{"time":"2026-10-14T10:28:52Z","round":"round-p3-smoke","kind":"gate","id":"cmt-claude-go","usd":0.0270211}
+{"time":"2026-10-14T10:28:52Z","round":"round-p3-smoke","kind":"judge","id":"json-ade-errors","usd":0.050924}
+{"time":"2026-10-14T10:29:13Z","round":"round-p3-smoke","kind":"judge","id":"cmt-claude-go","usd":0.0833366}
