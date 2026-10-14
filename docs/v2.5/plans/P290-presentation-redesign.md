@@ -332,3 +332,18 @@ P290 rebases on it. Overlap with P286 (workflow review step): none; P290 never t
 - Docs page restyling beyond the shared `Shot` frame; Starlight layout and sidebar stay.
 - Moving `.github/workflows/pages.yml` live.
 - A client-side tab script, copy buttons, light theme.
+
+## 14. Result
+
+Shipped as planned in 9 steps plus the user's Space-identity decision (section 5a) and one test fix.
+
+- Deviations: base was `2bed9cefc`, not `7eec31df7`. Space `space-memory*.png` changed with the
+  identity re-record because of base drift in the Memory UI; the name is not visible in any Space
+  shot. Hero `Shot` takes a `glow` prop; the hero gradient lives on `<main>` in `Landing.astro`
+  (not in `AppHero`) so no hard edge shows under the tab bar. Intro band shows `SITE.tagline`;
+  the availability line is the hero eyebrow. The keyboard focus-ring test skips on the phone project.
+- Visual spec first failed on smooth-scroll instability; capture now scrolls with
+  `behavior: 'instant'` and `test.slow()`. `site:check` passed three times in a row after.
+- Unverified: baselines are Linux-only; the design was judged on WebKit full-page captures at
+  375 and 1280 px, not on a real Mac browser.
+
