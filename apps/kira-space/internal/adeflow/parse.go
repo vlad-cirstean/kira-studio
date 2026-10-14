@@ -288,13 +288,7 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		}
 		step.Name = v.str(sm, sp, "name", true)
 		step.RunsOn = v.runsOn(sm, sp)
-		step.Before = "auto"
-		if _, has := sm["before"]; has {
-			step.Before = v.str(sm, sp, "before", true)
-			if v.err == nil && step.Before != "auto" && step.Before != "approval" {
-				v.fail(sm["before"], sp, "before must be auto or approval")
-			}
-		}
+		step.Before = v.before(sm, sp)
 		var rn *resultNodes
 		if n, has := sm["results"]; has {
 			if _, legacy := sm["on_failure"]; legacy {
@@ -324,6 +318,18 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 	}
 	v.resolveRoutes(out, nodes, prefixes)
 	return out
+}
+
+// before reads a step's approval gate; the default is auto.
+func (v *validator) before(sm map[string]*yaml.Node, sp string) string {
+	if _, has := sm["before"]; !has {
+		return "auto"
+	}
+	b := v.str(sm, sp, "before", true)
+	if v.err == nil && b != "auto" && b != "approval" {
+		v.fail(sm["before"], sp, "before must be auto or approval")
+	}
+	return b
 }
 
 // stepBody reads what a step runs: a prompt with its allowed tools, or a smart script with its params.

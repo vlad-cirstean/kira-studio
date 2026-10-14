@@ -139,18 +139,6 @@ func (h *hub) emit(runID string, d Denial) bool {
 	return true
 }
 
-func (h *hub) only() (string, bool) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if len(h.runs) != 1 {
-		return "", false
-	}
-	for id := range h.runs {
-		return id, true
-	}
-	return "", false
-}
-
 func (p *proxyOnce) release(runID string) {
 	if pr := p.p.Load(); pr != nil {
 		pr.release(runID)

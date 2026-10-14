@@ -75,6 +75,23 @@ type SandboxExec struct {
 // DefaultSandboxBin is macOS's profile runner.
 const DefaultSandboxBin = "/usr/bin/sandbox-exec"
 
+// onStdout feeds one stdout line to the handler's callbacks.
+func (h Handler) onStdout(line string, emit func(Line)) {
+	if h.OnRateLimits != nil {
+		if rl, ok := parseRateLimits(line); ok {
+			h.OnRateLimits(rl)
+		}
+	}
+	if h.OnResult != nil {
+		if r, ok := parseResult(line); ok {
+			h.OnResult(r)
+		}
+	}
+	for _, l := range parseLine(line) {
+		emit(l)
+	}
+}
+
 // Exit is how the process ended.
 type Exit struct {
 	Code      int
@@ -205,19 +222,7 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	cmd.Stdout = linewriter.New(func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
-		if h.OnRateLimits != nil {
-			if rl, ok := parseRateLimits(line); ok {
-				h.OnRateLimits(rl)
-			}
-		}
-		if h.OnResult != nil {
-			if r, ok := parseResult(line); ok {
-				h.OnResult(r)
-			}
-		}
-		for _, l := range parseLine(line) {
-			emit(l)
-		}
+		h.onStdout(line, emit)
 	})
 	cmd.Stderr = linewriter.New(func(line string) {
 		mu.Lock()

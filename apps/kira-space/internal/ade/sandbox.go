@@ -31,7 +31,6 @@ type sandboxRun struct {
 	policy   agentsandbox.Policy
 	tracker  agentsandbox.Tracker
 	keychain bool
-	push     bool
 	grant    *claudeheadless.SandboxGrant
 	scratch  string
 	notes    []string

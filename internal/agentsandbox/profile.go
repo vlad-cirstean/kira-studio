@@ -100,7 +100,7 @@ func Profile(p Policy, rt Runtime) string {
 	}
 	b.rule("allow", "file-write*", allowWrite...)
 	if rt.Home != "" {
-		var protect []string
+		protect := make([]string, 0, len(claudeConfigFiles)+len(claudeExtensionDirs))
 		for _, f := range claudeConfigFiles {
 			protect = append(protect, lit(filepath.Join(rt.Home, ".claude", f)))
 		}
@@ -191,7 +191,8 @@ func gitRules(b *sbpl, p Policy) {
 // ownRef lets the run advance its own branch: the loose ref, its lock and reflog, and the
 // directories a slashed name needs.
 func ownRef(b *sbpl, common, branch string) {
-	var files, dirs []string
+	files := make([]string, 0, 4)
+	var dirs []string
 	for _, root := range []string{filepath.Join(common, "refs", "heads"), filepath.Join(common, "logs", "refs", "heads")} {
 		ref := filepath.Join(root, filepath.FromSlash(branch))
 		files = append(files, lit(ref), lit(ref+".lock"))

@@ -114,7 +114,6 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		return Policy{}, nil, errors.New("agentsandbox: a policy needs a worktree")
 	}
 	p := Policy{RunID: in.RunID, Access: in.Access, Network: in.Network, Keychain: in.Keychain, Ports: in.Ports}
-	var notes []string
 	real := func(path string) (string, error) {
 		abs, err := ExpandHome(path, rt.Home)
 		if err != nil {
@@ -122,21 +121,13 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		}
 		return filepath.EvalSymlinks(abs)
 	}
-	var wts []string
-	for _, w := range in.Worktrees {
-		r, err := real(w)
-		if err != nil {
-			return Policy{}, nil, fmt.Errorf("agentsandbox: worktree %s: %w", w, err)
-		}
-		wts = appendUnique(wts, r)
+	wts, err := realAll(real, in.Worktrees)
+	if err != nil {
+		return Policy{}, nil, err
 	}
-	var ro []string
-	for _, w := range in.ReadWorktrees {
-		r, err := real(w)
-		if err != nil {
-			return Policy{}, nil, fmt.Errorf("agentsandbox: worktree %s: %w", w, err)
-		}
-		ro = appendUnique(ro, r)
+	ro, err := realAll(real, in.ReadWorktrees)
+	if err != nil {
+		return Policy{}, nil, err
 	}
 	if in.Access == AccessWrite {
 		p.Write = wts
@@ -153,44 +144,19 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		p.RunDir = r
 	}
 	keychains := filepath.Join(rt.Home, "Library", "Keychains")
-	var denied error
-	extra := func(list []string) []string {
-		var out []string
-		for _, e := range list {
-			r, err := real(e)
-			if err != nil {
-				notes = append(notes, i18n.T("backend.space.ade.sandbox.pathMissing.body", map[string]string{"path": e}))
-				continue
-			}
-			if r == keychains || strings.HasPrefix(r, keychains+string(filepath.Separator)) {
-				denied = fmt.Errorf("agentsandbox: path %q is not allowed", e)
-				continue
-			}
-			out = appendUnique(out, r)
-		}
-		return out
+	readExtra, n1, err := extraPaths(real, in.Read, keychains)
+	if err != nil {
+		return Policy{}, nil, err
 	}
-	p.Read = appendUnique(p.Read, extra(in.Read)...)
-	p.Allow = extra(in.Allow)
-	if denied != nil {
-		return Policy{}, nil, denied
+	allowExtra, n2, err := extraPaths(real, in.Allow, keychains)
+	if err != nil {
+		return Policy{}, nil, err
 	}
-	for _, d := range []struct {
-		src string
-		dst *string
-		sub string
-	}{{in.Scratch, &p.Scratch, "tmp"}, {in.Cache, &p.Cache, ""}} {
-		if d.src == "" {
-			return Policy{}, nil, errors.New("agentsandbox: scratch and cache directories are required")
-		}
-		if err := os.MkdirAll(filepath.Join(d.src, d.sub), 0o700); err != nil {
-			return Policy{}, nil, err
-		}
-		r, err := filepath.EvalSymlinks(d.src)
-		if err != nil {
-			return Policy{}, nil, err
-		}
-		*d.dst = r
+	notes := append(append([]string{}, n1...), n2...)
+	p.Read = appendUnique(p.Read, readExtra...)
+	p.Allow = allowExtra
+	if err := ensureDirs(in, &p); err != nil {
+		return Policy{}, nil, err
 	}
 	if len(in.Branch) > 0 {
 		p.Branch = map[string]string{}
@@ -200,16 +166,79 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 			}
 		}
 	}
-	for _, w := range append(append([]string{}, wts...), ro...) {
+	git, err := probeAll(append(append([]string{}, wts...), ro...))
+	if err != nil {
+		return Policy{}, nil, err
+	}
+	p.Git = git
+	return p, notes, nil
+}
+
+// extraPaths canonicalizes user paths. A missing one is skipped with a note; one inside the keychain
+// directory is an error.
+func extraPaths(real func(string) (string, error), list []string, keychains string) ([]string, []string, error) {
+	var out, notes []string
+	for _, e := range list {
+		r, err := real(e)
+		if err != nil {
+			notes = append(notes, i18n.T("backend.space.ade.sandbox.pathMissing.body", map[string]string{"path": e}))
+			continue
+		}
+		if r == keychains || strings.HasPrefix(r, keychains+string(filepath.Separator)) {
+			return nil, nil, fmt.Errorf("agentsandbox: path %q is not allowed", e)
+		}
+		out = appendUnique(out, r)
+	}
+	return out, notes, nil
+}
+
+// realAll canonicalizes worktree paths, dropping duplicates.
+func realAll(real func(string) (string, error), list []string) ([]string, error) {
+	var out []string
+	for _, w := range list {
+		r, err := real(w)
+		if err != nil {
+			return nil, fmt.Errorf("agentsandbox: worktree %s: %w", w, err)
+		}
+		out = appendUnique(out, r)
+	}
+	return out, nil
+}
+
+// ensureDirs creates the scratch tmp and cache directories and records their real paths.
+func ensureDirs(in Input, p *Policy) error {
+	for _, d := range []struct {
+		src string
+		dst *string
+		sub string
+	}{{in.Scratch, &p.Scratch, "tmp"}, {in.Cache, &p.Cache, ""}} {
+		if d.src == "" {
+			return errors.New("agentsandbox: scratch and cache directories are required")
+		}
+		if err := os.MkdirAll(filepath.Join(d.src, d.sub), 0o700); err != nil {
+			return err
+		}
+		r, err := filepath.EvalSymlinks(d.src)
+		if err != nil {
+			return err
+		}
+		*d.dst = r
+	}
+	return nil
+}
+
+func probeAll(dirs []string) ([]GitLayout, error) {
+	var out []GitLayout
+	for _, w := range dirs {
 		g, ok, err := ProbeGit(w)
 		if err != nil {
-			return Policy{}, nil, err
+			return nil, err
 		}
 		if ok {
-			p.Git = append(p.Git, g)
+			out = append(out, g)
 		}
 	}
-	return p, notes, nil
+	return out, nil
 }
 
 func appendUnique(list []string, add ...string) []string {

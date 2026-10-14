@@ -76,7 +76,7 @@ func StartProxy(h *hub, allow Allowlist) (*Proxy, error) {
 	}
 	gp.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
 		reject := func() (*goproxy.ConnectAction, string) {
-			ctx.Resp = goproxy.NewResponse(ctx.Req, goproxy.ContentTypeText, http.StatusForbidden, "blocked by the Kira sandbox")
+			ctx.Resp = goproxy.NewResponse(ctx.Req, goproxy.ContentTypeText, http.StatusForbidden, "blocked by the Kira sandbox") //nolint:bodyclose // goproxy writes and closes it
 			return goproxy.RejectConnect, host
 		}
 		runID, ok := p.runFor(ctx.Req.Header.Get("Proxy-Authorization"))
