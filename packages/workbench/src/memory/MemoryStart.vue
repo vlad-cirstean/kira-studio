@@ -12,6 +12,7 @@ import { formatDateTime as when } from '../behaviour/format';
 import Identifier from '../components/Identifier.vue';
 import ModuleStart from '../components/ModuleStart.vue';
 import QueryState from '../components/QueryState.vue';
+import DistillView from './distill/DistillView.vue';
 import ImportView from './import/ImportView.vue';
 import { eventText, GRADE_TEXT, originText, SCOPE_LABEL } from './labels';
 import MemoryContext from './MemoryContext.vue';
@@ -35,6 +36,7 @@ function eventsFor(id: string) {
 
 <template>
   <ImportView v-if="ui.view === 'imports'" />
+  <DistillView v-else-if="ui.view === 'distill'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
     <ModuleStart
       v-if="!selectedId"

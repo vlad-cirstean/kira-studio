@@ -1,3 +1,4 @@
+import * as MemoryDistillService from '@bindings/memorydistillservice.js';
 import * as MemoryImportService from '@bindings/memoryimportservice.js';
 import * as MemoryService from '@bindings/memoryservice.js';
 import {
@@ -10,6 +11,12 @@ import {
   memorySemanticStatusSchema,
   memoryStoreResultSchema,
 } from '@shared/domain/memory';
+import {
+  distillChoiceSchema,
+  distillLimitsSchema,
+  distillProgressSchema,
+  distillResultSchema,
+} from '@shared/domain/memoryDistill';
 import {
   importChoiceSchema,
   importJobDetailSchema,
@@ -97,4 +104,22 @@ export const memoryControl: MemoryControl = {
     await unwrap(MemoryImportService.RetryFile({ fileId }));
   },
   onMemoryImport: (cb) => on(CHANNEL.memoryImport, cb),
+  memoryDistill: async ({ requestId, text, path, mode }, signal) => {
+    const call = MemoryDistillService.Distill({
+      requestId,
+      text: text ?? '',
+      path: path ?? '',
+      mode,
+    });
+    signal?.addEventListener('abort', () => call.cancel(), { once: true });
+    return distillResultSchema.parse(await unwrap(call));
+  },
+  memoryDistillLimits: async () =>
+    distillLimitsSchema.parse(await unwrap(MemoryDistillService.Limits())),
+  memoryDistillChoose: async () =>
+    distillChoiceSchema.parse(await unwrap(MemoryDistillService.Choose())),
+  memoryDistillToImport: async (lines, source) =>
+    importJobSchema.parse(await unwrap(MemoryDistillService.ToImport({ lines, source }))),
+  onMemoryDistill: (cb) =>
+    on(CHANNEL.memoryDistill, (payload) => cb(distillProgressSchema.parse(payload))),
 };

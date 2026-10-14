@@ -260,4 +260,10 @@ export const IPC = {
   memoryImportRetryFailed: 'kira:memory:importretryFailed',
   memoryImportRetryFile: 'kira:memory:importretryFile',
   memoryImport: 'kira:memory:import',
+  // P285 Part 4: distill; memoryDistill is a push channel, no FQN entry.
+  memoryDistillRun: 'kira:memory:distillrun',
+  memoryDistillLimits: 'kira:memory:distilllimits',
+  memoryDistillChoose: 'kira:memory:distillchoose',
+  memoryDistillToImport: 'kira:memory:distilltoimport',
+  memoryDistill: 'kira:memory:distill',
 } as const;

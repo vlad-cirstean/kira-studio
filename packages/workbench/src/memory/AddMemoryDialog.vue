@@ -22,12 +22,16 @@ import ScopeField from './ScopeField.vue';
 import { useMemoryUiStore } from './store';
 
 // P214: free-text Add memory through the MCP store_memory gate. A challenge stores nothing; answer or edit, resubmit.
+// P285 Part 4: with `lines` (distilled output) it stores one fact per line instead of the text field.
+const props = defineProps<{ lines?: string[]; source?: string }>();
 const emit = defineEmits<{ close: [] }>();
 const ui = useMemoryUiStore();
 const store = useStoreMemory();
 
 const MAX_TEXT = 1000;
 const MANUAL_REASON = 'Stated by the user, added manually in the Memory module.';
+const distilledReason = (source: string): string =>
+  `Distilled by the user from ${source || 'pasted text'} in the Memory module.`;
 const text = ref('');
 const scope = ref<MemoryScope>('personal');
 const project = ref('');
@@ -40,12 +44,17 @@ let controller: AbortController | null = null;
 const busy = computed(() => store.isPending.value);
 const storeError = computed(() => (store.isError.value ? errorText(store.error.value) : ''));
 const challenged = computed(() => result.value?.status === 'challenged');
+// The text field holds one fact, so only its challenge applies; lines mode shows every challenge.
+const shownChallenges = computed(() =>
+  (result.value?.challenges ?? []).filter((c) => fromLines.value || c.index === 0),
+);
 const stored = computed(() => result.value?.status === 'stored');
 const projectKey = computed(() => (scope.value === 'project' ? project.value.trim() : ''));
+const fromLines = computed(() => props.lines !== undefined);
 const canSubmit = computed(
   () =>
     !busy.value &&
-    text.value.trim() !== '' &&
+    (fromLines.value ? (props.lines?.length ?? 0) > 0 : text.value.trim() !== '') &&
     (scope.value !== 'project' || projectKey.value !== ''),
 );
 
@@ -64,7 +73,9 @@ async function submit(): Promise<void> {
   controller = new AbortController();
   try {
     const res = await store.mutateAsync({
-      items: [{ fact: text.value.trim(), reason: MANUAL_REASON }],
+      items: props.lines
+        ? props.lines.map((fact) => ({ fact, reason: distilledReason(props.source ?? '') }))
+        : [{ fact: text.value.trim(), reason: MANUAL_REASON }],
       clarifications,
       scope: scope.value,
       project: projectKey.value,
@@ -106,7 +117,11 @@ function select(id: string): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="lg" :dirty="!stored && text.trim() !== ''" data-testid="add-memory-dialog">
+    <DialogContent
+      size="lg"
+      :dirty="!stored && !fromLines && text.trim() !== ''"
+      data-testid="add-memory-dialog"
+    >
       <DialogHeader>
         <DialogTitle>{{ t('memory.add.label') }}</DialogTitle>
       </DialogHeader>
@@ -143,19 +158,32 @@ function select(id: string): void {
 
         <template v-else>
           <div class="flex flex-col gap-1">
-            <Label for="memory-text">{{ t('memory.add.text.label') }}</Label>
-            <Textarea
-              id="memory-text"
-              v-model="text"
-              :disabled="busy"
-              :maxlength="MAX_TEXT"
-              :placeholder="t('memory.add.text.placeholder')"
-              data-testid="add-memory-text"
-            />
-            <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count"
-              >{{ text.length }}
-              / {{ MAX_TEXT }}</span
-            >
+            <template v-if="lines">
+              <Label>{{ t('memory.distill.store.items.label', { count: lines.length }) }}</Label>
+              <ul
+                class="m-0 flex max-h-48 list-none flex-col gap-0.5 overflow-y-auto p-0 text-kira-md"
+                data-testid="add-memory-lines"
+              >
+                <li v-for="(line, i) in lines" :key="i" class="whitespace-pre-wrap">{{ line }}</li>
+              </ul>
+            </template>
+            <template v-else>
+              <Label for="memory-text">{{ t('memory.add.text.label') }}</Label>
+              <Textarea
+                id="memory-text"
+                v-model="text"
+                :disabled="busy"
+                :maxlength="MAX_TEXT"
+                :placeholder="t('memory.add.text.placeholder')"
+                data-testid="add-memory-text"
+              />
+              <span
+                class="self-end text-kira-sm text-muted-foreground"
+                data-testid="add-memory-count"
+                >{{ text.length }}
+                / {{ MAX_TEXT }}</span
+              >
+            </template>
             <ScopeField
               v-model:scope="scope"
               v-model:project="project"
@@ -164,12 +192,13 @@ function select(id: string): void {
             />
             <template v-if="challenged">
               <Alert
-                v-for="c in result?.challenges.filter((x) => x.index === 0)"
+                v-for="c in shownChallenges"
                 :key="c.index"
                 variant="warn"
                 :icon="null"
                 data-testid="add-memory-challenge"
               >
+                <span v-if="lines" class="text-kira-sm font-medium">{{ lines[c.index] }}</span>
                 <div v-for="(question, q) in c.questions" :key="q" class="flex flex-col gap-0.5">
                   <Label :for="`memory-answer-${q}`">{{ question }}</Label>
                   <Textarea

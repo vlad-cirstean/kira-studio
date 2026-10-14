@@ -5724,6 +5724,83 @@
         "label": "Version {version}"
       }
     },
+    "distill": {
+      "cancelled": {
+        "status": "Cancelled. {cost} spent on finished parts"
+      },
+      "copy": {
+        "announce": "Copied {count} line | Copied {count} lines"
+      },
+      "empty": {
+        "description": "The input had nothing to condense.",
+        "title": "No lines came back"
+      },
+      "file": {
+        "choose": {
+          "label": "Choose a file…"
+        },
+        "none": {
+          "hint": "No file chosen."
+        }
+      },
+      "import": {
+        "label": "Import as document…"
+      },
+      "input": {
+        "placeholder": "Paste text to condense"
+      },
+      "mode": {
+        "facts": {
+          "hint": "Short statements of what the text says.",
+          "label": "Facts"
+        },
+        "instructions": {
+          "hint": "Short imperatives. Negations and numbers stay.",
+          "label": "Instructions"
+        }
+      },
+      "open": {
+        "label": "Distill text"
+      },
+      "origin": {
+        "label": "{path} lines {start} to {end}"
+      },
+      "overLimit": {
+        "error": "Over the limit of {max} characters."
+      },
+      "progress": {
+        "status": "Parts done: {done} of {total} · {cost}"
+      },
+      "result": {
+        "line": {
+          "aria": "Include line {number}"
+        },
+        "parts": {
+          "label": "{count} part | {count} parts"
+        },
+        "summary": {
+          "status": "{inChars} to {outChars} characters ({percent}) · {inTokens} to {outTokens} tokens · {cost}"
+        }
+      },
+      "run": {
+        "label": "Run distill"
+      },
+      "selectAll": {
+        "label": "Select all"
+      },
+      "size": {
+        "status": "{chars} characters, about {tokens} tokens"
+      },
+      "store": {
+        "items": {
+          "label": "{count} fact to store | {count} facts to store"
+        },
+        "label": "Store…",
+        "limit": {
+          "hint": "Select at most {max} lines to store."
+        }
+      }
+    },
     "import": {
       "back": {
         "label": "Back to memories"

@@ -13,6 +13,13 @@ import type {
   MemoryStoreResult,
 } from '@shared/domain/memory';
 import type {
+  DistillArgs,
+  DistillChoice,
+  DistillLimits,
+  DistillProgress,
+  DistillResult,
+} from '@shared/domain/memoryDistill';
+import type {
   ImportAction,
   ImportChoice,
   ImportJob,
@@ -73,6 +80,14 @@ export interface MemoryControl {
   memoryImportAction(action: ImportAction, id: string): Promise<void>;
   memoryImportRetryFile(fileId: string): Promise<void>;
   onMemoryImport(cb: () => void): () => void;
+  /** Condenses text or a file into terse lines; writes nothing. Aborting `signal` cancels the call. */
+  memoryDistill(args: DistillArgs, signal?: AbortSignal): Promise<DistillResult>;
+  memoryDistillLimits(): Promise<DistillLimits>;
+  /** Opens the native single-file picker. */
+  memoryDistillChoose(): Promise<DistillChoice>;
+  /** Saves the lines as a document and scans it; the job awaits confirmation once scanned. */
+  memoryDistillToImport(lines: string[], source: string): Promise<ImportJob>;
+  onMemoryDistill(cb: (progress: DistillProgress) => void): () => void;
 }
 
 export interface MemoryModuleContext {

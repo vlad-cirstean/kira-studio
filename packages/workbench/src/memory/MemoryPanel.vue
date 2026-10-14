@@ -105,6 +105,12 @@ const historyToggleId = useId();
           data-testid="memory-add"
           @click="addOpen = true"
         />
+        <TooltipIconButton
+          icon="sparkle"
+          :label="t('memory.distill.open.label')"
+          data-testid="memory-distill"
+          @click="ui.view = 'distill'"
+        />
         <ImportMenu />
       </template>
     </PanelHeader>

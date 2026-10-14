@@ -223,6 +223,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryImportDismiss: 'MemoryImportService.Dismiss',
   memoryImportRetryFailed: 'MemoryImportService.RetryFailed',
   memoryImportRetryFile: 'MemoryImportService.RetryFile',
+  memoryDistillRun: 'MemoryDistillService.Distill',
+  memoryDistillLimits: 'MemoryDistillService.Limits',
+  memoryDistillChoose: 'MemoryDistillService.Choose',
+  memoryDistillToImport: 'MemoryDistillService.ToImport',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
