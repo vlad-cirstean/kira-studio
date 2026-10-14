@@ -4774,7 +4774,7 @@ replies and full terminal attach for Claude Code sessions.
   with the app closed or open. `main.go` calls `appwire.RunArgvShim` (`internal/appwire/wire.go`) before `startupfail` and
   `acquireSingleInstance`. Tools `store_memory` (progress `checking`, `reconciling`, `saving`;
   `asComment`), `search_memories` (`includeHistory`, `scopes`, `origins`, `project`, `limit`), `memory_history`,
-  `memory_context`, plus `ingest_files` and `ingest_status` when `Options.Ingest` is set (never in import mode);
+  `memory_context`, plus `ingest_files` and `ingest_status` when `Options.Ingest` is set and `distill` when `Options.Distill` is set (neither in import mode);
   prompt `remember` (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
   from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
   script lives in Studio's `mcpauth`).
@@ -4904,6 +4904,7 @@ replies and full terminal attach for Claude Code sessions.
   user or external. Facts carry the requesting session for MCP jobs, plus the file's `document` group
   and the job's `task`/`thread` groups (job groups cap at 4). Scope `project` without `project` uses
   `DetectProject` of the first path, then the server's project.
+- Distill (P285 Part 2). MCP tool `distill` on `kira-memory`: text or one absolute file path in, terse atomic lines out (source order, one per line; structured output `{"lines": [string]}`), `mode` `facts` (default) or `instructions` (rules as short imperatives, negations and numbers verbatim). Read-only (`ReadOnlyHint`): never calls the gate, never writes `memory.db`; not registered in import mode. Prompt `memory.distill.system` (schema `{"lines": [{"text", "unresolved"}]}`, no evidence quote); core `importer.Distiller` (`Distill(ctx, DistillRequest) (DistillResult, error)`: lines, cost, chunk count, in and out runes). Limits: input at most 120 000 characters (text, or a file read with the 1 MiB import cap), at most 16 chunks under `DefaultBudget`, three chunks at once, per chunk 0.50 USD and 180 s, per call 2.00 USD (no chunk starts once reported spend reaches it; the call then fails naming the amount). Bad input is a tool error (`memory.ErrInvalid`). The import pipeline still runs the extract prompt (below): a unified import (distill per chunk, section and `Stated in` reason built by code, no evidence quote, salient-token check instead of the quote check) was built, measured and reverted; see Known open items.
 - Runner: the scheduler is one detached `kira-space memory-ingest` process per `memory.db`
   (`RunArgvShim` case, `memorycli.RunIngest`; `Setsid`, stderr appended to
   `<memory home>/import-runner.log`, restarted over 1 MiB). Exclusive `flock` on
@@ -4960,7 +4961,7 @@ replies and full terminal attach for Claude Code sessions.
 
 Opt-in harness that scores the ingest pipeline on real repo text. Runs real `claude`, costs money, never in hooks or CI.
 
-- Run: `bun run eval:memory` (`TestMemoryIngestEval`, `apps/kira-space/tests/claude/memory_eval*_test.go`). `KIRA_MEMORY_EVAL=1` is set by the script. `KIRA_EVAL_MODE` is `prepare`, `golden` or `run`; `run` needs `KIRA_EVAL_ROUND`. Other knobs: `KIRA_EVAL_SET` (`tuning`, `holdout`, `all`), `KIRA_EVAL_ONLY` (comma list of source ids, smoke runs), `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`.
+- Run: `bun run eval:memory` (`TestMemoryIngestEval`, `apps/kira-space/tests/claude/memory_eval*_test.go`). `KIRA_MEMORY_EVAL=1` is set by the script. `KIRA_EVAL_MODE` is `prepare`, `golden` or `run`; `run` needs `KIRA_EVAL_ROUND`. Other knobs: `KIRA_EVAL_SET` (`tuning`, `holdout`, `all`), `KIRA_EVAL_ONLY` (comma list of source ids, smoke runs), `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`, `KIRA_EVAL_LEDGER` (ledger file name under the runs dir, one per part; default `spend.jsonl`).
 - Overrides without code edits: `KIRA_EVAL_PROMPTS` is a JSON map `{prompt id: text}` replacing registry prompts for one run; `KIRA_EVAL_BUDGET` is a chunk budget `Target,Max,MinFill,MinTail,Context`.
 - Corpus: 15 files pinned to commit `9ed83ae85` (manifest `docs/v2.5/plans/P285-corpus/`), read by `git show`. 10 tuning, 5 hold-out, one hold-out per category. Golden: 585 facts (372 essential) written by Opus from the source text before any run. Judge: Opus, one call per source.
 - Metrics: `R_ess`, `R_all` (golden recall, partial counts 0.5), `P` (precision), atomic, standalone, unsupported, duplicate, `C_fact` (stored fact chars over source chars), `C_rec` (fact, reason, keywords), `C_doc` (the written `.memory.md`). Noise bands come from two baseline runs.
@@ -5165,7 +5166,7 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
   against an older default.
 - **Validation (server side).** Template parses, every `prompt:"required"` variable referenced, every
   required fragment included (`memory.dataHygiene` in the memory system prompts: injection defence),
-  executes against example vars. Schema-bound prompts (gate, reconcile, import extract and finalize)
+  executes against example vars. Schema-bound prompts (gate, reconcile, distill, import extract, verify and finalize)
   keep their JSON schema fixed; it shows read-only in Settings.
 - **Source injection.** No global. Consumers get a `llmprompts.Source` (`Resolve`, `Revision`) through
   their options: `memory.ServiceOptions`, `mcpserver.Options`, `claudeheadless`, `scriptruns`, ADE,
