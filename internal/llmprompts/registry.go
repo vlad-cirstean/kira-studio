@@ -60,6 +60,17 @@ type LimitVars struct {
 	Max     int `json:"max"`
 }
 
+// SandboxNoteVars fills the sandbox note appended to a sandboxed run's prompt. Tools is true when
+// the run has the Kira git tools in place of the shell git commands the sandbox blocks.
+type SandboxNoteVars struct {
+	Access   string   `json:"access"`
+	Worktree string   `json:"worktree"`
+	Read     []string `json:"read"`
+	Network  bool     `json:"network"`
+	Enforced bool     `json:"enforced"`
+	Tools    bool     `json:"tools"`
+}
+
 // ResultVar is one declared result of a step.
 type ResultVar struct {
 	ID          string `json:"id"`
@@ -668,6 +679,21 @@ var HeadlessSpaceSuffix = define(Entry{
 	Default:    `Kira Space tools: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.`,
 }, NoVars{})
 
+// HeadlessSandboxNote tells a sandboxed agent what it may write and what to do on a denial.
+var HeadlessSandboxNote = define(Entry{
+	ID: "headless.sandbox.note", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessSandboxNote.title",
+	PurposeKey: "llmPrompts.entry.headlessSandboxNote.description",
+	UsedByKey:  "llmPrompts.entry.headlessSandboxNote.usedBy.body",
+	Default: `Sandbox{{if not .Enforced}} (declared, not enforced){{end}}: {{if eq .Access "write"}}write only in {{.Worktree}} and $TMPDIR{{else}}read only; write only in $TMPDIR{{end}}.{{range .Read}}
+Read also: {{.}}{{end}}{{if not .Network}}
+Network: Claude API only.{{end}}{{if .Tools}}
+No git branch, worktree, tag, stash, fetch or push. Use request_branch, fetch_remote, push_branch.{{end}}
+"Operation not permitted" means the sandbox blocked it. Do not retry. Call finish_step failed; name the path in reason.`,
+}, SandboxNoteVars{
+	Access: "write", Worktree: "/work/kira-space/feat-login", Read: []string{"/work/specs"}, Network: false, Enforced: true, Tools: true,
+})
+
 // HeadlessRebaseReportSuffix ends every rebase run's prompt.
 var HeadlessRebaseReportSuffix = define(Entry{
 	ID: "headless.rebase.reportSuffix", Kind: KindSuffix, Apps: spaceApp, Applies: NextCall,
@@ -778,6 +804,22 @@ var (
 	_ = arg(HeadlessToolBranchStatus.id, "repo", spaceApp, NextCall, `Task repo: nickname, name or code repo id.`, NoVars{})
 	_ = arg(HeadlessToolBranchStatus.id, "waitSeconds", spaceApp, NextCall, `Seconds to wait for worktree setup, 0 to {{.Max}}. Default 0.`, MaxVars{Max: 600})
 )
+
+// HeadlessToolFetchRemote describes the fetch_remote tool.
+var HeadlessToolFetchRemote = define(Entry{
+	ID: "headless.tool.fetch_remote", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "fetch_remote",
+	Default: `Fetch a remote of your repo. Runs in Kira, outside the sandbox.`,
+}, NoVars{})
+
+var _ = arg(HeadlessToolFetchRemote.id, "remote", spaceApp, NextCall, `Remote name. Default origin.`, NoVars{})
+
+// HeadlessToolPushBranch describes the push_branch tool.
+var HeadlessToolPushBranch = define(Entry{
+	ID: "headless.tool.push_branch", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "push_branch",
+	Default: `Push your worktree's branch to its remote. Only that branch.`,
+}, NoVars{})
+
+var _ = arg(HeadlessToolPushBranch.id, "force", spaceApp, NextCall, `true pushes with --force-with-lease. Default false.`, NoVars{})
 
 // HeadlessToolRunOutcome describes the run_outcome tool.
 var HeadlessToolRunOutcome = define(Entry{

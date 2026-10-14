@@ -66,6 +66,7 @@ headless.space.suffix	267
 headless.rebase.reportSuffix	508
 headless.script.reportSuffix	221
 headless.space.instructions	296
+headless.sandbox.note	331
 headless.tool.finish_step	78
 headless.tool.finish_step.arg.status	86
 headless.tool.finish_step.arg.summary	67
@@ -83,6 +84,10 @@ headless.tool.request_branch.arg.name	47
 headless.tool.branch_status	93
 headless.tool.branch_status.arg.repo	42
 headless.tool.branch_status.arg.waitSeconds	56
+headless.tool.fetch_remote	63
+headless.tool.fetch_remote.arg.remote	28
+headless.tool.push_branch	60
+headless.tool.push_branch.arg.force	51
 headless.tool.run_outcome	183
 headless.tool.run_outcome.arg.runId	45
 headless.tool.run_outcome.arg.branch	30

@@ -5396,6 +5396,13 @@
           "body": "Returned to the agent after it replies to a review comment."
         }
       },
+      "headlessSandboxNote": {
+        "description": "Tells a sandboxed agent where it may write and to stop when the sandbox blocks an action.",
+        "title": "Sandbox notice",
+        "usedBy": {
+          "body": "Added to the prompt of every agent run under the sandbox."
+        }
+      },
       "headlessScriptReportSuffix": {
         "description": "Tells a smart script agent how to report its result with finish_step.",
         "title": "Script report instruction",

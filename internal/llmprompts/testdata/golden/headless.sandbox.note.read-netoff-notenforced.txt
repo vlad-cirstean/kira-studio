@@ -1,0 +1,5 @@
+Sandbox (declared, not enforced): read only; write only in $TMPDIR.
+Read also: /specs/payments
+Read also: /wt/kira-space/feat-login
+Network: Claude API only.
+"Operation not permitted" means the sandbox blocked it. Do not retry. Call finish_step failed; name the path in reason.
