@@ -55,6 +55,7 @@ Targets (tuning): `R_ess` >= 0.90, `R_all` >= 0.75, `P` >= 0.90, atomic and stan
 | 04 | finalize: keep every number, name, condition and quoted string; merge only entailing facts | finalize prompt, one sentence (override only) | 0.845 | 0.690 | 0.893 | 0.005 | 0.003 | 0.487 | 5.1 | 33.7 | rejected: no metric improved beyond band (R_ess -0.009, C_fact +0.014) |
 | 05 | chunk: smaller chunks (recall) | KIRA_EVAL_BUDGET 1500,2500,700,400,200 (budget.json, override only) | 0.898 | 0.733 | 0.888 | 0.010 | 0.003 | 0.519 | 4.5 | 38.2 | rejected by rule: C_fact +0.046 beyond band 0.029, although R_ess +0.044 (0.898) and R_all +0.050 (0.733) improved |
 | 06 | chunk: mid-size chunks (2250/3000/1100/550/200) | KIRA_EVAL_BUDGET (budget.json, override only) | 0.869 | 0.680 | 0.877 | 0.003 | 0.000 | 0.469 | 4.1 | 42.3 | rejected: no metric beyond band (R_ess +0.016 vs band 0.020, C_fact flat) |
+| 07 | extract: name the subject in every fact, use the code: line, split joined claims | extract prompt, one bullet (override only) | 0.867 | 0.690 | 0.887 | 0.003 | 0.000 | 0.482 | 4.6 | 47.0 | rejected: reason ok -0.138 beyond band 0.051; R_ess +0.014, P and standalone flat |
 
 Spend override from the user: 8 USD per run, 60 USD phase total (plan said 10 and 120).
 
