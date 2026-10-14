@@ -634,7 +634,7 @@ var HeadlessFinishStepSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessFinishStepSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessFinishStepSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessFinishStepSuffix.usedBy.body",
-	Default:    `{{if .Implicit}}When this step is done, call the finish_step tool with status "done" and a one-line summary. If it failed, call it with status "failed" and say what failed and give the reason. If you need a decision from me, call it with status "needs_input" and your question.{{else}}When this step ends, call the finish_step tool once with status set to one of: {{range $i, $r := .Results}}{{if $i}}, {{end}}{{$r.ID}} ({{if $r.OK}}ok{{else}}not ok{{end}}{{if $r.Description}}: {{$r.Description}}{{end}}){{end}}. Add a one-line summary; for a not-ok status give the reason. If you need a decision from me, use status "needs_input" with your question.{{end}}`,
+	Default:    `{{if .Implicit}}When this step is done, call finish_step with status "done" and a one-line summary. If it failed, call it with status "failed", what failed and the reason. If you need a decision from me, call it with status "needs_input" and your question.{{else}}When this step ends, call finish_step once with status one of: {{range $i, $r := .Results}}{{if $i}}, {{end}}{{$r.ID}} ({{if $r.OK}}ok{{else}}not ok{{end}}{{if $r.Description}}: {{$r.Description}}{{end}}){{end}}. Add a one-line summary; for a not-ok status add the reason. If you need a decision from me, use status "needs_input" with your question.{{end}}`,
 }, FinishVars{Implicit: true, Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}})
 
 // HeadlessSpaceSuffix goes before the finish instruction when the Kira Space tools are on.
@@ -643,7 +643,7 @@ var HeadlessSpaceSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceSuffix.usedBy.body",
-	Default:    `Kira Space tools are available: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, but change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.`,
+	Default:    `Kira Space tools: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.`,
 }, NoVars{})
 
 // HeadlessRebaseReportSuffix ends every rebase run's prompt.
@@ -652,7 +652,7 @@ var HeadlessRebaseReportSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessRebaseReportSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessRebaseReportSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessRebaseReportSuffix.usedBy.body",
-	Default:    `Run git only with the git tool: pass the worktree path from the list above and the words after git as args. There is no shell. When you are finished, call finish_step. status "done" only when every branch above is rebased and no rebase is in progress. status "failed" with reason, conflictedFiles, lastGitError and tried when you could not finish; leave a rebase in progress only when you could not resolve it, and say so. status "needs_input" with your question when you need a decision. Kira Space checks the result in git.`,
+	Default:    `Run git only with the git tool: pass the worktree path from the list above and the words after git as args. There is no shell. When finished, call finish_step. status "done" only when every branch above is rebased and no rebase is in progress. status "failed" with reason, conflictedFiles, lastGitError and tried when you could not finish; leave a rebase in progress only when you could not resolve it, and say so. status "needs_input" with your question when you need a decision. Kira Space checks the result in git.`,
 }, NoVars{})
 
 // HeadlessScriptReportSuffix ends every smart script prompt.
@@ -661,7 +661,7 @@ var HeadlessScriptReportSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessScriptReportSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessScriptReportSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessScriptReportSuffix.usedBy.body",
-	Default:    `When you are finished, call the finish_step tool with status "done" and a one-line summary. If you could not finish, call it with status "failed" and give the reason. If you need a decision, call it with status "needs_input" and your question.`,
+	Default:    `When finished, call finish_step with status "done" and a one-line summary. If you could not finish, call it with status "failed" and the reason. If you need a decision, call it with status "needs_input" and your question.`,
 }, NoVars{})
 
 // HeadlessSpaceInstructions is what the Kira Space tools server tells a client when it connects.
@@ -670,7 +670,7 @@ var HeadlessSpaceInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceInstructions.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceInstructions.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceInstructions.usedBy.body",
-	Default:    `Kira Space tools for this task. Call task_info first. Declare the repos the work touches with declare_repos before branching. Create branches only with request_branch, never with git branch or git worktree. A new worktree may still be preparing: call branch_status (it can wait) before editing in it.`,
+	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches only with request_branch, never with git branch or git worktree. A new worktree may still be preparing: call branch_status (it can wait) before editing there.`,
 }, NoVars{})
 
 // HeadlessToolFinishStep describes the finish_step tool.
@@ -681,12 +681,12 @@ var HeadlessToolFinishStep = define(Entry{
 
 var (
 	_ = arg(HeadlessToolFinishStep.id, "status", bothApps, NextCall,
-		`How the step ended. {{range .Results}}{{.ID}} ({{if .OK}}ok{{else}}not ok{{end}}{{if .Description}}: {{.Description}}{{end}}). {{end}}needs_input when a decision from the user is needed.`,
+		`How the step ended. {{range .Results}}{{.ID}} ({{if .OK}}ok{{else}}not ok{{end}}{{if .Description}}: {{.Description}}{{end}}). {{end}}needs_input when the user must decide.`,
 		StatusVars{Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}})
 	_ = arg(HeadlessToolFinishStep.id, "summary", bothApps, NextCall, `One line: what was done, what failed, or the question for the user.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "reason", bothApps, NextCall, `Why it failed, or what you need. Give it when status is failed or needs_input.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "conflictedFiles", bothApps, NextCall, `Files that still conflict, relative to the repo.`, NoVars{})
-	_ = arg(HeadlessToolFinishStep.id, "lastGitError", bothApps, NextCall, `The last git error output you saw.`, NoVars{})
+	_ = arg(HeadlessToolFinishStep.id, "lastGitError", bothApps, NextCall, `Last git error output you saw.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "tried", bothApps, NextCall, `What you tried before giving up.`, NoVars{})
 )
 
@@ -702,44 +702,44 @@ var HeadlessFinishStepAck = define(Entry{
 // HeadlessToolTaskInfo describes the task_info tool.
 var HeadlessToolTaskInfo = define(Entry{
 	ID: "headless.tool.task_info", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "task_info",
-	Default: `The Kira Space task you work on: title, Jira key, workflow, stage, the repos and branches it has, and the repos registered in Kira Space.`,
+	Default: `Your Kira Space task: title, Jira key, workflow, stage, its repos and branches, and repos registered in Kira Space.`,
 }, NoVars{})
 
 // HeadlessToolDeclareRepos describes the declare_repos tool.
 var HeadlessToolDeclareRepos = define(Entry{
 	ID: "headless.tool.declare_repos", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "declare_repos",
-	Default: `Add repos to the task. Only repos registered in Kira Space can be added; an unknown repo is refused, ask the user to import it from the Git module. Never removes a repo.`,
+	Default: `Add repos to the task. Only repos registered in Kira Space can be added. An unknown repo is refused: ask the user to import it from the Git module. Never removes a repo.`,
 }, NoVars{})
 
 var _ = arg(HeadlessToolDeclareRepos.id, "repos", spaceApp, NextCall,
-	`Repos to add to the task: nickname, name or code repo id from task_info registered. 1 to {{.Max}}.`, MaxVars{Max: 20})
+	`Repos to add: nickname, name or code repo id of a registered repo, from task_info. 1 to {{.Max}}.`, MaxVars{Max: 20})
 
 // HeadlessToolRequestBranch describes the request_branch tool.
 var HeadlessToolRequestBranch = define(Entry{
 	ID: "headless.tool.request_branch", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "request_branch",
-	Default: `Create a branch and its worktree for a repo of the task. Returns at once: the worktree's prepare script may still be running, so call branch_status before working there.`,
+	Default: `Create a branch and its worktree for a repo of the task. Returns at once; the prepare script may still run, so call branch_status before working there.`,
 }, NoVars{})
 
 var (
-	_ = arg(HeadlessToolRequestBranch.id, "repo", spaceApp, NextCall, `A repo on the task: nickname, name or code repo id.`, NoVars{})
-	_ = arg(HeadlessToolRequestBranch.id, "name", spaceApp, NextCall, `The branch name to create, for example feat/login-form.`, NoVars{})
+	_ = arg(HeadlessToolRequestBranch.id, "repo", spaceApp, NextCall, `Task repo: nickname, name or code repo id.`, NoVars{})
+	_ = arg(HeadlessToolRequestBranch.id, "name", spaceApp, NextCall, `Branch name to create, such as feat/login-form.`, NoVars{})
 )
 
 // HeadlessToolBranchStatus describes the branch_status tool.
 var HeadlessToolBranchStatus = define(Entry{
 	ID: "headless.tool.branch_status", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "branch_status",
-	Default: `The worktree and setup state of a branch of the task. With waitSeconds, waits until the setup is no longer running.`,
+	Default: `Worktree and setup state of a task branch. With waitSeconds, waits until setup stops running.`,
 }, NoVars{})
 
 var (
-	_ = arg(HeadlessToolBranchStatus.id, "repo", spaceApp, NextCall, `A repo on the task: nickname, name or code repo id.`, NoVars{})
-	_ = arg(HeadlessToolBranchStatus.id, "waitSeconds", spaceApp, NextCall, `Seconds to wait for the worktree setup to finish, 0 to {{.Max}}. Default 0.`, MaxVars{Max: 600})
+	_ = arg(HeadlessToolBranchStatus.id, "repo", spaceApp, NextCall, `Task repo: nickname, name or code repo id.`, NoVars{})
+	_ = arg(HeadlessToolBranchStatus.id, "waitSeconds", spaceApp, NextCall, `Seconds to wait for worktree setup, 0 to {{.Max}}. Default 0.`, MaxVars{Max: 600})
 )
 
 // HeadlessToolRunOutcome describes the run_outcome tool.
 var HeadlessToolRunOutcome = define(Entry{
 	ID: "headless.tool.run_outcome", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "run_outcome",
-	Default: `How the latest runs of this task ended: state, reason, conflicted files, last git error and, for a rebase, what git showed. Use it to learn why a rebase or step failed. Only this task's runs.`,
+	Default: `How this task's latest runs ended: state, reason, conflicted files, last git error and, for a rebase, what git showed. Use to learn why a rebase or step failed. Only this task's runs.`,
 }, NoVars{})
 
 var (
@@ -752,12 +752,12 @@ var (
 // HeadlessToolGit describes the git tool.
 var HeadlessToolGit = define(Entry{
 	ID: "headless.tool.git", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "git",
-	Default: `Run git in one of the worktrees named in the prompt. Allowed: status, diff, log, show, rev-parse, merge-base, ls-files, fetch <remote>, rebase (not interactive), add, rm, checkout --ours|--theirs -- <path>, and push --force-with-lease when the prompt asks for it. Options outside those shapes are refused. Put paths after a "--" entry.`,
+	Default: `Run git in a worktree named in the prompt. Allowed: status, diff, log, show, rev-parse, merge-base, ls-files, fetch <remote>, rebase (not interactive), add, rm, checkout --ours|--theirs -- <path>, and push --force-with-lease when the prompt asks for it. Options outside those shapes are refused. Put paths after a "--" entry.`,
 }, NoVars{})
 
 var (
-	_ = arg(HeadlessToolGit.id, "worktree", spaceApp, NextCall, `One of the worktree paths named in the prompt.`, NoVars{})
-	_ = arg(HeadlessToolGit.id, "args", spaceApp, NextCall, `The words after git, one per entry, for example ["rebase","--continue"]. Paths go after a "--" entry.`, NoVars{})
+	_ = arg(HeadlessToolGit.id, "worktree", spaceApp, NextCall, `A worktree path named in the prompt.`, NoVars{})
+	_ = arg(HeadlessToolGit.id, "args", spaceApp, NextCall, `Words after git, one per entry, such as ["rebase","--continue"]. Paths go after a "--" entry.`, NoVars{})
 )
 
 // ADE.

@@ -146,7 +146,7 @@
         "var": "topic"
       }
     ],
-    "suffix": "When you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "suffix": "When finished, call finish_step with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and the reason. If you need a decision, call it with status \"needs_input\" and your question.",
     "timeout": "15m",
     "tools": [
       "Read",
