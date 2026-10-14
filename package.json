@@ -88,6 +88,7 @@
     "test:go": "go test ./...",
     "test:claude": "bun run test:claude:space && bun run test:claude:studio",
     "test:claude:space": "cd apps/kira-space/tests/claude && CGO_ENABLED=1 go test -v -timeout 15m ./...",
+    "eval:memory": "cd apps/kira-space/tests/claude && KIRA_MEMORY_EVAL=1 CGO_ENABLED=1 go test -v -count=1 -timeout 180m -run TestMemoryIngestEval ./...",
     "test:claude:studio": "cd apps/kira-studio/tests/claude && CGO_ENABLED=1 go test -v -timeout 15m ./...",
     "lint:claude": "sh scripts/install-golangci-lint.sh && for d in apps/kira-space/tests/claude apps/kira-studio/tests/claude; do (cd $d && \"$(go env GOPATH)/bin/golangci-lint\" run) || exit 1; done",
     "test:compat": "sh scripts/db-compat.sh",

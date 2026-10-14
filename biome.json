@@ -15,6 +15,8 @@
       "!apps/kira-studio/tests/contract",
       "!apps/kira-space/tests/contract",
       "!docs/design",
+      "!docs/v2.5/plans/P285-corpus",
+      "!docs/v2.5/plans/P285-runs",
       "!apps/kira-space/tests/unit/support/fixtures/ade-v2-mockup-logic.js",
       "!.claude",
       "!packages/shared/protocol/wire.ts",
