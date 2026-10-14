@@ -101,7 +101,7 @@ type MCPCall struct {
 }
 
 // PromptRule answers a headless call whose --system-prompt contains System. Doc narrows it to one
-// document: the basename of the first "path" in the prompt, or of KIRA_DOC, which the fake exports to
+// document: the basename of the first "path" (else "source") in the prompt, or of KIRA_DOC, which the fake exports to
 // the MCP servers it starts so a nested call (memory-mcp's gate) keeps the document it belongs to.
 // Fail makes the first N matching calls end with a budget error; the rule's calls are counted in
 // <KIRA_FAKE_DIR>/rule-<index>.count. WaitFile blocks until the path exists, then Emit prints the file.
@@ -315,12 +315,18 @@ func finishAction(action Action, args []string, headless bool) int {
 	return 0 // "nofinish"
 }
 
-var promptPath = regexp.MustCompile(`"path":"([^"]*)"`)
+var (
+	promptPath   = regexp.MustCompile(`"path":"([^"]*)"`)
+	promptSource = regexp.MustCompile(`"source":"([^"]*)"`)
+)
 
-// promptDoc is the basename of the first "path" the prompt names, or KIRA_DOC when it names none.
+// promptDoc is the basename of the first "path" the prompt names (else its "source", the distill
+// input's file name), or KIRA_DOC when it names none.
 func promptDoc(prompt []byte) string {
-	if m := promptPath.FindSubmatch(prompt); m != nil {
-		return filepath.Base(string(m[1]))
+	for _, re := range []*regexp.Regexp{promptPath, promptSource} {
+		if m := re.FindSubmatch(prompt); m != nil {
+			return filepath.Base(string(m[1]))
+		}
 	}
 	return os.Getenv("KIRA_DOC")
 }

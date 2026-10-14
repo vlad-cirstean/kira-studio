@@ -205,3 +205,42 @@ func TestMemoryInstallRegisters(t *testing.T) {
 	}
 	t.Logf("claude mcp list:\n%s", out)
 }
+
+// TestMemoryDistill has the real claude call the read-only distill tool on a file path
+// through the memory-mcp server: the tool runs its own nested claude call and returns terse lines;
+// nothing is stored.
+func TestMemoryDistill(t *testing.T) {
+	app := newRealApp(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(t.TempDir(), "mcp.json")
+	writeFile(t, cfg, string(mustRaw(map[string]any{"mcpServers": map[string]any{
+		memoryServer: map[string]any{"command": exe, "args": []string{"memory-mcp"}, "env": map[string]string{
+			"KIRA_MEMORY_HOME": app.MemoryHome, "KIRA_SPACE_HOME": app.SpaceHome, "HOME": app.Home, "PATH": os.Getenv("PATH"),
+		}},
+	}})))
+	doc := filepath.Join(app.Work, "deploy.md")
+	writeFile(t, doc, "# Deploy\n\nThe billing-api service is deployed with Helm charts. Ops standardised on Helm in 2025, so there is no raw kubectl apply in production. Deploys never run on Friday.\n")
+
+	out, _ := app.claudeP(t, app.Work, nil,
+		"Call the distill tool once with path "+doc+" and no other argument, then reply with the word done.",
+		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__distill",
+		"--output-format", "stream-json", "--verbose")
+	msgs := parseStream(out)
+	uses := toolUses(msgs, "mcp__"+memoryServer+"__distill")
+	if len(uses) == 0 {
+		t.Fatalf("no distill tool use in the stream:\n%s", tail(out, 1500))
+	}
+	text, isErr, ok := toolResult(msgs, uses[0].ID)
+	if !ok || isErr || strings.TrimSpace(text) == "" {
+		t.Fatalf("distill result missing, empty or an error (ok=%v, isErr=%v, text=%q)", ok, isErr, text)
+	}
+	if got := toolUses(msgs, "mcp__"+memoryServer+"__store_memory"); len(got) != 0 {
+		t.Errorf("claude stored memory during a distill call: %s", got[0].Input)
+	}
+	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
+		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
+	}
+}

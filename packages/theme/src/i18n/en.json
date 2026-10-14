@@ -5311,6 +5311,13 @@
           "body": "Included in the memory gate, reconcile, import extract and import finalize prompts."
         }
       },
+      "memoryDistillSystem": {
+        "description": "Condenses text into terse atomic lines.",
+        "title": "Distill",
+        "usedBy": {
+          "body": "Sent as the system prompt for each chunk while a memory import reads a file, and by the distill tool of the memory MCP server."
+        }
+      },
       "memoryGateSystem": {
         "description": "Judges each fact before it is stored. It splits the fact into single claims, adds keywords, or challenges it with questions.",
         "title": "Memory gate",

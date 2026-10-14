@@ -46,10 +46,12 @@ func Run(args []string, promptsPath string) int {
 	if promptsPath != "" {
 		prompts = llmprompts.NewStore(promptsPath)
 	}
-	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
+	claude := memory.NewCLIRunner()
+	svc := memory.NewService(store, claude, memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
 	defer svc.Close()
 	opts := mcpserver.Options{ImportRef: *importRef, Prompts: prompts, Project: detectProject(ctx)}
 	if *importRef == "" {
+		opts.Distill = importer.Distiller{Runner: claude, Prompts: prompts}
 		if ing, err := openIngest(store); err != nil {
 			fmt.Fprintln(os.Stderr, "kira-memory: ingest tools off:", err)
 		} else {

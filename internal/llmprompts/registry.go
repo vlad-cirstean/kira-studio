@@ -23,6 +23,12 @@ type ExtractVars struct {
 	MaxEvidence int `json:"maxEvidence"`
 }
 
+// DistillVars fills the distill prompt. Instructions switches to the prompt mode: rules as short imperatives.
+type DistillVars struct {
+	MaxLines     int  `json:"maxLines" prompt:"required"`
+	Instructions bool `json:"instructions"`
+}
+
 // FinalizeVars fills the import finalize prompt.
 type FinalizeVars struct {
 	MaxItems  int `json:"maxItems"`
@@ -326,6 +332,42 @@ Extract atomic facts:
 }`,
 }, ExtractVars{MaxFacts: 40, MaxEvidence: 200})
 
+// MemoryDistillSystem is the system prompt that distills text into terse atomic lines: the base of the
+// distill MCP tool and of memory import (one call per chunk).
+var MemoryDistillSystem = define(Entry{
+	ID: "memory.distill.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryDistillSystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryDistillSystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryDistillSystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene"},
+	Default: `You distill text into terse atomic lines. Output only the schema.
+
+{{template "memory.dataHygiene"}}
+
+Input: "text"; optional "context" (end of the previous part: read it for references, never distill it), "section", "source".
+"text" may be JSON from an export: field values are content; author, time and id fields are context.
+
+- One claim per line, in source order.
+- Terse: cut articles, filler, hedges, pleasantries. Fragments fine. Short word over long phrase. No invented abbreviations, no arrows.
+- Keep verbatim: negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings, quoted text.
+- Keep every qualifier that changes the claim: conditions, exceptions, limits.
+- Keep decisions with their reasons, rejected alternatives with why, conventions, configuration, ownership, relationships, constraints, how things work.
+- Keep a reason the text states inline ("X, because Y") only when the line alone does not make it obvious. Drop it when self-explanatory.
+- Name the subject. Replace a pronoun with the name only when the text makes it certain. Otherwise keep the words and set "unresolved" to what is missing; else "".
+- Skip navigation, tables of contents, boilerplate, licence text, copied examples, step-by-step commands, time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend), code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
+- Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
+{{if .Instructions}}- The text is instructions. Each line is one rule as a short imperative. Keep must, never and only force, template variables and schema field names verbatim. Keep commands and examples a rule needs.
+{{end}}- At most {{.MaxLines}} lines. None when nothing durable.`,
+	Schema: `{
+  "type": "object", "additionalProperties": false, "required": ["lines"],
+  "properties": {"lines": {"type": "array", "items": {
+    "type": "object", "additionalProperties": false,
+    "required": ["text", "unresolved"],
+    "properties": {"text": {"type": "string"}, "unresolved": {"type": "string"}}
+  }}}
+}`,
+}, DistillVars{MaxLines: 40})
+
 // MemoryImportFinalizeSystem is the system prompt of the run that stores one imported file's facts.
 var MemoryImportFinalizeSystem = define(Entry{
 	ID: "memory.import.finalize.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
@@ -499,6 +541,18 @@ var MemoryToolIngestStatus = define(Entry{
 }, NoVars{})
 
 var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id returned by ingest_files`, NoVars{})
+
+// MemoryToolDistill describes the distill tool.
+var MemoryToolDistill = define(Entry{
+	ID: "memory.mcp.tool.distill", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "distill",
+	Default: `Condense text or a file into terse atomic lines, in source order. Stores nothing. To store a file, use ingest_files.`,
+}, NoVars{})
+
+var (
+	_ = arg(MemoryToolDistill.id, "text", spaceApp, NewSession, `text to distill, at most {{.Max}} characters; or path`, MaxVars{Max: 120000})
+	_ = arg(MemoryToolDistill.id, "path", spaceApp, NewSession, `absolute file path; or text`, NoVars{})
+	_ = arg(MemoryToolDistill.id, "mode", spaceApp, NewSession, `facts (default), or instructions: rules as short imperatives`, NoVars{})
+)
 
 // MemoryRememberDescription describes the remember prompt of the memory MCP server.
 var MemoryRememberDescription = define(Entry{

@@ -13,7 +13,8 @@ import (
 
 // TestMemoryMcpFollowsDocs has the real claude use the kira-memory server from goal-only prompts,
 // so the server instructions and tool docs alone must steer it: each stored item carries a reason,
-// origin and scope, and a docs folder goes by path with no read of its content.
+// origin and scope, a docs folder goes by path with no read of its content, and a request to
+// condense a file goes to distill by path, again with no read of the file.
 func TestMemoryMcpFollowsDocs(t *testing.T) {
 	app := newRealApp(t)
 	exe, err := os.Executable()
@@ -36,7 +37,7 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 		}},
 	}})))
 	var memTools []string
-	for _, n := range []string{"store_memory", "search_memories", "memory_history", "memory_context", "ingest_files", "ingest_status"} {
+	for _, n := range []string{"store_memory", "search_memories", "memory_history", "memory_context", "ingest_files", "ingest_status", "distill"} {
 		memTools = append(memTools, "mcp__"+memoryServer+"__"+n)
 	}
 
@@ -123,6 +124,41 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 		for _, j := range jobs {
 			if err := app.W.MemoryImport.Cancel(bridge.MemoryImportJobArgs{ID: j.ID}); err != nil {
 				t.Logf("cancel job %s: %v", j.ID, err)
+			}
+		}
+	})
+
+	t.Run("distill", func(t *testing.T) {
+		notes := filepath.Join(repo, "docs", "runbook.md")
+		writeFile(t, notes, "# Runbook\n\nbilling-api restarts take about 40 seconds. Restart workers first, never the database, because open invoices would lock.\n")
+		tools := strings.Join(append(append([]string{}, memTools...), "Read", "Glob", "Grep"), ",")
+		out, _ := app.claudeP(t, repo, nil,
+			"Condense "+notes+" into short lines; store nothing.",
+			"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools,
+			"--output-format", "stream-json", "--verbose")
+		msgs := parseStream(out)
+		uses := toolUses(msgs, "mcp__"+memoryServer+"__distill")
+		if len(uses) == 0 {
+			t.Fatalf("no distill tool use in the stream:\n%s", tail(out, 1500))
+		}
+		var in struct {
+			Path string `json:"path"`
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal(uses[0].Input, &in); err != nil {
+			t.Fatal(err)
+		}
+		if in.Path != notes || in.Text != "" {
+			t.Errorf("distill input = %s, want path %s and no text", uses[0].Input, notes)
+		}
+		if got := toolUses(msgs, "mcp__"+memoryServer+"__store_memory"); len(got) != 0 {
+			t.Errorf("claude stored memory in a distill request: %s", got[0].Input)
+		}
+		for _, tool := range []string{"Read", "Grep"} {
+			for _, u := range toolUses(msgs, tool) {
+				if strings.Contains(string(u.Input), notes) {
+					t.Errorf("claude used %s on the file itself: %s", tool, u.Input)
+				}
 			}
 		}
 	})

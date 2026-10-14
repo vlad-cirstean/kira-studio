@@ -352,3 +352,61 @@ func TestIngestToolsOverMCP(t *testing.T) {
 		t.Errorf("status = %q", lines)
 	}
 }
+
+type fakeDistill struct{ got importer.DistillRequest }
+
+func (f *fakeDistill) Distill(_ context.Context, r importer.DistillRequest) (importer.DistillResult, error) {
+	f.got = r
+	return importer.DistillResult{Lines: []string{"a", "b"}}, nil
+}
+
+func TestDistillToolOffer(t *testing.T) {
+	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
+	defer store.Close()
+	svc := memory.NewService(store, acceptRunner{}, memory.ServiceOptions{})
+	ctx := context.Background()
+	connect := func(opts Options) *mcp.ClientSession {
+		t.Helper()
+		ct, st := mcp.NewInMemoryTransports()
+		if _, err := Build(svc, opts).Connect(ctx, st, nil); err != nil {
+			t.Fatal(err)
+		}
+		cs, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "1"}, nil).Connect(ctx, ct, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = cs.Close() })
+		return cs
+	}
+	offered := func(cs *mcp.ClientSession) *mcp.Tool {
+		tools, err := cs.ListTools(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tl := range tools.Tools {
+			if tl.Name == "distill" {
+				return tl
+			}
+		}
+		return nil
+	}
+	if offered(connect(Options{})) != nil || offered(connect(Options{ImportRef: "f"})) != nil {
+		t.Fatal("distill offered without a distiller")
+	}
+	fd := &fakeDistill{}
+	cs := connect(Options{Distill: fd})
+	tl := offered(cs)
+	if tl == nil || tl.Annotations == nil || !tl.Annotations.ReadOnlyHint {
+		t.Fatalf("distill tool = %+v", tl)
+	}
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "distill", Arguments: map[string]any{"path": "/x/a.md", "mode": "instructions"}})
+	if err != nil || res.IsError {
+		t.Fatalf("err=%v res=%+v", err, res)
+	}
+	if got := res.Content[0].(*mcp.TextContent).Text; got != "a\nb" || fd.got.Path != "/x/a.md" || fd.got.Mode != "instructions" {
+		t.Errorf("text=%q req=%+v", got, fd.got)
+	}
+	if r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "distill", Arguments: map[string]any{"path": "/x/a.md", "mode": "nope"}}); err == nil && !r.IsError {
+		t.Error("bad mode accepted")
+	}
+}
