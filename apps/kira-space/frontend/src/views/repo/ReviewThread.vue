@@ -7,8 +7,9 @@
 // this zone rather than VS Code's own comment-widget chrome). All three transport calls
 // (review.comment.add/remove, plus the repaint that follows) stay in reviewDecorations.ts — this
 // component only renders and emits.
-import type { ReviewComment } from '@kira/git-ipc';
+import type { ReviewComment, ReviewCommentKind, ReviewCommentState } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
@@ -29,13 +30,30 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   delete: [];
-  submit: [body: string];
+  submit: [body: string, kind: ReviewCommentKind];
+  setState: [state: ReviewCommentState];
   cancel: [];
 }>();
 
 const anchorLabel = computed(() => anchorParts(props.comment, props.branch));
 
 const draft = ref('');
+const kind = ref<ReviewCommentKind>('change');
+const KIND_ITEMS = computed(() => [
+  {
+    value: 'change',
+    label: t('git.review.comments.kind.change.label'),
+    testid: 'review-thread-kind-change',
+  },
+  {
+    value: 'question',
+    label: t('space.ade.needs.kind.question.label'),
+    testid: 'review-thread-kind-question',
+  },
+]);
+const nextState = computed<ReviewCommentState>(() =>
+  props.comment?.state === 'addressed' ? 'open' : 'addressed',
+);
 const input = useTemplateRef<{ $el: HTMLElement }>('input');
 useShortcut(
   () => input.value?.$el,
@@ -46,7 +64,7 @@ useShortcut(
 function submit(): void {
   const body = draft.value.trim();
   if (body === '') return;
-  emit('submit', body);
+  emit('submit', body, kind.value);
 }
 </script>
 
@@ -58,8 +76,39 @@ function submit(): void {
   >
     <template v-if="mode === 'view' && comment">
       <div v-if="anchorLabel" class="text-warn italic"><VarText :parts="anchorLabel" /></div>
+      <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
+        <span data-testid="review-thread-kind-chip">{{
+          comment.kind === 'question'
+            ? t('space.ade.needs.kind.question.label')
+            : t('git.review.comments.kind.change.label')
+        }}</span>
+        <span data-testid="review-thread-state-chip">{{
+          comment.state === 'addressed'
+            ? t('git.review.comments.state.addressed.label')
+            : t('common.action.open.label')
+        }}</span>
+      </div>
       <div class="whitespace-pre-wrap break-words">{{ comment.body }}</div>
+      <div
+        v-if="comment.reply"
+        class="whitespace-pre-wrap break-words border-l-2 border-border-strong pl-2 text-muted-foreground"
+        data-testid="review-thread-reply"
+      >
+        {{ comment.reply }}
+      </div>
       <div class="flex justify-end gap-1.5">
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="review-thread-state"
+          @click="emit('setState', nextState)"
+        >
+          {{
+            comment.state === 'addressed'
+              ? t('git.review.comments.reopen.label')
+              : t('git.review.comments.markAddressed.label')
+          }}
+        </Button>
         <Button variant="toolbar" size="kira" @click="emit('close')">
           <CodiconIcon name="close" :size="13" />
           {{ t('common.action.close.label') }}
@@ -71,6 +120,12 @@ function submit(): void {
       </div>
     </template>
     <template v-else>
+      <SecondaryTabs
+        v-model="kind"
+        variant="segmented"
+        :items="KIND_ITEMS"
+        data-testid="review-thread-kind"
+      />
       <Textarea
         ref="input"
         v-model="draft"

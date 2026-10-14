@@ -4754,6 +4754,11 @@
         "empty": {
           "emptyHint": "No comments yet. Open a file from the file list and use the + in the diff gutter."
         },
+        "kind": {
+          "change": {
+            "label": "Change"
+          }
+        },
         "line": {
           "example": "L{start}"
         },
@@ -4763,8 +4768,19 @@
         "loadError": {
           "error": "Couldn’t load the comment list: {error}"
         },
+        "markAddressed": {
+          "label": "Mark addressed"
+        },
         "open": {
           "aria": "Open {path} {line}"
+        },
+        "reopen": {
+          "label": "Reopen"
+        },
+        "state": {
+          "addressed": {
+            "label": "Addressed"
+          }
         }
       },
       "commit": {
@@ -7830,6 +7846,42 @@
         }
       },
       "reviewStep": {
+        "candidate": {
+          "label": "{step} (attempt {attempt})"
+        },
+        "commits": {
+          "label": "{count} new commits"
+        },
+        "fallback": {
+          "status": "Moved to a new review agent"
+        },
+        "finish": {
+          "note": {
+            "placeholder": "Note for the next step (optional)"
+          }
+        },
+        "finishAnyway": {
+          "label": "Finish anyway"
+        },
+        "finishOpen": {
+          "body": "{count} comments are still open. The review ends anyway.",
+          "title": "Finish review"
+        },
+        "noComments": {
+          "hint": "No comments yet. Add one from the diff gutter."
+        },
+        "noImplementer": {
+          "hint": "No earlier agent run to resume. Send to a new review agent."
+        },
+        "noOpen": {
+          "tooltip": "No open comments to send"
+        },
+        "round": {
+          "label": "Round {n}"
+        },
+        "roundLive": {
+          "tooltip": "Available while the review waits and no round runs"
+        },
         "route": {
           "implementer": {
             "label": "Implementer session"
@@ -7838,11 +7890,25 @@
             "label": "New review agent"
           }
         },
+        "send": {
+          "label": "Send to agent"
+        },
+        "sendCount": {
+          "label": "{count} open"
+        },
         "sent": {
           "status": "Review sent"
         },
         "stuck": {
           "status": "Review agent stopped"
+        },
+        "tab": {
+          "ask": {
+            "label": "Ask agent"
+          },
+          "workflow": {
+            "label": "Workflow review"
+          }
         },
         "waiting": {
           "status": "Waiting for review"

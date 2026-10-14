@@ -377,6 +377,12 @@ const spaceControl = {
   adeTaskSessions: (): Promise<V2.SessionsResult> =>
     unwrap(AdeTaskService.Sessions()).then((r) => trust<V2.SessionsResult>(r)),
   adeTaskStopRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.StopRun(args)),
+  adeTaskReviewStep: (args: V2.BranchArgs): Promise<V2.ReviewStepState> =>
+    unwrap(AdeTaskService.ReviewStep(args)).then((r) => trust<V2.ReviewStepState>(r)),
+  adeTaskSendReview: (args: V2.SendReviewArgs): Promise<void> =>
+    unwrap(AdeTaskService.SendReview(args)),
+  adeTaskFinishReview: (args: V2.FinishReviewArgs): Promise<void> =>
+    unwrap(AdeTaskService.FinishReview(args)),
   adeTaskTakeOver: (args: V2.TakeOverArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.TakeOver(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskLaunchStage: (args: V2.LaunchStageArgs): Promise<V2.Launch> =>
@@ -422,6 +428,8 @@ const spaceControl = {
     on(CHANNEL.adeTaskRuns, cb),
   onAdeTaskLog: (cb: (event: V2.LogEvent) => void): (() => void) => on(CHANNEL.adeTaskLog, cb),
   onAdeTaskSessions: (cb: () => void): (() => void) => on(CHANNEL.adeTaskSessions, cb),
+  onAdeTaskReview: (cb: (event: V2.ReviewEvent) => void): (() => void) =>
+    on(CHANNEL.adeTaskReview, cb),
   onAdeTaskOpenSession: (cb: (event: V2.OpenSessionEvent) => void): (() => void) =>
     on(CHANNEL.adeTaskOpenSession, cb),
 

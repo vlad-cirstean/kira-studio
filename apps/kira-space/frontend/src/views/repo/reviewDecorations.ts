@@ -28,6 +28,8 @@ import type {
   LineRange,
   ResultOf,
   ReviewComment,
+  ReviewCommentKind,
+  ReviewCommentState,
   Transport,
 } from '@kira/git-ipc';
 import { i18n, t } from '@theme/i18n';
@@ -490,6 +492,7 @@ export function attachReviewDecorations(
         branch: deps.review.branch,
         onClose: () => closeZone(),
         onDelete: () => void handleDelete(comment),
+        onSetState: (state: ReviewCommentState) => void handleSetState(comment, state),
       });
       app.use(i18n);
       app.mount(container);
@@ -503,7 +506,7 @@ export function attachReviewDecorations(
         mode: 'compose' as const,
         branch: deps.review.branch,
         onCancel: () => closeZone(),
-        onSubmit: (body: string) => void handleSubmit(line, body),
+        onSubmit: (body: string, kind: ReviewCommentKind) => void handleSubmit(line, body, kind),
       });
       app.use(i18n);
       app.mount(container);
@@ -511,7 +514,7 @@ export function attachReviewDecorations(
     });
   }
 
-  async function handleSubmit(line: number, body: string): Promise<void> {
+  async function handleSubmit(line: number, body: string, kind: ReviewCommentKind): Promise<void> {
     try {
       await deps.transport.request('review.comment.add', {
         repoId: deps.gitRepoId,
@@ -520,6 +523,7 @@ export function attachReviewDecorations(
         at: deps.review.branchTip,
         range: { start: line, end: line },
         body,
+        kind,
       });
     } catch (err) {
       logError('reviewDecorations', 'review.comment.add failed', err);
@@ -528,6 +532,21 @@ export function attachReviewDecorations(
     closeZone();
     // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
     // editor already (C12-4).
+  }
+
+  async function handleSetState(comment: ReviewComment, state: ReviewCommentState): Promise<void> {
+    try {
+      await deps.transport.request('review.comment.setState', {
+        repoId: deps.gitRepoId,
+        branch: deps.review.branch,
+        id: comment.id,
+        state,
+      });
+    } catch (err) {
+      logError('reviewDecorations', 'review.comment.setState failed', err);
+      return;
+    }
+    closeZone();
   }
 
   async function handleDelete(comment: ReviewComment): Promise<void> {

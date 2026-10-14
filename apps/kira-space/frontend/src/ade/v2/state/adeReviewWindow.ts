@@ -21,6 +21,9 @@ export const useAdeReviewWindowStore = defineStore('adeReviewWindow', () => {
   /** Bumped by `Ask review agent` so the compose box takes focus. */
   const askNonce = ref(0);
 
+  /** The right pane's tab the user picked; null until then (the pane then picks by the review step). */
+  const rightTab = ref<'workflow' | 'ask' | null>(null);
+
   const reference = computed(() => asked.value ?? selection.value);
 
   function ask(sel: ReviewSelection): void {
@@ -33,5 +36,5 @@ export const useAdeReviewWindowStore = defineStore('adeReviewWindow', () => {
     asked.value = null;
   }
 
-  return { target, draft, selection, asked, askNonce, reference, ask, sent };
+  return { target, rightTab, draft, selection, asked, askNonce, reference, ask, sent };
 });

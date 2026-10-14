@@ -59,6 +59,18 @@ function lineLabel(range: LineRange): string {
     : t('git.review.comments.lineRange.example', { start: range.start, end: range.end });
 }
 
+function kindLabel(c: ReviewComment): string {
+  return c.kind === 'question'
+    ? t('space.ade.needs.kind.question.label')
+    : t('git.review.comments.kind.change.label');
+}
+
+function stateLabel(c: ReviewComment): string {
+  return c.state === 'addressed'
+    ? t('git.review.comments.state.addressed.label')
+    : t('common.action.open.label');
+}
+
 /** D12's own two suffix forms, restated for the sidebar rather than the export's plain text. */
 function anchorTitle(c: ReviewComment): string | undefined {
   const sha7 = shaLabel(c.anchorSha);
@@ -155,6 +167,13 @@ const listEl = useTemplateRef<HTMLElement>('list');
                     :data-kira-tip="anchorTitle(c)"
                     :aria-label="anchorTitle(c)"
                   ></span>
+                  <span
+                    class="text-graph-sm text-muted-foreground"
+                    data-testid="review-comment-chips"
+                    >{{
+                      t('common.dotPair.label', { first: kindLabel(c), second: stateLabel(c) })
+                    }}</span
+                  >
                   <TooltipIconButton
                     icon="trash"
                     :label="t('git.review.comments.delete.tooltip')"
@@ -164,6 +183,12 @@ const listEl = useTemplateRef<HTMLElement>('list');
                   />
                 </div>
                 <p class="m-0 pl-2.5 whitespace-pre-wrap text-fg text-graph-md">{{ c.body }}</p>
+                <p
+                  v-if="c.reply"
+                  class="m-0 pl-2.5 whitespace-pre-wrap text-muted-foreground text-graph-md"
+                >
+                  {{ c.reply }}
+                </p>
               </li>
             </ul>
           </section>

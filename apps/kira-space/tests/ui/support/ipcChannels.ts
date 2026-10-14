@@ -200,6 +200,9 @@ export const IPC = {
   adeTaskReadLog: 'kira:adetask:readLog',
   adeTaskSessions: 'kira:adetask:sessions:call',
   adeTaskStopRun: 'kira:adetask:stopRun',
+  adeTaskReviewStep: 'kira:adetask:reviewStep',
+  adeTaskSendReview: 'kira:adetask:sendReview',
+  adeTaskFinishReview: 'kira:adetask:finishReview',
   adeTaskTakeOver: 'kira:adetask:takeOver',
   adeTaskLaunchStage: 'kira:adetask:launchStage',
   adeTaskStartBranch: 'kira:adetask:startBranch',
@@ -227,6 +230,7 @@ export const IPC = {
   adeTaskRunsChanged: 'kira:adetask:runs',
   adeTaskLogChanged: 'kira:adetask:log',
   adeTaskSessionsChanged: 'kira:adetask:sessions',
+  adeTaskReviewChanged: 'kira:adetask:review',
   adeTaskOpenSession: 'kira:adetask:openSession',
 
   // P201 Part 2: the Memory module's bound surface; memoryChanged is a push channel, no FQN entry.

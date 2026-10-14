@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { t } from '@theme/i18n';
@@ -10,11 +11,12 @@ import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed } from 'vue';
 import { onReviewRepaint } from '../../../repo/git/transport';
-import { ghSyncPlanPrefix } from '../queries';
+import { ghSyncPlanPrefix, useReviewStep } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import AdeReviewAgentPanel from './AdeReviewAgentPanel.vue';
 import AdeReviewFiles from './AdeReviewFiles.vue';
 import AdeReviewHeader from './AdeReviewHeader.vue';
+import AdeWorkflowReviewPanel from './AdeWorkflowReviewPanel.vue';
 import { useReviewContext } from './useReviewContext';
 
 // Three panes for one branch: files to review (left), this window's diff tabs (centre), and the
@@ -32,6 +34,29 @@ tryOnScopeDispose(
     if (e.kind === 'mark' && e.repoId === target.value?.gitRepoId) refreshSyncPlan();
   }),
 );
+
+// The Workflow review tab shows while the branch has a review step run; it opens first while that
+// run waits, and the user's own pick wins afterwards.
+const reviewStep = useReviewStep(() => store.target?.branchId ?? '');
+const hasWorkflowReview = computed(() => reviewStep.data.value?.run != null);
+const rightTab = computed<'workflow' | 'ask'>({
+  get: () => {
+    if (!hasWorkflowReview.value) return 'ask';
+    if (store.rightTab) return store.rightTab;
+    return reviewStep.data.value?.run?.state === 'review' ? 'workflow' : 'ask';
+  },
+  set: (v) => {
+    store.rightTab = v;
+  },
+});
+const RIGHT_TABS = computed(() => [
+  {
+    value: 'workflow',
+    label: t('space.ade.reviewStep.tab.workflow.label'),
+    testid: 'ade-review-tab-workflow',
+  },
+  { value: 'ask', label: t('space.ade.reviewStep.tab.ask.label'), testid: 'ade-review-tab-ask' },
+]);
 
 const LEFT_MIN = 180;
 const LEFT_MAX = 480;
@@ -109,12 +134,22 @@ const right = useLiveSize(
         v-bind="right.bind"
       />
       <section
-        class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
+        class="flex min-h-0 flex-none flex-col overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${right.size.value}px` }"
         :aria-label="t('space.ade.review.agent.label')"
         data-testid="ade-review-right"
       >
-        <AdeReviewAgentPanel :target="target" :repo-label="repoLabel" />
+        <SecondaryTabs
+          v-if="hasWorkflowReview"
+          v-model="rightTab"
+          :items="RIGHT_TABS"
+          class="shrink-0 border-b border-border"
+          data-testid="ade-review-right-tabs"
+        />
+        <div class="min-h-0 flex-1">
+          <AdeWorkflowReviewPanel v-if="rightTab === 'workflow'" :target="target" />
+          <AdeReviewAgentPanel v-else :target="target" :repo-label="repoLabel" />
+        </div>
       </section>
     </div>
   </div>

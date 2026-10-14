@@ -16,6 +16,7 @@ import type {
   Board,
   BranchArgs,
   CreateTaskArgs,
+  FinishReviewArgs,
   FocusSessionArgs,
   GhSyncPlan,
   GhSyncResult,
@@ -36,6 +37,7 @@ import type {
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
   SendArgs,
+  SendReviewArgs,
   SetBranchBaseArgs,
   SetPlanArgs,
   SetTaskStageArgs,
@@ -68,6 +70,7 @@ export {
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
 export const ghSyncPlanPrefix = ['adetask', 'ghSyncPlan'] as const;
+export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
 
@@ -324,6 +327,22 @@ export function useReviewAgent(taskId: MaybeRefOrGetter<string>) {
     queryKey: ['adetask', 'reviewAgent', taskId] as const,
     queryFn: () => control.adeTaskReviewAgent({ taskId: toValue(taskId) }),
   });
+}
+
+/** A branch's review step for its review window; the review, board and runs pushes refetch it. */
+export function useReviewStep(branchId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...reviewStepPrefix, branchId] as const,
+    queryFn: () => control.adeTaskReviewStep({ branchId: toValue(branchId) }),
+  });
+}
+
+export function useSendReview() {
+  return useMutation({ mutationFn: (args: SendReviewArgs) => control.adeTaskSendReview(args) });
+}
+
+export function useFinishReview() {
+  return useMutation({ mutationFn: (args: FinishReviewArgs) => control.adeTaskFinishReview(args) });
 }
 
 export function useLaunchReviewAgent() {

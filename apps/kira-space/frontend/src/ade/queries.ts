@@ -5,7 +5,7 @@ import { reposKey } from '../repo/state/reposQueries';
 import type { useAgentSessionsStore } from './state';
 import { installMobileLaunch } from './v2/dialog/mobileLaunch';
 import { adeTurns } from './v2/dialog/turnWatch';
-import { workflowYamlKey } from './v2/queries';
+import { reviewStepPrefix, workflowYamlKey } from './v2/queries';
 import { installAdeReadSignals } from './v2/readSignals';
 import { useAdeBoardUiStore } from './v2/state/adeBoardUi';
 
@@ -45,6 +45,13 @@ export function installAdeSignals(
   control.onAdeTaskSessions(() => {
     void queryClient.invalidateQueries({ queryKey: reviewAgentPrefix });
   });
+  // A review step moves with the board, its runs and its own pushes.
+  const refreshReviewStep = (): void => {
+    void queryClient.invalidateQueries({ queryKey: reviewStepPrefix });
+  };
+  control.onAdeTaskReview(refreshReviewStep);
+  control.onAdeTaskBoard(refreshReviewStep);
+  control.onAdeTaskRuns(refreshReviewStep);
   control.onAdeTaskOpenSession((event) => {
     useAdeBoardUiStore().openSession(event);
   });

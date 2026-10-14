@@ -104,6 +104,7 @@ export const CHANNEL = {
   adeTaskLog: 'kira:adetask:log',
   adeTaskSessions: 'kira:adetask:sessions',
   adeTaskOpenSession: 'kira:adetask:openSession',
+  adeTaskReview: 'kira:adetask:review',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

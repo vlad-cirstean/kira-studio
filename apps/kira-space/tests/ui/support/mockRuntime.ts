@@ -178,6 +178,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskReadLog: 'AdeTaskService.ReadLog',
   adeTaskSessions: 'AdeTaskService.Sessions',
   adeTaskStopRun: 'AdeTaskService.StopRun',
+  adeTaskReviewStep: 'AdeTaskService.ReviewStep',
+  adeTaskSendReview: 'AdeTaskService.SendReview',
+  adeTaskFinishReview: 'AdeTaskService.FinishReview',
   adeTaskTakeOver: 'AdeTaskService.TakeOver',
   adeTaskLaunchStage: 'AdeTaskService.LaunchStage',
   adeTaskStartBranch: 'AdeTaskService.StartBranch',
@@ -325,6 +328,17 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
   // main.ts asks every window whether it is a review window; none of the specs' windows is one.
   [IPC.adeTaskReviewWindowTarget]: 'null',
+  // P286: the review window asks for its branch's review step; none by default.
+  [IPC.adeTaskReviewStep]: JSON.stringify({
+    run: null,
+    stepName: '',
+    results: [],
+    route: 'implementer',
+    targetRunId: '',
+    defaultTargetRunId: '',
+    candidates: [],
+    round: null,
+  }),
   // P201 Part 2: the Memory module lists recent memories as soon as its mode opens.
   [IPC.memoryRecent]: '[]',
   // P272: no project keys by default.
@@ -391,6 +405,8 @@ const ADE_TASK_PUSHES: Readonly<Record<string, readonly string[]>> = {
   [IPC.adeTaskSetTaskStage]: [IPC.adeTaskBoardChanged],
   [IPC.adeTaskRetrySetup]: [IPC.adeTaskBoardChanged],
   [IPC.adeTaskStopRun]: [IPC.adeTaskSessionsChanged],
+  [IPC.adeTaskSendReview]: [IPC.adeTaskBoardChanged, IPC.adeTaskReviewChanged],
+  [IPC.adeTaskFinishReview]: [IPC.adeTaskBoardChanged, IPC.adeTaskReviewChanged],
   [IPC.adeTaskTakeOver]: [IPC.adeTaskSessionsChanged],
   [IPC.adeTaskLaunchStage]: [IPC.adeTaskSessionsChanged],
   [IPC.adeTaskStartBranch]: [IPC.adeTaskSessionsChanged],
