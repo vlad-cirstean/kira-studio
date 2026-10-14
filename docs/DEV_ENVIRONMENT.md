@@ -102,9 +102,8 @@ Pending now: `docs/pending-workflows/pages.yml` (P280, GitHub Pages deploy). Go 
   quirk, not a real bug). Postgres is a confirmed instance. Workaround, already applied in
   `apps/kira-studio/tests/e2e-real/` (`support/postgres.ts`, `support/mariadb.ts`): invoke
   Playwright via its plain Node CLI entrypoint (`node node_modules/.bin/playwright test
-  --project=e2e-real`), never `bunx playwright test`. **There is no vendored Node runtime any more**
-  (removed P58f M10) to bundle a standalone capture script against, so the old capture tools
-  (`scripts/capture-postgres-tree.ts`, `scripts/capture-tree.ts`) are deleted with it. Capturing a
+  --project=e2e-real`), never `bunx playwright test`. **No vendored Node runtime exists**
+  to bundle a standalone capture script against. Capturing a
   genuinely new `tests/ui/` fixture shape needs a one-off capture mode in
   `apps/kira-studio/internal/ipcfixture`'s Go generator, not yet built (only the six committed
   per-adapter fixture generators exist, see below).
@@ -482,7 +481,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
 | Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest'` (import about 50 s, 0.14 USD, P211; ingest P274) |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
-| Prompt registry, store, templates: `internal/llmprompts/**` | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestSmartScriptRun'` and `bun run test:claude:studio` |
+| Prompt registry, store, templates: `internal/llmprompts/**` | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
 | Claude CLI upgrade | `bun run test:claude` |
 
 Sandbox notes:
