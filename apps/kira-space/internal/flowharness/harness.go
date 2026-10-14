@@ -35,6 +35,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agentsandbox"
+	"github.com/kirathecat/kira-studio/internal/agentsandbox/sandboxtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -44,6 +46,7 @@ import (
 
 type options struct {
 	smartTimeout    time.Duration
+	sandbox         agentsandbox.Enforcer
 	scheduleTimeout time.Duration
 	clock           scriptruns.Clock
 	noGh            bool
@@ -69,6 +72,9 @@ func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
 func WithTrackerGrace(d time.Duration) Opt { return func(o *options) { o.trackerGrace = d } }
 
 // WithSmartTimeout replaces every smart script's own timeout.
+// WithSandbox swaps the OS sandbox enforcer for a test one.
+func WithSandbox(e agentsandbox.Enforcer) Opt { return func(o *options) { o.sandbox = e } }
+
 func WithSmartTimeout(d time.Duration) Opt { return func(o *options) { o.smartTimeout = d } }
 
 // WithScheduleTimeout replaces every headless scheduled run's own timeout.
@@ -265,12 +271,16 @@ func (a *App) build() {
 		a.t.Fatalf("repos.New: %v", err)
 	}
 	a.db, a.repos, a.stopped = db, r, false
+	if a.opts.sandbox == nil {
+		// Same on every OS: flows never depend on the host's real Seatbelt.
+		a.opts.sandbox = &sandboxtest.Fake{Dir: a.t.TempDir(), NotEnforced: true}
+	}
 	var ghLocator ghclient.Locator
 	if a.opts.noGh {
 		ghLocator = noGhLocator{}
 	}
 	a.W = appwire.Build(appwire.Options{
-		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
+		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

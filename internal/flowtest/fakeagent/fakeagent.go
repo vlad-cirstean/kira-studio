@@ -73,6 +73,8 @@ type Action struct {
 	Emit string `json:"emit,omitempty"`
 	// WaitFile blocks until the path exists.
 	WaitFile string `json:"waitFile,omitempty"`
+	// Stderr replaces the "fail" behaviour's message (a CLI error line such as a sign-in failure).
+	Stderr string `json:"stderr,omitempty"`
 	// Exit, when set, ends the run with that code instead of the named behaviour.
 	Exit *int `json:"exit,omitempty"`
 }
@@ -98,6 +100,8 @@ type MCPCall struct {
 	Server string         `json:"server"`
 	Tool   string         `json:"tool"`
 	Args   map[string]any `json:"args,omitempty"`
+	// Tolerate records a tool error as the result and carries on instead of ending the run.
+	Tolerate bool `json:"tolerate,omitempty"`
 }
 
 // PromptRule answers a headless call whose --system-prompt contains System. Doc narrows it to one
@@ -248,6 +252,10 @@ func runSideEffects(action Action, dir, cwd string, args []string) (code int, do
 	}
 	for _, c := range action.MCP {
 		res, err := callTool(argsAfter(args, "--mcp-config"), c.Server, c.Tool, c.Args)
+		if err != nil && res != nil && c.Tolerate {
+			recordMCPResult(dir, c.Tool, res)
+			continue
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "mcp:", err)
 			return 3, true
@@ -299,7 +307,7 @@ func finishAction(action Action, args []string, headless bool) int {
 	case "needs_input", "failed":
 		return finish(action.Name)
 	case "fail":
-		fmt.Fprintln(os.Stderr, "fake claude: scripted failure")
+		fmt.Fprintln(os.Stderr, cmpStr(action.Stderr, "fake claude: scripted failure"))
 		return 1
 	case "lost":
 		fmt.Fprintln(os.Stderr, "No conversation found with session ID: "+argAfter(args, "--resume"))
@@ -414,12 +422,20 @@ func argsAfter(args []string, flag string) []string {
 func recordEnv(stem string) {
 	var lines []string
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") || strings.HasPrefix(kv, "KIRA_BRANCH") {
+		if strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") || strings.HasPrefix(kv, "KIRA_BRANCH") ||
+			strings.HasPrefix(kv, "TMPDIR=") || strings.HasPrefix(kv, "GIT_OPTIONAL_LOCKS=") || strings.HasPrefix(kv, "SSH_AUTH_SOCK=") || strings.HasPrefix(kv, "HTTPS_PROXY=") {
 			lines = append(lines, strconv.Quote(kv))
 		}
 	}
 	sort.Strings(lines)
 	writeFile(stem+".env", []byte(strings.Join(lines, "\n")))
+}
+
+func cmpStr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 func argAfter(args []string, flag string) string {
@@ -498,15 +514,27 @@ func callTool(cfgPaths []string, server, tool string, args map[string]any) (*mcp
 		return nil, err
 	}
 	if res.IsError {
-		return nil, fmt.Errorf("tool error: %v", res.Content)
+		return res, fmt.Errorf("tool error: %s", toolText(res))
 	}
 	return res, nil
+}
+
+func toolText(res *mcp.CallToolResult) string {
+	var parts []string
+	for _, c := range res.Content {
+		if t, ok := c.(*mcp.TextContent); ok {
+			parts = append(parts, t.Text)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 // recordMCPResult keeps what a scripted tool call returned, as <dir>/mcp-<tool>-<n>.json.
 func recordMCPResult(dir, tool string, res *mcp.CallToolResult) {
 	var v any = res.StructuredContent
-	if v == nil {
+	if res.IsError {
+		v = map[string]any{"isError": true, "text": toolText(res)}
+	} else if v == nil {
 		v = res.Content
 	}
 	raw, err := json.Marshal(v)

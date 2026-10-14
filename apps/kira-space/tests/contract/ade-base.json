@@ -167,6 +167,12 @@
     "purpose": "rebase",
     "resumable": false,
     "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
     "sessionId": "<masked>",
     "stageId": "",
     "startedAt": 0,
@@ -222,6 +228,12 @@
     "purpose": "rebase",
     "resumable": false,
     "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
     "sessionId": "<masked>",
     "stageId": "",
     "startedAt": 0,
@@ -268,6 +280,12 @@
     "purpose": "rebase",
     "resumable": false,
     "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
     "sessionId": "<masked>",
     "stageId": "",
     "startedAt": 0,

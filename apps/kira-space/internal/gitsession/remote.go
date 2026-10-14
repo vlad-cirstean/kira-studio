@@ -44,6 +44,8 @@ type RemoteOpParams struct {
 	ExpectedRemoteTip *string `json:"expectedRemoteTip,omitempty"`
 	PlainForce        bool    `json:"plainForce,omitempty"`
 	ConfirmToken      string  `json:"confirmToken,omitempty"`
+	// RemoteBranch (sandbox MCP push) overrides the upstream-derived remote branch for push and forcePush.
+	RemoteBranch string `json:"remoteBranch,omitempty"`
 }
 
 // RemoteOpError mirrors @kira/git-ipc's own remote.run error shape.
@@ -332,7 +334,9 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	// used to re-resolve it separately (three separate git-config-backed reads that can disagree if
 	// config changes mid-flight); forcePushRemoteBranch is empty and unused for every other kind.
 	var forcePushRemoteBranch string
-	if params.Kind == "forcePush" {
+	if params.Kind == "forcePush" && params.RemoteBranch != "" {
+		forcePushRemoteBranch = params.RemoteBranch
+	} else if params.Kind == "forcePush" {
 		remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
 		if uerr != nil {
 			return RemoteOpResult{}, uerr
@@ -470,9 +474,13 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 	var argv []string
 	switch params.Kind {
 	case "push":
-		remoteBranch, _, err := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
-		if err != nil {
-			return nil, nil, err
+		remoteBranch := params.RemoteBranch
+		if remoteBranch == "" {
+			var err error
+			remoteBranch, _, err = e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		argv = gitops.PushArgs(params.Remote, params.Branch, remoteBranch, params.SetUpstream)
 	case "forcePush":
@@ -676,12 +684,16 @@ func parseAheadBehind(raw []byte) (ahead, behind int, err error) {
 // already tracking a differently-named upstream must never be reported as "would set upstream"
 // just because no same-named ref happens to exist yet.
 func (e *RepoEntry) PushPreflight(ctx context.Context, remote, branch string) (gitpreflight.PushPreflight, error) {
-	protectedBranches, _, _ := e.settings()
-
 	remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, remote, branch)
 	if uerr != nil {
 		return gitpreflight.PushPreflight{}, uerr
 	}
+	return e.PushPreflightTo(ctx, remote, branch, remoteBranch)
+}
+
+// PushPreflightTo is PushPreflight against an explicit remote branch name.
+func (e *RepoEntry) PushPreflightTo(ctx context.Context, remote, branch, remoteBranch string) (gitpreflight.PushPreflight, error) {
+	protectedBranches, _, _ := e.settings()
 
 	tipRes, err := e.runAllowingExit(ctx, gitops.RemoteTipArgs(remote, remoteBranch), 0, 1)
 	if err != nil {

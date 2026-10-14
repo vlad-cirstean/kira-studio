@@ -20,6 +20,12 @@
     "purpose": "",
     "resumable": false,
     "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -49,6 +55,12 @@
     "purpose": "",
     "resumable": false,
     "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -78,6 +90,12 @@
     "purpose": "",
     "resumable": false,
     "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -88,6 +106,10 @@
   },
   "AdeTaskService.Workflows": {
     "dir": "<space>/workflows",
+    "sandbox": {
+      "enforced": false,
+      "reason": "The sandbox is not enforced on this OS. It runs on macOS only. Claude permission rules still apply, but they do not stop shell commands."
+    },
     "workflows": [
       {
         "error": null,

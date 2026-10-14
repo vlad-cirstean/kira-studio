@@ -272,7 +272,7 @@ func (b *TaskBoard) FetchRemote(ctx context.Context, runID, remote string) (clau
 		return claudeheadless.RemoteResult{}, err
 	}
 	if !slices.Contains(names, remote) {
-		return claudeheadless.RemoteResult{}, fmt.Errorf("remote must be one of: %s", strings.Join(names, ", "))
+		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("remote must be one of: " + strings.Join(names, ", "))
 	}
 	res, err := entry.RunRemote(ctx, b.conn, gitsession.RemoteOpParams{Kind: "fetch", Remote: remote}, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
 	if err != nil {
@@ -299,22 +299,22 @@ func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (c
 		return claudeheadless.RemoteResult{}, err
 	}
 	if head != "refs/heads/"+t.branch {
-		return claudeheadless.RemoteResult{}, fmt.Errorf("your worktree is not on %s", t.branch)
+		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("your worktree is not on " + t.branch)
 	}
 	remote := forcePushRemote(ctx, entry, t.branch)
 	if remote == "" {
-		return claudeheadless.RemoteResult{}, errors.New("the repo has no remote to push to")
+		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("the repo has no remote to push to")
 	}
-	pf, err := entry.PushPreflight(ctx, remote, t.branch)
+	pf, err := entry.PushPreflightTo(ctx, remote, t.branch, t.branch)
 	if err != nil {
 		return claudeheadless.RemoteResult{}, err
 	}
 	if pf.ProtectedBy != nil {
-		return claudeheadless.RemoteResult{}, fmt.Errorf("%s is a protected branch", t.branch)
+		return claudeheadless.RemoteResult{}, claudeheadless.ToolError(t.branch + " is a protected branch")
 	}
-	params := gitsession.RemoteOpParams{Kind: "push", Remote: remote, Branch: t.branch, SetUpstream: pf.Upstream == nil}
+	params := gitsession.RemoteOpParams{Kind: "push", Remote: remote, Branch: t.branch, RemoteBranch: t.branch, SetUpstream: pf.Upstream == nil}
 	if force {
-		params = gitsession.RemoteOpParams{Kind: "forcePush", Remote: remote, Branch: t.branch, ExpectedRemoteTip: pf.RemoteTip}
+		params = gitsession.RemoteOpParams{Kind: "forcePush", Remote: remote, Branch: t.branch, RemoteBranch: t.branch, ExpectedRemoteTip: pf.RemoteTip}
 	}
 	res, err := entry.RunRemote(ctx, b.conn, params, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
 	if err != nil {
@@ -328,7 +328,7 @@ func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (c
 // remoteResult turns a remote op result into the tool result; a failed op is an error with its message.
 func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (claudeheadless.RemoteResult, error) {
 	if res.Error != nil {
-		return claudeheadless.RemoteResult{}, errors.New(res.Error.Message)
+		return claudeheadless.RemoteResult{}, claudeheadless.ToolError(res.Error.Message)
 	}
 	var lines []string
 	for _, u := range res.Updates {

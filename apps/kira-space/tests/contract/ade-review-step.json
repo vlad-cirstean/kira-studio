@@ -58,6 +58,7 @@
         "purpose": "review",
         "resumable": false,
         "review": null,
+        "sandbox": null,
         "sessionId": "<masked>",
         "stageId": "build",
         "startedAt": 0,
@@ -85,6 +86,7 @@
         "round": 1,
         "route": "implementer"
       },
+      "sandbox": null,
       "sessionId": "<masked>",
       "stageId": "build",
       "startedAt": 0,
@@ -157,6 +159,7 @@
         "round": 0,
         "route": "implementer"
       },
+      "sandbox": null,
       "sessionId": "<masked>",
       "stageId": "build",
       "startedAt": 0,
@@ -227,6 +230,7 @@
         "purpose": "review",
         "resumable": false,
         "review": null,
+        "sandbox": null,
         "sessionId": "<masked>",
         "stageId": "build",
         "startedAt": 0,
@@ -254,6 +258,7 @@
         "round": 1,
         "route": "new"
       },
+      "sandbox": null,
       "sessionId": "<masked>",
       "stageId": "build",
       "startedAt": 0,
@@ -321,6 +326,7 @@
         "purpose": "review",
         "resumable": true,
         "review": null,
+        "sandbox": null,
         "sessionId": "<masked>",
         "stageId": "build",
         "startedAt": 0,
@@ -348,6 +354,7 @@
         "round": 1,
         "route": "implementer"
       },
+      "sandbox": null,
       "sessionId": "<masked>",
       "stageId": "build",
       "startedAt": 0,
@@ -412,6 +419,7 @@
         "round": 0,
         "route": "implementer"
       },
+      "sandbox": null,
       "sessionId": "<masked>",
       "stageId": "build",
       "startedAt": 0,
@@ -474,6 +482,7 @@
         "purpose": "review",
         "resumable": false,
         "review": null,
+        "sandbox": null,
         "sessionId": "<masked>",
         "stageId": "build",
         "startedAt": 0,
@@ -501,6 +510,7 @@
         "round": 1,
         "route": "implementer"
       },
+      "sandbox": null,
       "sessionId": "<masked>",
       "stageId": "build",
       "startedAt": 0,

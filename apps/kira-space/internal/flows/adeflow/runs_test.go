@@ -23,7 +23,12 @@ type runFixture struct {
 
 func newRunFixture(t *testing.T, actions []fakeagent.Action, stages string) *runFixture {
 	t.Helper()
-	app := flowharness.New(t)
+	return newRunFixtureWith(t, actions, stages)
+}
+
+func newRunFixtureWith(t *testing.T, actions []fakeagent.Action, stages string, opts ...flowharness.Opt) *runFixture {
+	t.Helper()
+	app := flowharness.New(t, opts...)
 	claude(app, map[string][]fakeagent.Action{"*": actions})
 	repo, bare := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	rec := importRepo(t, app, repo.Dir)

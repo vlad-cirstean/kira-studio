@@ -11,6 +11,7 @@
     "purpose": "",
     "resumable": false,
     "review": null,
+    "sandbox": null,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": null,
