@@ -19,6 +19,7 @@ import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS } from '../tones';
 import type { Run } from '../wire';
 import AdeRunLog from './AdeRunLog.vue';
+import AdeRunSandboxBadge from './AdeRunSandboxBadge.vue';
 import { outcomeText } from './outcomeText';
 
 // How one run ended: the agent's own report, then what git showed. Used for a branch's last
@@ -130,6 +131,11 @@ function copy(): void {
         v-if="rebase"
         :label="rebase.verified ? t('space.ade.outcome.verified.status') : t('space.ade.outcome.notVerified.status')"
         :tone="rebase.verified ? 'green' : 'amber'"
+      />
+      <AdeRunSandboxBadge
+        v-if="run.sandbox && run.sandbox.denials > 0"
+        :run-id="run.id"
+        :badge="run.sandbox"
       />
       <span class="flex-1" />
       <Button variant="toolbar" size="kira" data-testid="ade-outcome-copy" @click="copy">

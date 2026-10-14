@@ -7949,6 +7949,67 @@
           "title": "Run {stage} in the background"
         }
       },
+      "sandbox": {
+        "blocked": {
+          "label": "{count} blocked"
+        },
+        "notEnforced": {
+          "label": "Not enforced"
+        },
+        "off": {
+          "label": "No sandbox"
+        },
+        "popover": {
+          "allow": {
+            "label": "Allowed paths"
+          },
+          "denials": {
+            "label": "Blocked actions"
+          },
+          "enforced": {
+            "status": "Enforced by macOS"
+          },
+          "keychain": {
+            "label": "Keychain"
+          },
+          "keychainOn": {
+            "status": "Allowed"
+          },
+          "network": {
+            "label": "Network access"
+          },
+          "networkOff": {
+            "status": "Claude API only"
+          },
+          "networkOn": {
+            "status": "All hosts"
+          },
+          "read": {
+            "label": "Read paths"
+          },
+          "shown": {
+            "status": "{shown} of {total} shown"
+          },
+          "viewProfile": {
+            "label": "View profile"
+          },
+          "write": {
+            "label": "Write paths"
+          }
+        },
+        "profile": {
+          "title": "Sandbox profile"
+        },
+        "read": {
+          "label": "Read only"
+        },
+        "takeOver": {
+          "hint": "Takes over without the sandbox."
+        },
+        "write": {
+          "label": "Write worktree"
+        }
+      },
       "sessionList": {
         "empty": {
           "empty": "Nothing running"
@@ -8288,12 +8349,6 @@
           }
         },
         "sandbox": {
-          "accessRead": {
-            "label": "Read only"
-          },
-          "accessWrite": {
-            "label": "Write worktree"
-          },
           "allow": {
             "example": "~/go",
             "label": "Allow writes"
@@ -8437,9 +8492,6 @@
           },
           "resultStops": {
             "tooltip": "{id} ({outcome}) stops the run"
-          },
-          "sandboxOff": {
-            "label": "No sandbox"
           },
           "sendsImplementer": {
             "label": "Sends to the implementer"

@@ -88,8 +88,8 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
         >{{
           t(
             step.sandbox.access === 'off'
-              ? 'space.ade.workflows.stepNode.sandboxOff.label'
-              : 'space.ade.workflows.sandbox.accessRead.label',
+              ? 'space.ade.sandbox.off.label'
+              : 'space.ade.sandbox.read.label',
           )
         }}</span
       >

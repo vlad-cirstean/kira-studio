@@ -4,6 +4,7 @@ import type {
   Branch,
   OnFailure,
   RunReview,
+  RunSandboxBadge,
   RunState,
   RunsOn,
   Stage,
@@ -38,6 +39,8 @@ export interface StepRun {
   resumable: boolean;
   /** Review step run: where it stands; null on every other run. */
   review: RunReview | null;
+  /** Sandbox badge; null when the run had none. */
+  sandbox: RunSandboxBadge | null;
 }
 
 export interface StepProgress {
@@ -185,6 +188,7 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
     finishedAt: best.finishedAt,
     resumable: best.resumable,
     review: best.review,
+    sandbox: best.sandbox,
   };
 }
 
@@ -245,6 +249,7 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
           finishedAt: null,
           resumable: false,
           review: null,
+          sandbox: null,
         },
     );
     const state = aggregate(runs.map((r) => r.state));

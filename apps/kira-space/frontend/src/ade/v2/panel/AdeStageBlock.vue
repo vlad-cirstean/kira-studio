@@ -24,6 +24,7 @@ import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS, TONE_TEXT_CLASS } from '../tones';
 import AdeRunLog from './AdeRunLog.vue';
 import AdeRunOutcome from './AdeRunOutcome.vue';
+import AdeRunSandboxBadge from './AdeRunSandboxBadge.vue';
 import AdeSetupProgress from './AdeSetupProgress.vue';
 
 // One stage of the Workflow block: header (state chip, action slot, name, count, mode), then its
@@ -314,6 +315,11 @@ function logToggleLabel(runId: string): string {
               rl.status
             }}</span
           >
+          <AdeRunSandboxBadge
+            v-if="rl.run.sandbox && rl.run.runId"
+            :run-id="rl.run.runId"
+            :badge="rl.run.sandbox"
+          />
           <Button
             v-if="rl.hasLog"
             variant="dialog"
@@ -347,18 +353,22 @@ function logToggleLabel(runId: string): string {
           >
             {{ t('space.ade.board.branchTag.review.label') }}
           </Button>
-          <Button
-            variant="dialog"
+          <AdeTip
             v-if="canTakeOver(rl.run)"
-            size="kira"
-            class="shrink-0 "
-            :class="ACTION_CLASS.claude"
-            :pending="takeOver.pending.has(rl.run.sessionId)"
-            data-testid="ade-run-takeover"
-            @click="takeOver.request(rl.run.sessionId)"
+            :text="rl.run.sandbox && rl.run.sandbox.access !== 'off' ? t('space.ade.sandbox.takeOver.hint') : ''"
           >
-            {{ t('common.action.takeOver.label') }}
-          </Button>
+            <Button
+              variant="dialog"
+              size="kira"
+              class="shrink-0 "
+              :class="ACTION_CLASS.claude"
+              :pending="takeOver.pending.has(rl.run.sessionId)"
+              data-testid="ade-run-takeover"
+              @click="takeOver.request(rl.run.sessionId)"
+            >
+              {{ t('common.action.takeOver.label') }}
+            </Button>
+          </AdeTip>
           <Button
             variant="dialog"
             v-if="rl.canRetry"

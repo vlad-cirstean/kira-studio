@@ -33,8 +33,8 @@ const set = (p: Partial<StepSandbox>): void => emit('patch', { ...props.sandbox,
 const id = (k: string): string => `ade-wf-sandbox-${k}-${props.stepId}`;
 
 const ACCESS_LABEL: Record<SandboxAccess, MessageKey> = {
-  write: 'space.ade.workflows.sandbox.accessWrite.label',
-  read: 'space.ade.workflows.sandbox.accessRead.label',
+  write: 'space.ade.sandbox.write.label',
+  read: 'space.ade.sandbox.read.label',
   off: 'common.off.status',
 };
 const items = computed(() =>
