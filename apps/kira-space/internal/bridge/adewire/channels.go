@@ -10,4 +10,5 @@ const (
 	ChannelLog         = "kira:adetask:log"  // LogEvent
 	ChannelSessions    = "kira:adetask:sessions"
 	ChannelOpenSession = "kira:adetask:openSession" // OpenSessionEvent, EmitTo
+	ChannelReview      = "kira:adetask:review"      // ReviewEvent
 )

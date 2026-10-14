@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
@@ -62,6 +63,14 @@ func AdeTaskRunsChanged(ev *Events, payload adewire.RunsChangedEvent) {
 func AdeTaskLogAppended(ev *Events, payload adewire.LogEvent) {
 	ev.emit.Emit(adewire.ChannelLog, payload)
 }
+
+// AdeTaskReviewChanged is TaskBoard.OnReview's target: the review of one branch changed.
+func AdeTaskReviewChanged(ev *Events, payload adewire.ReviewEvent) {
+	ev.emit.Emit(adewire.ChannelReview, payload)
+}
+
+// adeReviewNoteMax bounds the note of FinishReview, in runes.
+const adeReviewNoteMax = 2000
 
 // AdeTaskSessionsChanged is TaskBoard.OnSessions' target: payload-free.
 func AdeTaskSessionsChanged(ev *Events) { ev.Broadcast(adewire.ChannelSessions) }
@@ -733,6 +742,45 @@ func (s *AdeTaskService) ResumeRun(ctx context.Context, args adewire.RunArgs) er
 		return err
 	}
 	return adeTaskError(s.Engine.ResumeRun(ctx, args.RunID))
+}
+
+// ReviewStep describes the branch's review step for its review window.
+func (s *AdeTaskService) ReviewStep(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewStepState, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ReviewStepState{}, err
+	}
+	st, err := s.Engine.ReviewStep(ctx, args.BranchID)
+	return st, adeTaskError(err)
+}
+
+// SendReview sends the open review comments of a waiting review run to an agent.
+func (s *AdeTaskService) SendReview(ctx context.Context, args adewire.SendReviewArgs) error {
+	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
+		return err
+	}
+	if args.TargetRunID != "" {
+		if err := validateAdeItemID(args.TargetRunID, "targetRunId"); err != nil {
+			return err
+		}
+	}
+	if args.Route != "" && args.Route != adewire.ReviewSendImplementer && args.Route != adewire.ReviewSendNew {
+		return adeTaskInvalid("route must be implementer or new")
+	}
+	return adeTaskError(s.Engine.SendReview(ctx, args))
+}
+
+// FinishReview ends a waiting review run on the result the user picked.
+func (s *AdeTaskService) FinishReview(ctx context.Context, args adewire.FinishReviewArgs) error {
+	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
+		return err
+	}
+	if err := validateAdeItemID(args.Result, "result"); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(args.Note) > adeReviewNoteMax {
+		return adeTaskInvalid("note is too long")
+	}
+	return adeTaskError(s.Engine.FinishReview(ctx, args))
 }
 
 func (s *AdeTaskService) StageDone(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {

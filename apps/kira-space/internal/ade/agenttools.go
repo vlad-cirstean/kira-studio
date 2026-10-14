@@ -427,6 +427,9 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q claudeheadle
 	out := []claudeheadless.RunOutcomeEntry{}
 	for i := len(runs) - 1; i >= 0 && len(out) < q.Limit; i-- {
 		r := runs[i]
+		if r.Purpose == model.AdeRunPurposeReview {
+			continue
+		}
 		kind := "step"
 		if r.Purpose == model.AdeRunPurposeRebase {
 			kind = "rebase"

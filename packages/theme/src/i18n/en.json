@@ -1092,6 +1092,38 @@
         "reviewConversationReset": {
           "body": "The previous review conversation ran in {path}, which no longer exists. Started a new one."
         },
+        "reviewStep": {
+          "badTarget": {
+            "body": "That agent run can’t take the review."
+          },
+          "fallback": {
+            "body": "The implementer session is gone. Sent to a new review agent."
+          },
+          "noOpen": {
+            "body": "There are no open comments to send."
+          },
+          "notReview": {
+            "body": "That run is not a review step."
+          },
+          "notWaiting": {
+            "body": "The review is not waiting for you."
+          },
+          "retryRound": {
+            "body": "Send the review again from the review window."
+          },
+          "roundLive": {
+            "body": "A review round is already running."
+          },
+          "targetBusy": {
+            "body": "That agent is busy. Wait for it to stop."
+          },
+          "unknownResult": {
+            "body": "Choose one of the results of this step."
+          },
+          "waits": {
+            "body": "The review waits for you. Finish it in the review window."
+          }
+        },
         "runNotFound": {
           "body": "That run no longer exists."
         },

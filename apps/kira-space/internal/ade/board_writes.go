@@ -63,7 +63,11 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 	if err != nil {
 		return adewire.Task{}, err
 	}
-	out := toWireTask(t, ids, runs)
+	reviews, err := b.deps.Tasks.Reviews()
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	out := toWireTask(t, ids, runs, reviews)
 	decorateTask(&out, t, b.liveHasher())
 	return out, nil
 }

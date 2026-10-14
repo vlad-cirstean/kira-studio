@@ -24,6 +24,8 @@ type stepDef struct {
 	// SmartScript names the smart script that replaces Prompt; Params are its values.
 	SmartScript string
 	Params      map[string][]string
+	// Review makes the step a review step: no process, the run waits for the user.
+	Review *adewire.ReviewStepConfig
 }
 
 // stageSteps lists a stage's steps; a user stage has none.
@@ -49,7 +51,7 @@ func stageSteps(st adewire.Stage) []stepDef {
 			}
 			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure, Results: results,
 				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools,
-				SmartScript: s.SmartScript, Params: s.Params}
+				SmartScript: s.SmartScript, Params: s.Params, Review: s.Review}
 		}
 		return out
 	}
@@ -106,7 +108,7 @@ func (v stepView) state() string {
 			stuck++
 		case model.AdeRunFailed:
 			failed++
-		case model.AdeRunRunning, model.AdeRunBack:
+		case model.AdeRunRunning, model.AdeRunBack, model.AdeRunReview:
 			running++
 		case model.AdeRunDone:
 			done++

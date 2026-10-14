@@ -215,7 +215,8 @@ func wireAdeTask(
 			bridge.AdeTaskRunsChanged(events, ev)
 			notifier.HandleRuns(ev.Runs)
 		},
-		OnLog: func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
+		OnLog:    func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
+		OnReview: func(ev adewire.ReviewEvent) { bridge.AdeTaskReviewChanged(events, ev) },
 		OnRateLimits: func(rl claudeheadless.RateLimits) {
 			var five, seven *claudeusage.Window
 			if rl.FiveHour != nil {

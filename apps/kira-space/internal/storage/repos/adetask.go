@@ -860,15 +860,18 @@ func (r *AdeTaskRepo) UpdateRun(id string, p model.AdeRunPatch) (model.AdeRun, e
 	if p.Launch != nil {
 		cur.Launch = *p.Launch
 	}
+	if p.SpecJSON != nil {
+		cur.SpecJSON = *p.SpecJSON
+	}
 	outcome, err := encodeOutcome(cur.Outcome)
 	if err != nil {
 		return model.AdeRun{}, err
 	}
 	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, summary = ?, session_id = ?,
 		exit_code = ?, started_at = ?, finished_at = ?, outcome_json = ?, launch_note = ?, launch_resume_id = ?, launch_prompt = ?,
-		launch_extra = ? WHERE id = ?`,
+		launch_extra = ?, spec_json = ? WHERE id = ?`,
 		cur.State, cur.Note, cur.Summary, cur.SessionID, cur.ExitCode, cur.StartedAt,
-		cur.FinishedAt, outcome, cur.Launch.Note, cur.Launch.ResumeID, cur.Launch.Prompt, cur.Launch.Extra, id); err != nil {
+		cur.FinishedAt, outcome, cur.Launch.Note, cur.Launch.ResumeID, cur.Launch.Prompt, cur.Launch.Extra, cur.SpecJSON, id); err != nil {
 		return model.AdeRun{}, fmt.Errorf("repos: update ade run %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -893,7 +896,7 @@ func (r *AdeTaskRepo) GetRun(id string) (model.AdeRun, error) {
 func (r *AdeTaskRepo) LatestRuns(taskID string) ([]model.AdeRun, error) {
 	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs a WHERE task_id = ? AND attempt = (
 		SELECT MAX(attempt) FROM ade_runs b WHERE b.task_id = a.task_id AND b.stage_id = a.stage_id
-		AND b.step_id = a.step_id AND b.branch_id = a.branch_id) ORDER BY COALESCE(started_at, 0), id`, taskID)
+		AND b.step_id = a.step_id AND b.branch_id = a.branch_id AND b.purpose = a.purpose) ORDER BY COALESCE(started_at, 0), id`, taskID)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
 		run, err := scanAdeRun(rows)
 		return run, true, err
@@ -940,6 +943,85 @@ func (r *AdeTaskRepo) SetPendingNote(branchID, note string) ([]model.AdeRun, err
 	})
 }
 
+// GetReview returns the review run's send state; (nil, nil) when it has none.
+func (r *AdeTaskRepo) GetReview(runID string) (*model.AdeReview, error) {
+	var v model.AdeReview
+	err := r.DB.QueryRow(`SELECT run_id, route, target_run_id, dedicated_claude_id, rounds FROM ade_reviews WHERE run_id = ?`, runID).
+		Scan(&v.RunID, &v.Route, &v.TargetRunID, &v.DedicatedClaudeID, &v.Rounds)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repos: get ade review %s: %w", runID, err)
+	}
+	return &v, nil
+}
+
+// UpsertReview writes the route and target of a review run; the round count and dedicated session stay.
+func (r *AdeTaskRepo) UpsertReview(v model.AdeReview) error {
+	if _, err := r.DB.Exec(`INSERT INTO ade_reviews (run_id, route, target_run_id) VALUES (?, ?, ?)
+		ON CONFLICT(run_id) DO UPDATE SET route = excluded.route, target_run_id = excluded.target_run_id`,
+		v.RunID, v.Route, v.TargetRunID); err != nil {
+		return fmt.Errorf("repos: upsert ade review %s: %w", v.RunID, err)
+	}
+	return nil
+}
+
+// BumpReviewRound counts one more round and returns the new count.
+func (r *AdeTaskRepo) BumpReviewRound(runID string) (int, error) {
+	var n int
+	if err := r.DB.QueryRow(`UPDATE ade_reviews SET rounds = rounds + 1 WHERE run_id = ? RETURNING rounds`, runID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("repos: bump ade review round %s: %w", runID, err)
+	}
+	return n, nil
+}
+
+// SetReviewDedicated stores the dedicated route's Claude session id ("" forgets a lost one).
+func (r *AdeTaskRepo) SetReviewDedicated(runID, claudeID string) error {
+	if _, err := r.DB.Exec(`UPDATE ade_reviews SET dedicated_claude_id = ? WHERE run_id = ?`, claudeID, runID); err != nil {
+		return fmt.Errorf("repos: set ade review session %s: %w", runID, err)
+	}
+	return nil
+}
+
+// Reviews returns the send state of every review run, by run id.
+func (r *AdeTaskRepo) Reviews() (map[string]model.AdeReview, error) {
+	rows, err := r.DB.Query(`SELECT run_id, route, target_run_id, dedicated_claude_id, rounds FROM ade_reviews`)
+	list, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeReview, bool, error) {
+		var v model.AdeReview
+		err := rows.Scan(&v.RunID, &v.Route, &v.TargetRunID, &v.DedicatedClaudeID, &v.Rounds)
+		return v, true, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repos: ade reviews: %w", err)
+	}
+	out := make(map[string]model.AdeReview, len(list))
+	for _, v := range list {
+		out[v.RunID] = v
+	}
+	return out, nil
+}
+
+// ReviewRounds returns the task's review rounds, oldest first.
+func (r *AdeTaskRepo) ReviewRounds(taskID string) ([]model.AdeRun, error) {
+	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs WHERE task_id = ? AND purpose = ? ORDER BY attempt, id`,
+		taskID, model.AdeRunPurposeReview)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
+		run, err := scanAdeRun(rows)
+		return run, true, err
+	})
+}
+
+// PendingOnBranch lists the pending runs of a branch with the given purpose.
+func (r *AdeTaskRepo) PendingOnBranch(branchID, purpose string) ([]model.AdeRun, error) {
+	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs WHERE branch_id = ? AND purpose = ? AND state = ? ORDER BY id`,
+		branchID, purpose, model.AdeRunPending)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
+		run, err := scanAdeRun(rows)
+		return run, true, err
+	})
+}
+
 // CountRunning counts runs in the running state.
 func (r *AdeTaskRepo) CountRunning() (int, error) {
 	var n int
@@ -959,7 +1041,7 @@ func (r *AdeTaskRepo) RecoverRunning(now int64, out model.AdeRunOutcome) ([]mode
 	}
 	rows, err := r.DB.Query(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ?, outcome_json = ?,
 		launch_note = '', launch_prompt = '', launch_extra = '',
-		launch_resume_id = CASE WHEN purpose = '' AND session_id <> '' THEN
+		launch_resume_id = CASE WHEN purpose IN ('', 'review') AND session_id <> '' THEN
 			COALESCE((SELECT claude_session_id FROM ade_sessions s WHERE s.id = ade_runs.session_id), '') ELSE '' END
 		WHERE state = 'running' RETURNING `+adeRunColumns,
 		model.AdeRunStuck, out.Reason, now, outcome)

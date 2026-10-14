@@ -83,8 +83,7 @@ func FormatComments(branch string, cs []AnchoredComment) string {
 		case AnchorStale:
 			fmt.Fprintf(&b, "  [lines as of %s; %s's history was rewritten since]", gitclient.ShortSHA(c.AnchorSHA), branch)
 		}
-		switch {
-		case c.Kind == CommentKindQuestion:
+		if c.Kind == CommentKindQuestion {
 			b.WriteString("  [question]")
 		}
 		if c.State == CommentStateAddressed {

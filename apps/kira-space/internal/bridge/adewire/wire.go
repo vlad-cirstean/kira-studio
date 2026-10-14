@@ -18,7 +18,7 @@ type RunsOn = string
 // OnFailure is 'stop' | 'retry 1' | 'retry 2' | `back:${string}`.
 type OnFailure = string
 
-// RunState is 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'done'.
+// RunState is 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'done' | 'review'.
 type RunState = string
 
 // LogKind is 'run' | 'setup'.
@@ -277,8 +277,76 @@ type Run struct {
 	Purpose    string   `json:"purpose"` // '' step run | 'rebase'
 	// Resumable says a restart stopped the run mid-session; ResumeRun continues it.
 	Resumable bool `json:"resumable"`
+	// Review is set on a review step run only.
+	Review *RunReview `json:"review"`
 
 	Outcome *model.AdeRunOutcome `json:"outcome"`
+}
+
+// Review phases of RunReview.Phase.
+const (
+	ReviewPhaseWaiting = "waiting"
+	ReviewPhaseSent    = "sent"
+	ReviewPhaseWorking = "working"
+	ReviewPhaseStuck   = "stuck"
+	ReviewPhaseDone    = "done"
+)
+
+// RunReview is where a review step run stands: waiting, a round pending/working/stuck, or finished.
+type RunReview struct {
+	Phase string `json:"phase"`
+	Round int    `json:"round"`
+	Route string `json:"route"`
+	Note  string `json:"note"`
+}
+
+// ReviewCandidate is an agent run that can take the review comments.
+type ReviewCandidate struct {
+	RunID      string `json:"runId"`
+	Stage      string `json:"stage"`
+	Step       string `json:"step"`
+	Attempt    int    `json:"attempt"`
+	FinishedAt *int64 `json:"finishedAt"`
+}
+
+// ReviewRound is the latest send of a review run.
+type ReviewRound struct {
+	Run      Run    `json:"run"`
+	N        int    `json:"n"`
+	Route    string `json:"route"`
+	Fallback bool   `json:"fallback"`
+	// Commits counts the commits the round added; nil when unknown or not finished.
+	Commits *int `json:"commits"`
+}
+
+// ReviewStepState is a branch's review step for the review window; Run nil = no review step there.
+type ReviewStepState struct {
+	Run                *Run              `json:"run"`
+	StepName           string            `json:"stepName"`
+	Results            []StepResult      `json:"results"`
+	Route              string            `json:"route"`
+	TargetRunID        string            `json:"targetRunId"`
+	DefaultTargetRunID string            `json:"defaultTargetRunId"`
+	Candidates         []ReviewCandidate `json:"candidates"`
+	Round              *ReviewRound      `json:"round"`
+}
+
+type SendReviewArgs struct {
+	RunID       string `json:"runId"`
+	Route       string `json:"route"`
+	TargetRunID string `json:"targetRunId"`
+}
+
+type FinishReviewArgs struct {
+	RunID  string `json:"runId"`
+	Result string `json:"result"`
+	Note   string `json:"note"`
+}
+
+// ReviewEvent is the payload of ChannelReview.
+type ReviewEvent struct {
+	TaskID   string `json:"taskId"`
+	BranchID string `json:"branchId"`
 }
 
 type Task struct {

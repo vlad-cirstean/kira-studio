@@ -132,15 +132,45 @@ type AdeRun struct {
 	StartedAt  *int64
 	FinishedAt *int64
 	Outcome    *AdeRunOutcome
-	// Purpose is AdeRunPurposeRebase for a rebase run (outside the workflow), "" for a step run.
+	// Purpose is AdeRunPurposeRebase for a rebase run (outside the workflow), AdeRunPurposeReview for
+	// a review round, "" for a step run.
 	Purpose string
-	// SpecJSON is a rebase run's AdeRebaseSpec ("" otherwise).
+	// SpecJSON is a rebase run's AdeRebaseSpec or a review round's AdeReviewSpec ("" otherwise).
 	SpecJSON string
 	Launch   AdeRunLaunch
 }
 
 // AdeRunPurposeRebase mirrors ade_runs.purpose's CHECK.
 const AdeRunPurposeRebase = "rebase"
+
+// AdeRunPurposeReview marks a review round: an agent run answering a review step's comments.
+const AdeRunPurposeReview = "review"
+
+// AdeReviewSpec is a review round's plan, stored in ade_runs.spec_json.
+type AdeReviewSpec struct {
+	ReviewRunID string  `json:"reviewRunId"`
+	Round       int     `json:"round"`
+	Route       string  `json:"route"`
+	CommentIDs  []int64 `json:"commentIds"`
+	HeadBefore  string  `json:"headBefore,omitempty"`
+	// HeadAfter is the worktree tip when the round ended ("" while it runs).
+	HeadAfter string `json:"headAfter,omitempty"`
+	// GitRepoID and Branch key the comments in review.db.
+	GitRepoID string `json:"gitRepoId"`
+	Branch    string `json:"branch"`
+	Fallback  bool   `json:"fallback,omitempty"`
+	// AllowedTools are the target step's tools (implementer route); the reply and finish tools are added at launch.
+	AllowedTools []string `json:"allowedTools,omitempty"`
+}
+
+// AdeReview is one row of ade_reviews: the review step run's send state.
+type AdeReview struct {
+	RunID             string
+	Route             string
+	TargetRunID       string
+	DedicatedClaudeID string
+	Rounds            int
+}
 
 // AdeRunOutcome is a run's stored end state: the shared outcome plus what the agent reported and
 // what git showed.
@@ -229,6 +259,8 @@ const (
 	AdeRunFailed  = "failed"
 	AdeRunBack    = "back"
 	AdeRunDone    = "done"
+	// AdeRunReview is a review step run waiting for the user; it has no process.
+	AdeRunReview = "review"
 )
 
 // AdeRunPatch holds only the run leaves the caller changes; nil = unchanged.
@@ -242,6 +274,7 @@ type AdeRunPatch struct {
 	FinishedAt *int64
 	Outcome    *AdeRunOutcome
 	Launch     *AdeRunLaunch
+	SpecJSON   *string
 }
 
 // AdeWorktreeSetup is one row of ade_worktree_setup.

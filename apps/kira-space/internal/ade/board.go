@@ -67,6 +67,8 @@ type TaskBoardDeps struct {
 	OnRateLimits func(claudeheadless.RateLimits)
 	// OnRuns pushes changed runs on kira:adetask:runs.
 	OnRuns func(adewire.RunsChangedEvent)
+	// OnReview pushes a review step's change on kira:adetask:review.
+	OnReview func(adewire.ReviewEvent)
 	// AgentDir holds each run's MCP config file (0700 dir, 0600 files).
 	AgentDir string
 	// Prompts resolves the editable LLM prompt texts; nil means the registry defaults.
@@ -173,7 +175,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
-	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Prompts: b.prompts()})
+	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, Prompts: b.prompts()})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)
@@ -342,6 +344,7 @@ type boardData struct {
 	branches   []model.AdeTaskBranch
 	plan       []model.AdeTaskPlanRow
 	runs       map[string][]model.AdeRun
+	reviews    map[string]model.AdeReview
 	setups     map[string]model.AdeWorktreeSetup
 	archived   []model.AdeTask
 	archBranch []model.AdeTaskBranch
@@ -360,6 +363,9 @@ func (b *TaskBoard) load() (boardData, error) {
 		return d, err
 	}
 	if d.runs, err = b.deps.Tasks.RunsByLiveTask(); err != nil {
+		return d, err
+	}
+	if d.reviews, err = b.deps.Tasks.Reviews(); err != nil {
 		return d, err
 	}
 	if d.setups, err = b.deps.Tasks.SetupByBranch(); err != nil {
@@ -457,7 +463,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	tasks := make([]adewire.Task, 0, len(d.tasks))
 	liveHash := b.liveHasher()
 	for _, t := range d.tasks {
-		wt := toWireTask(t, branchByTask[t.ID], d.runs[t.ID])
+		wt := toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
 		decorateTask(&wt, t, liveHash)
 		tasks = append(tasks, wt)
 	}
@@ -502,7 +508,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	}
 }
 
-func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun) adewire.Task {
+func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
 	out := adewire.Task{
 		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, GithubURL: t.GithubURL, WorkflowID: t.WorkflowID,
 		StageID: t.StageID, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
@@ -524,7 +530,14 @@ func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun) adewir
 		}
 	}
 	for _, r := range runs {
-		out.Runs = append(out.Runs, toWireRun(r))
+		if r.Purpose == model.AdeRunPurposeReview { // a round shows through its review run
+			continue
+		}
+		w := toWireRun(r)
+		if rev, ok := reviews[r.ID]; ok {
+			w.Review = reviewWire(r, rev, latestRoundOf(runs, r.ID))
+		}
+		out.Runs = append(out.Runs, w)
 	}
 	return out
 }

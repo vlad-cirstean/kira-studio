@@ -17,6 +17,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "review": null,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,

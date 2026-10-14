@@ -46,6 +46,7 @@
                   "ok": false
                 }
               ],
+              "review": null,
               "runsOn": "each repo",
               "smartScript": "",
               "timeout": "1m"
@@ -74,6 +75,7 @@
                   "ok": false
                 }
               ],
+              "review": null,
               "runsOn": "each repo",
               "smartScript": "",
               "timeout": "1m"
@@ -128,6 +130,7 @@
                   "ok": false
                 }
               ],
+              "review": null,
               "runsOn": "each repo",
               "smartScript": "",
               "timeout": "1m"
@@ -156,6 +159,7 @@
                   "ok": false
                 }
               ],
+              "review": null,
               "runsOn": "each repo",
               "smartScript": "",
               "timeout": "1m"

@@ -10,6 +10,7 @@
     "outcome": null,
     "purpose": "",
     "resumable": false,
+    "review": null,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": null,

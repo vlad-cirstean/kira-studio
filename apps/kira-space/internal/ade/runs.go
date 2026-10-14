@@ -178,7 +178,7 @@ func (b *TaskBoard) plan(tc *taskCtx) ([]stepView, error) {
 		}
 		v := stepView{Def: def, Targets: targets, Runs: map[string]model.AdeRun{}}
 		for _, r := range latest {
-			if r.StageID == tc.stage.ID && r.StepID == def.ID {
+			if r.Purpose == "" && r.StageID == tc.stage.ID && r.StepID == def.ID {
 				v.Runs[r.BranchID] = r
 			}
 		}
@@ -195,11 +195,19 @@ func (b *TaskBoard) emitRuns(runs ...model.AdeRun) {
 	if len(runs) == 0 {
 		return
 	}
-	if b.deps.OnRuns != nil {
-		ev := adewire.RunsChangedEvent{Runs: make([]adewire.Run, len(runs))}
-		for i, r := range runs {
-			ev.Runs[i] = toWireRun(r)
+	ev := adewire.RunsChangedEvent{Runs: make([]adewire.Run, 0, len(runs))}
+	for _, r := range runs {
+		if r.Purpose == model.AdeRunPurposeReview { // a round shows through its review run only
+			b.emitReview(r.TaskID, r.BranchID)
+			continue
 		}
+		w := b.wireRun(r)
+		if w.Review != nil {
+			b.emitReview(r.TaskID, r.BranchID)
+		}
+		ev.Runs = append(ev.Runs, w)
+	}
+	if b.deps.OnRuns != nil && len(ev.Runs) > 0 {
 		b.deps.OnRuns(ev)
 	}
 	b.scheduleBoard()
@@ -452,6 +460,9 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		return run, invalid("worktree of %s is missing", sb.Name)
 	}
 	def := plan[idx].Def
+	if def.Review != nil && tc.stage.Kind == "agent" {
+		return b.enterReview(ctx, tc, def, run, sb)
+	}
 	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
 	if err != nil {
 		return run, err
@@ -552,6 +563,7 @@ type outcome struct {
 	state, note, summary string
 	exit                 *int
 	noAdvance            bool // a user stop: the engine does not move the task on
+	lost                 bool // a resume whose Claude conversation is gone
 	out                  model.AdeRunOutcome
 }
 
@@ -603,11 +615,13 @@ type agentLaunch struct {
 	// git, when set, makes the run a sandboxed git agent: only the listed built-ins, no settings files,
 	// the worktrees added as directories and the git tool granted.
 	git *claudeheadless.GitGrant
+	// review, when set, makes the run a review round: it may answer those comments.
+	review *claudeheadless.ReviewGrant
 }
 
-// grantResults are the results finish_step takes for a run: a rebase run keeps the implicit pair.
-func grantResults(rebase bool, def stepDef) []claudeheadless.ResultSpec {
-	if rebase {
+// grantResults are the results finish_step takes for a run: a rebase run or review round keeps the implicit pair.
+func grantResults(implicit bool, def stepDef) []claudeheadless.ResultSpec {
+	if implicit {
 		return nil
 	}
 	return resultSpecs(def.Results)
@@ -617,9 +631,17 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	def, sessionID := l.def, l.sessionID
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	rebase := run.Purpose == model.AdeRunPurposeRebase
+	round := run.Purpose == model.AdeRunPurposeReview
 	space := false
-	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase {
+	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase && !round {
 		space = b.spaceEnabled(task)
+	}
+	complete := func(out outcome) {
+		if round {
+			b.completeReviewRound(run, sessionID, out)
+			return
+		}
+		b.completeRun(run, sessionID, out)
 	}
 	fail := func(err error) {
 		sink.add(logStderr, "could not start: "+err.Error())
@@ -629,16 +651,16 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 			b.completeRebase(run, sessionID, nil, end)
 			return
 		}
-		b.completeRun(run, sessionID, end)
+		complete(end)
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Results: grantResults(rebase, def)})
+	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Results: grantResults(rebase || round, def)})
 	if err != nil {
 		fail(err)
 		return
 	}
 	spec := claudeheadless.Spec{
 		ClaudeBin: cmpNonEmpty(b.deps.ClaudeBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
-		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), DisallowedTools: def.DisallowedTools,
+		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: roundTools(allowedTools(def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
@@ -680,7 +702,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 			b.completeRebase(run, sessionID, nil, out)
 			return
 		}
-		b.completeRun(run, sessionID, out)
+		complete(out)
 		return
 	}
 	if rebase {
@@ -700,7 +722,15 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), l.resume != ""))
 		return
 	}
-	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""))
+	complete(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""))
+}
+
+// roundTools adds the reply tool to a review round's allowed tools.
+func roundTools(tools []string, round bool) []string {
+	if round && !slices.Contains(tools, claudeheadless.ReviewReplyTool) {
+		return append(tools, claudeheadless.ReviewReplyTool)
+	}
+	return tools
 }
 
 // sessionClaudeID reads the Claude session id stored with the ade_sessions row.
@@ -718,7 +748,9 @@ func lostOutcome(resumed bool, lastErr string) (outcome, bool) {
 		return outcome{}, false
 	}
 	o := runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
-	return fromOutcome(model.AdeRunFailed, o), true
+	out := fromOutcome(model.AdeRunFailed, o)
+	out.lost = true
+	return out, true
 }
 
 func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, def stepDef, lastErr string, resumed bool) outcome {
@@ -928,6 +960,7 @@ func (b *TaskBoard) launchHeldLocked(sb model.AdeTaskBranch) {
 			slog.Warn("ade: launch held run", "scope", "ade", "run", r.ID, "err", err)
 		}
 	}
+	b.releaseHeldRounds(tc, sb, path)
 }
 
 // --- Approve, RetryRun, StageDone --------------------------------------------------------------
@@ -970,6 +1003,12 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	defer mu.Unlock()
 	if run.Purpose == model.AdeRunPurposeRebase {
 		return invalid("retry from the Rebase button: it shows the prompt first")
+	}
+	if run.Purpose == model.AdeRunPurposeReview {
+		return invalid("%s", i18n.T("backend.space.ade.reviewStep.retryRound.body", nil))
+	}
+	if run.State == model.AdeRunReview {
+		return errReviewWaits()
 	}
 	tc, err := b.loadTaskCtx(run.TaskID)
 	if err != nil {
@@ -1021,6 +1060,9 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	}
 	if !runResumable(run) {
 		return invalid("%s", i18n.T("backend.space.ade.resumeNotResumable.body", nil))
+	}
+	if run.Purpose == model.AdeRunPurposeReview {
+		return b.resumeReviewRound(ctx, run)
 	}
 	tc, err := b.loadTaskCtx(run.TaskID)
 	if err != nil {
@@ -1250,6 +1292,8 @@ func (b *TaskBoard) StopRun(_ context.Context, runID string) error {
 			return invalid("run %s is no longer pending", runID)
 		}
 		return b.markStopped(run)
+	case model.AdeRunReview:
+		return errReviewWaits()
 	}
 	return invalid("only a running or pending run can be stopped")
 }

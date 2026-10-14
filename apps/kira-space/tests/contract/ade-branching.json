@@ -19,6 +19,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "review": null,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -47,6 +48,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "review": null,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -75,6 +77,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "review": null,
     "sessionId": "<masked>",
     "stageId": "build",
     "startedAt": 0,
@@ -133,6 +136,7 @@
                       "ok": false
                     }
                   ],
+                  "review": null,
                   "runsOn": "each repo",
                   "smartScript": "",
                   "timeout": "1m"
@@ -161,6 +165,7 @@
                       "ok": false
                     }
                   ],
+                  "review": null,
                   "runsOn": "each repo",
                   "smartScript": "",
                   "timeout": "1m"
