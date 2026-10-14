@@ -69,7 +69,7 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 	target := strings.TrimSuffix(it.Path, filepath.Ext(it.Path)) + docSuffix
 	if existing, err := os.ReadFile(target); err == nil {
 		doc, ok, problems := memfmt.ParseDoc(existing)
-		if !ok || len(problems) > 0 || doc.Group != w.GroupID {
+		if !ok || doc.Group != w.GroupID || (len(problems) > 0 && doc.Version != 1) {
 			return "", "exists and is not this file's kira-memory doc"
 		}
 	} else if !os.IsNotExist(err) {
@@ -79,7 +79,7 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 	if err != nil {
 		return "", boundedMessage(err)
 	}
-	in := DocInput{GroupID: w.GroupID, Title: w.Title, FileName: filepath.Base(it.Path), Prov: w.Prov, Updated: r.opts.Now().Format(time.DateOnly)}
+	in := DocInput{GroupID: w.GroupID, Title: w.Title, FileName: filepath.Base(it.Path), Rel: it.Rel, Prov: w.Prov, Updated: r.opts.Now().Format(time.DateOnly)}
 	text, left, bad, err := RenderDoc(in, mems)
 	if err != nil {
 		if errors.Is(err, errNoDocFacts) {
@@ -102,35 +102,56 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 }
 
 // DocInput is what RenderDoc needs besides the facts: the group, the raw file title, the file name used
-// when the title is unusable, the job provenance and the header date (YYYY-MM-DD).
+// when the title is unusable, the job-relative path (the doc's "from", empty when unknown or not
+// header-safe), the job provenance and the header date (YYYY-MM-DD).
 type DocInput struct {
-	GroupID, Title, FileName string
-	Prov                     Provenance
-	Updated                  string
+	GroupID, Title, FileName, Rel string
+	Prov                          Provenance
+	Updated                       string
 }
 
 var errNoDocFacts = errors.New("no stored fact to write")
 
-// RenderDoc renders the kira-memory doc of a file's stored facts. left counts facts with another
-// provenance, bad facts whose text the format rejects; both are left out. Pure: the write-back and
-// the eval harness share it.
+// RenderDoc renders the kira-memory doc of a file's stored facts. A fact whose reason is the source
+// locator of its section takes that section as its heading and no reason line; any other reason is
+// written in full under the running section. left counts facts with another provenance, bad facts
+// whose text the format rejects; both are left out. Pure: the write-back and the eval harness share it.
 func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, err error) {
 	doc := memfmt.Doc{Group: in.GroupID, Title: docTitle(in.Title, in.FileName), Updated: in.Updated, Provenance: memfmt.Provenance{
 		Origin: in.Prov.Origin, Source: in.Prov.SourceTag, Scope: in.Prov.Scope, Project: in.Prov.Project}}
+	if memfmt.HeaderSafe(in.Rel) {
+		doc.From = in.Rel
+	}
 	if in.Prov.Origin != memory.OriginExternal {
 		doc.Session = in.Prov.Session
 	}
+	running := ""
 	for _, m := range mems {
 		if !sameProvenance(m, in.Prov) {
 			left++
 			continue
 		}
-		fact, reason := docText(m.Fact), docText(m.Reason)
-		if fact == "" || reason == "" {
+		fact := docText(m.Fact)
+		if fact == "" || strings.HasPrefix(fact, "fact: ") || strings.HasPrefix(fact, "reason: ") || strings.HasPrefix(fact, "keywords: ") {
 			bad++
 			continue
 		}
-		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: fact, Reason: reason})
+		f := memfmt.Fact{ID: m.LineageID, Fact: fact, Section: running}
+		section, isLocator := "", false
+		if doc.From != "" {
+			section, isLocator = memfmt.ParseLocator(m.Reason, doc.From)
+		}
+		switch {
+		case isLocator && section != "":
+			running, f.Section = section, section
+		case isLocator && running == "":
+		default:
+			if f.Reason = docText(m.Reason); f.Reason == "" {
+				bad++
+				continue
+			}
+		}
+		doc.Facts = append(doc.Facts, f)
 	}
 	if len(doc.Facts) == 0 {
 		return "", left, bad, errNoDocFacts

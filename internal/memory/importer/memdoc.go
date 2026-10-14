@@ -68,7 +68,7 @@ func (r *Runner) finalizeDoc(ctx context.Context, it finalItem) error {
 	if len(problems) > 0 {
 		return fail(docError(problems))
 	}
-	res, err := r.opts.Docs.ApplyDoc(ctx, memory.ApplyDocRequest{Doc: doc, FileID: it.FileID})
+	res, err := r.opts.Docs.ApplyDoc(ctx, memory.ApplyDocRequest{Doc: doc, FileID: it.FileID, Path: it.Rel})
 	switch {
 	case ctx.Err() != nil:
 		return r.st.releaseFinalize(it, usage{})

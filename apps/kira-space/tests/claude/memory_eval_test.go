@@ -529,7 +529,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 			}
 		}
 	}
-	rec.RenderedDoc, rec.RenderProblems = renderChecked(importer.DocInput{GroupID: f.GroupID, Title: f.Title, FileName: s.fileName(),
+	rec.RenderedDoc, rec.RenderProblems = renderChecked(importer.DocInput{GroupID: f.GroupID, Title: f.Title, FileName: s.fileName(), Rel: f.RelPath,
 		Prov: evalProvenance(), Updated: updated}, mems)
 	rec.DocMismatch = rec.MemoryDoc != "" && rec.MemoryDoc != rec.RenderedDoc
 	return rec, nil

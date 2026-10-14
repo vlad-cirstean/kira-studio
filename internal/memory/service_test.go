@@ -449,9 +449,9 @@ func TestApplyDocDecisions(t *testing.T) {
 		}
 		return memfmt.Doc{Group: group, Title: "Notes", Provenance: p, Facts: facts}
 	}
-	apply := func(dc memfmt.Doc) map[string]string {
+	applyAt := func(dc memfmt.Doc, path string) map[string]string {
 		t.Helper()
-		res, err := svc.ApplyDoc(ctx, ApplyDocRequest{Doc: dc, FileID: "file-1"})
+		res, err := svc.ApplyDoc(ctx, ApplyDocRequest{Doc: dc, FileID: "file-1", Path: path})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -461,6 +461,7 @@ func TestApplyDocDecisions(t *testing.T) {
 		}
 		return got
 	}
+	apply := func(dc memfmt.Doc) map[string]string { return applyAt(dc, "") }
 	same := func(got map[string]string, want map[string]string) {
 		t.Helper()
 		if !reflect.DeepEqual(got, want) {
@@ -484,12 +485,42 @@ func TestApplyDocDecisions(t *testing.T) {
 	same(apply(doc(OriginAgent, memfmt.Fact{ID: d, Fact: "deploys never run on friday", Reason: "guess"})),
 		map[string]string{d: DocSkipped, "orphaned": "3"})
 
+	// A fact without a reason rebuilds the source locator from "from", else from the doc's own path,
+	// and a second apply of the same doc is a noop. An update keeps the stored keywords.
+	const e, f = "km_0123456789af", "km_0123456789ag"
+	withFrom := doc(OriginUser, memfmt.Fact{ID: e, Fact: "jobs run nightly", Section: "Jobs"}, memfmt.Fact{ID: f, Fact: "queue depth is 10"})
+	withFrom.Keywords, withFrom.From = []string{"cron"}, "docs/ops.md"
+	same(applyAt(withFrom, "docs/other.md"), map[string]string{e: "add", f: "add", "orphaned": "4"})
+	same(applyAt(withFrom, "docs/other.md"), map[string]string{e: "noop", f: "noop", "orphaned": "4"})
+	stored := func(id string) Memory {
+		t.Helper()
+		h, err := svc.History(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return h.Memories[len(h.Memories)-1]
+	}
+	if m := stored(e); m.Reason != "Stated in docs/ops.md, Jobs" || !reflect.DeepEqual(m.Keywords, []string{"cron"}) {
+		t.Errorf("section fact = %+v", m)
+	}
+	if m := stored(f); m.Reason != "Stated in docs/ops.md" {
+		t.Errorf("section-less fact reason = %q", m.Reason)
+	}
+	withFrom.From = ""
+	withFrom.Keywords = []string{"other"}
+	same(applyAt(withFrom, "docs/ops.md"), map[string]string{e: "noop", f: "noop", "orphaned": "4"})
+	withFrom.Facts[0].Fact = "jobs run hourly"
+	same(applyAt(withFrom, "docs/ops.md"), map[string]string{e: "update", f: "noop", "orphaned": "4"})
+	if m := stored(e); m.Fact != "jobs run hourly" || !reflect.DeepEqual(m.Keywords, []string{"cron"}) {
+		t.Errorf("updated fact = %+v", m)
+	}
+
 	h, err := svc.History(ctx, b)
 	if err != nil || len(h.Memories) != 2 || h.Memories[1].Fact != "cache is valkey" || h.Events[0].Source != SourceImport ||
 		h.Events[0].SourceRef == nil || *h.Events[0].SourceRef != "file-1" {
 		t.Fatalf("history=%+v err=%v", h, err)
 	}
-	if rows, _ := st.Recent(ctx, 10); len(rows) != 4 {
+	if rows, _ := st.Recent(ctx, 10); len(rows) != 6 {
 		t.Errorf("rows = %v", facts(rows))
 	}
 }

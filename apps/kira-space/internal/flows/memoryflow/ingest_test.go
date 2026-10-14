@@ -308,6 +308,9 @@ func TestImportProvenanceWritesDoc(t *testing.T) {
 	if doc.Origin != memory.OriginUser || doc.Scope != memory.ScopeProject || doc.Project != billingKey || doc.Group != f.GroupID {
 		t.Fatalf("doc header = %+v, want user/project %s in group %s", doc.Provenance, billingKey, f.GroupID)
 	}
+	if doc.Version != 2 || doc.From != "billing.md" || strings.Contains(string(raw), " fact: ") {
+		t.Fatalf("written doc is not format v2 with from billing.md:\n%s", raw)
+	}
 	recent, err := app.W.Memory.Recent(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -326,6 +329,17 @@ func TestImportProvenanceWritesDoc(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "billing.md")); err != nil {
 		t.Fatalf("source file gone: %v", err)
+	}
+
+	// Write, then re-import the written doc: every fact is a noop, whatever its reason was.
+	again := createJob(t, app, dir)
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: again.Job.ID}); err != nil {
+		t.Fatal(err)
+	}
+	second := waitJob(t, app, again.Job.ID, importer.JobDone, importer.JobFailed)
+	g := fileNamed(t, second, "billing.memory.md")
+	if g.State != importer.FileDone || g.Added != 0 || g.Updated != 0 || g.Noop != 2 {
+		t.Fatalf("re-imported doc file = %+v, want two noops", g)
 	}
 }
 
@@ -373,7 +387,10 @@ func TestImportFormattedDocParsesOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	edited := strings.Replace(string(raw), "km_aaaaaaaaaaaa reason: Stated in the billing runbook.", "km_aaaaaaaaaaaa reason: Confirmed by the platform team.", 1)
+	edited := strings.Replace(string(raw), "  Stated in the billing runbook.", "  Confirmed by the platform team.", 1)
+	if edited == string(raw) {
+		t.Fatal("fixture lost its reason line")
+	}
 	if err := os.WriteFile(docFile, []byte(edited), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -384,6 +401,39 @@ func TestImportFormattedDocParsesOnly(t *testing.T) {
 	}
 	if got := ids(); !slices.Equal(got, []string{"km_aaaaaaaaaaaa", "km_bbbbbbbbbbbb"}) {
 		t.Fatalf("stored ids after re-ingest = %v, want the same two", got)
+	}
+	// The reason-less fact took the locator of its heading, the written one stayed.
+	reasons := map[string]string{}
+	recent, _ = app.W.Memory.Recent(ctx)
+	for _, m := range recent {
+		reasons[m.LineageID] = m.Reason
+	}
+	if reasons["km_aaaaaaaaaaaa"] != "Confirmed by the platform team." || reasons["km_bbbbbbbbbbbb"] != "Stated in billing.memory.md, Storage" {
+		t.Fatalf("reasons = %v", reasons)
+	}
+}
+
+// TestImportRetiredDocFails: a kira-memory: 1 doc has no compatibility reader; the file fails with the
+// retired-format message and stores nothing.
+func TestImportRetiredDocFails(t *testing.T) {
+	app := ingestApp(t, "")
+	dir := filepath.Join(app.Work, "retired")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, "billing.memory.md", "---\nkira-memory: 1\ngroup: kg_aaaaaaaaaaaa\ntitle: Billing\norigin: user\nscope: personal\n---\n\n"+
+		"km_aaaaaaaaaaaa fact: Invoices are monthly.\nkm_aaaaaaaaaaaa reason: Runbook.\n")
+	awaiting := createJob(t, app, dir)
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: awaiting.Job.ID}); err != nil {
+		t.Fatal(err)
+	}
+	done := waitJob(t, app, awaiting.Job.ID, importer.JobDone, importer.JobFailed)
+	f := fileNamed(t, done, "billing.memory.md")
+	if f.State != importer.FileFailed || !strings.Contains(f.Reason, "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2") {
+		t.Fatalf("file = %+v, want failed with the retired message", f)
+	}
+	if recent, _ := app.W.Memory.Recent(ctx); len(recent) != 0 {
+		t.Fatalf("stored %d facts from a retired doc", len(recent))
 	}
 }
 

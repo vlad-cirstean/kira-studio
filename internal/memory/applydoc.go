@@ -1,11 +1,10 @@
 package memory
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -20,6 +19,9 @@ const DocSkipped = "skipped"
 type ApplyDocRequest struct {
 	Doc    memfmt.Doc
 	FileID string
+	// Path is the doc's job-relative path: the locator source of a fact without a reason when the doc
+	// has no "from".
+	Path string
 }
 
 // DocOutcome is one doc fact's result: add, update, noop or skipped, with why.
@@ -36,8 +38,9 @@ type ApplyDocResult struct {
 }
 
 // ApplyDoc stores a doc's facts as they are: no gate, no reconcile, no Claude call. A fact without
-// a stored lineage is added under the doc's id; an identical one is a noop; a changed one becomes a
-// new version, unless the stored version ranks higher by origin.
+// a reason takes the source locator of its section. A fact without a stored lineage is added under
+// the doc's id with the doc-level keywords; an identical one is a noop; a changed one becomes a new
+// version that keeps the stored keywords, unless the stored version ranks higher by origin.
 func (s *Service) ApplyDoc(ctx context.Context, req ApplyDocRequest) (ApplyDocResult, error) {
 	d := req.Doc
 	if err := checkProvenance("doc", Item{Origin: d.Origin, SourceTag: d.Source, Scope: d.Scope, Project: d.Project}); err != nil {
@@ -77,7 +80,9 @@ func (s *Service) ApplyDoc(ctx context.Context, req ApplyDocRequest) (ApplyDocRe
 func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, requestID string, groups []GroupRef, f memfmt.Fact) (DocOutcome, error) {
 	d := req.Doc
 	out := DocOutcome{ID: f.ID}
-	keywords := cleanKeywords(d.Keywords)
+	if f.Reason == "" {
+		f.Reason = memfmt.Locator(cmp.Or(d.From, req.Path), f.Section)
+	}
 	if n := utf8.RuneCountInString(f.Fact); n > MaxFactLen {
 		out.Action, out.Why = DocSkipped, fmt.Sprintf("Fact is over %d characters.", MaxFactLen)
 		return out, nil
@@ -87,7 +92,7 @@ func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, request
 		return out, nil
 	}
 	in := commitInput{
-		Fact: f.Fact, Reason: f.Reason, Keywords: keywords, Origin: d.Origin, SourceTag: d.Source, Scope: d.Scope, Project: d.Project,
+		Fact: f.Fact, Reason: f.Reason, Origin: d.Origin, SourceTag: d.Source, Scope: d.Scope, Project: d.Project,
 		SessionID: d.Session, Source: SourceImport, SourceRef: req.FileID, RequestID: requestID, Groups: groups,
 	}
 	for attempt := 0; ; attempt++ {
@@ -103,10 +108,13 @@ func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, request
 		switch {
 		case !found:
 			in.Action, in.FactID, in.TargetID, in.Why = ActionAdd, f.ID, "", "Added from a kira-memory doc."
-		case sameDocFact(cur, f, keywords):
+			in.Keywords = cleanKeywords(d.Keywords)
+		case sameDocFact(cur, f):
 			in.Action, in.TargetID, in.Why = ActionNoop, cur.ID, "The doc matches the stored fact."
+			in.Keywords = cur.Keywords
 		case GradeOf(d.Origin) >= GradeOf(cur.Origin):
 			in.Action, in.TargetID, in.Why = ActionUpdate, cur.ID, "The doc changed the fact."
+			in.Keywords = cur.Keywords
 		default:
 			out.Action, out.Why = DocSkipped, "Stored fact ranks higher; doc not applied."
 			return out, nil
@@ -122,19 +130,6 @@ func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, request
 	}
 }
 
-func sameDocFact(cur Memory, f memfmt.Fact, keywords []string) bool {
-	if normalize(cur.Fact) != normalize(f.Fact) || collapse(cur.Reason) != collapse(f.Reason) || len(cur.Keywords) != len(keywords) {
-		return false
-	}
-	have := make([]string, len(cur.Keywords))
-	want := make([]string, len(keywords))
-	for i, k := range cur.Keywords {
-		have[i] = strings.ToLower(k)
-	}
-	for i, k := range keywords {
-		want[i] = strings.ToLower(k)
-	}
-	slices.Sort(have)
-	slices.Sort(want)
-	return slices.Equal(have, want)
+func sameDocFact(cur Memory, f memfmt.Fact) bool {
+	return normalize(cur.Fact) == normalize(f.Fact) && collapse(cur.Reason) == collapse(f.Reason)
 }

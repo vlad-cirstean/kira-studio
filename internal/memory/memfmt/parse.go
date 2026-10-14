@@ -242,6 +242,9 @@ func headerValue(v string) string {
 	return ""
 }
 
+// HeaderSafe reports whether v is a legal front matter value.
+func HeaderSafe(v string) bool { return headerValue(v) == "" }
+
 func splitKeywords(v string) []string {
 	var out []string
 	for _, k := range strings.Split(v, ",") {

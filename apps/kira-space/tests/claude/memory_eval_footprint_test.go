@@ -54,7 +54,7 @@ func renderChecked(in importer.DocInput, mems []memory.Memory) (text string, pro
 }
 
 func renderedDoc(rec runRecord, title, rel, updated string) (string, int) {
-	return renderChecked(importer.DocInput{GroupID: evalGroupID, Title: title, FileName: rel, Prov: evalProvenance(), Updated: updated},
+	return renderChecked(importer.DocInput{GroupID: evalGroupID, Title: title, FileName: rel, Rel: rel, Prov: evalProvenance(), Updated: updated},
 		storedMemories(rec.Stored))
 }
 
