@@ -208,3 +208,13 @@ func rootFields(tr *parse.Tree) map[string]bool {
 	visit(tr.Root, 0)
 	return used
 }
+
+// RenderExample renders the default text of id with its example variables, fragments included.
+// Tool and argument entries render as their raw default.
+func RenderExample(id ID) (string, error) {
+	e := mustEntry(id)
+	if e.literal {
+		return e.Default, nil
+	}
+	return renderWith(e, defaultText, e.example)
+}

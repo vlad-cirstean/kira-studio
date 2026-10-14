@@ -214,3 +214,70 @@ Follow-ups:
 - A reasons-first extraction pass and a keep-exact-strings rule for decision text.
 - Rerun the final round once to report `C_doc` (about 6 USD).
 - Part 2 (SPEC): terse memory prompts and the `distill` tool. Part 3: compact memory output, new text format, merged facts.
+
+# P285 Part 2: terse memory prompts and distill tool
+
+Sizes: rendered default (fragments and example vars included), chars and `ceil(runes/3)` tokens, from `go run ./internal/llmprompts/cmd/promptsizes -prefix memory.`. Before = `468650fc9`.
+
+## 8. Prompt sizes before
+
+| id | chars | tok |
+|---|---|---|
+| memory.dataHygiene | 177 | 59 |
+| memory.gate.system | 2981 | 994 |
+| memory.reconcile.system | 1432 | 478 |
+| memory.import.extract.system | 2025 | 675 |
+| memory.import.finalize.system | 2442 | 814 |
+| memory.import.verify.system | 1506 | 502 |
+| memory.mcp.instructions | 1437 | 479 |
+| memory.mcp.tool.store_memory | 453 | 151 |
+| memory.mcp.tool.store_memory.arg.items | 66 | 22 |
+| memory.mcp.tool.store_memory.arg.items.fact | 77 | 26 |
+| memory.mcp.tool.store_memory.arg.items.reason | 45 | 15 |
+| memory.mcp.tool.store_memory.arg.items.origin | 144 | 48 |
+| memory.mcp.tool.store_memory.arg.items.sourceTag | 115 | 39 |
+| memory.mcp.tool.store_memory.arg.items.scope | 60 | 20 |
+| memory.mcp.tool.store_memory.arg.items.project | 136 | 46 |
+| memory.mcp.tool.store_memory.arg.clarifications | 56 | 19 |
+| memory.mcp.tool.store_memory.arg.session | 45 | 15 |
+| memory.mcp.tool.store_memory.arg.groups | 102 | 34 |
+| memory.mcp.tool.store_memory.arg.groups.kind | 24 | 8 |
+| memory.mcp.tool.store_memory.arg.groups.key | 80 | 27 |
+| memory.mcp.tool.store_memory.arg.asComment | 129 | 43 |
+| memory.mcp.tool.store_memory.arg.groups.title | 25 | 9 |
+| memory.mcp.tool.search_memories | 238 | 80 |
+| memory.mcp.tool.search_memories.arg.query | 61 | 21 |
+| memory.mcp.tool.search_memories.arg.includeHistory | 51 | 17 |
+| memory.mcp.tool.search_memories.arg.limit | 40 | 14 |
+| memory.mcp.tool.search_memories.arg.scopes | 45 | 15 |
+| memory.mcp.tool.search_memories.arg.origins | 41 | 14 |
+| memory.mcp.tool.search_memories.arg.project | 77 | 26 |
+| memory.mcp.tool.memory_history | 84 | 28 |
+| memory.mcp.tool.memory_history.arg.id | 33 | 11 |
+| memory.mcp.tool.memory_context | 182 | 61 |
+| memory.mcp.tool.memory_context.arg.id | 33 | 11 |
+| memory.mcp.tool.memory_context.arg.limit | 48 | 16 |
+| memory.mcp.tool.ingest_files | 362 | 121 |
+| memory.mcp.tool.ingest_files.arg.paths | 104 | 35 |
+| memory.mcp.tool.ingest_files.arg.origin | 106 | 36 |
+| memory.mcp.tool.ingest_files.arg.sourceTag | 115 | 39 |
+| memory.mcp.tool.ingest_files.arg.scope | 66 | 22 |
+| memory.mcp.tool.ingest_files.arg.project | 141 | 47 |
+| memory.mcp.tool.ingest_files.arg.groups | 105 | 35 |
+| memory.mcp.tool.ingest_files.arg.groups.kind | 14 | 5 |
+| memory.mcp.tool.ingest_files.arg.groups.key | 61 | 21 |
+| memory.mcp.tool.ingest_files.arg.groups.title | 25 | 9 |
+| memory.mcp.tool.ingest_files.arg.writeDoc | 99 | 33 |
+| memory.mcp.tool.ingest_files.arg.session | 45 | 15 |
+| memory.mcp.tool.ingest_status | 266 | 89 |
+| memory.mcp.tool.ingest_status.arg.id | 31 | 11 |
+| memory.mcp.remember.description | 63 | 21 |
+| memory.mcp.remember.description.arg.text | 50 | 17 |
+| memory.mcp.remember.message | 470 | 157 |
+| memory.mcp.store.challenged | 107 | 36 |
+| memory.mcp.store.prepared | 90 | 30 |
+| memory.mcp.ingest.started | 108 | 36 |
+| memory.mcp.ingest.awaiting | 221 | 74 |
+| memory.mcp.semantic.notInstalled | 122 | 41 |
+| memory.mcp.semantic.unavailable | 97 | 33 |
+| total | 17358 | 5800 |
