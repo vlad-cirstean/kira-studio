@@ -24,6 +24,10 @@ gate, reconcile, finalize, verify and distill prompts as they shape stored or re
 stored fact text, reason text and distill output. Other prompts and the MCP/tool texts stay out of
 scope. P289's landed work stays as is. Goal order unchanged. One system, not two.
 
+User direction added later (final, D32): no backward compatibility. Nobody uses the memory module yet,
+so format versioning, migration care and "never rewrite stored memories" no longer constrain any
+option. Anything that gets better results is allowed when its gate passes.
+
 Base: `v2.0` at `45df3cfa0` (P290 close-out). P289 is not on `v2.0` yet: branch `p289` holds Steps 0-5
 and 7, Step 6 pending. P291 runs after P289 lands (table order). Step 0 re-checks every fact below
 that names a file P289 touches.
@@ -313,8 +317,9 @@ Telegraphic output (new):
   - Prompt level (adopted form): the D24 fragment in the registry, measured by the paid V1T run (D20).
     Why: the product writes the style once, at gate and distill time; a post-pass would be a second LLM
     call per fact and a second system.
-  The post-pass is never adopted as a production step, and existing stored memories are never
-  rewritten. Why: cost per store, two systems, and a silent rewrite of user facts.
+  The post-pass is never a recurring production step. Why: cost per store and two systems. D32:
+  nothing forbids restyling existing memories; if A4 is adopted, existing stores are re-imported or
+  rewritten once (one-off post-pass, or a destructive migration that drops them), not kept in mixed style.
 - D26. Same-facts telegraph gate (free after the post-pass and TJ): on the base and `round-p2-02`,
   `tele` vs `full`: D11 non-inferiority on `hybrid` with `band_R` and on `keyword` with `band_Rk`; token
   check (D27) residual loss <= 0.01 of facts after one retry; TJ (D28) `R_ess(tele) >= R_ess(full) -
@@ -354,8 +359,8 @@ Telegraphic output (new):
   - Keyword: no query change (stopwords already drop articles and negations); report the bm25 length
     effect.
   - Mixed store: one store with `tele` facts for odd sources and `full` for even, and the swap; MRR per
-    style within the store. Why: real users keep their full-style memories (D25), so new telegraphic
-    facts compete with old ones; a style rank bias (bm25 length or embedding shape) shows here.
+    style within the store. Why: a store holds both styles until it is re-imported (D32 allows that, so
+    the bias only matters in between); a style rank bias (bm25 length or embedding shape) shows here.
   - Calibration per style (D12), including style pairs against `DocFloor`.
   - Standalone-ness: TJ standalone (D28) plus the subject-cut count: `tele` facts that keep no name,
     identifier or noun phrase of their full text (code check, reported).
@@ -385,6 +390,12 @@ Pipeline variant and adoption:
     D10 holds against the base. If D26 failed, the style stays measurement-only.
   Why: A1 needs "beats"; A4 needs "not worse plus smaller"; XT is the only way to adopt A4 when A1
   fails.
+- D32. No backward compatibility (user decision, final). Every compatibility constraint of the first
+  plan is lifted: memfmt may change version and carry subject/aspect keys; migrations may rebuild
+  tables and drop rows; existing memories may be re-imported, restyled or dropped; read-time grouping
+  and write-time merge-by-key may be adopted; no legacy reader or shim. Gates D10, D11 and D26 are
+  unchanged: a variant must still win on measured numbers. Why: nobody uses the memory module yet, so
+  compatibility buys nothing and blocks better results.
 - D22. Adoption scope per winner:
   - A1 unified pipeline: keep commit 6a (section 3, Step 6).
   - A2 embed recipe or constants: `internal/memory/embeddings.go` builds the document text through one
@@ -398,8 +409,12 @@ Pipeline variant and adoption:
     writer every path shares: MCP, UI, import); migration `0008_p291_subject_aspect.sql` (or next free
     number) adds both columns `NOT NULL DEFAULT ''` and rebuilds `memories_fts` with a `subject` column
     holding "subject aspect" (bm25 weight 6); embed recipe from D18; `Memory` JSON gains `subject`,
-    `aspect` (omitempty). memfmt stays v2: keys are DB-only like per-fact keywords; `ApplyDoc` leaves
-    them empty. Write-time merge-by-key is not adopted.
+    `aspect` (omitempty). D32: the migration may rebuild `memories` and drop existing rows instead of
+    keeping them (no data-keeping constraint). memfmt carries the keys: `kira-memory: 3`, per-fact
+    subject and aspect, `FormatDoc`/`ParseDoc` and the comment format updated, v2 reading dropped (no
+    versioning constraint); `ApplyDoc` stores them, so the eval seeding (D6) and file import carry
+    keys. Write-time merge-by-key (code merges facts with the same normalized subject and aspect
+    instead of model-judged sameness) is adopted when the same KV round passes D10; no extra run.
   - A4 telegraphic style (code, commit 6b or the XT commit): `internal/llmprompts/registry.go` fragment
     `memory.factStyle` and its use in distill, gate, finalize, reconcile, verify (extract only under
     XT); replaced sentences removed, never duplicated. `packages/theme/src/i18n/en.json`
@@ -416,9 +431,14 @@ Pipeline variant and adoption:
     `memory.factStyle`; an override of it reaches the gate system text) and the UI half in
     `settings-llm-prompts` (Settings lists the fragment with its catalog copy; an override round-trips).
     `internal/textloss` lands in Step 1 (harness and `promptsizes` both use it).
-  - Measurement only, never adopted here: the post-pass, the `tele-guard` fallback, a runtime token
-    check, rewriting stored memories, read-time grouping (it changes the search result shape across MCP
-    text, bridge, UI and contract; a separate phase if it wins).
+  - A5 read-time grouping (D32; changes the search result shape across MCP text, bridge, UI and
+    contract): adopted when `section` or `subject` grouping beats `none` under D11 on two bases
+    (hit@k over groups) with returned chars at 5 not higher. No paid run (same facts). Code lands as
+    Step 9b.
+  - Rewriting existing stored memories (D32): when A3 or A4 is adopted, one-off re-import of existing
+    stores or a destructive migration; no compatibility shim.
+  - Measurement only, never adopted here: the recurring post-pass, the `tele-guard` fallback, a
+    runtime token check.
 - D23. Real `claude` rows are counted in the ledger as kind `real-rows` from the suite's printed
   `claude -p` spend (estimate 1.0 USD). Why: the cap is for the whole phase.
 
@@ -593,17 +613,23 @@ indexing to ready). No IPC shape change, so no UI spec; state that in the commit
 `feat(memory): P291 embedding text <recipe>`.
 
 Step 9. A3 adoption (code, only per D22 A3 and only if section 4 leaves 4.5 USD plus reserve). Files:
-migration `internal/memory/migrations/0008_p291_subject_aspect.sql` (next free number), `model.go`
+migration `internal/memory/migrations/0008_p291_subject_aspect.sql` (next free number; may rebuild
+tables destructively, D32), memfmt v3 (`internal/memory/memfmt`: keys in `FormatDoc`/`ParseDoc`, v2
+dropped), `model.go`
 (`Memory.Subject`, `Aspect`), `store.go` (`memoryColumns`, `commitInput`, `commitAdd`/`commitUpdate`,
 FTS weights in `searchFTSRows`), `gate.go` (schema fields to work), `registry.go` gate text and schema
 (one rule: subject and aspect per fact), `embeddings.go` recipe, Wails bindings regenerated, TS memory
-types in `packages/workbench/src/memory`, contract goldens. Tests: migration test (rebuilt FTS finds an
-old fact by fact text and a new one by subject), Go flow test (store through a fake gate, search by
+types in `packages/workbench/src/memory`, contract goldens. Tests: migration test (rebuilt FTS finds a fact by
+fact text and by subject; kept or dropped rows per the migration), memfmt round-trip of keys, Go flow test (store through a fake gate, search by
 subject term finds the fact) and UI spec half at the IPC boundary (memory panel mock returns
 `subject`/`aspect`; panel renders the fact unchanged; `memory-module.spec.ts`). Verification
 `round-p291-kv` tuning (est. 4.5), retrieval, D10 against the pre-Step 9 tree; fail reverts Step 9.
 Commit `feat(memory)!: P291 subject and aspect keys` with `BREAKING CHANGE:` naming the gate schema
-change.
+change, the memfmt version and any dropped rows.
+
+Step 9b. A5 adoption (code, only per D22 A5). Search result grouping in `Service.Search` and its
+callers (MCP text, bridge, UI, contract goldens); flow test plus UI spec half at the IPC boundary.
+Commit `feat(memory)!: P291 grouped search results`.
 
 Step 10. Docs, `docs(memory): P291 retrieval eval and results`:
 - `docs/ARCHITECTURE.md`: "Memory ingest eval (P285)" gains the P291 retrieval and telegraph eval
@@ -621,7 +647,7 @@ Step 10. Docs, `docs(memory): P291 retrieval eval and results`:
 - `site/src/content/docs/docs/space/memory.mdx` (import wording, stored fact style if A4, search wording
   if A2/A3), `site/src/content/docs/docs/reference/prompts.md` only if it lists fragments,
   `reference/mcp-tools.md` only if MCP texts changed (out of scope: expected no change),
-  `reference/memory-formats.md` only if a format changed (D22 keeps v2: expected no change). Site pages
+  `reference/memory-formats.md` if a format changed (A3 moves memfmt to v3, D32; otherwise no change). Site pages
   follow the `CLAUDE.md` Communication style. `bun run site:check`; `bun run lint` runs
   `site/scripts/check-docs.ts`.
 
@@ -734,13 +760,12 @@ report with what was measured.
 
 ## 8. Out of scope
 
-Chunk budget change (pending user decision since P285); judge and golden prompts (frozen); read-time
-grouping in search output; write-time merge-by-key; memfmt v3; ranking fusion weights and boosts other
+Chunk budget change (pending user decision since P285); judge and golden prompts (frozen); ranking fusion weights and boosts other
 than D12 constants; reconcile behavior beyond the D22 recipe floor; the Artifact page (not asked);
 multilingual embeddings. User scope for the telegraphic revision: every prompt outside the memory
 pipeline and distill; the memory MCP instructions, tool and argument texts,
 `memory.mcp.remember.message` and tool results (P289's texts stay); keyword style; a production
-post-pass; rewriting existing stored memories or docs.
+recurring post-pass. D32 lifts the earlier ban on rewriting existing stored memories.
 
 ## 9. Open items for the final message
 
@@ -752,12 +777,12 @@ post-pass; rewriting existing stored memories or docs.
   on the older tree. A 4.5 USD run would settle it if the user wants one.
 - MCP texts are out of scope: agents still send plain-style items through `store_memory` and
   `remember`; the gate restyles them, so stored text follows the fragment anyway.
-- Existing stored memories keep their full style; mixed stores rank with the measured bias until a
-  re-import.
+- Existing stored memories may be re-imported or dropped (D32); mixed stores rank with the measured
+  bias until then.
 - No runtime token-preservation check; a residual post-pass loss rate above 0 is listed with ids.
-- Read-time grouping is never adopted here; if it wins, it needs a phase for the result-shape change.
-- A3 keys adoption depends on a 4.5 USD verification round; if the cap blocks it, the numbers go to
-  Known open items and the user decides on a follow-up phase.
+- Read-time grouping is adopted here when it wins (A5, Step 9b); the result-shape change is allowed.
+- A3 keys adoption (with memfmt v3 and merge-by-key) depends on a 4.5 USD verification round; if the cap
+  blocks it, the numbers go to Known open items and the user decides on a follow-up phase.
 - The SPEC P291 row does not name the telegraphic direction yet; the orchestrator adds it as a user
   decision so verification checks against it.
 - Retrieval on 10-source stores understates difficulty at scale.
