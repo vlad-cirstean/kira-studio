@@ -6,6 +6,8 @@ sources:
   - docs/ARCHITECTURE.md
   - internal/memory/memfmt
   - internal/memory/importer
+  - apps/kira-space/internal/bridge/memorydistill.go
+  - packages/workbench/src/memory/distill
   - internal/memory/embed
   - packages/workbench/src/memory
   - apps/kira-space/frontend/src/workbench/settings/MemoryPane.vue
@@ -56,6 +58,24 @@ The `distill` tool of the `kira-memory` MCP server turns long text or a file int
 
 `distill` stores nothing, so it is not subject to the memory gate. Input is limited to 120,000 characters, split into at most 16 parts, and a call stops at 2 USD. It runs on your Claude subscription. See [MCP tools](../../reference/mcp-tools/).
 
+### Distill in the app
+
+The Memory module runs the same distill. Click **Distill text** in the panel header. **Back to memories** returns to the memory view.
+
+1. Choose **Text** and paste, or choose **File** and pick a document. In a file view, select text, open the context menu or command palette and run **Distill selection**. The selection arrives as text, with its path and line range shown.
+2. Choose **Facts** or **Instructions**.
+3. Click **Run distill**.
+
+The size line shows characters and about how many tokens the input holds (one token per three characters). While the run goes, the view shows finished parts and the cost so far. **Cancel** stops it. Parts that already finished are charged.
+
+The result shows characters and tokens before and after, the cost and the number of parts. Pick the lines you want, then:
+
+- **Copy** puts the picked lines on the clipboard, one per line.
+- **Store…** stores the picked lines as memories, up to 20 at a time. The usual memory check applies, and a challenge asks you to answer and resubmit.
+- **Import as document…** saves the lines as a document and opens the normal import confirmation. The document stays under `distilled/` in the memory folder as the import's source.
+
+Distill alone writes nothing to the store. Only one distill runs at a time. The input limits above apply.
+
 ## Search
 
 The search box finds facts by keyword. Semantic search adds matches by meaning.
@@ -79,4 +99,4 @@ The server works with the app open or closed.
 
 ## Where data lives
 
-Memories live in `~/.kira-memory/memory.db`. The downloaded model lives in `~/.kira-memory/models`. Set `KIRA_MEMORY_HOME` to move the folder.
+Memories live in `~/.kira-memory/memory.db`. The downloaded model lives in `~/.kira-memory/models`. Documents saved by **Import as document…** live in `~/.kira-memory/distilled`. Set `KIRA_MEMORY_HOME` to move the folder.
