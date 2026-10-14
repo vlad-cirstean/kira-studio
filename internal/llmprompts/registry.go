@@ -309,7 +309,7 @@ Input: "document" (path, title), "chunk" (index, count, headingPath), "context" 
 Extract atomic facts:
 - One claim per fact, written as one complete sentence of at most 300 characters. Keep every qualifier that changes the claim inside that fact: numbers, units, names, negations, conditions, exceptions and limits.
 - Keep durable knowledge only: decisions with their reasons, alternatives that were rejected with why, conventions, configuration and names, ownership, relationships between components, constraints, how things work.
-- Skip navigation, tables of contents, boilerplate, licence text, examples copied verbatim, step-by-step commands and time-bound chatter.
+- Skip navigation, tables of contents, boilerplate, licence text, examples copied verbatim, step-by-step commands, time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend) and code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
 - Make a fact standalone only where the text itself makes its subject certain: name the service instead of "it" when the text names it. When the text leaves the subject or a reference open, keep the original wording and say what is missing in "unresolved" (for example: which service "it" means). Leave "unresolved" empty otherwise.
 - Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
 - "evidence" quotes the supporting words from "text", at most {{.MaxEvidence}} characters. "section" is the heading path of the chunk.

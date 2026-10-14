@@ -436,8 +436,8 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	if err != nil {
 		return runRecord{}, err
 	}
-	wait := func(want string) (importer.JobDetail, error) {
-		deadline := time.Now().Add(12 * time.Minute)
+	wait := func(want string, limit time.Duration) (importer.JobDetail, error) {
+		deadline := time.Now().Add(limit)
 		for time.Now().Before(deadline) {
 			d, err := e.Job(job.ID)
 			if err != nil {
@@ -453,13 +453,13 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 		}
 		return importer.JobDetail{}, fmt.Errorf("job never reached %s", want)
 	}
-	if _, err := wait(importer.JobAwaiting); err != nil {
+	if _, err := wait(importer.JobAwaiting, 3*time.Minute); err != nil {
 		return runRecord{}, err
 	}
 	if err := e.Start(job.ID, importer.StartArgs{}); err != nil {
 		return runRecord{}, err
 	}
-	d, err := wait(importer.JobDone)
+	d, err := wait(importer.JobDone, 12*time.Minute)
 	if err != nil {
 		evalSpend("pipeline", s.ID, d.Job.CostUSD)
 		evalSpend("gate", s.ID, costLogTotal(costDir))
