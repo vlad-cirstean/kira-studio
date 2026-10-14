@@ -80,6 +80,19 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
       <span v-if="step.smartScript" class="shrink-0 text-info">{{
         t('space.ade.workflows.stepNode.smart.label')
       }}</span>
+      <span
+        v-if="step.sandbox.access !== 'write'"
+        class="shrink-0"
+        :class="step.sandbox.access === 'off' ? 'text-warn-text' : 'text-muted-foreground'"
+        data-testid="ade-wf-node-sandbox"
+        >{{
+          t(
+            step.sandbox.access === 'off'
+              ? 'space.ade.workflows.stepNode.sandboxOff.label'
+              : 'space.ade.workflows.sandbox.accessRead.label',
+          )
+        }}</span
+      >
       <span v-if="step.review" class="shrink-0 text-info" data-testid="ade-wf-node-review">{{
         t('space.ade.board.branchTag.review.label')
       }}</span>

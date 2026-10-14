@@ -24,6 +24,7 @@ import { useAdePromptPreview } from '../queries';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
 import AdeStepResults from './AdeStepResults.vue';
+import AdeStepSandbox from './AdeStepSandbox.vue';
 
 const modeItems = computed(() => [
   { value: 'prompt', label: t('common.prompt.label'), testid: 'ade-wf-step-mode-prompt' },
@@ -299,6 +300,11 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         <VarText :parts="preview" />
       </Card>
     </template>
+    <AdeStepSandbox
+      :sandbox="step.sandbox"
+      :step-id="step.id"
+      @patch="(sandbox) => patch({ sandbox })"
+    />
     <AdeStepResults :stage-id="stageId" :step="step" :steps="steps" />
     <Card v-if="step.review" class="text-kira-sm text-subtle" data-testid="ade-wf-review-note">
       {{ t('space.ade.workflows.stepInspector.reviewNote.hint') }}

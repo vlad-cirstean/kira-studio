@@ -8287,6 +8287,53 @@
             "label": "Only {name}"
           }
         },
+        "sandbox": {
+          "accessRead": {
+            "label": "Read only"
+          },
+          "accessWrite": {
+            "label": "Write worktree"
+          },
+          "allow": {
+            "example": "~/go",
+            "label": "Allow writes"
+          },
+          "network": {
+            "hint": "Off: Claude API only.",
+            "label": "Allow network"
+          },
+          "offWarning": {
+            "body": "Agent runs with your full rights."
+          },
+          "pathInvalid": {
+            "error": "Use absolute paths or paths starting with ~/."
+          },
+          "paths": {
+            "hint": "One path per line, absolute or starting with ~/."
+          },
+          "preset": {
+            "label": "Add toolchain"
+          },
+          "presetGo": {
+            "option": "Go"
+          },
+          "presetNode": {
+            "option": "Node"
+          },
+          "presetPython": {
+            "option": "Python"
+          },
+          "presetRust": {
+            "option": "Rust"
+          },
+          "read": {
+            "example": "~/notes",
+            "label": "Read folders"
+          },
+          "title": {
+            "label": "Sandbox"
+          }
+        },
         "saveBar": {
           "applies": {
             "hint": "Saved edits apply to work not yet started."
@@ -8390,6 +8437,9 @@
           },
           "resultStops": {
             "tooltip": "{id} ({outcome}) stops the run"
+          },
+          "sandboxOff": {
+            "label": "No sandbox"
           },
           "sendsImplementer": {
             "label": "Sends to the implementer"
