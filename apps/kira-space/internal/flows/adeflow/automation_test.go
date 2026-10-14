@@ -477,8 +477,8 @@ func TestAutomationStep(t *testing.T) {
 		if r.State != "done" {
 			t.Fatalf("run = %+v", r)
 		}
-		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+claudeheadless.FinishInstruction(llmprompts.Defaults(), nil); got != want {
-			t.Fatalf("prompt = %q, want %q", got, want)
+		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+claudeheadless.FinishInstruction(llmprompts.Defaults(), nil); !strings.HasPrefix(got, want) {
+			t.Fatalf("prompt = %q, want it to start with %q", got, want)
 		}
 		args := fakeFile(t, f.app, "api-1.args")
 		for _, want := range []string{"--model\nopus", "--max-budget-usd\n0.5", "--tools\nRead,Grep", "--strict-mcp-config", claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool} {

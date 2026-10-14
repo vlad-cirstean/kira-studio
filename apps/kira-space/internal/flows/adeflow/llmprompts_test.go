@@ -39,8 +39,8 @@ func TestRunUsesEditedFinishInstruction(t *testing.T) {
 		t.Fatalf("run = %+v", r)
 	}
 	got := strings.TrimRight(fakeFile(t, f.app, "api-1.prompt"), "\n")
-	if !strings.HasSuffix(got, "\n\n"+finishOverride) {
-		t.Fatalf("prompt = %q, want it to end with the edited instruction", got)
+	if !strings.Contains(got, "\n\n"+finishOverride) {
+		t.Fatalf("prompt = %q, want it to carry the edited instruction", got)
 	}
 	if strings.Contains(got, "call finish_step with status") {
 		t.Fatalf("prompt still carries the default instruction: %q", got)

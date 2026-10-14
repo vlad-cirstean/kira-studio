@@ -539,7 +539,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
-			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, prompt: prompt, timeout: timeout, smart: smart})
+			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, worktree: path, prompt: prompt, timeout: timeout, smart: smart})
 		}()
 	} else {
 		go func() {
@@ -610,8 +610,10 @@ type agentLaunch struct {
 	def               stepDef
 	sessionID, resume string
 	path, prompt      string
-	timeout           time.Duration
-	smart             *smartStep
+	// worktree is the task branch's worktree; path differs for a smart step that runs in its own folder.
+	worktree string
+	timeout  time.Duration
+	smart    *smartStep
 	// git, when set, makes the run a sandboxed git agent: only the listed built-ins, no settings files,
 	// the worktrees added as directories and the git tool granted.
 	git *claudeheadless.GitGrant
@@ -653,7 +655,17 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		}
 		complete(end)
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Results: grantResults(rebase || round, def)})
+	sbx, err := b.prepareSandbox(ctx, run, l)
+	if err != nil {
+		fail(err)
+		return
+	}
+	defer b.endSandbox(run.ID, sbx)
+	var grantSandbox *claudeheadless.SandboxGrant
+	if sbx != nil {
+		grantSandbox = sbx.grant
+	}
+	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Results: grantResults(rebase || round, def)})
 	if err != nil {
 		fail(err)
 		return
@@ -683,12 +695,23 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 			spec.MCPConfigPaths = []string{path}
 		}
 	}
+	spec = b.applySandbox(spec, sbx, l)
+	b.noticeSandbox(sink, sbx)
 	var res *claudeheadless.Result
+	var stopWatch func()
 	exit, runErr := claudeheadless.Run(ctx, spec, claudeheadless.Handler{
 		OnLine:       func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
 		OnRateLimits: b.deps.OnRateLimits,
 		OnResult:     func(r claudeheadless.Result) { res = &r },
+		OnStart: func(pid int) {
+			if sbx.on() {
+				stopWatch = b.watchSandbox(run, sbx, sink, pid)
+			}
+		},
 	})
+	if stopWatch != nil {
+		stopWatch()
+	}
 	sink.flush()
 	release()
 	if b.ctx.Err() != nil {
@@ -708,7 +731,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	if rebase {
 		code := exit.Code
 		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
-		end := fromOutcome(model.AdeRunFailed, o)
+		end := sbx.sandboxOutcome(fromOutcome(model.AdeRunFailed, o), sink.lastStderr())
 		end.out.ExitCode = &code
 		f, ok := b.takeFinish(run.ID)
 		var report *claudeheadless.Finish
@@ -719,10 +742,10 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	if l.smart != nil {
-		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), l.resume != ""))
+		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), l.resume != ""), sink.lastStderr()))
 		return
 	}
-	complete(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""))
+	complete(sbx.sandboxOutcome(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""), sink.lastStderr()))
 }
 
 // roundTools adds the reply tool to a review round's allowed tools.

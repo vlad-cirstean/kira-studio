@@ -138,6 +138,12 @@
                   ],
                   "review": null,
                   "runsOn": "each repo",
+                  "sandbox": {
+                    "access": "write",
+                    "allow": [],
+                    "network": true,
+                    "read": []
+                  },
                   "smartScript": "",
                   "timeout": "1m"
                 },
@@ -167,6 +173,12 @@
                   ],
                   "review": null,
                   "runsOn": "each repo",
+                  "sandbox": {
+                    "access": "write",
+                    "allow": [],
+                    "network": true,
+                    "read": []
+                  },
                   "smartScript": "",
                   "timeout": "1m"
                 }

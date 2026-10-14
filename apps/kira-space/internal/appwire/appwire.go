@@ -32,6 +32,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
@@ -75,6 +76,8 @@ type Options struct {
 	TrackerGrace time.Duration
 	// RebaseTimeout bounds one ADE rebase run; 0 keeps the default (20 minutes).
 	RebaseTimeout time.Duration
+	// Sandbox confines headless agents; nil uses the OS enforcer (a flow-test seam).
+	Sandbox agentsandbox.Enforcer
 	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); 0 keeps each script's.
 	SmartTimeout time.Duration
 	// ScheduleTimeout replaces every headless scheduled run's own timeout and Clock drives the
@@ -240,6 +243,10 @@ func Build(opts Options) *Wired {
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now
+	}
+	runs.Sandbox = opts.Sandbox
+	if runs.Sandbox == nil {
+		runs.Sandbox = agentsandbox.System()
 	}
 	w.runs = runs
 	if err := runs.Recover(); err != nil {

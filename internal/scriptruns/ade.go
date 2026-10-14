@@ -22,6 +22,10 @@ type ADE interface {
 	Busy(branchID string) string
 	// Tools are the Kira Space tools and run_outcome a task-bound smart run may call.
 	Tools() (claudeheadless.SpaceTools, claudeheadless.Outcomes)
+	// SandboxGit serves fetch_remote and push_branch to a sandboxed smart run.
+	SandboxGit() claudeheadless.SandboxGit
+	// SandboxTarget points those tools at branchID's worktree for one run; release drops it.
+	SandboxTarget(runID, branchID, worktree string) (release func(), err error)
 }
 
 // TaskChoice is a live task the run dialog can pick.

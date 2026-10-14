@@ -1128,6 +1128,12 @@
           "body": "That run no longer exists."
         },
         "sandbox": {
+          "auth": {
+            "body": "Claude can’t sign in because the sandbox blocks the keychain. Turn on keychain access in the Claude Code settings, or run claude setup-token and export the token from your shell profile."
+          },
+          "blocked": {
+            "body": "Sandbox blocked {op} {target}."
+          },
           "noSandboxExec": {
             "body": "The sandbox is unavailable because /usr/bin/sandbox-exec is missing. Turn the step’s sandbox off or repair macOS."
           },

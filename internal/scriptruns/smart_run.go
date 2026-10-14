@@ -49,6 +49,7 @@ func (s *Service) mcpServer() *claudeheadless.Server {
 		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts()}
 		if s.ADE != nil {
 			opts.Space, opts.Outcomes = s.ADE.Tools()
+			opts.SandboxGit = s.ADE.SandboxGit()
 		}
 		s.server = claudeheadless.NewServer(opts)
 	}
@@ -121,8 +122,22 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	s.mu.Lock()
 	srv := s.mcpServer()
 	s.mu.Unlock()
-	cfg, releaseGrant, err := srv.Register(claudeheadless.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != ""})
+	sbx, err := s.prepareSandbox(ctx, p, runID, srv.Port())
 	if err != nil {
+		abandon()
+		return Started{}, ipcerr.InternalErr(err)
+	}
+	grant := claudeheadless.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != ""}
+	releaseTarget := func() {}
+	if sbx != nil && p.preview.ADE != nil {
+		if rel, err := s.ADE.SandboxTarget(runID, p.preview.ADE.BranchID, p.dir.Path); err == nil {
+			grant.Sandbox, releaseTarget = &claudeheadless.SandboxGrant{Push: true}, rel
+		}
+	}
+	cfg, releaseGrant, err := srv.Register(grant)
+	if err != nil {
+		releaseTarget()
+		sbx.cleanup()
 		abandon()
 		return Started{}, ipcerr.InternalErr(err)
 	}
@@ -132,6 +147,8 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		path, rel, err := claudeheadless.WriteUserConfig(s.getenv, filepath.Join(s.Home, "automations-mcp"), runID, p.mcp)
 		if err != nil {
 			releaseGrant()
+			releaseTarget()
+			sbx.cleanup()
 			abandon()
 			return Started{}, ipcerr.BadRequest(err.Error())
 		}
@@ -140,6 +157,8 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	if err := s.begin(run, existing); err != nil {
 		releaseGrant()
 		releaseUser()
+		releaseTarget()
+		sbx.cleanup()
 		abandon()
 		return Started{}, err
 	}
@@ -157,21 +176,31 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		Model: p.smart.Model, MaxBudgetUSD: p.smart.MaxBudgetUSD, Tools: pv.Tools, AllowedTools: pv.Allowed,
 		Isolated: true, Timeout: timeout, Env: env,
 	}
+	spec = s.applySandbox(spec, sbx)
 	go func() {
 		defer s.smartWait.Done()
 		sink := newLogSink(s, runID)
+		s.noticeSandbox(sink, sbx)
 		var res *claudeheadless.Result
+		var stopWatch func()
 		exit, runErr := claudeheadless.Run(ctx, spec, claudeheadless.Handler{
 			OnLine:   func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
 			OnResult: func(r claudeheadless.Result) { res = &r },
+			OnStart:  func(pid int) { stopWatch = s.watchSandbox(sbx, runID, sink, pid) },
 		})
+		if stopWatch != nil {
+			stopWatch()
+		}
 		sink.flush()
 		releaseGrant()
 		releaseUser()
+		releaseTarget()
+		sbx.cleanup()
 		out := decide(decision{
 			finish: s.takeFinishPtr(runID), res: res, exit: exit, runErr: runErr, end: sr.endedBy(),
 			timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(), resumed: p.resume != "",
 		})
+		out = sbx.outcome(out)
 		cancel()
 		done, ferr := s.Runs.FinishByRun(runID, out, s.now())
 		if p.release != nil {

@@ -603,7 +603,7 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 	def := stepDef{ID: run.StepID, Timeout: "", AllowedTools: spec.AllowedTools}
 	for _, s := range stageSteps(*tc.stage) {
 		if s.ID == run.StepID {
-			def.Name, def.Timeout = s.Name, s.Timeout
+			def.Name, def.Timeout, def.Sandbox = s.Name, s.Timeout, s.Sandbox
 		}
 	}
 	prompt := composeResumePrompt(b.prompts(), launch.Prompt, nil)
@@ -613,7 +613,7 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 		defer b.wg.Done()
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
-			def: def, sessionID: sessionID, resume: launch.ResumeID, path: path, prompt: prompt,
+			def: def, sessionID: sessionID, resume: launch.ResumeID, path: path, worktree: path, prompt: prompt,
 			timeout: parseStepTimeout(def.Timeout), review: &claudeheadless.ReviewGrant{CommentIDs: spec.CommentIDs},
 		})
 	}()

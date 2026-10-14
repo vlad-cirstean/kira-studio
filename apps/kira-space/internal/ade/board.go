@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -92,6 +93,11 @@ type TaskBoardDeps struct {
 	ScriptRunsOf  func(taskID string, limit int) ([]scriptruns.Run, error)
 	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
 	HeadlessSettingSources func() string
+	// Sandbox confines headless agents (P287); nil = no sandbox. SandboxKeychain reads the
+	// ade.sandboxKeychain setting per run. RunSandbox stores each run's policy and denials.
+	Sandbox         agentsandbox.Enforcer
+	SandboxKeychain func() bool
+	RunSandbox      *repos.AdeRunSandboxRepo
 	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.
 	RebaseTimeout time.Duration
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
@@ -126,13 +132,15 @@ type TaskBoard struct {
 	wfTimer     *time.Timer
 	startOnce   sync.Once
 
-	mu          sync.Mutex
-	repoMus     map[string]*sync.Mutex
-	byGitRepoID map[string]string // gitclient RepoID -> codeRepoID, populated on open
-	gitRepoIDOf map[string]string // codeRepoID -> gitclient RepoID
-	caches      map[string]*repoCaches
-	rebase      map[string]*rebaseCache
-	boardTimer  *time.Timer
+	mu      sync.Mutex
+	repoMus map[string]*sync.Mutex
+	// sandboxTargets maps a live sandboxed run id to its sandboxTarget.
+	sandboxTargets sync.Map
+	byGitRepoID    map[string]string // gitclient RepoID -> codeRepoID, populated on open
+	gitRepoIDOf    map[string]string // codeRepoID -> gitclient RepoID
+	caches         map[string]*repoCaches
+	rebase         map[string]*rebaseCache
+	boardTimer     *time.Timer
 
 	runMu            sync.Mutex                       // guards live, setupLive, archiving, taskMus, finishes, stepMsgs
 	live             map[string]*liveRun              // run id -> its process
@@ -175,7 +183,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
-	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, Prompts: b.prompts()})
+	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts()})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)

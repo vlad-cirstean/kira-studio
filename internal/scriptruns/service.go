@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
@@ -42,6 +43,10 @@ type Service struct {
 	Prompts prompts.Sink
 	// LlmPrompts resolves the report suffixes and server texts; nil means the registry defaults.
 	LlmPrompts llmprompts.Source
+	// Sandbox confines smart runs in dir mode worktree (P287); nil = no sandbox, as in Studio.
+	// SandboxKeychain reads the keychain setting per run.
+	Sandbox         agentsandbox.Enforcer
+	SandboxKeychain func() bool
 	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
 	ScheduleTimeout time.Duration
 

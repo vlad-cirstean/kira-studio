@@ -17,6 +17,11 @@ func RemotesArgs() []string {
 	return []string{"remote"}
 }
 
+// HeadRefArgs builds `git rev-parse --symbolic-full-name HEAD`: the checked-out ref, "HEAD" when detached.
+func HeadRefArgs() []string {
+	return []string{"rev-parse", "--symbolic-full-name", "HEAD"}
+}
+
 // RemoteGetURLArgs builds `git remote get-url <name>` — G24 D15's own one-git-spawn "is this a
 // GitHub repository" check, upstream verbatim. Tolerated through the caller's own
 // runAllowingExit (exit 128 == no such remote, F15's own precedent).

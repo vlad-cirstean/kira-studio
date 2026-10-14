@@ -152,6 +152,8 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		}
 		p.RunDir = r
 	}
+	keychains := filepath.Join(rt.Home, "Library", "Keychains")
+	var denied error
 	extra := func(list []string) []string {
 		var out []string
 		for _, e := range list {
@@ -160,12 +162,19 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 				notes = append(notes, i18n.T("backend.space.ade.sandbox.pathMissing.body", map[string]string{"path": e}))
 				continue
 			}
+			if r == keychains || strings.HasPrefix(r, keychains+string(filepath.Separator)) {
+				denied = fmt.Errorf("agentsandbox: path %q is not allowed", e)
+				continue
+			}
 			out = appendUnique(out, r)
 		}
 		return out
 	}
 	p.Read = appendUnique(p.Read, extra(in.Read)...)
 	p.Allow = extra(in.Allow)
+	if denied != nil {
+		return Policy{}, nil, denied
+	}
 	for _, d := range []struct {
 		src string
 		dst *string

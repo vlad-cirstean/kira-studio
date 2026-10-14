@@ -319,3 +319,18 @@ func (e *RepoEntry) ResolveCommit(ctx context.Context, sha string) (full string,
 	}
 	return strings.TrimSpace(string(res.Stdout)), true, nil
 }
+
+// Remotes lists the repo's remote names.
+func (e *RepoEntry) Remotes(ctx context.Context) ([]string, error) {
+	raw, err := e.runOne(ctx, gitops.RemotesArgs())
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(string(raw)), nil
+}
+
+// WorktreeHeadRef is the ref checked out in the worktree at dir ("HEAD" when detached).
+func (e *RepoEntry) WorktreeHeadRef(ctx context.Context, dir string) (string, error) {
+	raw, err := e.runOneInDir(ctx, dir, gitops.HeadRefArgs())
+	return strings.TrimSpace(string(raw)), err
+}

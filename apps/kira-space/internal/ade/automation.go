@@ -251,3 +251,16 @@ func (b *TaskBoard) launchAutomationHeld() {
 		}
 	}
 }
+
+// SandboxGit serves fetch_remote and push_branch to a sandboxed smart run (scriptruns.ADE).
+func (b *TaskBoard) SandboxGit() claudeheadless.SandboxGit { return b }
+
+// SandboxTarget points the sandbox git tools at a branch's worktree for one smart run.
+func (b *TaskBoard) SandboxTarget(runID, branchID, worktree string) (func(), error) {
+	sb, err := b.deps.Tasks.GetBranch(branchID)
+	if err != nil {
+		return nil, err
+	}
+	b.sandboxTargets.Store(runID, sandboxTarget{codeRepoID: sb.CodeRepoID, branch: sb.Name, worktree: worktree})
+	return func() { b.sandboxTargets.Delete(runID) }, nil
+}
