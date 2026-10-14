@@ -768,11 +768,11 @@ var AdeRebasePrompt = define(Entry{
 	TitleKey:   "llmPrompts.entry.adeRebasePrompt.title",
 	PurposeKey: "llmPrompts.entry.adeRebasePrompt.description",
 	UsedByKey:  "llmPrompts.entry.adeRebasePrompt.usedBy.body",
-	Default: `{{if .Stack}}Rebase {{(index .Stack 0).Name}} (repo {{.Repo}}) onto {{.Onto}}{{if gt (len .Stack) 1}}, then restack the branches built on it{{end}}:
+	Default: `{{if .Stack}}Rebase {{(index .Stack 0).Name}} (repo {{.Repo}}) onto {{.Onto}}{{if gt (len .Stack) 1}}, then restack branches built on it{{end}}:
 {{range $i, $s := .Stack}}{{inc $i}}. In {{$s.Worktree}}: {{if $i}}git rebase {{if $.Autostash}}--autostash {{end}}--onto {{$s.ParentName}} {{$s.ParentBefore}}
 {{else}}{{if $.Remote}}git fetch {{$.Remote}}, then {{end}}git rebase {{if $.Autostash}}--autostash {{end}}{{$s.ParentRef}}
 {{end}}{{end}}{{if .Review}}Do not modify {{.Review}}.
-{{end}}Resolve any conflicts by editing the files, then git add and git rebase --continue.
+{{end}}Resolve conflicts by editing files, then git add and git rebase --continue.
 {{if .Push}}Then push each rebased branch with git push --force-with-lease.{{else}}Do not push.{{end}}{{end}}`,
 }, RebaseVars{
 	Repo: "kira-space", Onto: "origin/main", Remote: "origin", Autostash: true,
@@ -840,7 +840,7 @@ var AdeReviewMessage = define(Entry{
 {{template "ade.jiraLine" .}}{{end}}{{if .Notes}}
 - Notes: {{.Notes}}{{end}}{{range .Repos}}
 {{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{end}}
-I review these branches in Kira Space and will ask you questions about them. Answer from the code; change files only when I ask you to.`,
+I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.`,
 }, ReviewVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Notes: "Check the error states.",
@@ -909,7 +909,7 @@ var RunResumeLine = define(Entry{
 	TitleKey:   "llmPrompts.entry.runResumeLine.title",
 	PurposeKey: "llmPrompts.entry.runResumeLine.description",
 	UsedByKey:  "llmPrompts.entry.runResumeLine.usedBy.body",
-	Default:    `Kira {{.App}} closed while you worked, so your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check the current state of that action (files, git, running processes) before you redo or skip it. Then carry on with the task.`,
+	Default:    `Kira {{.App}} closed while you worked; your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check that action's current state (files, git, running processes) before you redo or skip it. Then continue the task.`,
 }, ResumeVars{App: "Space"})
 
 // Database MCP (Kira Studio).

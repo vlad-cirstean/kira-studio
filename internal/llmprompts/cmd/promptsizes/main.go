@@ -18,6 +18,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/renameio/v2"
+
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -65,7 +67,7 @@ func main() {
 		if err != nil {
 			fatal(err)
 		}
-		if err := os.WriteFile(*snapshot, append(b, '\n'), 0o644); err != nil {
+		if err := renameio.WriteFile(*snapshot, append(b, '\n'), 0o644); err != nil {
 			fatal(err)
 		}
 	}

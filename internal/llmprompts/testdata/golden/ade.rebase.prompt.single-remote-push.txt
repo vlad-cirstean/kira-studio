@@ -1,4 +1,4 @@
 Rebase feat/login (repo kira-space) onto origin/main:
 1. In /wt/kira-space/feat-login: git fetch origin, then git rebase origin/main
-Resolve any conflicts by editing the files, then git add and git rebase --continue.
+Resolve conflicts by editing files, then git add and git rebase --continue.
 Then push each rebased branch with git push --force-with-lease.

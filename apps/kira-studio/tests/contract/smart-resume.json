@@ -64,7 +64,7 @@
       "summary": "summary-done"
     },
     "params": [],
-    "prompt": "Kira Studio closed while you worked, so your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check the current state of that action (files, git, running processes) before you redo or skip it. Then carry on with the task.\n\nWhen finished, call finish_step with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "prompt": "Kira Studio closed while you worked; your last turn was cut off. A tool call marked interrupted has an unknown outcome: it may have run in part. Check that action's current state (files, git, running processes) before you redo or skip it. Then continue the task.\n\nWhen finished, call finish_step with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and the reason. If you need a decision, call it with status \"needs_input\" and your question.",
     "resumable": false,
     "resumedFrom": "<id:2>",
     "scriptId": "<id:1>",
