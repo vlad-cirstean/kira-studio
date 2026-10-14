@@ -246,3 +246,34 @@ func TestMemoryDistill(t *testing.T) {
 		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
 	}
 }
+
+// TestMemoryDistillBridge calls the Memory module's bridge distill (the UI path) with the real
+// claude: terse lines come back with sizes and cost, and nothing is stored.
+func TestMemoryDistillBridge(t *testing.T) {
+	app := newRealApp(t)
+	mark := app.Events.Mark()
+	text := "# Deploy\n\nThe billing-api service is deployed with Helm charts. Ops standardised on Helm in 2025, so there is no raw kubectl apply in production. Deploys never run on Friday.\n"
+
+	res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "claude-row", Text: text})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Lines) == 0 || res.Chunks != 1 || res.InChars != len([]rune(text)) || res.OutChars == 0 {
+		t.Fatalf("result = %+v", res)
+	}
+	for _, l := range res.Lines {
+		if strings.TrimSpace(l) == "" {
+			t.Errorf("empty line in %q", res.Lines)
+		}
+	}
+	if res.CostUSD <= 0 || res.CostUSD > 0.50 {
+		t.Errorf("cost = %v USD, want above 0 and at most 0.50", res.CostUSD)
+	}
+	t.Logf("distill bridge: %d lines, %d to %d chars, %.4f USD", len(res.Lines), res.InChars, res.OutChars, res.CostUSD)
+	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
+		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
+	}
+	if ev := app.Events.Since(mark, bridge.ChannelMemoryChanged); len(ev) != 0 {
+		t.Errorf("distill emitted %d memory changed events, want none", len(ev))
+	}
+}
