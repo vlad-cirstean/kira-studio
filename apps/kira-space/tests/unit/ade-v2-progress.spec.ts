@@ -7,6 +7,7 @@ import {
 } from '../../frontend/src/ade/v2/board/progress';
 import { deriveStatus } from '../../frontend/src/ade/v2/board/status';
 import { implicitResults } from '../../frontend/src/ade/v2/board/stepResults';
+import { defaultSandbox } from '../../frontend/src/ade/v2/board/stepSandbox';
 import type { Branch, Run, Stage, Task, Workflow } from '../../frontend/src/ade/v2/wire';
 import { mkBranch, mkRun, mkStage, mkTask } from './support/adeV2Fixtures';
 
@@ -26,6 +27,7 @@ const step = (
   allowedTools: [],
   smartScript: '',
   review: null,
+  sandbox: defaultSandbox(),
   params: {},
 });
 

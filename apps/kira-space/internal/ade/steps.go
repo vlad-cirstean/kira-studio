@@ -26,6 +26,8 @@ type stepDef struct {
 	Params      map[string][]string
 	// Review makes the step a review step: no process, the run waits for the user.
 	Review *adewire.ReviewStepConfig
+	// Sandbox is what the step's agent may do on the machine.
+	Sandbox adewire.StepSandbox
 }
 
 // stageSteps lists a stage's steps; a user stage has none.
@@ -41,7 +43,7 @@ func stageSteps(st adewire.Stage) []stepDef {
 			onFailure = "stop"
 		}
 		return []stepDef{{ID: st.ID, Name: st.Name, RunsOn: runsOn, Before: "auto", OnFailure: onFailure,
-			Results: adewire.ImplicitResults(st.ID, onFailure), Timeout: st.Timeout, Prompt: st.Command}}
+			Results: adewire.ImplicitResults(st.ID, onFailure), Timeout: st.Timeout, Prompt: st.Command, Sandbox: adewire.DefaultSandbox()}}
 	case "agent":
 		out := make([]stepDef, len(st.Steps))
 		for i, s := range st.Steps {
@@ -51,7 +53,7 @@ func stageSteps(st adewire.Stage) []stepDef {
 			}
 			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure, Results: results,
 				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools,
-				SmartScript: s.SmartScript, Params: s.Params, Review: s.Review}
+				SmartScript: s.SmartScript, Params: s.Params, Review: s.Review, Sandbox: s.Sandbox.Normalized()}
 		}
 		return out
 	}

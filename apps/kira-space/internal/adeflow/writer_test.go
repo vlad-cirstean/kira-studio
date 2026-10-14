@@ -115,7 +115,7 @@ func TestSave_edits(t *testing.T) {
 		wf.Stages[2].Steps = append(append([]adewire.PipelineStep(nil), steps[:2]...), steps[3:]...)
 		wf.Stages[2].Steps = append(wf.Stages[2].Steps, adewire.PipelineStep{
 			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("lint", "stop"), Timeout: "10m",
-			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"}, Params: map[string][]string{},
+			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 		})
 		out := saveOK(t, r, "standard.yaml", wf)
 		if strings.Index(out, "id: review") > strings.Index(out, "id: spec") {
@@ -154,7 +154,7 @@ func TestSave_edits(t *testing.T) {
 		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
 		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
 		wf.Stages[impl].Steps[0] = adewire.PipelineStep{
-			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("plan", "stop"), Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize",
+			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("plan", "stop"), Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize", Sandbox: adewire.DefaultSandbox(),
 			Params: map[string][]string{"lang": {"go"}, "dirs": {"a", "b"}},
 		}
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -178,13 +178,42 @@ func TestSave_edits(t *testing.T) {
 		}
 	})
 
+	t.Run("sandbox block round trip", func(t *testing.T) {
+		wf := load(t, r, "standard.yaml")
+		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
+		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
+		if out := saveOK(t, r, "standard.yaml", wf); strings.Contains(out, "sandbox:") {
+			t.Fatalf("default sandbox written:\n%s", out)
+		}
+		want := adewire.StepSandbox{Access: "read", Read: []string{"~/specs"}, Allow: []string{"~/.cache/tool"}, Network: false}
+		last := len(wf.Stages[impl].Steps) - 1
+		wf.Stages[impl].Steps[last].Sandbox = want
+		out := saveOK(t, r, "standard.yaml", wf)
+		for _, k := range []string{"sandbox:", "access: read", "- ~/specs", "- ~/.cache/tool", "network: false"} {
+			if !strings.Contains(out, k) {
+				t.Fatalf("%q missing:\n%s", k, out)
+			}
+		}
+		if got := load(t, r, "standard.yaml").Stages[impl].Steps[last].Sandbox; !reflect.DeepEqual(got, want) {
+			t.Fatalf("round trip: %+v", got)
+		}
+		wf.Stages[impl].Steps[last].Sandbox = adewire.StepSandbox{Access: "off", Read: []string{}, Allow: []string{}, Network: true}
+		if out := saveOK(t, r, "standard.yaml", wf); !strings.Contains(out, "access: off") || strings.Contains(out, "network:") || strings.Contains(out, "~/specs") {
+			t.Fatalf("off block:\n%s", out)
+		}
+		wf.Stages[impl].Steps[last].Sandbox = adewire.DefaultSandbox()
+		if out := saveOK(t, r, "standard.yaml", wf); strings.Contains(out, "sandbox:") {
+			t.Fatalf("sandbox left after reset:\n%s", out)
+		}
+	})
+
 	t.Run("review step round trip", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
 		prompt := slices.IndexFunc(wf.Stages[impl].Steps, func(s adewire.PipelineStep) bool { return s.SmartScript == "" })
 		wf.Stages[impl].Steps = append(append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...), adewire.PipelineStep{
 			ID: "code-review", Name: "Code review", RunsOn: "each repo", Before: "auto", OnFailure: "stop",
-			Results: adewire.ImplicitResults("code-review", "stop"), Timeout: "30m", AllowedTools: []string{}, Params: map[string][]string{},
+			Results: adewire.ImplicitResults("code-review", "stop"), Timeout: "30m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 			Review: &adewire.ReviewStepConfig{SendTo: "new", Implementer: wf.Stages[impl].Steps[prompt].ID},
 		})
 		out := saveOK(t, r, "standard.yaml", wf)

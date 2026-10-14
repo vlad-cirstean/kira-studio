@@ -1,6 +1,7 @@
 import { t } from '@theme/i18n';
 import type { OnFailure, PipelineStep, Stage, StageKind, Workflow } from '../wire';
 import { implicitResults } from './stepResults';
+import { defaultSandbox } from './stepSandbox';
 
 // Pure helpers behind the Workflows form editor (SPEC2 section 5.1.1). Stage and step ids are run
 // keys: they are minted once, here, and never follow a rename.
@@ -69,6 +70,7 @@ export function newStep(steps: readonly PipelineStep[]): PipelineStep {
     allowedTools: [],
     smartScript: '',
     review: null,
+    sandbox: defaultSandbox(),
     params: {},
   };
 }

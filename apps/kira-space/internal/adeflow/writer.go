@@ -317,7 +317,7 @@ var (
 	topOrder    = []string{"id", "name", "kira_space_mcp", "stages"}
 	stageOrder  = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
 	resultOrder = []string{"id", "ok", "description", "next", "max"}
-	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "timeout", "smart_script", "params", "review", "prompt", "allowed_tools"}
+	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "timeout", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -542,6 +542,7 @@ func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
 	setScalar(m, "before", kText, defaultStr(s.Before, "auto"), s.Before != "" && s.Before != "auto", stepOrder)
 	applyResults(m, s, earlier)
 	setScalar(m, "timeout", kText, s.Timeout, true, stepOrder)
+	applySandbox(m, s.Sandbox)
 	if s.Review != nil {
 		dropKeys(m, "smart_script", "params", "prompt", "allowed_tools")
 		applyReview(m, *s.Review)
@@ -557,6 +558,39 @@ func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
 	dropKeys(m, "prompt", "allowed_tools")
 	setScalar(m, "smart_script", kText, s.SmartScript, true, stepOrder)
 	setParams(m, s.Params)
+}
+
+// applySandbox writes a step's sandbox block, or removes it when the policy is the default so a
+// file without one stays unchanged.
+func applySandbox(m *yaml.Node, sb adewire.StepSandbox) {
+	if sb.IsDefault() {
+		dropKeys(m, "sandbox")
+		return
+	}
+	sb = sb.Normalized()
+	_, sn := find(m, "sandbox")
+	if sn == nil || sn.Kind != yaml.MappingNode {
+		sn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		put(m, "sandbox", sn, stepOrder)
+	}
+	order := []string{"access", "read", "allow", "network"}
+	setScalar(sn, "access", kText, sb.Access, true, order)
+	if sb.Access == adewire.SandboxOff {
+		dropKeys(sn, "read", "allow", "network")
+		return
+	}
+	setList(sn, "read", sb.Read, order)
+	setList(sn, "allow", sb.Allow, order)
+	if len(sb.Read) == 0 {
+		dropKeys(sn, "read")
+	}
+	if len(sb.Allow) == 0 {
+		dropKeys(sn, "allow")
+	}
+	setScalar(sn, "network", kBool, fmt.Sprint(sb.Network), !sb.Network, order)
+	if sb.Network {
+		dropKeys(sn, "network")
+	}
 }
 
 // applyReview writes a review step's block; send_to is always spelled out, implementer only when set.

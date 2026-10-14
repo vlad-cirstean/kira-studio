@@ -274,11 +274,11 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 	var prefixes []string
 	for i, stepNode := range list.Content {
 		sp := fmt.Sprintf("%sstep %d: ", prefix[:len(prefix)-2]+", ", i+1)
-		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "timeout", "prompt", "allowed_tools", "smart_script", "params", "review")
+		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "timeout", "prompt", "allowed_tools", "smart_script", "params", "review", "sandbox")
 		if v.err != nil {
 			return out
 		}
-		step := adewire.PipelineStep{AllowedTools: make([]string, 0), Params: map[string][]string{}}
+		step := adewire.PipelineStep{AllowedTools: make([]string, 0), Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
 		step.ID = v.str(sm, sp, "id", true)
 		if v.err == nil && !idPattern.MatchString(step.ID) {
 			v.fail(sm["id"], sp, "id must be lowercase letters, digits, - or _")
@@ -308,6 +308,9 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		}
 		step.Timeout = v.timeout(sm, sp)
 		v.stepBody(sm, sp, &step, candidates)
+		if n, has := sm["sandbox"]; has && v.err == nil {
+			step.Sandbox = v.sandbox(n, sp)
+		}
 		if v.err != nil {
 			return out
 		}
@@ -355,6 +358,83 @@ func (v *validator) stepBody(sm map[string]*yaml.Node, sp string, step *adewire.
 		v.fail(sm["smart_script"], sp, "smart_script must be at most %d characters", maxSmartScriptName)
 	}
 	step.Params = v.stepParams(sm, sp)
+}
+
+const (
+	maxSandboxPaths = 32
+	maxSandboxPath  = 4096
+)
+
+// sandbox reads a step's sandbox block. An empty mapping is the default.
+func (v *validator) sandbox(n *yaml.Node, sp string) adewire.StepSandbox {
+	sb := adewire.DefaultSandbox()
+	if n.Kind != yaml.MappingNode {
+		v.fail(n, sp, "sandbox must be a mapping")
+		return sb
+	}
+	m := v.fields(n, sp, "access", "read", "allow", "network")
+	if v.err != nil {
+		return sb
+	}
+	if _, has := m["access"]; has {
+		sb.Access = v.str(m, sp, "access", true)
+		if v.err == nil && sb.Access != adewire.SandboxWrite && sb.Access != adewire.SandboxRead && sb.Access != adewire.SandboxOff {
+			v.fail(m["access"], sp, "access must be write, read or off")
+		}
+	}
+	sb.Read = v.sandboxPaths(m, sp, "read")
+	sb.Allow = v.sandboxPaths(m, sp, "allow")
+	if _, has := m["network"]; has {
+		sb.Network = v.boolean(m, sp, "network")
+	}
+	if v.err == nil && sb.Access == adewire.SandboxOff && (len(sb.Read) > 0 || len(sb.Allow) > 0 || m["network"] != nil) {
+		v.fail(n, sp, "sandbox off takes no other keys")
+	}
+	return sb
+}
+
+// sandboxPaths reads a list of absolute or ~/ paths.
+func (v *validator) sandboxPaths(m map[string]*yaml.Node, sp, key string) []string {
+	out := make([]string, 0)
+	n, has := m[key]
+	if !has {
+		return out
+	}
+	if n.Kind != yaml.SequenceNode {
+		v.fail(n, sp, "%s must be a list of paths", key)
+		return out
+	}
+	if len(n.Content) > maxSandboxPaths {
+		v.fail(n, sp, "%s has too many entries: at most %d", key, maxSandboxPaths)
+		return out
+	}
+	for _, e := range n.Content {
+		if e.Kind != yaml.ScalarNode || e.Tag == "!!null" {
+			v.fail(e, sp, "%s entries must be text", key)
+			return out
+		}
+		switch p := e.Value; {
+		case len(p) > maxSandboxPath || strings.ContainsAny(p, "\x00\r\n"):
+			v.fail(e, sp, "path %q is not allowed", truncate(p, 80))
+		case p != "~" && !strings.HasPrefix(p, "~/") && !strings.HasPrefix(p, "/"):
+			v.fail(e, sp, "path %q must be absolute or start with ~/", p)
+		case p == "/" || p == "~" || strings.TrimRight(p, "/") == "~" || strings.HasPrefix(strings.TrimRight(p, "/")+"/", "~/Library/Keychains/"):
+			v.fail(e, sp, "path %q is not allowed", p)
+		default:
+			out = append(out, p)
+		}
+		if v.err != nil {
+			return out
+		}
+	}
+	return out
+}
+
+func truncate(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
 }
 
 // reviewConfig reads a review step's block. An empty mapping takes the defaults.

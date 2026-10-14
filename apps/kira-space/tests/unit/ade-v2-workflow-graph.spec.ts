@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { implicitResults } from '../../frontend/src/ade/v2/board/stepResults';
+import { defaultSandbox } from '../../frontend/src/ade/v2/board/stepSandbox';
 import {
   addStep,
   aggregateEdges,
@@ -37,6 +38,7 @@ const step = (id: string, results: StepResult[] = implicitResults(id, 'stop')): 
   allowedTools: [],
   smartScript: '',
   review: null,
+  sandbox: defaultSandbox(),
   params: {},
 });
 const wfOf = (steps: PipelineStep[]): Workflow => ({

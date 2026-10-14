@@ -93,6 +93,17 @@ export interface PipelineStep {
   params: Record<string, string[]>;
   /** Set on a review step: it waits for the user instead of running an agent. */
   review: ReviewStepConfig | null;
+  /** Agent policy; the default (write, network on) when the step has no block. */
+  sandbox: StepSandbox;
+}
+export type SandboxAccess = 'write' | 'read' | 'off';
+export interface StepSandbox {
+  access: SandboxAccess;
+  /** Extra read-only folders: absolute or `~/`. */
+  read: string[];
+  /** Extra read-write paths: absolute or `~/`. */
+  allow: string[];
+  network: boolean;
 }
 interface ReviewStepConfig {
   sendTo: 'implementer' | 'new';

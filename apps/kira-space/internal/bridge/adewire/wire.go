@@ -112,6 +112,49 @@ type PipelineStep struct {
 	Params      map[string][]string `json:"params"`
 	// Review, when set, makes this a review step: it waits for the user instead of running an agent.
 	Review *ReviewStepConfig `json:"review"`
+	// Sandbox is what the step's agent may do on the machine; always set, the default when absent.
+	Sandbox StepSandbox `json:"sandbox"`
+}
+
+// Sandbox access levels.
+const (
+	SandboxWrite = "write"
+	SandboxRead  = "read"
+	SandboxOff   = "off"
+)
+
+// StepSandbox is a step's agent policy. Read are extra read-only folders, Allow extra read-write
+// paths; both are absolute or start with "~/".
+type StepSandbox struct {
+	Access  string   `json:"access"`
+	Read    []string `json:"read"`
+	Allow   []string `json:"allow"`
+	Network bool     `json:"network"`
+}
+
+// DefaultSandbox is the policy of a step without a sandbox block: write its worktree, network on.
+func DefaultSandbox() StepSandbox {
+	return StepSandbox{Access: SandboxWrite, Read: []string{}, Allow: []string{}, Network: true}
+}
+
+// Normalized fills the default into a zero value (a snapshot from before the field existed).
+func (s StepSandbox) Normalized() StepSandbox {
+	if s.Access == "" {
+		return DefaultSandbox()
+	}
+	if s.Read == nil {
+		s.Read = []string{}
+	}
+	if s.Allow == nil {
+		s.Allow = []string{}
+	}
+	return s
+}
+
+// IsDefault reports whether s equals the default policy.
+func (s StepSandbox) IsDefault() bool {
+	s = s.Normalized()
+	return s.Access == SandboxWrite && len(s.Read) == 0 && len(s.Allow) == 0 && s.Network
 }
 
 // Review step routes.
