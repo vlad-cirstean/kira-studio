@@ -17,13 +17,15 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 // TestMemoryIngestEval measures the memory ingest pipeline on a pinned corpus of repo text (P285).
 // Opt-in twice: it lives in this nested module and needs KIRA_MEMORY_EVAL=1, because a run costs
 // dollars. Run with `bun run eval:memory`. Env:
 //
-//	KIRA_EVAL_MODE     prepare | golden | run
+//	KIRA_EVAL_MODE     prepare | golden | run | footprint (free: re-renders finished rounds, no claude)
+//	KIRA_EVAL_ROUNDS   footprint mode: comma-separated round names
 //	KIRA_EVAL_SET      tuning | holdout | all (run default tuning; prepare and golden default all)
 //	KIRA_EVAL_ROUND    round name, the output dir under docs/v2.5/plans/P285-runs
 //	KIRA_EVAL_PROMPTS  JSON map {prompt id: text} overriding registry prompts for the run
@@ -36,15 +38,19 @@ func TestMemoryIngestEval(t *testing.T) {
 	if os.Getenv("KIRA_MEMORY_EVAL") != "1" {
 		t.Skip("memory ingest eval: set KIRA_MEMORY_EVAL=1 (costs real money, see bun run eval:memory)")
 	}
-	real, err := exec.LookPath("claude")
-	if err != nil {
-		t.Skip("memory ingest eval: no claude on PATH")
-	}
 	man, err := loadManifest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	mode := os.Getenv("KIRA_EVAL_MODE")
+	if mode == "footprint" {
+		evalFootprint(t, man)
+		return
+	}
+	real, err := exec.LookPath("claude")
+	if err != nil {
+		t.Skip("memory ingest eval: no claude on PATH")
+	}
 	switch mode {
 	case "prepare":
 		evalPrepare(t, man)
@@ -53,7 +59,7 @@ func TestMemoryIngestEval(t *testing.T) {
 	case "run":
 		evalRun(t, man, real)
 	default:
-		t.Fatalf("KIRA_EVAL_MODE = %q, want prepare, golden or run", mode)
+		t.Fatalf("KIRA_EVAL_MODE = %q, want prepare, golden, run or footprint", mode)
 	}
 }
 
@@ -156,6 +162,11 @@ type runRecord struct {
 	Stages    stageInfo       `json:"stages"`
 	MemoryDoc string          `json:"memoryDoc"`
 	DocError  string          `json:"docError,omitempty"`
+	// RenderedDoc is what importer.RenderDoc renders from the stored facts (C_doc reads it); MemoryDoc is
+	// the file the write-back wrote, empty when the write failed. DocMismatch: both exist and differ.
+	RenderedDoc    string `json:"renderedDoc,omitempty"`
+	RenderProblems int    `json:"renderProblems,omitempty"`
+	DocMismatch    bool   `json:"docMismatch,omitempty"`
 	// CostUSD is the job (extract, cross-check, finalize); GateUSD the store_memory gate and reconcile calls.
 	CostUSD    float64 `json:"costUsd"`
 	ExtractUSD float64 `json:"extractUsd"`
@@ -509,11 +520,18 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	rec.Stages.Chunks = f.ChunkCount
 	rec.Stages.Dropped, rec.Stages.Unresolved = f.Dropped, f.Unresolved
 	rec.Stages.Added, rec.Stages.Updated, rec.Stages.Noop = f.Added, f.Updated, f.Noop
+	updated := evalDocDate
 	if f.DocPath != "" {
 		if raw, err := os.ReadFile(f.DocPath); err == nil {
 			rec.MemoryDoc = string(raw)
+			if doc, ok, _ := memfmt.ParseDoc(raw); ok && doc.Updated != "" {
+				updated = doc.Updated
+			}
 		}
 	}
+	rec.RenderedDoc, rec.RenderProblems = renderChecked(importer.DocInput{GroupID: f.GroupID, Title: f.Title, FileName: s.fileName(),
+		Prov: evalProvenance(), Updated: updated}, mems)
+	rec.DocMismatch = rec.MemoryDoc != "" && rec.MemoryDoc != rec.RenderedDoc
 	return rec, nil
 }
 
@@ -533,6 +551,11 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 		MissedEssential []missed `json:"missedEssential"`
 		// Notes are the judge's notes on failed checks of stored facts.
 		Notes []string `json:"notes"`
+		// DocMismatch: the written .memory.md differs from the render; RenderProblems: ParseDoc problems
+		// of the render; DocError: why the write-back failed, if it did.
+		DocMismatch    bool   `json:"docMismatch"`
+		RenderProblems int    `json:"renderProblems"`
+		DocError       string `json:"docError,omitempty"`
 	}
 	out := map[string]any{"round": cfg.round, "set": set, "judgeModel": judgeModel, "capped": capped, "incomplete": failed,
 		"budget": cfg.budget, "promptsOverride": cfg.promptsFile != ""}
@@ -546,7 +569,8 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 		}
 		rec := recs[s.ID]
 		tl := tallyOf(texts[s.ID], golden[s.ID], rec, g)
-		so := srcOut{Category: s.Category, Tally: tl, Ratios: tl.ratios()}
+		so := srcOut{Category: s.Category, Tally: tl, Ratios: tl.ratios(), DocMismatch: rec.DocMismatch,
+			RenderProblems: rec.RenderProblems, DocError: rec.DocError}
 		weight := map[string]string{}
 		fact := map[string]string{}
 		for _, f := range golden[s.ID].Facts {

@@ -337,7 +337,7 @@ func (t tally) ratios() ratios {
 
 func tallyOf(text string, gold goldenLine, rec runRecord, g scoreGrades) tally {
 	t := tally{SrcRunes: utf8.RuneCountInString(text), Stored: len(rec.Stored), Extracted: len(rec.Extracted),
-		DocRunes: utf8.RuneCountInString(rec.MemoryDoc)}
+		DocRunes: utf8.RuneCountInString(rec.RenderedDoc)}
 	weight := map[string]string{}
 	for _, f := range gold.Facts {
 		weight[f.ID] = f.Weight
