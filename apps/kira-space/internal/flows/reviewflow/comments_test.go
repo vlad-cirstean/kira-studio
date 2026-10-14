@@ -189,3 +189,52 @@ func TestRefsChangedKeepsComments(t *testing.T) {
 		t.Fatalf("comments after an unrelated refsChanged = %+v", got)
 	}
 }
+
+// Guards kind, state and the export markers: a question lists as an open question, setState
+// addresses it, a missing id answers false, and Copy for AI marks both.
+func TestCommentKindStateExport(t *testing.T) {
+	app := flowharness.New(t)
+	gs := app.OpenGitStream()
+	repo, tip := twoFileFeature(app)
+	id := openRepo(t, gs, repo.Dir)
+
+	change := addComment(t, gs, id, "feature", "a.txt", tip, lr(1, 1), "rename this")
+	question := call[gitrpc.ReviewCommentAddResult](t, gs, "review.comment.add", gitrpc.ReviewCommentAddParams{
+		RepoID: id, Branch: "feature", Path: "a.txt", At: tip, Range: lr(3, 3), Body: "why?", Kind: "question",
+	}).Comment
+	if change.Kind != "change" || change.State != "open" || question.Kind != "question" || question.State != "open" {
+		t.Fatalf("kinds/states = %+v / %+v", change, question)
+	}
+	badRequest(t, gs, "review.comment.add", gitrpc.ReviewCommentAddParams{
+		RepoID: id, Branch: "feature", Path: "a.txt", At: tip, Range: lr(1, 1), Body: "x", Kind: "bogus",
+	}, "kind")
+
+	set := func(cid int64, state string) bool {
+		return call[gitrpc.ReviewCommentSetStateResult](t, gs, "review.comment.setState",
+			gitrpc.ReviewCommentSetStateParams{RepoID: id, Branch: "feature", ID: cid, State: state}).Changed
+	}
+	if !set(question.ID, "addressed") {
+		t.Fatal("setState addressed answered false")
+	}
+	if set(9999, "addressed") {
+		t.Fatal("setState on a missing id answered true")
+	}
+	badRequest(t, gs, "review.comment.setState", gitrpc.ReviewCommentSetStateParams{
+		RepoID: id, Branch: "feature", ID: question.ID, State: "bogus",
+	}, "state")
+
+	got := listComments(t, gs, id, "feature")
+	if len(got) != 2 || got[0].ID != change.ID || got[0].State != "open" || got[1].State != "addressed" {
+		t.Fatalf("list = %+v", got)
+	}
+	text := call[gitrpc.ReviewCommentExportResult](t, gs, "review.comment.export", gitrpc.ReviewCommentExportParams{RepoID: id, Branch: "feature"}).Text
+	want := "Review comments — feature (2 comments)\n\n" +
+		"a.txt:1\n  rename this\n\n" +
+		"a.txt:3  [question]  [addressed]\n  why?\n"
+	if text != want {
+		t.Fatalf("export =\n%q\nwant\n%q", text, want)
+	}
+	if !set(question.ID, "open") || listComments(t, gs, id, "feature")[1].State != "open" {
+		t.Fatal("reopen failed")
+	}
+}

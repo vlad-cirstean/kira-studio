@@ -27,7 +27,7 @@ func buildCommentFixture(t *testing.T) (dir, sha1 string, entry *RepoEntry) {
 
 func addTestComment(t *testing.T, ctx context.Context, entry *RepoEntry, at string, r gitreview.LineRange) CommentEntry {
 	t.Helper()
-	added, err := entry.AddComment(ctx, "main", "a.txt", at, r, "note")
+	added, err := entry.AddComment(ctx, "main", "a.txt", at, r, "note", "")
 	if err != nil {
 		t.Fatalf("AddComment: %v", err)
 	}

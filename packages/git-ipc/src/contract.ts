@@ -1309,7 +1309,18 @@ export interface ReviewComment {
   readonly anchor: CommentAnchor;
   readonly anchorSha: string;
   readonly createdAt: number; // unix millis
+  /** P286: a change request or a question to answer. */
+  readonly kind: ReviewCommentKind;
+  readonly state: ReviewCommentState;
+  /** An agent's answer; '' until one replies. */
+  readonly reply: string;
+  readonly repliedAt: number | null; // unix millis
+  /** Last send to an agent, unix millis. */
+  readonly sentAt: number | null;
 }
+
+export type ReviewCommentKind = 'change' | 'question';
+export type ReviewCommentState = 'open' | 'addressed';
 
 // ---------------------------------------------------------------------------------------
 // P11 — search. Structural copy of `packages/core`'s `search/query.ts` (minus `scope`: the
@@ -1599,8 +1610,15 @@ export type Contract = {
         at: string;
         range: LineRange;
         body: string;
+        /** P286: defaults to 'change'. */
+        kind?: ReviewCommentKind;
       };
       result: { readonly comment: ReviewComment };
+    };
+    /** P286: reopens or addresses one comment. `changed` is false when the id matches nothing. */
+    'review.comment.setState': {
+      params: { repoId: string; branch: string; id: number; state: ReviewCommentState };
+      result: { readonly changed: boolean };
     };
     /** G13 D11: `at` defaults to the branch tip when omitted — the resolved value is echoed back
      *  so a caller never has to guess which coordinates it is holding. */

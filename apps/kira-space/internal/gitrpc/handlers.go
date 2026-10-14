@@ -272,6 +272,9 @@ var requestHandlers = map[string]requestHandler{
 	"review.comment.remove": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewCommentRemove(ctx, c, params)
 	},
+	"review.comment.setState": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentSetState(ctx, c, params)
+	},
 	"review.comment.clear": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewCommentClear(ctx, c, params)
 	},

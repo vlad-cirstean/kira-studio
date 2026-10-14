@@ -174,7 +174,9 @@ package gitrpc
 // connection's credential prompts go to the app's credential relay, tagged with its window.
 // P257: 47 -> 48, breaking. FileChange loses additions, deletions and isBinary; the file lists
 // (commit.detail, stash.show, working.detail) read --name-status only.
-const ContractVersion = 48
+// P286: 48 -> 49, additive. One new request, review.comment.setState; review.comment.add takes an
+// optional kind; every comment carries kind, state, reply, repliedAt and sentAt.
+const ContractVersion = 49
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

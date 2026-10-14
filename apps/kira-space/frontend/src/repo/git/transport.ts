@@ -109,6 +109,7 @@ function fireReviewRepaint(event: ReviewRepaintEvent): void {
 const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
   'review.comment.add',
   'review.comment.remove',
+  'review.comment.setState',
   'review.comment.clear',
 ]);
 

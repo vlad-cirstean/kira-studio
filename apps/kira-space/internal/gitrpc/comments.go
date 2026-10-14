@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
@@ -13,11 +14,6 @@ import (
 // D17: thin dispatch, five handlers — decode, D15's shape validation, entryFor, one RepoEntry
 // call, marshal (with two size guards, following G11 D15 exactly). No handler here computes
 // anything itself.
-
-// MaxCommentBytes is D15's own cap on one comment's body, applied AFTER \r\n/\r normalisation —
-// roughly 1,200 words, far past anything typed into a gutter, and what bounds review.comment.list/
-// export deterministically.
-const MaxCommentBytes = 8 << 10
 
 // objectIDPattern is D15's own shape check on `at`: a sha-1 or sha-256 object id, lowercase.
 var objectIDPattern = regexp.MustCompile(`^[0-9a-f]{40}$|^[0-9a-f]{64}$`)
@@ -69,17 +65,20 @@ func (r *Router) handleReviewCommentAdd(ctx context.Context, c *gitsession.Conn,
 			if p.Range.Start < 1 || p.Range.End < p.Range.Start {
 				return "", ipcerr.Contract("gitrpc: review.comment.add: range must satisfy 1 <= start <= end")
 			}
+			if p.Kind != "" && p.Kind != gitreview.CommentKindChange && p.Kind != gitreview.CommentKindQuestion {
+				return "", ipcerr.Contract("gitrpc: review.comment.add: kind must be change or question")
+			}
 			body = normalizeCommentBody(p.Body)
 			if body == "" {
 				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentEmpty.body", nil)
 			}
-			if len(body) > MaxCommentBytes {
+			if len(body) > gitreview.MaxCommentBytes {
 				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentTooLong.body", nil)
 			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewCommentAddParams) (ReviewCommentAddResult, error) {
-			comment, err := entry.AddComment(ctx, p.Branch, p.Path, p.At, p.Range, body)
+			comment, err := entry.AddComment(ctx, p.Branch, p.Path, p.At, p.Range, body, p.Kind)
 			if err != nil {
 				return ReviewCommentAddResult{}, mapDetailError(err)
 			}
@@ -140,6 +139,33 @@ func (r *Router) handleReviewCommentRemove(ctx context.Context, c *gitsession.Co
 				return ReviewCommentRemoveResult{}, mapDetailError(err)
 			}
 			return ReviewCommentRemoveResult{Removed: removed}, nil
+		},
+	)
+}
+
+func (r *Router) handleReviewCommentSetState(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "review.comment.setState", params,
+		func(p ReviewCommentSetStateParams) (string, error) {
+			if err := requireNonEmpty("review.comment.setState", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if err := validRefArg("branch", p.Branch); err != nil {
+				return "", err
+			}
+			if p.ID <= 0 {
+				return "", ipcerr.Contract("gitrpc: review.comment.setState: id must be positive")
+			}
+			if p.State != gitreview.CommentStateOpen && p.State != gitreview.CommentStateAddressed {
+				return "", ipcerr.Contract("gitrpc: review.comment.setState: state must be open or addressed")
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewCommentSetStateParams) (ReviewCommentSetStateResult, error) {
+			changed, err := entry.SetCommentState(ctx, p.Branch, p.ID, p.State)
+			if err != nil {
+				return ReviewCommentSetStateResult{}, mapDetailError(err)
+			}
+			return ReviewCommentSetStateResult{Changed: changed}, nil
 		},
 	)
 }

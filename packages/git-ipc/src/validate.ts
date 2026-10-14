@@ -183,7 +183,9 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P246: 46 -> 47, breaking. 'credential.request' and 'credential.provide' are removed: native git
 // stream credential prompts go through Kira Space's prompt router and credential relay instead.
 // P257: 47 -> 48, breaking. 'FileChange' loses 'additions', 'deletions' and 'isBinary'.
-export const CONTRACT_VERSION = 48;
+// P286: 48 -> 49, additive. New request 'review.comment.setState'; 'review.comment.add' gains an
+// optional 'kind'; 'ReviewComment' gains 'kind', 'state', 'reply', 'repliedAt' and 'sentAt'.
+export const CONTRACT_VERSION = 49;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -267,6 +269,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.comment.add': true,
   'review.comment.list': true,
   'review.comment.remove': true,
+  'review.comment.setState': true,
   'review.comment.clear': true,
   'review.comment.export': true,
   'remote.pullPreflight': true,

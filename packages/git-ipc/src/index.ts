@@ -72,6 +72,8 @@ export type {
   RevertParentChoice,
   RevertPreflight,
   ReviewComment,
+  ReviewCommentKind,
+  ReviewCommentState,
   ReviewDeltaSource,
   ReviewDiffMode,
   ReviewFileEntry,

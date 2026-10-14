@@ -27,6 +27,11 @@ type CommentEntry struct {
 	Anchor    gitreview.CommentAnchor `json:"anchor"`
 	AnchorSHA string                  `json:"anchorSha"`
 	CreatedAt int64                   `json:"createdAt"`
+	Kind      string                  `json:"kind"`
+	State     string                  `json:"state"`
+	Reply     string                  `json:"reply"`
+	RepliedAt *int64                  `json:"repliedAt"`
+	SentAt    *int64                  `json:"sentAt"`
 }
 
 // CommentListResult mirrors @kira/git-ipc's own review.comment.list result.
@@ -39,7 +44,17 @@ func toCommentEntry(ac gitreview.AnchoredComment) CommentEntry {
 	return CommentEntry{
 		ID: ac.ID, Path: ac.Path, Range: ac.Range, Body: ac.Body,
 		Anchor: ac.Anchor, AnchorSHA: ac.AnchorSHA, CreatedAt: ac.CreatedAt.UnixMilli(),
+		Kind: ac.Kind, State: ac.State, Reply: ac.Reply,
+		RepliedAt: millisPtr(ac.RepliedAt), SentAt: millisPtr(ac.SentAt),
 	}
+}
+
+func millisPtr(t *time.Time) *int64 {
+	if t == nil {
+		return nil
+	}
+	ms := t.UnixMilli()
+	return &ms
 }
 
 func toCommentEntries(acs []gitreview.AnchoredComment) []CommentEntry {
@@ -55,7 +70,7 @@ func toCommentEntries(acs []gitreview.AnchoredComment) []CommentEntry {
 // count at `at` — then blobOID(at, path) captures tier 0's own comparand and the row is written
 // anchored to `at` (D6). `at` is the revision the caller says it was reading; there is no default
 // (D15's own refusal to guess).
-func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r gitreview.LineRange, body string) (CommentEntry, error) {
+func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r gitreview.LineRange, body, kind string) (CommentEntry, error) {
 	// G31 round-2 performance review, finding #5 (same fix as MarkFile's): blobOID comes straight
 	// off readSnapshotSource's own return now, not a second blobOID(ctx, at, path) round trip for
 	// the identical rev — valid here since a non-ContentText kind already returns above.
@@ -71,7 +86,7 @@ func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r g
 	}
 
 	stored, err := e.review.AddComment(ctx, e.Summary.RepoID, branch, gitreview.Comment{
-		Path: path, Range: r, Body: body, AnchorSHA: at, AnchorBlobOID: blobOID, CreatedAt: time.Now(),
+		Path: path, Range: r, Body: body, AnchorSHA: at, AnchorBlobOID: blobOID, CreatedAt: time.Now(), Kind: kind,
 	})
 	if err != nil {
 		return CommentEntry{}, err
@@ -143,6 +158,18 @@ func (e *RepoEntry) RemoveComment(ctx context.Context, branch string, id int64) 
 		return false, err
 	}
 	return removed, nil
+}
+
+// SetCommentState is review.comment.setState's whole orchestration.
+func (e *RepoEntry) SetCommentState(ctx context.Context, branch string, id int64, state string) (bool, error) {
+	changed, err := e.review.SetCommentState(ctx, e.Summary.RepoID, branch, id, state)
+	if err != nil {
+		return false, err
+	}
+	if err := e.review.Touch(ctx, e.Summary.RepoID, branch); err != nil {
+		return false, err
+	}
+	return changed, nil
 }
 
 // ClearComments is review.comment.clear's whole orchestration — a thin pass-through plus Touch.

@@ -2,6 +2,7 @@ package gitreview
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 )
@@ -16,7 +17,23 @@ type Comment struct {
 	AnchorSHA     string
 	AnchorBlobOID string
 	CreatedAt     time.Time
+	Kind          string // CommentKindChange | CommentKindQuestion
+	State         string // CommentStateOpen | CommentStateAddressed
+	Reply         string
+	RepliedAt     *time.Time
+	SentAt        *time.Time
 }
+
+// Comment kinds and states (P286).
+const (
+	CommentKindChange     = "change"
+	CommentKindQuestion   = "question"
+	CommentStateOpen      = "open"
+	CommentStateAddressed = "addressed"
+)
+
+// MaxCommentBytes bounds one comment body or reply, after \r\n normalisation.
+const MaxCommentBytes = 8 << 10
 
 // AddComment inserts one comment, creating (repoID, branch)'s review_session row if this is the
 // first thing ever recorded for it (D4) and bumping last_used_at either way. Returns the row with
@@ -40,12 +57,16 @@ func (s *Store) AddComment(ctx context.Context, repoID, branch string, c Comment
 		return Comment{}, err
 	}
 
+	if c.Kind == "" {
+		c.Kind = CommentKindChange
+	}
+	c.State = CommentStateOpen
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO review_comment
-			(session_id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			(session_id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at, kind)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, sessionID, c.Path, c.Range.Start, c.Range.End, c.Body, c.AnchorSHA, c.AnchorBlobOID,
-		c.CreatedAt.UnixMilli())
+		c.CreatedAt.UnixMilli(), c.Kind)
 	if err != nil {
 		return Comment{}, fmt.Errorf("gitreview: insert review_comment: %w", err)
 	}
@@ -78,11 +99,34 @@ func (s *Store) Comments(ctx context.Context, repoID, branch string) ([]Comment,
 		return nil, nil
 	}
 
-	rows, err := db.QueryContext(ctx, `
-		SELECT id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at
-		FROM review_comment WHERE session_id = ?
-		ORDER BY path, start_line, end_line, created_at, id
-	`, id)
+	return queryComments(ctx, db, id, false)
+}
+
+// OpenComments is Comments filtered to state open, in the same stored order.
+func (s *Store) OpenComments(ctx context.Context, repoID, branch string) ([]Comment, error) {
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	id, ok, err := sessionID(ctx, db, repoID, branch)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil
+	}
+	return queryComments(ctx, db, id, true)
+}
+
+func queryComments(ctx context.Context, db *sql.DB, sessionID int64, openOnly bool) ([]Comment, error) {
+	q := `
+		SELECT id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at,
+			kind, state, reply, replied_at, sent_at
+		FROM review_comment WHERE session_id = ?`
+	if openOnly {
+		q += ` AND state = 'open'`
+	}
+	rows, err := db.QueryContext(ctx, q+` ORDER BY path, start_line, end_line, created_at, id`, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("gitreview: query review_comment: %w", err)
 	}
@@ -92,17 +136,75 @@ func (s *Store) Comments(ctx context.Context, repoID, branch string) ([]Comment,
 	for rows.Next() {
 		var c Comment
 		var createdAtMillis int64
+		var repliedAt, sentAt sql.NullInt64
 		if err := rows.Scan(&c.ID, &c.Path, &c.Range.Start, &c.Range.End, &c.Body,
-			&c.AnchorSHA, &c.AnchorBlobOID, &createdAtMillis); err != nil {
+			&c.AnchorSHA, &c.AnchorBlobOID, &createdAtMillis,
+			&c.Kind, &c.State, &c.Reply, &repliedAt, &sentAt); err != nil {
 			return nil, fmt.Errorf("gitreview: scan review_comment: %w", err)
 		}
 		c.CreatedAt = time.UnixMilli(createdAtMillis)
+		if repliedAt.Valid {
+			t := time.UnixMilli(repliedAt.Int64)
+			c.RepliedAt = &t
+		}
+		if sentAt.Valid {
+			t := time.UnixMilli(sentAt.Int64)
+			c.SentAt = &t
+		}
 		out = append(out, c)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("gitreview: iterate review_comment: %w", err)
 	}
 	return out, nil
+}
+
+// SetCommentState reopens or addresses one comment. false when the id matches nothing in this
+// session.
+func (s *Store) SetCommentState(ctx context.Context, repoID, branch string, id int64, state string) (bool, error) {
+	return s.updateComment(ctx, repoID, branch, `state = ?`, []any{state}, id)
+}
+
+// ReplyComment stores an agent reply; resolved moves the comment to addressed, otherwise it stays open.
+func (s *Store) ReplyComment(ctx context.Context, repoID, branch string, id int64, reply string, resolved bool, at time.Time) (bool, error) {
+	state := CommentStateOpen
+	if resolved {
+		state = CommentStateAddressed
+	}
+	return s.updateComment(ctx, repoID, branch, `reply = ?, replied_at = ?, state = ?`,
+		[]any{reply, at.UnixMilli(), state}, id)
+}
+
+// MarkSent stamps sent_at on the given comments of this session.
+func (s *Store) MarkSent(ctx context.Context, repoID, branch string, ids []int64, at time.Time) error {
+	for _, id := range ids {
+		if _, err := s.updateComment(ctx, repoID, branch, `sent_at = ?`, []any{at.UnixMilli()}, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) updateComment(ctx context.Context, repoID, branch, set string, args []any, id int64) (bool, error) {
+	db, err := s.conn()
+	if err != nil {
+		return false, err
+	}
+	args = append(args, id, repoID, branch)
+	res, err := db.ExecContext(ctx, `UPDATE review_comment SET `+set+` WHERE id = ? AND session_id = (
+		SELECT id FROM review_session WHERE repo_id = ? AND branch = ?
+	)`, args...)
+	if err != nil {
+		return false, fmt.Errorf("gitreview: update review_comment: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("gitreview: read RowsAffected: %w", err)
+	}
+	if n > 0 {
+		s.notify(ReviewChange{RepoID: repoID, Branch: branch, State: "comment"})
+	}
+	return n > 0, nil
 }
 
 // RemoveComment deletes one comment, scoped to (repoID, branch)'s own session so an id belonging

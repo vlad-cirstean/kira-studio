@@ -212,7 +212,7 @@ func (b *TaskBoard) WatchReviews() {
 }
 
 func (b *TaskBoard) onReviewChange(c gitreview.ReviewChange) {
-	if c.State == "full" || b.ctx.Err() != nil {
+	if c.State == "full" || c.State == "comment" || b.ctx.Err() != nil {
 		return
 	}
 	b.mu.Lock()

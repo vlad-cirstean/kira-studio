@@ -476,6 +476,20 @@ type ReviewCommentAddParams struct {
 	At     string              `json:"at"`
 	Range  gitreview.LineRange `json:"range"`
 	Body   string              `json:"body"`
+	Kind   string              `json:"kind,omitempty"` // change (default) | question
+}
+
+// ReviewCommentSetStateParams is review.comment.setState's request (P286).
+type ReviewCommentSetStateParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	ID     int64  `json:"id"`
+	State  string `json:"state"` // open | addressed
+}
+
+// ReviewCommentSetStateResult is false when the id matches nothing.
+type ReviewCommentSetStateResult struct {
+	Changed bool `json:"changed"`
 }
 
 // ReviewCommentAddResult carries the whole new comment, id included, so the extension can render
