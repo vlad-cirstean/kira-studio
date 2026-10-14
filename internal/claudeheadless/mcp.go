@@ -62,6 +62,8 @@ type Grant struct {
 	// Results are the step's declared results; finish_step's status is one of their ids or
 	// needs_input. Empty = the implicit done (ok) and failed (not ok).
 	Results []ResultSpec
+	// Review, when set on a run grant, adds reply_review_comment for those comment ids.
+	Review *ReviewGrant
 }
 
 // ResultSpec is one result a step may report.
@@ -103,6 +105,7 @@ type Server struct {
 	onFinish FinishFunc
 	space    SpaceTools
 	outcomes Outcomes
+	review   ReviewReplier
 	prompts  llmprompts.Source
 
 	mu     sync.Mutex
@@ -123,6 +126,8 @@ type Options struct {
 	OnFinish FinishFunc
 	Space    SpaceTools
 	Outcomes Outcomes
+	// Review answers reply_review_comment calls; nil refuses review grants.
+	Review ReviewReplier
 	// Prompts resolves tool and instruction texts; nil means the registry defaults.
 	Prompts llmprompts.Source
 }
@@ -132,7 +137,7 @@ func NewServer(o Options) *Server {
 	if o.Prompts == nil {
 		o.Prompts = llmprompts.Defaults()
 	}
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, prompts: o.Prompts}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, prompts: o.Prompts}
 }
 
 type finishArgs struct {
@@ -193,7 +198,7 @@ func (s *Server) finishSchema(results []ResultSpec) (*jsonschema.Schema, error) 
 }
 
 // buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
-func (s *Server) buildMCPServer(finish, space, outcomes, git bool, results []ResultSpec) *mcp.Server {
+func (s *Server) buildMCPServer(finish, space, outcomes, git, review bool, results []ResultSpec) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
 		opts.Instructions = llmprompts.HeadlessSpaceInstructions.Text(s.prompts, llmprompts.NoVars{})
@@ -218,6 +223,9 @@ func (s *Server) buildMCPServer(finish, space, outcomes, git bool, results []Res
 	}
 	if git {
 		s.addGitTool(srv)
+	}
+	if review {
+		s.addReviewTool(srv)
 	}
 	return srv
 }
@@ -326,7 +334,7 @@ func (s *Server) sharedServer(key [4]bool) *mcp.Server {
 	}
 	srv := s.shared[key]
 	if srv == nil && (key[0] || key[1] || key[2] || key[3]) {
-		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], nil)
+		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], false, nil)
 		s.shared[key] = srv
 	}
 	return srv
@@ -348,9 +356,15 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 		}
 		g.Git = &GitGrant{Worktrees: wts, Push: g.Git.Push}
 	}
+	if g.Review != nil {
+		if g.RunID == "" || s.review == nil {
+			return "", nil, errors.New("claudeheadless: review grant needs a run and a review replier")
+		}
+		g.Review = &ReviewGrant{CommentIDs: slices.Clone(g.Review.CommentIDs)}
+	}
 	var perRun *mcp.Server
-	if g.RunID != "" && !IsImplicit(g.Results) {
-		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Results)
+	if g.RunID != "" && (!IsImplicit(g.Results) || g.Review != nil) {
+		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Review != nil, g.Results)
 	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
