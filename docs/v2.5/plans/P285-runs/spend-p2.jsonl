@@ -59,3 +59,9 @@
 {"time":"2026-10-14T05:34:49Z","round":"round-p2-01b","kind":"pipeline","id":"cmt-runner-go","usd":0.08519090000000001}
 {"time":"2026-10-14T05:34:49Z","round":"round-p2-01b","kind":"gate","id":"cmt-runner-go","usd":0.042572399999999996}
 {"time":"2026-10-14T05:35:18Z","round":"round-p2-01b","kind":"judge","id":"cmt-runner-go","usd":0.1346326}
+{"time":"2026-10-14T07:09:03Z","round":"round-p2-smoke","kind":"pipeline","id":"json-ade-errors","usd":0.0325474}
+{"time":"2026-10-14T07:09:03Z","round":"round-p2-smoke","kind":"gate","id":"json-ade-errors","usd":0.0137644}
+{"time":"2026-10-14T07:09:16Z","round":"round-p2-smoke","kind":"judge","id":"json-ade-errors","usd":0.059852}
+{"time":"2026-10-14T07:09:47Z","round":"round-p2-smoke","kind":"pipeline","id":"plan-p153","usd":0.1780592}
+{"time":"2026-10-14T07:09:47Z","round":"round-p2-smoke","kind":"gate","id":"plan-p153","usd":0.0627184}
+{"time":"2026-10-14T07:10:31Z","round":"round-p2-smoke","kind":"judge","id":"plan-p153","usd":0.2238846}
