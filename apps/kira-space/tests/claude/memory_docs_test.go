@@ -68,6 +68,31 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 		}
 	})
 
+	t.Run("list", func(t *testing.T) {
+		out, _ := app.claudeP(t, repo, nil,
+			"Remember for the team: billing amounts are stored in cents, rounded half up, and capped at 12 digits. Use the kira-memory server.",
+			"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", strings.Join(memTools, ","),
+			"--output-format", "stream-json", "--verbose")
+		uses := toolUses(parseStream(out), "mcp__"+memoryServer+"__store_memory")
+		if len(uses) == 0 {
+			t.Fatalf("no store_memory tool use in the stream:\n%s", tail(out, 1500))
+		}
+		var in struct {
+			Items []struct {
+				Fact string `json:"fact"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(uses[0].Input, &in); err != nil || len(in.Items) != 1 {
+			t.Fatalf("store_memory input = %s (%v), want exactly one item", uses[0].Input, err)
+		}
+		fact := strings.ToLower(in.Items[0].Fact)
+		for _, want := range []string{"cents", "half up", "12"} {
+			if !strings.Contains(fact, want) {
+				t.Errorf("fact %q lacks %q; the list about one subject must stay one fact", in.Items[0].Fact, want)
+			}
+		}
+	})
+
 	t.Run("files", func(t *testing.T) {
 		docs := filepath.Join(repo, "docs")
 		deploy := filepath.Join(docs, "deploy.md")

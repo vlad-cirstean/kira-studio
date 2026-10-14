@@ -31,8 +31,7 @@ type DistillVars struct {
 
 // FinalizeVars fills the import finalize prompt.
 type FinalizeVars struct {
-	MaxItems  int `json:"maxItems"`
-	MaxReason int `json:"maxReason"`
+	MaxItems int `json:"maxItems"`
 }
 
 // VerifyVars fills the import cross-check prompt.
@@ -222,8 +221,8 @@ Input: "items" (each a claimed fact with a reason, an origin, an optional source
 Origin, sourceTag and scope are metadata of the item. Never change them and never judge the item by them; every fact split from an item keeps them.
 
 For each item:
-1. Split it into atomic facts: one claim each, one sentence of about 20 words at most. Rewrite each fact to the shortest plain form that keeps its meaning: active voice, present tense where true; cut filler, hedges (just, really, basically, actually, simply) and pleasantries; drop articles only where meaning stays clear. Keep exactly negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings and ids. When a shorter form could change the meaning, keep the original words. Make each fact standalone: resolve a pronoun or vague reference only when the item itself makes the referent certain. Write plain text only: no Markdown, no backticks, no line breaks. Cite another memory or document only by its id (km_... or kg_...), never by pasting its text.
-2. Attach the reason that supports each fact, in the same short plain style.
+1. Split it into independent claims, one fact each. A sentence listing values, fields, cases or limits of one subject is one claim: keep it one fact. One sentence each, about 20 words; a list about one subject may run to 300 characters. Rewrite each fact to the shortest plain form that keeps its meaning: active voice, present tense where true; cut filler, hedges (just, really, basically, actually, simply) and pleasantries; drop articles only where meaning stays clear. Keep exactly negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings and ids. When a shorter form could change the meaning, keep the original words. Make each fact standalone: resolve a pronoun or vague reference only when the item itself makes the referent certain. Write plain text only: no Markdown, no backticks, no line breaks. Cite another memory or document only by its id (km_... or kg_...), never by pasting its text.
+2. Attach the reason that supports each fact, in the same short plain style. A reason "Stated in <path>" or "Stated in <path>, <section>" is a source locator: keep it verbatim; it supports a fact from that document. A fact that states its own rationale ("X, because Y") keeps it only when the fact alone does not make it obvious.
 3. For each fact give 3 to {{.MaxKeywords}} "keywords": synonyms, abbreviations, product, person and project names, related terms. They exist so a later search finds the fact.
 
 Challenge the item (verdict "challenge", no facts, specific questions answerable in one line) when:
@@ -379,12 +378,12 @@ var MemoryImportFinalizeSystem = define(Entry{
 
 {{template "memory.dataHygiene"}}
 
-Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope, project), "challenge", "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote and, when the chunk left something open, "unresolved".
+Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope, project), "challenge", "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote, reason (source locator) and, when the chunk left something open, "unresolved".
 
-1. Chunks were read independently. Merge duplicates and near-duplicates into one fact.
+1. Chunks were read independently. Merge duplicates and near-duplicates into one fact. Also merge facts about the same subject and the same aspect (fields of one type, values or limits of one setting, cases of one rule) into one fact that keeps every qualifier of each, at most 300 characters. Never merge facts about different subjects.
 2. Resolve each unresolved fact from the other facts of this document, then rewrite it standalone. A fact that stays ambiguous is not stored: list it in "unresolved" with the open question.
 3. Drop a fact that is not durable (trivia, example, time-bound, navigation): list it in "dropped" with why. Drop any secret (password, token, API key, private key); never store it.
-4. Store the rest with store_memory, at most {{.MaxItems}} items per call. Item origin, sourceTag, scope, project: the input "provenance" values (omit missing ones; the store enforces them). Item fact: standalone. Item reason, exactly: Stated in <document path>, <section>: "<evidence>" (at most {{.MaxReason}} characters).
+4. Store the rest with store_memory, at most {{.MaxItems}} items per call. Item origin, sourceTag, scope, project: the input "provenance" values (omit missing ones; the store enforces them). Item fact: standalone; keep a reason the facts or evidence state inline ("X, because Y") only when the fact alone does not make it obvious. Item reason: the fact's "reason", exactly; a merged fact takes the reason of its first fact. Never put an evidence quote in a reason.
 5. With "challenge" true, store_memory can challenge items with questions; a challenged call stores nothing. Answer through "clarifications" using only what this document's facts state, never assumption or general knowledge. When the document cannot answer, remove that item from the call, call again, and list the fact in "unresolved" with the store's questions. With "challenge" false, nobody can answer: store_memory stores the accepted items and reports the rest as "Not stored". List each of those in "dropped" with the questions as why, never in "unresolved".
 6. store_memory already reconciles new facts against stored ones. Use search_memories only to help word a fact.
 7. Stop when every input fact is stored, merged, dropped or listed unresolved. Report only facts you did not store.`,
@@ -399,7 +398,7 @@ Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope,
       "properties": {"fact": {"type": "string"}, "why": {"type": "string"}}}}
   }
 }`,
-}, FinalizeVars{MaxItems: 20, MaxReason: 2000})
+}, FinalizeVars{MaxItems: 20})
 
 // MemoryImportVerifySystem is the system prompt of the cross-check that judges questionable extracted facts against the source file.
 var MemoryImportVerifySystem = define(Entry{
@@ -454,13 +453,13 @@ A challenge stores nothing. Ask the user the returned questions or fix the items
 Files (repo docs, Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
 Condense long text or a file into short lines without storing: call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. Stores nothing; to store a file use ingest_files.
 
-Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Cite a memory by fact id (km_...). ctx=N in a result's meta: memory_context has N facts stored with it. memory_history shows versions.`,
+Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", then an indented reason line, then an indented meta line (version, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits compound text into atomic facts, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
+	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts and keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
 }, NoVars{})
 
 var (
