@@ -125,3 +125,11 @@ dbmcp.tool.explain_query.arg.connectionId	36
 dbmcp.tool.explain_query.arg.sql	80
 dbmcp.tool.explain_query.arg.path	121
 dbmcp.tool.explain_query.arg.includeRaw	113
+ade.review.comments	323
+ade.review.round.message	574
+ade.review.followup.message	400
+headless.reviewReply.ack	6
+headless.tool.reply_review_comment	63
+headless.tool.reply_review_comment.arg.id	34
+headless.tool.reply_review_comment.arg.reply	44
+headless.tool.reply_review_comment.arg.resolved	53

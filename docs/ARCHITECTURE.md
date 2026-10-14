@@ -5192,7 +5192,7 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
 
 - **Registry.** `registry.go` is the one file with prompt text. Entry: id, kind, apps, title/purpose/usedBy
   catalog keys, applies-when, default, required fragments, fixed output schema. Typed handle
-  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 126 entries: Space lists 102,
+  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 134 entries: Space lists 110,
   Studio 34. User-authored text (smart-script bodies, workflow stage and step prompts) stays out, as do
   tool and server names, tool error strings and result data formatting.
 - **Kinds.** `system`, `message`, `suffix`, `instructions`, `tool`, `argument` (one MCP tool property
