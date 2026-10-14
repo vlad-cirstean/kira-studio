@@ -56,6 +56,7 @@ Targets (tuning): `R_ess` >= 0.90, `R_all` >= 0.75, `P` >= 0.90, atomic and stan
 | 05 | chunk: smaller chunks (recall) | KIRA_EVAL_BUDGET 1500,2500,700,400,200 (budget.json, override only) | 0.898 | 0.733 | 0.888 | 0.010 | 0.003 | 0.519 | 4.5 | 38.2 | rejected by rule: C_fact +0.046 beyond band 0.029, although R_ess +0.044 (0.898) and R_all +0.050 (0.733) improved |
 | 06 | chunk: mid-size chunks (2250/3000/1100/550/200) | KIRA_EVAL_BUDGET (budget.json, override only) | 0.869 | 0.680 | 0.877 | 0.003 | 0.000 | 0.469 | 4.1 | 42.3 | rejected: no metric beyond band (R_ess +0.016 vs band 0.020, C_fact flat) |
 | 07 | extract: name the subject in every fact, use the code: line, split joined claims | extract prompt, one bullet (override only) | 0.867 | 0.690 | 0.887 | 0.003 | 0.000 | 0.482 | 4.6 | 47.0 | rejected: reason ok -0.138 beyond band 0.051; R_ess +0.014, P and standalone flat |
+| 08 | chunk: Target 1800 (between rounds 5 and 6) | KIRA_EVAL_BUDGET 1800,2800,900,450,200 (budget.json, override only) | 0.873 | 0.698 | 0.921 | 0.006 | 0.000 | 0.489 | 4.2 | 51.2 | rejected: nothing beyond band (R_ess +0.019 vs band 0.020, P +0.029 vs 0.065, C_fact +0.017); phase budget ends the loop |
 
 Spend override from the user: 8 USD per run, 60 USD phase total (plan said 10 and 120).
 
