@@ -374,6 +374,8 @@ const spaceControl = {
     unwrap(AdeTaskService.RetrySetup(args)),
   adeTaskReadLog: (args: V2.ReadLogArgs): Promise<V2.LogPage> =>
     unwrap(AdeTaskService.ReadLog(args)).then((r) => trust<V2.LogPage>(r)),
+  adeTaskRunSandbox: (args: V2.RunArgs): Promise<V2.RunSandboxDetail> =>
+    unwrap(AdeTaskService.RunSandbox(args)).then((r) => trust<V2.RunSandboxDetail>(r)),
   adeTaskSessions: (): Promise<V2.SessionsResult> =>
     unwrap(AdeTaskService.Sessions()).then((r) => trust<V2.SessionsResult>(r)),
   adeTaskStopRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.StopRun(args)),

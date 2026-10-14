@@ -146,6 +146,7 @@ export interface WorkflowEntry {
 export interface WorkflowsResult {
   dir: string;
   workflows: WorkflowEntry[];
+  sandbox: SandboxSupport;
 }
 export interface WorkflowYaml {
   fileName: string;
@@ -260,6 +261,41 @@ export interface Run {
   resumable: boolean;
   /** Where a review step run stands; null on every other run. */
   review: RunReview | null;
+  /** The run's sandbox badge; null when it ran without one (script runs, rows before P287). */
+  sandbox: RunSandboxBadge | null;
+}
+export interface RunSandboxBadge {
+  access: SandboxAccess;
+  /** False when the OS cannot enforce the profile: declared only. */
+  enforced: boolean;
+  denials: number;
+  /** The last kept denial as `op target`; '' when none. */
+  last: string;
+}
+export interface SandboxSupport {
+  enforced: boolean;
+  /** The notice text when not enforced. */
+  reason: string;
+}
+export interface SandboxDenial {
+  at: number;
+  op: string;
+  target: string;
+  process: string;
+}
+export interface RunSandboxDetail {
+  access: SandboxAccess;
+  enforced: boolean;
+  reason: string;
+  write: string[];
+  read: string[];
+  allow: string[];
+  network: boolean;
+  keychain: boolean;
+  /** The SBPL text as written; '' for access off. */
+  profile: string;
+  denials: SandboxDenial[];
+  denialCount: number;
 }
 export type ReviewPhase = 'waiting' | 'sent' | 'working' | 'stuck' | 'done';
 export interface RunReview {

@@ -59,6 +59,10 @@ function setUsage(on: boolean): void {
   props.draft.claudeCode.usageEnabled = on;
 }
 
+function setSandboxKeychain(on: boolean): void {
+  props.draft.ade.sandboxKeychain = on;
+}
+
 function setKeepAwake(on: boolean): void {
   props.draft.claudeCode.keepAwakeWithAgents = on;
 }
@@ -86,6 +90,31 @@ function setKeepAwake(on: boolean): void {
       />
       <FieldDescription>
         {{ t('space.settings.claudeCode.keepAwake.description') }}
+      </FieldDescription>
+    </Field>
+
+    <Field>
+      <div class="flex items-center justify-between gap-1">
+        <Label :for="`${switchId}-sandboxKeychain`">{{
+          t('space.settings.claudeCode.sandboxKeychain.label')
+        }}</Label>
+        <TooltipIconButton
+          icon="discard"
+          :label="t('common.action.resetToDefault.label')"
+          data-testid="settings-reset-ade-sandboxKeychain"
+          :disabled-trigger="isAtDefault('ade', 'sandboxKeychain')"
+          :disabled="isAtDefault('ade', 'sandboxKeychain')"
+          @click="resetLeaf('ade', 'sandboxKeychain')"
+        />
+      </div>
+      <Switch
+        :id="`${switchId}-sandboxKeychain`"
+        :model-value="draft.ade.sandboxKeychain"
+        data-testid="settings-claude-code-sandbox-keychain"
+        @update:model-value="(v) => setSandboxKeychain(v === true)"
+      />
+      <FieldDescription>
+        {{ t('space.settings.claudeCode.sandboxKeychain.description') }}
       </FieldDescription>
     </Field>
 

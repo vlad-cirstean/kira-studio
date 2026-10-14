@@ -189,6 +189,7 @@ func wireAdeTask(
 		slog.Warn("ade: user home", "scope", "ade", "err", err)
 	}
 	gitPath := adeGitPathSetting(repositories)
+	runs.SandboxKeychain = sandboxKeychain(repositories)
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
 		Prompts: runs.LlmPrompts,
 		Tasks:   repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
@@ -242,6 +243,7 @@ func wireAdeTask(
 			}
 			return settings.Ade.HeadlessSettingSources
 		},
+		SandboxKeychain:  runs.SandboxKeychain,
 		AutofetchMinutes: adeAutofetchMinutes(repositories),
 		HomeDir:          userHome,
 		RebaseTimeout:    rebaseTimeout,
@@ -278,6 +280,14 @@ func adeAutofetchMinutes(repositories *repos.Repos) func() int {
 			return 0
 		}
 		return settings.Git.FetchAutoIntervalMinutes
+	}
+}
+
+// sandboxKeychain reads ade.sandboxKeychain fresh per run.
+func sandboxKeychain(repositories *repos.Repos) func() bool {
+	return func() bool {
+		settings, err := repositories.Settings.GetAll()
+		return err == nil && settings.Ade.SandboxKeychain
 	}
 }
 

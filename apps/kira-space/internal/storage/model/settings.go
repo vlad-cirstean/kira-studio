@@ -67,6 +67,8 @@ type AdeSettings struct {
 	// HeadlessSettingSources is the claude -p --setting-sources scope: "all" (user, project, local)
 	// or "user" (ignore repo-committed settings).
 	HeadlessSettingSources string `json:"headlessSettingSources"`
+	// SandboxKeychain lets sandboxed agents reach the macOS keychain so `claude` signs in from it (P287).
+	SandboxKeychain bool `json:"sandboxKeychain"`
 }
 
 // ClaudeCodeSettings is P188's keep-awake-with-agents leaf: on, this Mac stays awake while any
@@ -202,6 +204,7 @@ type AdePatch struct {
 	SpanDayShare    *float64  `json:"spanDayShare,omitempty"`
 
 	HeadlessSettingSources *string `json:"headlessSettingSources,omitempty"`
+	SandboxKeychain        *bool   `json:"sandboxKeychain,omitempty"`
 }
 
 // ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape.

@@ -12,6 +12,7 @@ export const prsKey = ['adetask', 'prs'] as const;
 export const workflowsKey = ['adetask', 'workflows'] as const;
 export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
 export const backlogKey = ['adetask', 'backlog'] as const;
+export const runSandboxKey = ['ade', 'runSandbox'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 export const repoNamesKey = ['adetask', 'repoNames'] as const;
 

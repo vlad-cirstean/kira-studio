@@ -82,6 +82,7 @@ export function mkRun(
     purpose: '',
     resumable: false,
     review: null,
+    sandbox: null,
     ...over,
   };
 }

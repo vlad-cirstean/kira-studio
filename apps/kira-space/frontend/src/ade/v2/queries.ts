@@ -6,7 +6,7 @@ import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
 import { withMovedItem } from './backlogOrder';
-import { backlogKey, boardKey, useWorkflows } from './readQueries';
+import { backlogKey, boardKey, runSandboxKey, useWorkflows } from './readQueries';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
@@ -192,6 +192,15 @@ export function useSetPlan() {
     mutationFn: (args: SetPlanArgs) => control.adeTaskSetPlan(args),
     ...optimisticUpdate<Board, SetPlanArgs>(queryClient, boardKey, withPlan),
   });
+}
+
+/** The stored sandbox of a run; the badge popover and profile dialog read it. */
+export function useRunSandbox(runId: MaybeRefOrGetter<string>, enabled: MaybeRefOrGetter<boolean>) {
+  return useQuery(() => ({
+    queryKey: [...runSandboxKey, toValue(runId)] as const,
+    queryFn: () => control.adeTaskRunSandbox({ runId: toValue(runId) }),
+    enabled: toValue(enabled) && toValue(runId) !== '',
+  }));
 }
 
 export function useWorkflowYaml(fileName: MaybeRefOrGetter<string>) {

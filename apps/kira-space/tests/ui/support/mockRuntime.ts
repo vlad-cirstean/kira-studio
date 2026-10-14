@@ -176,6 +176,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskSetTaskStage: 'AdeTaskService.SetTaskStage',
   adeTaskRetrySetup: 'AdeTaskService.RetrySetup',
   adeTaskReadLog: 'AdeTaskService.ReadLog',
+  adeTaskRunSandbox: 'AdeTaskService.RunSandbox',
   adeTaskSessions: 'AdeTaskService.Sessions',
   adeTaskStopRun: 'AdeTaskService.StopRun',
   adeTaskReviewStep: 'AdeTaskService.ReviewStep',

@@ -114,6 +114,7 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
     .max(ADE_SPAN_DAY_SHARE_RANGE.max)
     .default(0.5),
   headlessSettingSources: z.enum(['user', 'all']).default('all'),
+  sandboxKeychain: z.boolean().default(false),
 });
 
 // P188: keep this Mac awake while any Claude Code session runs, independent of the title bar's own
@@ -160,6 +161,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     workdayHours: 6,
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
+    sandboxKeychain: false,
   }),
   claudeCode: claudeCodeSettingsSchema.default({
     keepAwakeWithAgents: false,
@@ -217,6 +219,7 @@ export const defaultSettings: Settings = {
     workdayHours: 6,
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
+    sandboxKeychain: false,
   },
   claudeCode: {
     keepAwakeWithAgents: false,

@@ -42,6 +42,7 @@ const SETTINGS = {
   workdayHours: 6,
   spanDayShare: 0.5,
   headlessSettingSources: 'all' as const,
+  sandboxKeychain: false,
 };
 
 // The product words differ from the mockup's only by sentence case (P265): compare lowercased.

@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
@@ -49,6 +50,34 @@ func (r *AdeRunSandboxRepo) Get(runID string) (*AdeRunSandbox, error) {
 		s.Enforced = enforced != 0
 		return &s, err
 	}, `SELECT run_id, access, enforced, reason, policy_json, profile, denial_count, denials_json FROM ade_run_sandbox WHERE run_id = ?`, runID)
+}
+
+// Badges returns the light columns (no profile or policy) of the given runs' rows, keyed by run id.
+func (r *AdeRunSandboxRepo) Badges(runIDs []string) (map[string]AdeRunSandbox, error) {
+	out := map[string]AdeRunSandbox{}
+	if len(runIDs) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(runIDs))
+	marks := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		args[i], marks[i] = id, "?"
+	}
+	rows, err := r.DB.Query(`SELECT run_id, access, enforced, denial_count, denials_json FROM ade_run_sandbox WHERE run_id IN (`+strings.Join(marks, ",")+`)`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("repos: run sandbox badges: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s AdeRunSandbox
+		var enforced int
+		if err := rows.Scan(&s.RunID, &s.Access, &enforced, &s.DenialCount, &s.DenialsJSON); err != nil {
+			return nil, fmt.Errorf("repos: scan run sandbox badge: %w", err)
+		}
+		s.Enforced = enforced != 0
+		out[s.RunID] = s
+	}
+	return out, rows.Err()
 }
 
 // AddDenial counts one more denial; denialsJSON, when not empty, replaces the stored list.

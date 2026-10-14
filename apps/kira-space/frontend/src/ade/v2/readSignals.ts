@@ -1,6 +1,14 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { appendChunks, mergeRuns } from './pushMerge';
-import { backlogKey, boardKey, logKey, prsKey, sessionsKey, workflowsKey } from './readQueries';
+import {
+  backlogKey,
+  boardKey,
+  logKey,
+  prsKey,
+  runSandboxKey,
+  sessionsKey,
+  workflowsKey,
+} from './readQueries';
 import type { Board, LogEvent, LogPage, RunsChangedEvent } from './wire';
 
 /** Where read-side pushes come from: Wails events on the desktop, server-sent events on the
@@ -33,6 +41,11 @@ export function installAdeReadSignals(queryClient: QueryClient, source: AdeSigna
   });
   source.onRuns((event) => {
     queryClient.setQueryData<Board>(boardKey, (board) => (board ? mergeRuns(board, event) : board));
+    for (const run of event.runs) {
+      if (run.sandbox) {
+        void queryClient.invalidateQueries({ queryKey: [...runSandboxKey, run.id], exact: true });
+      }
+    }
   });
   source.onLog((event) => {
     queryClient.setQueryData<LogPage>(logKey(event.kind, event.id), (page) =>

@@ -19,6 +19,7 @@ const SETTINGS = {
   workdayHours: 6,
   spanDayShare: 0.5,
   headlessSettingSources: 'all' as const,
+  sandboxKeychain: false,
 };
 
 function iso(offset: number): string {

@@ -475,6 +475,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 		decorateTask(&wt, t, liveHash)
 		tasks = append(tasks, wt)
 	}
+	b.badgeTasks(tasks)
 
 	plan := adewire.Plan{Day: map[string]string{}, Order: make([]string, 0, len(d.tasks)), QueuedAfter: map[string]string{}, Unpushed: map[string]bool{}}
 	live := make(map[string]bool, len(d.tasks))

@@ -211,6 +211,8 @@ type WorkflowEntry struct {
 type WorkflowsResult struct {
 	Dir       string          `json:"dir"`
 	Workflows []WorkflowEntry `json:"workflows"`
+	// Sandbox says whether step sandboxes are enforced on this OS.
+	Sandbox SandboxSupport `json:"sandbox"`
 }
 
 type WorkflowYaml struct {
@@ -322,8 +324,49 @@ type Run struct {
 	Resumable bool `json:"resumable"`
 	// Review is set on a review step run only.
 	Review *RunReview `json:"review"`
+	// Sandbox is the badge of a headless run's sandbox; null when the run had none.
+	Sandbox *RunSandboxBadge `json:"sandbox"`
 
 	Outcome *model.AdeRunOutcome `json:"outcome"`
+}
+
+// RunSandboxBadge summarises a run's sandbox for the run line.
+type RunSandboxBadge struct {
+	Access   string `json:"access"`
+	Enforced bool   `json:"enforced"`
+	Denials  int    `json:"denials"`
+	// Last is the last kept denial as "op target"; "" when none.
+	Last string `json:"last"`
+}
+
+// SandboxSupport says whether this OS enforces step sandboxes; Reason is the notice when it does not.
+type SandboxSupport struct {
+	Enforced bool   `json:"enforced"`
+	Reason   string `json:"reason"`
+}
+
+// SandboxDenial is one operation the sandbox blocked.
+type SandboxDenial struct {
+	At      int64  `json:"at"`
+	Op      string `json:"op"`
+	Target  string `json:"target"`
+	Process string `json:"process"`
+}
+
+// RunSandboxDetail is everything the sandbox popover and profile dialog show for a run.
+type RunSandboxDetail struct {
+	Access   string   `json:"access"`
+	Enforced bool     `json:"enforced"`
+	Reason   string   `json:"reason"`
+	Write    []string `json:"write"`
+	Read     []string `json:"read"`
+	Allow    []string `json:"allow"`
+	Network  bool     `json:"network"`
+	Keychain bool     `json:"keychain"`
+	Profile  string   `json:"profile"`
+	// Denials are the first distinct denials; DenialCount counts every one.
+	Denials     []SandboxDenial `json:"denials"`
+	DenialCount int             `json:"denialCount"`
 }
 
 // Review phases of RunReview.Phase.

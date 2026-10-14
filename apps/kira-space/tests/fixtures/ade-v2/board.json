@@ -51,7 +51,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_cart_fix_b_cart",
@@ -71,7 +72,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_cart_ci_b_cart",
@@ -91,7 +93,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_cart_pr_b_cart",
@@ -111,7 +114,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_cart_release_b_cart",
@@ -131,7 +135,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789808400000
@@ -184,7 +189,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "impl",
@@ -213,7 +224,13 @@
                 "next": "impl",
                 "max": 1
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "tests",
@@ -242,7 +259,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "ci",
@@ -271,7 +294,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "pr",
@@ -300,7 +329,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           }
         ],
         "command": "",
@@ -333,7 +368,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_bill_impl_b_meter",
@@ -353,7 +389,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_bill_impl_b_bill",
@@ -373,7 +410,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_bill_impl_b_billdash",
@@ -393,7 +431,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789722000000
@@ -449,7 +488,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_impl_b_authcb",
@@ -469,7 +509,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_impl_b_auth",
@@ -489,7 +530,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_impl_b_authui",
@@ -509,7 +551,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_tests_b_authcb",
@@ -529,7 +572,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_tests_b_auth",
@@ -549,7 +593,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_tests_b_authui",
@@ -569,7 +614,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_ci_b_authcb",
@@ -589,7 +635,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_ci_b_auth",
@@ -609,7 +656,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_ci_b_authui",
@@ -629,7 +677,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_pr_b_authcb",
@@ -649,7 +698,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_pr_b_auth",
@@ -669,7 +719,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_auth_pr_b_authui",
@@ -689,7 +740,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789635600000
@@ -742,7 +794,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "impl",
@@ -771,7 +829,13 @@
                 "next": "impl",
                 "max": 1
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "tests",
@@ -800,7 +864,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "ci",
@@ -829,7 +899,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "pr",
@@ -858,7 +934,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           }
         ],
         "command": "",
@@ -891,7 +973,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_impl_b_hooks",
@@ -911,7 +994,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_impl_b_hooksretry",
@@ -931,7 +1015,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_tests_b_hooks",
@@ -951,7 +1036,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_tests_b_hooksretry",
@@ -971,7 +1057,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_ci_b_hooks",
@@ -991,7 +1078,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_ci_b_hooksretry",
@@ -1011,7 +1099,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_pr_b_hooks",
@@ -1031,7 +1120,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_hooks_pr_b_hooksretry",
@@ -1051,7 +1141,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789549200000
@@ -1104,7 +1195,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "impl",
@@ -1133,7 +1230,13 @@
                 "next": "impl",
                 "max": 1
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "tests",
@@ -1162,7 +1265,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "ci",
@@ -1191,7 +1300,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "pr",
@@ -1220,7 +1335,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           }
         ],
         "command": "",
@@ -1253,7 +1374,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_search_impl_b_search",
@@ -1273,7 +1395,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_search_impl_b_searchui",
@@ -1293,7 +1416,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_search_tests_b_search",
@@ -1313,7 +1437,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_search_tests_b_searchui",
@@ -1333,7 +1458,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_search_ci_b_search",
@@ -1353,7 +1479,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789462800000
@@ -1403,7 +1530,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "fix",
@@ -1432,7 +1565,13 @@
                 "next": "fix",
                 "max": 1
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "ci",
@@ -1461,7 +1600,13 @@
                 "next": "ci",
                 "max": 2
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "pr",
@@ -1490,7 +1635,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           }
         ],
         "command": "",
@@ -1523,7 +1674,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_notif_fix_b_notif",
@@ -1543,7 +1695,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789376400000
@@ -1593,7 +1746,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "ci",
@@ -1622,7 +1781,13 @@
                 "next": "ci",
                 "max": 2
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           }
         ],
         "command": "",
@@ -1655,7 +1820,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_deps_ci_b_deps",
@@ -1675,7 +1841,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789290000000
@@ -1728,7 +1895,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "impl",
@@ -1757,7 +1930,13 @@
                 "next": "impl",
                 "max": 1
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "tests",
@@ -1786,7 +1965,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "ci",
@@ -1815,7 +2000,13 @@
                 "next": "impl",
                 "max": 3
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           },
           {
             "id": "pr",
@@ -1844,7 +2035,13 @@
                 "next": "stop",
                 "max": 0
               }
-            ]
+            ],
+            "sandbox": {
+              "access": "write",
+              "read": [],
+              "allow": [],
+              "network": true
+            }
           }
         ],
         "command": "",
@@ -1877,7 +2074,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_push_impl_b_pushapi",
@@ -1897,7 +2095,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_push_impl_b_push",
@@ -1917,7 +2116,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_push_tests_b_pushapi",
@@ -1937,7 +2137,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         },
         {
           "id": "r_T_push_tests_b_push",
@@ -1957,7 +2158,8 @@
           "purpose": "",
           "resumable": false,
           "review": null,
-          "outcome": null
+          "outcome": null,
+          "sandbox": null
         }
       ],
       "createdAt": 1789203600000

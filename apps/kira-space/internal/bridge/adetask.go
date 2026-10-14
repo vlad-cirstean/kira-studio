@@ -826,6 +826,15 @@ func (s *AdeTaskService) ReadLog(ctx context.Context, args adewire.ReadLogArgs) 
 	return p, adeTaskError(err)
 }
 
+// RunSandbox returns the sandbox a headless run started with.
+func (s *AdeTaskService) RunSandbox(ctx context.Context, args adewire.RunArgs) (adewire.RunSandboxDetail, error) {
+	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
+		return adewire.RunSandboxDetail{}, err
+	}
+	d, err := s.Engine.RunSandbox(ctx, args.RunID)
+	return d, adeTaskError(err)
+}
+
 func (s *AdeTaskService) Sessions(ctx context.Context) (adewire.SessionsResult, error) {
 	r, err := s.Engine.Sessions(ctx)
 	return r, adeTaskError(err)

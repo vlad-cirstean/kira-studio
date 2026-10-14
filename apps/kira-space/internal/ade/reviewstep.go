@@ -97,6 +97,7 @@ func reviewWire(run model.AdeRun, rev model.AdeReview, round *model.AdeRun) *ade
 // wireRun is the run as it goes on the wire, with the review state of a review step run.
 func (b *TaskBoard) wireRun(r model.AdeRun) adewire.Run {
 	w := toWireRun(r)
+	w.Sandbox = b.runBadge(r.ID)
 	if r.Purpose != "" {
 		return w
 	}

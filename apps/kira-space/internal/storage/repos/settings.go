@@ -86,6 +86,7 @@ func readAde(stored map[string]json.RawMessage) model.AdeSettings {
 	appsettings.LeafValid(stored, "ade.workdayHours", &result.WorkdayHours, model.ValidAdeWorkdayHours)
 	appsettings.LeafValid(stored, "ade.spanDayShare", &result.SpanDayShare, model.ValidAdeSpanDayShare)
 	appsettings.LeafValid(stored, "ade.headlessSettingSources", &result.HeadlessSettingSources, model.ValidAdeHeadlessSettingSources)
+	appsettings.Leaf(stored, "ade.sandboxKeychain", &result.SandboxKeychain)
 	return result
 }
 
@@ -137,7 +138,10 @@ func upsertAde(tx *sql.Tx, a *model.AdePatch) error {
 	if err := appsettings.UpsertOptional(tx, "ade.spanDayShare", a.SpanDayShare); err != nil {
 		return err
 	}
-	return appsettings.UpsertOptional(tx, "ade.headlessSettingSources", a.HeadlessSettingSources)
+	if err := appsettings.UpsertOptional(tx, "ade.headlessSettingSources", a.HeadlessSettingSources); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "ade.sandboxKeychain", a.SandboxKeychain)
 }
 
 // upsertGit mirrors the former appsettings.UpsertGit verbatim — "git.path" (not "git.gitPath") is

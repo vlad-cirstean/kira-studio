@@ -8870,6 +8870,10 @@
         "notifyRunEnded": {
           "label": "When a background ADE run ends"
         },
+        "sandboxKeychain": {
+          "description": "Lets sandboxed agents read the macOS keychain so Claude can sign in. Off by default. Without it, set a token from claude setup-token. Applies on macOS only.",
+          "label": "Keychain access for sandboxed agents"
+        },
         "usage": {
           "description": "Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space report. Claude Code hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on Claude subscription plans only.",
           "label": "Show Claude Code usage limits in the ADE status bar"

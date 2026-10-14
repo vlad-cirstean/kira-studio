@@ -59,14 +59,20 @@ async function save(patch: SettingsPatch): Promise<void> {
       advanced: defaultSettings.advanced,
       git: defaultSettings.git,
       claudeCode: defaultSettings.claudeCode,
-      ade: { headlessSettingSources: defaultSettings.ade.headlessSettingSources },
+      ade: {
+        headlessSettingSources: defaultSettings.ade.headlessSettingSources,
+        sandboxKeychain: defaultSettings.ade.sandboxKeychain,
+      },
     }"
     :current="{
       appearance: settingsStore.appearance,
       advanced: settingsStore.advanced,
       git: settingsStore.git,
       claudeCode: settingsStore.claudeCode,
-      ade: { headlessSettingSources: settingsStore.ade.headlessSettingSources },
+      ade: {
+        headlessSettingSources: settingsStore.ade.headlessSettingSources,
+        sandboxKeychain: settingsStore.ade.sandboxKeychain,
+      },
     }"
     :save="save"
     :extra="promptsExtra"

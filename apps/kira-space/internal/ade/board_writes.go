@@ -69,6 +69,7 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 	}
 	out := toWireTask(t, ids, runs, reviews)
 	decorateTask(&out, t, b.liveHasher())
+	b.badgeTasks([]adewire.Task{out})
 	return out, nil
 }
 
@@ -605,7 +606,9 @@ func (b *TaskBoard) Workflows(_ context.Context) (adewire.WorkflowsResult, error
 	if err != nil {
 		return adewire.WorkflowsResult{}, err
 	}
-	return b.deps.Workflows.List(usedBy), nil
+	res := b.deps.Workflows.List(usedBy)
+	res.Sandbox = b.sandboxSupport()
+	return res, nil
 }
 
 // Repos lists every code repo with its ade config and the folders it was imported from.

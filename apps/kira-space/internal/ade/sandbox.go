@@ -366,3 +366,100 @@ func (b *TaskBoard) noticeSandbox(sink *logSink, sr *sandboxRun) {
 		sink.add(logStdout, n)
 	}
 }
+
+// --- wire ---------------------------------------------------------------------------------------------
+
+// sandboxSupport is whether this OS enforces step sandboxes; Reason is the editor notice when not.
+func (b *TaskBoard) sandboxSupport() adewire.SandboxSupport {
+	if b.deps.Sandbox != nil {
+		if sup := b.deps.Sandbox.Support(); sup.Enforced {
+			return adewire.SandboxSupport{Enforced: true}
+		} else {
+			return adewire.SandboxSupport{Reason: i18n.T(sup.Reason, nil)}
+		}
+	}
+	return adewire.SandboxSupport{Reason: i18n.T(agentsandbox.NotEnforcedKey, nil)}
+}
+
+func badgeOf(s repos.AdeRunSandbox) *adewire.RunSandboxBadge {
+	badge := &adewire.RunSandboxBadge{Access: s.Access, Enforced: s.Enforced, Denials: s.DenialCount}
+	var list []agentsandbox.Denial
+	if json.Unmarshal([]byte(s.DenialsJSON), &list) == nil && len(list) > 0 {
+		last := list[len(list)-1]
+		badge.Last = last.Op + " " + last.Target
+	}
+	return badge
+}
+
+// badgeTasks sets the sandbox badge of every headless run in tasks with one query.
+func (b *TaskBoard) badgeTasks(tasks []adewire.Task) {
+	if b.deps.RunSandbox == nil {
+		return
+	}
+	var ids []string
+	for _, t := range tasks {
+		for _, r := range t.Runs {
+			ids = append(ids, r.ID)
+		}
+	}
+	rows, err := b.deps.RunSandbox.Badges(ids)
+	if err != nil {
+		slog.Warn("ade: sandbox badges", "scope", "ade", "err", err)
+		return
+	}
+	for _, t := range tasks {
+		for i := range t.Runs {
+			if row, ok := rows[t.Runs[i].ID]; ok {
+				t.Runs[i].Sandbox = badgeOf(row)
+			}
+		}
+	}
+}
+
+func (b *TaskBoard) runBadge(runID string) *adewire.RunSandboxBadge {
+	if b.deps.RunSandbox == nil {
+		return nil
+	}
+	rows, err := b.deps.RunSandbox.Badges([]string{runID})
+	if err != nil {
+		slog.Warn("ade: sandbox badge", "scope", "ade", "run", runID, "err", err)
+		return nil
+	}
+	if row, ok := rows[runID]; ok {
+		return badgeOf(row)
+	}
+	return nil
+}
+
+// RunSandbox returns the stored sandbox of a run: its policy, profile and denials.
+func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSandboxDetail, error) {
+	if b.deps.RunSandbox == nil {
+		return adewire.RunSandboxDetail{}, invalid("run %s has no sandbox", runID)
+	}
+	row, err := b.deps.RunSandbox.Get(runID)
+	if err != nil {
+		return adewire.RunSandboxDetail{}, err
+	}
+	if row == nil {
+		return adewire.RunSandboxDetail{}, invalid("run %s has no sandbox", runID)
+	}
+	out := adewire.RunSandboxDetail{
+		Access: row.Access, Enforced: row.Enforced, Profile: row.Profile, DenialCount: row.DenialCount,
+		Write: []string{}, Read: []string{}, Allow: []string{}, Denials: []adewire.SandboxDenial{},
+	}
+	if row.Reason != "" {
+		out.Reason = i18n.T(row.Reason, nil)
+	}
+	var pol agentsandbox.Policy
+	if err := json.Unmarshal([]byte(row.PolicyJSON), &pol); err == nil {
+		out.Write, out.Read, out.Allow = nonNil(pol.Write), nonNil(pol.Read), nonNil(pol.Allow)
+		out.Network, out.Keychain = pol.Network, pol.Keychain
+	}
+	var list []agentsandbox.Denial
+	if err := json.Unmarshal([]byte(row.DenialsJSON), &list); err == nil {
+		for _, d := range list {
+			out.Denials = append(out.Denials, adewire.SandboxDenial{At: d.At.UnixMilli(), Op: d.Op, Target: d.Target, Process: d.Process})
+		}
+	}
+	return out, nil
+}

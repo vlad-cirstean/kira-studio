@@ -9,7 +9,7 @@ import type { Settings } from '../../state/settingsDomain';
 // `ade` carries the one leaf the dialog edits (the other `ade` leaves are written live by the Plan
 // and its panel), so it saves with the rest instead of writing on toggle.
 type SettingsSections = Pick<Settings, 'appearance' | 'advanced' | 'git' | 'claudeCode'> & {
-  ade: Pick<Settings['ade'], 'headlessSettingSources'>;
+  ade: Pick<Settings['ade'], 'headlessSettingSources' | 'sandboxKeychain'>;
 };
 
 // P115 H9: this app and Kira Studio each declared the identical SettingsPaneProps interface,

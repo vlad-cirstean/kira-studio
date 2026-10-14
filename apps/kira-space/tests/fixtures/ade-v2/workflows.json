@@ -59,7 +59,13 @@
                     "next": "stop",
                     "max": 0
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "impl",
@@ -88,7 +94,13 @@
                     "next": "impl",
                     "max": 1
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "tests",
@@ -117,7 +129,13 @@
                     "next": "impl",
                     "max": 3
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "ci",
@@ -146,7 +164,13 @@
                     "next": "impl",
                     "max": 3
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "pr",
@@ -175,7 +199,13 @@
                     "next": "stop",
                     "max": 0
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               }
             ],
             "command": "",
@@ -275,7 +305,13 @@
                     "next": "stop",
                     "max": 0
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "fix",
@@ -304,7 +340,13 @@
                     "next": "fix",
                     "max": 1
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "ci",
@@ -333,7 +375,13 @@
                     "next": "ci",
                     "max": 2
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "pr",
@@ -362,7 +410,13 @@
                     "next": "stop",
                     "max": 0
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               }
             ],
             "command": "",
@@ -434,7 +488,13 @@
                     "next": "stop",
                     "max": 0
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               },
               {
                 "id": "ci",
@@ -463,7 +523,13 @@
                     "next": "ci",
                     "max": 2
                   }
-                ]
+                ],
+                "sandbox": {
+                  "access": "write",
+                  "read": [],
+                  "allow": [],
+                  "network": true
+                }
               }
             ],
             "command": "",
@@ -502,5 +568,9 @@
       "usedBy": 0,
       "hash": "hash-broken.yaml"
     }
-  ]
+  ],
+  "sandbox": {
+    "enforced": true,
+    "reason": ""
+  }
 }
