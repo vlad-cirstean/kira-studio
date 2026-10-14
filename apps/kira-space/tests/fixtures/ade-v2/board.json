@@ -162,6 +162,7 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -190,6 +191,7 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -218,6 +220,7 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -246,6 +249,7 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -274,6 +278,7 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -698,6 +703,7 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -726,6 +732,7 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -754,6 +761,7 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -782,6 +790,7 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -810,6 +819,7 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1046,6 +1056,7 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1074,6 +1085,7 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1102,6 +1114,7 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1130,6 +1143,7 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1158,6 +1172,7 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1334,6 +1349,7 @@
             "prompt": "Reproduce {jira} with a failing test on {branch}.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1362,6 +1378,7 @@
             "prompt": "Make the failing test pass with the smallest change.",
             "allowedTools": ["Bash(npm test)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1390,6 +1407,7 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1418,6 +1436,7 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1518,6 +1537,7 @@
             "prompt": "Apply the change described in the task on {branch}.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1546,6 +1566,7 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1649,6 +1670,7 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1677,6 +1699,7 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1705,6 +1728,7 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1733,6 +1757,7 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {
@@ -1761,6 +1786,7 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
+            "review": null,
             "params": {},
             "results": [
               {

@@ -68,6 +68,7 @@ export function newStep(steps: readonly PipelineStep[]): PipelineStep {
     prompt: '',
     allowedTools: [],
     smartScript: '',
+    review: null,
     params: {},
   };
 }

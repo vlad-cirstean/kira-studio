@@ -91,6 +91,13 @@ export interface PipelineStep {
   smartScript: string;
   /** The smart script's values per param name. */
   params: Record<string, string[]>;
+  /** Set on a review step: it waits for the user instead of running an agent. */
+  review: ReviewStepConfig | null;
+}
+export interface ReviewStepConfig {
+  sendTo: 'implementer' | 'new';
+  /** Earlier prompt step of the stage whose session takes the comments; '' = the nearest one. */
+  implementer: string;
 }
 export interface Stage {
   id: string;

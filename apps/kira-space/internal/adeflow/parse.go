@@ -269,11 +269,12 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		return out
 	}
 	earlier := make(map[string]bool)
+	candidates := make(map[string]bool) // earlier steps a review may resume: prompt steps only
 	var nodes []*resultNodes
 	var prefixes []string
 	for i, stepNode := range list.Content {
 		sp := fmt.Sprintf("%sstep %d: ", prefix[:len(prefix)-2]+", ", i+1)
-		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "timeout", "prompt", "allowed_tools", "smart_script", "params")
+		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "timeout", "prompt", "allowed_tools", "smart_script", "params", "review")
 		if v.err != nil {
 			return out
 		}
@@ -306,11 +307,14 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 			step.Results = adewire.ImplicitResults(step.ID, step.OnFailure)
 		}
 		step.Timeout = v.timeout(sm, sp)
-		v.stepBody(sm, sp, &step)
+		v.stepBody(sm, sp, &step, candidates)
 		if v.err != nil {
 			return out
 		}
 		earlier[step.ID] = true
+		if step.SmartScript == "" && step.Review == nil {
+			candidates[step.ID] = true
+		}
 		out = append(out, step)
 		nodes = append(nodes, rn)
 		prefixes = append(prefixes, sp)
@@ -320,7 +324,17 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 }
 
 // stepBody reads what a step runs: a prompt with its allowed tools, or a smart script with its params.
-func (v *validator) stepBody(sm map[string]*yaml.Node, sp string, step *adewire.PipelineStep) {
+func (v *validator) stepBody(sm map[string]*yaml.Node, sp string, step *adewire.PipelineStep, candidates map[string]bool) {
+	if rn, review := sm["review"]; review {
+		for _, key := range []string{"prompt", "allowed_tools", "smart_script", "params"} {
+			if n, has := sm[key]; has {
+				v.fail(n, sp, "%s is not allowed on review steps", key)
+				return
+			}
+		}
+		step.Review = v.reviewConfig(rn, sp, candidates)
+		return
+	}
 	if _, smart := sm["smart_script"]; !smart {
 		if n, has := sm["params"]; has {
 			v.fail(n, sp, "params is only allowed with smart_script")
@@ -341,6 +355,32 @@ func (v *validator) stepBody(sm map[string]*yaml.Node, sp string, step *adewire.
 		v.fail(sm["smart_script"], sp, "smart_script must be at most %d characters", maxSmartScriptName)
 	}
 	step.Params = v.stepParams(sm, sp)
+}
+
+// reviewConfig reads a review step's block. An empty mapping takes the defaults.
+func (v *validator) reviewConfig(n *yaml.Node, sp string, candidates map[string]bool) *adewire.ReviewStepConfig {
+	if n.Kind != yaml.MappingNode {
+		v.fail(n, sp, "review must be a mapping")
+		return nil
+	}
+	m := v.fields(n, sp, "send_to", "implementer")
+	if v.err != nil {
+		return nil
+	}
+	cfg := &adewire.ReviewStepConfig{SendTo: adewire.ReviewSendImplementer}
+	if _, has := m["send_to"]; has {
+		cfg.SendTo = v.str(m, sp, "send_to", true)
+		if v.err == nil && cfg.SendTo != adewire.ReviewSendImplementer && cfg.SendTo != adewire.ReviewSendNew {
+			v.fail(m["send_to"], sp, "send_to must be implementer or new")
+		}
+	}
+	if _, has := m["implementer"]; has {
+		cfg.Implementer = v.str(m, sp, "implementer", true)
+		if v.err == nil && !candidates[cfg.Implementer] {
+			v.fail(m["implementer"], sp, "implementer must be an earlier agent step")
+		}
+	}
+	return cfg
 }
 
 // stepParams reads params: a mapping from a param name to one text value or a list of them.

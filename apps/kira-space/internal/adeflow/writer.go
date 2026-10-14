@@ -317,7 +317,7 @@ var (
 	topOrder    = []string{"id", "name", "kira_space_mcp", "stages"}
 	stageOrder  = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
 	resultOrder = []string{"id", "ok", "description", "next", "max"}
-	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "timeout", "smart_script", "params", "prompt", "allowed_tools"}
+	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "timeout", "smart_script", "params", "review", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -542,6 +542,12 @@ func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
 	setScalar(m, "before", kText, defaultStr(s.Before, "auto"), s.Before != "" && s.Before != "auto", stepOrder)
 	applyResults(m, s, earlier)
 	setScalar(m, "timeout", kText, s.Timeout, true, stepOrder)
+	if s.Review != nil {
+		dropKeys(m, "smart_script", "params", "prompt", "allowed_tools")
+		applyReview(m, *s.Review)
+		return
+	}
+	dropKeys(m, "review")
 	if s.SmartScript == "" {
 		dropKeys(m, "smart_script", "params")
 		setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
@@ -551,6 +557,22 @@ func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
 	dropKeys(m, "prompt", "allowed_tools")
 	setScalar(m, "smart_script", kText, s.SmartScript, true, stepOrder)
 	setParams(m, s.Params)
+}
+
+// applyReview writes a review step's block; send_to is always spelled out, implementer only when set.
+func applyReview(m *yaml.Node, r adewire.ReviewStepConfig) {
+	_, rn := find(m, "review")
+	if rn == nil || rn.Kind != yaml.MappingNode {
+		rn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		put(m, "review", rn, stepOrder)
+	}
+	order := []string{"send_to", "implementer"}
+	setScalar(rn, "send_to", kText, defaultStr(r.SendTo, adewire.ReviewSendImplementer), true, order)
+	if r.Implementer == "" {
+		dropKeys(rn, "implementer")
+	} else {
+		setScalar(rn, "implementer", kText, r.Implementer, true, order)
+	}
 }
 
 // applyResults writes a step's routing: the legacy on_failure rule when the results equal one

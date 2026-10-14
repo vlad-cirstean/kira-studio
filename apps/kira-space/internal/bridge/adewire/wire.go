@@ -110,6 +110,21 @@ type PipelineStep struct {
 	// SmartScript runs the named smart script instead of Prompt; Params are its values per param name.
 	SmartScript string              `json:"smartScript"`
 	Params      map[string][]string `json:"params"`
+	// Review, when set, makes this a review step: it waits for the user instead of running an agent.
+	Review *ReviewStepConfig `json:"review"`
+}
+
+// Review step routes.
+const (
+	ReviewSendImplementer = "implementer"
+	ReviewSendNew         = "new"
+)
+
+// ReviewStepConfig is a review step's own block. Implementer names an earlier prompt step of the
+// stage whose session takes the comments; "" = the nearest earlier one.
+type ReviewStepConfig struct {
+	SendTo      string `json:"sendTo"` // ReviewSendImplementer | ReviewSendNew
+	Implementer string `json:"implementer"`
 }
 
 type Stage struct {

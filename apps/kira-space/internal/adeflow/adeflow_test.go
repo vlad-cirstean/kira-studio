@@ -34,6 +34,10 @@ func step(id, extra string) string {
 	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        prompt: go\n" + extra
 }
 
+func reviewStep(id, extra string) string {
+	return "      - id: " + id + "\n        name: R\n        runs_on: each repo\n        timeout: 1h\n" + extra
+}
+
 func smartStep(id, extra string) string {
 	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        smart_script: Summarize\n" + extra
 }
@@ -112,6 +116,18 @@ func TestParse_rules(t *testing.T) {
 		{"params alone", head + agent + step("s", "        params:\n          a: b\n"), 0, "params is only allowed with smart_script"},
 		{"smart param name", head + agent + smartStep("s", "        params:\n          Bad-Name: x\n"), 0, "param name"},
 		{"smart param nested", head + agent + smartStep("s", "        params:\n          a:\n            b: c\n"), 0, "must be text or a list of text"},
+		{"review step", head + agent + step("s", "") + reviewStep("r", "        review:\n          send_to: new\n"), 0, ""},
+		{"review defaults", head + agent + step("s", "") + reviewStep("r", "        review: {}\n"), 0, ""},
+		{"review implementer", head + agent + step("s", "") + reviewStep("r", "        review:\n          implementer: s\n"), 0, ""},
+		{"review refuses prompt", head + agent + step("s", "") + reviewStep("r", "        prompt: go\n        review: {}\n"), 0, "prompt is not allowed on review steps"},
+		{"review refuses smart", head + agent + step("s", "") + reviewStep("r", "        smart_script: X\n        review: {}\n"), 0, "smart_script is not allowed on review steps"},
+		{"review bad send_to", head + agent + step("s", "") + reviewStep("r", "        review:\n          send_to: both\n"), 0, "send_to must be implementer or new"},
+		{"review unknown key", head + agent + step("s", "") + reviewStep("r", "        review:\n          model: x\n"), 0, "unknown key"},
+		{"review not mapping", head + agent + step("s", "") + reviewStep("r", "        review: yes\n"), 0, "review must be a mapping"},
+		{"review implementer unknown", head + agent + step("s", "") + reviewStep("r", "        review:\n          implementer: nope\n"), 0, "implementer must be an earlier agent step"},
+		{"review implementer later", head + agent + reviewStep("r", "        review:\n          implementer: s\n") + step("s", ""), 0, "implementer must be an earlier agent step"},
+		{"review implementer smart", head + agent + smartStep("x", "") + reviewStep("r", "        review:\n          implementer: x\n"), 0, "implementer must be an earlier agent step"},
+		{"review implementer review", head + agent + step("s", "") + reviewStep("q", "        review: {}\n") + reviewStep("r", "        review:\n          implementer: q\n"), 0, "implementer must be an earlier agent step"},
 		{"script ok", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n", 0, ""},
 		{"script back", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n    on_failure: back:x\n", 0, "back: is only allowed on an agent step"},
 		{"script needs command", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n", 0, "command is required"},

@@ -36,6 +36,7 @@ const step = (id: string, results: StepResult[] = implicitResults(id, 'stop')): 
   prompt: '',
   allowedTools: [],
   smartScript: '',
+  review: null,
   params: {},
 });
 const wfOf = (steps: PipelineStep[]): Workflow => ({

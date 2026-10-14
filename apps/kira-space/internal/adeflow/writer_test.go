@@ -178,6 +178,27 @@ func TestSave_edits(t *testing.T) {
 		}
 	})
 
+	t.Run("review step round trip", func(t *testing.T) {
+		wf := load(t, r, "standard.yaml")
+		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
+		prompt := slices.IndexFunc(wf.Stages[impl].Steps, func(s adewire.PipelineStep) bool { return s.SmartScript == "" })
+		wf.Stages[impl].Steps = append(append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...), adewire.PipelineStep{
+			ID: "code-review", Name: "Code review", RunsOn: "each repo", Before: "auto", OnFailure: "stop",
+			Results: adewire.ImplicitResults("code-review", "stop"), Timeout: "30m", AllowedTools: []string{}, Params: map[string][]string{},
+			Review: &adewire.ReviewStepConfig{SendTo: "new", Implementer: wf.Stages[impl].Steps[prompt].ID},
+		})
+		out := saveOK(t, r, "standard.yaml", wf)
+		_, seg, _ := strings.Cut(out, "id: code-review")
+		if !strings.Contains(seg, "review:\n") || !strings.Contains(seg, "send_to: new") || strings.Contains(seg, "prompt:") {
+			t.Fatalf("review block:\n%s", seg)
+		}
+		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].Review = nil
+		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].Prompt = "go"
+		if back := saveOK(t, r, "standard.yaml", wf); strings.Contains(back, "review:") {
+			t.Fatalf("review block left after switching back:\n%s", back)
+		}
+	})
+
 	t.Run("kind change drops foreign keys", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		for i := range wf.Stages {

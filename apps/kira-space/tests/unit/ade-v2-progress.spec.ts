@@ -25,6 +25,7 @@ const step = (
   prompt: 'p',
   allowedTools: [],
   smartScript: '',
+  review: null,
   params: {},
 });
 
