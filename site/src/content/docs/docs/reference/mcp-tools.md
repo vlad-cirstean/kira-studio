@@ -61,6 +61,16 @@ A large job waits for you to start it in Kira Space. So does a job holding a kir
 
 State of an ingest job. Argument: `id`, the job id from `ingest_files`.
 
+### distill
+
+Condense text or a file into short, atomic lines, in source order. Stores nothing and never touches the memory store, so no gate runs. To store a file, use `ingest_files`.
+
+- `text`: the text, up to 120,000 characters. Give `text` or `path`, not both.
+- `path`: an absolute file path.
+- `mode`: `facts` (default) or `instructions`. `instructions` keeps each rule as a short imperative and keeps negations and numbers verbatim, for condensing prompts.
+
+The result is the lines only, one per line. A call costs Claude tokens: large input is split into at most 16 parts, and the call stops at 2 USD. `distill` is not available to the agent an import runs.
+
 ### remember (prompt)
 
 Run `/mcp__kira-memory__remember` to store durable facts from given text or the recent conversation. Argument: `text`.

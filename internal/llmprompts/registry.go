@@ -217,32 +217,27 @@ var MemoryGateSystem = define(Entry{
 
 {{template "memory.dataHygiene"}}
 
-Input: "items" (each a claimed fact, reason, origin, optional sourceTag, scope), optional "clarifications" (question and answer pairs from the person who stated the items), "relatedMemories" (stored facts; context only, never edit).
+Input: "items" (each a claimed fact with a reason, an origin, an optional sourceTag and a scope), optional "clarifications" (question and answer pairs from the person who stated the items), and "relatedMemories" (facts already stored; context only, never edit them).
 
-Origin, sourceTag and scope are item metadata. Never change them. Never judge an item by them. Every fact split from an item keeps them.
+Origin, sourceTag and scope are metadata of the item. Never change them and never judge the item by them; every fact split from an item keeps them.
 
 For each item:
-1. Split it into atomic facts: one claim each, one sentence, about 20 words at most.
-   - Write the shortest plain form that keeps the meaning: active voice, present tense where true. Cut filler, hedges (just, really, basically, actually, simply), pleasantries. Drop articles only where meaning stays clear.
-   - Keep exactly: negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings, ids. When a shorter form could change the meaning, keep the original words.
-   - Make each fact standalone. Resolve a pronoun or vague reference only when the item itself makes the referent certain.
-   - Plain text only: no Markdown, no backticks, no line breaks.
-   - Cite another memory or document only by id (km_... or kg_...). Never paste its text.
-2. Attach the reason that supports each fact, same short plain style. Keep a "Stated in <path>[, <section>]" locator in the reason verbatim. Keep a rationale the item states inline ("X, because Y") only when the fact alone does not make it obvious; drop it when self-explanatory.
-3. Give each fact 3 to {{.MaxKeywords}} "keywords": synonyms, abbreviations, product, person and project names, related terms. They let a later search find the fact.
+1. Split it into atomic facts: one claim each, one sentence of about 20 words at most. Rewrite each fact to the shortest plain form that keeps its meaning: active voice, present tense where true; cut filler, hedges (just, really, basically, actually, simply) and pleasantries; drop articles only where meaning stays clear. Keep exactly negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings and ids. When a shorter form could change the meaning, keep the original words. Make each fact standalone: resolve a pronoun or vague reference only when the item itself makes the referent certain. Write plain text only: no Markdown, no backticks, no line breaks. Cite another memory or document only by its id (km_... or kg_...), never by pasting its text.
+2. Attach the reason that supports each fact, in the same short plain style.
+3. For each fact give 3 to {{.MaxKeywords}} "keywords": synonyms, abbreviations, product, person and project names, related terms. They exist so a later search finds the fact.
 
 Challenge the item (verdict "challenge", no facts, specific questions answerable in one line) when:
 - a referent is ambiguous ("it", "the project", "that service" with no name);
-- the reason is missing, circular ("because it is true") or does not support the fact; a reason naming a source document supports a fact from that document;
-- the fact is a question, an instruction or a task, not a durable statement;
+- the reason is missing, circular ("because it is true") or does not support the fact;
+- the fact is a question, an instruction or a task rather than a durable statement;
 - the item contradicts itself;
 - the fact conflicts with relatedMemories and the reason does not say it replaces them;
-- it contains a secret (password, token, API key, private key): ask nothing about it; say "secrets are not stored".
+- it contains a secret (password, token, API key, private key): ask nothing about it and say "secrets are not stored".
 
 Otherwise accept (verdict "accept", at least one fact, no questions).
 
-Clarification answers are authoritative. Never ask again about a point already answered. Accept when the answers resolve the issue.
-Never challenge style, brevity or relevance to coding. Answer every item index exactly once.
+Treat clarification answers as authoritative. Never ask again about a point already answered. Accept when the answers resolve the issue.
+Do not challenge style, brevity or relevance to coding. Answer every item index exactly once.
 
 When the input has "challenge": false, the items come from an outside source nobody can ask. Challenge only an item that holds a secret, is a question or an instruction, or contradicts itself. Accept every other item in the best standalone wording it supports, even with a thin reason; where a referent stays open, keep the original words.`,
 	Schema: `{

@@ -50,6 +50,12 @@ Tick **Write a kira-memory doc beside each file** to save the extracted facts as
 
 Files an earlier import already finished are skipped when unchanged.
 
+## Condense text with distill
+
+The `distill` tool of the `kira-memory` MCP server turns long text or a file into short, atomic lines. An agent calls it with `text` or an absolute `path`. Use `mode` `instructions` for prompts: each rule stays a short imperative and keeps its negations and numbers.
+
+`distill` stores nothing, so it is not subject to the memory gate. Input is limited to 120,000 characters, split into at most 16 parts, and a call stops at 2 USD. It runs on your Claude subscription. See [MCP tools](../../reference/mcp-tools/).
+
 ## Search
 
 The search box finds facts by keyword. Semantic search adds matches by meaning.
