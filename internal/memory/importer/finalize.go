@@ -81,7 +81,7 @@ func (a ClaudeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOu
 	}
 	timeout, budget := finalizeLimits(len(in.Facts))
 	res, err := a.Runner.RunResult(ctx, memory.Call{
-		System: llmprompts.MemoryImportFinalizeSystem.Text(a.prompts(), llmprompts.FinalizeVars{MaxItems: memory.MaxItems}), Input: string(input), Schema: llmprompts.MemoryImportFinalizeSystem.Schema(),
+		System: llmprompts.MemoryImportFinalizeSystem.Text(a.prompts(), llmprompts.FinalizeVars{MaxItems: memory.MaxItems, MaxReason: memory.MaxReasonLen}), Input: string(input), Schema: llmprompts.MemoryImportFinalizeSystem.Schema(),
 		MCPConfig: mcpConfig(a.Executable, a.Home, in.FileID, a.Env), AllowedTools: finalizeTools,
 		Timeout: timeout, Budget: budget,
 	})

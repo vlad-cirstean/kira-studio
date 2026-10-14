@@ -46,16 +46,16 @@ func answer(t *testing.T, structured any) string {
 	return p
 }
 
-// extracted is one canned distilled line; unresolved is the model's own doubt.
-type extracted struct{ fact, unresolved string }
+// extracted is one canned extract fact; unresolved is the model's own doubt.
+type extracted struct{ fact, evidence, unresolved string }
 
 func extractAnswer(t *testing.T, facts ...extracted) string {
 	t.Helper()
-	out := []map[string]string{}
+	var out []map[string]string
 	for _, f := range facts {
-		out = append(out, map[string]string{"text": f.fact, "unresolved": f.unresolved})
+		out = append(out, map[string]string{"fact": f.fact, "evidence": f.evidence, "section": "", "unresolved": f.unresolved})
 	}
-	return answer(t, map[string]any{"lines": out})
+	return answer(t, map[string]any{"facts": out})
 }
 
 func gateAnswer(t *testing.T, items ...gateItem) string {
@@ -209,12 +209,12 @@ func copyTestdata(t *testing.T, app *flowharness.App, dir string, names ...strin
 func TestMcpIngestExternal(t *testing.T) {
 	var rules []fakeagent.PromptRule
 	rules = append(rules, docRules(t, "slack.json", [2]extracted{
-		{fact: "Billing runs on PostgreSQL 16 in production."},
-		{fact: "Invoices go out on the first day of each month."},
+		{fact: "Billing runs on PostgreSQL 16 in production.", evidence: "Billing runs on PostgreSQL 16 in production"},
+		{fact: "Invoices go out on the first day of each month.", evidence: "Invoices go out on the first day of each month"},
 	})...)
 	rules = append(rules, docRules(t, "notes.md", [2]extracted{
-		{fact: "Releases ship every second Thursday."},
-		{fact: "Hotfixes go through the on-call engineer."},
+		{fact: "Releases ship every second Thursday.", evidence: "Releases ship every second Thursday"},
+		{fact: "Hotfixes go through the on-call engineer.", evidence: "Hotfixes go through the on-call engineer"},
 	})...)
 	app := ingestApp(t, "", rules...)
 	dir := copyTestdata(t, app, "export", "ingest/slack.json", "ingest/notes.md")
@@ -279,7 +279,7 @@ func TestMcpIngestExternal(t *testing.T) {
 
 func TestImportProvenanceWritesDoc(t *testing.T) {
 	app := ingestApp(t, "",
-		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "distill-billing.md.json")},
+		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "extract-billing.md.json")},
 		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
 		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")})
 	dir := copyTestdata(t, app, "docs", "import/billing.md")
@@ -391,11 +391,11 @@ func TestImportVerifiesQuestionableFacts(t *testing.T) {
 	rewritten := "Deploys run from the main branch."
 	app := ingestApp(t, "",
 		fakeagent.PromptRule{System: extractSystem, Doc: "ops.md", Emit: extractAnswer(t,
-			extracted{fact: "Deploys run from there.", unresolved: "Which place is meant by there?"},
-			extracted{fact: "Pagers rotate every Monday at 14:00."})},
+			extracted{fact: "Deploys run from there.", evidence: "run from the main branch", unresolved: "Which place is meant by there?"},
+			extracted{fact: "Pagers rotate every Monday.", evidence: "a quote the document never contains"})},
 		fakeagent.PromptRule{System: verifySystem, Emit: answer(t, map[string]any{"verdicts": []map[string]string{
-			{"id": "1.1", "verdict": "rewritten", "fact": rewritten, "why": "The file names the branch."},
-			{"id": "1.2", "verdict": "unsupported", "fact": "", "why": "No pager rotation in the file."},
+			{"id": "1.1", "verdict": "rewritten", "fact": rewritten, "evidence": "run from the main branch", "why": "The file names the branch."},
+			{"id": "1.2", "verdict": "unsupported", "fact": "", "evidence": "", "why": "No pager rotation in the file."},
 		}})},
 		fakeagent.PromptRule{System: gateSystem, Doc: "ops.md", Emit: gateAnswer(t,
 			gateItem{verdict: "accept", fact: rewritten}, gateItem{verdict: "accept", fact: "Nothing else is decided in ops.md."})},
@@ -409,7 +409,7 @@ func TestImportVerifiesQuestionableFacts(t *testing.T) {
 	done := waitJob(t, app, awaiting.Job.ID, importer.JobDone, importer.JobFailed)
 	f := fileNamed(t, done, "ops.md")
 	if done.Job.State != importer.JobDone || f.Verified != 2 || len(f.Dropped) != 1 || !strings.Contains(f.Dropped[0].Why, "Not supported by the source") ||
-		f.Dropped[0].Fact != "Pagers rotate every Monday at 14:00." {
+		f.Dropped[0].Fact != "Pagers rotate every Monday." {
 		t.Fatalf("job = %+v file %+v, want two verified and the unsupported fact dropped with why", done.Job, f)
 	}
 	app.Contract(t, "memory-import", "MemoryImportService.Job#verified", done, ingestMask)
@@ -425,9 +425,6 @@ func TestImportVerifiesQuestionableFacts(t *testing.T) {
 	if !strings.Contains(finalize, rewritten) || strings.Contains(finalize, "Pagers rotate") || strings.Contains(finalize, "Deploys run from there") {
 		t.Fatalf("finalize input = %q, want the rewritten fact and neither the unsupported nor the original", finalize)
 	}
-	if !strings.Contains(finalize, `"reason":"Stated in ops.md, Ops"`) {
-		t.Fatalf("finalize input = %q, want the code-built locator as each fact's reason", finalize)
-	}
 }
 
 func TestExternalIngestNeverChallenges(t *testing.T) {
@@ -437,8 +434,8 @@ func TestExternalIngestNeverChallenges(t *testing.T) {
 		"dropped":    []map[string]string{{"fact": "Billing is paused.", "why": "Not stored (nobody can answer): " + asked}},
 	}),
 		fakeagent.PromptRule{System: extractSystem, Doc: "export.md", Emit: extractAnswer(t,
-			extracted{fact: "Billing is paused."},
-			extracted{fact: "Staging deploys at 09:00."})},
+			extracted{fact: "Billing is paused.", evidence: "Billing is paused"},
+			extracted{fact: "Staging deploys at 09:00.", evidence: "Staging deploys at 09:00"})},
 		fakeagent.PromptRule{System: gateSystem, Doc: "export.md", Emit: gateAnswer(t,
 			gateItem{verdict: "challenge", questions: []string{asked}}, gateItem{verdict: "accept", fact: "Staging deploys at 09:00."})},
 		fakeagent.PromptRule{System: reconcileSystem, Doc: "export.md", Emit: reconcileAdds(t, 1)})
@@ -553,7 +550,7 @@ func TestIngestIdempotentCall(t *testing.T) {
 func TestRunnerOutlivesApp(t *testing.T) {
 	hold := filepath.Join(t.TempDir(), "release")
 	app := ingestApp(t, "",
-		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", WaitFile: hold, Emit: testdata(t, "distill-billing.md.json")},
+		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", WaitFile: hold, Emit: testdata(t, "extract-billing.md.json")},
 		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
 		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")})
 	dir := copyTestdata(t, app, "docs", "import/billing.md")

@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"unicode"
 
 	"github.com/cenkalti/backoff/v4"
 
@@ -55,9 +54,9 @@ type fakeAgent struct {
 	svc *memory.Service
 
 	mu          sync.Mutex
-	extractHook func(ctx context.Context, in DistillInput) error
+	extractHook func(ctx context.Context, in ExtractInput) error
 	finalHook   func(ctx context.Context, in FinalizeInput) error
-	factsHook   func(in DistillInput) []DistillLine
+	factsHook   func(in ExtractInput) []Fact
 	verifyHook  func(ctx context.Context, in VerifyInput) (VerifyOutput, error)
 	extracted   map[string]int // "rel#idx" -> successful calls
 	extractRuns int
@@ -70,7 +69,7 @@ type fakeAgent struct {
 
 func (a *fakeAgent) Available() error { return nil }
 
-func (a *fakeAgent) Distill(ctx context.Context, in DistillInput) (DistillOutput, error) {
+func (a *fakeAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutput, error) {
 	a.mu.Lock()
 	a.extractRuns++
 	a.curExtract++
@@ -80,33 +79,28 @@ func (a *fakeAgent) Distill(ctx context.Context, in DistillInput) (DistillOutput
 	defer func() { a.mu.Lock(); a.curExtract--; a.mu.Unlock() }()
 	if hook != nil {
 		if err := hook(ctx, in); err != nil {
-			return DistillOutput{}, err
+			return ExtractOutput{}, err
 		}
 	}
 	a.mu.Lock()
 	if a.extracted == nil {
 		a.extracted = map[string]int{}
 	}
-	a.extracted[in.Source+"#"+in.Section]++
+	a.extracted[fmt.Sprintf("%s#%d", in.Path, in.Index)]++
 	a.mu.Unlock()
-	lines := []DistillLine{{Text: "Part " + letters(in.Source+" "+in.Section) + " holds a fact."}}
+	facts := []Fact{{Fact: fmt.Sprintf("%s says part %d", in.Title, in.Index), Evidence: firstWord(in.Text), Section: in.HeadingPath}}
 	if a.factsHook != nil {
-		lines = a.factsHook(in)
+		facts = a.factsHook(in)
 	}
-	return DistillOutput{Lines: lines, CostUSD: 0.01}, nil
+	return ExtractOutput{Facts: facts, CostUSD: 0.01}, nil
 }
 
-// letters maps digits to letters and drops punctuation, so a fake fact holds no salient token.
-func letters(s string) string {
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= '0' && r <= '9':
-			return 'a' + (r - '0')
-		case unicode.IsLetter(r) || r == ' ':
-			return r
-		}
-		return -1
-	}, s)
+func firstWord(s string) string {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return "x"
+	}
+	return f[0]
 }
 
 func (a *fakeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error) {
@@ -118,7 +112,7 @@ func (a *fakeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, e
 	}
 	out := VerifyOutput{Verdicts: map[string]Verdict{}, CostUSD: 0.01}
 	for _, f := range in.Facts {
-		out.Verdicts[f.ID] = Verdict{Verdict: VerdictConfirmed, Why: "found"}
+		out.Verdicts[f.ID] = Verdict{Verdict: VerdictConfirmed, Evidence: f.Evidence, Why: "found"}
 	}
 	return out, nil
 }
@@ -304,11 +298,11 @@ func TestImportRetriesAndRetryFile(t *testing.T) {
 	var transient atomic.Bool
 	var broken atomic.Bool
 	broken.Store(true)
-	h.agent.extractHook = func(_ context.Context, in DistillInput) error {
-		if strings.HasSuffix(in.Source, "doc0.md") && !strings.Contains(in.Section, ">") && transient.CompareAndSwap(false, true) {
+	h.agent.extractHook = func(_ context.Context, in ExtractInput) error {
+		if strings.HasSuffix(in.Path, "doc0.md") && in.Index == 0 && transient.CompareAndSwap(false, true) {
 			return errors.New("Claude Code failed: blip")
 		}
-		if strings.HasSuffix(in.Source, "doc1.md") && strings.HasSuffix(in.Section, "Section 1") && broken.Load() {
+		if strings.HasSuffix(in.Path, "doc1.md") && in.Index == 1 && broken.Load() {
 			return memory.ErrClaudeOutput
 		}
 		return nil
@@ -343,7 +337,7 @@ func TestImportFatalErrorPausesJob(t *testing.T) {
 	h := newHarness(t, 2)
 	var loggedOut atomic.Bool
 	loggedOut.Store(true)
-	h.agent.extractHook = func(context.Context, DistillInput) error {
+	h.agent.extractHook = func(context.Context, ExtractInput) error {
 		if loggedOut.Load() {
 			return memory.ErrClaudeAuth
 		}
@@ -373,7 +367,7 @@ func TestImportPauseReleasesInFlightChunk(t *testing.T) {
 	started := make(chan struct{}, 8)
 	var block atomic.Bool
 	block.Store(true)
-	h.agent.extractHook = func(ctx context.Context, _ DistillInput) error {
+	h.agent.extractHook = func(ctx context.Context, _ ExtractInput) error {
 		if !block.Load() {
 			return nil
 		}
@@ -403,8 +397,8 @@ func TestImportPauseReleasesInFlightChunk(t *testing.T) {
 func TestImportResumesAfterRestart(t *testing.T) {
 	h := newHarness(t, 2)
 	gate := make(chan struct{})
-	h.agent.extractHook = func(ctx context.Context, in DistillInput) error {
-		if strings.HasSuffix(in.Section, "Section 2") {
+	h.agent.extractHook = func(ctx context.Context, in ExtractInput) error {
+		if in.Index == 2 {
 			select {
 			case <-gate:
 			case <-ctx.Done():
@@ -480,7 +474,7 @@ func TestImportSkipsUnchangedAndCancels(t *testing.T) {
 		t.Fatal(err)
 	}
 	started := make(chan struct{}, 1)
-	h.agent.extractHook = func(ctx context.Context, _ DistillInput) error {
+	h.agent.extractHook = func(ctx context.Context, _ ExtractInput) error {
 		select {
 		case started <- struct{}{}:
 		default:
@@ -506,7 +500,7 @@ func TestImportSkipsUnchangedAndCancels(t *testing.T) {
 
 func TestImportConcurrencyLimits(t *testing.T) {
 	h := newHarness(t, 4)
-	h.agent.extractHook = func(context.Context, DistillInput) error { time.Sleep(15 * time.Millisecond); return nil }
+	h.agent.extractHook = func(context.Context, ExtractInput) error { time.Sleep(15 * time.Millisecond); return nil }
 	h.agent.finalHook = func(context.Context, FinalizeInput) error { time.Sleep(15 * time.Millisecond); return nil }
 	j := h.create()
 	h.mustStart(j.ID)
@@ -521,14 +515,14 @@ func TestImportConcurrencyLimits(t *testing.T) {
 
 func TestImportCrossChecksQuestionableFacts(t *testing.T) {
 	h := newHarness(t, 1)
-	h.agent.factsHook = func(in DistillInput) []DistillLine {
-		if !!strings.Contains(in.Section, ">") {
+	h.agent.factsHook = func(in ExtractInput) []Fact {
+		if in.Index != 0 {
 			return nil
 		}
-		return []DistillLine{
-			{Text: "It uses port 80.", Unresolved: "which service"},
-			{Text: "Invented claim about port 8443.", Unresolved: ""},
-			{Text: "Solid claim."},
+		return []Fact{
+			{Fact: "It uses port 80.", Evidence: firstWord(in.Text), Section: "s", Unresolved: "which service"},
+			{Fact: "Invented claim.", Evidence: "a quote that is nowhere", Section: "s"},
+			{Fact: "Solid claim.", Evidence: firstWord(in.Text), Section: "s"},
 		}
 	}
 	h.agent.verifyHook = func(_ context.Context, in VerifyInput) (VerifyOutput, error) {
@@ -536,7 +530,7 @@ func TestImportCrossChecksQuestionableFacts(t *testing.T) {
 			return VerifyOutput{}, fmt.Errorf("verify input = %+v", in.Facts)
 		}
 		return VerifyOutput{Verdicts: map[string]Verdict{
-			"1.1": {Verdict: VerdictRewritten, Fact: "The web service uses port 80.", Why: "named"},
+			"1.1": {Verdict: VerdictRewritten, Fact: "The web service uses port 80.", Evidence: "alpha", Why: "named"},
 			"1.2": {Verdict: VerdictUnsupported, Why: "no such text"},
 		}}, nil
 	}
@@ -611,7 +605,7 @@ func TestIdleClaimsDoNotScaleWithExtractedFiles(t *testing.T) {
 	h := newHarness(t, 1)
 	j := h.create()
 	text := strings.Repeat("alpha beta gamma delta ", 80)
-	facts := `[{"fact":"x 9999","section":"s","reason":"r"},{"fact":"y 8888","section":"s","reason":"r"}]`
+	facts := `[{"fact":"x","evidence":"no such quote","section":"s"},{"fact":"y","evidence":"nowhere","section":"s"}]`
 	tx, err := h.e.st.db.Begin()
 	if err != nil {
 		t.Fatal(err)

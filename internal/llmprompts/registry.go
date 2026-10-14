@@ -17,6 +17,12 @@ type GateVars struct {
 	MaxKeywords int `json:"maxKeywords"`
 }
 
+// ExtractVars fills the import extraction prompt.
+type ExtractVars struct {
+	MaxFacts    int `json:"maxFacts"`
+	MaxEvidence int `json:"maxEvidence"`
+}
+
 // DistillVars fills the distill prompt. Instructions switches to the prompt mode: rules as short imperatives.
 type DistillVars struct {
 	MaxLines     int  `json:"maxLines" prompt:"required"`
@@ -25,7 +31,8 @@ type DistillVars struct {
 
 // FinalizeVars fills the import finalize prompt.
 type FinalizeVars struct {
-	MaxItems int `json:"maxItems"`
+	MaxItems  int `json:"maxItems"`
+	MaxReason int `json:"maxReason"`
 }
 
 // VerifyVars fills the import cross-check prompt.
@@ -295,6 +302,41 @@ Choose exactly one action per fact:
 }`,
 }, NoVars{})
 
+// MemoryImportExtractSystem is the system prompt that extracts facts from one chunk of an imported file.
+var MemoryImportExtractSystem = define(Entry{
+	ID: "memory.import.extract.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryImportExtractSystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryImportExtractSystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryImportExtractSystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene"},
+	Default: `You extract durable facts from one chunk of a document for a developer's long-term memory. Output only the schema.
+
+{{template "memory.dataHygiene"}}
+
+Input: "document" (path, title), "chunk" (index, count, headingPath), "context" and "text".
+"text" is the only source of facts. "context" is the end of the previous chunk: read it to understand references, never extract a fact from it.
+"text" may be JSON from an export. Field values are the content; author, time and id fields give context.
+
+Extract atomic facts:
+- One claim per fact, written as one complete sentence of at most 300 characters. Keep every qualifier that changes the claim inside that fact: numbers, units, names, negations, conditions, exceptions and limits.
+- Keep durable knowledge only: decisions with their reasons, alternatives that were rejected with why, conventions, configuration and names, ownership, relationships between components, constraints, how things work.
+- Skip navigation, tables of contents, boilerplate, licence text, examples copied verbatim, step-by-step commands, time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend) and code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
+- Make a fact standalone only where the text itself makes its subject certain: name the service instead of "it" when the text names it. When the text leaves the subject or a reference open, keep the original wording and say what is missing in "unresolved" (for example: which service "it" means). Leave "unresolved" empty otherwise.
+- Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
+- "evidence" quotes the supporting words from "text", at most {{.MaxEvidence}} characters. "section" is the heading path of the chunk.
+- At most {{.MaxFacts}} facts. Return none when the chunk holds nothing durable.`,
+	Schema: `{
+  "type": "object", "additionalProperties": false, "required": ["facts"],
+  "properties": {"facts": {"type": "array", "items": {
+    "type": "object", "additionalProperties": false,
+    "required": ["fact", "evidence", "section", "unresolved"],
+    "properties": {
+      "fact": {"type": "string"}, "evidence": {"type": "string"},
+      "section": {"type": "string"}, "unresolved": {"type": "string"}
+    }}}}
+}`,
+}, ExtractVars{MaxFacts: 40, MaxEvidence: 200})
+
 // MemoryDistillSystem is the system prompt that distills text into terse atomic lines: the base of the
 // distill MCP tool and of memory import (one call per chunk).
 var MemoryDistillSystem = define(Entry{
@@ -338,16 +380,16 @@ var MemoryImportFinalizeSystem = define(Entry{
 	PurposeKey:        "llmPrompts.entry.memoryImportFinalizeSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryImportFinalizeSystem.usedBy.body",
 	RequiredFragments: []ID{"memory.dataHygiene"},
-	Default: `You store the facts distilled from one document into long-term memory through the kira-memory tools, then report the facts you did not store. Output only the schema when done.
+	Default: `You store the facts extracted from one document into long-term memory through the kira-memory tools, then report the facts you did not store. Output only the schema when done.
 
 {{template "memory.dataHygiene"}}
 
-Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope, project), "challenge", "facts": atomic facts distilled separately per chunk, in document order. Each has id, chunk, section, reason and, when the chunk left something open, "unresolved".
+Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope, project), "challenge", "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote and, when the chunk left something open, "unresolved".
 
 1. Chunks were read independently. Merge duplicates and near-duplicates into one fact.
 2. Resolve each unresolved fact from the other facts of this document, then rewrite it standalone. A fact that stays ambiguous is not stored: list it in "unresolved" with the open question.
 3. Drop a fact that is not durable (trivia, example, time-bound, navigation): list it in "dropped" with why. Drop any secret (password, token, API key, private key); never store it.
-4. Store the rest with store_memory, at most {{.MaxItems}} items per call. Item origin, sourceTag, scope, project: the input "provenance" values (omit missing ones; the store enforces them). Item fact: standalone. Item reason: the fact's "reason"; for a merged fact, the first fact's.
+4. Store the rest with store_memory, at most {{.MaxItems}} items per call. Item origin, sourceTag, scope, project: the input "provenance" values (omit missing ones; the store enforces them). Item fact: standalone. Item reason, exactly: Stated in <document path>, <section>: "<evidence>" (at most {{.MaxReason}} characters).
 5. With "challenge" true, store_memory can challenge items with questions; a challenged call stores nothing. Answer through "clarifications" using only what this document's facts state, never assumption or general knowledge. When the document cannot answer, remove that item from the call, call again, and list the fact in "unresolved" with the store's questions. With "challenge" false, nobody can answer: store_memory stores the accepted items and reports the rest as "Not stored". List each of those in "dropped" with the questions as why, never in "unresolved".
 6. store_memory already reconciles new facts against stored ones. Use search_memories only to help word a fact.
 7. Stop when every input fact is stored, merged, dropped or listed unresolved. Report only facts you did not store.`,
@@ -362,7 +404,7 @@ Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope,
       "properties": {"fact": {"type": "string"}, "why": {"type": "string"}}}}
   }
 }`,
-}, FinalizeVars{MaxItems: 20})
+}, FinalizeVars{MaxItems: 20, MaxReason: 2000})
 
 // MemoryImportVerifySystem is the system prompt of the cross-check that judges questionable extracted facts against the source file.
 var MemoryImportVerifySystem = define(Entry{
@@ -375,24 +417,24 @@ var MemoryImportVerifySystem = define(Entry{
 
 {{template "memory.dataHygiene"}}
 
-Input: "document" (path, title, "source": file name in your working directory), "facts": each with id, fact, section and, when the distiller doubted it, "unresolved".
-The only source of truth is the file named in "source". Read it with Read and Grep only, never another file. Find the words in the file before any verdict; never trust the fact.
+Input: "document" (path, title, "source": file name in your working directory), "facts": each with id, fact, evidence quote, section and, when the extractor doubted it, "unresolved".
+The only source of truth is the file named in "source". Read it with Read and Grep only, never another file. Find the words in the file before any verdict; never trust the fact or its quote.
 
 One verdict per fact:
-- "confirmed": the file states the fact as written, and any open question has an answer in the file.
-- "rewritten": the file supports the claim, but the wording is wrong, vague or leaves a reference open. Put a terse standalone line of at most 300 characters in "fact". Use only what the file says.
+- "confirmed": the file states the fact as written, and any open question has an answer in the file. "evidence": verbatim supporting quote.
+- "rewritten": the file supports the claim, but the wording is wrong, vague or leaves a reference open. "fact": corrected standalone sentence of at most 300 characters, only what the file says. "evidence": verbatim supporting quote.
 - "unsupported": the file does not state the fact, or contradicts it.
 - "ambiguous": the file states something close, but the subject or a reference stays open after reading the whole file.
-"why": one sentence. "fact": "" unless rewritten. Answer every fact id exactly once, at most {{.MaxFacts}} facts per call.`,
+"why": one sentence. "fact" and "evidence": "" where not asked for. Answer every fact id exactly once, at most {{.MaxFacts}} facts per call.`,
 	Schema: `{
   "type": "object", "additionalProperties": false, "required": ["verdicts"],
   "properties": {"verdicts": {"type": "array", "items": {
     "type": "object", "additionalProperties": false,
-    "required": ["id", "verdict", "fact", "why"],
+    "required": ["id", "verdict", "fact", "evidence", "why"],
     "properties": {
       "id": {"type": "string"},
       "verdict": {"enum": ["confirmed", "rewritten", "unsupported", "ambiguous"]},
-      "fact": {"type": "string"}, "why": {"type": "string"}
+      "fact": {"type": "string"}, "evidence": {"type": "string"}, "why": {"type": "string"}
     }}}}
 }`,
 }, VerifyVars{MaxFacts: 40})
