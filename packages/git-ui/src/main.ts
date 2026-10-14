@@ -38,6 +38,8 @@ export interface MountOptions {
   readonly reviewFilter?: 'all' | 'needsReview';
   /** Only meaningful when `view === "review"`: called with the path after each file-list mark. */
   readonly onReviewMarked?: (path: string) => void;
+  /** Only meaningful when `view === "review"`: receives a handle that opens a file's diff, as a click in the Files pane does. */
+  readonly onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
   /** G10 D19: only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
    *  palette command that fired while the graph webview was cold (`panelView.ts`'s own
    *  `#pendingUiAction`/bootstrap-island arm). `undefined`/`null` means no action is pending. G14
@@ -85,6 +87,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     target,
     reviewFilter,
     onReviewMarked,
+    onReviewApi,
     pendingUiAction,
     dateFormat,
     onShowOperations,
@@ -98,7 +101,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     view === 'review'
       ? createApp(MountRoot, {
           root: ReviewView,
-          rootProps: { ...rest, target, reviewFilter, onReviewMarked, repoHead },
+          rootProps: { ...rest, target, reviewFilter, onReviewMarked, onReviewApi, repoHead },
         })
       : createApp(MountRoot, {
           root: AppRoot,

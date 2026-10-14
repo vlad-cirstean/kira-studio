@@ -9,7 +9,7 @@ import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { queryClient } from '@workbench/state/queryClient';
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import { onReviewRepaint } from '../../../repo/git/transport';
 import { ghSyncPlanPrefix, useReviewStep } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
@@ -24,6 +24,8 @@ import { useReviewContext } from './useReviewContext';
 const store = useAdeReviewWindowStore();
 const target = computed(() => store.target);
 const { repoLabel } = useReviewContext(() => store.target as NonNullable<typeof store.target>);
+
+const files = useTemplateRef('files');
 
 // A mark from the file list or from a diff editor can change what a sync would do.
 function refreshSyncPlan(): void {
@@ -95,7 +97,7 @@ const right = useLiveSize(
         :aria-label="t('space.ade.review.window.files.aria')"
         data-testid="ade-review-left"
       >
-        <AdeReviewFiles :target="target" @marked="refreshSyncPlan" />
+        <AdeReviewFiles ref="files" :target="target" @marked="refreshSyncPlan" />
       </section>
       <ResizeHandle
         :label="t('space.ade.panel.resize.label')"
@@ -147,7 +149,11 @@ const right = useLiveSize(
           data-testid="ade-review-right-tabs"
         />
         <div class="min-h-0 flex-1">
-          <AdeWorkflowReviewPanel v-if="rightTab === 'workflow'" :target="target" />
+          <AdeWorkflowReviewPanel
+            v-if="rightTab === 'workflow'"
+            :target="target"
+            @open-file="files?.selectFile($event)"
+          />
           <AdeReviewAgentPanel v-else :target="target" :repo-label="repoLabel" />
         </div>
       </section>

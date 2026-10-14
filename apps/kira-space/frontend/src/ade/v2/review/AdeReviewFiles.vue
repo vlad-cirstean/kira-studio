@@ -16,6 +16,10 @@ const emit = defineEmits<{ marked: [path: string] }>();
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
+let api: { selectFile: (path: string) => void } | null = null;
+
+// Opens a file's diff in the centre tabs, as a click in the file list does.
+defineExpose({ selectFile: (path: string) => api?.selectFile(path) });
 
 onMounted(async () => {
   if (!container.value) return;
@@ -37,6 +41,9 @@ onMounted(async () => {
       },
       reviewFilter: 'needsReview',
       onReviewMarked: (path) => emit('marked', path),
+      onReviewApi: (a) => {
+        api = a;
+      },
     });
   } catch (err) {
     errorMessage.value = errorText(err);

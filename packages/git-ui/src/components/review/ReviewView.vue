@@ -56,6 +56,7 @@ const props = defineProps<{
   target?: ReviewTarget | null;
   reviewFilter?: 'all' | 'needsReview';
   onReviewMarked?: (path: string) => void;
+  onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
   repoHead?: RepoHead;
 }>();
 
@@ -371,6 +372,7 @@ const rowActions = computed<DetailActions | undefined>(() => review.value?.rowAc
 const filesActions = createReviewFilesActions(bridge, () => repoId.value, announce);
 
 onMounted(() => {
+  props.onReviewApi?.({ selectFile: (path) => reviewFiles.value?.selectFile(path) });
   // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
   // this, not merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
   // worker to wait a frame for, so this can mark right after mount rather than waiting on a
