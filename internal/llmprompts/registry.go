@@ -441,7 +441,7 @@ var MemoryMcpInstructions = define(Entry{
 	UsedByKey:  "llmPrompts.entry.memoryMcpInstructions.usedBy.body",
 	Default: `Long-term memory shared by the user and their agents, across sessions and projects.
 
-Store a durable fact or decision when the user states one or you learn one. Call store_memory. Each item needs:
+Store a durable fact or decision when the user states one or you learn one: call store_memory. Each item needs:
 - fact: what is true. Rough or compound text is fine; the store splits and rewords it.
 - reason: why it is true or was decided. Never invent one.
 - origin: "user" (user stated or confirmed it), "agent" (you concluded it) or "external" with a sourceTag (slack, jira, a doc says it).
@@ -451,22 +451,22 @@ Origins rank user, external, agent. An agent fact never replaces a user fact.
 A challenge stores nothing. Ask the user the returned questions or fix the items, then call again with the answers in clarifications.
 
 Files (repo docs, Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
-Condense long text or a file into short lines without storing: call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. Stores nothing; to store a file use ingest_files.
+Condense long text or a file into short lines without storing: call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. To store a file use ingest_files.
 
-Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", then an indented reason line, then an indented meta line (version, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
+Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", an indented reason line, an indented meta line (version, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts and keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
+	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
 }, NoVars{})
 
 var (
 	_ = arg(MemoryToolStoreMemory.id, "items", spaceApp, NewSession, `facts to store, 1 to {{.Max}}; each needs fact, reason, origin and scope`, MaxVars{Max: 20})
 	_ = arg(MemoryToolStoreMemory.id, "items.fact", spaceApp, NewSession, `what is true; rough or compound text is fine, the store splits and rewords it`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "items.reason", spaceApp, NewSession, `why it is true or was decided; never invented`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "items.origin", spaceApp, NewSession, `who decided it: user (the user stated or confirmed it), agent (you concluded it) or external (a source outside this conversation; set sourceTag)`, NoVars{})
+	_ = arg(MemoryToolStoreMemory.id, "items.origin", spaceApp, NewSession, `who decided it: user (stated or confirmed it), agent (you concluded it) or external (a source outside this conversation; set sourceTag)`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "items.sourceTag", spaceApp, NewSession, `source name, only for origin external: lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "items.scope", spaceApp, NewSession, `where it holds: company, project or personal (the user only)`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "items.project", spaceApp, NewSession, `project key host/owner/repo, such as github.com/acme/billing, never a bare name; omit to use this repo's project; only for scope project`, NoVars{})
