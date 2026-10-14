@@ -175,6 +175,28 @@ type RebaseContextVars struct {
 	RunID   string `json:"runID" prompt:"required"`
 }
 
+// ReviewCommentVar is one review comment sent to an agent.
+type ReviewCommentVar struct {
+	ID    int64  `json:"id"`
+	Kind  string `json:"kind"`
+	Path  string `json:"path"`
+	Lines string `json:"lines"`
+	Body  string `json:"body"`
+}
+
+// ReviewRoundVars fills the review round messages and the comment list fragment.
+type ReviewRoundVars struct {
+	Title    string             `json:"title"`
+	JiraKey  string             `json:"jiraKey"`
+	JiraURL  string             `json:"jiraURL"`
+	Repo     string             `json:"repo"`
+	Branch   string             `json:"branch"`
+	Base     string             `json:"base"`
+	Worktree string             `json:"worktree"`
+	Round    int                `json:"round"`
+	Comments []ReviewCommentVar `json:"comments"`
+}
+
 // ResumeVars fills the resume-after-restart message.
 type ResumeVars struct {
 	App string `json:"app" prompt:"required"`
@@ -699,6 +721,27 @@ var HeadlessFinishStepAck = define(Entry{
 	Default:    `Recorded. Stop now.`,
 }, NoVars{})
 
+// HeadlessToolReplyReviewComment describes the reply_review_comment tool.
+var HeadlessToolReplyReviewComment = define(Entry{
+	ID: "headless.tool.reply_review_comment", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "reply_review_comment",
+	Default: `Answer one review comment. Call once per comment you were sent.`,
+}, NoVars{})
+
+var (
+	_ = arg(HeadlessToolReplyReviewComment.id, "id", spaceApp, NextCall, `The comment number, from the list.`, NoVars{})
+	_ = arg(HeadlessToolReplyReviewComment.id, "reply", spaceApp, NextCall, `What you changed, or the answer. Plain text.`, NoVars{})
+	_ = arg(HeadlessToolReplyReviewComment.id, "resolved", spaceApp, NextCall, `true when done or answered; false when you could not.`, NoVars{})
+)
+
+// HeadlessReviewReplyAck is the reply to a reply_review_comment call.
+var HeadlessReviewReplyAck = define(Entry{
+	ID: "headless.reviewReply.ack", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessReviewReplyAck.title",
+	PurposeKey: "llmPrompts.entry.headlessReviewReplyAck.description",
+	UsedByKey:  "llmPrompts.entry.headlessReviewReplyAck.usedBy.body",
+	Default:    `Saved.`,
+}, NoVars{})
+
 // HeadlessToolTaskInfo describes the task_info tool.
 var HeadlessToolTaskInfo = define(Entry{
 	ID: "headless.tool.task_info", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "task_info",
@@ -849,6 +892,54 @@ I review these branches in Kira Space and will ask questions about them. Answer 
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
 	},
 })
+
+var reviewRoundExample = ReviewRoundVars{
+	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
+	Repo: "kira-space", Branch: "feat/login", Base: "main", Worktree: "/work/kira-space/feat-login", Round: 1,
+	Comments: []ReviewCommentVar{
+		{ID: 3, Kind: "change", Path: "src/login.ts", Lines: "12-14", Body: "Rename this to isValid."},
+		{ID: 4, Kind: "question", Path: "src/login.ts", Lines: "30", Body: "Why retry twice?"},
+	},
+}
+
+// AdeReviewComments lists the comments sent to a review round and says how to answer each.
+var AdeReviewComments = define(Entry{
+	ID: "ade.review.comments", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeReviewComments.title",
+	PurposeKey: "llmPrompts.entry.adeReviewComments.description",
+	UsedByKey:  "llmPrompts.entry.adeReviewComments.usedBy.body",
+	Default: `{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}
+{{.Body}}
+{{end}}Per comment, call reply_review_comment once.
+change: make the change, commit it, reply what changed, resolved true.
+question: answer in the reply, change no file for it, resolved true.
+Cannot do it: reply why, resolved false.`,
+}, reviewRoundExample)
+
+// AdeReviewRoundMessage is the first message of a dedicated review step agent.
+var AdeReviewRoundMessage = define(Entry{
+	ID: "ade.review.round.message", Kind: KindMessage, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.adeReviewRoundMessage.title",
+	PurposeKey:        "llmPrompts.entry.adeReviewRoundMessage.description",
+	UsedByKey:         "llmPrompts.entry.adeReviewRoundMessage.usedBy.body",
+	RequiredFragments: []ID{"ade.review.comments"},
+	Default: `Review of task {{.Title}}{{if .JiraKey}}
+{{template "ade.jiraLine" .}}{{end}}
+Repo {{.Repo}}, branch {{.Branch}} (base {{.Base}}), worktree {{.Worktree}}.
+Read the branch diff against the base first. The reviewer left these comments:
+{{template "ade.review.comments" .}}`,
+}, reviewRoundExample)
+
+// AdeReviewFollowupMessage goes to a resumed session that takes review comments.
+var AdeReviewFollowupMessage = define(Entry{
+	ID: "ade.review.followup.message", Kind: KindMessage, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.adeReviewFollowupMessage.title",
+	PurposeKey:        "llmPrompts.entry.adeReviewFollowupMessage.description",
+	UsedByKey:         "llmPrompts.entry.adeReviewFollowupMessage.usedBy.body",
+	RequiredFragments: []ID{"ade.review.comments"},
+	Default: `Review round {{.Round}} on {{.Branch}}. The reviewer left these comments on your work:
+{{template "ade.review.comments" .}}`,
+}, reviewRoundExample)
 
 // AdeStartMessage is the first message of a branch-level Start session.
 var AdeStartMessage = define(Entry{

@@ -86,6 +86,9 @@ func TestGolden(t *testing.T) {
 		{"ade.rebase.contextLine.failed", AdeRebaseContextLine.id, RebaseContextVars{Branch: "feat/login", Outcome: "failed", Reason: "conflicts in a.go", RunID: "run-7"}},
 		{"ade.sendBack.line.basic", AdeSendBackLine.id, SendBackVars{From: "Verify", Branch: "feat/login", Reason: "tests red"}},
 
+		{"ade.review.round.message.full", AdeReviewRoundMessage.id, reviewRoundExample},
+		{"ade.review.followup.message.full", AdeReviewFollowupMessage.id, reviewRoundExample},
+
 		{"run.resume.line.space", RunResumeLine.id, ResumeVars{App: "Space"}},
 
 		{"headless.finishStep.suffix.implicit", HeadlessFinishStepSuffix.id, implicit},

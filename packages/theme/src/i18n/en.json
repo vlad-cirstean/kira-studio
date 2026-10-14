@@ -5243,11 +5243,32 @@
           "body": "Included in the stage and start messages."
         }
       },
+      "adeReviewComments": {
+        "description": "The comments sent to a review round, with how to answer each one. Change requests are fixed and committed; questions are answered.",
+        "title": "Review comment list",
+        "usedBy": {
+          "body": "Included in the review round and follow-up messages."
+        }
+      },
+      "adeReviewFollowupMessage": {
+        "description": "Sent to a resumed agent session with the review comments left on its work.",
+        "title": "Review follow-up message",
+        "usedBy": {
+          "body": "Sent when a review step sends comments to the implementer session or to a later round of a review agent."
+        }
+      },
       "adeReviewMessage": {
         "description": "The first message of the review agent. It lists the task, notes, and each branch with its base and worktree.",
         "title": "Review message",
         "usedBy": {
           "body": "Sent when the review agent starts for a task."
+        }
+      },
+      "adeReviewRoundMessage": {
+        "description": "The first message of a new review agent. It names the task, branch and worktree, then lists the review comments.",
+        "title": "Review round message",
+        "usedBy": {
+          "body": "Sent when a review step sends comments to a new review agent."
         }
       },
       "adeSendBackLine": {
@@ -5304,6 +5325,13 @@
         "title": "Rebase report instruction",
         "usedBy": {
           "body": "Ends every rebase run prompt, edited ones included."
+        }
+      },
+      "headlessReviewReplyAck": {
+        "description": "The reply to a reply_review_comment call.",
+        "title": "Review reply result",
+        "usedBy": {
+          "body": "Returned to the agent after it replies to a review comment."
         }
       },
       "headlessScriptReportSuffix": {
