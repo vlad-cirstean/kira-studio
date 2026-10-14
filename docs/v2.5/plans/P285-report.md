@@ -281,3 +281,11 @@ Sizes: rendered default (fragments and example vars included), chars and `ceil(r
 | memory.mcp.semantic.notInstalled | 122 | 41 |
 | memory.mcp.semantic.unavailable | 97 | 33 |
 | total | 17358 | 5800 |
+
+## 9. Part 2 iteration log
+
+Reference = Part 1 `round-final` tuning aggregate (10 sources): `R_ess` 0.883, `R_all` 0.713, `P` 0.895, unsupported 0.000, duplicate 0.000, `C_fact` 0.497. Pass floors from the Part 1 bands: `R_ess` >= 0.863, `R_all` >= 0.693, `P` >= 0.830, unsupported <= 0.010, duplicate <= 0.020, `C_fact` <= 0.526. Aggregates recomputed over the tuning sources from each round's `scores.json`. Phase ledger `P285-runs/spend-p2.jsonl`, cap 30 USD.
+
+| round | hypothesis | change | R_ess | R_all | P | unsupp | dup | C_fact | reason ok | run USD | phase USD | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| p2-01 | terse gate and reconcile keep recall | gate and reconcile terse (override), rest as Part 1 | 0.859 | 0.672 | 0.880 | 0.009 | 0.000 | 0.457 | 0.905 | 4.2 | 4.3 | `R_ess` 0.004 and `R_all` 0.021 under their floors; `C_fact` -0.040, `P` and unsupported in band; confirmation rerun next (noise rule) |
