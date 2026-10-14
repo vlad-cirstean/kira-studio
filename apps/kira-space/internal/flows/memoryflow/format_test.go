@@ -191,6 +191,9 @@ func TestMcpPrepareComment(t *testing.T) {
 	}
 }
 
+// metaLine is a result's indented meta line; it starts with the version and origin.
+var metaLine = regexp.MustCompile(`^  v\d+ origin=`)
+
 func TestMcpSearchTextFormat(t *testing.T) {
 	app := flowharness.New(t)
 	gate(t, app, "gate-accept.json")
@@ -202,18 +205,14 @@ func TestMcpSearchTextFormat(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("search_memories: %v %+v", err, res)
 	}
-	line := regexp.MustCompile(`^` + memfmt.FactID + ` (fact|reason|meta): `)
-	n := 0
+	var lines []string
 	for _, l := range strings.Split(res.Content[0].(*mcp.TextContent).Text, "\n") {
-		if l == "" || strings.HasPrefix(l, "Note: ") {
-			continue
-		}
-		n++
-		if !line.MatchString(l) {
-			t.Fatalf("line %q is not '<km_ id> fact|reason|meta: ...'", l)
+		if l != "" && !strings.HasPrefix(l, "Note: ") {
+			lines = append(lines, l)
 		}
 	}
-	if n != 3 {
-		t.Fatalf("search text holds %d lines, want fact, reason and meta", n)
+	if len(lines) != 3 || !regexp.MustCompile(`^`+memfmt.FactID+` \S`).MatchString(lines[0]) || !regexp.MustCompile(`^  \S`).MatchString(lines[1]) ||
+		!metaLine.MatchString(lines[2]) || metaLine.MatchString(lines[1]) {
+		t.Fatalf("search text = %q, want '<km_ id> <fact>', an indented reason and an indented meta line", lines)
 	}
 }

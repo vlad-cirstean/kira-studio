@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -88,8 +89,9 @@ func searchScoredThroughClaude(t *testing.T, app *realApp, cfg string) {
 		return
 	}
 	metas := 0
+	metaLine := regexp.MustCompile(`^  v\d+ origin=`)
 	for _, l := range strings.Split(text, "\n") {
-		if !strings.Contains(l, " meta: ") {
+		if !metaLine.MatchString(l) {
 			continue
 		}
 		metas++

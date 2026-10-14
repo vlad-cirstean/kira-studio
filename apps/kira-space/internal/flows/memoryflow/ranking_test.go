@@ -150,16 +150,16 @@ func TestMcpSearchScoreMeta(t *testing.T) {
 		t.Fatalf("search_memories: %v %+v", err, res)
 	}
 	text := res.Content[0].(*mcp.TextContent).Text
-	line := regexp.MustCompile(`^` + memfmt.FactID + ` (fact|reason|meta): `)
+	line := regexp.MustCompile(`^(` + memfmt.FactID + ` \S|  \S)`)
 	var metas []string
 	for _, l := range strings.Split(text, "\n") {
 		if l == "" || strings.HasPrefix(l, "Note: ") {
 			continue
 		}
 		if !line.MatchString(l) {
-			t.Fatalf("line %q is not '<km_ id> fact|reason|meta: ...'", l)
+			t.Fatalf("line %q is not '<km_ id> <fact>' or an indented line", l)
 		}
-		if strings.Contains(l, " meta: ") {
+		if metaLine.MatchString(l) {
 			metas = append(metas, l)
 		}
 	}

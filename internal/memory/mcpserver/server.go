@@ -365,8 +365,8 @@ func renderMemories(ms []memory.Memory) string {
 	return b.String()
 }
 
-// writeMemory prints the grep-first grammar shared with the comment and doc formats, plus a meta
-// line with the per-result provenance: "<id> fact: ...", "<id> reason: ...", "<id> meta: ...".
+// writeMemory prints the grep-first layout shared with the comment and doc formats: "<id> <fact>",
+// the reason indented by two spaces, then an indented meta line with the per-result provenance.
 func writeMemory(b *strings.Builder, m memory.Memory) {
 	meta := []string{fmt.Sprintf("v%d", m.Version), "origin=" + m.Origin}
 	if m.SourceTag != nil {
@@ -386,7 +386,11 @@ func writeMemory(b *strings.Builder, m memory.Memory) {
 	if m.ContextCount > 0 {
 		meta = append(meta, fmt.Sprintf("ctx=%d", m.ContextCount))
 	}
-	fmt.Fprintf(b, "%s fact: %s\n%s reason: %s\n%s meta: %s\n\n", m.LineageID, oneLine(m.Fact), m.LineageID, oneLine(m.Reason), m.LineageID, strings.Join(meta, " "))
+	fmt.Fprintf(b, "%s %s\n", m.LineageID, oneLine(m.Fact))
+	if m.Reason != "" {
+		fmt.Fprintf(b, "  %s\n", oneLine(m.Reason))
+	}
+	fmt.Fprintf(b, "  %s\n\n", strings.Join(meta, " "))
 }
 
 // scoreMeta prints a search result's score parts: total and per-source scores, then the boosts that

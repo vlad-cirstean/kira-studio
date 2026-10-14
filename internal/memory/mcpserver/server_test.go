@@ -203,19 +203,15 @@ func TestAsCommentPersistsNothingAndTextIsGrepFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	line := regexp.MustCompile(`^` + memfmt.FactID + ` (fact|reason|meta): `)
-	n := 0
+	var lines []string
 	for _, l := range strings.Split(res.Content[0].(*mcp.TextContent).Text, "\n") {
-		if l == "" {
-			continue
-		}
-		n++
-		if !line.MatchString(l) {
-			t.Errorf("line %q is not grep-first", l)
+		if l != "" {
+			lines = append(lines, l)
 		}
 	}
-	if n != 3 {
-		t.Errorf("want fact, reason and meta lines, got %d", n)
+	if len(lines) != 3 || !regexp.MustCompile(`^`+memfmt.FactID+` \S`).MatchString(lines[0]) || !regexp.MustCompile(`^  \S`).MatchString(lines[1]) ||
+		!regexp.MustCompile(`^  v\d+ origin=`).MatchString(lines[2]) {
+		t.Errorf("want '<id> <fact>', an indented reason and an indented meta line, got %q", lines)
 	}
 }
 
