@@ -28,6 +28,7 @@ import (
 //	KIRA_EVAL_ROUND    round name, the output dir under docs/v2.5/plans/P285-runs
 //	KIRA_EVAL_PROMPTS  JSON map {prompt id: text} overriding registry prompts for the run
 //	KIRA_EVAL_BUDGET   chunk budget "Target,Max,MinFill,MinTail,Context"
+//	KIRA_EVAL_ONLY     comma-separated source ids to run (smoke test); default all of the set
 //	KIRA_EVAL_PARALLEL sources at once (default 2)
 //	KIRA_EVAL_CAP_USD  run cap (default 8); KIRA_EVAL_PHASE_CAP_USD phase cap (default 60)
 func TestMemoryIngestEval(t *testing.T) {
@@ -153,6 +154,7 @@ type runRecord struct {
 	Extracted []extractedFact `json:"extracted"`
 	Stages    stageInfo       `json:"stages"`
 	MemoryDoc string          `json:"memoryDoc"`
+	DocError  string          `json:"docError,omitempty"`
 	// CostUSD is the job (extract, cross-check, finalize); GateUSD the store_memory gate and reconcile calls.
 	CostUSD    float64 `json:"costUsd"`
 	ExtractUSD float64 `json:"extractUsd"`
@@ -268,6 +270,15 @@ func evalRun(t *testing.T, man evalManifest, realClaude string) {
 	}
 	set := envOr("KIRA_EVAL_SET", "tuning")
 	srcs := man.pick(set)
+	if only := os.Getenv("KIRA_EVAL_ONLY"); only != "" {
+		var keep []evalSource
+		for _, s := range srcs {
+			if slices.Contains(strings.Split(only, ","), s.ID) {
+				keep = append(keep, s)
+			}
+		}
+		srcs = keep
+	}
 	for _, s := range srcs {
 		if _, ok := golden[s.ID]; !ok {
 			t.Fatalf("no golden facts for %s", s.ID)
@@ -424,7 +435,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	}
 	runCtx, stop := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	go func() { defer close(done); _ = runner.Run(runCtx) }()
+	go func() { defer close(done); runRunner(runCtx, runner) }()
 	defer func() { stop(); <-done }()
 	e, err := importer.Open(ms, importer.Options{Launcher: noLauncher{}})
 	if err != nil {
@@ -482,6 +493,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 		}
 	}
 	f := d.Files[0]
+	rec0DocError := f.DocError
 	ctx := context.Background()
 	mems, err := ms.DocumentFacts(ctx, f.ID)
 	if err != nil {
@@ -492,6 +504,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	}
 	rec.ExtractUSD = f.CostUSD
 	ra.fill(&rec)
+	rec.DocError = rec0DocError
 	rec.Stages.Chunks = f.ChunkCount
 	rec.Stages.Dropped, rec.Stages.Unresolved = f.Dropped, f.Unresolved
 	rec.Stages.Added, rec.Stages.Updated, rec.Stages.Noop = f.Added, f.Updated, f.Noop

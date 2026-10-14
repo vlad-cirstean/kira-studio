@@ -78,18 +78,23 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 	if err != nil {
 		return "", boundedMessage(err)
 	}
-	doc := memfmt.Doc{Group: w.GroupID, Title: w.Title, Updated: r.opts.Now().Format(time.DateOnly), Provenance: memfmt.Provenance{
+	doc := memfmt.Doc{Group: w.GroupID, Title: docTitle(w.Title, filepath.Base(it.Path)), Updated: r.opts.Now().Format(time.DateOnly), Provenance: memfmt.Provenance{
 		Origin: w.Prov.Origin, Source: w.Prov.SourceTag, Scope: w.Prov.Scope, Project: w.Prov.Project}}
 	if w.Prov.Origin != memory.OriginExternal {
 		doc.Session = w.Prov.Session
 	}
-	left := 0
+	left, bad := 0, 0
 	for _, m := range mems {
 		if !sameProvenance(m, w.Prov) {
 			left++
 			continue
 		}
-		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: m.Fact, Reason: m.Reason, Keywords: m.Keywords})
+		fact, reason := docText(m.Fact), docText(m.Reason)
+		if fact == "" || reason == "" {
+			bad++
+			continue
+		}
+		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: fact, Reason: reason, Keywords: m.Keywords})
 	}
 	if len(doc.Facts) == 0 {
 		return "", "no stored fact to write"
@@ -101,10 +106,38 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 	if err := renameio.WriteFile(target, []byte(text), 0o644); err != nil {
 		return "", "cannot write " + filepath.Base(target) + ": " + err.Error()
 	}
-	if left > 0 {
+	switch {
+	case left > 0 && bad > 0:
+		return target, fmt.Sprintf("%d fact(s) with another provenance and %d with text the format rejects left out", left, bad)
+	case left > 0:
 		return target, fmt.Sprintf("%d fact(s) with another provenance left out", left)
+	case bad > 0:
+		return target, fmt.Sprintf("%d fact(s) with text the format rejects left out", bad)
 	}
 	return target, ""
+}
+
+// docTitle makes a file title YAML-safe for the doc header: the format rejects ": ", " #" and a
+// leading indicator, which real titles ("P153: plan") contain.
+func docTitle(title, fallback string) string {
+	t := strings.NewReplacer(": ", " - ", " #", " ").Replace(strings.Join(strings.Fields(title), " "))
+	t = strings.TrimLeft(t, "[{&*!|>'\"%@` ")
+	if t == "" {
+		return fallback
+	}
+	return t
+}
+
+// docText returns s, or s without Markdown markup when that makes it valid, or "" when it cannot be
+// written (the fact is then counted as left out).
+func docText(s string) string {
+	if memfmt.CheckText(s) == "" {
+		return s
+	}
+	if t := memfmt.StripMarkup(s); memfmt.CheckText(t) == "" {
+		return t
+	}
+	return ""
 }
 
 func sameProvenance(m memory.Memory, p Provenance) bool {

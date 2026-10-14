@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"slices"
@@ -16,6 +17,17 @@ import (
 type noLauncher struct{}
 
 func (noLauncher) Launch() error { return nil }
+
+// runRunner runs r until ctx ends. Engine.Create probes the runner lock for an instant; a runner
+// that starts in that window gets ErrRunnerBusy, and noLauncher never starts another, so retry.
+func runRunner(ctx context.Context, r *importer.Runner) {
+	for {
+		if err := r.Run(ctx); !errors.Is(err, importer.ErrRunnerBusy) || ctx.Err() != nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
 
 // The finalize agent's MCP server is this test binary re-executed as `memory-mcp` (see TestMain).
 // The runner runs in this process; the production runner process is covered by TestMemoryIngestThroughClaude.
@@ -43,7 +55,7 @@ func TestMemoryImport(t *testing.T) {
 	}
 	runCtx, stop := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	go func() { defer close(done); _ = runner.Run(runCtx) }()
+	go func() { defer close(done); runRunner(runCtx, runner) }()
 	defer func() { stop(); <-done }()
 	e, err := importer.Open(ms, importer.Options{Launcher: noLauncher{}})
 	if err != nil {
