@@ -362,3 +362,32 @@ Ledger `P285-runs/spend-p2.jsonl`: 28.51 USD of the 30 USD cap after `round-p2-0
 Part 1 final: "Call is one isolated structured Claude Code request." / "When Call.MCPConfig is set, it is an inline --mcp-config JSON naming the only MCP servers the call may use, and AllowedTools lists the only tools it may call."
 
 Unified distill (`round-p2-02`): "Call: one isolated structured Claude Code request." / "Call.MCPConfig, when set, is inline --mcp-config JSON naming the only MCP servers the call may use; AllowedTools then lists the only tools it may call."
+
+# P285 Part 3: compact memory output
+
+Plan `plans/P285-part3-compact-memory-output.md`. Ledger `P285-runs/spend-p3.jsonl`, total cap 20 USD. Harness: `bun run eval:memory`; free `KIRA_EVAL_MODE=footprint KIRA_EVAL_ROUNDS=<r1,r2>` re-renders finished rounds through `importer.RenderDoc` and writes `footprint-<p273|v2>.json` per round.
+
+## 12. Footprint baseline (E0, P273 format)
+
+`C_doc` = runes of the doc `importer.RenderDoc` renders from the stored facts, front matter included, over source runes. Part 1 measured the written file; 9 of 15 sources had none (write-back bug), so this is the first full measurement. Tuning sources; `round-p2-04` covers its 8 scored sources. Render matches `scores.json` `C_fact` for every round.
+
+| round | sources | `C_fact` | `C_rec` | `C_doc` (P273) |
+|---|---|---|---|---|
+| round-00a | 10 | 0.444 | 0.967 | 1.381 |
+| round-00b | 10 | 0.473 | 1.033 | 1.484 |
+| round-final (Part 1) | 10 | 0.497 | 1.062 | 1.504 |
+| round-p2-final (Part 2) | 10 | 0.451 | 1.049 | 1.467 |
+| round-p2-04 | 8 | 0.472 | 0.994 | 1.429 |
+
+A P273 doc is 1.4 to 1.5 times the source. `C_doc` band = |00a - 00b| = 0.103.
+
+Gates for the final tree (tuning aggregate):
+
+| metric | limit | derivation |
+|---|---|---|
+| `C_fact` | <= 0.468 | Part 1 final 0.497 minus band 0.029 |
+| `C_doc` (v2 render) | <= 1.401 | Part 1 final 1.504 minus band 0.103 |
+| `R_ess` | >= 0.839 | Part 2 `round-p2-final` 0.859 minus band 0.020 |
+| unsupported + distorted | <= 0.02 | Part 1 target |
+
+Reported, not gated: `R_all`, `P`, atomic, standalone, duplicate, `reason ok`, `C_rec`, stored count, mean fact length, locator share.
