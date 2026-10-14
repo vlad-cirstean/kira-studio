@@ -94,7 +94,7 @@ export interface PipelineStep {
   /** Set on a review step: it waits for the user instead of running an agent. */
   review: ReviewStepConfig | null;
 }
-export interface ReviewStepConfig {
+interface ReviewStepConfig {
   sendTo: 'implementer' | 'new';
   /** Earlier prompt step of the stage whose session takes the comments; '' = the nearest one. */
   implementer: string;
@@ -258,7 +258,7 @@ export interface RunReview {
   note: string;
 }
 /** An agent run that can take the review comments. */
-export interface ReviewCandidate {
+interface ReviewCandidate {
   runId: string;
   stage: string;
   step: string;
@@ -266,7 +266,7 @@ export interface ReviewCandidate {
   finishedAt: number | null;
 }
 /** The latest send of a review run. */
-export interface ReviewRound {
+interface ReviewRound {
   run: Run;
   n: number;
   route: 'implementer' | 'new';
