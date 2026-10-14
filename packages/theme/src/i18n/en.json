@@ -5788,6 +5788,9 @@
       "selectAll": {
         "label": "Select all"
       },
+      "selection": {
+        "label": "Distill selection"
+      },
       "size": {
         "status": "{chars} characters, about {tokens} tokens"
       },

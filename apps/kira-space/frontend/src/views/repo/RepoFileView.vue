@@ -15,6 +15,7 @@ import { useSettingsStore } from '../../state/settings';
 import type { RepoFileTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
+import { attachDistillSelection } from './distillSelection';
 import { registerEditor, unmountEditor } from './editors';
 import { loadFileContent } from './fileContent';
 import { monacoLanguageFor } from './language';
@@ -135,6 +136,7 @@ function onReadingClick(event: MouseEvent): void {
 useEventListener(readingPane, 'click', onReadingClick);
 
 let disposeCursorSub: (() => void) | null = null;
+let disposeDistill: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
 const inlineBlame = useInlineBlame();
 
@@ -200,6 +202,7 @@ async function mount(): Promise<void> {
   });
   registerEditor(props.tab.id, uri, editor);
   editorInstance = editor;
+  disposeDistill = attachDistillSelection(editor, props.tab.path);
 
   // P62 §4.1: attached after the editor exists, guarded on the setting and on whether this
   // window has a git record for the repository at all (`gitRepoIdFor`'s own "never guessed"
@@ -268,6 +271,8 @@ onMounted(() => void mount());
 onUnmounted(() => {
   disposeCursorSub?.();
   disposeCursorSub = null;
+  disposeDistill?.();
+  disposeDistill = null;
   unregisterFind?.();
   unregisterFind = null;
   inlineBlame.dispose();
