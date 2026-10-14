@@ -1,0 +1,9 @@
+{"time":"2026-10-14T15:11:21Z","round":"round-p289-00a","kind":"pipeline","id":"spec-chunk-go","usd":0.1294297}
+{"time":"2026-10-14T15:11:21Z","round":"round-p289-00a","kind":"gate","id":"spec-chunk-go","usd":0.02855}
+{"time":"2026-10-14T15:11:39Z","round":"round-p289-00a","kind":"judge","id":"spec-chunk-go","usd":0.10916799999999999}
+{"time":"2026-10-14T15:11:54Z","round":"round-p289-00a","kind":"pipeline","id":"plan-p257","usd":0.22932010000000003}
+{"time":"2026-10-14T15:11:54Z","round":"round-p289-00a","kind":"gate","id":"plan-p257","usd":0.05747709999999999}
+{"time":"2026-10-14T15:12:36Z","round":"round-p289-00a","kind":"judge","id":"plan-p257","usd":0.23420459999999999}
+{"time":"2026-10-14T15:12:39Z","round":"round-p289-00a","kind":"pipeline","id":"doc-arch-prompts","usd":0.11911370000000002}
+{"time":"2026-10-14T15:12:39Z","round":"round-p289-00a","kind":"gate","id":"doc-arch-prompts","usd":0.05199109999999999}
+{"time":"2026-10-14T15:13:17Z","round":"round-p289-00a","kind":"judge","id":"doc-arch-prompts","usd":0.1733206}

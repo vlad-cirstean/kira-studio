@@ -89,7 +89,7 @@ func compareTo(file, allowedFile string, ids []string, cur map[string]snap) int 
 		fatal(err)
 	}
 	allow := readAllowed(allowedFile)
-	fields := fieldNames()
+	fields := fieldsByEntry()
 	var bc, bt, ac, at, changed int
 	var problems []string
 	fmt.Println("id\tbefore chars\tafter chars\tbefore tok\tafter tok\tchange")
@@ -107,7 +107,7 @@ func compareTo(file, allowedFile string, ids []string, cur map[string]snap) int 
 		}
 		changed++
 		fmt.Printf("%s\t%d\t%d\t%d\t%d\t%+.1f%%\n", id, b.Chars, a.Chars, b.Tokens, a.Tokens, pct(b.Chars, a.Chars))
-		for _, l := range lost(b.Default, a.Default, fields) {
+		for _, l := range lost(b.Default, a.Default, fields[id]) {
 			if !allow[id+"\t"+l] {
 				problems = append(problems, fmt.Sprintf("%s: lost %s", id, l))
 			}
@@ -144,14 +144,22 @@ func readAllowed(file string) map[string]bool {
 	return out
 }
 
-func fieldNames() []string {
-	seen := map[string]bool{}
-	var out []string
+// fieldsByEntry maps an entry id to the argument names of its tool: the entry's own children for a
+// tool, its siblings for an argument.
+func fieldsByEntry() map[string][]string {
+	byParent := map[llmprompts.ID][]string{}
 	for _, in := range llmprompts.All() {
-		if in.Field != "" && !seen[in.Field] {
-			seen[in.Field] = true
-			out = append(out, in.Field)
+		if in.Parent != "" && in.Field != "" {
+			byParent[in.Parent] = append(byParent[in.Parent], in.Field)
 		}
+	}
+	out := map[string][]string{}
+	for _, in := range llmprompts.All() {
+		parent := in.ID
+		if in.Parent != "" {
+			parent = in.Parent
+		}
+		out[string(in.ID)] = byParent[parent]
 	}
 	return out
 }

@@ -920,25 +920,25 @@ var DbmcpInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.dbmcpInstructions.title",
 	PurposeKey: "llmPrompts.entry.dbmcpInstructions.description",
 	UsedByKey:  "llmPrompts.entry.dbmcpInstructions.usedBy.body",
-	Default:    "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Plan an expensive-looking query with `explain_query` before running it, and expect `run_query` to plan it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it.",
+	Default:    "Read and query the databases configured in this Kira Studio app. Only connections the user exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned. Levels differ per engine; do not assume a database or schema level exists. `describe_schema` returns every relation's columns in one call, cheaper than one `describe_table` per table. `run_query` runs one statement through the app's SQL console path, under the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Run `explain_query` before an expensive-looking query. `run_query` plans it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it.",
 }, NoVars{})
 
 // DbmcpToolListConnections describes the list_connections tool.
 var DbmcpToolListConnections = define(Entry{
 	ID: "dbmcp.tool.list_connections", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "list_connections",
-	Default: "List every database connection this app has exposed to MCP, with its kind, read-only flag, live status and (once connected) capabilities.",
+	Default: "List every database connection exposed to MCP, with kind, read-only flag, live status and, once connected, capabilities.",
 }, NoVars{})
 
 // DbmcpToolListChildren describes the list_children tool.
 var DbmcpToolListChildren = define(Entry{
 	ID: "dbmcp.tool.list_children", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "list_children",
-	Default: "List one container's own children — databases, schemas, tables, keys, topics, buckets, whatever this connection's own engine has at that level. Omit path for the connection's top level.",
+	Default: "List one container's own children: databases, schemas, tables, keys, topics, buckets, whatever this connection's engine has at that level. Omit path for the top level.",
 }, NoVars{})
 
 var (
 	_ = arg(DbmcpToolListChildren.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolListChildren.id, "path", studioApp, NextCall, `Encoded path of the container to list, exactly as a previous list_children returned it. Omit for the connection's top level.`, NoVars{})
-	_ = arg(DbmcpToolListChildren.id, "refresh", studioApp, NextCall, `Bypass the cached listing and re-read from the server. Default false.`, NoVars{})
+	_ = arg(DbmcpToolListChildren.id, "path", studioApp, NextCall, `Encoded container path, exactly as list_children returned it. Omit for the top level.`, NoVars{})
+	_ = arg(DbmcpToolListChildren.id, "refresh", studioApp, NextCall, `Bypass the cache and re-read from the server. Default false.`, NoVars{})
 )
 
 // DbmcpToolDescribeTable describes the describe_table tool.
@@ -949,44 +949,44 @@ var DbmcpToolDescribeTable = define(Entry{
 
 var (
 	_ = arg(DbmcpToolDescribeTable.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolDescribeTable.id, "path", studioApp, NextCall, `Encoded path of the table, view or collection, from list_children.`, NoVars{})
-	_ = arg(DbmcpToolDescribeTable.id, "refresh", studioApp, NextCall, `Bypass the cached listing and re-read from the server. Default false.`, NoVars{})
+	_ = arg(DbmcpToolDescribeTable.id, "path", studioApp, NextCall, `Encoded table, view or collection path, from list_children.`, NoVars{})
+	_ = arg(DbmcpToolDescribeTable.id, "refresh", studioApp, NextCall, `Bypass the cache and re-read from the server. Default false.`, NoVars{})
 )
 
 // DbmcpToolDescribeSchema describes the describe_schema tool.
 var DbmcpToolDescribeSchema = define(Entry{
 	ID: "dbmcp.tool.describe_schema", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "describe_schema",
-	Default: "Describe every table and view's columns in one database or schema in a single call — cheaper than one describe_table call per table.",
+	Default: "Describe the columns of every table and view in one database or schema, in one call. Cheaper than one describe_table per table.",
 }, NoVars{})
 
 var (
 	_ = arg(DbmcpToolDescribeSchema.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolDescribeSchema.id, "path", studioApp, NextCall, `Encoded path of a database or schema, from list_children.`, NoVars{})
-	_ = arg(DbmcpToolDescribeSchema.id, "refresh", studioApp, NextCall, `Bypass the cached listing and re-read from the server. Default false.`, NoVars{})
+	_ = arg(DbmcpToolDescribeSchema.id, "path", studioApp, NextCall, `Encoded database or schema path, from list_children.`, NoVars{})
+	_ = arg(DbmcpToolDescribeSchema.id, "refresh", studioApp, NextCall, `Bypass the cache and re-read from the server. Default false.`, NoVars{})
 )
 
 // DbmcpToolRunQuery describes the run_query tool.
 var DbmcpToolRunQuery = define(Entry{
 	ID: "dbmcp.tool.run_query", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "run_query",
-	Default: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Reading stops at maxRows: rowCount is the number of rows fetched, a lower bound on the result size when truncated is true, and the database may still run the statement to completion. Each connection's read/write/DDL permission is checked first: a denied class is refused, and a class set to prompt waits for the user to approve it, which can take up to two minutes. On a connection whose owner turned auto-explain on, an explainable SELECT/WITH is planned first — a plan estimated over the connection owner's expensive-query threshold pauses the query for approval the same way a prompt-mode permission does.",
+	Default: "Run one statement per call, not a script, through the app's SQL console path. Connects the connection if not connected. Reading stops at maxRows: rowCount is rows fetched, a lower bound on result size when truncated is true; the database may still run the statement to completion. Read/write/DDL permission is checked first: a denied class is refused; a class set to prompt waits up to two minutes for user approval. With auto-explain on (owner setting), an explainable SELECT/WITH is planned first; a plan over the owner's expensive-query threshold pauses the query for approval, as a prompt permission does.",
 }, NoVars{})
 
 var (
 	_ = arg(DbmcpToolRunQuery.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement to run. Not a script — send one statement per call.`, NoVars{})
-	_ = arg(DbmcpToolRunQuery.id, "path", studioApp, NextCall, `Encoded path selecting the database to run against, from list_children. Required for engines with more than one database; ignored by engines with one.`, NoVars{})
-	_ = arg(DbmcpToolRunQuery.id, "maxRows", studioApp, NextCall, `Rows to return, 1-{{.Max}}. Default {{.Default}}. Reading stops once this many rows are fetched; rowCount is then a lower bound.`, LimitVars{Default: 200, Max: 2000})
+	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement; not a script.`, NoVars{})
+	_ = arg(DbmcpToolRunQuery.id, "path", studioApp, NextCall, `Encoded database path, from list_children. Required for engines with more than one database; ignored by engines with one.`, NoVars{})
+	_ = arg(DbmcpToolRunQuery.id, "maxRows", studioApp, NextCall, `Rows to return, 1-{{.Max}}. Default {{.Default}}. Reading stops at this many rows; rowCount is then a lower bound.`, LimitVars{Default: 200, Max: 2000})
 )
 
 // DbmcpToolExplainQuery describes the explain_query tool.
 var DbmcpToolExplainQuery = define(Entry{
 	ID: "dbmcp.tool.explain_query", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "explain_query",
-	Default: "Plan one SELECT or WITH statement without running it, and return the normalized plan: the node tree, each node's estimated rows and native cost, and the structural issues this app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
+	Default: "Plan one SELECT or WITH statement without running it. Returns the normalized plan: node tree, each node's estimated rows and native cost, and structural issues the app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
 }, NoVars{})
 
 var (
 	_ = arg(DbmcpToolExplainQuery.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolExplainQuery.id, "sql", studioApp, NextCall, `One SELECT or WITH statement to plan. It is not executed — EXPLAIN is always issued without ANALYZE.`, NoVars{})
-	_ = arg(DbmcpToolExplainQuery.id, "path", studioApp, NextCall, `Encoded path selecting the database to plan against, from list_children. Required for engines with more than one database; ignored by engines with one.`, NoVars{})
-	_ = arg(DbmcpToolExplainQuery.id, "includeRaw", studioApp, NextCall, `Also return the server's own raw EXPLAIN text. Default false — it can be tens of kilobytes, and the parsed plan above is the point.`, NoVars{})
+	_ = arg(DbmcpToolExplainQuery.id, "sql", studioApp, NextCall, `One SELECT or WITH statement. Not executed: EXPLAIN always runs without ANALYZE.`, NoVars{})
+	_ = arg(DbmcpToolExplainQuery.id, "path", studioApp, NextCall, `Encoded database path, from list_children. Required for engines with more than one database; ignored by engines with one.`, NoVars{})
+	_ = arg(DbmcpToolExplainQuery.id, "includeRaw", studioApp, NextCall, `Also return the server's raw EXPLAIN text. Default false: can be tens of kilobytes; the parsed plan is the point.`, NoVars{})
 )
