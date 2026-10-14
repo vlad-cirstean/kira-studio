@@ -70,7 +70,7 @@ Discovery: `codegraph_explore` over the screenshot flow and i18n catalog (`packa
    GitHub.
 9. Studio English names (fictional, at most 14 characters so column widths and crops hold): Alice
    Morgan, Ben Carter, Chloe Hughes, Daniel Brooks, Emma Wright, Oliver Grant, Grace Turner, Henry
-   Walsh. Space shots are not in the ask and stay unchanged.
+   Walsh. User decision after planning: Space fixtures drop the Romanian identity too (section 5a).
 10. Develop section is removed, not moved. Developer docs live in `README.md` and `docs/`.
 11. Visual baseline: a new `site/tests/visual.spec.ts` with full-page `toHaveScreenshot` per tab per
     project. Linux-recorded in the sandbox; skipped on other platforms.
@@ -173,6 +173,17 @@ new point comes from `README.md` ("Studio (database client)", "Api (HTTP/gRPC cl
    query plus result, and the response. Adjust `detail` coordinates only if a crop misses its feature.
 5. Commit the nine changed PNGs. `README.md` "Screenshots" embeds the same files, so it updates
    without an edit. Space PNGs must show no diff.
+
+### 5a. Space screenshots (user decision, added after planning)
+
+1. `apps/kira-space/tests/screenshots/space.shot.ts`: `IDENTITY` becomes `Alice Morgan`,
+   `alice.morgan@acme.example`. No other Romanian name or data exists in Space fixtures (grep).
+2. Re-record: `bun run build:test:space && bunx playwright test
+   --config=apps/kira-space/playwright.config.ts --project=screenshots`. Rerun leaves no change.
+3. The identity is not visible in any Space shot (author column hidden), so only
+   `space-memory*.png` change, from base drift in the Memory UI, not from the name. Space UI and
+   visual specs do not reference the old name (grep).
+4. Own commit: `fix(screenshots): English identity in Space shots`.
 
 ## 6. Develop section removal inventory
 
@@ -277,8 +288,8 @@ P290 touches only:
 
 - `site/**` except `site/src/content/docs/docs/{studio,space,shared,reference}/**`. Docs content
   edits are limited to `docs/index.md`, `docs/start/install.md` and deleting `docs/develop/**`.
-- `apps/kira-studio/tests/screenshots/**`, `screenshots/studio-*.png`,
-  `screenshots/framed/studio-*.png`.
+- `apps/kira-studio/tests/screenshots/**`, `apps/kira-space/tests/screenshots/space.shot.ts`,
+  `screenshots/{studio,space}-*.png`, `screenshots/framed/{studio,space}-*.png`.
 - `bun.lock`; `README.md` (line 15 and "Documentation" bullet); `docs/ARCHITECTURE.md` "Presentation
   site" section; `docs/DEV_ENVIRONMENT.md` "Presentation screenshots and site check" section;
   `docs/v2.5/SPEC.md` row P290; this plan.
@@ -318,7 +329,6 @@ P290 rebases on it. Overlap with P286 (workflow review step): none; P290 never t
 
 ## 13. Out of scope
 
-- Space screenshot fixtures (Ana Pop git identity in `space.shot.ts`): not in the ask.
 - Docs page restyling beyond the shared `Shot` frame; Starlight layout and sidebar stay.
 - Moving `.github/workflows/pages.yml` live.
 - A client-side tab script, copy buttons, light theme.

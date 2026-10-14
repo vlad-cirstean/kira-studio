@@ -30,7 +30,11 @@ const sha = (n: number) =>
     ((Math.imul(n + 1, 2654435761) + Math.imul(i + 1, 40503)) >>> 0).toString(16).padStart(8, '0'),
   ).join('');
 const COMMIT_SECONDS = Math.floor(CAPTURE_NOW / 1000) - 3.5 * 3600;
-const IDENTITY = { name: 'Ana Pop', email: 'ana.pop@acme.example', timestamp: COMMIT_SECONDS };
+const IDENTITY = {
+  name: 'Alice Morgan',
+  email: 'alice.morgan@acme.example',
+  timestamp: COMMIT_SECONDS,
+};
 
 // Row 0 merges rows 1 and 2, which both fork from row 3; the rest is a straight line.
 const SUBJECTS = [
