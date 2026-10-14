@@ -13,6 +13,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/renameio/v2"
+
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/memory"
@@ -223,5 +225,5 @@ func writeDistilled(doc string) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(dir, "distilled-"+time.Now().UTC().Format("20060102-150405")+"-"+hex.EncodeToString(salt[:])+".md")
-	return path, os.WriteFile(path, []byte(doc), 0o600)
+	return path, renameio.WriteFile(path, []byte(doc), 0o600)
 }
