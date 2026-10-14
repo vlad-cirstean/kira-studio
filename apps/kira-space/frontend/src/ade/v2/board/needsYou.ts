@@ -1,7 +1,8 @@
 import { type MessageKey, t } from '@theme/i18n';
 import { formatDuration } from '@workbench/behaviour/format';
+import { reviewPhaseLabel } from '../runState';
 import type { Board, Branch, Run, Session } from '../wire';
-import type { TaskProgress } from './progress';
+import type { StepProgress, TaskProgress } from './progress';
 import { runsOnLabel } from './workflowForm';
 
 // Needs-you list (SPEC2 §11), mockup v2 lines 2490-2520. No CI item: D9 has no CI badge.
@@ -12,6 +13,7 @@ export type NeedsKind =
   | 'rebase'
   | 'question'
   | 'approval'
+  | 'review'
   | 'setup failed'
   | 'stale merge';
 
@@ -22,11 +24,20 @@ export const NEEDS_RANK: readonly NeedsKind[] = [
   'rebase',
   'question',
   'approval',
+  'review',
   'setup failed',
   'stale merge',
 ];
 
-type NeedsAction = 'Take over' | 'Retry' | 'Resume' | 'Open' | 'Approve' | 'See error' | 'Re-merge';
+type NeedsAction =
+  | 'Take over'
+  | 'Retry'
+  | 'Resume'
+  | 'Open'
+  | 'Approve'
+  | 'Review'
+  | 'See error'
+  | 'Re-merge';
 
 const ACTION: Record<NeedsKind, NeedsAction> = {
   'stuck run': 'Take over',
@@ -34,6 +45,7 @@ const ACTION: Record<NeedsKind, NeedsAction> = {
   rebase: 'Open',
   question: 'Open',
   approval: 'Approve',
+  review: 'Review',
   'setup failed': 'See error',
   'stale merge': 'Re-merge',
 };
@@ -44,6 +56,7 @@ const KIND_LABEL = {
   rebase: 'common.rebase.label',
   question: 'space.ade.needs.kind.question.label',
   approval: 'space.ade.needs.kind.approval.label',
+  review: 'space.ade.board.branchTag.review.label',
   'setup failed': 'space.ade.needs.kind.setupFailed.label',
   'stale merge': 'space.ade.needs.kind.staleMerge.label',
 } as const satisfies Record<NeedsKind, MessageKey>;
@@ -54,6 +67,7 @@ const ACTION_LABEL = {
   Resume: 'common.action.resume.label',
   Open: 'common.action.open.label',
   Approve: 'common.action.approve.label',
+  Review: 'space.ade.board.branchTag.review.label',
   'See error': 'space.ade.needs.action.seeError.label',
   'Re-merge': 'space.ade.needs.action.reMerge.label',
 } as const satisfies Record<NeedsAction, MessageKey>;
@@ -74,6 +88,7 @@ const TONE: Record<NeedsKind, 'red' | 'amber' | 'grey'> = {
   rebase: 'red',
   question: 'amber',
   approval: 'amber',
+  review: 'amber',
   'setup failed': 'red',
   'stale merge': 'grey',
 };
@@ -157,6 +172,29 @@ function failedWhat(name: string, result: string): string {
     : t('space.ade.needs.what.stepFailed.label', { name });
 }
 
+/** A review step run waiting for the user, or whose agent stopped. */
+function reviewItems(c: Ctx, taskId: string, step: StepProgress): NeedsItem[] {
+  return step.runs
+    .filter(
+      (x) => x.state === 'review' && (x.review?.phase === 'waiting' || x.review?.phase === 'stuck'),
+    )
+    .map((r) =>
+      item('review', {
+        id: `review:${taskId}:${step.id}:${r.branchId}`,
+        taskId,
+        branchId: r.branchId,
+        stepId: step.id,
+        scope: c.nick(r.branchId),
+        what: t('space.ade.needs.what.review.label', {
+          name: step.name,
+          branch: c.nameOf(r.branchId),
+        }),
+        detail: r.review?.phase === 'stuck' ? reviewPhaseLabel('stuck') : '',
+        ageMs: c.age(r.finishedAt),
+      }),
+    );
+}
+
 function stepItems(c: Ctx): NeedsItem[] {
   const out: NeedsItem[] = [];
   for (const task of c.i.board.tasks) {
@@ -196,6 +234,7 @@ function stepItems(c: Ctx): NeedsItem[] {
           }),
         );
       }
+      out.push(...reviewItems(c, task.id, step));
       if (step.approval) {
         out.push(
           item('approval', {

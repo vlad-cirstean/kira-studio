@@ -1,5 +1,5 @@
 import { t } from '@theme/i18n';
-import { runStateLabel } from '../runState';
+import { reviewPhaseLabel, runStateLabel } from '../runState';
 import type { Stage, Workflow } from '../wire';
 import type { Tone } from './actions';
 import {
@@ -26,6 +26,8 @@ interface RunLine {
   hasLog: boolean;
   canRetry: boolean;
   canResume: boolean;
+  /** Review step run waiting on or between rounds: the Review button opens the window. */
+  canReview: boolean;
 }
 
 interface StepView {
@@ -63,6 +65,7 @@ const RUN_GLYPH: Record<StepRun['state'], { glyph: string; tone: Tone }> = {
 const STEP_TONE: Record<StepState, Tone> = {
   done: 'green',
   running: 'amber',
+  review: 'blue',
   stuck: 'red',
   failed: 'red',
   pending: 'grey',
@@ -103,6 +106,7 @@ function runStatus(r: StepRun): string {
       ? t('common.action.retry.label')
       : t('space.ade.outcome.back.status');
   }
+  if (r.state === 'review' && r.review) return reviewPhaseLabel(r.review.phase);
   return runStateLabel(r.state);
 }
 
@@ -135,6 +139,7 @@ function runLine(r: StepRun, max: number): RunLine {
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
     canResume: r.resumable,
+    canReview: r.state === 'review',
   };
 }
 

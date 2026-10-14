@@ -307,7 +307,7 @@ function logToggleLabel(runId: string): string {
             :label="card.rows.find((r) => r.id === rl.run.branchId)?.repo ?? ''"
           />
           <span
-            class="w-16 shrink-0 whitespace-nowrap text-kira-sm"
+            class="min-w-16 shrink-0 whitespace-nowrap text-kira-sm"
             :class="TONE_TEXT_CLASS[rl.tone]"
             data-testid="ade-run-status"
             >{{
@@ -337,6 +337,16 @@ function logToggleLabel(runId: string): string {
               {{ t('common.action.resume.label') }}
             </Button>
           </AdeTip>
+          <Button
+            v-if="rl.canReview"
+            variant="dialog"
+            size="kira"
+            class="shrink-0"
+            data-testid="ade-run-review"
+            @click="onReview(rl.run.branchId)"
+          >
+            {{ t('space.ade.board.branchTag.review.label') }}
+          </Button>
           <Button
             variant="dialog"
             v-if="canTakeOver(rl.run)"

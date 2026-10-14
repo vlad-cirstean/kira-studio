@@ -7324,6 +7324,9 @@
           "rebasePending": {
             "label": "Rebase of {branch} pending"
           },
+          "review": {
+            "label": "Review {name} on {branch}"
+          },
           "setupFailed": {
             "label": "Worktree setup failed for {branch}"
           },
@@ -7834,6 +7837,18 @@
           "new": {
             "label": "New review agent"
           }
+        },
+        "sent": {
+          "status": "Review sent"
+        },
+        "stuck": {
+          "status": "Review agent stopped"
+        },
+        "waiting": {
+          "status": "Waiting for review"
+        },
+        "working": {
+          "status": "Agent working"
         }
       },
       "runDialog": {

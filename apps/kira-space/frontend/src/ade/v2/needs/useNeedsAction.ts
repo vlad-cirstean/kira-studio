@@ -3,6 +3,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import { useTerminalsStore } from '../../../state/terminals';
 import type { NeedsItem } from '../board/needsYou';
 import { useApprove, useFocusSession, useResumeRun, useRetryRun } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -21,6 +22,7 @@ export function useNeedsAction() {
   const resume = useResumeRun();
   const approve = useApprove();
   const focus = useFocusSession();
+  const reviewCode = useReviewCode();
 
   /** Opens a session in its Sessions tab; a terminal another window holds is raised there first. */
   async function openSession(sessionId: string, taskId: string, branchId: string): Promise<void> {
@@ -49,6 +51,8 @@ export function useNeedsAction() {
       } else if (n.action === 'Open') await openSession(n.sessionId, n.taskId, n.branchId);
       else if (n.action === 'Approve') {
         await approve.mutateAsync({ taskId: n.taskId, stageId: n.stageId, stepId: n.stepId });
+      } else if (n.action === 'Review') {
+        reviewCode.open(n.taskId, n.branchId, null);
       } else if (n.action === 'See error') {
         ui.view = 'plan';
         ui.selectBranch(n.taskId, n.branchId);

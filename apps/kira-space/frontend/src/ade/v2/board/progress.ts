@@ -3,6 +3,7 @@ import { runStateLabel } from '../runState';
 import type {
   Branch,
   OnFailure,
+  RunReview,
   RunState,
   RunsOn,
   Stage,
@@ -16,7 +17,7 @@ import { implicitResults } from './stepResults';
 // `branchProg` (1768-1787). Runs are the backend's: a stuck run arrives as `state: 'stuck'`.
 
 /** `skipped`: a route went past the step, so it never runs. */
-export type StepState = 'pending' | 'running' | 'stuck' | 'failed' | 'done' | 'skipped';
+export type StepState = 'pending' | 'running' | 'review' | 'stuck' | 'failed' | 'done' | 'skipped';
 
 export interface StepRun {
   branchId: string;
@@ -35,6 +36,8 @@ export interface StepRun {
   sessionId: string;
   finishedAt: number | null;
   resumable: boolean;
+  /** Review step run: where it stands; null on every other run. */
+  review: RunReview | null;
 }
 
 export interface StepProgress {
@@ -115,6 +118,7 @@ function aggregate(states: readonly RunState[]): StepState {
   if (!states.length) return 'pending';
   if (states.includes('stuck')) return 'stuck';
   if (states.includes('failed')) return 'failed';
+  if (states.includes('review')) return 'review';
   if (states.includes('running') || states.includes('back')) return 'running';
   return states.every((s) => s === 'done') ? 'done' : 'pending';
 }
@@ -180,6 +184,7 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
     sessionId: best.sessionId,
     finishedAt: best.finishedAt,
     resumable: best.resumable,
+    review: best.review,
   };
 }
 
@@ -239,6 +244,7 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
           sessionId: '',
           finishedAt: null,
           resumable: false,
+          review: null,
         },
     );
     const state = aggregate(runs.map((r) => r.state));
@@ -367,7 +373,7 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
   if (!own.length) return null;
   const segments = own.map(({ run }): BranchSegState => {
     if (run.state === 'done') return 'done';
-    if (run.state === 'running' || run.state === 'back') return 'running';
+    if (run.state === 'running' || run.state === 'back' || run.state === 'review') return 'running';
     return run.state === 'stuck' || run.state === 'failed' ? 'bad' : 'pending';
   });
   const pos = own.find(({ run }) => run.state !== 'done');

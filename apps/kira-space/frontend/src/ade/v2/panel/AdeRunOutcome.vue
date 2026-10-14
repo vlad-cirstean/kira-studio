@@ -62,6 +62,7 @@ const STATE_TONE: Record<string, Tone> = {
   back: 'amber',
   running: 'blue',
   pending: 'grey',
+  review: 'blue',
 };
 const state = computed(() => runStateLabel(props.run.state));
 
