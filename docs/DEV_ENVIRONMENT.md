@@ -480,6 +480,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters'` |
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
 | Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest'` (import about 50 s, 0.14 USD, P211; ingest P274) |
+| Memory ingest eval (P285): `internal/llmprompts` memory.import.* prompts, `internal/memory/importer/{chunk,extract,finalize}*.go` quality | `bun run eval:memory` with `KIRA_EVAL_MODE=run KIRA_EVAL_ROUND=<name>` (see ARCHITECTURE "Memory ingest eval"). Opt-in, never in hooks or CI. Costs about 4 to 5 USD per tuning run (8 to 10 min), judge included; P285 spent 57.9 USD in all. Not a pass/fail row: it scores quality. |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
 | Prompt registry, store, templates: `internal/llmprompts/**` | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
 | Claude CLI upgrade | `bun run test:claude` |
@@ -900,6 +901,7 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_COMPAT_IMAGE_<KIND>` | Overrides the adapter compat container image per kind | you |
 | `KIRA_FAKE_SCEN`, `KIRA_FAKE_DIR`, `KIRA_DOC` | Fake agent: scenario JSON or path, call-log dir, doc basename | flow tests |
 | `KIRA_FAKE_CLAUDE` | Re-executes the ADE test binary as a fake `claude` | `ade` tests |
+| `KIRA_MEMORY_EVAL`, `KIRA_EVAL_MODE`, `KIRA_EVAL_ROUND`, `KIRA_EVAL_SET`, `KIRA_EVAL_ONLY`, `KIRA_EVAL_PROMPTS`, `KIRA_EVAL_BUDGET`, `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD` | Memory ingest eval; `KIRA_MEMORY_EVAL=1` opts in (costs real money) | `bun run eval:memory`, you |
 | `KIRA_TEST_MEMORY_MCP` | Real `claude` tests: run the binary as the memory MCP server | `apps/kira-space/tests/claude` |
 | `KIRA_GIT_DIFFERENTIAL`, `KIRA_GIT_PERF` | `1` runs the git search differential test, the git perf probe | you |
 | `KIRA_DATAGRIP_REAL_PROJECT` | Path of a real DataGrip project for the opt-in import test | you |

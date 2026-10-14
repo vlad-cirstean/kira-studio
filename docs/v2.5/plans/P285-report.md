@@ -29,7 +29,7 @@ What the numbers say:
 - Golden: Opus (`claude-opus-5-5`) wrote 585 reference facts (372 essential, 213 minor) from the source text alone, before any pipeline run. A quote check dropped none. Frozen at baseline.
 - Judge: the same Opus model grades each run against golden and grades every stored fact. Full coverage 1, partial 0.5. Aggregates sum counts over sources.
 - Noise bands: two baseline runs of identical code; band = absolute difference, at least 0.02 (0.01 for unsupported). Round decisions compare against the last kept round using these bands. The plan's floor `R_ess >= 0.85` could not apply to round 1 (baseline was below it); I required no drop beyond the band instead.
-- Spend: the user lowered the cap to 8 USD per run and 60 USD for the phase. Ledger 56.93 USD (plus about 0.3 USD of smoke tests before it): golden 1.63, pipeline 19.82, store gate 12.83, judge 22.65. A tuning run costs about 4.2 USD and takes 8 to 10 min.
+- Spend: the user lowered the cap to 8 USD per run and 60 USD for the phase. Ledger 57.88 USD (56.93 for the rounds, 0.95 for two write-back smoke runs; plus about 0.3 USD of smoke tests before the ledger): golden 1.63, pipeline 19.82, store gate 12.83, judge 22.65. A tuning run costs about 4.2 USD and takes 8 to 10 min.
 - Token numbers use the repo estimate `ceil(runes/3)`, not a tokenizer. Final tuning stored facts: 11174 estimated tokens.
 
 ### Baseline noise (tuning)
@@ -68,7 +68,7 @@ Targets (tuning): `R_ess` >= 0.90, `R_all` >= 0.75, `P` >= 0.90, atomic and stan
 | C_rec (fact + reason + keywords) | 0.967 | 1.033 | 1.062 | reported |
 | essential misses lost at extract / at finalize | 12 / 5 | 16 / 7 | 8 / 4 | reported |
 
-`C_rec` above 1.0: the stored record (fact, reason, keywords) is longer than the source. Reason and keywords grow with every kept fact. `C_doc` (the `.memory.md` text) is not reported: the harness read the file before write-back finished at baseline; after the fix it is still empty for 9 of 15 sources in the final run (cause not found, section 7).
+`C_rec` above 1.0: the stored record (fact, reason, keywords) is longer than the source. Reason and keywords grow with every kept fact. `C_doc` (the `.memory.md` text) is not reported for these runs: write-back failed for 9 of 15 sources in the final run (root cause in section 7). The write-back fix landed after the final run; a two-source smoke run confirmed docs now write (plan-p153: 9168 chars from 28 facts, json-ade-errors: 1655 chars from 4 facts). `C_doc` for all sources needs one more run.
 
 ## 3. Results per source
 
@@ -201,10 +201,10 @@ Unverified or caveats:
 - Token numbers are the repo estimate, not a tokenizer.
 - Judge variance: one judge call per source per run, no second opinion. The bands come from two runs only; round 2 and round 8 decisions sit at their edge.
 - The golden list comes from the same model family that judges, and rewards qualifier-heavy facts. The 0.30 target may be unreachable against it (section 1).
-- Intermittent stall: in 4 of 13 runs one source stayed in "scanning" for the whole wait ("job never reached awaiting"). The harness reran that source on a fresh store and it worked each time. Not investigated in the product (suspect a runner start race in the in-process setup); each cost 3 to 12 minutes.
-- `C_doc` missing (section 2).
+- Intermittent stall, root cause found, harness-only. `Engine.Create` probes the runner lock (`ensureRunner`: take the flock, release). The harness started its runner on a goroutine at the same moment; a runner whose `TryLock` hit the probe got `ErrRunnerBusy`, returned, and the harness ignored the error. With `noLauncher` nothing started another runner, so the job stayed `scanning`. A diagnostic reproduced it: 22 stalls in 300 starts, all `ErrRunnerBusy`. The product is not affected: a real launcher follows every probe with `Launch`, and `TestCreateAlwaysFindsRunner` (150 creates racing runner start and idle exit) passes. Fix: the harness and `TestMemoryImport` retry `Run` on `ErrRunnerBusy` (`runRunner`). The stalls cost about 3 to 12 minutes each.
+- `.memory.md` empty, root cause found, product bug. The harness did not read too early. `writeDocFile` called `memfmt.FormatDoc` with the raw file title and raw fact text. Titles like "P153: plan" contain `: ` (rejected as unsafe YAML) and some facts contain inline markup such as `<x>` (rejected by `CheckText`). The write failed with `doc_error` set, the file stayed done, and the harness found no doc. Fix in `internal/memory/importer/writedoc.go`: adjust the title (`: ` to ` - `), strip markup from facts, leave out and count a fact that stays invalid. Real imports hit the same failure, so this fixes user-visible behavior. The eval record now stores `docError`.
 - Job cost excludes the gate; the harness adds the gate cost by wrapping `claude` in the memory MCP child.
-- Fast checks only: lint, lint:go, typecheck via commit hooks, `checkprompts`, `go test ./internal/llmprompts/...`. Full suites and real `claude` rows are left to the serial test-and-fix step.
+- Close-out suites: lint, lint:go, typecheck, unit (1927), checkprompts, llmprompts, Go (128 packages ok; two `internal/terminal` timing tests failed under load, pass alone), UI space (588 of 590; two load timing specs pass alone), UI studio (545 of 546; one tooltip spec passes alone), visual space and studio (13 each), site check (117), check-docs. Real `claude` rows TestMemoryImport, TestMemoryIngestThroughClaude, TestMemoryMcpThroughClaude, TestMemoryMcpFollowsDocs, TestMemoryGate all pass, 0.027 USD of `claude -p`.
 
 Follow-ups:
 
@@ -212,5 +212,5 @@ Follow-ups:
 - Rebase the compression target on what the golden facts allow (about 0.47 for essential facts alone), or measure information instead of chars.
 - Gate prompt: terse rewrite that keeps every qualifier (plan's last-resort item, not tried).
 - A reasons-first extraction pass and a keep-exact-strings rule for decision text.
-- Find why the write-back doc is empty in the harness and why a scan occasionally stalls.
-- Artifact page `Memory Ingest Eval` not built in this pass: close-out step.
+- Rerun the final round once to report `C_doc` (about 6 USD).
+- Part 2 (SPEC): terse memory prompts and the `distill` tool. Part 3: compact memory output, new text format, merged facts.

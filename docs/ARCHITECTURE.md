@@ -4956,6 +4956,18 @@ replies and full terminal attach for Claude Code sessions.
 - Speech to text was removed in P224. Kira Space deletes the leftover speech model directory
   (`models/whisper-small.en-q5_1-5359861`) at startup (`modelstore.RemoveRetired`).
 
+### Memory ingest eval (P285)
+
+Opt-in harness that scores the ingest pipeline on real repo text. Runs real `claude`, costs money, never in hooks or CI.
+
+- Run: `bun run eval:memory` (`TestMemoryIngestEval`, `apps/kira-space/tests/claude/memory_eval*_test.go`). `KIRA_MEMORY_EVAL=1` is set by the script. `KIRA_EVAL_MODE` is `prepare`, `golden` or `run`; `run` needs `KIRA_EVAL_ROUND`. Other knobs: `KIRA_EVAL_SET` (`tuning`, `holdout`, `all`), `KIRA_EVAL_ONLY` (comma list of source ids, smoke runs), `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`.
+- Overrides without code edits: `KIRA_EVAL_PROMPTS` is a JSON map `{prompt id: text}` replacing registry prompts for one run; `KIRA_EVAL_BUDGET` is a chunk budget `Target,Max,MinFill,MinTail,Context`.
+- Corpus: 15 files pinned to commit `9ed83ae85` (manifest `docs/v2.5/plans/P285-corpus/`), read by `git show`. 10 tuning, 5 hold-out, one hold-out per category. Golden: 585 facts (372 essential) written by Opus from the source text before any run. Judge: Opus, one call per source.
+- Metrics: `R_ess`, `R_all` (golden recall, partial counts 0.5), `P` (precision), atomic, standalone, unsupported, duplicate, `C_fact` (stored fact chars over source chars), `C_rec` (fact, reason, keywords), `C_doc` (the written `.memory.md`). Noise bands come from two baseline runs.
+- Cost: a tuning run is about 4 to 5 USD and 8 to 10 min; hold-out about 1.3 USD. Spend ledger `docs/v2.5/plans/P285-runs/spend.jsonl`; the harness stops at the run and phase caps. Round data: `docs/v2.5/plans/P285-runs/`. Results: `docs/v2.5/plans/P285-report.md`.
+- Caveats: embedder off (reconcile sees keyword candidates only); token numbers use `ceil(runes/3)`; judge and extractor noise is as large as most single changes; the golden list rewards qualifier-heavy facts.
+- Write-back (P285 fix): the `.memory.md` writer adjusts a title with `: ` or ` #` and strips inline Markdown from facts before `memfmt.FormatDoc`; a fact that stays invalid is left out and counted in `doc_error`. Before, most imports failed write-back with a format error.
+
 ## Docker module (P200, Kira Studio)
 
 - Registered in Kira Studio only. Go `internal/docker` (Engine API via `github.com/moby/moby/client`
@@ -5633,6 +5645,8 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
+
+- **Memory ingest compression target not met (P285).** Tuning set after two kept extract-prompt changes: `R_ess` 0.883 (target 0.90), `P` 0.895 (0.90), `C_fact` 0.497 (0.30). The golden essential facts alone are 0.47 of source chars, so 0.30 was unreachable with 0.90 recall; the target was set before any measurement. Fewer facts is the only lever and it costs recall. Chunk target 1500 (`DefaultBudget`) gave `R_ess` 0.898 but `C_fact` 0.519; adopting it is a pending user decision. Not tried: gate, reconcile and verify prompts. See `docs/v2.5/plans/P285-report.md`.
 
 - **No detached runner for agent runs and PTYs (P279).** Quit or crash stops every agent and PTY. The memory ingest runner is separate and does detach (P274). Resume restores the Claude conversation; the turn in flight is lost and its tool effects may be half-applied. The `kira-db` MCP stops with Studio. Resume needs the saved transcript under `~/.claude`; without it the run fails with "could not resume".
 
