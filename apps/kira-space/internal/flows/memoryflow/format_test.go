@@ -13,6 +13,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
@@ -159,7 +160,7 @@ func TestMcpPrepareComment(t *testing.T) {
 			t.Fatalf("fact id %q is not a km_ id", f.ID)
 		}
 	}
-	if !strings.HasPrefix(text, "Nothing was stored.") || !strings.HasSuffix(text, "\n\n"+out.Comment) {
+	if !strings.HasPrefix(text, llmprompts.MemoryStorePrepared.Text(llmprompts.Defaults(), llmprompts.NoVars{})) || !strings.HasSuffix(text, "\n\n"+out.Comment) {
 		t.Fatalf("text = %q, want the prepared line, a blank line and the comment", text)
 	}
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {

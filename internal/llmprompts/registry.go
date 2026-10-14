@@ -567,7 +567,7 @@ var MemoryRememberMessage = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpRememberMessage.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpRememberMessage.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpRememberMessage.usedBy.body",
-	Default: `Store the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}} with store_memory. Give every item its reason, origin (user: the user stated it; agent: you concluded it; external with a sourceTag: a source such as slack or jira states it) and scope (company, project or personal). Rough wording is fine: the store splits and rewords facts. If store_memory returns questions, ask the user, then call it again with the answers as clarifications. Report what was stored.{{if .Text}}
+	Default: `Store the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}} with store_memory. Give every item reason, origin (user: user stated it; agent: you concluded it; external with a sourceTag: a source such as slack or jira states it) and scope (company, project or personal). Rough wording is fine: the store splits and rewords. If store_memory returns questions, ask the user, then call it again with the answers as clarifications. Report what was stored.{{if .Text}}
 
 {{.Text}}{{end}}`,
 }, RememberVars{Text: "We use pnpm, not npm."})
@@ -578,7 +578,7 @@ var MemoryStoreChallenged = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpStoreChallenged.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpStoreChallenged.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpStoreChallenged.usedBy.body",
-	Default:    `Nothing was stored. Ask the user these, or fix the items, then call store_memory again with clarifications:`,
+	Default:    `Nothing stored. Ask the user these or fix the items, then call store_memory again with clarifications:`,
 }, NoVars{})
 
 // MemoryStorePrepared heads the comment store_memory returns when called with asComment.
@@ -587,7 +587,7 @@ var MemoryStorePrepared = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpStorePrepared.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpStorePrepared.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpStorePrepared.usedBy.body",
-	Default:    `Nothing was stored. Paste this comment above the code it explains; keep every id as it is:`,
+	Default:    `Nothing stored. Paste this comment above the code it explains; keep every id unchanged:`,
 }, NoVars{})
 
 // MemoryIngestStarted tells the agent an ingest job runs on its own.
@@ -605,7 +605,7 @@ var MemoryIngestAwaiting = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpIngestAwaiting.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpIngestAwaiting.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpIngestAwaiting.usedBy.body",
-	Default:    `The job waits for the user: {{.Cause}}. Ask the user to start it in Kira Space, Memory, Import. Do not read these files. Call ingest_status with this job id for progress.`,
+	Default:    `Job waits for the user: {{.Cause}}. Ask the user to start it in Kira Space, Memory, Import. Do not read these files. Call ingest_status with this job id for progress.`,
 }, CauseVars{Cause: "Needs confirmation in Kira Space: 400 chunks, about 500 calls"})
 
 // MemorySemanticNotInstalled is appended to search results while semantic search is not installed.
@@ -614,7 +614,7 @@ var MemorySemanticNotInstalled = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpSemanticNotInstalled.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpSemanticNotInstalled.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpSemanticNotInstalled.usedBy.body",
-	Default:    `Note: semantic search is not installed. Results are keyword matches only. Enable it in Kira Space, Memory, Download model.`,
+	Default:    `Note: semantic search not installed. Results are keyword matches only. Enable it in Kira Space, Memory, Download model.`,
 }, NoVars{})
 
 // MemorySemanticUnavailable is appended to search results when semantic search fails.
@@ -623,7 +623,7 @@ var MemorySemanticUnavailable = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpSemanticUnavailable.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpSemanticUnavailable.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpSemanticUnavailable.usedBy.body",
-	Default:    `Note: semantic search is unavailable: {{.Cause}}. Results are keyword matches only.`,
+	Default:    `Note: semantic search unavailable: {{.Cause}}. Results are keyword matches only.`,
 }, CauseVars{Cause: "the model failed to load"})
 
 // Headless agent runs.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
@@ -179,7 +180,7 @@ func TestAsCommentPersistsNothingAndTextIsGrepFirst(t *testing.T) {
 	if out.Status != "prepared" || len(ps) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 1 {
 		t.Fatalf("out=%+v problems=%v", out, ps)
 	}
-	if text := res.Content[0].(*mcp.TextContent).Text; !strings.HasSuffix(text, "\n\n"+out.Comment) || !strings.HasPrefix(text, "Nothing was stored.") {
+	if text := res.Content[0].(*mcp.TextContent).Text; !strings.HasSuffix(text, "\n\n"+out.Comment) || !strings.HasPrefix(text, llmprompts.MemoryStorePrepared.Text(llmprompts.Defaults(), llmprompts.NoVars{})) {
 		t.Errorf("text = %q", text)
 	}
 	if rows, _ := svc.Recent(ctx, 10); len(rows) != 0 {
