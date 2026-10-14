@@ -153,6 +153,9 @@ type stageInfo struct {
 	Added           int                       `json:"added"`
 	Updated         int                       `json:"updated"`
 	Noop            int                       `json:"noop"`
+	// Locator counts stored reasons that equal this file's source locator (Part 3 stores nothing else
+	// from the source in a reason).
+	Locator int `json:"locator"`
 }
 
 type runRecord struct {
@@ -529,6 +532,11 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 			}
 		}
 	}
+	for _, m := range mems {
+		if _, ok := memfmt.ParseLocator(m.Reason, f.RelPath); ok {
+			rec.Stages.Locator++
+		}
+	}
 	rec.RenderedDoc, rec.RenderProblems = renderChecked(importer.DocInput{GroupID: f.GroupID, Title: f.Title, FileName: s.fileName(), Rel: f.RelPath,
 		Prov: evalProvenance(), Updated: updated}, mems)
 	rec.DocMismatch = rec.MemoryDoc != "" && rec.MemoryDoc != rec.RenderedDoc
@@ -553,9 +561,10 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 		Notes []string `json:"notes"`
 		// DocMismatch: the written .memory.md differs from the render; RenderProblems: ParseDoc problems
 		// of the render; DocError: why the write-back failed, if it did.
-		DocMismatch    bool   `json:"docMismatch"`
-		RenderProblems int    `json:"renderProblems"`
-		DocError       string `json:"docError,omitempty"`
+		DocMismatch    bool    `json:"docMismatch"`
+		LocatorShare   float64 `json:"locatorShare"`
+		RenderProblems int     `json:"renderProblems"`
+		DocError       string  `json:"docError,omitempty"`
 	}
 	out := map[string]any{"round": cfg.round, "set": set, "judgeModel": judgeModel, "capped": capped, "incomplete": failed,
 		"budget": cfg.budget, "promptsOverride": cfg.promptsFile != ""}
@@ -570,7 +579,8 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 		rec := recs[s.ID]
 		tl := tallyOf(texts[s.ID], golden[s.ID], rec, g)
 		so := srcOut{Category: s.Category, Tally: tl, Ratios: tl.ratios(), DocMismatch: rec.DocMismatch,
-			RenderProblems: rec.RenderProblems, DocError: rec.DocError}
+			RenderProblems: rec.RenderProblems, DocError: rec.DocError,
+			LocatorShare: div(float64(rec.Stages.Locator), float64(len(rec.Stored)))}
 		weight := map[string]string{}
 		fact := map[string]string{}
 		for _, f := range golden[s.ID].Facts {
@@ -592,7 +602,12 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 	}
 	slices.Sort(ids)
 	out["sources"] = per
-	out["aggregate"] = map[string]any{"tally": agg, "ratios": agg.ratios()}
+	var loc, stored int
+	for _, id := range ids {
+		loc += recs[id].Stages.Locator
+		stored += len(recs[id].Stored)
+	}
+	out["aggregate"] = map[string]any{"tally": agg, "ratios": agg.ratios(), "locatorShare": div(float64(loc), float64(stored))}
 	var pipe, gate, extract float64
 	for _, r := range recs {
 		pipe += r.CostUSD
