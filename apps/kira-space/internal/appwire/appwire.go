@@ -137,6 +137,7 @@ type Wired struct {
 	Mobile         *bridge.MobileAccessService
 	Memory         *bridge.MemoryService
 	MemoryImport   *bridge.MemoryImportService
+	MemoryDistill  *bridge.MemoryDistillService
 	WindowsSvc     *bridge.WindowsService
 	PromptsSvc     *bridge.PromptsService
 	LlmPromptsSvc  *bridge.LlmPromptsService
@@ -328,6 +329,7 @@ func Build(opts Options) *Wired {
 	w.Quitter.SetGate(prompts.QuitGate{R: w.Prompts, LiveFn: func() int { return live().Total() }})
 	w.Lifecycle = &bridge.LifecycleService{Flusher: w.Quitter, WindowFlusher: w.CloseFlush, Quit: w.Quitter, Live: live}
 	w.MemoryImport = bridge.NewMemoryImportService(w.Memory, opts.Dialogs)
+	w.MemoryDistill = bridge.NewMemoryDistillService(w.Memory, opts.Dialogs, emitter)
 	w.Update = &bridge.UpdateService{Checker: updateChecker, Installer: updateInstaller, Quit: w.Quitter.RequestQuit}
 	return w
 }
@@ -372,7 +374,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
-		application.NewService(w.MemoryImport), application.NewService(w.WindowsSvc), application.NewService(w.Update),
+		application.NewService(w.MemoryImport), application.NewService(w.MemoryDistill), application.NewService(w.WindowsSvc), application.NewService(w.Update),
 		application.NewService(w.AgentNotifySvc), application.NewService(w.ClaudeUsageSvc),
 		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
 	}

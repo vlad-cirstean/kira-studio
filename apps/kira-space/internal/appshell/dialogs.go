@@ -24,6 +24,10 @@ func (a *Dialogs) OpenDirectory(req bridge.OpenDirectoryRequest) (string, error)
 	return a.d.OpenDirectory(req.Title)
 }
 
+func (a *Dialogs) OpenFile(req bridge.OpenFileRequest) (string, error) {
+	return a.d.OpenFile(req.Title, req.FilterName, req.FilterPattern)
+}
+
 func (a *Dialogs) OpenFiles(req bridge.OpenFilesRequest) ([]string, error) {
 	return a.d.OpenMultipleFiles(req.Title, req.FilterName, req.FilterPattern)
 }

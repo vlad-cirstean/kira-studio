@@ -33,9 +33,30 @@ type Dialogs struct {
 	mu          sync.Mutex
 	directories []string
 	files       [][]string
+	single      []string
 	// Requests records every call, in order.
 	Directory []bridge.OpenDirectoryRequest
 	Files     []bridge.OpenFilesRequest
+	File      []bridge.OpenFileRequest
+}
+
+// AnswerFile queues the path the next OpenFile returns.
+func (d *Dialogs) AnswerFile(path string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.single = append(d.single, path)
+}
+
+func (d *Dialogs) OpenFile(req bridge.OpenFileRequest) (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.File = append(d.File, req)
+	if len(d.single) == 0 {
+		return "", nil
+	}
+	p := d.single[0]
+	d.single = d.single[1:]
+	return p, nil
 }
 
 // AnswerDirectory queues the path the next OpenDirectory returns.

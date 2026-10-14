@@ -756,6 +756,9 @@
       }
     },
     "dialog": {
+      "distillFile": {
+        "title": "Choose file to distill"
+      },
       "documentsFilter": {
         "label": "Documents"
       },
@@ -1216,6 +1219,26 @@
       "memory": {
         "alreadyDownloading": {
           "body": "The semantic model is already downloading."
+        },
+        "distill": {
+          "busy": {
+            "body": "Another distill is running. Wait for it to finish."
+          },
+          "cancelled": {
+            "body": "Distill cancelled."
+          },
+          "spendCap": {
+            "body": "Distill stopped at its spend cap: ${spent} spent, ${cap} allowed."
+          },
+          "tooLong": {
+            "body": "The input is {count} characters. The limit is {max}."
+          },
+          "tooManyParts": {
+            "body": "The input splits into {count} parts. The limit is {max}."
+          },
+          "unreadable": {
+            "body": "Can’t read {path} ({reason})."
+          }
         },
         "importCannotRead": {
           "body": "Can’t read {path}."

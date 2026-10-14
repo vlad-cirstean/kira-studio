@@ -24,12 +24,17 @@ type OpenDirectoryRequest struct{ Title string }
 // OpenFilesRequest asks for several files at once, with one filter ("*.md;*.txt" style).
 type OpenFilesRequest struct{ Title, FilterName, FilterPattern string }
 
+// OpenFileRequest asks for one file, with one filter ("*.md;*.txt" style).
+type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
+
 // Dialogs is the native-dialog seam — internal/appshell adapts it over repo-root
 // internal/shell.Dialogs (app.Dialog with the main window attached for modality, P103 Part 3;
 // Kira Studio's own bridge.Dialogs interface, trimmed to the one method this app calls). Returns
 // "" for a cancelled dialog, the only cancel signal Wails gives.
 type Dialogs interface {
 	OpenDirectory(req OpenDirectoryRequest) (string, error)
+	// OpenFile returns "" for a cancelled dialog.
+	OpenFile(req OpenFileRequest) (string, error)
 	// OpenFiles returns no paths for a cancelled dialog.
 	OpenFiles(req OpenFilesRequest) ([]string, error)
 }

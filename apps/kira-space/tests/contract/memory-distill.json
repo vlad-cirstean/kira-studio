@@ -1,0 +1,71 @@
+{
+  "MemoryDistillService.Distill#done": {
+    "chunks": 1,
+    "costUsd": 0.01,
+    "inChars": 71,
+    "inTokens": 24,
+    "lines": [
+      "Worker keeps port 8000 open.",
+      "Queue never retries."
+    ],
+    "outChars": 49,
+    "outTokens": 17
+  },
+  "MemoryDistillService.Limits": {
+    "maxChars": 120000,
+    "maxParts": 16,
+    "spendCapUsd": 2,
+    "storeMaxLines": 20
+  },
+  "MemoryDistillService.ToImport#job": {
+    "autoStart": false,
+    "base": "<masked>",
+    "calls": 0,
+    "channel": "ui",
+    "costUsd": 0,
+    "createdAt": "<masked>",
+    "estimate": {
+      "calls": 4,
+      "chunks": 1,
+      "files": 1,
+      "seconds": 58,
+      "tokens": 28
+    },
+    "finishedAt": null,
+    "groups": [],
+    "id": "<id:1>",
+    "ignoredCount": 0,
+    "origin": "external",
+    "progress": {
+      "chunksDone": 0,
+      "chunksTotal": 1,
+      "filesDone": 0,
+      "filesTotal": 1
+    },
+    "project": null,
+    "reason": "",
+    "roots": [],
+    "scope": "personal",
+    "sessionId": null,
+    "sourceTag": "doc",
+    "startedAt": null,
+    "state": "awaiting",
+    "totals": {
+      "added": 0,
+      "dropped": 0,
+      "failedFiles": 0,
+      "noop": 0,
+      "skippedFiles": 0,
+      "unresolved": 0,
+      "updated": 0
+    },
+    "truncated": false,
+    "writeDoc": false
+  },
+  "kira:memory:distill#progress": {
+    "costUsd": 0.01,
+    "done": 1,
+    "requestId": "req-1",
+    "total": 1
+  }
+}
