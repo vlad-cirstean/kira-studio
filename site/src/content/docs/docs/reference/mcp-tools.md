@@ -19,7 +19,7 @@ Registered in your Claude Code user scope from `Settings > Memory`. Claude Code 
 
 ### store_memory
 
-Store facts. The store splits compound text, rewords it, and updates a matching fact in the same scope unless the stored one has a higher origin. An unclear item or weak reason is challenged: nothing is stored and questions come back.
+Store facts. The store splits independent claims into separate facts. A list about one subject stays one fact. It rewords each fact and updates a matching fact in the same scope, unless the stored one has a higher origin. An unclear item or weak reason is challenged: nothing is stored and questions come back.
 
 - `items`: 1 to 20 items. Each has `fact`, `reason`, `origin` (user, agent or external), `scope` (company, project or personal), plus `sourceTag` for external and `project` for project scope.
 - `clarifications`: question and answer pairs for an earlier challenge.

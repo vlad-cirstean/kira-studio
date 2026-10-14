@@ -4828,17 +4828,22 @@ replies and full terminal attach for Claude Code sessions.
   session and a context section per group (`MemoryContext.vue`).
 - Text formats (P273), pure Go in `internal/memory/memfmt` (parse, format, `CheckText`, `MarkersFor`; no I/O,
   `internal/memory` imports it, `ids.go` builds the id patterns from it). Both formats are grep-first: id leads
-  every line, `<id> <field>: <text>`, fields `fact`, `reason` (docs add `keywords`), one line each, no version,
-  no inline Markdown pairs (`**x**`, `` `x` ``, links, tags; lone `*` and `_` in identifiers stay legal),
+  every line, `<id> <fact>` (P285 Part 3, format v2), the reason an optional line indented by two spaces, no field
+  names, no per-fact keywords, no version, no inline Markdown pairs (`**x**`, `` `x` ``, links, tags; lone `*` and `_` in identifiers stay legal),
   `km_`/`kg_` tokens in text must be full ids, other memories cited by id only.
 - Comment format: header `<marker> kira-memory origin=<o> [source=<tag>] scope=<s>` once per block, then
-  contiguous fact/reason pairs. No project, session or keywords. In scope: comment line whose text starts
+  `<id> <fact>` lines, each with an optional reason line (text indented by exactly two spaces; a second indented line ends the block unflagged). No project, session or keywords. In scope: comment line whose text starts
   `kira-memory ` or `km_`; any other comment is legacy, never flagged. Markers by extension (`//`, `#`, `--`,
   `;`, `%`, `<!-- -->`, `/* */`); unlisted extension unsupported. Regex: `memory-check --print-regex`.
-- Doc format over `.md`/`.txt`: front matter (`---`, `kira-memory: 1`, `group: kg_...`, `title`, `origin`,
-  `source`, `scope`, `project`, optional `session`, `keywords`, `updated`), body only headings and fact blocks
-  (fact, reason, optional keywords). In scope only when line 1 is `---` and line 2 `kira-memory: 1`. One
+  Retired v1 lines (`<id> fact:`, `<id> reason:`, `<id> keywords:`) yield one problem naming the P273 format; the formatter refuses a fact text starting `fact: `, `reason: ` or `keywords: `.
+- Doc format over `.md`/`.txt`: front matter (`---`, `kira-memory: 2`, `group: kg_...`, `title`, optional `from`
+  (job-relative source path), `origin`, `source`, `scope`, `project`, optional `session`, doc-level `keywords`,
+  `updated`), body only `## section` headings and `- <id> <fact>` items, each with an optional two-space-indented
+  reason line. In scope only when line 1 is `---` and line 2 `kira-memory: 1` or `2`; version 1 yields one
+  problem (`kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2`) and no reader. One
   provenance per doc. P274 writes and re-ingests it by parse alone.
+- Source locator: `memfmt.Locator(path, section)` returns `Stated in <path>[, <section>]`; `ParseLocator(reason, path)`
+  is its exact inverse. Import, store pin and write-back share both.
 - Style rule: `memory.gate.system` rewrites each fact and reason to `CLAUDE.md` style (one claim, about 20 words,
   keeps negations, numbers, names, ids); `memory.reconcile.system` asks the same for update/add text. Go
   collapses whitespace runs to one space in both (`validateGate`, `checkDecision`).
@@ -4847,8 +4852,8 @@ replies and full terminal attach for Claude Code sessions.
   event. Ids: noop and update reuse the stored fact id, add mints a fresh unreserved one. Result status
   `prepared` with `comment` and `prepared` facts; text is the `memory.mcp.store.prepared` line plus the
   comment. Refused with `groups`, import mode, `md`/`txt` or an unsupported extension.
-- MCP text output (`search_memories`, `memory_history`, `memory_context`): same grammar, `fact`, `reason`,
-  then `<id> meta: vN origin=... [source=...] scope=... [project=...] [match=...] [score parts] [historical] [ctx=N]`.
+- MCP text output (`search_memories`, `memory_history`, `memory_context`): same grammar, `<id> <fact>`, then
+  `  <reason>`, then `  vN origin=... [source=...] scope=... [project=...] [match=...] [score parts] [historical] [ctx=N]`.
   Ranking "Output" lists the score parts; neutral parts are omitted. `ctx=N`: `memory_context` has N facts stored with it.
 - Validator: `<Kira Space executable> memory-check` (`internal/memory/memcheck`, `appwire.RunArgvShim` case).
   `[paths]` scans git-tracked files (or walks outside git); `--staged` checks staged blobs and runs the
@@ -4931,11 +4936,18 @@ replies and full terminal attach for Claude Code sessions.
   `decide` stores accepted items and returns challenged ones with status `stored`; the gate input carries
   `challenge: false`; finalize lists what the store still challenged under `dropped`, never `unresolved`.
   Live `store_memory` keeps challenges for every origin.
-- Formatted docs: a `.md`/`.txt` whose first two lines are `---` and `kira-memory: 1` is kind `memdoc`.
+- Import locator (P285 Part 3): `loadExtracted` sets each fact's `Section` from the chunk `heading_path` and `Reason` to
+  `memfmt.Locator(rel, headingPath)`, both by code. The evidence quote is never stored; extract keeps it for the cross-check
+  and finalize sees it. `StoreRequest.ImportPath` (Go-only, set by `requestFor` from `ImportProvenance.RelPath`) pins the
+  committed reason of every import add or update to the item's reason when `ParseLocator` accepts it, else the bare
+  locator. Finalize merges facts of one subject and aspect (at most 300 characters); the gate keeps a list about one
+  subject as one fact and keeps a locator reason verbatim.
+- Formatted docs: a `.md`/`.txt` whose first two lines are `---` and `kira-memory: 2` (or `1`, which fails) is kind `memdoc`.
   It parses with `memfmt.ParseDoc` (first 5 problems fail the file), no chunk, no claude call.
   Provenance and group come from the doc header. `Service.ApplyDoc` per fact id: no lineage adds with the
-  doc's id, equal text noops, an edit updates when the doc grade is at least the stored grade, else
-  skipped. Facts the doc no longer lists stay stored and count as orphaned. `GroupRef.ID` joins or
+  doc's id, equal fact and reason noop, an edit updates when the doc grade is at least the stored grade, else
+  skipped. A fact without a reason line takes `Locator(from or the job path, section)`; an update keeps the stored
+  keywords, an add takes the doc-level keywords. Facts the doc no longer lists stay stored and count as orphaned. `GroupRef.ID` joins or
   creates the group by the doc's `kg_` id.
   Header provenance wins on apply, so a memdoc whose header origin grades above the job's origin, or names
   another scope or project than the job's (narrowing to `project` of the job's own project passes), holds an
@@ -4943,7 +4955,10 @@ replies and full terminal attach for Claude Code sessions.
 - Write-back: opt-in per job (`writeDoc`, confirm-dialog checkbox). Writes `<dir>/<stem>.memory.md`
   beside the source with `renameio`, never over the source. An existing target is overwritten only when
   it is a kira-memory doc with the same group; otherwise the file stays `done` with `doc_error`. Holds
-  only facts with the job's provenance. Skipped for `memdoc` input.
+  only facts with the job's provenance. Skipped for `memdoc` input. `importer.RenderDoc` is the pure renderer
+  (write-back and eval share it): `from` is the job path when header-safe; a fact whose reason is the locator of its
+  section takes that section as its heading and no reason line, any other reason is written under the running
+  section; no per-fact keywords. A kira-memory v1 doc of the same group is overwritten.
 - Limits: MCP job over 300 chunks stops at `awaiting` for confirmation in the UI; at most 5 active MCP
   jobs; same roots and provenance as an active job returns that job's id; relative or missing path
   refused. `doneHash` skip matches content hash and provenance (origin, tag, scope, project).
@@ -4964,10 +4979,11 @@ Opt-in harness that scores the ingest pipeline on real repo text. Runs real `cla
 - Run: `bun run eval:memory` (`TestMemoryIngestEval`, `apps/kira-space/tests/claude/memory_eval*_test.go`). `KIRA_MEMORY_EVAL=1` is set by the script. `KIRA_EVAL_MODE` is `prepare`, `golden` or `run`; `run` needs `KIRA_EVAL_ROUND`. Other knobs: `KIRA_EVAL_SET` (`tuning`, `holdout`, `all`), `KIRA_EVAL_ONLY` (comma list of source ids, smoke runs), `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`, `KIRA_EVAL_LEDGER` (ledger file name under the runs dir, one per part; default `spend.jsonl`).
 - Overrides without code edits: `KIRA_EVAL_PROMPTS` is a JSON map `{prompt id: text}` replacing registry prompts for one run; `KIRA_EVAL_BUDGET` is a chunk budget `Target,Max,MinFill,MinTail,Context`.
 - Corpus: 15 files pinned to commit `9ed83ae85` (manifest `docs/v2.5/plans/P285-corpus/`), read by `git show`. 10 tuning, 5 hold-out, one hold-out per category. Golden: 585 facts (372 essential) written by Opus from the source text before any run. Judge: Opus, one call per source.
-- Metrics: `R_ess`, `R_all` (golden recall, partial counts 0.5), `P` (precision), atomic, standalone, unsupported, duplicate, `C_fact` (stored fact chars over source chars), `C_rec` (fact, reason, keywords), `C_doc` (the written `.memory.md`). Noise bands come from two baseline runs.
+- Metrics: `R_ess`, `R_all` (golden recall, partial counts 0.5), `P` (precision), atomic, standalone, unsupported, duplicate, `C_fact` (stored fact chars over source chars), `C_rec` (fact, reason, keywords), `C_doc` (the `.memory.md` text `RenderDoc` renders). Noise bands come from two baseline runs.
 - Cost: a tuning run is about 4 to 5 USD and 8 to 10 min; hold-out about 1.3 USD. Spend ledger `docs/v2.5/plans/P285-runs/spend.jsonl`; the harness stops at the run and phase caps. Round data: `docs/v2.5/plans/P285-runs/`. Results: `docs/v2.5/plans/P285-report.md`.
 - Caveats: embedder off (reconcile sees keyword candidates only); token numbers use `ceil(runes/3)`; judge and extractor noise is as large as most single changes; the golden list rewards qualifier-heavy facts.
 - Part 2 (P285): terse reconcile, finalize, verify and MCP texts; new `distill` tool. Final tuning numbers (terse gate): `R_ess` 0.859, `R_all` 0.658, `P` 0.904, `C_fact` 0.451; the terse gate was reverted after that round (`R_all` under its floor). Unified import tried and reverted (`C_fact` 0.55). See the report, Part 2.
+- Part 3 (P285): compact output format v2 (above), locator by code, merge rule. Free `KIRA_EVAL_MODE=footprint` with `KIRA_EVAL_ROUNDS=<r1,r2>` re-renders stored facts of listed rounds (`footprint-p273.json`, `footprint-v2.json`). `C_doc` is now the `RenderDoc` render over source runes for every source, with `renderProblems`, `docMismatch` and `locatorShare` per source. Gates and results: `round-p3-01` tuning `C_fact` 0.434, `C_doc` 0.532, `R_ess` 0.885, unsupported 0.005; hold-out `C_fact` 0.457, `R_ess` 0.876. See the report, Part 3.
 - Write-back (P285 fix): the `.memory.md` writer adjusts a title with `: ` or ` #` and strips inline Markdown from facts before `memfmt.FormatDoc`; a fact that stays invalid is left out and counted in `doc_error`. Before, most imports failed write-back with a format error.
 
 ## Docker module (P200, Kira Studio)
@@ -5648,6 +5664,7 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **A written memory doc holds no per-fact keywords (P285 Part 3).** Importing it into another store indexes its facts with the doc-level keywords only; the store regenerates per-fact keywords only for facts the gate sees.
 - **Memory import is not unified with `distill` (P285 Part 2).** Import still runs the extract prompt with an evidence quote; `distill` is a separate prompt. The unified pipeline (distill per chunk, code-built `Stated in` reason, no quote) gave `R_all` 0.836 but `C_fact` 0.549 against a ceiling of 0.526, so it was reverted. The terse reconcile, finalize and verify prompts and the Part 1 gate were not re-measured together on all 10 tuning sources (budget). See `docs/v2.5/plans/P285-report.md`.
 
 - **Memory ingest compression target not met (P285).** Tuning set after two kept extract-prompt changes: `R_ess` 0.883 (target 0.90), `P` 0.895 (0.90), `C_fact` 0.497 (0.30). The golden essential facts alone are 0.47 of source chars, so 0.30 was unreachable with 0.90 recall; the target was set before any measurement. Fewer facts is the only lever and it costs recall. Chunk target 1500 (`DefaultBudget`) gave `R_ess` 0.898 but `C_fact` 0.519; adopting it is a pending user decision. Not tried: gate, reconcile and verify prompts. See `docs/v2.5/plans/P285-report.md`.

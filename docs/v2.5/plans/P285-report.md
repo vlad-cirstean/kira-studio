@@ -405,3 +405,68 @@ Same five rounds, same stored facts and reasons, rendered by the v2 `RenderDoc` 
 | round-p2-04 (8 sources) | 1.429 | 0.809 | -0.620 | 29486 | 16702 | -43% | 0 |
 
 The `C_doc` gate (<= 1.401) is met by the layout alone: 0.883 on the Part 1 facts. The remaining doc weight is the reasons (evidence quote plus locator) the old pipeline stored; the code-built locator (reason-less lines) and fewer facts are measured in the iteration log below.
+
+## 14. Part 3 iteration log
+
+One prompt variant, no override needed. Smoke ran two sources; the tuning round ran the committed tree.
+
+| round | set | `R_ess` | `R_all` | `P` | unsupported | `C_fact` | `C_rec` | `C_doc` (v2) | stored | locator share |
+|---|---|---|---|---|---|---|---|---|---|---|
+| round-p3-smoke | json-ade-errors, cmt-claude-go | 0.841 | 0.719 | 0.706 | 0.059 | 0.626 | 1.225 | 0.884 | 17 | 1.00 |
+| round-p3-01 | tuning (10) | 0.885 | 0.689 | 0.737 | 0.005 | 0.434 | 0.863 | 0.532 | 209 | 1.00 |
+| round-p3-holdout | hold-out (5) | 0.876 | 0.670 | 0.703 | 0.000 | 0.457 | 0.868 | 0.551 | 64 | 1.00 |
+
+Smoke checks passed: both sources `done`, render re-parses with 0 problems, locator share 1.00, no store challenge, `docMismatch` false. The smoke `unsupported` 0.059 is one fact in 17 (a noise-sized sample); the tuning round measures 0.005.
+
+Round-p3-01 hit every gate with margin (closest: `C_fact`, 0.034 under). No confirmation rerun, no contingency round: step 1 of plan section 5 needs a metric within 0.01 of its limit. Two transient `claude` exit-1 retries on `spec-chunk-go` succeeded on their own.
+
+## 15. Part 3 results vs gates
+
+| gate | limit | `round-p3-01` (tuning) | hold-out |
+|---|---|---|---|
+| `C_fact` | <= 0.468 | 0.434 pass | 0.457 |
+| `C_doc` (v2 render) | <= 1.401 | 0.532 pass | 0.551 |
+| `R_ess` | >= 0.839 | 0.885 pass | 0.876 |
+| unsupported + distorted | <= 0.02 | 0.005 pass | 0.000 |
+
+Per source on the tuning set, `R_ess` ranges 0.71 (`json-ade-errors`, 3 facts) to 0.99 (`doc-arch-prompts`); `plan-p257` is 0.80. Essential misses: 12 of 283, 11 lost at extract and 1 at finalize, so the merge rule loses almost nothing.
+
+All 15 sources (tuning plus hold-out), against Part 2 final (`round-p2-final`, set all):
+
+| metric | Part 2 final | Part 3 |
+|---|---|---|
+| `R_ess` | 0.853 | 0.883 |
+| `R_all` | 0.654 | 0.685 |
+| `P` | 0.899 | 0.729 |
+| atomic | 0.947 | 0.740 |
+| unsupported | 0.005 | 0.004 |
+| `C_fact` | 0.454 | 0.439 |
+| `C_doc` | 1.450 (P273 render) | 0.536 (v2 render) |
+| stored facts | 416 | 273 |
+
+Reading: the doc is 63% smaller than Part 2's, mostly format and code-built locators (E1 alone gave 40 to 43%). Fact text is 3% smaller; stored count drops 34% because related facts merge. `P` and atomic fall by design: denser facts fail the frozen judge's "one claim" and precision checks, and the plan reports them without gating them. `reasonOk` is 0.665 on tuning because the frozen judge asks for a quote that D12 removes; reported only.
+
+Doc excerpt, `plan-p257`, Part 2 facts in the P273 doc layout (first two facts, reasons carried the section plus a quote; 40 facts, doc 1.13x the source):
+
+```
+km_… fact: P257 removes per-file and per-directory added/removed line counts from the git module UI.
+km_… reason: Stated in P257-drop-git-line-counts.md, P257 plan: drop git line add/remove counts. Counts are noisy and useless.
+km_… keywords: P257, git module, line counts, additions, deletions, UI, numstat
+```
+
+Part 3 for the same source: 26 facts, doc 0.39x the source (4669 of 11914 characters). The heading holds the locator once:
+
+```
+## P257 plan: drop git line add/remove counts
+
+- km_… P257 removes per-file and per-directory added/removed line counts from the git module UI, keeping per-file status indicators (kind letter, rename original path, similarity) sourced from --name-status.
+- km_… Line counts render in packages/git-ui FileTree.vue at 4 sites (directory and file rows in tree and flat modes) and in ADE AdeChangesTab.vue via fileDelta(); no per-commit count exists.
+```
+
+## 16. Part 3 spend, reverted, deviations
+
+- Eval ledger `spend-p3.jsonl`: 5.39 USD (smoke 0.31, tuning 3.84, hold-out 1.25) of the 18.5 USD cap.
+- Real `claude` rows: `TestMemoryGate`, `TestMemoryImport`, `TestMemoryIngestThroughClaude`, `TestMemoryMcpThroughClaude`, `TestMemoryMcpFollowsDocs` (new `list` subtest passes: one item holding cents, half up and 12), `TestMemoryInstallRegisters`, `TestMemoryDistill` all pass (about 281 s). Their spend is not metered by the harness.
+- Reverted: nothing. No Part 3 prompt variant failed a gate.
+- Not run: ADE, smart-script and Studio `claude` rows. Part 3 touches none of their code or prompts.
+- Known cost: a written doc holds no per-fact keywords (ARCHITECTURE Known open items).
