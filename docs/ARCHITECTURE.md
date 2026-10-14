@@ -36,7 +36,7 @@ whatever sandbox a session happens to be in),
 | Phone terminal transport (P212 Part 2) | `github.com/coder/websocket` (ISC) | ordered binary frames both ways, `context` and close codes; already in the module graph; separate from the SSE hub |
 | Text editing / viewing | `monaco-editor` — one engine, every editor surface in the app | CodeMirror 6 is gone entirely as of P60b: the SQL query console and `project/SchemaDialog.vue`'s DDL editor were the last two mount sites (P60a migrated the other 15), and both now mount `editor/MonacoHost.vue`. `editor/CodeMirrorHost.vue` and the nine remaining `@codemirror/*` packages plus `@lezer/highlight` are deleted from `package.json`. The two surfaces stayed on CodeMirror through P60a only because their language service (completion, diagnostics, hover, the DDL extractor) walked `@codemirror/lang-sql`'s Lezer parse tree — P60b replaced that tree with an in-house one (`packages/shared/domain/sqlTokens.ts`, below), which is what let the mounts themselves move; the SQL Monarch grammar Monaco already had (`monacoEntry.ts`) was always colouring-only and needed no change. Every editor surface — read-only viewer and real editable host alike — loads Monaco through the one shared, memoised `loadMonaco()` (`editor/monaco.ts`); nothing is eager, so a session that opens no editor fetches nothing and a session that opens its first one pays the ~972 KB gzip chunk once, cached thereafter. `docs/v1.6/plans/P60a-monaco-host-and-general-surfaces.md` and `docs/v1.6/plans/P60b-sql-language-service-monaco.md` have the full capability-by-capability mapping (theme/token colours, range highlights, hover, completion, lint, the undo boundary around an external write, wrap-on-type, auto-close brackets, and — P60b's own addition — the SQL language service itself) |
 
-**The in-house SQL tokenizer (P60b).** Three siblings now live in `packages/shared/domain/`, all built on one shared quote/comment/dollar-quote lexical scanner (`sql-lex.ts`, hoisted out of the first two to close a duplication they used to carry independently): `sql-split.ts` (statement splitting, pre-existing), `sql-lint.ts` (lexical diagnostics — unterminated quote/comment, unbalanced parens, pre-existing), and `sql-tokens.ts` (the parse layer proper, P60b). `sql-tokens.ts#tokenizeSql` produces the same shallow tree shape (`LNode`: `name`/`from`/`to`/`firstChild`/`nextSibling`, `Statement`/`Parens`/`CompositeIdentifier` the only groupings) the deleted `@codemirror/lang-sql` dependency used to hand the console's language service — every consumer (`views/console/{ddl,sqlRefs,sqlHover,sqlDiagnostics}.ts`) is unchanged apart from taking a plain `SqlDialect` string instead of a library dialect object. `packages/shared/domain/sqlKeywords.ts` supplies each of the five dialects' curated keyword/type vocabulary (a membership test enforces every consumer that branches on `name === 'Keyword'` stays covered). A module-level memo in `sql-tokens.ts` (key: `(options, source)` compared by reference, size 2, FIFO) is what keeps a hover/lint/completion burst over one untouched document to one real scan — the same technique `findRanges.ts`'s own position cache and `state/schemas.ts`'s own parsed-DDL cache already use.
+**The in-house SQL tokenizer (P60b).** Three siblings now live in `packages/shared/domain/`, all built on one shared quote/comment/dollar-quote lexical scanner (`sqlLex.ts`, hoisted out of the first two to close a duplication they used to carry independently): `sqlSplit.ts` (statement splitting, pre-existing), `sqlLint.ts` (lexical diagnostics — unterminated quote/comment, unbalanced parens, pre-existing), and `sqlTokens.ts` (the parse layer proper, P60b). `sqlTokens.ts#tokenizeSql` produces the same shallow tree shape (`LNode`: `name`/`from`/`to`/`firstChild`/`nextSibling`, `Statement`/`Parens`/`CompositeIdentifier` the only groupings) the deleted `@codemirror/lang-sql` dependency used to hand the console's language service — every consumer (`views/console/{ddl,sqlRefs,sqlHover,sqlDiagnostics}.ts`) is unchanged apart from taking a plain `SqlDialect` string instead of a library dialect object. `packages/shared/domain/sqlKeywords.ts` supplies each of the five dialects' curated keyword/type vocabulary (a membership test enforces every consumer that branches on `name === 'Keyword'` stays covered). A module-level memo in `sqlTokens.ts` (key: `(options, source)` compared by reference, size 2, FIFO) is what keeps a hover/lint/completion burst over one untouched document to one real scan — the same technique `findRanges.ts`'s own position cache and `state/schemas.ts`'s own parsed-DDL cache already use.
 
 No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-sql-language-service-monaco.md` §2) declined every alternative found: `sql-parser-cst` (best technical fit — a CST with real positions, sqlite + mysql/mariadb + postgresql) is GPL-2.0-or-later, and this repo is MIT shipping a packaged desktop binary — a copyleft obligation across the whole app, not a "paid tier" problem to work around; `node-sql-parser` throws on unparseable input and has no reliable per-token offsets; `dt-sql-parser`/`monaco-sql-languages` cover neither SQLite nor ClickHouse and pull in an ANTLR runtime for a handful of node kinds this app actually needs. `sql-tokens.ts` is the only option that covers all five dialects, tolerates half-typed text (never throws), and keeps byte-accurate offsets.
 | Icons | `@vscode/codicons` | UI chrome |
@@ -5634,7 +5634,7 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **No detached runner (P279).** Quit or crash stops every agent and PTY. Resume restores the Claude conversation; the turn in flight is lost and its tool effects may be half-applied. The `kira-db` MCP stops with Studio. Resume needs the saved transcript under `~/.claude`; without it the run fails with "could not resume".
+- **No detached runner for agent runs and PTYs (P279).** Quit or crash stops every agent and PTY. The memory ingest runner is separate and does detach (P274). Resume restores the Claude conversation; the turn in flight is lost and its tool effects may be half-applied. The `kira-db` MCP stops with Studio. Resume needs the saved transcript under `~/.claude`; without it the run fails with "could not resume".
 
 - **Studio Settings footer shows `~/.kira-studio/kira.sqlite`; the real file is `kira.db`.** Label in `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue`. The docs say `kira.db`.
 - **Quit discards staged grid edits and dirty edit buffers (P267).** Tab close and dialogs guard unsaved edits; app quit does not. Accepted by the user (P266 decision).
@@ -5695,7 +5695,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   ordinary one at the hook level.
 
 - **The ADE board's conflict pairs drop a rename/delete conflict whose two paths differ and
-  neither lies in the pair's own shared-file set (`ade/facts.go`)**. `pairFacts` intersects
+  neither lies in the pair's own shared-file set (`apps/kira-space/internal/ade/facts.go`)**. `pairFacts` intersects
   `git merge-tree --write-tree`'s conflicted paths against `shared` (each branch's own changed-path
   set) before reporting `conflicts`; a rename or delete on one side names a path the other side
   never touched, so the intersection is empty and the conflict is silently dropped from the pair's
@@ -5716,7 +5716,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   further prompt. Closing this needs the pending archive itself surviving a reload (a persisted
   Go-side flag on the task), a later phase's call.
 
-- **`internal/ipcfixture`'s fixture connection rows carry no MCP mode columns** (v1.7 M3). The committed `testdata/*.fixture.json` hold no `mcp_read_mode`/`mcp_write_mode`/`mcp_ddl_mode`, so each fixture connection logs "coercing connection row: unrecognised MCP ... mode". The `keyTypes` gap this item once named is fixed. Not rerun here for lack of Docker: whether the on-demand suite still diffs against the committed JSON is unconfirmed. Closing it needs the suite's own regeneration path (`KIRA_IPC_FIXTURES=write`) against the current schema.
+- **`apps/kira-studio/internal/ipcfixture`'s fixture connection rows carry no MCP mode columns** (v1.7 M3). The committed `testdata/*.fixture.json` hold no `mcp_read_mode`/`mcp_write_mode`/`mcp_ddl_mode`, so each fixture connection logs "coercing connection row: unrecognised MCP ... mode". The `keyTypes` gap this item once named is fixed. Not rerun here for lack of Docker: whether the on-demand suite still diffs against the committed JSON is unconfirmed. Closing it needs the suite's own regeneration path (`KIRA_IPC_FIXTURES=write`) against the current schema.
 
 - **`maskedColumnRenamedOrHidden`'s outer-statement scan can't see into a pre-existing view
   definition** (M7 round 2, finding #1). A view that itself renames a masked column
@@ -5750,9 +5750,9 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   `render.go`'s matching logic, a materially larger structural change than the finding itself.
   Closing this needs that provenance wiring.
 
-- **Response bodies, gRPC response messages and jar cookies reach `kira.sqlite` history unmasked**
-  (F16, P108 Part 8). `bridge/http.go`'s `maskSecrets` masks headers, redirect/final URLs and the
-  rendered `Wire` exchange, but never `resp.Body` — `internal/httpclient/options.go`'s own
+- **Response bodies, gRPC response messages and jar cookies reach `kira.db` history unmasked**
+  (F16, P108 Part 8). `apps/kira-studio/internal/bridge/http.go`'s `maskSecrets` masks headers, redirect/final URLs and the
+  rendered `Wire` exchange, but never `resp.Body` — `apps/kira-studio/internal/httpclient/options.go`'s own
   `WireMask`/`wire.go`'s `capWireText` (P108 F12) mask the *request* body's wire text earlier, before
   truncation, but that is a different pass over a different field, and the response body stays
   untouched by either; `bridge/grpc.go`'s `maskGrpcResult` never masks `Messages[].JSON`; the
@@ -5763,7 +5763,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   `Set-Cookie` therefore stores that secret in plaintext in history. Closing this needs the same
   substituted-secret value set applied as a body/message/cookie scan, not just a header/URL one.
 
-- **`internal/dbmcp/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (M7 finding
+- **`apps/kira-studio/internal/dbmcp/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (M7 finding
   #7 gave it `ReadHeaderTimeout`/`IdleTimeout` plus the cross-origin wrapper). Deliberate: the
   Streamable HTTP transport holds long-lived server-to-client streams, and a write/read deadline
   would cut one mid-response; a slow client body on a long POST is not a threat on loopback the way
@@ -5773,8 +5773,8 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **The SQL splitter has no notion of a compound statement body** (F4, P108 Part 11). A SQLite
   `CREATE TRIGGER … BEGIN …; …; END`, a MySQL stored procedure body, or a Postgres `BEGIN ATOMIC …
-  END` all use `;` to separate the *inner* statements of one outer statement — `sql-split.ts`'s
-  `scanSqlSpan`-driven scan tracks only quote/comment/dollar-quote lexical state, not `BEGIN`/`END`
+  END` all use `;` to separate the *inner* statements of one outer statement — `packages/shared/domain/sqlSplit.ts`'s
+  `scanSqlSpan`-driven scan (`sqlLex.ts`) tracks only quote/comment/dollar-quote lexical state, not `BEGIN`/`END`
   nesting, so it splits at every inner `;` too. A verified SQLite trigger body splits into four
   fragments instead of staying one statement. Closing this needs real `BEGIN`/`END` depth tracking
   per dialect (a fifth `SqlLexOptions`-style flag isn't enough — it's a grammar-level construct, not
@@ -5878,4 +5878,4 @@ Performance:
 - **Visual baseline of the ADE workflow graph shows the Preview placeholder (P271).** The finish note is rendered by `LlmPromptsService.Preview`, unmocked in that spec. The PNG does not show the real note text.
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
-- **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) the app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Measured: `repo-graph-refresh` scroll test 8+ of 40 failed, all on that wait; `repo-graph-paging` 9 of 48 on the `graph-svg` wait in `openRepo`; `repo-graph-columns` 3 of 400; `repo-workspace` 4 of 252. All four pass on an idle machine (`test:ui:space`: 576 passed). Cause is CPU starvation of the whole app boot, not a step in the test. Closed by P277 with 0 failures at the same load: `refsChanged` (0 of 40, fake clock), `sql-schema` D3 (0 of 40, was 36), `tooltips` a11y (0 of 40, was 20), `TestScheduleADE` (0 of 40), `TestDescribeCancel` and `TestUnaryDeadline` (0 of 40). Unreproduced even before the fixes: `repo-graph-badges` (0 of 120), `ade-v2-panel` (0 of 40), `http-timeline` (0 of 40), `grid-commit-in-flight` (0 of 80), `ui-leftovers` (0 of 40). Run these suites alone; delete once the boot is cheaper or the machine is faster.
+- **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Failures: `repo-graph-refresh` scroll test 8+ of 40, `repo-graph-paging` 9 of 48 (`graph-svg` wait in `openRepo`), `repo-graph-columns` 3 of 400, `repo-workspace` 4 of 252. All pass idle (`test:ui:space`: 576 passed). Cause: CPU starvation of the whole app boot, not a test step. Delete once the boot is cheaper or the machine faster.
