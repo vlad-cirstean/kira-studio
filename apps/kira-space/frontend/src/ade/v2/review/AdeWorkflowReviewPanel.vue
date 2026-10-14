@@ -192,8 +192,8 @@ const stateLabel = (c: ReviewComment): string =>
         <div class="flex flex-wrap items-center gap-1.5">
           <Button
             variant="link"
-            size="kira"
-            class="font-data text-kira-sm"
+            size="inline"
+            class="font-data text-kira-sm text-muted-foreground"
             data-testid="ade-review-comment-path"
             @click="emit('openFile', c.path)"
             >{{
