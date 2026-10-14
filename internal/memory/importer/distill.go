@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -28,10 +29,11 @@ const (
 	distillBudget    = "0.50"
 
 	// MaxDistillRunes bounds one distill call's input (about 40 000 estimated tokens).
-	MaxDistillRunes  = 120_000
-	maxDistillChunks = 16
-	// distillSpendCapUSD stops a call from starting new chunks once the reported spend reaches it.
-	distillSpendCapUSD = 2.00
+	MaxDistillRunes = 120_000
+	// MaxDistillChunks bounds the parts one distill call splits into.
+	MaxDistillChunks = 16
+	// DistillSpendCapUSD stops a call from starting new chunks once the reported spend reaches it.
+	DistillSpendCapUSD = 2.00
 	distillWorkers     = 3
 )
 
@@ -106,7 +108,36 @@ type DistillRequest struct {
 	Path string
 	// Mode is ModeFacts (default) or ModeInstructions.
 	Mode string
+	// Progress, when set, is called with Done 0 after chunking and once per finished chunk. It runs
+	// under the call's lock and must return quickly.
+	Progress func(DistillProgress)
 }
+
+// DistillProgress is the parts finished so far and the spend they reported.
+type DistillProgress struct {
+	Done, Total int
+	CostUSD     float64
+}
+
+// Reasons a DistillError carries; each maps to one UI message.
+const (
+	ReasonTooLong      = "tooLong"
+	ReasonTooManyParts = "tooManyParts"
+	ReasonUnreadable   = "unreadable"
+	ReasonSpendCap     = "spendCap"
+)
+
+// DistillError is a refused or capped distill call. Error is the English text MCP clients see; Reason
+// and Vars let the UI pick a catalog message without parsing it.
+type DistillError struct {
+	Reason string
+	Vars   map[string]string
+	msg    string
+	wrap   error
+}
+
+func (e *DistillError) Error() string { return e.msg }
+func (e *DistillError) Unwrap() error { return e.wrap }
 
 // DistillResult is the distilled lines in source order plus what the call cost and shrank.
 type DistillResult struct {
@@ -127,6 +158,10 @@ func invalid(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", memory.ErrInvalid, fmt.Sprintf(format, a...))
 }
 
+func invalidReason(reason string, vars map[string]string, format string, a ...any) error {
+	return &DistillError{Reason: reason, Vars: vars, msg: invalid(format, a...).Error(), wrap: memory.ErrInvalid}
+}
+
 // Distill chunks the input like an import, distills each chunk (three at once) and joins the lines in
 // source order. It starts no chunk once the spend reaches the per-call cap; the error then names the
 // amount spent.
@@ -141,14 +176,17 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 	}
 	in := utf8.RuneCountInString(text)
 	if in > MaxDistillRunes {
-		return DistillResult{}, invalid("input is %d characters, the limit is %d", in, MaxDistillRunes)
+		return DistillResult{}, invalidReason(ReasonTooLong, map[string]string{"count": strconv.Itoa(in), "max": strconv.Itoa(MaxDistillRunes)},
+			"input is %d characters, the limit is %d", in, MaxDistillRunes)
 	}
 	chunks, _, err := chunkFile(kind, text, rel, DefaultBudget)
 	if err != nil {
-		return DistillResult{}, invalid("cannot read the input as %s: %v", kind, err)
+		return DistillResult{}, invalidReason(ReasonUnreadable, map[string]string{"path": req.Path, "reason": err.Error()},
+			"cannot read the input as %s: %v", kind, err)
 	}
-	if len(chunks) > maxDistillChunks {
-		return DistillResult{}, invalid("input splits into %d parts, the limit is %d", len(chunks), maxDistillChunks)
+	if len(chunks) > MaxDistillChunks {
+		return DistillResult{}, invalidReason(ReasonTooManyParts, map[string]string{"count": strconv.Itoa(len(chunks)), "max": strconv.Itoa(MaxDistillChunks)},
+			"input splits into %d parts, the limit is %d", len(chunks), MaxDistillChunks)
 	}
 	prompts := d.Prompts
 	if prompts == nil {
@@ -157,14 +195,18 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 
 	var mu sync.Mutex
 	var spent float64
+	done := 0
 	capped := false
+	if req.Progress != nil {
+		req.Progress(DistillProgress{Total: len(chunks)})
+	}
 	results := make([][]DistillLine, len(chunks))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(distillWorkers)
 	for i, c := range chunks {
 		g.Go(func() error {
 			mu.Lock()
-			stop := spent >= distillSpendCapUSD
+			stop := spent >= DistillSpendCapUSD
 			if stop {
 				capped = true
 			}
@@ -180,6 +222,12 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 				return err
 			}
 			results[i] = out.Lines
+			if req.Progress != nil {
+				mu.Lock()
+				done++
+				req.Progress(DistillProgress{Done: done, Total: len(chunks), CostUSD: spent})
+				mu.Unlock()
+			}
 			return nil
 		})
 	}
@@ -189,7 +237,11 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 	case err != nil:
 		return res, err
 	case capped:
-		return res, fmt.Errorf("distill stopped at its spend cap: %.2f USD spent, %.2f USD allowed", spent, distillSpendCapUSD)
+		return res, &DistillError{
+			Reason: ReasonSpendCap,
+			Vars:   map[string]string{"spent": fmt.Sprintf("%.2f", spent), "cap": fmt.Sprintf("%.2f", DistillSpendCapUSD)},
+			msg:    fmt.Sprintf("distill stopped at its spend cap: %.2f USD spent, %.2f USD allowed", spent, DistillSpendCapUSD),
+		}
 	}
 	for _, lines := range results {
 		for _, l := range lines {
@@ -224,9 +276,11 @@ func distillSource(req DistillRequest) (text, kind, rel string, err error) {
 	text, _, skip, err := ReadText(req.Path, DefaultCaps.MaxFileBytes)
 	switch {
 	case err != nil:
-		return "", "", "", invalid("cannot read %s: %v", req.Path, err)
+		return "", "", "", invalidReason(ReasonUnreadable, map[string]string{"path": req.Path, "reason": err.Error()},
+			"cannot read %s: %v", req.Path, err)
 	case skip != "":
-		return "", "", "", invalid("cannot distill %s: %s", req.Path, skip)
+		return "", "", "", invalidReason(ReasonUnreadable, map[string]string{"path": req.Path, "reason": skip},
+			"cannot distill %s: %s", req.Path, skip)
 	}
 	kind, ok := kindOf(req.Path)
 	if !ok {
