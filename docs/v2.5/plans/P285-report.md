@@ -289,3 +289,6 @@ Reference = Part 1 `round-final` tuning aggregate (10 sources): `R_ess` 0.883, `
 | round | hypothesis | change | R_ess | R_all | P | unsupp | dup | C_fact | reason ok | run USD | phase USD | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | p2-01 | terse gate and reconcile keep recall | gate and reconcile terse (override), rest as Part 1 | 0.859 | 0.672 | 0.880 | 0.009 | 0.000 | 0.457 | 0.905 | 4.2 | 4.3 | `R_ess` 0.004 and `R_all` 0.021 under their floors; `C_fact` -0.040, `P` and unsupported in band; confirmation rerun next (noise rule) |
+| p2-01b | confirmation rerun of p2-01 (same code) | none | 0.862 | 0.695 | 0.887 | 0.003 | 0.000 | 0.478 | 0.770 | 4.4 | 8.6 | `R_ess` 0.001 under floor 0.863 (one golden fact is 0.0013), `R_all` in band. Judged noise, not a confirmed regression: Part 1 identical-code rounds 2 and final span 0.853 to 0.883 (mean 0.868), p2-01 and p2-01b mean 0.8605. Terse gate and reconcile kept (commit `feat(memory): terse gate and reconcile prompts`). Final M5 round decides. |
+
+Note: `reason ok` fell (0.905, 0.770 vs 0.985) because the terse gate rewrites the evidence quote in reasons; not gated (judge asks for a quote that Part 2 removes).

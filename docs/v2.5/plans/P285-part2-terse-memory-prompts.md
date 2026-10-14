@@ -350,3 +350,17 @@ No UI changes here (Part 4), so no UI spec. Go side:
 8. `llmpromptsflow` count 101; `checkprompts` green; en.json has no `memoryImportExtractSystem`.
 9. Site pages and ARCHITECTURE mention `distill`; Artifact link opens with a Part 2 section.
 10. Tool logs: this planner and the implementer's loss analysis show real `codegraph_explore` calls.
+
+## 10. Resume note (implementer stopped early, tokens)
+
+Done, committed in worktree `/home/user/wt-p285p2` (branch `p285p2`, not pushed):
+- C1 `promptsizes` command + report before table. C2 `distill` MCP tool (`importer/distill.go`, `mcpserver/distill.go`, registry `memory.distill.system` + tool + args, en.json key, `memorycli` wiring, flow tests `TestMcpDistill`/`TestMcpDistillSpendCap`, `TestDistillToolOffer`, real rows `TestMemoryDistill` and "distill" subtest; fakeagent doc match also reads `"source"`). Count in `llmpromptsflow` is 102 until C5 removes extract (then 101).
+- C3 `KIRA_EVAL_LEDGER`. M1 real rows: `TestMemoryDistill` passes; `TestMemoryMcpFollowsDocs/distill` FAILS (claude used Read, no distill call) until C4b adds the distill line to `memory.mcp.instructions`.
+- M2: round-p2-01 and p2-01b (terse gate + reconcile). 01: R_ess 0.859, R_all 0.672, P 0.880, unsupp 0.009, dup 0, C_fact 0.457. 01b: 0.862, 0.695, 0.887, 0.003, 0, 0.478. Reference 0.883/0.713/0.895/0/0/0.497, floors 0.863/0.693/0.830/0.010/0.020/<=0.526. Verdict: noise (R_ess 0.001 under floor in 01b); terse gate and reconcile committed as defaults.
+- Spend: 8.64 USD of 30 (`P285-runs/spend-p2.jsonl`). Scratch texts for steps below were in the session scratchpad (finalize/verify drafts in plan sections 3.2, 3.3).
+
+Remaining (plan section 5 order):
+1. C4b terse MCP texts (instructions with distill line "Condense long text or a file into short lines without storing: distill ...; to store a file use ingest_files", add "do not Read the file first"; tool and arg descriptions); run `go test -count=1 -run TestMemoryMcpFollowsDocs` in `apps/kira-space/tests/claude` until "distill" subtest passes; commit.
+2. C5 `feat(memory)!: import distills each chunk`: remove `MemoryImportExtractSystem`/`ExtractVars`/`extract.go`, `Agent.Distill`, `Fact` without `Evidence` (Section = chunk heading path), `FinalFact.Reason = "Stated in <rel>[, <section>]"` (<= `memory.MaxReasonLen`), D9 questionable rule + `verify_test.go`, verify/finalize terse prompts and schemas (no evidence, `FinalizeVars` without `MaxReason`), en.json extract keys removed (and dataHygiene usedBy text), fake agent in `engine_test.go`, memoryflow constants/fixtures `extract-*.json` to `distill-*.json` (lines schema), `import_test`/`ingest_test` updates, harness `recAgent`; `llmpromptsflow` count 101; footer BREAKING CHANGE.
+3. M3 smoke `KIRA_EVAL_ONLY=plan-p153,json-ade-errors`, M4 `round-p2-02` tuning, M5 `round-p2-final` (all 15), M6 real rows; fix rounds/fallback per plan section 4. Env: `KIRA_EVAL_LEDGER=spend-p2.jsonl KIRA_EVAL_PHASE_CAP_USD=30 KIRA_EVAL_CAP_USD=6`.
+4. Docs: ARCHITECTURE, DEV_ENVIRONMENT, site `space/memory.mdx` + `reference/mcp-tools.md`, report Part 2 (after-sizes from `promptsizes`), Artifact page, SPEC row Done. Then the test-and-fix agent.
