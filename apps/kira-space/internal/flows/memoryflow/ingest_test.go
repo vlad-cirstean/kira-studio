@@ -84,6 +84,12 @@ func reconcileAdds(t *testing.T, n int) string {
 // the real memory-mcp server, whose provenance comes from the job.
 func ingestApp(t *testing.T, finalize string, rules ...fakeagent.PromptRule) *flowharness.App {
 	t.Helper()
+	return ingestAppReason(t, "document", finalize, rules...)
+}
+
+// ingestAppReason is ingestApp with the reason the finalize agent puts on both stored items.
+func ingestAppReason(t *testing.T, reason, finalize string, rules ...fakeagent.PromptRule) *flowharness.App {
+	t.Helper()
 	app := flowharness.New(t)
 	if finalize == "" {
 		finalize = testdata(t, "finalize.json")
@@ -91,8 +97,8 @@ func ingestApp(t *testing.T, finalize string, rules ...fakeagent.PromptRule) *fl
 	app.Scenario(fakeagent.Scenario{Prompts: rules, Claude: map[string][]fakeagent.Action{"*": {{
 		MCP: []fakeagent.MCPCall{{Server: "kira-memory", Tool: "store_memory", Args: map[string]any{
 			"items": []map[string]string{
-				{"fact": "first", "reason": "document", "origin": "agent", "scope": "personal"},
-				{"fact": "second", "reason": "document", "origin": "agent", "scope": "personal"},
+				{"fact": "first", "reason": reason, "origin": "agent", "scope": "personal"},
+				{"fact": "second", "reason": reason, "origin": "agent", "scope": "personal"},
 			},
 		}}},
 		Emit: finalize,
@@ -278,7 +284,20 @@ func TestMcpIngestExternal(t *testing.T) {
 }
 
 func TestImportProvenanceWritesDoc(t *testing.T) {
-	app := ingestApp(t, "",
+	// The finalize agent's reason is not a locator: the store pins the bare "Stated in <path>", so the
+	// written doc has no heading and no reason line.
+	writesDoc(t, "document", "Stated in billing.md", false)
+}
+
+// TestImportLocatorSectionWritesHeading: a section locator survives the gate and reconcile, and the
+// written doc turns it into a heading with no reason line.
+func TestImportLocatorSectionWritesHeading(t *testing.T) {
+	writesDoc(t, "Stated in billing.md, Billing", "Stated in billing.md, Billing", true)
+}
+
+func writesDoc(t *testing.T, itemReason, wantReason string, heading bool) {
+	t.Helper()
+	app := ingestAppReason(t, itemReason, "",
 		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "extract-billing.md.json")},
 		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
 		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")})
@@ -308,8 +327,11 @@ func TestImportProvenanceWritesDoc(t *testing.T) {
 	if doc.Origin != memory.OriginUser || doc.Scope != memory.ScopeProject || doc.Project != billingKey || doc.Group != f.GroupID {
 		t.Fatalf("doc header = %+v, want user/project %s in group %s", doc.Provenance, billingKey, f.GroupID)
 	}
-	if doc.Version != 2 || doc.From != "billing.md" || strings.Contains(string(raw), " fact: ") {
-		t.Fatalf("written doc is not format v2 with from billing.md:\n%s", raw)
+	if doc.Version != 2 || doc.From != "billing.md" || strings.Contains(string(raw), " fact: ") || strings.Contains(string(raw), "\n  ") {
+		t.Fatalf("written doc is not format v2 with from billing.md and no reason lines:\n%s", raw)
+	}
+	if got := strings.Contains(string(raw), "\n## Billing\n"); got != heading {
+		t.Fatalf("heading present = %v, want %v:\n%s", got, heading, raw)
 	}
 	recent, err := app.W.Memory.Recent(ctx)
 	if err != nil {
@@ -321,6 +343,11 @@ func TestImportProvenanceWritesDoc(t *testing.T) {
 	}
 	for _, fact := range doc.Facts {
 		written = append(written, fact.ID)
+	}
+	for _, m := range recent {
+		if m.Reason != wantReason {
+			t.Fatalf("stored reason %q, want the pinned locator %q", m.Reason, wantReason)
+		}
 	}
 	slices.Sort(stored)
 	slices.Sort(written)

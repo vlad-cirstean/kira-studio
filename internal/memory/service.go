@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -79,6 +80,10 @@ type StoreRequest struct {
 	// NoChallenge stores the items the gate accepts even when it challenges others: the source is an
 	// outside one nobody can ask. Challenged items come back in Challenges with status "stored".
 	NoChallenge bool
+	// ImportPath is the import file's job-relative path (import mode only). It pins every committed
+	// add or update to a source locator: the item's reason when it is one for this path, else the
+	// bare "Stated in <path>". Gate and reconcile may reword reasons; provenance must not drift.
+	ImportPath string
 	// Progress, when set, is told the stage: "checking", "reconciling", "saving".
 	Progress func(stage string)
 }
@@ -311,8 +316,9 @@ func (s *Service) decide(ctx context.Context, req StoreRequest) (works []*work, 
 
 	for _, v := range verdicts {
 		it := req.Items[v.Index]
+		pinned := importReason(req, it)
 		for _, f := range v.Facts {
-			works = append(works, &work{Fact: f.Fact, Reason: f.Reason, Keywords: f.Keywords,
+			works = append(works, &work{Fact: f.Fact, Reason: cmp.Or(pinned, f.Reason), pinned: pinned, Keywords: f.Keywords,
 				Origin: it.Origin, SourceTag: it.SourceTag, Scope: it.Scope, Project: it.Project})
 		}
 	}
@@ -335,6 +341,17 @@ func (s *Service) decide(ctx context.Context, req StoreRequest) (works []*work, 
 		return nil, 0, StoreResult{}, err
 	}
 	return works, rev, res, nil
+}
+
+// importReason is the pinned reason of an import-mode item (see StoreRequest.ImportPath), "" outside it.
+func importReason(req StoreRequest, it Item) string {
+	if req.Source != SourceImport || req.ImportPath == "" {
+		return ""
+	}
+	if _, ok := memfmt.ParseLocator(it.Reason, req.ImportPath); ok {
+		return it.Reason
+	}
+	return memfmt.Locator(req.ImportPath, "")
 }
 
 // Store gates, reconciles and commits. A challenge stores nothing. A runner error fails the whole
@@ -515,6 +532,9 @@ func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string
 			return fail(w.dec.Err)
 		}
 		vec, model := s.vectorFor(ctx, w)
+		if w.pinned != "" && (w.dec.Action == ActionAdd || w.dec.Action == ActionUpdate) {
+			w.dec.Reason = w.pinned
+		}
 		r, err := s.store.commitFact(ctx, commitInput{
 			Revision: *rev, Action: w.dec.Action, TargetID: w.dec.Target, Fact: w.dec.Fact, Reason: w.dec.Reason,
 			Keywords: w.Keywords, Origin: w.Origin, SourceTag: w.SourceTag, Scope: w.Scope, Project: w.Project,

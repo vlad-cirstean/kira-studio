@@ -524,3 +524,59 @@ func TestApplyDocDecisions(t *testing.T) {
 		t.Errorf("rows = %v", facts(rows))
 	}
 }
+
+// TestImportPinsLocatorReason: gate and reconcile reword reasons, yet an import-mode add or update
+// commits the item's source locator, or the bare locator when the item's reason is not one.
+func TestImportPinsLocatorReason(t *testing.T) {
+	reword := func(in gateInput) string {
+		var items []map[string]any
+		for _, gi := range in.Items {
+			items = append(items, map[string]any{"index": gi.Index, "verdict": "accept", "questions": []string{},
+				"facts": []map[string]any{{"fact": gi.Fact, "reason": "Reworded quote", "keywords": []string{"billing"}}}})
+		}
+		b, _ := json.Marshal(map[string]any{"items": items})
+		return string(b)
+	}
+	updateReworded := func(in map[string]any) string {
+		var ds []map[string]any
+		for _, f := range in["facts"].([]any) {
+			fm := f.(map[string]any)
+			ds = append(ds, map[string]any{"index": fm["index"], "action": "update", "target": fm["candidates"].([]any)[0].(map[string]any)["id"],
+				"fact": fm["fact"], "reason": "Reconcile wording", "why": "refines"})
+		}
+		b, _ := json.Marshal(map[string]any{"decisions": ds})
+		return string(b)
+	}
+	svc, st := newService(t, &fakeRunner{gate: reword, rec: updateReworded})
+	ctx := context.Background()
+	store := func(items ...Item) {
+		t.Helper()
+		r := req(items...)
+		r.Source, r.SourceRef, r.ImportPath = SourceImport, "file-1", "docs/a.md"
+		if _, err := svc.Store(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reasons := func() map[string]string {
+		rows, _ := st.Recent(ctx, 10)
+		out := map[string]string{}
+		for _, m := range rows {
+			out[m.Fact] = m.Reason
+		}
+		return out
+	}
+	store(it("billing port is 8080", "Stated in docs/a.md, Ports > Billing"), it("billing queue is nats", "a quote from the file"),
+		it("billing cache is redis", "Stated in docs/other.md, Cache"))
+	want := map[string]string{
+		"billing port is 8080":   "Stated in docs/a.md, Ports > Billing",
+		"billing queue is nats":  "Stated in docs/a.md",
+		"billing cache is redis": "Stated in docs/a.md",
+	}
+	if got := reasons(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("added reasons = %v, want %v", got, want)
+	}
+	store(it("billing port is 9090", "Stated in docs/a.md, Ports > Billing v2"))
+	if got := reasons(); got["billing port is 9090"] != "Stated in docs/a.md, Ports > Billing v2" || len(got) != 3 {
+		t.Fatalf("updated reasons = %v, want the locator kept over the reconcile wording", got)
+	}
+}

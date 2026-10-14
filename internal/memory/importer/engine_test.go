@@ -16,6 +16,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -136,7 +137,7 @@ func (a *fakeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOut
 	}
 	var items []memory.Item
 	for _, f := range in.Facts {
-		items = append(items, memory.Item{Fact: f.Fact.Fact, Reason: "Stated in " + in.Path,
+		items = append(items, memory.Item{Fact: f.Fact.Fact, Reason: f.Reason,
 			Origin: ip.Origin, SourceTag: ip.SourceTag, Scope: ip.Scope, Project: ip.Project})
 	}
 	_, err = a.svc.Store(ctx, memory.StoreRequest{Items: items, Source: memory.SourceImport, SourceRef: in.FileID, Session: ip.Session,
@@ -286,6 +287,24 @@ func TestImportHappyPath(t *testing.T) {
 		}
 		if strings.Join(ids, ",") != "1.1,2.1,3.1" {
 			t.Errorf("finalize facts out of chunk order: %v", ids)
+		}
+		// Section and reason come from the chunk's heading path, built by code; the model's own
+		// section never reaches finalize.
+		for _, f := range in.Facts {
+			if f.Section == "" || f.Reason != memfmt.Locator(in.Path, f.Section) {
+				t.Errorf("fact %s: section %q reason %q, want the heading path and its locator", f.ID, f.Section, f.Reason)
+			}
+		}
+	}
+	rows, err := h.svc.Recent(context.Background(), 20)
+	if err != nil || len(rows) != 6 {
+		t.Fatalf("Recent = %d rows, %v", len(rows), err)
+	}
+	for _, m := range rows {
+		if _, ok := memfmt.ParseLocator(m.Reason, "doc0.md"); !ok {
+			if _, ok := memfmt.ParseLocator(m.Reason, "doc1.md"); !ok {
+				t.Errorf("stored reason %q is not a source locator", m.Reason)
+			}
 		}
 	}
 	if ev := h.rows(`SELECT source_ref FROM memory_events WHERE source = 'import' GROUP BY source_ref`); len(ev) != 2 {

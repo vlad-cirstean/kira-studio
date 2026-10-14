@@ -241,7 +241,7 @@ func requestFor(ctx context.Context, svc *memory.Service, opts Options, in store
 	default:
 		return memory.StoreRequest{}, err
 	}
-	sr.Source, sr.SourceRef, sr.Session = memory.SourceImport, opts.ImportRef, ip.Session
+	sr.Source, sr.SourceRef, sr.Session, sr.ImportPath = memory.SourceImport, opts.ImportRef, ip.Session, ip.RelPath
 	sr.NoChallenge = ip.Origin == memory.OriginExternal
 	for i := range sr.Items {
 		sr.Items[i].Origin, sr.Items[i].SourceTag = ip.Origin, ip.SourceTag

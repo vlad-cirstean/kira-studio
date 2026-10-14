@@ -15,7 +15,9 @@ const reconcileCandidateLimit = 10
 // work is one accepted fact moving through reconcile and commit.
 type work struct {
 	Fact, Reason string
-	Keywords     []string
+	// pinned, when set, is the reason an add or update commits (import mode).
+	pinned   string
+	Keywords []string
 	// Provenance of the item the fact came from.
 	Origin, SourceTag, Scope, Project string
 	cands                             []Memory

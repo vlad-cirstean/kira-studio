@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const interruptedReason = "Interrupted: the import runner stopped during the import. Resume to continue."
@@ -700,15 +702,15 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 	if json.Unmarshal([]byte(verify), &f.verdicts) != nil || f.verdicts == nil {
 		f.verdicts = map[string]Verdict{}
 	}
-	rows, err := tx.Query(`SELECT idx, text, facts FROM import_chunks WHERE file_id = ? ORDER BY idx`, fileID)
+	rows, err := tx.Query(`SELECT idx, heading_path, text, facts FROM import_chunks WHERE file_id = ? ORDER BY idx`, fileID)
 	if err != nil {
 		return f, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var idx int
-		var text, raw string
-		if err := rows.Scan(&idx, &text, &raw); err != nil {
+		var headingPath, text, raw string
+		if err := rows.Scan(&idx, &headingPath, &text, &raw); err != nil {
 			return f, err
 		}
 		norm := normalizeQuote(text)
@@ -716,8 +718,10 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 		if err := json.Unmarshal([]byte(raw), &facts); err != nil {
 			return f, fmt.Errorf("import: chunk facts: %w", err)
 		}
+		reason := sourceLocator(f.Rel, headingPath)
 		for n, fact := range facts {
-			ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Fact: fact}
+			fact.Section = headingPath
+			ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Reason: reason, Fact: fact}
 			if questionableIn(norm, fact) {
 				if _, judged := f.verdicts[ff.ID]; !judged {
 					f.Verify = append(f.Verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Evidence: fact.Evidence, Section: fact.Section, Unresolved: fact.Unresolved})
@@ -727,6 +731,20 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 		}
 	}
 	return f, rows.Err()
+}
+
+// sourceLocator is the stored reason of a fact stated under a heading path: memfmt.Locator, with the
+// section cut so the whole stays within memory.MaxReasonLen.
+func sourceLocator(rel, headingPath string) string {
+	reason := memfmt.Locator(rel, headingPath)
+	over := utf8.RuneCountInString(reason) - memory.MaxReasonLen
+	if over <= 0 {
+		return reason
+	}
+	if r := []rune(headingPath); over < len(r) {
+		return memfmt.Locator(rel, string(r[:len(r)-over]))
+	}
+	return memfmt.Locator(rel, "")
 }
 
 // applyVerdicts folds the cross-check verdicts into the facts: confirmed and rewritten facts are

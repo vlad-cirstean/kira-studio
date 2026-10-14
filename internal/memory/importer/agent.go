@@ -43,10 +43,12 @@ type FinalizeInput struct {
 	Facts               []FinalFact
 }
 
-// FinalFact is a Fact tagged with the chunk it came from, in document order.
+// FinalFact is a Fact tagged with the chunk it came from, in document order. Section and Reason are
+// set by code, never the model: the chunk's heading path and the source locator built from it.
 type FinalFact struct {
-	ID    string `json:"id"` // "<chunk>.<n>", one-based chunk
-	Chunk int    `json:"chunk"`
+	ID     string `json:"id"` // "<chunk>.<n>", one-based chunk
+	Chunk  int    `json:"chunk"`
+	Reason string `json:"reason"`
 	Fact
 }
 
