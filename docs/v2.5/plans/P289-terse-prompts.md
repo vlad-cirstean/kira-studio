@@ -199,7 +199,7 @@ integration (ADE row for workflow prompts; the P287 macOS and sandbox rows its p
 stays open: the SPEC row says so, D10 keeps P287/P288 prompts in check meanwhile, and the orchestrator
 runs Step 6 as a follow-up commit once P288 lands.
 
-Step 6 resume state: P286-P288 entries have no `budget.tsv` line, so `checkprompts` (part of `bun run lint`)
+Step 6 resume state: P286 entries have `budget.tsv` lines (added at P286 landing, already terse). P287-P288 entries have no `budget.tsv` line, so `checkprompts` (part of `bun run lint`)
 fails for them until each gets one. Sweep adds the lines. Open until P288 lands.
 
 Step 7. `feat(llmprompts): terse style and size budget check` (C-guard): D10 in `checkprompts`, generate
