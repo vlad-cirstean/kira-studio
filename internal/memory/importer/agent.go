@@ -7,33 +7,19 @@ import "context"
 type Agent interface {
 	// Available fails with a user-facing message when Claude Code cannot run.
 	Available() error
-	Extract(ctx context.Context, in ExtractInput) (ExtractOutput, error)
+	Distill(ctx context.Context, in DistillInput) (DistillOutput, error)
 	Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error)
 	Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error)
 }
 
-type ExtractInput struct {
-	Path, Title string
-	Index       int // zero-based
-	Count       int
-	HeadingPath string
-	Context     string
-	Text        string
-}
-
-// Fact is one atomic claim extracted from a chunk. Unresolved names what the text leaves open
-// ("which service 'it' is"); empty when the fact stands alone.
+// Fact is one atomic line distilled from a chunk. Section and Reason come from code: the chunk's
+// heading path and the "Stated in" locator. Unresolved names what the text leaves open ("which
+// service 'it' is"); empty when the fact stands alone.
 type Fact struct {
 	Fact       string `json:"fact"`
-	Evidence   string `json:"evidence"`
-	Section    string `json:"section"`
-	Unresolved string `json:"unresolved"`
-}
-
-// ExtractOutput.CostUSD is valid even alongside an error.
-type ExtractOutput struct {
-	Facts   []Fact
-	CostUSD float64
+	Section    string `json:"section,omitempty"`
+	Unresolved string `json:"unresolved,omitempty"`
+	Reason     string `json:"reason"`
 }
 
 type FinalizeInput struct {

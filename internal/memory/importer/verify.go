@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
@@ -32,20 +34,17 @@ const (
 	verifyMaxTurns    = 20
 )
 
-// Verdict is the cross-check's judgement of one questionable fact. Fact and Evidence are set for a
-// rewrite and, for Evidence, a confirmation.
+// Verdict is the cross-check's judgement of one questionable fact. Fact is set for a rewrite.
 type Verdict struct {
-	Verdict  string `json:"verdict"`
-	Fact     string `json:"fact"`
-	Evidence string `json:"evidence"`
-	Why      string `json:"why"`
+	Verdict string `json:"verdict"`
+	Fact    string `json:"fact"`
+	Why     string `json:"why"`
 }
 
 // VerifyFact is a questionable fact sent to the cross-check.
 type VerifyFact struct {
 	ID         string `json:"id"`
 	Fact       string `json:"fact"`
-	Evidence   string `json:"evidence"`
 	Section    string `json:"section"`
 	Unresolved string `json:"unresolved,omitempty"`
 }
@@ -64,8 +63,9 @@ type VerifyOutput struct {
 	CostUSD  float64
 }
 
-// Questionable reports whether a fact needs the cross-check: the extractor doubted it, or its quote
-// is not in the chunk (whitespace and case aside), which catches an invented quote.
+// Questionable reports whether a fact needs the cross-check: the distiller doubted it, or one of
+// its salient tokens (see salientTokens) is missing from the chunk text, which catches an invented
+// claim. chunkText is the chunk plus the context the distiller saw.
 func Questionable(chunkText string, f Fact) bool {
 	return questionableIn(normalizeQuote(chunkText), f)
 }
@@ -75,12 +75,57 @@ func questionableIn(normChunk string, f Fact) bool {
 	if f.Unresolved != "" {
 		return true
 	}
-	ev := normalizeQuote(f.Evidence)
-	return ev == "" || !strings.Contains(normChunk, ev)
+	for _, tok := range salientTokens(f.Fact) {
+		if !strings.Contains(normChunk, normalizeQuote(tok)) {
+			return true
+		}
+	}
+	return false
+}
+
+var quotedSpan = regexp.MustCompile("`([^`]+)`|\"([^\"]+)\"")
+
+// salientTokens lists what a distortion changes: backticked and double-quoted spans, and words
+// holding a digit, `_`, `::`, a `/` or `.` between letters, or an inner capital (camelCase, PascalCase).
+func salientTokens(fact string) []string {
+	var out []string
+	for _, m := range quotedSpan.FindAllStringSubmatch(fact, -1) {
+		out = append(out, m[1]+m[2])
+	}
+	for _, w := range strings.Fields(quotedSpan.ReplaceAllString(fact, " ")) {
+		w = strings.Trim(w, ".,;:!?()[]{}\"'`*")
+		if w != "" && salientWord(w) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func salientWord(w string) bool {
+	if strings.ContainsAny(w, "_0123456789") || strings.Contains(w, "::") {
+		return true
+	}
+	rs := []rune(w)
+	for i := 1; i+1 < len(rs); i++ {
+		switch {
+		case (rs[i] == '/' || rs[i] == '.') && unicode.IsLetter(rs[i-1]) && unicode.IsLetter(rs[i+1]):
+			return true
+		case unicode.IsUpper(rs[i]) && unicode.IsLetter(rs[i-1]) && !unicode.IsUpper(rs[i-1]):
+			return true
+		}
+	}
+	return len(rs) > 1 && unicode.IsUpper(rs[len(rs)-1]) && unicode.IsLower(rs[len(rs)-2])
 }
 
 func normalizeQuote(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
+func truncateRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
 
 func verifyLimits(facts int) (time.Duration, string, int) {
@@ -141,7 +186,7 @@ func (a ClaudeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, 
 		}
 		if asked[v.ID] {
 			out.Verdicts[v.ID] = Verdict{Verdict: v.Verdict.Verdict, Fact: truncateRunes(strings.TrimSpace(v.Fact), memory.MaxFactLen),
-				Evidence: truncateRunes(strings.TrimSpace(v.Evidence), maxEvidenceLen), Why: truncateRunes(strings.TrimSpace(v.Why), 300)}
+				Why: truncateRunes(strings.TrimSpace(v.Why), 300)}
 		}
 	}
 	if len(out.Verdicts) == 0 {

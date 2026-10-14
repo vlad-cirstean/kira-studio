@@ -84,7 +84,7 @@ func TestPauseFromControlCancelsInFlight(t *testing.T) {
 	h := newHarness(t, 1)
 	started := make(chan struct{}, 8)
 	cancelled := make(chan time.Time, 8)
-	h.agent.extractHook = func(ctx context.Context, _ ExtractInput) error {
+	h.agent.extractHook = func(ctx context.Context, _ DistillInput) error {
 		started <- struct{}{}
 		<-ctx.Done()
 		cancelled <- time.Now()
