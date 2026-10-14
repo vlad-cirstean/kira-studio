@@ -40,8 +40,12 @@ func storedMemories(stored []storedFact) []memory.Memory {
 
 // renderChecked renders the doc the write-back would write for a file's stored facts through
 // importer.RenderDoc, the same pure renderer, so C_doc never depends on whether the write succeeded.
-// problems counts ParseDoc problems of the render (1 when it fails to render at all).
+// problems counts ParseDoc problems of the render (1 when it fails to render at all). A file with no
+// stored fact has no doc and no problem.
 func renderChecked(in importer.DocInput, mems []memory.Memory) (text string, problems int) {
+	if len(mems) == 0 {
+		return "", 0
+	}
 	text, _, _, err := importer.RenderDoc(in, mems)
 	if err != nil {
 		return "", 1

@@ -391,3 +391,17 @@ Gates for the final tree (tuning aggregate):
 | unsupported + distorted | <= 0.02 | Part 1 target |
 
 Reported, not gated: `R_all`, `P`, atomic, standalone, duplicate, `reason ok`, `C_rec`, stored count, mean fact length, locator share.
+
+## 13. Format-only gain (E1, same stored facts, v2 renderer)
+
+Same five rounds, same stored facts and reasons, rendered by the v2 `RenderDoc` (`footprint-v2.json`). Reasons here are still the old evidence-bearing text, so only the layout changes: id once, no `fact:`, `reason:`, `keywords:` prefixes, no per-fact keywords, `## heading` once per section. Tuning aggregate; tokens are `ceil(runes/3)`.
+
+| round | `C_doc` P273 | `C_doc` v2 | delta | doc tokens P273 | doc tokens v2 | doc size | render problems |
+|---|---|---|---|---|---|---|---|
+| round-00a | 1.381 | 0.801 | -0.580 | 30763 | 17840 | -42% | 0 |
+| round-00b | 1.484 | 0.846 | -0.638 | 33064 | 18854 | -43% | 0 |
+| round-final (Part 1) | 1.504 | 0.883 | -0.621 | 33519 | 19682 | -41% | 0 |
+| round-p2-final (Part 2) | 1.467 | 0.876 | -0.591 | 32673 | 19510 | -40% | 0 |
+| round-p2-04 (8 sources) | 1.429 | 0.809 | -0.620 | 29486 | 16702 | -43% | 0 |
+
+The `C_doc` gate (<= 1.401) is met by the layout alone: 0.883 on the Part 1 facts. The remaining doc weight is the reasons (evidence quote plus locator) the old pipeline stored; the code-built locator (reason-less lines) and fewer facts are measured in the iteration log below.
