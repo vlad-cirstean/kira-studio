@@ -49,6 +49,7 @@ Targets (tuning): `R_ess` >= 0.90, `R_all` >= 0.75, `P` >= 0.90, atomic and stan
 | 00a | baseline | none | 0.830 | 0.659 | 0.846 | 0.009 | 0.000 | 0.444 | 4.1 (+4.1 wasted first attempt, harness bug) | 10.0 | baseline |
 | 00b | baseline repeat | none | 0.836 | 0.675 | 0.912 | 0.000 | 0.000 | 0.473 | 4.2 | 14.2 | baseline |
 | 00-holdout | baseline hold-out | none | 0.798 | 0.592 | 0.894 | 0.000 | 0.000 | 0.420 | 1.3 | 15.6 | baseline |
+| 01 | extract: keep qualifiers, decision reasons, rejected alternatives | extract prompt, 2 bullets (registry.go) | 0.860 | 0.662 | 0.900 | 0.009 | 0.000 | 0.472 | 4.2 | 19.8 | kept: R_ess +0.027 beyond band 0.020, no regression |
 
 Spend override from the user: 8 USD per run, 60 USD phase total (plan said 10 and 120).
 

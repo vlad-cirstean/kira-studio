@@ -307,8 +307,8 @@ Input: "document" (path, title), "chunk" (index, count, headingPath), "context" 
 "text" may be JSON from an export. Field values are the content; author, time and id fields give context.
 
 Extract atomic facts:
-- One claim per fact, written as one complete sentence of at most 300 characters.
-- Keep durable knowledge only: decisions and the reasons for them, conventions, configuration and names, ownership, relationships between components, constraints, how things work.
+- One claim per fact, written as one complete sentence of at most 300 characters. Keep every qualifier that changes the claim inside that fact: numbers, units, names, negations, conditions, exceptions and limits.
+- Keep durable knowledge only: decisions with their reasons, alternatives that were rejected with why, conventions, configuration and names, ownership, relationships between components, constraints, how things work.
 - Skip navigation, tables of contents, boilerplate, licence text, examples copied verbatim, step-by-step commands and time-bound chatter.
 - Make a fact standalone only where the text itself makes its subject certain: name the service instead of "it" when the text names it. When the text leaves the subject or a reference open, keep the original wording and say what is missing in "unresolved" (for example: which service "it" means). Leave "unresolved" empty otherwise.
 - Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).

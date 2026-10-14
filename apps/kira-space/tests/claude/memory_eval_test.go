@@ -437,7 +437,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 		return runRecord{}, err
 	}
 	wait := func(want string) (importer.JobDetail, error) {
-		deadline := time.Now().Add(30 * time.Minute)
+		deadline := time.Now().Add(12 * time.Minute)
 		for time.Now().Before(deadline) {
 			d, err := e.Job(job.ID)
 			if err != nil {
