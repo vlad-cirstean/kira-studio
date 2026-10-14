@@ -3,6 +3,7 @@ package importer
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -78,29 +79,12 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 	if err != nil {
 		return "", boundedMessage(err)
 	}
-	doc := memfmt.Doc{Group: w.GroupID, Title: docTitle(w.Title, filepath.Base(it.Path)), Updated: r.opts.Now().Format(time.DateOnly), Provenance: memfmt.Provenance{
-		Origin: w.Prov.Origin, Source: w.Prov.SourceTag, Scope: w.Prov.Scope, Project: w.Prov.Project}}
-	if w.Prov.Origin != memory.OriginExternal {
-		doc.Session = w.Prov.Session
-	}
-	left, bad := 0, 0
-	for _, m := range mems {
-		if !sameProvenance(m, w.Prov) {
-			left++
-			continue
-		}
-		fact, reason := docText(m.Fact), docText(m.Reason)
-		if fact == "" || reason == "" {
-			bad++
-			continue
-		}
-		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: fact, Reason: reason, Keywords: m.Keywords})
-	}
-	if len(doc.Facts) == 0 {
-		return "", "no stored fact to write"
-	}
-	text, err := memfmt.FormatDoc(doc)
+	in := DocInput{GroupID: w.GroupID, Title: w.Title, FileName: filepath.Base(it.Path), Prov: w.Prov, Updated: r.opts.Now().Format(time.DateOnly)}
+	text, left, bad, err := RenderDoc(in, mems)
 	if err != nil {
+		if errors.Is(err, errNoDocFacts) {
+			return "", "no stored fact to write"
+		}
 		return "", boundedMessage(err)
 	}
 	if err := renameio.WriteFile(target, []byte(text), 0o644); err != nil {
@@ -115,6 +99,44 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 		return target, fmt.Sprintf("%d fact(s) with text the format rejects left out", bad)
 	}
 	return target, ""
+}
+
+// DocInput is what RenderDoc needs besides the facts: the group, the raw file title, the file name used
+// when the title is unusable, the job provenance and the header date (YYYY-MM-DD).
+type DocInput struct {
+	GroupID, Title, FileName string
+	Prov                     Provenance
+	Updated                  string
+}
+
+var errNoDocFacts = errors.New("no stored fact to write")
+
+// RenderDoc renders the kira-memory doc of a file's stored facts. left counts facts with another
+// provenance, bad facts whose text the format rejects; both are left out. Pure: the write-back and
+// the eval harness share it.
+func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, err error) {
+	doc := memfmt.Doc{Group: in.GroupID, Title: docTitle(in.Title, in.FileName), Updated: in.Updated, Provenance: memfmt.Provenance{
+		Origin: in.Prov.Origin, Source: in.Prov.SourceTag, Scope: in.Prov.Scope, Project: in.Prov.Project}}
+	if in.Prov.Origin != memory.OriginExternal {
+		doc.Session = in.Prov.Session
+	}
+	for _, m := range mems {
+		if !sameProvenance(m, in.Prov) {
+			left++
+			continue
+		}
+		fact, reason := docText(m.Fact), docText(m.Reason)
+		if fact == "" || reason == "" {
+			bad++
+			continue
+		}
+		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: fact, Reason: reason, Keywords: m.Keywords})
+	}
+	if len(doc.Facts) == 0 {
+		return "", left, bad, errNoDocFacts
+	}
+	text, err = memfmt.FormatDoc(doc)
+	return text, left, bad, err
 }
 
 // docTitle makes a file title YAML-safe for the doc header: the format rejects ": ", " #" and a
