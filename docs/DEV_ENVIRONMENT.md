@@ -56,7 +56,8 @@ Pending now: `docs/pending-workflows/pages.yml` (P280, GitHub Pages deploy). Go 
 ## Presentation screenshots and site check (P280)
 
 - `bun run screenshots` rebuilds both `frontend/dist` (test bundles), then captures six shots in
-  WebKit into `screenshots/`. Never run it beside a UI suite in the same checkout. Not in hooks, CI or
+  WebKit into `screenshots/`. For Studio only: `bun run build:test:studio && bunx playwright test
+  --config=apps/kira-studio/playwright.config.ts --project=screenshots`; same pattern for Space. Never run it beside a UI suite in the same checkout. Not in hooks, CI or
   the Pages Action. Run it by hand when a shown UI changes, then commit the PNGs.
 - Rerun it and check `git status --porcelain screenshots/` is empty. A diff means a nondeterministic
   input; fix the cause, never add tolerance.
@@ -64,6 +65,10 @@ Pending now: `docs/pending-workflows/pages.yml` (P280, GitHub Pages deploy). Go 
   channel without a fixture (`E_FIXTURE_MISS`, HTTP 422) shows up as one; add the snapshot.
 - `bun run site:check` builds the site, then runs the 375 px and 1280 px WebKit checks.
   `bun run site:dev` serves it locally.
+- Site visual baselines (`site/tests/visual.spec.ts-snapshots/`) are recorded on Linux in this
+  sandbox and skipped elsewhere. Refresh only for an intended change:
+  `bunx playwright test --config=site/playwright.config.ts visual --update-snapshots` (after
+  `bun run site:build`).
 - `bun run site:build` runs `astro check`, then the build. Root `lint` runs `site/scripts/check-docs.ts`
   (docs style lint); run it alone with `bun site/scripts/check-docs.ts`. Its spec runs in `test:unit`.
   A `sources:` path that does not exist fails lint.

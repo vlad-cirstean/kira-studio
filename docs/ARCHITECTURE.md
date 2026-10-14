@@ -5626,6 +5626,15 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 
 Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Static, zero client JavaScript.
 
+- Two tabs, two static routes (P290): `/` is Studio, `/space/` is Space. `AppTabs` renders
+  `<nav aria-label="Apps">` with two links; the current one has `aria-current="page"`. No tablist, no
+  script, deep links work. `layouts/Landing.astro` renders both. Each tab sets its own title,
+  description and `og:image`.
+- Tint: `<main data-app>` sets `--tint` (`--kira-info` for Studio, `--kira-ok` for Space); utilities
+  such as `text-tint` and `bg-tint/10` read it. Only existing tokens; no new hues.
+- Icons: Codicons (`@vscode/codicons`, CC BY 4.0) as inlined SVG through `Icon.astro` and the typed
+  `src/data/icons.ts` map. The footer carries the attribution. Decorative icons are `aria-hidden`.
+
 - `site/` is a Bun workspace member (`@kira/site`): Astro 7, Tailwind 4 through `@tailwindcss/vite`
   (`@astrojs/tailwind` is Tailwind 3 only). `astro.config.mjs` sets `base: '/kira-studio'`. Every link
   and asset goes through `import.meta.env.BASE_URL` or `astro:assets`; never a hard-coded `/` path.
@@ -5636,7 +5645,10 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
   `site/dist` only. No capture, no Playwright in the Action. Go-live steps: `docs/DEV_ENVIRONMENT.md`.
 - Check: `bun run site:check` builds, then runs `site/tests/site.spec.ts` in WebKit at 375 px (phone)
   and 1280 px (desktop). It asserts no horizontal scroll, every image loads, every link answers 200,
-  no console errors, crop on phone and framed window on desktop, 16 px text, 44 px tap targets.
+  no console errors, crop on phone and framed window on desktop, 16 px text, 44 px tap targets,
+  per route. It also checks the tab bar, icons, head tags and footer attribution. `visual.spec.ts`
+  compares full-page screenshots per tab against Linux-recorded baselines (skipped on other
+  platforms).
 - Screenshots: `bun run screenshots` drives the production frontend bundles of both apps against the
   mocked Wails runtime (same fixtures stack as the `ui` tier; no backend, no credentials). Window
   1024 x 640 (the apps' minimum), scale 2, WebKit, pinned clock and `en-US`/UTC. Inter and JetBrains
@@ -5647,13 +5659,15 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 - Determinism is byte-identical: a rerun must leave `git status screenshots/` clean. Nondeterminism
   found so far: Monaco tokenizes JSON asynchronously (shot waits for coloured tokens) and fades its
   scrollbars on a JS timer (capture hides them).
-- Docs (P284): Starlight (MIT) serves 21 pages from `site/src/content/docs/docs/` at `/docs/`. The
+- Docs (P284): Starlight (MIT) serves 18 pages from `site/src/content/docs/docs/` at `/docs/`. The
   `docs` collection extends `docsSchema` with a required `sources:` list of repo-relative paths.
   Starlight's Tailwind layer is wired in `global.css`; Docs is in `src/data/nav.ts`.
   `src/lib/shots.ts` serves screenshot imports to any page.
 - Docs lint: `site/scripts/check-docs.ts` (rules in `docsRules.ts`, spec beside it) parses each page
   with unified and remark and enforces the `CLAUDE.md` style rules plus frontmatter and link checks.
   Each `sources:` path must exist. It runs inside root `lint` and `site:build`.
+- Developer docs are not on the site: P290 removed the Develop section. They live in `README.md`
+  and `docs/`.
 - Page ownership: a phase that changes a file listed in a page's `sources:` updates that page in the
   same phase. Grep `sources:` for the changed path to find it. Claims come from code and
   `packages/theme/src/i18n/en.json`, never from README wording alone.

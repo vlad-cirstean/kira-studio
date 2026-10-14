@@ -12,7 +12,7 @@ workspace with coding agents (ADE), a memory store, a terminal and a phone view 
 network. This README covers Kira Studio; see
 [`apps/kira-space/README.md`](apps/kira-space/README.md) for Kira Space.
 
-See both apps on the [presentation page](https://vlad-cirstean.github.io/kira-studio/).
+See both apps on the presentation page: [Kira Studio](https://vlad-cirstean.github.io/kira-studio/) and [Kira Space](https://vlad-cirstean.github.io/kira-studio/space/).
 
 ## Screenshots
 
