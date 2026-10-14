@@ -448,24 +448,25 @@ var MemoryMcpInstructions = define(Entry{
 	UsedByKey:  "llmPrompts.entry.memoryMcpInstructions.usedBy.body",
 	Default: `Long-term memory shared by the user and their agents, across sessions and projects.
 
-Store a durable fact or decision when the user states one or you learn one worth keeping. Call store_memory; each item needs:
-- fact: what is true. Rough or compound text is fine: the store splits it into atomic facts and rewords them.
+Store a durable fact or decision when the user states one or you learn one. Call store_memory. Each item needs:
+- fact: what is true. Rough or compound text is fine; the store splits and rewords it.
 - reason: why it is true or was decided. Never invent one.
-- origin: who decided it. "user" (the user stated or confirmed it), "agent" (you concluded it) or "external" with a sourceTag (a source such as slack, jira or a doc says it).
+- origin: "user" (user stated or confirmed it), "agent" (you concluded it) or "external" with a sourceTag (slack, jira, a doc says it).
 - scope: "company", "project" (this repo unless project is set) or "personal".
 Never drop a reason, origin or scope to tidy a fact. Never store secrets.
-Origins rank user, external, agent; an agent fact never replaces a user fact.
-A challenge stores nothing: ask the user the returned questions or fix the items, then call again with the answers in clarifications.
+Origins rank user, external, agent. An agent fact never replaces a user fact.
+A challenge stores nothing. Ask the user the returned questions or fix the items, then call again with the answers in clarifications.
 
-Files (repo docs, a Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
+Files (repo docs, Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
+Condense long text or a file into short lines without storing: call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. Stores nothing; to store a file use ingest_files.
 
-Recall: search_memories matches words and meaning, best first, and returns loosely related results; drop what is unrelated. Cite a memory by its fact id (km_...). ctx=N in a result's meta means memory_context has N facts stored with it; memory_history shows its versions.`,
+Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Cite a memory by fact id (km_...). ctx=N in a result's meta: memory_context has N facts stored with it. memory_history shows versions.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits compound text into atomic facts, rewords them, and updates a matching fact in the same scope unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing is stored and questions come back. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
+	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits compound text into atomic facts, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
 }, NoVars{})
 
 var (
@@ -488,7 +489,7 @@ var (
 // MemoryToolSearchMemories describes the search_memories tool.
 var MemoryToolSearchMemories = define(Entry{
 	ID: "memory.mcp.tool.search_memories", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "search_memories",
-	Default: `Search memories by words and meaning, best first. Recall-biased: drop unrelated results. Meta lines show provenance, score parts (score is relevance times boosts) and ctx=N for memory_context. Superseded versions only with includeHistory.`,
+	Default: `Search memories by words and meaning, best first. Recall-biased: drop unrelated results. Meta lines show provenance, score parts (relevance times boosts) and ctx=N for memory_context. Superseded versions only with includeHistory.`,
 }, NoVars{})
 
 var (
@@ -503,7 +504,7 @@ var (
 // MemoryToolMemoryHistory describes the memory_history tool.
 var MemoryToolMemoryHistory = define(Entry{
 	ID: "memory.mcp.tool.memory_history", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "memory_history",
-	Default: `Every version of one memory, oldest first, with the event that explains each change.`,
+	Default: `Versions of one memory, oldest first, each with the event explaining the change.`,
 }, NoVars{})
 
 var _ = arg(MemoryToolMemoryHistory.id, "id", spaceApp, NewSession, `fact id, or the id of any version`, NoVars{})
@@ -511,7 +512,7 @@ var _ = arg(MemoryToolMemoryHistory.id, "id", spaceApp, NewSession, `fact id, or
 // MemoryToolMemoryContext describes the memory_context tool.
 var MemoryToolMemoryContext = define(Entry{
 	ID: "memory.mcp.tool.memory_context", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "memory_context",
-	Default: `The facts stored with one fact, per group (session, request, task, document, thread), newest first. Call it after search_memories when a result shows ctx=N or needs its surroundings.`,
+	Default: `Facts stored with one fact, per group (session, request, task, document, thread), newest first. Call after search_memories when a result shows ctx=N or needs surroundings.`,
 }, NoVars{})
 
 var (
@@ -522,7 +523,7 @@ var (
 // MemoryToolIngestFiles describes the ingest_files tool.
 var MemoryToolIngestFiles = define(Entry{
 	ID: "memory.mcp.tool.ingest_files", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_files",
-	Default: `Store the facts of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a file in kira-memory doc format is applied as is. Every fact gets the origin, scope and groups given. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space.`,
+	Default: `Store the facts of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space.`,
 }, NoVars{})
 
 var (
@@ -542,7 +543,7 @@ var (
 // MemoryToolIngestStatus describes the ingest_status tool.
 var MemoryToolIngestStatus = define(Entry{
 	ID: "memory.mcp.tool.ingest_status", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_status",
-	Default: `State of an ingest job: progress, totals, cost, and per file its state, document group and counts of stored, updated, unchanged, dropped and unresolved facts. The structured result lists stored fact ids per file; pass one to memory_context to read that file's facts.`,
+	Default: `Ingest job state: progress, totals, cost, and per file its state, document group and counts of stored, updated, unchanged, dropped and unresolved facts. The structured result lists stored fact ids per file; pass one to memory_context to read that file's facts.`,
 }, NoVars{})
 
 var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id returned by ingest_files`, NoVars{})
@@ -550,7 +551,7 @@ var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id retur
 // MemoryToolDistill describes the distill tool.
 var MemoryToolDistill = define(Entry{
 	ID: "memory.mcp.tool.distill", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "distill",
-	Default: `Condense text or a file into terse atomic lines, in source order. Stores nothing. To store a file, use ingest_files.`,
+	Default: `Condense text or a file into terse atomic lines, in source order. Stores nothing; do not Read the file first. To store a file, use ingest_files.`,
 }, NoVars{})
 
 var (
