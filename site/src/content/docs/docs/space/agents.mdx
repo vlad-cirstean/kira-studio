@@ -71,6 +71,35 @@ The Workflows page edits a workflow as a graph or as YAML. Save with `Cmd+S`. No
 
 A task follows the live file until its first run, session or stage move. After that it keeps a snapshot, and an updated file applies to new work only.
 
+### Review steps
+
+A step with a `review` block waits for you instead of running an agent. Put it after the step that wrote the code.
+
+```yaml
+- id: review
+  name: Review
+  runs_on: each repo
+  timeout: 1h
+  review:
+    send_to: implementer
+  results:
+    - id: approved
+      ok: true
+    - id: rejected
+      ok: false
+      next: stop
+```
+
+`send_to` is `implementer` or `new`. `implementer` resumes the Claude session of an earlier agent step. `new` starts a review agent that keeps its own session across rounds. The optional `implementer` key names that step. Empty means the nearest earlier agent step. A review step takes no `prompt`, `allowed_tools` or smart script. `timeout` stays required.
+
+The run enters the `review` state and the board shows **Waiting for review** and a **Review** item in Needs you. Open **Review code**, comment on the diff, then pick **Send to agent** in the **Workflow review** tab. The tab also holds the route and the finish buttons.
+
+A comment is a **Change** or a **Question**. One send is one headless round. The agent answers each open comment with `reply_review_comment` and may commit. An answered comment turns **Addressed**. Reopen one and send again for another round. A round runs one at a time.
+
+Finish with one of the step's results. The note you type (up to 2000 characters) reaches the step the result routes to. Open comments ask for a confirmation first.
+
+If the implementer session is gone, the round moves to a new review agent and the tab says so. A round that a quit interrupted shows **Resume**. The review run itself stays in `review` across a restart.
+
 ## Runs
 
 A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `no report: Claude ended without calling finish_step`.
@@ -92,6 +121,8 @@ A branch holds one session at a time.
 ## Review code
 
 **Review code** opens the per-branch review in one step: `Cmd+Shift+R`.
+
+The right pane has two tabs when the branch has a review step: **Workflow review** and **Ask agent**. Without a review step it shows the review agent only.
 
 ## Notifications
 

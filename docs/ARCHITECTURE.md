@@ -4123,6 +4123,7 @@ and `docs/v2.0/plans/`.
   `0017`: `ade_tasks.workflow_json`, `workflow_hash` (P196 snapshot). `0018`: `ade_task_branch.origin`
   (P199; `agent` for branches an agent created). `0019`: `ade_worktree_setup.note` (P202 failure reason).
   `0026`: `ade_runs.outcome_json` (P242). `0027`: `ade_task_branches.base_branch_id`, `base_pending_from`, `ade_runs.purpose`, `spec_json` (P241).
+  `0036`: rebuilds `ade_runs` (states add `review`, purposes add `review`) and adds `ade_reviews` (P286).
   Space's `0020` is scripts, not ADE.
   Space's `0024` (P222) adds `code_repos.color`, not ADE.
 - Per-repo colour (P222): `code_repos.color` is a `PaletteColor` name, never empty. Migration 0024
@@ -4206,6 +4207,24 @@ and `docs/v2.0/plans/`.
 - Edits save explicitly (P196): Save and Discard in the graph and YAML editors, Cmd/Ctrl+S, no autosave;
   leaving with unsaved edits (list switch, import/new, mode toggle, shell tab change) asks through
   `ConfirmDialog`. Validation stays debounced.
+- Review step (P286): a step with `review: {send_to: implementer|new, implementer}` (`adewire.ReviewStepConfig`,
+  parser and writer in `adeflow`) takes no prompt, tools or smart script; `timeout` stays required. Reaching it,
+  `startRun` calls `enterReview` (`ade/reviewstep.go`): the run goes to state `review` and the stage waits.
+  Wire `Run.review` carries phase `waiting|sent|working|stuck|done`, round and note; the phase derives from the
+  latest round. A send is a round: its own `ade_runs` row (`purpose = 'review'`, `spec_json` =
+  `model.AdeReviewSpec` with the comment ids, route and head before/after), run through `superviseAgent` with the
+  `reply_review_comment` tool and implicit results. `LatestRuns` partitions by purpose and `plan()` skips
+  `Purpose != ''`, so rounds never count as step runs; `toWireTask` hides them behind the review run.
+  `ade_reviews(run_id, route, target_run_id, dedicated_claude_id, rounds)` holds the send state.
+  Route `implementer` resumes the Claude session of the chosen candidate (`ReviewStep` lists the stage's agent
+  runs; default the nearest earlier); route `new` launches one dedicated session reused by later rounds. A lost
+  target (`EndResumeLost`) fails the round with `outcome.lost` and `queueFallback` starts a round on `new` with
+  the note. `RecoverRunning` keeps `launch_resume_id` for review rounds, so a quit leaves the round `stuck`
+  and resumable; `ResumeRun` on a round resumes it. `Reply` (the `claudeheadless.ReviewReplier` the board
+  implements) writes the reply and state through the review store. `FinishReview` accepts a result of the step
+  only while no round is live, ends the review run and routes like any step result; the note travels as the
+  next step's send-back note. Bound: `ReviewStep`, `SendReview`, `FinishReview`; push `kira:adetask:review`
+  `{taskId, branchId}`.
 - Task snapshot (P196, `ade/taskwf.go`): a task follows the live file until its first run, session
   or stage move. Then `snapshotWorkflow` (idempotent, first wins) stores the whole workflow in
   `ade_tasks.workflow_json` with a sha256 `workflow_hash`, and `StageDone`, `SetTaskStage` and
@@ -4530,6 +4549,12 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
   one aliased `markFileAsViewed` mutation (`gh api graphql`). `ade_gh_synced` records files this app
   marked. Un-reviewing one fires `unmarkFileAsViewed` server side through the unmark observer
   (`SetObserver`), for ledger files only. Partial reviews never sync.
+- Comments carry `kind` (`change|question`) and `state` (`open|addressed`) plus the agent's `reply`, `repliedAt` and
+  `sentAt` (gitreview `0004`; rows older than it read as `change`/`open`). `review.comment.add` takes `kind`;
+  `review.comment.setState` reopens or addresses one. The export marks the kind and state. The review window's
+  right pane has `SecondaryTabs` (`ade-review-right-tabs`): `AdeWorkflowReviewPanel` (comments by TanStack query
+  `['reviewComments', repoId, branch]`, route, Send to agent, round block, finish buttons; shown while the branch
+  has a review step run) and the review agent. The tab pick lives in `useAdeReviewWindowStore`.
 - Monaco objects stay in `shallowRef` (`useDiffEditor`): a deep `ref` hangs the page.
 - One entry rule (P240): `board/reviewCode.ts` `reviewChoice` hides (parked), disables with a reason (uncreated
   branch, `ahead === 0`, with or without uncommitted changes) or enables each branch; `useReviewCode` is the
@@ -5736,6 +5761,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
 - **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.
 - **Parts of an interactive `claude` turn are unobserved (P147, P149, P150).** The real suite (`bun run test:claude:space`) launches the TUI, sees hooks including `Stop`, and drives `Send` into a session. Never seen against a real `claude`: the folder-trust prompt (the suite pre-trusts the folder), `claude --resume` of a stopped session, the initial ` -- ` message, send-then-archive completing after the turn, and for the P150 review agent `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint. Delete once checked on an authenticated desktop build.
+- **A taken-over review round has no reply or finish tools (P286).** `TakeOver` of a round opens the plain interactive session: `reply_review_comment` and `finish_step` are not on it, so its comments stay open until answered by hand. Delete once a take-over loads them.
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
 - **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every

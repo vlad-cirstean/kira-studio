@@ -91,6 +91,7 @@ Server name `kira-db`. See [Database MCP server](../../studio/database-mcp/).
 Server name `kira-ade`. `finish_step` is available to every agent run. The other tools need `kira_space_mcp: true` in the workflow. See [Agents](../../space/agents/).
 
 - `finish_step`: report how a step ended. Call it once, last. Arguments: `status`, `summary`, `reason`, `conflictedFiles`, `lastGitError`, `tried`.
+- `reply_review_comment`: answer one review comment. Only in a workflow review round. Call once per comment. Arguments: `id`, `reply`, `resolved`.
 - `task_info`: the task, its workflow, stage, repositories and branches.
 - `declare_repos`: add registered repositories to the task. Argument: `repos`, 1 to 20.
 - `request_branch`: create a branch and its worktree. Arguments: `repo`, `name`.
