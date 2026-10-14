@@ -31,6 +31,7 @@ import (
 //	KIRA_EVAL_ONLY     comma-separated source ids to run (smoke test); default all of the set
 //	KIRA_EVAL_PARALLEL sources at once (default 2)
 //	KIRA_EVAL_CAP_USD  run cap (default 8); KIRA_EVAL_PHASE_CAP_USD phase cap (default 60)
+//	KIRA_EVAL_LEDGER   spend ledger file name under the runs dir (default spend.jsonl; one per part)
 func TestMemoryIngestEval(t *testing.T) {
 	if os.Getenv("KIRA_MEMORY_EVAL") != "1" {
 		t.Skip("memory ingest eval: set KIRA_MEMORY_EVAL=1 (costs real money, see bun run eval:memory)")

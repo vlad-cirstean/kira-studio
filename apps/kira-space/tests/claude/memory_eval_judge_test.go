@@ -409,7 +409,10 @@ type spendLine struct {
 	USD   float64 `json:"usd"`
 }
 
-func spendPath() string { return filepath.Join(evalRunsDir(), "spend.jsonl") }
+// spendPath is the phase ledger: spend.jsonl, or the file KIRA_EVAL_LEDGER names (one per part).
+func spendPath() string {
+	return filepath.Join(evalRunsDir(), filepath.Base(envOr("KIRA_EVAL_LEDGER", "spend.jsonl")))
+}
 
 func evalSpend(kind, id string, usd float64) {
 	if usd == 0 {

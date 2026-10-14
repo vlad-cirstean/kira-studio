@@ -901,7 +901,7 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_COMPAT_IMAGE_<KIND>` | Overrides the adapter compat container image per kind | you |
 | `KIRA_FAKE_SCEN`, `KIRA_FAKE_DIR`, `KIRA_DOC` | Fake agent: scenario JSON or path, call-log dir, doc basename | flow tests |
 | `KIRA_FAKE_CLAUDE` | Re-executes the ADE test binary as a fake `claude` | `ade` tests |
-| `KIRA_MEMORY_EVAL`, `KIRA_EVAL_MODE`, `KIRA_EVAL_ROUND`, `KIRA_EVAL_SET`, `KIRA_EVAL_ONLY`, `KIRA_EVAL_PROMPTS`, `KIRA_EVAL_BUDGET`, `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD` | Memory ingest eval; `KIRA_MEMORY_EVAL=1` opts in (costs real money) | `bun run eval:memory`, you |
+| `KIRA_MEMORY_EVAL`, `KIRA_EVAL_MODE`, `KIRA_EVAL_ROUND`, `KIRA_EVAL_SET`, `KIRA_EVAL_ONLY`, `KIRA_EVAL_PROMPTS`, `KIRA_EVAL_BUDGET`, `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`, `KIRA_EVAL_LEDGER` | Memory ingest eval; `KIRA_MEMORY_EVAL=1` opts in (costs real money); `KIRA_EVAL_LEDGER` names the spend file per part (default `spend.jsonl`) | `bun run eval:memory`, you |
 | `KIRA_TEST_MEMORY_MCP` | Real `claude` tests: run the binary as the memory MCP server | `apps/kira-space/tests/claude` |
 | `KIRA_GIT_DIFFERENTIAL`, `KIRA_GIT_PERF` | `1` runs the git search differential test, the git perf probe | you |
 | `KIRA_DATAGRIP_REAL_PROJECT` | Path of a real DataGrip project for the opt-in import test | you |
