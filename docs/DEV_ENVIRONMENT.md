@@ -480,14 +480,15 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 |---|---|
 | Hook injection, shim, listener: `internal/agenthooks/**`, `apps/kira-space/internal/ade/tracker.go`, `internal/terminal/bound.go` | `bun run test:claude:space -run 'TestTerminalAgentHooks\|TestHookPayloadContract\|TestShimInertForPlainClaude'` |
 | Claude config isolation: anything that composes a `claude` argv or env, `apps/kira-space/internal/appwire/wire.go` | `bun run test:claude:space -run TestRealClaudeSettingsUntouched` |
-| ADE runs and sessions: `apps/kira-space/internal/{ade,adeflow}/**, internal/claudeheadless/**` | `bun run test:claude:space -run 'TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeReviewStep\|TestAdeReviewLost'` |
+| ADE runs and sessions: `apps/kira-space/internal/{ade,adeflow}/**, internal/claudeheadless/**` | `bun run test:claude:space -run 'TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeReviewStep\|TestAdeReviewLost\|TestAdeSandbox\|TestAdeSandboxReadOnly'` |
+| Agent sandbox: `internal/agentsandbox/**`, `apps/kira-space/internal/ade/sandbox.go` | `bun run test:claude:space -run 'TestAdeSandbox\|TestAdeSandboxReadOnly' -count=1`. Linux checks the second layer (flags, note, `enforced 0`); the macOS half is in the Mac checklist below. |
 | Smart scripts: `internal/{claudeheadless,scriptruns,scripts}/**` (incl. `scheduler.go`, `confirm.go`), `apps/kira-space/internal/ade/automation.go` | `bun run test:claude:space -run 'TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio -run TestSmartScriptRun` |
 | Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go`, `apps/kira-space/internal/bridge/memorydistill.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryDistill\|TestMemoryDistillBridge'` (`TestMemoryDistill` covers the `distill` tool, P285 Part 2; `TestMemoryDistillBridge` covers the UI bridge call, P285 Part 4, about 0.005 USD) |
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
 | Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge'` (import about 50 s, 0.14 USD, P211; ingest P274) |
 | Memory ingest eval (P285): `internal/llmprompts` memory.import.* prompts, `internal/memory/importer/{chunk,extract,finalize}*.go` quality | `bun run eval:memory` with `KIRA_EVAL_MODE=run KIRA_EVAL_ROUND=<name>` (see ARCHITECTURE "Memory ingest eval"). Opt-in, never in hooks or CI. Costs about 4 to 5 USD per tuning run (8 to 10 min), judge included; P285 spent 57.9 USD in all; Part 2 spent 28.5 USD (ledger `spend-p2.jsonl`). Part 3 spent about 5.4 USD on the eval (ledger `spend-p3.jsonl`). P289 spent about 8.9 USD on the 5-source subset (ledger `spend-p289.jsonl`; `KIRA_EVAL_ONLY=plan-p257,spec-chunk-go,doc-arch-prompts,cmt-runner-go,json-ade-errors`, about 1.5 USD per round); run the test binary from `apps/kira-space/tests/claude` (`go test -c`) to keep a tree edit from changing a round midway. `KIRA_EVAL_MODE=footprint` with `KIRA_EVAL_ROUNDS=<r1,r2>` re-renders stored facts of past rounds and costs nothing. Not a pass/fail row: it scores quality. |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
-| Prompt registry, store, templates: `internal/llmprompts/**` (after a default rewrite run the whole row; regenerate goldens with `go test ./internal/llmprompts -run TestGolden -update` and contracts with `KIRA_CONTRACT=write`) | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
+| Prompt registry, store, templates: `internal/llmprompts/**` (after a default rewrite run the whole row; regenerate goldens with `go test ./internal/llmprompts -run TestGolden -update` and contracts with `KIRA_CONTRACT=write`) | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeStageSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeSandbox\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
 | Drafting a terse prompt (P289): `internal/llmprompts/cmd/promptdistill` | `go run ./internal/llmprompts/cmd/promptdistill -ids <id,..> -out <jsonl> -cap 1.5`. Opt-in, spends about 0.01 USD per prompt (0.275 USD for 31 ids), never in hooks or CI. Resumable: ids already in `-out` are skipped. |
 | Claude CLI upgrade | `bun run test:claude` |
 
@@ -501,6 +502,23 @@ Sandbox notes:
 - Studio's harness fakes the `claude` MCP installer. `TestDbMcpInstallRegisters` forwards the arguments the
   fake records to the real `mcpinstall` installer.
 - `~/.claude.json` is not compared in the settings test: the CLI rewrites it on every run (P233 A13).
+
+## Mac checklist (user-run)
+
+The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbelt, so these steps wait for a Mac.
+
+1. `go test ./internal/agentsandbox -run TestEnforce -count=1 -v`. Expect every subtest to pass: worktree
+   write and `git commit` allowed; write outside, `git branch`, `git worktree add`, `git update-ref`, `git tag`,
+   object delete and `.git` file write denied; home file read denied, `read` folder allowed; direct connect
+   with network off denied; the watcher reports the `git branch` denial within 5 s.
+2. Make the CLI sign in without the keychain: turn on **Keychain access for sandboxed agents** in Settings,
+   Claude Code, or export `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` in the shell profile.
+3. `bun run test:claude:space -run 'TestAdeSandbox' -count=1`. Expect `a.txt` in the worktree, no branch `x` or
+   `y`, at least one denial recorded, and a run `done` or `failed` with a reason naming the ref path. The
+   read-only test must leave the file unchanged.
+4. In the app: run a workflow step, open the run-line lock badge, check the denial list and **View profile**.
+   Run `sandbox-exec -f <copied profile> /usr/bin/true` from a terminal; it must exit 0.
+5. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
 
 ## Load, disk and test scope (P236-P251)
 

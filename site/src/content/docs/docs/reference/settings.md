@@ -77,7 +77,7 @@ Off by default. Port 1024 to 65535, default 7790. See [Phone view](../../space/p
 
 ### Claude Code
 
-Keep-awake (off by default), notifications per event, and the usage display. All notifications and the usage display are on by default. See [Agents](../../space/agents/).
+Keep-awake (off by default), notifications per event, and the usage display. All notifications and the usage display are on by default. **Keychain access for sandboxed agents** (off by default, macOS) lets sandboxed agents read the keychain so Claude can sign in. See [Agents](../../space/agents/).
 
 ### Memory
 

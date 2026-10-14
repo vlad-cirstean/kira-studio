@@ -4354,6 +4354,49 @@ and `docs/v2.0/plans/`.
 - The agent-hooks `Stop` event ends a dialog turn; the renderer's `turnWatch` then calls `RecordMerge`
   (merge dialog) or `ArchiveTask` (send-then-archive). That pending state lives in the renderer.
 
+### Agent sandbox (P287)
+
+- **Package.** `internal/agentsandbox`, shared by `apps/kira-space/internal/ade` and `internal/scriptruns`.
+  `ResolvePolicy` expands `~/`, canonicalizes with `EvalSymlinks` (Seatbelt matches real paths) and probes
+  each worktree's git layout (`ProbeGit`: linked or main). `Profile` renders SBPL text; golden files in
+  `testdata/*.sb`, regenerate with `-update`. Paths enter the profile as escaped string literals, never regex.
+  `ade.sandbox.go` holds the engine side (`prepareSandbox`, `watchSandbox`, `sandboxOutcome`).
+- **Profile.** `(allow default)` then denies and re-allows; last matching rule wins. Reads are restricted
+  through `file-read-data`, never `file-read-metadata` (`realpath` of ancestors must work). Denied: file
+  writes outside the policy, keychain, AppleEvents, LaunchServices, the SSH agent socket, signals to other
+  processes, `~/.claude` config and extension writes.
+- **Git rules.** Worktree read-write except its `.git` file. Linked gitdir read-write except `gitdir`,
+  `commondir`, `locked`, `config.worktree`. Common objects append-only. Own branch ref, lock and reflog
+  writable. The rest of the common dir is read-only, so branch, worktree, tag, stash, remote-ref, config and
+  hook writes fail with EPERM. `allow` entries never open these (the protections come last).
+- **Default and scope.** A step without a `sandbox` block is `write`, network on. Covers headless agents from
+  `superviseAgent` (steps, review rounds, rebase runs with every stack worktree writable) and `scriptruns`
+  smart runs in dir mode `worktree`. Not covered: TUI sessions and Take over, script stages, setup
+  scripts, folder-mode automations, memory `claude` calls.
+- **Enforcer seam.** `Enforcer` (`Support`, `Prepare`, `Watch`). `System()` is real on darwin; elsewhere
+  `Support{Enforced:false, Reason: NotEnforcedKey}` and `Prepare` still builds profile, flags and env but no
+  wrapper. `sandboxtest.Fake` stands in for flow tests; the flow harness defaults to a not-enforced fake so
+  contracts do not depend on the host OS.
+- **Launch.** `claudeheadless.Spec.Sandbox` makes `Script` emit `exec /usr/bin/env -u … K=V
+  /usr/bin/sandbox-exec -f <profile> claude …` after the login shell sources the user profile. The profile
+  is checked with `sandbox-exec -f <profile> /usr/bin/true` first; a failure fails the run before `claude`
+  starts. Env redirects build caches to `<AgentDir>/sandbox-cache/` and sets `TMPDIR` to the run scratch.
+- **Second layer.** `--add-dir` and `--disallowedTools` (`Bash(git branch:*)`, `Bash(git worktree:*)`,
+  edit tools for `read`). The only layer on Linux, where the notice says it does not stop shell commands.
+- **Network off.** Seatbelt allows loopback only. `HTTPS_PROXY` points at an in-app `goproxy` CONNECT proxy
+  that passes the Claude API hosts, chaining an upstream proxy from the environment.
+- **Denials.** One shared `/usr/bin/log stream` child runs while a sandboxed run is live; events map to a run
+  by pid ancestry (`Handler.OnStart` gives the root pid). `Tracker` keeps the first 50 distinct denials and
+  counts all. A failed run with denials gets reason `Sandbox blocked <op> <path>.`; a sign-in failure with the
+  keychain denied gets the token hint. Denial and notice lines go to the run log on stdout.
+- **Storage and IPC.** Table `ade_run_sandbox` (migration `0037`): access, enforced, resolved policy JSON,
+  profile, denials. `AdeTaskService.Run.sandbox` carries the badge; `RunSandbox` returns the detail.
+  Setting `ade.sandboxKeychain` (default false).
+- **Tools.** `fetch_remote` and `push_branch` run in the app, unsandboxed (`TaskBoard` implements
+  `claudeheadless.SandboxGit`, via `Grant.Sandbox`). `push_branch` pushes the run's branch to the
+  same-named remote branch (`RemoteOpParams.RemoteBranch`), refuses protected branches, and is refused for
+  `read` steps. `request_branch` stays the way to create a branch and its worktree.
+
 ### Claude launch check and folder-scan hiding (P277)
 
 - `toolexec.ResolveClaude` finds `claude` before any launch: `PATH`, well-known install paths (`ClaudeCandidates`;
@@ -5192,7 +5235,7 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
 
 - **Registry.** `registry.go` is the one file with prompt text. Entry: id, kind, apps, title/purpose/usedBy
   catalog keys, applies-when, default, required fragments, fixed output schema. Typed handle
-  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 134 entries: Space lists 110,
+  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 139 entries: Space lists 115,
   Studio 34. User-authored text (smart-script bodies, workflow stage and step prompts) stays out, as do
   tool and server names, tool error strings and result data formatting.
 - **Kinds.** `system`, `message`, `suffix`, `instructions`, `tool`, `argument` (one MCP tool property
@@ -5721,6 +5764,15 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **The sandbox profile leaves some macOS services open (P287).** The profile allows by default and lists
+  denies, so a launchd or XPC service that acts for the agent (for example `launchctl submit`) is not closed
+  beyond the listed denies.
+- **`~/.claude.json` is writable to a sandboxed agent (P287).** It holds the user's MCP servers; the CLI writes
+  it on every run.
+- **Hooks and build scripts an agent edits run unsandboxed later (P287).** Kira's own git operations and the
+  user run them outside the sandbox.
+- **The sandbox is unverified on a real Mac (P287).** Linux checks the generator and flows only. Delete once
+  the Mac checklist in `docs/DEV_ENVIRONMENT.md` passes.
 - **A written memory doc holds no per-fact keywords (P285 Part 3).** Importing it into another store indexes its facts with the doc-level keywords only; the store regenerates per-fact keywords only for facts the gate sees.
 - **Memory import is not unified with `distill` (P285 Part 2).** Import still runs the extract prompt with an evidence quote; `distill` is a separate prompt. The unified pipeline (distill per chunk, code-built `Stated in` reason, no quote) gave `R_all` 0.836 but `C_fact` 0.549 against a ceiling of 0.526, so it was reverted. The terse reconcile, finalize and verify prompts and the Part 1 gate were not re-measured together on all 10 tuning sources (budget). See `docs/v2.5/plans/P285-report.md`.
 

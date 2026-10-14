@@ -88,7 +88,7 @@ Server name `kira-db`. See [Database MCP server](../../studio/database-mcp/).
 
 ## Agent tools (Kira Space)
 
-Server name `kira-ade`. `finish_step` is available to every agent run. The other tools need `kira_space_mcp: true` in the workflow. See [Agents](../../space/agents/).
+Server name `kira-ade`. `finish_step` is available to every agent run. `fetch_remote` and `push_branch` come with a sandboxed run. The other tools need `kira_space_mcp: true` in the workflow. See [Agents](../../space/agents/).
 
 - `finish_step`: report how a step ended. Call it once, last. Arguments: `status`, `summary`, `reason`, `conflictedFiles`, `lastGitError`, `tried`.
 - `reply_review_comment`: answer one review comment. Only in a workflow review round. Call once per comment. Arguments: `id`, `reply`, `resolved`.
@@ -97,4 +97,6 @@ Server name `kira-ade`. `finish_step` is available to every agent run. The other
 - `request_branch`: create a branch and its worktree. Arguments: `repo`, `name`.
 - `branch_status`: the worktree and setup state of a branch. Arguments: `repo`, `waitSeconds` (0 to 600).
 - `run_outcome`: how the latest runs of the task ended. Arguments: `runId`, `branch`, `kind`, `limit` (default 3, maximum 10).
+- `fetch_remote`: fetch one remote of the repository, in the app. Sandboxed runs only. Argument: `remote` (default `origin`).
+- `push_branch`: push the task branch to the same-named remote branch, in the app. Sandboxed write runs only. Never a protected branch. Argument: `force` (lease-checked force push).
 - `git`: run restricted git in a named worktree. Used by rebase runs. Arguments: `worktree`, `args`.

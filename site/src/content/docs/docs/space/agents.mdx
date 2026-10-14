@@ -100,11 +100,38 @@ Finish with one of the step's results. The note you type (up to 2000 characters)
 
 If the implementer session is gone, the round moves to a new review agent and the tab says so. A round that a quit interrupted shows **Resume**. The review run itself stays in `review` across a restart.
 
+### Sandbox
+
+On macOS every agent step runs under a Seatbelt sandbox. A step without a `sandbox` block gets the default: write the branch worktree, network on.
+
+```yaml
+sandbox:
+  access: write        # write | read | off
+  read: [~/notes]      # extra read-only folders
+  allow: [~/go]        # extra read-write paths
+  network: true        # false: Claude API only
+```
+
+- `write`: writes the worktree and the scratch folder. Reads the worktree, tools and the `read` list. A home file outside them fails.
+- `read`: same reads, no worktree writes.
+- `off`: no sandbox, no other keys. The step badge shows `No sandbox`.
+- Paths are absolute or start with `~/`. Keychain paths are refused.
+
+Git inside the sandbox can stage, commit, amend and rebase in place. It cannot create branches, worktrees or tags, change config or hooks, write other branches, or delete objects. Use `request_branch` for a branch. Use `fetch_remote` and `push_branch` for the network; both run in the app. `push_branch` pushes the task branch only, never a protected branch, and a read step cannot push.
+
+The SSH agent is blocked. With `network: false` only the Claude API is reachable. The macOS keychain is blocked unless you turn on **Keychain access for sandboxed agents** in Settings, Claude Code. Without it Claude must sign in from the environment: run `claude setup-token` and export the token from your shell profile.
+
+The run line shows a lock badge: `Write worktree`, `Read only`, `No sandbox`, or `N blocked` after denials. Click it for the policy, the first 50 blocked actions and the profile. A run that fails after a block says `Sandbox blocked <op> <path>.` Take over opens an unsandboxed session.
+
+Linux and Windows write the profile but do not enforce it. The badge says `Not enforced`. Claude permission rules still apply; they do not stop shell commands.
+
 ## Runs
 
 A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `no report: Claude ended without calling finish_step`.
 
 A step starts automatically or waits for your approval.
+
+Each run line shows its sandbox badge. See [Sandbox](#sandbox).
 
 ### Agent tools
 
