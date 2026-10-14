@@ -34,6 +34,7 @@ interface SavedWorkflow {
       steps: {
         id: string;
         allowedTools: string[];
+        review: { sendTo: string; implementer: string } | null;
         results: { id: string; ok: boolean; next: string; max: number; description: string }[];
       }[];
     }[];
@@ -122,6 +123,26 @@ test('a new step gets a fresh id and Allowed tools becomes allowedTools', async 
     'Read',
     'Grep',
     'Bash(git diff:*)',
+  ]);
+});
+
+test('the Review mode saves a review block with approved and rejected results', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  await chip(page, 'impl').click();
+  await node(page, 'pr').click();
+  await page.locator(t('ade-wf-step-mode-review')).click();
+  await expect(page.locator(t('ade-wf-step-review'))).toBeVisible();
+  await expect(page.locator(t('ade-wf-step-tools'))).toHaveCount(0);
+  await expect(node(page, 'pr').locator(t('ade-wf-node-review'))).toBeVisible();
+  await page.locator(t('ade-wf-step-review-send-to')).selectOption('new');
+  const args = await saved(page, control, 1);
+  const step = args.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
+  expect(step?.review).toEqual({ sendTo: 'new', implementer: '' });
+  expect(step?.results.map((r) => [r.id, r.ok])).toEqual([
+    ['approved', true],
+    ['rejected', false],
   ]);
 });
 

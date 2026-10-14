@@ -168,6 +168,10 @@ const stateLabel = (c: ReviewComment): string =>
       >
     </div>
 
+    <p v-if="run.review?.note" class="m-0 text-warn" data-testid="ade-review-note">
+      {{ run.review.note }}
+    </p>
+
     <section :aria-label="t('git.review.pane.comments.label')" class="flex flex-col gap-1.5">
       <p
         v-if="comments.length === 0"
@@ -290,14 +294,6 @@ const stateLabel = (c: ReviewComment): string =>
 
     <section v-if="round" class="flex flex-col gap-1.5" data-testid="ade-review-round-block">
       <div class="flex flex-wrap items-center gap-2">
-        <span
-          v-if="round.fallback"
-          class="text-kira-sm text-warn"
-          data-testid="ade-review-fallback"
-          >{{
-            t('space.ade.reviewStep.fallback.status')
-          }}</span
-        >
         <span v-if="round.commits !== null" class="text-kira-sm text-muted-foreground">{{
           t('space.ade.reviewStep.commits.label', { count: round.commits })
         }}</span>

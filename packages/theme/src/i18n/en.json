@@ -7850,10 +7850,7 @@
           "label": "{step} (attempt {attempt})"
         },
         "commits": {
-          "label": "{count} new commits"
-        },
-        "fallback": {
-          "status": "Moved to a new review agent"
+          "label": "New commits: {count}"
         },
         "finish": {
           "note": {

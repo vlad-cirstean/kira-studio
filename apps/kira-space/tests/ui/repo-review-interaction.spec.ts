@@ -176,3 +176,44 @@ test('contract: stored review comments come back in the Review pane', async ({ r
   await host.locator('[data-testid="review-pane-comments"]').click();
   await expect(host.getByText(list.comments[0].body)).toBeVisible();
 });
+
+test('the Review pane shows each comment kind, state and the agent reply', async ({ relaunch }) => {
+  const base = {
+    path: 'src/a.ts',
+    anchor: 'exact',
+    anchorSha: SHA_A,
+    createdAt: 1,
+    sentAt: 1,
+  };
+  const comments = [
+    {
+      ...base,
+      id: 1,
+      range: { start: 3, end: 3 },
+      body: 'Rename it.',
+      kind: 'change',
+      state: 'addressed',
+      reply: 'Renamed.',
+      repliedAt: 2,
+    },
+    {
+      ...base,
+      id: 2,
+      range: { start: 9, end: 9 },
+      body: 'Why cents?',
+      kind: 'question',
+      state: 'open',
+      reply: '',
+      repliedAt: null,
+    },
+  ];
+  const page = await openReviewListing(relaunch, {
+    results: { 'review.comment.list': { at: SHA_A, comments } },
+  });
+  const host = page.locator('[data-testid="repo-review-host"]');
+  await host.locator('[data-testid="review-pane-comments"]').click();
+  const chips = host.locator('[data-testid="review-comment-chips"]');
+  await expect(chips.nth(0)).toHaveText('Change · Addressed');
+  await expect(chips.nth(1)).toHaveText('Question · Open');
+  await expect(host.getByText('Renamed.')).toBeVisible();
+});
