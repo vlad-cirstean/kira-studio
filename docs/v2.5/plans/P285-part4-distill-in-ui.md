@@ -265,3 +265,17 @@ resume point. A half-done commit is redone from its first file, never mixed into
   the 5 `view` sites, `AddMemoryDialog` callers) goes through `codegraph_explore` first.
 - Result section must state: real spend, contract keys written, whether the selection UI test ran against
   the file view, and any deviation from these decisions with its reason.
+
+## 8. Result
+
+- Real spend: 0.0051 USD (`TestMemoryDistill|TestMemoryDistillBridge`) + 0.0055 USD (`TestMemoryImport|TestMemoryIngest`). Under 1 USD cap.
+- Contract keys written (`memory-distill.json`): `MemoryDistillService.Distill#done`, `MemoryDistillService.Limits`, `MemoryDistillService.ToImport#job`, `kira:memory:distill#progress`.
+- Selection UI test ran against real repo file view (Monaco action via F1 palette, Home then Shift+End).
+- Verified: `memoryflow` + `coverage` Go tests; UI specs `memory-distill`, `memory-module`, `memory-import`, `memory-provenance`, `repo-workspace`; visual `memory`, `settings`; site build.
+- Deviations:
+  - Progress text "Parts done: {done} of {total} · {cost}", not "Part 1 of 1". Reason: total known after chunking, done counts finished parts.
+  - Busy `E_CONFLICT` test lives in `TestBridgeDistillCancel` (shares lock-release setup).
+  - Result hidden while run in flight. Reason: avoids stale result beside new progress.
+  - Selection UI test uses palette, not context menu. Reason: right-click collapses selection in Monaco under WebKit.
+  - Extra `DistillProgress.vue`. Reason: U92 forbids Spinner inside Button.
+  - Cost via `formatCurrency`, tokens share via `formatPercent`.
