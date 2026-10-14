@@ -1,0 +1,84 @@
+(version 1)
+;; kira-sbpl/1 run=run-1 access=read network=true keychain=false
+;; loopback ports: 4100
+(allow default)
+
+;; escapes
+(deny appleevent-send)
+(deny mach-lookup
+  (global-name "com.apple.coreservices.launchservicesd")
+  (global-name-prefix "com.apple.lsd.")
+  (global-name "com.apple.pasteboard.1"))
+(deny signal)
+(allow signal (target same-sandbox))
+
+;; keychain
+(deny mach-lookup
+  (global-name "com.apple.SecurityServer")
+  (global-name-prefix "com.apple.securityd")
+  (global-name-prefix "com.apple.security."))
+
+;; reads
+(deny file-read-data
+  (subpath "/Users")
+  (subpath "/Volumes"))
+(allow file-read-data
+  (subpath "/Users/ada/.claude")
+  (regex #"^/Users/ada/\.claude\.json")
+  (literal "/Users/ada/.gitconfig")
+  (subpath "/Users/ada/.config/git")
+  (literal "/Users/ada/.zshenv")
+  (literal "/Users/ada/.zprofile")
+  (literal "/Users/ada/.zshrc")
+  (literal "/Users/ada/.zlogin")
+  (literal "/Users/ada/.bashrc")
+  (literal "/Users/ada/.bash_profile")
+  (literal "/Users/ada/.profile")
+  (subpath "/Users/ada/.kira-memory")
+  (subpath "/Users/ada/.nvm/versions/node/v22.1.0")
+  (subpath "/Users/ada/go")
+  (subpath "/Users/ada/.local/share/claude")
+  (subpath "/Users/ada/src/app-wt/feat")
+  (subpath "/Users/ada/specs/payments")
+  (subpath "/Users/ada/.cache/my-tool")
+  (subpath "/Users/ada/src/app/.git/worktrees/feat")
+  (subpath "/Users/ada/src/app/.git")
+  (subpath "/Users/ada/Library/Application Support/Kira/agent/sandbox/run-1")
+  (subpath "/Users/ada/Library/Application Support/Kira/agent/sandbox-cache"))
+(deny file-read-data
+  (subpath "/Users/ada/Library/Keychains"))
+
+;; writes
+(deny file-write*)
+(allow file-write*
+  (literal "/dev/null")
+  (literal "/dev/zero")
+  (literal "/dev/tty")
+  (literal "/dev/dtracehelper")
+  (regex #"^/dev/ttys[0-9]+$")
+  (regex #"^/dev/fd/")
+  (subpath "/Users/ada/Library/Application Support/Kira/agent/sandbox/run-1")
+  (subpath "/Users/ada/Library/Application Support/Kira/agent/sandbox-cache")
+  (subpath "/private/var/folders/ab/cd/T")
+  (subpath "/private/var/folders/ab/cd/C")
+  (subpath "/Users/ada/.claude")
+  (regex #"^/Users/ada/\.claude\.json")
+  (subpath "/Users/ada/.kira-memory"))
+(deny file-write*
+  (literal "/Users/ada/.claude/settings.json")
+  (literal "/Users/ada/.claude/settings.local.json")
+  (literal "/Users/ada/.claude/CLAUDE.md")
+  (literal "/Users/ada/.claude/keybindings.json")
+  (subpath "/Users/ada/.claude/commands")
+  (subpath "/Users/ada/.claude/agents")
+  (subpath "/Users/ada/.claude/skills")
+  (subpath "/Users/ada/.claude/plugins")
+  (subpath "/Users/ada/.claude/hooks")
+  (subpath "/Users/ada/.claude/output-styles"))
+
+;; allow paths
+(allow file-write*
+  (subpath "/Users/ada/.cache/my-tool"))
+
+;; network
+(deny network-outbound (remote unix-socket (path-literal "/private/tmp/com.apple.launchd.X/Listeners")))
