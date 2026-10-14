@@ -61,14 +61,14 @@ export const ORDER_COLUMNS: ColumnDescriptor[] = [
 ];
 
 const CUSTOMERS = [
-  'Ana Pop',
-  'Mihai Ionescu',
-  'Elena Radu',
-  'Andrei Dumitru',
-  'Ioana Stan',
-  'Radu Marin',
-  'Maria Toma',
-  'Paul Vasile',
+  'Alice Morgan',
+  'Ben Carter',
+  'Chloe Hughes',
+  'Daniel Brooks',
+  'Emma Wright',
+  'Oliver Grant',
+  'Grace Turner',
+  'Henry Walsh',
 ];
 const STATUSES = ['paid', 'shipped', 'delivered', 'pending', 'delivered', 'shipped'];
 

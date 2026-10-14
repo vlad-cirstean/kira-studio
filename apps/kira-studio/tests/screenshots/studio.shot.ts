@@ -65,7 +65,7 @@ test('studio data grid', async ({ relaunch, consoleErrors }) => {
   await expect(grid).toBeVisible();
   const rows = page.locator('[data-testid="grid-row"]');
   await expect(rows.first()).toBeVisible({ timeout: 15_000 });
-  await expect(grid).toContainText('Ana Pop');
+  await expect(grid).toContainText('Alice Morgan');
   await rows.nth(2).click();
 
   await captureShot(page, { id: 'studio-data-grid', detail: { x: 265, y: 130 }, consoleErrors });
@@ -88,12 +88,12 @@ const RESULT_PAGE: LogicalPage = {
     col('revenue', 'numeric', 'number'),
   ],
   rows: [
-    ['Ana Pop', '14', '2318.50'],
-    ['Mihai Ionescu', '11', '1904.25'],
-    ['Elena Radu', '9', '1650.00'],
-    ['Andrei Dumitru', '8', '1388.75'],
-    ['Ioana Stan', '6', '972.40'],
-    ['Radu Marin', '5', '815.10'],
+    ['Alice Morgan', '14', '2318.50'],
+    ['Ben Carter', '11', '1904.25'],
+    ['Chloe Hughes', '9', '1650.00'],
+    ['Daniel Brooks', '8', '1388.75'],
+    ['Emma Wright', '6', '972.40'],
+    ['Oliver Grant', '5', '815.10'],
   ],
   position: {
     offset: 0,
@@ -130,7 +130,7 @@ test('studio sql console', async ({ relaunch, consoleErrors }) => {
   await typeInto(view, page, QUERY, { paste: true });
   await expect(view.locator('.view-lines')).toContainText('order by revenue desc');
   await page.click('[data-testid="console-run-all"]');
-  await expect(view.locator('[data-testid="console-result-grid"]')).toContainText('Ana Pop');
+  await expect(view.locator('[data-testid="console-result-grid"]')).toContainText('Alice Morgan');
 
   // Monaco's caret blink is JS-driven: blur the editor so two runs match.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -143,7 +143,7 @@ test('studio api request', async ({ relaunch, consoleErrors }) => {
   const body = JSON.stringify(
     {
       id: 4217,
-      customer: 'Ana Pop',
+      customer: 'Alice Morgan',
       status: 'shipped',
       items: [
         { sku: 'KB-104', qty: 1, price: 89.9 },
@@ -179,7 +179,7 @@ test('studio api request', async ({ relaunch, consoleErrors }) => {
   await page.fill('[data-testid="http-url"]', 'https://api.acme.example/v1/orders/4217');
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-status"]')).toHaveText('200 OK');
-  await expect(page.locator('[data-testid="http-request-view"]')).toContainText('Ana Pop');
+  await expect(page.locator('[data-testid="http-request-view"]')).toContainText('Alice Morgan');
   // Monaco tokenizes JSON asynchronously; an uncoloured body would differ between runs.
   await expect
     .poll(() =>
