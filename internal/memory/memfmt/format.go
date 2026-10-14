@@ -29,6 +29,10 @@ func checkProvenance(p Provenance, doc bool) error {
 	return nil
 }
 
+// retiredPrefixes start a P273 line body (`<id> fact: ...`). A fact text starting with one would
+// read as that retired line, so the formatter refuses it.
+var retiredPrefixes = []string{"fact: ", "reason: ", "keywords: "}
+
 func checkFact(f Fact) error {
 	if !IsFactID(f.ID) {
 		return fmt.Errorf("fact id %q is not a km_ id", f.ID)
@@ -36,8 +40,15 @@ func checkFact(f Fact) error {
 	if msg := CheckText(f.Fact); msg != "" {
 		return fmt.Errorf("%s fact: %s", f.ID, msg)
 	}
-	if msg := CheckText(f.Reason); msg != "" {
-		return fmt.Errorf("%s reason: %s", f.ID, msg)
+	for _, p := range retiredPrefixes {
+		if strings.HasPrefix(f.Fact, p) {
+			return fmt.Errorf("%s fact: text starts with %q, which reads as a retired P273 line", f.ID, p)
+		}
+	}
+	if f.Reason != "" {
+		if msg := CheckText(f.Reason); msg != "" {
+			return fmt.Errorf("%s reason: %s", f.ID, msg)
+		}
 	}
 	return nil
 }
@@ -84,10 +95,13 @@ func (w *commentWriter) block(bl Block, seen map[string]bool) error {
 			return fmt.Errorf("%s appears twice", f.ID)
 		}
 		seen[f.ID] = true
-		if err := w.line(f.ID + " fact: " + f.Fact); err != nil {
+		if err := w.line(f.ID + " " + f.Fact); err != nil {
 			return err
 		}
-		if err := w.line(f.ID + " reason: " + f.Reason); err != nil {
+		if f.Reason == "" {
+			continue
+		}
+		if err := w.line("  " + f.Reason); err != nil {
 			return err
 		}
 	}
@@ -130,17 +144,22 @@ func (w *docWriter) front(d Doc) error {
 	if err := checkProvenance(d.Provenance, true); err != nil {
 		return err
 	}
+	if d.From != "" {
+		if msg := headerValue(d.From); msg != "" {
+			return fmt.Errorf("from: %s", msg)
+		}
+	}
 	if d.Updated != "" {
 		if _, err := time.Parse("2006-01-02", d.Updated); err != nil {
 			return errors.New("updated must be YYYY-MM-DD")
 		}
 	}
-	w.b.WriteString("---\nkira-memory: 1\n")
+	w.b.WriteString("---\nkira-memory: 2\n")
 	for _, f := range []struct {
 		key, val string
 		optional bool
 	}{
-		{"group", d.Group, false}, {"title", d.Title, false}, {"origin", d.Origin, false}, {"source", d.Source, true},
+		{"group", d.Group, false}, {"title", d.Title, false}, {"from", d.From, true}, {"origin", d.Origin, false}, {"source", d.Source, true},
 		{"scope", d.Scope, false}, {"project", d.Project, true}, {"session", d.Session, true},
 		{"keywords", strings.Join(d.Keywords, ", "), true}, {"updated", d.Updated, true},
 	} {
@@ -156,25 +175,21 @@ func (w *docWriter) fact(f Fact) error {
 	if err := checkFact(f); err != nil {
 		return err
 	}
-	w.b.WriteString("\n" + f.ID + " fact: " + f.Fact + "\n" + f.ID + " reason: " + f.Reason + "\n")
-	if len(f.Keywords) == 0 {
-		return nil
+	w.b.WriteString("- " + f.ID + " " + f.Fact + "\n")
+	if f.Reason != "" {
+		w.b.WriteString("  " + f.Reason + "\n")
 	}
-	kw := strings.Join(f.Keywords, ", ")
-	if msg := CheckText(kw); msg != "" {
-		return fmt.Errorf("%s keywords: %s", f.ID, msg)
-	}
-	w.b.WriteString(f.ID + " keywords: " + kw + "\n")
 	return nil
 }
 
-// FormatDoc renders a doc file. Facts print in order; a heading appears wherever Section changes.
+// FormatDoc renders a doc file. Facts print in order as list items; a heading appears wherever
+// Section changes.
 func FormatDoc(d Doc) (string, error) {
 	w := &docWriter{}
 	if err := w.front(d); err != nil {
 		return "", err
 	}
-	section, seen := "", map[string]bool{}
+	section, seen, started := "", map[string]bool{}, false
 	for _, f := range d.Facts {
 		if seen[f.ID] {
 			return "", fmt.Errorf("%s appears twice", f.ID)
@@ -185,8 +200,11 @@ func FormatDoc(d Doc) (string, error) {
 				return "", fmt.Errorf("%s: section %q must be one trimmed line, and sections cannot end", f.ID, f.Section)
 			}
 			section = f.Section
-			w.b.WriteString("\n## " + section + "\n")
+			w.b.WriteString("\n## " + section + "\n\n")
+		} else if !started {
+			w.b.WriteString("\n")
 		}
+		started = true
 		if err := w.fact(f); err != nil {
 			return "", err
 		}

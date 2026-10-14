@@ -29,8 +29,8 @@ type seenFact struct {
 	at           string
 }
 
-// Check validates every file and the facts across them: one id must carry the same fact and
-// reason text everywhere. Problems come sorted; facts counts the valid facts read.
+// Check validates every file and the facts across them: one id must carry the same fact text
+// everywhere, and the same reason wherever two files both state one. Problems come sorted; facts counts the valid facts read.
 func Check(files []Source) (problems []Problem, facts int) {
 	sorted := append([]Source(nil), files...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Path < sorted[j].Path })
@@ -61,8 +61,11 @@ func Check(files []Source) (problems []Problem, facts int) {
 			switch {
 			case !ok:
 				seen[x.ID] = seenFact{x.Fact, x.Reason, at}
-			case prev.fact != x.Fact || prev.reason != x.Reason:
+			case prev.fact != x.Fact || (prev.reason != "" && x.Reason != "" && prev.reason != x.Reason):
 				problems = append(problems, Problem{f.Path, x.Line, fmt.Sprintf("%s differs from %s", x.ID, prev.at)})
+			case prev.reason == "" && x.Reason != "":
+				prev.reason = x.Reason
+				seen[x.ID] = prev
 			}
 		}
 	}

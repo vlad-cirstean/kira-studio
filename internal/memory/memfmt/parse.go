@@ -9,7 +9,9 @@ import (
 
 var (
 	sourceTag   = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
-	memoryLine  = regexp.MustCompile(`^(` + FactID + `) (fact|reason|keywords): (.*)$`)
+	factLine    = regexp.MustCompile(`^(` + FactID + `) (.*)$`)
+	retiredLine = regexp.MustCompile(`^` + FactID + ` (fact|reason|keywords): `)
+	docFactLine = regexp.MustCompile(`^- (` + FactID + `) (.*)$`)
 	headingLine = regexp.MustCompile(`^#{1,6} (\S.*)$`)
 	dateLine    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
@@ -47,11 +49,19 @@ func inScopeText(t string) bool {
 	return strings.HasPrefix(t, "kira-memory ") || strings.HasPrefix(t, "km_")
 }
 
+// isReasonText reports whether t is a reason line: exactly two spaces, then text.
+func isReasonText(t string) bool {
+	return len(t) > 2 && strings.HasPrefix(t, "  ") && t[2] != ' ' && t[2] != '\t'
+}
+
+const retiredCommentMsg = "'<id> fact:' and '<id> reason:' lines are the retired P273 format; write '<id> <fact>' and an indented reason line"
+
 type blockState struct {
-	block   Block
-	marker  Marker
-	indent  string
-	pending *Fact // fact line seen, reason not yet
+	block  Block
+	marker Marker
+	indent string
+	// afterFact: the previous line of this block was a fact line, so an indented line is its reason.
+	afterFact bool
 }
 
 type commentParser struct {
@@ -71,10 +81,7 @@ func (p *commentParser) finish() {
 	if c == nil {
 		return
 	}
-	if c.pending != nil {
-		p.add(c.pending.Line, "%s has a fact line but no reason line", c.pending.ID)
-	}
-	if len(c.block.Facts) == 0 && c.pending == nil {
+	if len(c.block.Facts) == 0 {
 		p.add(c.block.Line, "empty kira-memory block")
 	}
 	p.blocks = append(p.blocks, c.block)
@@ -82,8 +89,9 @@ func (p *commentParser) finish() {
 }
 
 // ParseComments parses the kira-memory blocks of a source file. Only in-scope lines (text after
-// the marker starting "kira-memory " or "km_") are read or flagged; other comments are legacy.
-// An unsupported path yields nothing.
+// the marker starting "kira-memory " or "km_", or an indented reason line directly after a fact
+// line) are read or flagged; other comments are legacy and end the block. An unsupported path
+// yields nothing.
 func ParseComments(path string, src []byte) ([]Block, []Problem) {
 	markers, ok := MarkersFor(path)
 	if !ok {
@@ -103,7 +111,7 @@ func (p *commentParser) line(n int, line string) {
 		if !ok {
 			continue
 		}
-		if !inScopeText(text) {
+		if !inScopeText(text) && !(p.cur != nil && p.cur.afterFact && isReasonText(text)) {
 			break
 		}
 		p.scoped(n, m, indent, text, closed)
@@ -133,16 +141,23 @@ func (p *commentParser) scoped(n int, m Marker, indent, text string, closed bool
 		p.cur = &blockState{block: Block{Provenance: prov, Line: n}, marker: m, indent: indent}
 		return
 	}
-	sm := memoryLine.FindStringSubmatch(text)
-	if sm == nil || sm[2] == "keywords" {
-		p.add(n, "line must be '<id> fact: <text>' or '<id> reason: <text>'")
+	c := p.cur
+	if retiredLine.MatchString(text) {
+		p.add(n, "%s", retiredCommentMsg)
+		if c != nil {
+			c.afterFact = false
+		}
 		return
 	}
-	id, kind, body := sm[1], sm[2], sm[3]
-	if msg := CheckText(body); msg != "" {
-		p.add(n, "%s %s: %s", id, kind, msg)
+	reason := isReasonText(text)
+	sm := factLine.FindStringSubmatch(text)
+	if !reason && sm == nil {
+		p.add(n, "line must be '<id> <fact>' or an indented reason line")
+		if c != nil {
+			c.afterFact = false
+		}
+		return
 	}
-	c := p.cur
 	if c == nil {
 		p.add(n, "fact line without kira-memory header")
 		return
@@ -150,38 +165,34 @@ func (p *commentParser) scoped(n int, m Marker, indent, text string, closed bool
 	if m != c.marker || indent != c.indent {
 		p.add(n, "marker or indentation differs from the block header")
 	}
-	if kind == "fact" {
-		p.fact(n, id, body)
-	} else {
-		p.reason(n, id, body)
+	if reason {
+		p.reason(n, text[2:])
+		return
 	}
+	p.fact(n, sm[1], sm[2])
 }
 
 func (p *commentParser) fact(n int, id, body string) {
 	c := p.cur
-	if c.pending != nil {
-		p.add(n, "%s has a fact line but no reason line", c.pending.ID)
+	if msg := CheckText(body); msg != "" {
+		p.add(n, "%s fact: %s", id, msg)
 	}
 	if first, dup := p.seen[id]; dup {
 		p.add(n, "%s already a fact at line %d", id, first)
 	}
 	p.seen[id] = n
-	c.pending = &Fact{ID: id, Fact: body, Line: n}
+	c.block.Facts = append(c.block.Facts, Fact{ID: id, Fact: body, Line: n})
+	c.afterFact = true
 }
 
-func (p *commentParser) reason(n int, id, body string) {
+func (p *commentParser) reason(n int, body string) {
 	c := p.cur
-	switch {
-	case c.pending == nil:
-		p.add(n, "reason line without fact line")
-	case c.pending.ID != id:
-		p.add(n, "reason id %s differs from fact id %s", id, c.pending.ID)
-		c.pending = nil
-	default:
-		c.pending.Reason = body
-		c.block.Facts = append(c.block.Facts, *c.pending)
-		c.pending = nil
+	last := &c.block.Facts[len(c.block.Facts)-1]
+	if msg := CheckText(body); msg != "" {
+		p.add(n, "%s reason: %s", last.ID, msg)
 	}
+	last.Reason = body
+	c.afterFact = false
 }
 
 // parseHeader reads "kira-memory origin=<o> [source=<tag>] scope=<s>".
@@ -214,7 +225,7 @@ func parseHeader(text string) (Provenance, string) {
 	return p, ""
 }
 
-var docKeys = []string{"group", "title", "origin", "source", "scope", "project", "session", "keywords", "updated"}
+var docKeys = []string{"group", "title", "from", "origin", "source", "scope", "project", "session", "keywords", "updated"}
 
 // headerValue returns why a front matter value is not YAML-safe, or "".
 func headerValue(v string) string {
@@ -247,9 +258,9 @@ type docParser struct {
 	vals     map[string]string
 
 	section string
-	cur     *Fact
-	stage   int // 0 none, 1 after fact, 2 after reason, 3 after keywords
-	seen    map[string]int
+	// last: the previous line was a fact line, so an indented line is its reason.
+	last bool
+	seen map[string]int
 }
 
 func (p *docParser) add(line int, f string, a ...any) {
@@ -257,23 +268,28 @@ func (p *docParser) add(line int, f string, a ...any) {
 }
 
 // ParseDoc parses a doc file. inScope is false when line 1 is not "---" followed by
-// "kira-memory: 1"; such a file is legacy and yields no problems.
+// "kira-memory: 2" (or "kira-memory: 1", the retired format, which yields one problem and its front
+// matter); such a file is legacy and yields no problems.
 func ParseDoc(src []byte) (Doc, bool, []Problem) {
 	lines := splitLines(src)
-	if len(lines) < 2 || lines[0] != "---" || lines[1] != "kira-memory: 1" {
+	if len(lines) < 2 || lines[0] != "---" || (lines[1] != "kira-memory: 2" && lines[1] != "kira-memory: 1") {
 		return Doc{}, false, nil
 	}
 	p := &docParser{vals: map[string]string{}, seen: map[string]int{}}
+	p.doc.Version = int(lines[1][len(lines[1])-1] - '0')
 	closeAt := p.front(lines)
 	if closeAt < 0 {
 		p.add(len(lines), "front matter is not closed with ---")
 		return p.doc, true, p.problems
 	}
 	p.checkFront()
+	if p.doc.Version == 1 {
+		p.add(2, "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2")
+		return p.doc, true, p.problems
+	}
 	for i := closeAt + 1; i < len(lines); i++ {
 		p.body(i+1, lines[i])
 	}
-	p.endBlock()
 	return p.doc, true, p.problems
 }
 
@@ -311,7 +327,7 @@ func (p *docParser) checkFront() {
 			p.add(2, "front matter lacks %s", k)
 		}
 	}
-	d.Group, d.Title = vals["group"], vals["title"]
+	d.Group, d.Title, d.From = vals["group"], vals["title"], vals["from"]
 	if _, ok := vals["group"]; ok && !IsGroupID(d.Group) {
 		p.add(2, "group must be a kg_ id")
 	}
@@ -361,68 +377,50 @@ func (p *docParser) checkScope() {
 	}
 }
 
-func (p *docParser) endBlock() {
-	if p.cur != nil && p.stage == 1 {
-		p.add(p.cur.Line, "%s has a fact line but no reason line", p.cur.ID)
-	}
-	p.cur, p.stage = nil, 0
-}
-
 func (p *docParser) body(n int, line string) {
-	if line == "" {
-		p.endBlock()
-		return
-	}
-	if hm := headingLine.FindStringSubmatch(line); hm != nil {
-		p.endBlock()
-		p.section = strings.TrimSpace(hm[1])
-		return
-	}
-	sm := memoryLine.FindStringSubmatch(line)
-	if sm == nil || sm[3] == "" || sm[3][0] == ' ' {
-		p.add(n, "body allows only blank lines, headings and '<id> fact|reason|keywords: <text>' lines")
-		p.endBlock()
-		return
-	}
-	id, kind, text := sm[1], sm[2], sm[3]
-	if msg := CheckText(text); msg != "" {
-		p.add(n, "%s %s: %s", id, kind, msg)
-	}
-	switch kind {
-	case "keywords":
-		if p.cur == nil || p.stage != 2 || p.cur.ID != id {
-			p.add(n, "keywords line must follow the reason line of the same fact")
+	reason := isReasonText(line)
+	wasFact := p.last
+	p.last = false
+	switch {
+	case line == "":
+	case reason:
+		if !wasFact {
+			p.add(n, "reason line must directly follow a fact line")
 			return
 		}
-		p.cur.Keywords = splitKeywords(text)
-		p.doc.Facts[len(p.doc.Facts)-1] = *p.cur
-		p.stage = 3
-	case "fact":
-		p.fact(n, id, text)
+		last := &p.doc.Facts[len(p.doc.Facts)-1]
+		if msg := CheckText(line[2:]); msg != "" {
+			p.add(n, "%s reason: %s", last.ID, msg)
+		}
+		last.Reason = line[2:]
 	default:
-		if p.cur == nil || p.stage != 1 || p.cur.ID != id {
-			p.add(n, "reason line must follow the fact line of the same id")
+		if hm := headingLine.FindStringSubmatch(line); hm != nil {
+			p.section = strings.TrimSpace(hm[1])
 			return
 		}
-		p.cur.Reason = text
-		p.doc.Facts = append(p.doc.Facts, *p.cur)
-		p.stage = 2
+		if retiredLine.MatchString(line) {
+			p.add(n, "%s", retiredCommentMsg)
+			return
+		}
+		sm := docFactLine.FindStringSubmatch(line)
+		if sm == nil {
+			p.add(n, "body allows only blank lines, headings, '- <id> <fact>' lines and an indented reason line")
+			return
+		}
+		p.fact(n, sm[1], sm[2])
 	}
 }
 
 func (p *docParser) fact(n int, id, text string) {
-	if p.cur != nil {
-		if p.stage == 1 {
-			p.add(p.cur.Line, "%s has a fact line but no reason line", p.cur.ID)
-		} else {
-			p.add(n, "fact blocks need a blank line or heading between them")
-		}
+	if msg := CheckText(text); msg != "" {
+		p.add(n, "%s fact: %s", id, msg)
 	}
 	if first, dup := p.seen[id]; dup {
 		p.add(n, "%s already a fact at line %d", id, first)
 	}
 	p.seen[id] = n
-	p.cur, p.stage = &Fact{ID: id, Fact: text, Line: n, Section: p.section}, 1
+	p.doc.Facts = append(p.doc.Facts, Fact{ID: id, Fact: text, Line: n, Section: p.section})
+	p.last = true
 }
 
 func indexOf(list []string, s string) int {

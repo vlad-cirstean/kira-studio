@@ -130,7 +130,7 @@ func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, e
 			bad++
 			continue
 		}
-		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: fact, Reason: reason, Keywords: m.Keywords})
+		doc.Facts = append(doc.Facts, memfmt.Fact{ID: m.LineageID, Fact: fact, Reason: reason})
 	}
 	if len(doc.Facts) == 0 {
 		return "", left, bad, errNoDocFacts

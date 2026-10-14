@@ -77,10 +77,7 @@ func (s *Service) ApplyDoc(ctx context.Context, req ApplyDocRequest) (ApplyDocRe
 func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, requestID string, groups []GroupRef, f memfmt.Fact) (DocOutcome, error) {
 	d := req.Doc
 	out := DocOutcome{ID: f.ID}
-	keywords := cleanKeywords(f.Keywords)
-	if len(keywords) == 0 {
-		keywords = cleanKeywords(d.Keywords)
-	}
+	keywords := cleanKeywords(d.Keywords)
 	if n := utf8.RuneCountInString(f.Fact); n > MaxFactLen {
 		out.Action, out.Why = DocSkipped, fmt.Sprintf("Fact is over %d characters.", MaxFactLen)
 		return out, nil
