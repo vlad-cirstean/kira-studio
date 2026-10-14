@@ -652,7 +652,7 @@ var HeadlessRebaseReportSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessRebaseReportSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessRebaseReportSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessRebaseReportSuffix.usedBy.body",
-	Default:    `Run git only with the git tool: pass the worktree path from the list above and the words after git as args. There is no shell. When finished, call finish_step. status "done" only when every branch above is rebased and no rebase is in progress. status "failed" with reason, conflictedFiles, lastGitError and tried when you could not finish; leave a rebase in progress only when you could not resolve it, and say so. status "needs_input" with your question when you need a decision. Kira Space checks the result in git.`,
+	Default:    `Run git only with the git tool: pass the worktree path from the list above and the words after git as args. No shell. When finished, call finish_step. status "done" only when every branch above is rebased and no rebase is in progress. status "failed" with reason, conflictedFiles, lastGitError and tried when you could not finish; leave a rebase in progress only when you could not resolve it, and say so. status "needs_input" with your question when you need a decision. Kira Space checks the result in git.`,
 }, NoVars{})
 
 // HeadlessScriptReportSuffix ends every smart script prompt.

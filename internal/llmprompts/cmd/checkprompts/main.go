@@ -1,6 +1,7 @@
 // Command checkprompts fails when an LLM prompt lives outside internal/llmprompts: a jsonschema
 // tag, an MCP description or system prompt that is not an llmprompts call, or a copy of a
-// registry default in Go, TS or Vue code. Run from the repo root.
+// registry default in Go, TS or Vue code. It also fails a default that holds filler words and an entry
+// over its line in internal/llmprompts/testdata/budget.tsv. Run from the repo root.
 package main
 
 import (
@@ -73,13 +74,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "checkprompts:", err)
 		os.Exit(2)
 	}
+	problems = append(problems, styleProblems()...)
+	problems = append(problems, budgetProblems(root)...)
 	if len(problems) > 0 {
 		sort.Strings(problems)
 		fmt.Fprintln(os.Stderr, strings.Join(problems, "\n"))
-		fmt.Fprintf(os.Stderr, "checkprompts: %d prompt(s) outside internal/llmprompts; move them into the registry\n", len(problems))
+		fmt.Fprintf(os.Stderr, "checkprompts: %d problem(s): move prompts into internal/llmprompts, keep defaults terse, keep budget.tsv in step\n", len(problems))
 		os.Exit(1)
 	}
-	fmt.Println("checkprompts: every prompt lives in internal/llmprompts.")
+	fmt.Println("checkprompts: every prompt lives in internal/llmprompts, terse and within budget.")
 }
 
 func skipFile(name string) bool {

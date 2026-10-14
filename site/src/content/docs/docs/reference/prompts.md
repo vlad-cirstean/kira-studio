@@ -48,7 +48,7 @@ Some prompts must include shared paragraphs. Click one in the editor to insert i
 ## Badges
 
 - **Edited**: your text replaces the default.
-- **Default changed**: the default changed after you saved the edit. Review the diff.
+- **Default changed**: the default changed after you saved the edit, for example when an app update shortens it. Review the diff.
 - **Invalid**: the saved edit fails validation, so the default is in use.
 
 ## When an edit applies
