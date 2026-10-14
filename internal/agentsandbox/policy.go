@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // Access is how much a run may write.
@@ -84,6 +86,8 @@ type Denial struct {
 	Op      string    `json:"op"`
 	Target  string    `json:"target"`
 	Process string    `json:"process"`
+	// Count is how often this (op, target) occurred in the run so far; 1 marks the first.
+	Count int `json:"count"`
 }
 
 // ExpandHome turns "~/x" into home/x; any other path must already be absolute.
@@ -153,7 +157,7 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		for _, e := range list {
 			r, err := real(e)
 			if err != nil {
-				notes = append(notes, "sandbox path missing: "+e)
+				notes = append(notes, i18n.T("backend.space.ade.sandbox.pathMissing.body", map[string]string{"path": e}))
 				continue
 			}
 			out = appendUnique(out, r)

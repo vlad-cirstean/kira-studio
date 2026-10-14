@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 func TestResolvePolicy(t *testing.T) {
@@ -36,7 +38,7 @@ func TestResolvePolicy(t *testing.T) {
 	if len(p.Read) != 1 || p.Read[0] != filepath.Join(home, "specs") {
 		t.Fatalf("read: %v", p.Read)
 	}
-	if len(notes) != 1 || notes[0] != "sandbox path missing: ~/nope" {
+	if len(notes) != 1 || notes[0] != i18n.T("backend.space.ade.sandbox.pathMissing.body", map[string]string{"path": "~/nope"}) {
 		t.Fatalf("notes: %v", notes)
 	}
 	if len(p.Git) != 1 || p.Git[0].GitDir != filepath.Join(repo, ".git", "worktrees", "wt") || p.Git[0].CommonDir != filepath.Join(repo, ".git") {

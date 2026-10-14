@@ -1127,6 +1127,20 @@
         "runNotFound": {
           "body": "That run no longer exists."
         },
+        "sandbox": {
+          "noSandboxExec": {
+            "body": "The sandbox is unavailable because /usr/bin/sandbox-exec is missing. Turn the step’s sandbox off or repair macOS."
+          },
+          "notEnforced": {
+            "body": "The sandbox is not enforced on this OS. It runs on macOS only. Claude permission rules still apply, but they do not stop shell commands."
+          },
+          "pathMissing": {
+            "body": "Sandbox path missing: {path}."
+          },
+          "profileInvalid": {
+            "body": "The sandbox profile did not load: {detail}."
+          }
+        },
         "scriptTooLarge": {
           "body": "The script is too large."
         },
