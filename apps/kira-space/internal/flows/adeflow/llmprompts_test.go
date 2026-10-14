@@ -42,7 +42,7 @@ func TestRunUsesEditedFinishInstruction(t *testing.T) {
 	if !strings.HasSuffix(got, "\n\n"+finishOverride) {
 		t.Fatalf("prompt = %q, want it to end with the edited instruction", got)
 	}
-	if strings.Contains(got, "call the finish_step tool with status") {
+	if strings.Contains(got, "call finish_step with status") {
 		t.Fatalf("prompt still carries the default instruction: %q", got)
 	}
 }

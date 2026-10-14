@@ -40,7 +40,7 @@ function fixtureData(): RegExp[] {
     new RegExp(`^(?:${token}|⟦[^⟧]*⟧|[\\s\\d.,:%·–—+\\-/→✓⚠▲›…↩≤])+$`),
     /\b\d{4}\b|\b\d+\s?(second|minute|hour|day|month|year)s?\b|\bago\b/,
     // Sent to Claude, not shown as chrome; notes toolbar glyph letters; palette ids stay raw by decision.
-    /^When this step is done, call the finish_step tool/,
+    /^When this step is done, call finish_step/,
     /^(red|amber|green|cyan|blue|magenta|grey)$/,
     /^(connecting|connected|error)$/,
     /^[BIH]$/,

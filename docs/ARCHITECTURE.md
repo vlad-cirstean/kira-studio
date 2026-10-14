@@ -4985,6 +4985,7 @@ Opt-in harness that scores the ingest pipeline on real repo text. Runs real `cla
 - Cost: a tuning run is about 4 to 5 USD and 8 to 10 min; hold-out about 1.3 USD. Spend ledger `docs/v2.5/plans/P285-runs/spend.jsonl`; the harness stops at the run and phase caps. Round data: `docs/v2.5/plans/P285-runs/`. Results: `docs/v2.5/plans/P285-report.md`.
 - Caveats: embedder off (reconcile sees keyword candidates only); token numbers use `ceil(runes/3)`; judge and extractor noise is as large as most single changes; the golden list rewards qualifier-heavy facts.
 - Part 2 (P285): terse reconcile, finalize, verify and MCP texts; new `distill` tool. Final tuning numbers (terse gate): `R_ess` 0.859, `R_all` 0.658, `P` 0.904, `C_fact` 0.451; the terse gate was reverted after that round (`R_all` under its floor). Unified import tried and reverted (`C_fact` 0.55). See the report, Part 2.
+- Part 4 (P289): terse registry defaults, 5-source tuning subset (`plan-p257`, `spec-chunk-go`, `doc-arch-prompts`, `cmt-runner-go`, `json-ade-errors`), ledger `spend-p289.jsonl`. Reference = mean of `round-p289-00a`/`00b`: `R_ess` 0.871, `R_all` 0.712, `P` 0.635 (noise 0.106 between the two), `C_fact` 0.443; `round-p289-01` passes every Part 1 band (`R_ess` 0.877, `R_all` 0.756, `P` 0.614, `C_fact` 0.452). A bolder extract edit (`01c`/`01d`, mean `P` 0.568 under the floor 0.570) was reverted.
 - Part 3 (P285): compact output format v2 (above), locator by code, merge rule. Free `KIRA_EVAL_MODE=footprint` with `KIRA_EVAL_ROUNDS=<r1,r2>` re-renders stored facts of listed rounds (`footprint-p273.json`, `footprint-v2.json`). `C_doc` is now the `RenderDoc` render over source runes for every source, with `renderProblems`, `docMismatch` and `locatorShare` per source. Gates and results: `round-p3-01` tuning `C_fact` 0.434, `C_doc` 0.532, `R_ess` 0.885, unsupported 0.005; hold-out `C_fact` 0.457, `R_ess` 0.876. See the report, Part 3.
 - Write-back (P285 fix): the `.memory.md` writer adjusts a title with `: ` or ` #` and strips inline Markdown from facts before `memfmt.FormatDoc`; a fact that stays invalid is left out and counted in `doc_error`. Before, most imports failed write-back with a format error.
 
@@ -5166,16 +5167,17 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
 
 - **Registry.** `registry.go` is the one file with prompt text. Entry: id, kind, apps, title/purpose/usedBy
   catalog keys, applies-when, default, required fragments, fixed output schema. Typed handle
-  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 85 entries: Space lists 61,
-  Studio 33. User-authored text (smart-script bodies, workflow stage and step prompts) stays out, as do
+  `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 126 entries: Space lists 102,
+  Studio 34. User-authored text (smart-script bodies, workflow stage and step prompts) stays out, as do
   tool and server names, tool error strings and result data formatting.
 - **Kinds.** `system`, `message`, `suffix`, `instructions`, `tool`, `argument` (one MCP tool property
   description; carries `Parent` tool and `Field`), `toolResult`, `fragment` (included via `{{template}}`).
   `InputSchema[T]` sets each tool property's description from its `argument` entry; a mismatch panics at
   server build. No `jsonschema:"..."` tags.
 - **Templates.** `text/template`, one set per resolve; funcs `inc` and `join` only. An entry with `NoVars`
-  and no fragments is literal, never parsed. Defaults render byte-identical to the pre-P271 output
-  (`testdata/golden`). `RenderParts` wraps each string variable in marker runes and splits, so Settings
+  and no fragments is literal, never parsed. `testdata/golden` holds the current defaults rendered over fixed
+  inputs; regenerate with `go test ./internal/llmprompts -run TestGolden -update` after an intended default
+  change and review the diff. `RenderParts` wraps each string variable in marker runes and splits, so Settings
   Preview marks resolved values with `VarText`; a failed self-check returns one literal part.
 - **Store.** `<home>/llm-prompts.json` (`~/.kira-studio/`, `~/.kira-space/`), per app, written with
   `renameio`, mode 0600. Shape `{version, revision, overrides: {id: {text, defaultHash, updatedAt}}}`.
@@ -5206,7 +5208,21 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
   tag, an `mcp.Tool`/`mcp.Prompt`/`mcp.PromptArgument` `Description` or `mcp.ServerOptions`
   `Instructions` not from `llmprompts`, a `memory.Call` `System` not from `llmprompts`, or a copy of a
   registry default (first 48 characters; whole text when 24 to 47) in a non-test `.go`, `.ts` or `.vue`
-  file outside `internal/llmprompts` and `internal/flowtest`.
+  file outside `internal/llmprompts` and `internal/flowtest`. It also fails a default that holds a filler
+  word (`please`, `just`, `simply`, `basically`, `actually`, `really`, `very`, `of course`, `certainly`,
+  `kindly`, `in order to`, `make sure`, `note that`, `it is important`, `you should`, `feel free`, `→`)
+  outside template actions, backticks and double-quoted spans, and an entry whose rendered example
+  exceeds its line in `internal/llmprompts/testdata/budget.tsv` (a ratchet: a new prompt needs a line, a
+  longer one a visible diff).
+- **Terse defaults (P289).** Defaults follow `CLAUDE.md` Communication style: fragments, imperative, no
+  filler. Kept verbatim: `memory.dataHygiene`, the secrets clauses, the `dbmcp.instructions` permissions and
+  masked-columns sentences, error strings, negations, numbers, template actions, and the fakeagent match
+  keys. Tooling (`go run ./internal/llmprompts/cmd/...`): `promptsizes` prints sizes, `-snapshot f.json`
+  writes defaults and sizes, `-compare f.json` prints before and after per id and fails on a lost
+  protected token (actions, numbers, quoted spans, identifiers, tool argument names, negations; allowed
+  losses in `docs/v2.5/plans/P289-runs/allowed-losses.tsv`); `promptdistill` drafts a terse version through the
+  memory `distill` core (opt-in, spends tokens). Result: 126 entries, 30567 to 29507 characters (-3.5 %),
+  -6.0 % over the 52 rewritten entries; the memory texts were already at the P285 Part 2 floor.
 
 ## Renderer security surface
 

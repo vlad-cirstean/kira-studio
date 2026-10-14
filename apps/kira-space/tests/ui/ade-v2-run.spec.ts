@@ -75,7 +75,7 @@ test('the Run dialog shows the default message and the read-only suffix', async 
     /^Task: .*\n- Jira: PAY-130 \S+\n- Repo: \{repo\} · Branch: \{branch\} · Worktree: \{worktree\}\nStep 1\/5: Plan from spec\n/,
   );
   await expect(dialog.locator(t('ade-run-suffix'))).toHaveText(previewText('finish'));
-  await expect(dialog.locator(t('ade-run-suffix'))).toContainText('call the finish_step tool');
+  await expect(dialog.locator(t('ade-run-suffix'))).toContainText('call finish_step');
   await expect(msg).not.toHaveValue(/finish_step/);
   // The message is the backend render without the finish instruction the dialog shows apart.
   await expect(msg).toHaveValue(previewText('step').replace(`\n\n${previewText('finish')}\n`, ''));

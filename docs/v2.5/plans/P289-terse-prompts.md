@@ -191,7 +191,7 @@ in the results ledger (§8) in the same or next commit.
 
 Step 5. After G3, G2 and G1 land: eval `round-p289-01` (§5). Commit outputs. Decide per §5; reverts as D13.
 
-Step 6. Sweep for P286-P288 prompts (runs as soon as the P288 row is Done; if P288 was Done at Step 0,
+Step 6 (pending after the P289 implementer pass: runs once P288 is Done). Sweep for P286-P288 prompts (runs as soon as the P288 row is Done; if P288 was Done at Step 0,
 it runs now). `promptsizes -compare before.json` lists ids absent from `before.json` or changed since it
 by another phase; each gets the style audit and §3 where it has filler or repetition; rows of the touched
 integration (ADE row for workflow prompts; the P287 macOS and sandbox rows its plan adds). Commit
@@ -303,6 +303,143 @@ estimate under 0.01 per run), copied into §8.
 - Reverted prompts: id, round or row, metric or failure.
 - Ids with no row exercising them (D12).
 - Allowed protected-token losses (copy of `allowed-losses.tsv` with reasons).
+
+### Results (implementer, Steps 0-5 and 7; Step 6 pending)
+
+Base `2bed9cefc`. Step 0: P286, P287, P288 not Done at start; scope = the 126 entries of the base.
+Commands: `go run ./internal/llmprompts/cmd/promptsizes -compare docs/v2.5/plans/P289-runs/before.json`
+(exit 0), `docs/v2.5/plans/P289-runs/{before.json,distill.jsonl,allowed-losses.tsv}`.
+
+**Ledger (USD).** Real rows count only `claude -p` results the suites print; TUI and MCP-session spend is
+not counted.
+
+| step | planned | actual | running |
+|---|---|---|---|
+| 2 distill drafts (31 ids) | 1.0 | 0.275 | 0.275 |
+| 3 `round-p289-00a`, `00b` | 3.0 | 2.983 | 3.258 |
+| 4 rows G6, G4, G5, G3, G2, G1 (plus one rerun for the extract edit) | 1.1 | about 0.15 counted | 3.41 |
+| 5 `round-p289-01` | 1.5 | 1.578 | 4.99 |
+| 5 extra: `01c`, `01d` (bolder extract edit), `01d` first attempt hit the phase cap at 1.01 | 3.0 | 4.31 | 9.30 |
+
+Total about 9.3 of 15. The 9 USD eval phase cap in §5 was raised to 12 for the `01d` rerun.
+
+**Sizes** (rendered example, chars and `ceil(runes/3)`; 126 entries, 52 changed, the rest already terse or D2/D3):
+
+| group | entries | changed | chars before | chars after | tok before | tok after | change |
+|---|---|---|---|---|---|---|---|
+| G1 memory pipeline | 7 | 2 | 12663 | 12520 | 4222 | 4175 | -1.1% |
+| G2 memory MCP | 48 | 3 | 6102 | 6064 | 2046 | 2033 | -0.6% |
+| G3 memory results, remember | 7 | 6 | 1215 | 1183 | 407 | 396 | -2.6% |
+| G4 headless | 30 | 20 | 3849 | 3610 | 1293 | 1212 | -6.2% |
+| G5 ADE messages, resume | 10 | 3 | 2181 | 2124 | 731 | 711 | -2.6% |
+| G6 DB MCP | 24 | 18 | 4557 | 4006 | 1524 | 1342 | -12.1% |
+| total | 126 | 52 | 30567 | 29507 | 10223 | 9869 | -3.5% |
+
+Over the 52 rewritten entries: 17401 to 16362 chars, -6.0%. The 25 % target is not met: P285 Part 2 and
+P286 had already compacted the memory and workflow texts, and D2 text stays verbatim. Per prompt:
+
+| id | chars before | chars after | tok before | tok after | change |
+|---|---|---|---|---|---|
+| ade.rebase.prompt | 350 | 338 | 117 | 113 | -3.4% |
+| ade.review.message | 353 | 342 | 118 | 114 | -3.1% |
+| dbmcp.instructions | 1484 | 1400 | 495 | 467 | -5.7% |
+| dbmcp.tool.describe_schema | 132 | 127 | 44 | 43 | -3.8% |
+| dbmcp.tool.describe_schema.arg.path | 57 | 52 | 19 | 18 | -8.8% |
+| dbmcp.tool.describe_schema.arg.refresh | 69 | 60 | 23 | 20 | -13.0% |
+| dbmcp.tool.describe_table.arg.path | 66 | 59 | 22 | 20 | -10.6% |
+| dbmcp.tool.describe_table.arg.refresh | 69 | 60 | 23 | 20 | -13.0% |
+| dbmcp.tool.explain_query | 369 | 357 | 123 | 119 | -3.3% |
+| dbmcp.tool.explain_query.arg.includeRaw | 131 | 113 | 44 | 38 | -13.7% |
+| dbmcp.tool.explain_query.arg.path | 151 | 121 | 51 | 41 | -19.9% |
+| dbmcp.tool.explain_query.arg.sql | 100 | 80 | 34 | 27 | -20.0% |
+| dbmcp.tool.list_children | 185 | 167 | 62 | 56 | -9.7% |
+| dbmcp.tool.list_children.arg.path | 124 | 85 | 42 | 29 | -31.5% |
+| dbmcp.tool.list_children.arg.refresh | 69 | 60 | 23 | 20 | -13.0% |
+| dbmcp.tool.list_connections | 137 | 120 | 46 | 40 | -12.4% |
+| dbmcp.tool.run_query | 798 | 609 | 266 | 203 | -23.7% |
+| dbmcp.tool.run_query.arg.maxRows | 115 | 101 | 39 | 34 | -12.2% |
+| dbmcp.tool.run_query.arg.path | 150 | 121 | 50 | 41 | -19.3% |
+| dbmcp.tool.run_query.arg.sql | 65 | 28 | 22 | 10 | -56.9% |
+| headless.finishStep.suffix | 261 | 240 | 87 | 80 | -8.0% |
+| headless.rebase.reportSuffix | 525 | 508 | 175 | 170 | -3.2% |
+| headless.script.reportSuffix | 243 | 221 | 81 | 74 | -9.1% |
+| headless.space.instructions | 300 | 296 | 100 | 99 | -1.3% |
+| headless.space.suffix | 285 | 267 | 95 | 89 | -6.3% |
+| headless.tool.branch_status | 115 | 93 | 39 | 31 | -19.1% |
+| headless.tool.branch_status.arg.repo | 51 | 42 | 17 | 14 | -17.6% |
+| headless.tool.branch_status.arg.waitSeconds | 70 | 56 | 24 | 19 | -20.0% |
+| headless.tool.declare_repos | 169 | 169 | 57 | 57 | +0.0% |
+| headless.tool.declare_repos.arg.repos | 92 | 91 | 31 | 31 | -1.1% |
+| headless.tool.finish_step.arg.lastGitError | 34 | 30 | 12 | 10 | -11.8% |
+| headless.tool.finish_step.arg.status | 100 | 86 | 34 | 29 | -14.0% |
+| headless.tool.git | 335 | 325 | 112 | 109 | -3.0% |
+| headless.tool.git.arg.args | 101 | 93 | 34 | 31 | -7.9% |
+| headless.tool.git.arg.worktree | 46 | 36 | 16 | 12 | -21.7% |
+| headless.tool.request_branch | 169 | 151 | 57 | 51 | -10.7% |
+| headless.tool.request_branch.arg.name | 55 | 47 | 19 | 16 | -14.5% |
+| headless.tool.request_branch.arg.repo | 51 | 42 | 17 | 14 | -17.6% |
+| headless.tool.run_outcome | 191 | 183 | 64 | 61 | -4.2% |
+| headless.tool.task_info | 137 | 115 | 46 | 39 | -16.1% |
+| memory.gate.system | 3384 | 3316 | 1128 | 1106 | -2.0% |
+| memory.import.extract.system | 2025 | 1950 | 675 | 650 | -3.7% |
+| memory.mcp.ingest.awaiting | 221 | 217 | 74 | 73 | -1.8% |
+| memory.mcp.instructions | 1670 | 1644 | 557 | 548 | -1.6% |
+| memory.mcp.remember.message | 470 | 456 | 157 | 152 | -3.0% |
+| memory.mcp.semantic.notInstalled | 122 | 119 | 41 | 40 | -2.5% |
+| memory.mcp.semantic.unavailable | 97 | 94 | 33 | 32 | -3.1% |
+| memory.mcp.store.challenged | 107 | 102 | 36 | 34 | -4.7% |
+| memory.mcp.store.prepared | 90 | 87 | 30 | 29 | -3.3% |
+| memory.mcp.tool.store_memory | 493 | 490 | 165 | 164 | -0.6% |
+| memory.mcp.tool.store_memory.arg.items.origin | 144 | 135 | 48 | 45 | -6.2% |
+| run.resume.line | 274 | 261 | 92 | 87 | -4.7% |
+| total | 30567 | 29507 | 10223 | 9869 | -3.5% |
+
+**Eval** (subset of 5 tuning sources; reference = mean of `00a`, `00b`; bands from §5):
+
+| metric | `00a` | `00b` | reference | noise | `01` | band floor or ceiling | verdict |
+|---|---|---|---|---|---|---|---|
+| `R_ess` | 0.869 | 0.873 | 0.871 | 0.004 | 0.877 | 0.851 | pass |
+| `R_all` | 0.716 | 0.708 | 0.712 | 0.008 | 0.756 | 0.692 | pass |
+| `P` | 0.582 | 0.688 | 0.635 | 0.106 | 0.614 | 0.570 | pass |
+| unsupported | 0 | 0.011 | 0.005 | 0.011 | 0 | 0.015 | pass |
+| duplicate | 0 | 0 | 0 | 0 | 0 | 0.020 | pass |
+| `C_fact` | 0.436 | 0.450 | 0.443 | 0.014 | 0.452 | 0.472 | pass |
+
+`round-p289-01` passed every band: all memory prompt rewrites kept. A bolder second pass on
+`memory.import.extract.system` (-9.7 % chars) was measured as `01c` (`P` 0.541, out of band, `R_ess` 0.918)
+and `01d` (`P` 0.596); the mean `P` 0.568 sits 0.002 under the floor 0.570, so that second edit was
+reverted to the first-pass text that `01` measured. Final extract text equals the `01` text. P noise
+between `00a` and `00b` (0.106) exceeds the band 0.065.
+
+**Rows** (all green, `-count=1`): G6 `test:claude:studio` (smart script run); G4 and G5 the Space row
+`TestAdeHeadlessRun|TestAdeStepResults|TestAdeStageSession|TestAdeRebaseRun|TestAdeResumeRun|TestAdeResumeLost|TestSmartScriptRun|TestSmartScriptResume`
+(0.023 and 0.021 USD) plus Studio `TestSmartScriptRun|TestSmartScriptResume`; G3, G2, G1 (run together after
+the G1 commit, one compiled test binary): `TestMemoryGate`, `TestMemoryImport`, `TestMemoryIngestThroughClaude`,
+`TestMemoryDistill`, `TestMemoryDistillBridge`, `TestMemoryMcpThroughClaude`, `TestMemoryMcpFollowsDocs`,
+`TestMemoryInstallRegisters`; `TestMemoryImport`, `TestMemoryIngestThroughClaude`, `TestAdeRebaseRun` rerun
+on the final extract and rebase suffix.
+
+**Reverted prompts.** None for a failing row or round-01. Second extract edit (described above) reverted
+before the commit, never shipped.
+
+**Ids no row exercises (D12).** G6 `test:claude:studio` ran `TestDbMcpThroughClaude`,
+`TestDbMcpInstallRegisters` and `TestSmartScriptRun`, all green, so `dbmcp.*` has a row. Without a paid
+row (D9 plus goldens and flow tests only): `ade.review.message`, `memory.mcp.semantic.*`,
+`memory.mcp.store.prepared`, `memory.mcp.ingest.awaiting`.
+
+**Allowed protected-token losses** (`allowed-losses.tsv`): `headless.tool.branch_status`, negation "no"
+1 to 0, "no longer running" reworded to "stops running".
+
+**Deviations.** (1) Memory-group rows ran once after the G1 commit, not after each of G3, G2, G1.
+(2) D10 style check also ignores double-quoted spans (the gate lists the filler words it tells the model to
+cut). (3) D9 field check covers the entry's own tool and sibling argument names, not every registry field
+(common words such as `mode` gave false losses). (4) Distill drafts shortened little (guidance only);
+rewrites were by hand under §3. (5) Memory MCP, gate and extract texts shrank 1 to 4 %; they were already
+at the P285 Part 2 floor. (6) Tests that asserted old default text now assert the new default or the
+registry render (`mcpserver` and `memoryflow` prepared line, `adeflow` override check, two UI specs).
+
+**Step 6 pending.** The sweep of P286-P288 prompts runs after P288 lands (orchestrator). `budget.tsv`
+has no line for those prompts yet, so `checkprompts` fails on them until each gets a line (D10 design).
 
 ## 9. Docs and close-out
 
