@@ -290,5 +290,75 @@ Reference = Part 1 `round-final` tuning aggregate (10 sources): `R_ess` 0.883, `
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | p2-01 | terse gate and reconcile keep recall | gate and reconcile terse (override), rest as Part 1 | 0.859 | 0.672 | 0.880 | 0.009 | 0.000 | 0.457 | 0.905 | 4.2 | 4.3 | `R_ess` 0.004 and `R_all` 0.021 under their floors; `C_fact` -0.040, `P` and unsupported in band; confirmation rerun next (noise rule) |
 | p2-01b | confirmation rerun of p2-01 (same code) | none | 0.862 | 0.695 | 0.887 | 0.003 | 0.000 | 0.478 | 0.770 | 4.4 | 8.6 | `R_ess` 0.001 under floor 0.863 (one golden fact is 0.0013), `R_all` in band. Judged noise, not a confirmed regression: Part 1 identical-code rounds 2 and final span 0.853 to 0.883 (mean 0.868), p2-01 and p2-01b mean 0.8605. Terse gate and reconcile kept (commit `feat(memory): terse gate and reconcile prompts`). Final M5 round decides. |
+| p2-02 | unified pipeline: distill per chunk, code-built reason, no evidence | commit `5866fd5e1`, all terse defaults | 0.924 | 0.836 | 0.865 | 0.005 | 0.000 | 0.549 | 0.715 | 4.5 | 13.7 | `C_fact` 0.023 over ceiling; recall far above Part 1 |
+| p2-03 | skip inventories and merge restating lines | distill prompt (override only) | 0.920 | 0.836 | 0.861 | 0.008 | 0.000 | 0.552 | 0.763 | 4.5 | 18.2 | no `C_fact` gain; fallback (D23): `5866fd5e1` reverted, terse finalize and verify kept in the evidence shape |
+| p2-final | final run, all 15 sources, fallback tree | none | 0.859 | 0.658 | 0.904 | 0.006 | 0.000 | 0.451 | 0.814 | 6.4 | 24.6 | `R_ess` 0.004 and `R_all` 0.035 under floors; `C_fact` -0.046. Hold-out in band |
+| p2-04 | Part 1 gate against the terse gate | gate text (override only), 8 of 10 tuning sources | 0.864 | 0.694 | 0.860 | 0.003 | 0.000 | 0.472 | 0.946 | 3.9 | 28.5 | on those 8 sources `R_all` +0.040, `P` -0.040 vs terse gate; terse gate reverted |
 
 Note: `reason ok` fell (0.905, 0.770 vs 0.985) because the terse gate rewrites the evidence quote in reasons; not gated (judge asks for a quote that Part 2 removes).
+
+## 10. Prompt sizes after
+
+Same command, final tree. Only rows that changed are listed; every other `memory.*` row is identical to section 8.
+
+| id | chars before | chars after | tok before | tok after | change |
+|---|---|---|---|---|---|
+| memory.reconcile.system | 1432 | 1344 | 478 | 448 | -6% |
+| memory.distill.system | - | 1763 | - | 588 | new |
+| memory.import.finalize.system | 2442 | 2188 | 814 | 730 | -10% |
+| memory.import.verify.system | 1506 | 1355 | 502 | 452 | -10% |
+| memory.mcp.instructions | 1437 | 1559 | 479 | 520 | +8% |
+| memory.mcp.tool.store_memory | 453 | 439 | 151 | 147 | -3% |
+| memory.mcp.tool.search_memories | 238 | 229 | 80 | 77 | -4% |
+| memory.mcp.tool.memory_history | 84 | 80 | 28 | 27 | -5% |
+| memory.mcp.tool.memory_context | 182 | 171 | 61 | 57 | -6% |
+| memory.mcp.tool.ingest_files | 362 | 359 | 121 | 120 | -1% |
+| memory.mcp.tool.ingest_status | 266 | 260 | 89 | 87 | -2% |
+| memory.mcp.tool.distill | - | 144 | - | 48 | new |
+| memory.mcp.tool.distill.arg.text | - | 51 | - | 17 | new |
+| memory.mcp.tool.distill.arg.path | - | 27 | - | 9 | new |
+| memory.mcp.tool.distill.arg.mode | - | 60 | - | 20 | new |
+| total | 17358 | 18985 | 5800 | 6344 | +9% |
+
+Reading: reconcile, finalize, verify and the tool texts shrank 1 to 10 %. The gate is back at its Part 1 text (reverted, section 11), so it did not shrink. The MCP instructions grew by the `distill` line and the "do not Read the file first" clause. The total grew because `memory.distill.system` and the `distill` tool are new (+2045 chars, +682 tokens); without them the existing memory prompts shrank. The 25 to 40 % target of the plan was not met: the old texts were already short, and the rules (negations, numbers, safety clauses) cannot shrink.
+
+## 11. Part 2 results
+
+Final round `round-p2-final`, all 15 sources, committed defaults at that time (terse gate, reconcile, finalize, verify; extract unchanged). Tuning aggregate against the Part 1 reference and floors:
+
+| metric | Part 1 final | floor / ceiling | `round-p2-final` tuning | in band |
+|---|---|---|---|---|
+| `R_ess` | 0.883 | >= 0.863 | 0.859 | no (0.004 under) |
+| `R_all` | 0.713 | >= 0.693 | 0.658 | no (0.035 under) |
+| `P` | 0.895 | >= 0.830 | 0.904 | yes |
+| unsupported | 0.000 | <= 0.010 | 0.006 | yes |
+| duplicate | 0.000 | <= 0.020 | 0.000 | yes |
+| `C_fact` | 0.497 | <= 0.526 | 0.451 | yes (better) |
+
+Hold-out (5 sources, reported, not tuned): `R_ess` 0.837 (Part 1 0.826), `R_all` 0.642 (0.628), `P` 0.882 (0.892), unsupported 0.000, duplicate 0.011, `C_fact` 0.462 (0.479). All 15: `R_ess` 0.853, `R_all` 0.654, `P` 0.899, `C_fact` 0.454.
+
+After that round the gate was reverted to its Part 1 text (see below). The reverted tree was measured only by `round-p2-04` (Part 1 gate via override; the cap stopped it after 8 of 10 tuning sources). On those 8 sources: Part 1 final 0.882 / 0.716 / 0.898 / `C_fact` 0.491; terse gate 0.856 / 0.654 / 0.900 / 0.441; Part 1 gate 0.864 / 0.694 / 0.860 / 0.472 (`R_ess`, `R_all`, `P`, `C_fact`). So the revert recovers `R_all` to the band edge and costs `P` (still above its floor). The final tree (terse reconcile, finalize, verify and MCP texts, Part 1 gate and extract) has no full 10-source round: the budget ended. Treat the band result as "met on 8 of 10 sources, not confirmed on the full set".
+
+### Decision: fallback taken for the unified pipeline
+
+Built and measured as planned (distill prompt per chunk, section from the heading path, `Stated in <path>, <section>` reason built by code, no evidence quote, salient-token questionable rule, evidence-free verify and finalize). `round-p2-02` (tuning): `R_ess` 0.924, `R_all` 0.836, `P` 0.865, unsupported 0.005, duplicate 0.000, `C_fact` 0.549. One fix round `round-p2-03` (distill override: skip inventories, merge restating lines): 0.920 / 0.836 / 0.861 / 0.008 / 0.000 / 0.552. Recall rose far above Part 1, but `C_fact` stayed 0.023 to 0.026 over its ceiling 0.526, with 360 extracted lines against 221. The rule is `C_fact` not worse, so per plan D23 commit `5866fd5e1` was reverted. `distill` stays a standalone tool and prompt (Part 4 builds the UI on `importer.Distiller`). Import still runs the extract prompt with an evidence quote. The recall gain of the unified prompt is a real finding for a later part: the cost is more, shorter facts.
+
+Reverted prompts, listed:
+
+| prompt | round | metric |
+|---|---|---|
+| unified import (distill per chunk) | `round-p2-02`, `round-p2-03` | `C_fact` 0.549 and 0.552 over ceiling 0.526 |
+| `memory.gate.system` (terse) | `round-p2-final` | `R_all` 0.658 under floor 0.693; text back to Part 1 |
+| `memory.distill.system` override of round 3 | `round-p2-03` | no `C_fact` gain; never a default |
+
+`reason ok` is not gated: the frozen judge asks for a quote. It read 0.715 to 0.814 in rounds with terse prompts.
+
+### Spend and real rows
+
+Ledger `P285-runs/spend-p2.jsonl`: 28.51 USD of the 30 USD cap after `round-p2-04`. The cap stopped `round-p2-04` at 8 of 10 sources. The first attempt of `round-p2-final` was killed at the 30 minute task limit after 9 sources and resumed from disk (no spend lost). Real `claude` rows after the final tree, all green: `TestMemoryGate`, `TestMemoryImport`, `TestMemoryIngestThroughClaude`, `TestMemoryMcpThroughClaude`, `TestMemoryMcpFollowsDocs` (store, files, distill), `TestMemoryInstallRegisters`, `TestMemoryDistill`. Their spend is not metered in the ledger (about 1 USD).
+
+### Example (`cmt-claude-go`, first facts)
+
+Part 1 final: "Call is one isolated structured Claude Code request." / "When Call.MCPConfig is set, it is an inline --mcp-config JSON naming the only MCP servers the call may use, and AllowedTools lists the only tools it may call."
+
+Unified distill (`round-p2-02`): "Call: one isolated structured Claude Code request." / "Call.MCPConfig, when set, is inline --mcp-config JSON naming the only MCP servers the call may use; AllowedTools then lists the only tools it may call."

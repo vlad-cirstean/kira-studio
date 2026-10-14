@@ -4967,6 +4967,7 @@ Opt-in harness that scores the ingest pipeline on real repo text. Runs real `cla
 - Metrics: `R_ess`, `R_all` (golden recall, partial counts 0.5), `P` (precision), atomic, standalone, unsupported, duplicate, `C_fact` (stored fact chars over source chars), `C_rec` (fact, reason, keywords), `C_doc` (the written `.memory.md`). Noise bands come from two baseline runs.
 - Cost: a tuning run is about 4 to 5 USD and 8 to 10 min; hold-out about 1.3 USD. Spend ledger `docs/v2.5/plans/P285-runs/spend.jsonl`; the harness stops at the run and phase caps. Round data: `docs/v2.5/plans/P285-runs/`. Results: `docs/v2.5/plans/P285-report.md`.
 - Caveats: embedder off (reconcile sees keyword candidates only); token numbers use `ceil(runes/3)`; judge and extractor noise is as large as most single changes; the golden list rewards qualifier-heavy facts.
+- Part 2 (P285): terse reconcile, finalize, verify and MCP texts; new `distill` tool. Final tuning numbers (terse gate): `R_ess` 0.859, `R_all` 0.658, `P` 0.904, `C_fact` 0.451; the terse gate was reverted after that round (`R_all` under its floor). Unified import tried and reverted (`C_fact` 0.55). See the report, Part 2.
 - Write-back (P285 fix): the `.memory.md` writer adjusts a title with `: ` or ` #` and strips inline Markdown from facts before `memfmt.FormatDoc`; a fact that stays invalid is left out and counted in `doc_error`. Before, most imports failed write-back with a format error.
 
 ## Docker module (P200, Kira Studio)
@@ -5646,6 +5647,8 @@ Public page for both apps: `https://vlad-cirstean.github.io/kira-studio/`. Stati
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
+
+- **Memory import is not unified with `distill` (P285 Part 2).** Import still runs the extract prompt with an evidence quote; `distill` is a separate prompt. The unified pipeline (distill per chunk, code-built `Stated in` reason, no quote) gave `R_all` 0.836 but `C_fact` 0.549 against a ceiling of 0.526, so it was reverted. The terse reconcile, finalize and verify prompts and the Part 1 gate were not re-measured together on all 10 tuning sources (budget). See `docs/v2.5/plans/P285-report.md`.
 
 - **Memory ingest compression target not met (P285).** Tuning set after two kept extract-prompt changes: `R_ess` 0.883 (target 0.90), `P` 0.895 (0.90), `C_fact` 0.497 (0.30). The golden essential facts alone are 0.47 of source chars, so 0.30 was unreachable with 0.90 recall; the target was set before any measurement. Fewer facts is the only lever and it costs recall. Chunk target 1500 (`DefaultBudget`) gave `R_ess` 0.898 but `C_fact` 0.519; adopting it is a pending user decision. Not tried: gate, reconcile and verify prompts. See `docs/v2.5/plans/P285-report.md`.
 
