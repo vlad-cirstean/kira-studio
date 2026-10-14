@@ -133,15 +133,18 @@ type extractedFact struct {
 }
 
 type stageInfo struct {
-	Chunks     int                       `json:"chunks"`
-	Extracted  int                       `json:"extracted"`
-	Flagged    int                       `json:"flaggedUnresolved"`
-	Verdicts   map[string]int            `json:"verdicts"`
-	Dropped    []importer.DroppedFact    `json:"dropped"`
-	Unresolved []importer.UnresolvedFact `json:"unresolved"`
-	Added      int                       `json:"added"`
-	Updated    int                       `json:"updated"`
-	Noop       int                       `json:"noop"`
+	Chunks    int `json:"chunks"`
+	Extracted int `json:"extracted"`
+	Flagged   int `json:"flaggedUnresolved"`
+	// Questionable counts facts sent to the cross-check; AfterCrossCheck the facts finalize received.
+	Questionable    int                       `json:"questionable"`
+	AfterCrossCheck int                       `json:"afterCrossCheck"`
+	Verdicts        map[string]int            `json:"verdicts"`
+	Dropped         []importer.DroppedFact    `json:"dropped"`
+	Unresolved      []importer.UnresolvedFact `json:"unresolved"`
+	Added           int                       `json:"added"`
+	Updated         int                       `json:"updated"`
+	Noop            int                       `json:"noop"`
 }
 
 type runRecord struct {
@@ -317,7 +320,12 @@ func evalRun(t *testing.T, man evalManifest, realClaude string) {
 					return
 				}
 				begin := time.Now()
+				// A transient CLI failure fails the file; rerun the whole source once on a fresh store.
 				r, err := runPipeline(t, cfg, s, text)
+				if err != nil && !over() {
+					t.Logf("%s: retrying after: %v", s.ID, err)
+					r, err = runPipeline(t, cfg, s, text)
+				}
 				if err != nil {
 					fail("pipeline: " + err.Error())
 					return
@@ -389,7 +397,7 @@ func appendRecord(path string, r runRecord) {
 
 // runPipeline ingests one source into a fresh store and collects what each stage produced.
 func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecord, error) {
-	dir := filepath.Join(cfg.scratch, cfg.round, s.ID)
+	dir, _ := os.MkdirTemp(cfg.scratch, s.ID+"-")
 	srcDir, home, costDir := filepath.Join(dir, "src"), filepath.Join(dir, "memory"), filepath.Join(dir, "costlog")
 	for _, d := range []string{srcDir, home, costDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -407,9 +415,10 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	}
 	svc := memory.NewService(ms, memory.NewCLIRunner(), memory.ServiceOptions{Prompts: prompts})
 	defer svc.Close()
-	agent := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: cfg.exe, Home: home, Prompts: prompts,
+	inner := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: cfg.exe, Home: home, Prompts: prompts,
 		Env: map[string]string{"KIRA_TEST_MEMORY_MCP": "1", "KIRA_TEST_PROMPTS": cfg.promptsFile, "KIRA_EVAL_COSTLOG": costDir}}
-	runner, err := importer.NewRunner(ms, importer.RunnerOptions{Agent: agent, Docs: svc, Budget: cfg.budget})
+	ra := &recAgent{inner: inner, raw: map[int][]importer.Fact{}, verdicts: map[string]int{}}
+	runner, err := importer.NewRunner(ms, importer.RunnerOptions{Agent: ra, Docs: svc, Budget: cfg.budget})
 	if err != nil {
 		return runRecord{}, err
 	}
@@ -462,6 +471,16 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	if len(d.Files) != 1 || d.Files[0].State != importer.FileDone {
 		return runRecord{}, fmt.Errorf("file not done: %+v", d.Files)
 	}
+	// The write-back runs just after the file is done; wait for its path (or error).
+	for range 60 {
+		if d.Files[0].DocPath != "" || d.Files[0].DocError != "" {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+		if d, err = e.Job(job.ID); err != nil {
+			return runRecord{}, err
+		}
+	}
 	f := d.Files[0]
 	ctx := context.Background()
 	mems, err := ms.DocumentFacts(ctx, f.ID)
@@ -471,43 +490,9 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	for i, m := range mems {
 		rec.Stored = append(rec.Stored, storedFact{ID: "s" + strconv.Itoa(i+1), Fact: m.Fact, Reason: m.Reason, Keywords: m.Keywords})
 	}
-	db, err := ms.DB()
-	if err != nil {
-		return runRecord{}, err
-	}
-	rows, err := db.Query(`SELECT idx, facts, cost_usd FROM import_chunks WHERE file_id = ? ORDER BY idx`, f.ID)
-	if err != nil {
-		return runRecord{}, err
-	}
-	for rows.Next() {
-		var idx int
-		var raw string
-		var cost float64
-		if err := rows.Scan(&idx, &raw, &cost); err != nil {
-			_ = rows.Close()
-			return runRecord{}, err
-		}
-		rec.ExtractUSD += cost
-		var facts []importer.Fact
-		_ = json.Unmarshal([]byte(raw), &facts)
-		for n, x := range facts {
-			rec.Extracted = append(rec.Extracted, extractedFact{ID: fmt.Sprintf("e%d.%d", idx+1, n+1), Chunk: idx + 1,
-				Fact: x.Fact, Evidence: x.Evidence, Section: x.Section, Unresolved: x.Unresolved})
-			if x.Unresolved != "" {
-				rec.Stages.Flagged++
-			}
-		}
-	}
-	_ = rows.Close()
-	var verify string
-	_ = db.QueryRow(`SELECT verify_json FROM import_files WHERE id = ?`, f.ID).Scan(&verify)
-	var verdicts map[string]struct{ Verdict string }
-	_ = json.Unmarshal([]byte(verify), &verdicts)
-	rec.Stages.Verdicts = map[string]int{}
-	for _, v := range verdicts {
-		rec.Stages.Verdicts[v.Verdict]++
-	}
-	rec.Stages.Chunks, rec.Stages.Extracted = f.ChunkCount, len(rec.Extracted)
+	rec.ExtractUSD = f.CostUSD
+	ra.fill(&rec)
+	rec.Stages.Chunks = f.ChunkCount
 	rec.Stages.Dropped, rec.Stages.Unresolved = f.Dropped, f.Unresolved
 	rec.Stages.Added, rec.Stages.Updated, rec.Stages.Noop = f.Added, f.Updated, f.Noop
 	if f.DocPath != "" {
@@ -584,4 +569,69 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 	}
 	r := agg.ratios()
 	t.Logf("%s: R_ess %.3f R_all %.3f P %.3f unsupported %.3f dup %.3f C_fact %.3f (stored %d)", cfg.round, r.REss, r.RAll, r.P, r.Unsupported, r.Duplicate, r.CFact, agg.Stored)
+}
+
+// recAgent records what each stage hands the next: the chunk's facts are deleted from memory.db when
+// the file finishes, so the harness keeps them here. Extracted in the record is what finalize received
+// (extracted and cross-checked, not yet merged).
+type recAgent struct {
+	inner importer.ClaudeAgent
+	mu    sync.Mutex
+	raw   map[int][]importer.Fact
+	// questionable counts facts sent to the cross-check; verdicts counts them by kind.
+	questionable int
+	verdicts     map[string]int
+	final        []importer.FinalFact
+}
+
+func (r *recAgent) Available() error { return r.inner.Available() }
+
+func (r *recAgent) Extract(ctx context.Context, in importer.ExtractInput) (importer.ExtractOutput, error) {
+	out, err := r.inner.Extract(ctx, in)
+	if err == nil {
+		r.mu.Lock()
+		r.raw[in.Index] = out.Facts
+		r.mu.Unlock()
+	}
+	return out, err
+}
+
+func (r *recAgent) Verify(ctx context.Context, in importer.VerifyInput) (importer.VerifyOutput, error) {
+	out, err := r.inner.Verify(ctx, in)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err == nil {
+		r.questionable += len(in.Facts)
+		for _, v := range out.Verdicts {
+			r.verdicts[v.Verdict]++
+		}
+	}
+	return out, err
+}
+
+func (r *recAgent) Finalize(ctx context.Context, in importer.FinalizeInput) (importer.FinalizeOutput, error) {
+	r.mu.Lock()
+	r.final = in.Facts
+	r.mu.Unlock()
+	return r.inner.Finalize(ctx, in)
+}
+
+func (r *recAgent) fill(rec *runRecord) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, f := range r.final {
+		rec.Extracted = append(rec.Extracted, extractedFact{ID: "e" + f.ID, Chunk: f.Chunk, Fact: f.Fact.Fact,
+			Evidence: f.Evidence, Section: f.Section, Unresolved: f.Unresolved})
+	}
+	for _, facts := range r.raw {
+		rec.Stages.Extracted += len(facts)
+		for _, f := range facts {
+			if f.Unresolved != "" {
+				rec.Stages.Flagged++
+			}
+		}
+	}
+	rec.Stages.Questionable = r.questionable
+	rec.Stages.Verdicts = r.verdicts
+	rec.Stages.AfterCrossCheck = len(r.final)
 }
