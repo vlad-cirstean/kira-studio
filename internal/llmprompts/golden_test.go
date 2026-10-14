@@ -1,14 +1,17 @@
 package llmprompts
 
 import (
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// Golden files were generated from the pre-registry composition code; a default render over the same
-// inputs must stay byte-identical.
+var update = flag.Bool("update", false, "rewrite the golden files from the current defaults")
+
+// Golden files hold the current defaults rendered over fixed inputs; regenerate with -update after an
+// intended default change and review the diff.
 
 func TestGolden(t *testing.T) {
 	stack1 := []RebaseStackVar{{Name: "feat/login", Worktree: "/wt/kira-space/feat-login", ParentRef: "origin/main"}}
@@ -103,11 +106,19 @@ func TestGolden(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			want, err := os.ReadFile(filepath.Join("testdata", "golden", c.name+".txt"))
+			path := filepath.Join("testdata", "golden", c.name+".txt")
+			got := Render(Defaults(), c.p, c.v)
+			if *update {
+				if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			want, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := Render(Defaults(), c.p, c.v); got != string(want) {
+			if got != string(want) {
 				t.Fatalf("render differs from golden\n got: %q\nwant: %q", got, want)
 			}
 		})
