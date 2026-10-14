@@ -13,6 +13,7 @@ require (
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.11.0 // indirect
+	github.com/elazarl/goproxy v1.7.2 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect

@@ -45,6 +45,11 @@ type realApp struct {
 // `claude` through the login shell's PATH, whose first entry is BinDir (P150), so the real binary
 // runs even from a ~/.local/bin install outside the temp HOME.
 func newRealApp(t *testing.T, trustDirs ...string) *realApp {
+	return newRealAppWith(t, nil, trustDirs...)
+}
+
+// newRealAppWith adds harness options, such as the real sandbox enforcer.
+func newRealAppWith(t *testing.T, opts []flowharness.Opt, trustDirs ...string) *realApp {
 	t.Helper()
 	found, err := exec.LookPath("claude")
 	if err != nil {
@@ -58,7 +63,7 @@ func newRealApp(t *testing.T, trustDirs ...string) *realApp {
 	if parentSession == "" {
 		parentSession = os.Getenv("CLAUDE_CODE_REMOTE_SESSION_ID")
 	}
-	app := flowharness.New(t)
+	app := flowharness.New(t, opts...)
 	ra := &realApp{App: app, Claude: real, tee: filepath.Join(app.Root, "claude-tee.jsonl")}
 
 	// A wrapper, not a bare symlink: it copies the stdout of `claude -p` runs to ra.tee so a test

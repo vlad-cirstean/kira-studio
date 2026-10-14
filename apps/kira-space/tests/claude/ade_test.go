@@ -23,8 +23,12 @@ type adeFixture struct {
 
 // newAdeFixture seeds files into the base commit, so a worktree off main carries them.
 func newAdeFixture(t *testing.T, files map[string]string) *adeFixture {
+	return newAdeFixtureWith(t, files)
+}
+
+func newAdeFixtureWith(t *testing.T, files map[string]string, opts ...flowharness.Opt) *adeFixture {
 	t.Helper()
-	app := newRealApp(t)
+	app := newRealAppWith(t, opts)
 	bare := app.NewBare("api-remote")
 	seed := app.NewRepo("api-seed")
 	seed.Commit("base", mergeFiles(map[string]string{"base.txt": "base\n"}, files))
