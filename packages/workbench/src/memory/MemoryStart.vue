@@ -13,7 +13,6 @@ import Identifier from '../components/Identifier.vue';
 import ModuleStart from '../components/ModuleStart.vue';
 import QueryState from '../components/QueryState.vue';
 import ImportView from './import/ImportView.vue';
-import { useImportUiStore } from './import/importStore';
 import { eventText, GRADE_TEXT, originText, SCOPE_LABEL } from './labels';
 import MemoryContext from './MemoryContext.vue';
 import { useMemoryHistory } from './queries';
@@ -21,7 +20,6 @@ import { useMemoryUiStore } from './store';
 
 // P201: the main area of the Memory module — the selected memory and its version trail.
 const ui = useMemoryUiStore();
-const imports = useImportUiStore();
 const { selectedId } = storeToRefs(ui);
 const history = useMemoryHistory(selectedId);
 
@@ -36,7 +34,7 @@ function eventsFor(id: string) {
 </script>
 
 <template>
-  <ImportView v-if="imports.view === 'imports'" />
+  <ImportView v-if="ui.view === 'imports'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
     <ModuleStart
       v-if="!selectedId"

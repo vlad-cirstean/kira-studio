@@ -15,6 +15,8 @@ export const useMemoryUiStore = defineStore('memoryUi', () => {
   const includeHistory = ref(false);
   const selectedId = ref<string | null>(null);
   const addOpen = ref(false);
+  // Main-area view; 'distill' (P285 Part 4) joins 'memory' and 'imports'.
+  const view = ref<'memory' | 'imports' | 'distill'>('memory');
   const scopes = usePersistedState<MemoryScope[]>('kira.memory.searchScopes', [], {
     schema: memoryScopeSchema.array(),
   });
@@ -22,5 +24,5 @@ export const useMemoryUiStore = defineStore('memoryUi', () => {
     schema: memoryOriginSchema.array(),
   });
   const project = usePersistedState('kira.memory.boostProject', '');
-  return { query, includeHistory, selectedId, addOpen, scopes, origins, project };
+  return { query, includeHistory, selectedId, addOpen, view, scopes, origins, project };
 });

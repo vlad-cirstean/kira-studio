@@ -45,8 +45,8 @@ const search = useMemorySearch(debounced, includeHistory, () => ({
 }));
 useMemoryChangeSync();
 useImportChangeSync();
-const imports = useImportUiStore();
 
+const imports = useImportUiStore();
 const rootEl = useTemplateRef<HTMLElement>('root');
 const searchInput = computed(
   () => rootEl.value?.querySelector<HTMLInputElement>('[data-testid="memory-search"]') ?? null,
@@ -88,7 +88,7 @@ const semanticNeedsSetup = computed(
 
 function selectMemory(id: string): void {
   selectedId.value = id;
-  imports.view = 'memory';
+  ui.view = 'memory';
 }
 
 const historyToggleId = useId();

@@ -24,12 +24,14 @@ import { formatDuration } from '../../behaviour/format';
 import { errorText } from '../../bridge/codedError';
 import { ORIGIN_LABEL } from '../labels';
 import ScopeField from '../ScopeField.vue';
+import { useMemoryUiStore } from '../store';
 import { useImportAction, useImportJob, useStartImport } from './importQueries';
 import { useImportUiStore } from './importStore';
 
 // P211: the scan result and its cost estimate, confirmed before any Claude call is made.
 const emit = defineEmits<{ close: [] }>();
 const ui = useImportUiStore();
+const memoryUi = useMemoryUiStore();
 const { confirmJobId } = storeToRefs(ui);
 const detail = useImportJob(confirmJobId);
 const act = useImportAction();
@@ -86,7 +88,7 @@ async function start(): Promise<void> {
     return;
   }
   ui.selectedJobId = id;
-  ui.view = 'imports';
+  memoryUi.view = 'imports';
   emit('close');
 }
 

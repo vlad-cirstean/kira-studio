@@ -3,12 +3,14 @@ import { Button } from '@theme/components/ui/button';
 import { Progress } from '@theme/components/ui/progress';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
+import { useMemoryUiStore } from '../store';
 import { ACTIVE_JOB_STATES, jobTitle } from './importFormat';
 import { useImportJobs } from './importQueries';
 import { useImportUiStore } from './importStore';
 
 // P211: panel row for the newest unfinished import — progress and a way into the imports view.
 const ui = useImportUiStore();
+const memoryUi = useMemoryUiStore();
 const jobs = useImportJobs();
 
 const STATUS_LABEL = {
@@ -31,7 +33,7 @@ const percent = computed(() => {
 function open(): void {
   if (!job.value) return;
   ui.selectedJobId = job.value.id;
-  ui.view = 'imports';
+  memoryUi.view = 'imports';
 }
 </script>
 

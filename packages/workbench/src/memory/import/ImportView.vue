@@ -6,6 +6,7 @@ import { t } from '@theme/i18n';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import PanelBar from '../../components/PanelBar.vue';
+import { useMemoryUiStore } from '../store';
 import ImportJobDetail from './ImportJobDetail.vue';
 import { jobTitle } from './importFormat';
 import { useImportJobs } from './importQueries';
@@ -14,6 +15,7 @@ import { useImportUiStore } from './importStore';
 // P211: the main area's imports view — job list on top, the selected job below.
 const ui = useImportUiStore();
 const { selectedJobId, confirmJobId } = storeToRefs(ui);
+const memoryUi = useMemoryUiStore();
 const jobs = useImportJobs();
 
 const listed = computed(() => (jobs.data.value ?? []).filter((j) => j.id !== confirmJobId.value));
@@ -35,9 +37,15 @@ const jobItems = computed(() =>
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="import-view">
     <PanelBar class="flex-row items-center gap-1.5">
-      <Button variant="toolbar" size="kira" data-testid="import-back" @click="ui.view = 'memory'">{{
-        t('memory.import.back.label')
-      }}</Button>
+      <Button
+        variant="toolbar"
+        size="kira"
+        data-testid="import-back"
+        @click="memoryUi.view = 'memory'"
+        >{{
+          t('memory.import.back.label')
+        }}</Button
+      >
       <SecondaryTabs
         class="min-w-0 overflow-x-auto"
         :model-value="current?.id ?? ''"
