@@ -4,15 +4,23 @@ import type { ResolvedShot } from '../lib/shots';
 interface Props {
   shot: ResolvedShot;
   eager?: boolean;
+  glow?: boolean;
 }
 
-const { shot, eager = false } = Astro.props;
+const { shot, eager = false, glow = false } = Astro.props;
 ---
 
-<figure class="m-0">
+<figure class="relative m-0">
+  {glow && (
+    <div
+      aria-hidden="true"
+      class="absolute -inset-4 -z-10 rounded-3xl bg-tint/10 blur-3xl"
+    >
+    </div>
+  )}
   <a
     href={shot.framedPng}
-    class="block overflow-hidden rounded-lg border border-border bg-chrome"
+    class="block overflow-hidden rounded-xl bg-chrome shadow-shot ring-1 ring-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     aria-label={`Open full size: ${shot.title}`}
   >
     <picture>
@@ -31,5 +39,8 @@ const { shot, eager = false } = Astro.props;
       >
     </picture>
   </a>
-  <figcaption class="mt-2 text-base text-muted">{shot.caption}</figcaption>
+  <figcaption class="mt-3 text-base text-muted">
+    <span class="font-medium text-fg">{shot.title}.</span>{' '}
+    {shot.caption.replace(/^[^.]*\.\s*/, '')}
+  </figcaption>
 </figure>
