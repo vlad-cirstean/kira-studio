@@ -216,3 +216,11 @@ export async function emitAgentSessions(page: Page, terminalIds: readonly string
     sessions: terminalIds.map((terminalId) => ({ terminalId, cwd: '' })),
   });
 }
+
+/** Opens the bill task's panel from its card. */
+export async function openBillTask(page: Page): Promise<void> {
+  await page
+    .locator('[data-testid="ade-card"][data-task-id="T_bill"] [data-testid="ade-card-head"]')
+    .click();
+  await page.locator('[data-testid="ade-panel"]').waitFor();
+}
