@@ -29,7 +29,6 @@ export default defineConfig({
         { label: 'Kira Space', items: [{ autogenerate: { directory: 'docs/space' } }] },
         { label: 'Both apps', items: [{ autogenerate: { directory: 'docs/shared' } }] },
         { label: 'Reference', items: [{ autogenerate: { directory: 'docs/reference' } }] },
-        { label: 'Develop', items: [{ autogenerate: { directory: 'docs/develop' } }] },
       ],
     }),
   ],

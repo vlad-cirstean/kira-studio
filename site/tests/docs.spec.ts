@@ -9,6 +9,7 @@ interface DocPage {
   readonly url: string;
   readonly title: string;
   readonly file: string;
+  readonly path: string;
 }
 
 function walk(dir: string): string[] {
@@ -22,7 +23,7 @@ function pageOf(file: string): DocPage {
   const slug = rel === 'index' ? '' : `${rel}/`;
   const title = /^title: (.+)$/m.exec(readFileSync(file, 'utf8'))?.[1];
   if (!title) throw new Error(`No title in ${file}`);
-  return { url: `${BASE}docs/${slug}`, title, file: rel };
+  return { url: `${BASE}docs/${slug}`, title, file: rel, path: file };
 }
 
 const PAGES = walk(DOCS_DIR)
@@ -51,7 +52,15 @@ function watchErrors(page: Page): string[] {
 }
 
 test('the page list is not empty', () => {
-  expect(PAGES.length).toBeGreaterThanOrEqual(21);
+  expect(PAGES.length).toBeGreaterThanOrEqual(18);
+});
+
+test('the Develop section is gone', async ({ request }) => {
+  const res = await request.get(`${BASE}docs/develop/`);
+  expect(res.status()).toBe(404);
+  for (const doc of PAGES) {
+    expect(readFileSync(doc.path, 'utf8'), doc.file).not.toContain('develop/');
+  }
 });
 
 for (const doc of PAGES) {

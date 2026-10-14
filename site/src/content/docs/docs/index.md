@@ -27,4 +27,3 @@ Two native macOS apps share one repository.
 - Kira Space: [Git](space/git/), [code workspace](space/workspace/), [agents](space/agents/), [phone view](space/phone/), [memory](space/memory/).
 - Both apps: [automations and smart scripts](shared/automations/).
 - Reference: [settings](reference/settings/), [prompts](reference/prompts/), [MCP tools](reference/mcp-tools/), [memory formats](reference/memory-formats/).
-- Develop: [architecture](develop/architecture/), [build and test](develop/build-and-test/), [contributing](develop/contributing/).

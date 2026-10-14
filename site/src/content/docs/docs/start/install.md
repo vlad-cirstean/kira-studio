@@ -43,4 +43,4 @@ The app checks GitHub for a newer release and offers to update. Nothing installs
 
 ## Build from source
 
-Building is the developer path. See [Build and test](../../develop/build-and-test/).
+Building is the developer path. See [Building from source](https://github.com/vlad-cirstean/kira-studio#building-from-source) in the README.

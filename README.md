@@ -254,7 +254,7 @@ docs                  architecture, packaging, performance and the per-chapter r
 
 ## Documentation
 
-- [Documentation site](https://vlad-cirstean.github.io/kira-studio/docs/) — user guides for both apps, reference pages and developer docs.
+- [Documentation site](https://vlad-cirstean.github.io/kira-studio/docs/) — user guides for both apps, and reference pages.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the app works today, plus known open
   limitations.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — building, releasing, install and update.
