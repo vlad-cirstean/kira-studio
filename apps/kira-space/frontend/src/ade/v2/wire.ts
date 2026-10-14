@@ -225,7 +225,7 @@ export interface Pair {
 }
 
 // ---- runs, tasks, plan (§2, §4, §5, §12, D7, D10, D12, D16)
-export type RunState = 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'done';
+export type RunState = 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'done' | 'review';
 export interface Run {
   id: string;
   taskId: string;
@@ -244,9 +244,60 @@ export interface Run {
   /** How the run ended; null while it runs and for rows older than P242. */
   outcome: AdeRunOutcome | null;
   /** 'rebase' for a rebase run (outside the workflow), '' for a step run. */
-  purpose: '' | 'rebase';
+  purpose: '' | 'rebase' | 'review';
   /** A restart stopped the run mid-session: Resume continues its Claude conversation. */
   resumable: boolean;
+  /** Where a review step run stands; null on every other run. */
+  review: RunReview | null;
+}
+export type ReviewPhase = 'waiting' | 'sent' | 'working' | 'stuck' | 'done';
+export interface RunReview {
+  phase: ReviewPhase;
+  round: number;
+  route: 'implementer' | 'new';
+  note: string;
+}
+/** An agent run that can take the review comments. */
+export interface ReviewCandidate {
+  runId: string;
+  stage: string;
+  step: string;
+  attempt: number;
+  finishedAt: number | null;
+}
+/** The latest send of a review run. */
+export interface ReviewRound {
+  run: Run;
+  n: number;
+  route: 'implementer' | 'new';
+  fallback: boolean;
+  /** Commits the round added; null when unknown or not finished. */
+  commits: number | null;
+}
+/** A branch's review step for its review window; `run` null = no review step there. */
+export interface ReviewStepState {
+  run: Run | null;
+  stepName: string;
+  results: StepResult[];
+  route: 'implementer' | 'new';
+  targetRunId: string;
+  defaultTargetRunId: string;
+  candidates: ReviewCandidate[];
+  round: ReviewRound | null;
+}
+export interface SendReviewArgs {
+  runId: string;
+  route: 'implementer' | 'new' | '';
+  targetRunId: string;
+}
+export interface FinishReviewArgs {
+  runId: string;
+  result: string;
+  note: string;
+}
+export interface ReviewEvent {
+  taskId: string;
+  branchId: string;
 }
 /** What the agent reported beyond status and summary. */
 interface AgentReport {

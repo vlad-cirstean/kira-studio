@@ -7826,6 +7826,16 @@
           }
         }
       },
+      "reviewStep": {
+        "route": {
+          "implementer": {
+            "label": "Implementer session"
+          },
+          "new": {
+            "label": "New review agent"
+          }
+        }
+      },
       "runDialog": {
         "smartMissing": {
           "error": "This smart script was not found."
@@ -8245,6 +8255,18 @@
           "name": {
             "aria": "Step name"
           },
+          "reviewImplementer": {
+            "label": "Implementer step"
+          },
+          "reviewNearest": {
+            "option": "Nearest earlier step"
+          },
+          "reviewNote": {
+            "hint": "The run waits for you. Comment in the review window, send the comments to an agent, then finish with a result."
+          },
+          "reviewSendTo": {
+            "label": "Send comments to"
+          },
           "scriptMissing": {
             "error": "Script not found."
           },
@@ -8263,6 +8285,12 @@
           },
           "resultStops": {
             "tooltip": "{id} ({outcome}) stops the run"
+          },
+          "sendsImplementer": {
+            "label": "Sends to the implementer"
+          },
+          "sendsNew": {
+            "label": "Sends to a new agent"
           },
           "smart": {
             "label": "Smart"

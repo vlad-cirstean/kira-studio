@@ -13,9 +13,16 @@ import { resultHandleId, type StepNodeData } from '../board/workflowGraph';
 // text lives in the inspector.
 const props = defineProps<{ data: StepNodeData }>();
 const step = computed(() => props.data.step);
-const body = computed(() =>
-  step.value.smartScript ? `✦ ${step.value.smartScript}` : step.value.prompt,
-);
+const body = computed(() => {
+  const review = step.value.review;
+  if (review)
+    return t(
+      review.sendTo === 'new'
+        ? 'space.ade.workflows.stepNode.sendsNew.label'
+        : 'space.ade.workflows.stepNode.sendsImplementer.label',
+    );
+  return step.value.smartScript ? `✦ ${step.value.smartScript}` : step.value.prompt;
+});
 const parts = computed(() => promptParts(body.value));
 const LABEL_MAX = 4;
 const labelled = computed(() => step.value.results.length <= LABEL_MAX);
@@ -72,6 +79,9 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
       >
       <span v-if="step.smartScript" class="shrink-0 text-info">{{
         t('space.ade.workflows.stepNode.smart.label')
+      }}</span>
+      <span v-if="step.review" class="shrink-0 text-info" data-testid="ade-wf-node-review">{{
+        t('space.ade.board.branchTag.review.label')
       }}</span>
     </div>
     <div class="truncate px-2 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>

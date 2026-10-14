@@ -57,6 +57,7 @@ const RUN_GLYPH: Record<StepRun['state'], { glyph: string; tone: Tone }> = {
   stuck: { glyph: '!', tone: 'red' },
   failed: { glyph: '✕', tone: 'red' },
   pending: { glyph: '○', tone: 'grey' },
+  review: { glyph: '◐', tone: 'blue' },
 };
 
 const STEP_TONE: Record<StepState, Tone> = {
