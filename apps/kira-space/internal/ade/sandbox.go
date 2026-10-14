@@ -18,7 +18,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
-	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // sandbox.go confines headless agents (P287): it resolves each run's policy, applies the prepared
@@ -359,7 +358,7 @@ func (b *TaskBoard) noticeSandbox(sink *logSink, sr *sandboxRun) {
 		return
 	}
 	if sup := b.deps.Sandbox.Support(); !sup.Enforced {
-		sink.add(logStdout, i18n.T(sup.Reason, nil))
+		sink.add(logStdout, agentsandbox.NotEnforcedText())
 	}
 	for _, n := range sr.notes {
 		sink.add(logStdout, n)
@@ -374,10 +373,10 @@ func (b *TaskBoard) sandboxSupport() adewire.SandboxSupport {
 		if sup := b.deps.Sandbox.Support(); sup.Enforced {
 			return adewire.SandboxSupport{Enforced: true}
 		} else {
-			return adewire.SandboxSupport{Reason: i18n.T(sup.Reason, nil)}
+			return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText()}
 		}
 	}
-	return adewire.SandboxSupport{Reason: i18n.T(agentsandbox.NotEnforcedKey, nil)}
+	return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText()}
 }
 
 func badgeOf(s repos.AdeRunSandbox) *adewire.RunSandboxBadge {
@@ -447,7 +446,7 @@ func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSand
 		Write: []string{}, Read: []string{}, Allow: []string{}, Denials: []adewire.SandboxDenial{},
 	}
 	if row.Reason != "" {
-		out.Reason = i18n.T(row.Reason, nil)
+		out.Reason = agentsandbox.NotEnforcedText()
 	}
 	var pol agentsandbox.Policy
 	if err := json.Unmarshal([]byte(row.PolicyJSON), &pol); err == nil {

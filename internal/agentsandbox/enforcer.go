@@ -7,10 +7,14 @@ import (
 	"sync/atomic"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // NotEnforcedKey is the catalog key shown when the OS cannot enforce a profile.
 const NotEnforcedKey = "backend.space.ade.sandbox.notEnforced.body"
+
+// NotEnforcedText is the not-enforced notice in the user's language.
+func NotEnforcedText() string { return i18n.T("backend.space.ade.sandbox.notEnforced.body", nil) }
 
 // Support says whether profiles are enforced on this OS.
 type Support struct {

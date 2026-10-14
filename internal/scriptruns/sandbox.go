@@ -13,7 +13,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
-	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // sandbox.go confines a smart run in dir mode worktree: the default write policy on its worktree.
@@ -87,7 +86,7 @@ func (s *Service) noticeSandbox(sink *logSink, sb *smartSandbox) {
 		return
 	}
 	if sup := s.Sandbox.Support(); !sup.Enforced {
-		sink.add("stdout", i18n.T(sup.Reason, nil))
+		sink.add("stdout", agentsandbox.NotEnforcedText())
 	}
 }
 

@@ -84,7 +84,7 @@ func TestSandboxStepDefault(t *testing.T) {
 	mustContain(t, "profile", d.Profile, "(version 1)", real)
 	args := fakeFile(t, f.app, "api-1.args")
 	mustContain(t, "argv", args, "--disallowedTools", "Bash(git branch:*)", "Bash(git worktree:*)", "--add-dir")
-	env := fakeFile(t, f.app, "api-1.env")
+	env := fakeFile(t, f.app, "api-1.sandbox-env")
 	mustContain(t, "env", env, "TMPDIR=")
 	mustLack(t, "env", env, "SSH_AUTH_SOCK")
 	mustContain(t, "prompt", fakeFile(t, f.app, "api-1.prompt"), "Sandbox: write only in "+real)
@@ -105,7 +105,7 @@ func TestSandboxReadStep(t *testing.T) {
 		t.Fatalf("detail = %+v, want read access that writes nothing", d)
 	}
 	mustContain(t, "argv", fakeFile(t, f.app, "api-1.args"), "Edit", "Write", "NotebookEdit")
-	mustContain(t, "env", fakeFile(t, f.app, "api-1.env"), "GIT_OPTIONAL_LOCKS=0")
+	mustContain(t, "env", fakeFile(t, f.app, "api-1.sandbox-env"), "GIT_OPTIONAL_LOCKS=0")
 	mustContain(t, "prompt", fakeFile(t, f.app, "api-1.prompt"), "read only")
 }
 
@@ -287,7 +287,7 @@ func TestSmartRunSandboxed(t *testing.T) {
 	release(t, f.gateOne)
 	f.run(t, started.RunID, "done")
 	mustContain(t, "argv", fakeFile(t, f.app, "api-2.args"), "--disallowedTools", "--add-dir")
-	mustContain(t, "env", fakeFile(t, f.app, "api-2.env"), "TMPDIR=")
+	mustContain(t, "env", fakeFile(t, f.app, "api-2.sandbox-env"), "TMPDIR=")
 	if got := fake.Policies(); len(got) != 3 {
 		t.Fatalf("policies = %d, want two step runs and the smart run", len(got))
 	}

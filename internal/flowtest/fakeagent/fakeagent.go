@@ -418,17 +418,22 @@ func argsAfter(args []string, flag string) []string {
 	return out
 }
 
-// recordEnv keeps the KIRA_* variables the call was started with.
+// recordEnv keeps the KIRA_* variables the call was started with, and in <stem>.sandbox-env the
+// variables a sandbox launch sets (kept apart so host values never reach the KIRA_* record).
 func recordEnv(stem string) {
-	var lines []string
+	var lines, sandbox []string
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") || strings.HasPrefix(kv, "KIRA_BRANCH") ||
-			strings.HasPrefix(kv, "TMPDIR=") || strings.HasPrefix(kv, "GIT_OPTIONAL_LOCKS=") || strings.HasPrefix(kv, "SSH_AUTH_SOCK=") || strings.HasPrefix(kv, "HTTPS_PROXY=") {
+		switch {
+		case strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") || strings.HasPrefix(kv, "KIRA_BRANCH"):
 			lines = append(lines, strconv.Quote(kv))
+		case strings.HasPrefix(kv, "TMPDIR=") || strings.HasPrefix(kv, "GIT_OPTIONAL_LOCKS=") || strings.HasPrefix(kv, "SSH_AUTH_SOCK=") || strings.HasPrefix(kv, "HTTPS_PROXY="):
+			sandbox = append(sandbox, strconv.Quote(kv))
 		}
 	}
 	sort.Strings(lines)
+	sort.Strings(sandbox)
 	writeFile(stem+".env", []byte(strings.Join(lines, "\n")))
+	writeFile(stem+".sandbox-env", []byte(strings.Join(sandbox, "\n")))
 }
 
 func cmpStr(a, b string) string {
