@@ -1,0 +1,4 @@
+# id	token	why
+memory.import.finalize.system	negation "never" (5 to 4)	evidence-quote clause dropped: evidence no longer exists
+memory.import.verify.system	"evidence"	field dropped with the evidence quote
+memory.import.verify.system	negation "not" (2 to 1)	clause "where not asked for" dropped with the evidence field

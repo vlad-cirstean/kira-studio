@@ -159,7 +159,6 @@ type extractedFact struct {
 	ID         string `json:"id"`
 	Chunk      int    `json:"chunk"`
 	Fact       string `json:"fact"`
-	Evidence   string `json:"evidence"`
 	Section    string `json:"section"`
 	Unresolved string `json:"unresolved"`
 }
@@ -467,7 +466,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	defer svc.Close()
 	inner := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: cfg.exe, Home: home, Prompts: prompts,
 		Env: map[string]string{"KIRA_TEST_MEMORY_MCP": "1", "KIRA_TEST_PROMPTS": cfg.promptsFile, "KIRA_EVAL_COSTLOG": costDir}}
-	ra := &recAgent{inner: inner, raw: map[int][]importer.Fact{}, verdicts: map[string]int{}}
+	ra := &recAgent{inner: inner, verdicts: map[string]int{}}
 	runner, err := importer.NewRunner(ms, importer.RunnerOptions{Agent: ra, Docs: svc, Budget: cfg.budget})
 	if err != nil {
 		return runRecord{}, err
@@ -654,7 +653,7 @@ func writeScores(t *testing.T, roundDir, file string, cfg evalCfg, set string, s
 type recAgent struct {
 	inner importer.ClaudeAgent
 	mu    sync.Mutex
-	raw   map[int][]importer.Fact
+	raw   []importer.DistillLine
 	// questionable counts facts sent to the cross-check; verdicts counts them by kind.
 	questionable int
 	verdicts     map[string]int
@@ -663,11 +662,11 @@ type recAgent struct {
 
 func (r *recAgent) Available() error { return r.inner.Available() }
 
-func (r *recAgent) Extract(ctx context.Context, in importer.ExtractInput) (importer.ExtractOutput, error) {
-	out, err := r.inner.Extract(ctx, in)
+func (r *recAgent) Distill(ctx context.Context, in importer.DistillInput) (importer.DistillOutput, error) {
+	out, err := r.inner.Distill(ctx, in)
 	if err == nil {
 		r.mu.Lock()
-		r.raw[in.Index] = out.Facts
+		r.raw = append(r.raw, out.Lines...)
 		r.mu.Unlock()
 	}
 	return out, err
@@ -698,14 +697,12 @@ func (r *recAgent) fill(rec *runRecord) {
 	defer r.mu.Unlock()
 	for _, f := range r.final {
 		rec.Extracted = append(rec.Extracted, extractedFact{ID: "e" + f.ID, Chunk: f.Chunk, Fact: f.Fact.Fact,
-			Evidence: f.Evidence, Section: f.Section, Unresolved: f.Unresolved})
+			Section: f.Section, Unresolved: f.Unresolved})
 	}
-	for _, facts := range r.raw {
-		rec.Stages.Extracted += len(facts)
-		for _, f := range facts {
-			if f.Unresolved != "" {
-				rec.Stages.Flagged++
-			}
+	rec.Stages.Extracted += len(r.raw)
+	for _, l := range r.raw {
+		if l.Unresolved != "" {
+			rec.Stages.Flagged++
 		}
 	}
 	rec.Stages.Questionable = r.questionable

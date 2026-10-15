@@ -62,6 +62,32 @@ type distillWire struct {
 	Text    string `json:"text"`
 }
 
+// ClaudeAgent drives the three steps through Claude Code (memory.CLIRunner).
+type ClaudeAgent struct {
+	Runner *memory.CLIRunner
+	// Executable and Home start the kira-memory MCP server the finalize step uses.
+	Executable string
+	Home       string
+	// Env is extra environment for that server (tests only).
+	Env map[string]string
+	// Prompts resolves the extract and finalize prompts; nil means the registry defaults.
+	Prompts llmprompts.Source
+}
+
+func (a ClaudeAgent) prompts() llmprompts.Source {
+	if a.Prompts == nil {
+		return llmprompts.Defaults()
+	}
+	return a.Prompts
+}
+
+func (a ClaudeAgent) Available() error { return a.Runner.Available() }
+
+// Distill runs the distill prompt over one chunk.
+func (a ClaudeAgent) Distill(ctx context.Context, in DistillInput) (DistillOutput, error) {
+	return distillCall(ctx, a.Runner, a.prompts(), in)
+}
+
 // distillCall runs the distill prompt over one chunk. It is the one core import and the MCP tool share.
 func distillCall(ctx context.Context, runner *memory.CLIRunner, prompts llmprompts.Source, in DistillInput) (DistillOutput, error) {
 	input, err := json.Marshal(distillWire{Source: in.Source, Section: in.Section, Context: in.Context, Text: in.Text})

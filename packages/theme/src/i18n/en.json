@@ -5454,13 +5454,6 @@
           "body": "Sent as the system prompt of the Claude call that checks every memory save. The reply follows a fixed schema."
         }
       },
-      "memoryImportExtractSystem": {
-        "description": "Extracts short, durable facts from one chunk of an imported file.",
-        "title": "Import fact extraction",
-        "usedBy": {
-          "body": "Sent as the system prompt for each chunk while a memory import reads a file."
-        }
-      },
       "memoryImportFinalizeSystem": {
         "description": "Merges the facts of one imported file and stores them through the memory tools.",
         "title": "Import finalize",
@@ -5627,6 +5620,9 @@
       "implicit": {
         "description": "True when the step declares no results beyond done and failed."
       },
+      "instructions": {
+        "description": "True when the text is instructions. Each line then becomes one rule as a short imperative."
+      },
       "jiraKey": {
         "description": "The Jira key. Empty when the task has none."
       },
@@ -5636,11 +5632,8 @@
       "max": {
         "description": "The upper bound of the argument."
       },
-      "maxEvidence": {
-        "description": "The longest evidence quote, in characters."
-      },
       "maxFacts": {
-        "description": "The most facts one chunk may yield."
+        "description": "The most facts one cross-check call may judge."
       },
       "maxItems": {
         "description": "The most items one store_memory call may carry."
@@ -5648,8 +5641,8 @@
       "maxKeywords": {
         "description": "The most keywords the gate may give a fact."
       },
-      "maxReason": {
-        "description": "The longest reason, in characters."
+      "maxLines": {
+        "description": "The most lines one chunk may yield."
       },
       "message": {
         "description": "A message that replaces the composed prompt. Empty by default."
