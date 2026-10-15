@@ -37,10 +37,10 @@ func TestContainerActions(t *testing.T) {
 	if err := svc.Stop(docker.IDArgs{ID: plain}); err != nil {
 		t.Fatal(err)
 	}
-	running, _ := svc.Containers(docker.ListArgs{All: false})
-	if findContainer(running, plain) != nil {
-		t.Fatal("stopped container still listed with all:false")
-	}
+	waitUntil(t, "stopped container to drop out of an all:false list", func() bool {
+		running, _ := svc.Containers(docker.ListArgs{All: false})
+		return findContainer(running, plain) == nil
+	})
 	stopped, _ := svc.Containers(docker.ListArgs{All: true})
 	if c := findContainer(stopped, plain); c == nil || c.State != "exited" {
 		t.Fatalf("stopped container = %+v, want exited", c)

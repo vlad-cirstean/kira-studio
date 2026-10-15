@@ -131,3 +131,17 @@ func sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
+
+// waitUntil polls cond, bounded, for a daemon-side state change (e.g. a stopped container
+// dropping out of an all:false list) that a shared CI docker daemon under concurrent load from
+// every other adapter test's own containers can lag a beat behind the client call that caused it.
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}

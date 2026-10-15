@@ -215,7 +215,7 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 	e.live = newFakeLive()
 	e.tracker = NewTracker(TrackerDeps{
 		Store: r.AdeSessions, LiveAgents: e.live.AgentSessions, WriteTerminal: e.live.Write, Now: time.Now,
-		Grace: 20 * time.Millisecond, PendingTTL: time.Minute,
+		Grace: 20 * time.Millisecond, PendingTTL: time.Minute, ClaudeBin: self,
 	})
 	e.board = NewTaskBoard(TaskBoardDeps{
 		Credentials: gitcred.New(),

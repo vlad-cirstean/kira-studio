@@ -53,7 +53,11 @@ func TestGraphFirstPage(t *testing.T) {
 	}
 
 	decor := map[string][]string{}
-	for _, l := range lines(repo.Git("for-each-ref", "--format=%(objectname) %(*objectname) %(refname)")) {
+	// --exclude=refs/remotes/*/HEAD mirrors porcelain.HeadsRefsArgs' own exclusion (G32 round-3
+	// finding #5): the graph deliberately drops this symbolic pointer from decorations, so the
+	// expected set built here must drop it too, or a git version/config that auto-creates it on
+	// fetch (this one does) makes the comparison fail over a ref the app excludes on purpose.
+	for _, l := range lines(repo.Git("for-each-ref", "--format=%(objectname) %(*objectname) %(refname)", "--exclude=refs/remotes/*/HEAD")) {
 		f := strings.Fields(l)
 		target := f[0]
 		if len(f) == 3 {
