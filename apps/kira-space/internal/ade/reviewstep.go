@@ -94,26 +94,78 @@ func reviewWire(run model.AdeRun, rev model.AdeReview, round *model.AdeRun) *ade
 	return out
 }
 
-// wireRun is the run as it goes on the wire, with the review state of a review step run.
-func (b *TaskBoard) wireRun(r model.AdeRun) adewire.Run {
-	w := toWireRun(r)
-	w.Sandbox = b.runBadge(r.ID)
-	if r.Purpose != "" {
+// wireBatch holds what wireRun reads per task and per run, loaded once for a batch of runs.
+type wireBatch struct {
+	b      *TaskBoard
+	badges map[string]repos.AdeRunSandbox
+	runs   map[string][]model.AdeRun
+	rounds map[string][]model.AdeRun
+}
+
+func (b *TaskBoard) newWireBatch(runs []model.AdeRun) *wireBatch {
+	w := &wireBatch{b: b, runs: map[string][]model.AdeRun{}, rounds: map[string][]model.AdeRun{}}
+	if b.deps.RunSandbox == nil {
 		return w
 	}
-	if runs, err := b.deps.Tasks.RunsOfTask(r.TaskID); err == nil {
-		w.Returns = countReturns(runs, r.StageID, r.StepID, r.BranchID, r.Attempt)
+	ids := make([]string, len(runs))
+	for i, r := range runs {
+		ids[i] = r.ID
 	}
-	rev, err := b.deps.Tasks.GetReview(r.ID)
-	if err != nil || rev == nil {
-		return w
-	}
-	rounds, err := b.deps.Tasks.ReviewRounds(r.TaskID)
+	rows, err := b.deps.RunSandbox.Badges(ids)
 	if err != nil {
+		slog.Warn("ade: sandbox badges", "scope", "ade", "err", err)
 		return w
 	}
-	w.Review = reviewWire(r, *rev, latestRoundOf(rounds, r.ID))
+	w.badges = rows
 	return w
+}
+
+func (w *wireBatch) taskRuns(taskID string) ([]model.AdeRun, bool) {
+	if runs, ok := w.runs[taskID]; ok {
+		return runs, true
+	}
+	runs, err := w.b.deps.Tasks.RunsOfTask(taskID)
+	if err != nil {
+		return nil, false
+	}
+	w.runs[taskID] = runs
+	return runs, true
+}
+
+func (w *wireBatch) taskRounds(taskID string) ([]model.AdeRun, bool) {
+	if rounds, ok := w.rounds[taskID]; ok {
+		return rounds, true
+	}
+	rounds, err := w.b.deps.Tasks.ReviewRounds(taskID)
+	if err != nil {
+		return nil, false
+	}
+	w.rounds[taskID] = rounds
+	return rounds, true
+}
+
+// wireRun is the run as it goes on the wire, with the review state of a review step run.
+func (w *wireBatch) wireRun(r model.AdeRun) adewire.Run {
+	out := toWireRun(r)
+	if row, ok := w.badges[r.ID]; ok {
+		out.Sandbox = badgeOf(row)
+	}
+	if r.Purpose != "" {
+		return out
+	}
+	if runs, ok := w.taskRuns(r.TaskID); ok {
+		out.Returns = countReturns(runs, r.StageID, r.StepID, r.BranchID, r.Attempt)
+	}
+	rev, err := w.b.deps.Tasks.GetReview(r.ID)
+	if err != nil || rev == nil {
+		return out
+	}
+	rounds, ok := w.taskRounds(r.TaskID)
+	if !ok {
+		return out
+	}
+	out.Review = reviewWire(r, *rev, latestRoundOf(rounds, r.ID))
+	return out
 }
 
 // --- entering the step ---------------------------------------------------------------------------

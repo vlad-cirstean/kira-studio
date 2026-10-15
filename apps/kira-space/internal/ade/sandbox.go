@@ -459,21 +459,6 @@ func (b *TaskBoard) badgeTasks(tasks []adewire.Task) {
 	}
 }
 
-func (b *TaskBoard) runBadge(runID string) *adewire.RunSandboxBadge {
-	if b.deps.RunSandbox == nil {
-		return nil
-	}
-	rows, err := b.deps.RunSandbox.Badges([]string{runID})
-	if err != nil {
-		slog.Warn("ade: sandbox badge", "scope", "ade", "run", runID, "err", err)
-		return nil
-	}
-	if row, ok := rows[runID]; ok {
-		return badgeOf(row)
-	}
-	return nil
-}
-
 // RunSandbox returns the stored sandbox of a run: its policy, profile and denials.
 func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSandboxDetail, error) {
 	if b.deps.RunSandbox == nil {

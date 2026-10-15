@@ -197,12 +197,13 @@ func (b *TaskBoard) emitRuns(runs ...model.AdeRun) {
 		return
 	}
 	ev := adewire.RunsChangedEvent{Runs: make([]adewire.Run, 0, len(runs))}
+	batch := b.newWireBatch(runs)
 	for _, r := range runs {
 		if r.Purpose == model.AdeRunPurposeReview { // a round shows through its review run only
 			b.emitReview(r.TaskID, r.BranchID)
 			continue
 		}
-		w := b.wireRun(r)
+		w := batch.wireRun(r)
 		if w.Review != nil {
 			b.emitReview(r.TaskID, r.BranchID)
 		}
