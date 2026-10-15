@@ -44,15 +44,18 @@ type watcher struct {
 	// ppid reports a live process's parent; false when the process is gone.
 	ppid  func(int) (int, bool)
 	start func(ctx context.Context) (io.ReadCloser, func() error, error)
+	// backoffs are the waits between restarts of the log stream.
+	backoffs []time.Duration
 
 	mu     sync.Mutex
 	roots  map[string]int
+	names  map[string]map[string]bool // run -> process names already attributed to it
 	cancel context.CancelFunc
 	idle   *time.Timer
 }
 
 func newWatcher(h *hub) *watcher {
-	return &watcher{h: h, ppid: parentPID, start: startLogStream, roots: map[string]int{}}
+	return &watcher{h: h, ppid: parentPID, start: startLogStream, backoffs: watcherBackoffs, roots: map[string]int{}, names: map[string]map[string]bool{}}
 }
 
 func startLogStream(ctx context.Context) (io.ReadCloser, func() error, error) {
@@ -85,6 +88,7 @@ func (w *watcher) watch(pid int, runID string) func() {
 		w.mu.Lock()
 		defer w.mu.Unlock()
 		delete(w.roots, runID)
+		delete(w.names, runID)
 		if len(w.roots) == 0 && w.idle == nil {
 			w.idle = time.AfterFunc(watcherGrace, w.stopIfIdle)
 		}
@@ -105,10 +109,12 @@ func (w *watcher) loop(ctx context.Context) {
 	failures := 0
 	for ctx.Err() == nil {
 		out, wait, err := w.start(ctx)
+		lines := 0
 		if err == nil {
 			sc := bufio.NewScanner(out)
 			sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 			for sc.Scan() {
+				lines++
 				w.dispatch(sc.Text())
 			}
 			_ = wait()
@@ -116,16 +122,30 @@ func (w *watcher) loop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if failures >= len(watcherBackoffs) {
+		if lines > 0 {
+			failures = 0 // a healthy stream earns a fresh retry budget
+		}
+		if failures >= len(w.backoffs) {
 			slog.Warn("sandbox: denial log unavailable; continuing without denials", "scope", "agentsandbox", "err", err)
+			w.giveUp(ctx)
 			return
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(watcherBackoffs[failures]):
+		case <-time.After(w.backoffs[failures]):
 		}
 		failures++
+	}
+}
+
+// giveUp clears the loop's cancel so the next watch starts a new loop.
+func (w *watcher) giveUp(ctx context.Context) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if ctx.Err() == nil && w.cancel != nil {
+		w.cancel()
+		w.cancel = nil
 	}
 }
 
@@ -134,16 +154,30 @@ func (w *watcher) dispatch(line string) {
 	if !ok {
 		return
 	}
-	if runID, ok := w.attribute(pid); ok {
+	if runID, ok := w.attribute(pid, d.Process); ok {
 		w.h.emit(runID, d)
 		return
 	}
-	slog.Info("ade: unattributed sandbox denial", "scope", "agentsandbox", "op", d.Op, "target", d.Target)
+	slog.Debug("sandbox: unattributed denial", "scope", "agentsandbox", "op", d.Op, "target", d.Target, "process", d.Process)
 }
 
-// attribute finds the run owning pid by walking its parents up to a watched root; a vanished
-// process belongs to the only watched run, else to nobody.
-func (w *watcher) attribute(pid int) (string, bool) {
+// attribute finds the run owning pid by walking its parents up to a watched root. A vanished process
+// belongs to the only watched run when that run already had a denial from a process of the same name;
+// the stream is system-wide, so any other vanished process is another app's.
+func (w *watcher) attribute(pid int, process string) (string, bool) {
+	run, ok := w.walk(pid, process)
+	if ok {
+		w.mu.Lock()
+		if w.names[run] == nil {
+			w.names[run] = map[string]bool{}
+		}
+		w.names[run][process] = true
+		w.mu.Unlock()
+	}
+	return run, ok
+}
+
+func (w *watcher) walk(pid int, process string) (string, bool) {
 	w.mu.Lock()
 	roots := make(map[int]string, len(w.roots))
 	for run, root := range w.roots {
@@ -159,7 +193,10 @@ func (w *watcher) attribute(pid int) (string, bool) {
 		if !alive {
 			if cur == pid && len(roots) == 1 {
 				for _, run := range roots {
-					return run, true
+					w.mu.Lock()
+					known := w.names[run][process]
+					w.mu.Unlock()
+					return run, known
 				}
 			}
 			return "", false

@@ -27,14 +27,28 @@ type Runtime struct {
 }
 
 var (
-	rtOnce sync.Once
-	rtVal  Runtime
+	rtMu  sync.Mutex
+	rtVal *Runtime
 )
 
-// DiscoverRuntime probes once per app session; a failed probe shrinks the set and logs once.
-func DiscoverRuntime(ctx context.Context, claudeBin string) Runtime {
-	rtOnce.Do(func() { rtVal = discover(ctx, claudeBin) })
-	return rtVal
+const discoverTimeout = 20 * time.Second
+
+// DiscoverRuntime probes once per app session. The probe is detached from the caller's context, so
+// one stopped run cannot shrink the set for the rest of the session. A probe that finds no claude is
+// not cached; the next launch retries.
+func DiscoverRuntime(_ context.Context, claudeBin string) Runtime {
+	rtMu.Lock()
+	defer rtMu.Unlock()
+	if rtVal != nil {
+		return *rtVal
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), discoverTimeout)
+	defer cancel()
+	rt := discover(ctx, claudeBin)
+	if rt.ClaudePrefix != "" {
+		rtVal = &rt
+	}
+	return rt
 }
 
 func discover(ctx context.Context, claudeBin string) Runtime {
