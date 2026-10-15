@@ -258,6 +258,17 @@ type rerun struct {
 // done or `back` run with fewer loops than the round is stale and is queued again with loops =
 // round. A missing, running, pending, stuck or failed run ends the walk.
 func chainRerun(steps []stepView, entry int) []rerun {
+	var out []rerun
+	for _, bid := range targetBranches(steps) {
+		if r, ok := chainRerunBranch(steps, entry, bid); ok {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// targetBranches lists every target branch id in first-seen order.
+func targetBranches(steps []stepView) []string {
 	var branches []string
 	seen := map[string]bool{}
 	for _, s := range steps {
@@ -268,39 +279,36 @@ func chainRerun(steps []stepView, entry int) []rerun {
 			}
 		}
 	}
-	var out []rerun
-walk:
-	for _, bid := range branches {
-		round := 0
-		for i := max(entry, 0); i < len(steps); {
-			s := steps[i]
-			if s.Def.Skip || !slices.Contains(s.Targets, bid) {
-				i++
-				continue
+	return branches
+}
+
+func chainRerunBranch(steps []stepView, entry int, bid string) (rerun, bool) {
+	round := 0
+	for i := max(entry, 0); i < len(steps); {
+		s := steps[i]
+		if s.Def.Skip || !slices.Contains(s.Targets, bid) {
+			i++
+			continue
+		}
+		r, ok := s.Runs[bid]
+		if !ok {
+			return rerun{}, false
+		}
+		stale := rerun{Step: i, Branch: bid, Attempt: r.Attempt + 1, Loops: round}
+		switch r.State {
+		case model.AdeRunDone:
+			if r.Loops < round {
+				return stale, true
 			}
-			r, ok := s.Runs[bid]
-			if !ok {
-				continue walk
-			}
-			switch r.State {
-			case model.AdeRunDone:
-				if r.Loops < round {
-					out = append(out, rerun{Step: i, Branch: bid, Attempt: r.Attempt + 1, Loops: round})
-					continue walk
-				}
-				round = max(round, r.Loops)
-				i = forwardTarget(steps, i, []string{bid})
-			case model.AdeRunBack:
-				if r.Loops < round {
-					out = append(out, rerun{Step: i, Branch: bid, Attempt: r.Attempt + 1, Loops: round})
-				}
-				continue walk
-			default:
-				continue walk
-			}
+			round = max(round, r.Loops)
+			i = forwardTarget(steps, i, []string{bid})
+		case model.AdeRunBack:
+			return stale, r.Loops < round
+		default:
+			return rerun{}, false
 		}
 	}
-	return out
+	return rerun{}, false
 }
 
 // nextAction looks at the end of the route path from the entry step: the first step not done. A
