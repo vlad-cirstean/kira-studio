@@ -61,13 +61,22 @@ An agent step can declare 1 to 12 results. Each result has an `id`, an `ok` flag
 - `end`: the end of the stage.
 - `stop`: stop the task. Only a result that is not ok can use it.
 
-A loop edge has a `max` from 1 to 10. The default is 3.
+A route to the step itself or an earlier step is a return. The step's `max_returns` limits them per task, stage, step and branch. The count survives restart and Resume.
+
+- Agent step: 1 to 10, default 3.
+- Review step: 0 to 10, default 0. `0` means no limit.
+
+At the limit the run stops with `Stopped: <step> reached its limit of <n> returns.` Retry the step to continue.
+
+Older files still load. `retry N` becomes `max_returns: N`. A result `max` on a loop route becomes the largest value. `max_returns` with `on_failure`, or with a result `max`, is refused. Saving never writes a result `max`.
 
 A run that ends with no report takes the step's `failed` result. A step without declared results stops on failure, or follows its `on_failure` rule: `stop`, `retry 1`, `retry 2` or `back:<step id>`.
 
 ### Graph editor
 
 The Workflows page edits a workflow as a graph or as YAML. Save with `Cmd+S`. Nothing saves automatically. Leaving with unsaved edits asks first.
+
+Edit on the canvas. `+ Step` in a stage adds a step. `+ Add stage` under the graph adds a stage. The `⋯` menu on a stage has Add step, Add stage after, Move up, Move down, Skip and Remove. The `⋯` menu on a step, or a right click, has Add step after, Make start and Remove. Select a step to edit its fields, including **Max returns**, in the inspector.
 
 A task follows the live file until its first run, session or stage move. After that it keeps a snapshot, and an updated file applies to new work only.
 
@@ -130,6 +139,8 @@ Linux and Windows write the profile but do not enforce it. The badge says `Not e
 A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `no report: Claude ended without calling finish_step`.
 
 A step starts automatically or waits for your approval.
+
+A run that came back shows `↩ n/N`: returns used of the limit. A step with no limit shows `↩ n`. The chip turns red when the limit stops the run.
 
 Each run line shows its sandbox badge. See [Sandbox](#sandbox).
 

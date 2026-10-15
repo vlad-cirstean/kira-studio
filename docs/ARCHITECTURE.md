@@ -4188,18 +4188,28 @@ and `docs/v2.0/plans/`.
 - Sample workflows (`apps/kira-space/internal/adeflow/testdata/`) import and validate in the app.
 - Step results (P247): an agent step may declare `results:` (1 to 12): `id`, `ok` (required), `description`
   (one line, at most 200), `next` (`next|end|stop|<step id>`, default `next` for ok and `stop` for not ok),
-  `max` (1..10, loop edges only, default 3). `needs_input` is reserved; `results` and `on_failure` on one
-  step is a parse error; at least one result must route forward. The parser always materializes
-  `PipelineStep.Results`; `OnFailure` is set only when the results equal a legacy form. The writer writes
-  `on_failure` when they do (old files save byte-identical) and `results` otherwise. `adewire/results.go`
-  holds `ImplicitResults` and `LegacyOnFailure`.
+  `needs_input` is reserved; at least one result must route forward. Wire: `StepResult.loop` (route targets the
+  step or an earlier one) replaces the old per-result `max`; limit is `PipelineStep.MaxReturns` (P288, see Return
+  limit). The parser always materializes `Results`; `OnFailure` is set only when results and limit equal a legacy
+  form (`adewire.LegacyLimit`). The writer writes `on_failure` then (old files save byte-identical) and
+  `results` plus `max_returns` otherwise. `adewire/results.go` holds `ImplicitResults`, `DefaultLimit`,
+  `LegacyLimit`, `LegacyOnFailure`.
+- Return limit (P288): `max_returns` per step; agent default 3, range 1..10; review default 0 (no limit), range
+  0..10. A return is a result routed to the step itself or an earlier one. Counter: `ade_runs` rows in state `back`
+  with purpose '' per (task, stage, step, branch), no migration, never reset, survives restart and Resume
+  (`countReturns`, `Run.Returns`). `decideLoop` stops at the limit with catalog note
+  `backend.space.ade.returnLimit.body`. Legacy: `retry N` gives N; a result `max` on loop routes folds to the
+  largest; `max_returns` with `on_failure` or a result `max` is a parse error. Writer drops result `max`, writes
+  `max_returns` only when it differs from the implied default. `FillReturnLimits` fills snapshots stored before
+  P288 on decode. UI: `↩ n/N` chip on the run line (red when spent), `↩ ≤N` on the node, Max returns in the
+  step inspector.
 - Graph editor (P247, `ade/v2/workflows/`): the Workflows page edits a draft (`state/adeWorkflowDraft.ts`)
   as a Vue Flow canvas (`@vue-flow/core`, MIT) with `@dagrejs/dagre` auto-layout on every edit; no stored
   positions, nodes not draggable. `board/workflowGraph.ts` is the pure model (edges grouped by target,
-  green for all ok, red for all not ok, neutral for mixed; loop edges dashed with `max`; `setRoute` turns an
+  green for all ok, red for all not ok, neutral for mixed; loop edges dashed; `setRoute` turns an
   edge into a loop when the target already leads to the source, else moves the target after it;
   `normalizeOrder` keeps the start first and forward routes pointing later). A result dot dragged to a step,
-  or the route select in the inspector, sets `next`. Stages reorder by dragging the stage strip. The editor
+  or the route select in the inspector, sets `next`. No stage strip (P288): stage and step menus (`⋯`, right click on a step) add, move (Move up/down), skip and remove; `+ Step` per stage and `+ Add stage` under the canvas add. The editor
   mode is `graph | yaml`; the graph editor loads asynchronously so the board bundle stays free of Vue Flow.
   Layout is locked (P255): top to bottom only, every node `256x104`, stages stacked on one spine column,
   `results:` branches fan to the side, loops run dashed in a left gutter of the stage and enter the target
@@ -4260,7 +4270,7 @@ and `docs/v2.0/plans/`.
   to a route: `next`, a later step (steps between are skipped, a view only), `end`, `stop`, or a loop to
   the step itself or an earlier one. A forward or `end` route marks the run `done` (a not-ok result keeps
   outcome status `failed`), `stop` or a spent loop marks it `failed`, a loop marks it `back`. Loop counts
-  are cumulative per task, stage, step, branch and result (`max` 1..10, default 3). A self loop starts a
+  are cumulative per task, stage, step and branch against the step's `max_returns`. A self loop starts a
   fresh attempt; an earlier-step loop queues a fix run of the target with `claude -p --resume <session id>`
   (same Claude session), `loops` is the round epoch. The fix run's resume spec sits on its run row until launch, so a run held behind a setup resumes the same Claude session after restart. No report (crash, timeout) takes the step's `failed` result, else stops. `walkPath` follows the routes; `nextAction` and `chainRerun` use that path. The run outcome stores `result` and `route`. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
