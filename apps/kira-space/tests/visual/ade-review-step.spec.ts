@@ -24,6 +24,7 @@ test('workflow graph with a review step', async ({ relaunch }) => {
   if (tests) {
     tests.prompt = '';
     tests.review = { sendTo: 'implementer', implementer: '' };
+    tests.maxReturns = 0;
     tests.results = [
       { id: 'approved', ok: true, description: '', next: 'next', loop: false },
       { id: 'rejected', ok: false, description: '', next: 'stop', loop: false },
