@@ -43,7 +43,7 @@ var ErrRunnerBusy = errors.New("importer: another import runner holds the lock")
 // RunnerOptions configure a Runner. Only Agent is required.
 type RunnerOptions struct {
 	Agent      Agent
-	Extractors int                    // concurrent distill calls; 0 means 3
+	Extractors int                    // concurrent extract calls; 0 means 3
 	Backoff    func() backoff.BackOff // per-item retry schedule; nil means exponential from 10 s
 	OnChange   func()                 // runs after any state change; must not block
 	Now        func() time.Time
@@ -465,7 +465,7 @@ func (r *Runner) startSlotWork() bool {
 			r.extractSem.Release(1)
 			return false
 		}
-		r.spawn(func() { r.runDistill(ctx, it) })
+		r.spawn(func() { r.runExtract(ctx, it) })
 		return true
 	}
 	vit, ok, err := r.st.claimVerify()
@@ -630,18 +630,19 @@ func (r *Runner) pauseFatal(jobID string, err error) {
 	}
 }
 
-func (r *Runner) runDistill(ctx context.Context, it chunkItem) {
+func (r *Runner) runExtract(ctx context.Context, it chunkItem) {
 	defer r.kick()
 	defer r.extractSem.Release(1)
 	defer r.changed()
 
 	var u usage
-	var out DistillOutput
+	var out ExtractOutput
 	tries := 0
 	runErr := r.retry(ctx, func() error {
 		tries++
 		u.Calls++
-		o, err := r.agent.Distill(ctx, DistillInput{Source: it.Path, Section: it.HeadingPath, Context: it.Context, Text: it.Text})
+		o, err := r.agent.Extract(ctx, ExtractInput{Path: it.Path, Title: it.Title, Index: it.Index, Count: it.Count,
+			HeadingPath: it.HeadingPath, Context: it.Context, Text: it.Text})
 		u.CostUSD += o.CostUSD
 		if err == nil {
 			out = o
@@ -651,7 +652,7 @@ func (r *Runner) runDistill(ctx context.Context, it chunkItem) {
 	var err error
 	switch {
 	case runErr == nil:
-		err = r.st.finishChunk(it, chunkFacts(it, out.Lines), tries, u)
+		err = r.st.finishChunk(it, out.Facts, tries, u)
 	case ctx.Err() != nil:
 		err = r.st.releaseChunk(it, u)
 	case isFatal(runErr):
@@ -666,16 +667,6 @@ func (r *Runner) runDistill(ctx context.Context, it chunkItem) {
 	if err != nil {
 		slog.Error("memory import: extract result", "scope", "memory", "err", err)
 	}
-}
-
-// chunkFacts turns distilled lines into facts. The section comes from the chunk, not the model; the
-// stored reason is built at load time (sourceLocator).
-func chunkFacts(it chunkItem, lines []DistillLine) []Fact {
-	facts := make([]Fact, len(lines))
-	for i, l := range lines {
-		facts[i] = Fact{Fact: l.Text, Section: it.HeadingPath, Unresolved: l.Unresolved}
-	}
-	return facts
 }
 
 func boundedMessage(err error) string {

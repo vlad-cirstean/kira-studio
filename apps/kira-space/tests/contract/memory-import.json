@@ -534,7 +534,7 @@
         "docPath": "",
         "dropped": [
           {
-            "fact": "Pagers rotate every Monday at 14:00.",
+            "fact": "Pagers rotate every Monday.",
             "why": "Not supported by the source: No pager rotation in the file."
           }
         ],

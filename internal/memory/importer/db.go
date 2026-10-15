@@ -702,18 +702,18 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 	if json.Unmarshal([]byte(verify), &f.verdicts) != nil || f.verdicts == nil {
 		f.verdicts = map[string]Verdict{}
 	}
-	rows, err := tx.Query(`SELECT idx, heading_path, context, text, facts FROM import_chunks WHERE file_id = ? ORDER BY idx`, fileID)
+	rows, err := tx.Query(`SELECT idx, heading_path, text, facts FROM import_chunks WHERE file_id = ? ORDER BY idx`, fileID)
 	if err != nil {
 		return f, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var idx int
-		var headingPath, ctxText, text, raw string
-		if err := rows.Scan(&idx, &headingPath, &ctxText, &text, &raw); err != nil {
+		var headingPath, text, raw string
+		if err := rows.Scan(&idx, &headingPath, &text, &raw); err != nil {
 			return f, err
 		}
-		norm := normalizeQuote(ctxText + " " + text)
+		norm := normalizeQuote(text)
 		var facts []Fact
 		if err := json.Unmarshal([]byte(raw), &facts); err != nil {
 			return f, fmt.Errorf("import: chunk facts: %w", err)
@@ -724,7 +724,7 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 			ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Reason: reason, Fact: fact}
 			if questionableIn(norm, fact) {
 				if _, judged := f.verdicts[ff.ID]; !judged {
-					f.Verify = append(f.Verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Section: fact.Section, Unresolved: fact.Unresolved})
+					f.Verify = append(f.Verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Evidence: fact.Evidence, Section: fact.Section, Unresolved: fact.Unresolved})
 				}
 			}
 			f.Facts = append(f.Facts, ff)
@@ -760,6 +760,9 @@ func (f *extractedFile) applyVerdicts() {
 		case v.Verdict == VerdictRewritten:
 			if v.Fact != "" {
 				ff.Fact.Fact = v.Fact
+			}
+			if v.Evidence != "" {
+				ff.Evidence = v.Evidence
 			}
 			ff.Unresolved = ""
 		case v.Verdict == VerdictUnsupported:

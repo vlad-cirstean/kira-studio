@@ -27,7 +27,7 @@ func testdata(t *testing.T, name string) string {
 const (
 	gateSystem      = "gatekeeper of a long-term memory"
 	reconcileSystem = "reconcile new facts"
-	extractSystem   = "distill text into terse atomic lines"
+	extractSystem   = "extract durable facts"
 )
 
 // importApp boots the app with a finalize agent that stores two facts through the real memory-mcp
@@ -48,8 +48,8 @@ func importAppGate(t *testing.T, gateSystem string, extract ...fakeagent.PromptR
 		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
 		fakeagent.PromptRule{System: gateSystem, Doc: "release.md", Emit: testdata(t, "gate-release.md.json")},
 		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")},
-		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "distill-billing.md.json")},
-		fakeagent.PromptRule{System: extractSystem, Doc: "release.md", Emit: testdata(t, "distill-release.md.json")},
+		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "extract-billing.md.json")},
+		fakeagent.PromptRule{System: extractSystem, Doc: "release.md", Emit: testdata(t, "extract-release.md.json")},
 	)
 	app.Scenario(fakeagent.Scenario{Prompts: prompts, Claude: map[string][]fakeagent.Action{"*": {{
 		MCP: []fakeagent.MCPCall{{Server: "kira-memory", Tool: "store_memory", Args: map[string]any{
@@ -132,7 +132,7 @@ var importMask = flowharness.Mask("roots", "base", "createdAt", "startedAt", "fi
 
 func TestImportLifecycle(t *testing.T) {
 	held := filepath.Join(t.TempDir(), "release")
-	app := importApp(t, fakeagent.PromptRule{System: extractSystem, Doc: "ops.md", WaitFile: held, Emit: testdata(t, "distill-billing.md.json")})
+	app := importApp(t, fakeagent.PromptRule{System: extractSystem, Doc: "ops.md", WaitFile: held, Emit: testdata(t, "extract-billing.md.json")})
 
 	awaiting := createJob(t, app, importDir(t))
 	if awaiting.Job.Estimate.Files != 2 || len(awaiting.Files) != 2 {
