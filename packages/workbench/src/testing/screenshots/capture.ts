@@ -114,8 +114,8 @@ async function frame(page: Page, raw: Buffer): Promise<Buffer> {
   }
 }
 
-/** Writes `screenshots/<id>.png`, `<id>-detail.png` and `framed/<id>.png`. Call once the view shows
- *  its key content: the caller asserts that first. */
+/** Writes `screenshots/<id>-detail.png` and `framed/<id>.png`; the raw shot stays in
+ *  memory. Call once the view shows its key content: the caller asserts that first. */
 export async function captureShot(page: Page, options: ShotOptions): Promise<void> {
   const { id, detail, consoleErrors } = options;
   await page.mouse.move(0, 0);
@@ -130,7 +130,6 @@ export async function captureShot(page: Page, options: ShotOptions): Promise<voi
   const crop = await page.screenshot({ ...capture, clip: { ...detail, ...DETAIL_SIZE } });
 
   await mkdir(join(OUT_DIR, 'framed'), { recursive: true });
-  await writeFile(join(OUT_DIR, `${id}.png`), raw);
   await writeFile(join(OUT_DIR, `${id}-detail.png`), crop);
   await writeFile(join(OUT_DIR, 'framed', `${id}.png`), await frame(page, raw));
 }
