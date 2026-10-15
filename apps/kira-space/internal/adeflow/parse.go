@@ -474,7 +474,23 @@ func protectedSandboxPath(p string) bool {
 	case "/", "~", "~/Library", "~/.claude", ".":
 		return true
 	}
-	return strings.HasPrefix(c, "..") || strings.HasPrefix(c+"/", "~/Library/Keychains/")
+	return strings.HasPrefix(c, "..") || strings.HasPrefix(c+"/", "~/Library/Keychains/") || protectedAbsoluteHome(c)
+}
+
+// protectedAbsoluteHome catches the absolute spelling of the protected paths: /Users or /home, a
+// home folder under it, its Library and .claude folders, and the keychain directory.
+func protectedAbsoluteHome(c string) bool {
+	seg := strings.Split(strings.TrimPrefix(c, "/"), "/")
+	if !strings.HasPrefix(c, "/") || (seg[0] != "Users" && seg[0] != "home") {
+		return false
+	}
+	switch {
+	case len(seg) <= 2:
+		return true
+	case len(seg) == 3:
+		return seg[2] == "Library" || seg[2] == ".claude"
+	}
+	return seg[2] == "Library" && seg[3] == "Keychains"
 }
 
 func truncate(s string, n int) string {

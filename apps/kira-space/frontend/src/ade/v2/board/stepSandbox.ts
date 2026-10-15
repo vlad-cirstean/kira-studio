@@ -41,11 +41,22 @@ function cleanPath(p: string): string {
   return p.startsWith('/') ? `/${joined}` : joined || '.';
 }
 
-/** Mirrors the workflow parser: roots, home, ~/Library, ~/.claude and the keychain directory are refused. */
+/** Mirrors the workflow parser: roots, home, ~/Library, ~/.claude and the keychain directory are refused, in `~` or absolute spelling. */
 function isProtectedPath(p: string): boolean {
   const c = cleanPath(p);
   if (['/', '~', '~/Library', '~/.claude', '.'].includes(c)) return true;
-  return c.startsWith('..') || `${c}/`.startsWith('~/Library/Keychains/');
+  return (
+    c.startsWith('..') || `${c}/`.startsWith('~/Library/Keychains/') || isProtectedAbsoluteHome(c)
+  );
+}
+
+/** Absolute spelling of the protected paths: /Users or /home, a home folder, its Library and .claude, the keychain directory. */
+function isProtectedAbsoluteHome(c: string): boolean {
+  const seg = c.split('/').slice(1);
+  if (!c.startsWith('/') || (seg[0] !== 'Users' && seg[0] !== 'home')) return false;
+  if (seg.length <= 2) return true;
+  if (seg.length === 3) return seg[2] === 'Library' || seg[2] === '.claude';
+  return seg[2] === 'Library' && seg[3] === 'Keychains';
 }
 
 export function pathsValid(paths: readonly string[]): boolean {
