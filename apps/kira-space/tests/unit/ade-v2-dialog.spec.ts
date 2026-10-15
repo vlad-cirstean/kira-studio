@@ -6,24 +6,18 @@ import {
   type DialogCtx,
   mergeSpec,
   rebaseSpec,
-  stageSpec,
+  sessionSpec,
   startSpec,
   templateFor,
 } from '../../frontend/src/ade/v2/dialog/compose';
 import { createTurnWatcher } from '../../frontend/src/ade/v2/dialog/turnWatch';
-import type {
-  Board,
-  ReposResult,
-  Session,
-  SessionsResult,
-  Stage,
-} from '../../frontend/src/ade/v2/wire';
+import type { Board, ReposResult, Session, SessionsResult } from '../../frontend/src/ade/v2/wire';
 import { loadFixture } from './support/adeV2Fixtures';
 import { runMockupV2 } from './support/mockupV2Oracle';
 
 // The dialog templates against the mockup run unmodified (rebase with a restack chain, queue onto a
 // review branch, merge), then the rules the mockup has no oracle for: busy and headless blocks,
-// target resolution, archive lines and the stage and start mirrors of the server defaults. The turn
+// target resolution, archive lines and the session and start mirrors of the server defaults. The turn
 // watcher's submit / stop / ended / live-seen rules close the file.
 
 const board = loadFixture<Board>('board');
@@ -48,6 +42,7 @@ function ctxWith(sessions: Session[], repoName?: (id: string) => string): Dialog
     }),
     taskTitle: (id) => board.tasks.find((t) => t.id === id)?.title || 'Usage-based billing',
     openStep: () => 'Metering endpoints',
+    currentStep: () => null,
   };
 }
 
@@ -119,7 +114,6 @@ describe('busy and headless blocks', () => {
     terminalId: 't1',
     taskId: 'T_bill',
     branchId: 'b_billdash',
-    stageId: '',
     stepId: '',
     runId: '',
     resumes: '',
@@ -175,7 +169,6 @@ describe('targets', () => {
     terminalId: `t-${id}`,
     taskId: 'T_bill',
     branchId,
-    stageId: '',
     stepId: '',
     runId: '',
     resumes: '',
@@ -243,23 +236,13 @@ describe('archive', () => {
   });
 });
 
-describe('stage and start mirror the server defaults', () => {
-  const stage: Stage = {
-    id: 'spec',
+describe('session and start mirror the server defaults', () => {
+  const manual = {
     name: 'Spec',
-    kind: 'user',
-    status: 'In progress',
-    skip: false,
-    session: true,
     prompt: 'Ask me questions until the spec is clear about {task} in {repo}.',
-    steps: [],
-    command: '',
-    runsOn: '',
-    onFailure: '',
-    timeout: '',
   };
 
-  test('stage: title line, Jira, writable and read-only repos, notes, substituted prompt', () => {
+  test('session: title line, Jira, writable and read-only repos, notes, substituted prompt', () => {
     const t = board.tasks.find((x) => x.id === 'T_bill');
     if (!t) throw new Error('fixture');
     const g = buildBranchGraph({
@@ -270,13 +253,12 @@ describe('stage and start mirror the server defaults', () => {
               ...x,
               notes: 'Reuse line items.',
               jira: { key: 'PAY-102', url: 'https://j/PAY-102' },
-              currentStage: stage,
             }
           : x,
       ),
     });
-    const c = { ...ctx, graph: g };
-    const text = templateFor(c, stageSpec(c, 'T_bill'), STATE);
+    const c = { ...ctx, graph: g, currentStep: () => manual };
+    const text = templateFor(c, sessionSpec(c, 'T_bill'), STATE);
     expect(text.split('\n')).toEqual([
       'Spec: Usage-based billing',
       '- Jira: PAY-102 https://j/PAY-102',
@@ -286,11 +268,11 @@ describe('stage and start mirror the server defaults', () => {
       '- Notes: Reuse line items.',
       'Ask me questions until the spec is clear about Usage-based billing in api, web-app, web-app.',
     ]);
-    expect(stageSpec(c, 'T_bill').title).toBe('Spec · interactive Claude Code');
+    expect(sessionSpec(c, 'T_bill').title).toBe('Spec · interactive Claude Code');
   });
 
-  test('stage: a branch not created yet is a read-only repo line', () => {
-    const text = templateFor(ctx, stageSpec(ctx, 'T_csv'), STATE);
+  test('session: a branch not created yet is a read-only repo line', () => {
+    const text = templateFor({ ...ctx, currentStep: () => null }, sessionSpec(ctx, 'T_csv'), STATE);
     expect(text).toContain(
       '- Repo: api (read only, in ~/code/acme/acme-platform-core-api-service)',
     );

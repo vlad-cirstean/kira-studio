@@ -90,11 +90,11 @@ func TestWorkflowsYaml(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fresh.FileName != "release-flow.yaml" || fresh.Workflow == nil || len(fresh.Workflow.Stages) != 1 {
-		t.Fatalf("NewWorkflow = %+v, want release-flow.yaml with one stage", fresh)
+	if fresh.FileName != "release-flow.yaml" || fresh.Workflow == nil || len(fresh.Workflow.Steps) != 1 {
+		t.Fatalf("NewWorkflow = %+v, want release-flow.yaml with one step", fresh)
 	}
 
-	broken := "id: broken\nname: Broken\nstages:\n  - id: build\n    name: Build\n    kind: nonsense\n    status: In progress\n"
+	broken := "id: broken\nname: Broken\nsteps:\n  - id: build\n    name: Build\n    kind: nonsense\n"
 	val, err := svc.ValidateWorkflowYaml(ctx, adewire.ValidateWorkflowYamlArgs{Yaml: broken})
 	if err != nil {
 		t.Fatal(err)
@@ -110,14 +110,14 @@ func TestWorkflowsYaml(t *testing.T) {
 		t.Fatalf("saving invalid yaml = %+v, want the file kept with its error", saved)
 	}
 
-	two := flowYAML("two-stage", agentStage("build", agentStep("one", ""))+"  - id: review\n    name: Review\n    kind: user\n    status: In review\n")
-	saveWorkflow(t, app, "two-stage", two)
+	two := flowYAML("two-step", agentStep("one", "")+"  - id: review\n    name: Review\n    kind: manual\n    status: In review\n")
+	saveWorkflow(t, app, "two-step", two)
 
 	imported, err := svc.ImportWorkflow(ctx, adewire.ImportWorkflowArgs{Path: mustAbs(t, filepath.Join("testdata", "imported.yaml"))})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if imported.FileName != "imported.yaml" || imported.Workflow == nil || len(imported.Workflow.Stages) != 2 {
+	if imported.FileName != "imported.yaml" || imported.Workflow == nil || len(imported.Workflow.Steps) != 2 {
 		t.Fatalf("ImportWorkflow = %+v", imported)
 	}
 	if _, err := svc.ImportWorkflow(ctx, adewire.ImportWorkflowArgs{Path: mustAbs(t, filepath.Join("testdata", "imported.yaml"))}); err == nil {
@@ -132,7 +132,7 @@ func TestWorkflowsYaml(t *testing.T) {
 	for _, e := range list.Workflows {
 		names = append(names, e.FileName)
 	}
-	if !slices.Equal(names, []string{"broken.yaml", "imported.yaml", "release-flow.yaml", "two-stage.yaml"}) {
+	if !slices.Equal(names, []string{"broken.yaml", "imported.yaml", "release-flow.yaml", "two-step.yaml"}) {
 		t.Fatalf("workflows = %v", names)
 	}
 
@@ -140,26 +140,26 @@ func TestWorkflowsYaml(t *testing.T) {
 	repo.Commit("base", map[string]string{"a.txt": "a\n"})
 	rec := importRepo(t, app, repo.Dir)
 	task := createTask(t, app, "switch", "release-flow", rec.ID)
-	if task.WorkflowID != "release-flow" || task.StageID != "work" {
-		t.Fatalf("task = %+v, want release-flow at stage work", task)
+	if task.WorkflowID != "release-flow" || task.EntryStepID != "work" {
+		t.Fatalf("task = %+v, want release-flow at step work", task)
 	}
-	switched, err := svc.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: task.ID, WorkflowID: "two-stage"})
+	switched, err := svc.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: task.ID, WorkflowID: "two-step"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if switched.WorkflowID != "two-stage" || switched.StageID != "build" || switched.CurrentStage == nil || switched.CurrentStage.Kind != "agent" {
-		t.Fatalf("switched task = %+v, want two-stage at its agent stage build", switched)
+	if switched.WorkflowID != "two-step" || switched.EntryStepID != "one" {
+		t.Fatalf("switched task = %+v, want two-step at its first step one", switched)
 	}
 	list, _ = svc.Workflows(ctx)
 	used := map[string]int{}
 	for _, e := range list.Workflows {
 		used[e.FileName] = e.UsedBy
 	}
-	if used["two-stage.yaml"] != 1 || used["release-flow.yaml"] != 0 {
-		t.Fatalf("workflow usage = %v, want two-stage 1 and release-flow 0", used)
+	if used["two-step.yaml"] != 1 || used["release-flow.yaml"] != 0 {
+		t.Fatalf("workflow usage = %v, want two-step 1 and release-flow 0", used)
 	}
 	cleared, err := svc.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: task.ID, WorkflowID: ""})
-	if err != nil || cleared.WorkflowID != "" || cleared.StageID != "" {
+	if err != nil || cleared.WorkflowID != "" || cleared.EntryStepID != "" {
 		t.Fatalf("cleared task = %+v, %v", cleared, err)
 	}
 	if _, err := svc.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: task.ID, WorkflowID: "missing"}); err == nil {

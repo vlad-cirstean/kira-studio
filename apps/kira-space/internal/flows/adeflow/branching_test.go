@@ -18,11 +18,21 @@ import (
 func reviewResults(maxReturns int) string {
 	m := ""
 	if maxReturns > 0 {
-		m = "        max_returns: " + strconv.Itoa(maxReturns) + "\n"
+		m = "    max_returns: " + strconv.Itoa(maxReturns) + "\n"
 	}
-	return "        results:\n" +
-		"          - id: approved\n            ok: true\n" +
-		"          - id: changes\n            ok: false\n            next: impl\n" + m
+	return "    results:\n" +
+		"      - id: approved\n        ok: true\n" +
+		"      - id: changes\n        ok: false\n        next: impl\n" + m
+}
+
+// backTo routes the failed result to an earlier step.
+func backTo(target string) string {
+	return "    results:\n      - id: done\n        ok: true\n      - id: failed\n        ok: false\n        next: " + target + "\n"
+}
+
+// selfReturn retries the step on failure, up to limit returns.
+func selfReturn(id string, limit int) string {
+	return backTo(id) + "    max_returns: " + strconv.Itoa(limit) + "\n"
 }
 
 func acts(names ...string) []fakeagent.Action {
@@ -56,7 +66,7 @@ func resultOf(r adewire.Run) (result, route string) {
 func TestBranching(t *testing.T) {
 	t.Run("a review loops back to implement until it approves", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:changes", "done", "result:changes", "done", "result:approved"),
-			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(0)))+userStage)
+			agentStep("impl", "")+agentStep("review", reviewResults(0))+manualStep)
 		f.start(t, "feat/api-work")
 		final := waitRun(t, f.app, f.taskID, "review", "done")
 		if res, route := resultOf(final); res != "approved" || route != "next" {
@@ -75,15 +85,15 @@ func TestBranching(t *testing.T) {
 		if impl := stepRuns(t, f, "impl"); len(impl) != 3 {
 			t.Fatalf("impl runs = %d, want 3 (first plus two fix rounds)", len(impl))
 		}
-		task, err := f.app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
-		if err != nil || task.StageID != "review" {
-			t.Fatalf("StageDone = %+v, %v, want the stage complete and the task in review", task, err)
+		task, err := f.app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
+		if err != nil || task.EntryStepID != "done" {
+			t.Fatalf("StepDone = %+v, %v, want the task done after the manual step", task, err)
 		}
 	})
 
 	t.Run("a fix round counts against the step's return limit", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:changes", "done", "result:approved"),
-			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(2))))
+			agentStep("impl", "")+agentStep("review", reviewResults(2)))
 		f.start(t, "feat/api-work")
 		final := waitRun(t, f.app, f.taskID, "review", "done")
 		if res, _ := resultOf(final); res != "approved" {
@@ -106,9 +116,9 @@ func TestBranching(t *testing.T) {
 		f.app.Contract(t, "ade-branching", "AdeTaskService.Run#review-back", back, runMask)
 	})
 
-	t.Run("a spent return limit stops the stage", func(t *testing.T) {
+	t.Run("a spent return limit stops the task", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:changes", "done", "result:changes", "done", "result:changes"),
-			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(2))))
+			agentStep("impl", "")+agentStep("review", reviewResults(2)))
 		f.start(t, "feat/api-work")
 		var last adewire.Run
 		testx.WaitUntil(t, waitFor, func() bool {
@@ -127,9 +137,9 @@ func TestBranching(t *testing.T) {
 	})
 
 	t.Run("a forward route skips the steps between", func(t *testing.T) {
-		skip := "        results:\n          - id: quick\n            ok: true\n            next: finish\n          - id: normal\n            ok: true\n"
+		skip := "    results:\n      - id: quick\n        ok: true\n        next: finish\n      - id: normal\n        ok: true\n"
 		f := newRunFixture(t, acts("result:quick", "done"),
-			agentStage("build", agentStep("start", skip)+agentStep("middle", "")+agentStep("finish", "")))
+			agentStep("start", skip)+agentStep("middle", "")+agentStep("finish", ""))
 		f.start(t, "feat/api-work")
 		waitRun(t, f.app, f.taskID, "finish", "done")
 		if runs := stepRuns(t, f, "middle"); len(runs) != 0 {
@@ -141,26 +151,22 @@ func TestBranching(t *testing.T) {
 		}
 	})
 
-	t.Run("an end route completes the stage", func(t *testing.T) {
-		end := "        results:\n          - id: trivial\n            ok: true\n            next: end\n          - id: normal\n            ok: true\n"
+	t.Run("an end route completes the workflow", func(t *testing.T) {
+		end := "    results:\n      - id: trivial\n        ok: true\n        next: end\n      - id: normal\n        ok: true\n"
 		f := newRunFixture(t, acts("result:trivial"),
-			agentStage("build", agentStep("triage", end)+agentStep("later", ""))+userStage)
+			agentStep("triage", end)+agentStep("later", ""))
 		f.start(t, "feat/api-work")
 		waitRun(t, f.app, f.taskID, "triage", "done")
 		testx.WaitUntil(t, waitFor, func() bool {
-			return taskOf(t, board(t, f.app), f.taskID).CurrentStage != nil
+			return taskOf(t, board(t, f.app), f.taskID).EntryStepID == "done"
 		})
 		if runs := stepRuns(t, f, "later"); len(runs) != 0 {
 			t.Fatalf("later ran after an end route: %+v", runs)
 		}
-		task, err := f.app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
-		if err != nil || task.StageID != "review" {
-			t.Fatalf("StageDone = %+v, %v, want the stage complete", task, err)
-		}
 	})
 
-	t.Run("legacy retry and back rules behave as before", func(t *testing.T) {
-		f := newRunFixture(t, acts("failed", "done"), agentStage("build", agentStep("first", "        on_failure: retry 1\n")))
+	t.Run("a failed result can retry its step or go back", func(t *testing.T) {
+		f := newRunFixture(t, acts("failed", "done"), agentStep("first", selfReturn("first", 1)))
 		f.start(t, "feat/api-work")
 		ok := waitRun(t, f.app, f.taskID, "first", "done")
 		if ok.Attempt != 2 {
@@ -171,7 +177,7 @@ func TestBranching(t *testing.T) {
 		}
 
 		g := newRunFixture(t, acts("done", "failed", "done", "done"),
-			agentStage("build", agentStep("impl", "")+agentStep("tests", "        on_failure: back:impl\n")))
+			agentStep("impl", "")+agentStep("tests", backTo("impl")))
 		g.start(t, "feat/api-work")
 		waitRun(t, g.app, g.taskID, "tests", "done")
 		if runs := stepRuns(t, g, "impl"); len(runs) != 2 {
@@ -180,7 +186,7 @@ func TestBranching(t *testing.T) {
 	})
 
 	t.Run("saved results round trip through the bound methods", func(t *testing.T) {
-		f := newRunFixture(t, acts("done"), agentStage("build", agentStep("impl", "")+agentStep("review", "")))
+		f := newRunFixture(t, acts("done"), agentStep("impl", "")+agentStep("review", ""))
 		list, err := f.app.W.AdeTask.Workflows(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -192,7 +198,7 @@ func TestBranching(t *testing.T) {
 			}
 		}
 		wf := *entry.Workflow
-		review := &wf.Stages[0].Steps[1]
+		review := &wf.Steps[1]
 		review.Results = []adewire.StepResult{
 			{ID: "approved", OK: true, Next: "next"},
 			{ID: "changes", Description: "Needs work.", Next: "impl", Loop: true},
@@ -214,14 +220,14 @@ func TestBranching(t *testing.T) {
 		}
 		f.app.Contract(t, "ade-workflow-results", "args:AdeTaskService.SaveWorkflow", args, flowharness.Mask("baseHash"))
 		f.app.Contract(t, "ade-workflow-results", "AdeTaskService.SaveWorkflow", saved, flowharness.Mask("hash"))
-		got := saved.Workflow.Stages[0].Steps[1].Results
-		if len(got) != 2 || got[1].ID != "changes" || !got[1].Loop || saved.Workflow.Stages[0].Steps[1].MaxReturns != 2 || got[1].Next != "impl" {
+		got := saved.Workflow.Steps[1].Results
+		if len(got) != 2 || got[1].ID != "changes" || !got[1].Loop || saved.Workflow.Steps[1].MaxReturns != 2 || got[1].Next != "impl" {
 			t.Fatalf("saved results = %+v", got)
 		}
 	})
 
 	t.Run("a save built on an older file text is refused", func(t *testing.T) {
-		f := newRunFixture(t, acts("done"), agentStage("build", agentStep("impl", "")))
+		f := newRunFixture(t, acts("done"), agentStep("impl", ""))
 		list, err := f.app.W.AdeTask.Workflows(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -253,7 +259,7 @@ func TestBranching(t *testing.T) {
 	})
 
 	t.Run("a YAML save built on an older file text is refused", func(t *testing.T) {
-		f := newRunFixture(t, acts("done"), agentStage("build", agentStep("impl", "")))
+		f := newRunFixture(t, acts("done"), agentStep("impl", ""))
 		read, err := f.app.W.AdeTask.WorkflowYaml(ctx, adewire.FileNameArgs{FileName: "flow.yaml"})
 		if err != nil || read.Hash == "" {
 			t.Fatalf("WorkflowYaml = %+v, %v, want a hash", read, err)

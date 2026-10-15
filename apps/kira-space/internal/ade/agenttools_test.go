@@ -25,7 +25,7 @@ func TestSpaceTools_declareIsAdditiveAndIdempotent(t *testing.T) {
 	e := newEngine(t, nil)
 	e.repo("api")
 	e.repo("web")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	e.workflow(flowYAML(agentStep("first", "")))
 	id := e.task("api")
 	ctx := context.Background()
 
@@ -60,7 +60,7 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 	e.repo("api")
 	e.repo("web")
 	e.prepare("api", "echo ok")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	e.workflow(flowYAML(agentStep("first", "")))
 	id := e.task("api")
 	other := e.task("web")
 	ctx := context.Background()
@@ -99,7 +99,7 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 func TestSpaceTools_requestBranchRefusals(t *testing.T) {
 	e := newEngine(t, nil)
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	e.workflow(flowYAML(agentStep("first", "")))
 	id := e.task("api")
 	ctx := context.Background()
 	main := e.board.mainShortName(ctx, "api")
@@ -139,7 +139,7 @@ func TestSpaceTools_archivedAndBranchStatus(t *testing.T) {
 	e.repo("api")
 	gate := t.TempDir() + "/gate"
 	e.prepare("api", "while [ ! -f "+gate+" ]; do sleep 0.05; done")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	e.workflow(flowYAML(agentStep("first", "")))
 	id := e.task("api")
 	ctx := context.Background()
 
@@ -190,7 +190,7 @@ func (e *engine) branch(t *testing.T, taskID, repo string) model.AdeTaskBranch {
 func TestSpaceTools_startRunCreatesNoBranch(t *testing.T) {
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
-	e.workflow("id: flow\nname: Flow\nkira_space_mcp: true\nstages:\n" + agentStage("build", agentStep("first", "")))
+	e.workflow("id: flow\nname: Flow\nkira_space_mcp: true\nsteps:\n" + agentStep("first", ""))
 	id := e.task("api")
 	e.start(id)
 	e.waitRun(id, "first/api", model.AdeRunDone)

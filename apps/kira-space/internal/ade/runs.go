@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"slices"
 	"sync"
@@ -23,7 +24,7 @@ import (
 )
 
 // runs.go is the run engine: StartRun, the step machine's side effects (start, retry, advance),
-// agent and script processes, and the log, session and stage reads. Every transition of a task runs
+// agent and script processes, and the log, session and step reads. Every transition of a task runs
 // under that task's mutex; a process runs outside it and re-enters to record how it ended.
 
 const (
@@ -66,14 +67,33 @@ func (b *TaskBoard) taskMu(id string) *sync.Mutex {
 	return m
 }
 
-// taskCtx is one task with its stage snapshot and live branches.
+// taskCtx is one task with its workflow, position and live branches. wf is nil when the task has no
+// workflow or its file is gone and it never started.
 type taskCtx struct {
-	task     model.AdeTask
-	stage    *adewire.Stage
+	task model.AdeTask
+	wf   *adewire.Workflow
+	// entry is the step the task last entered ("done" when finished, "" without a workflow). A task that
+	// has not started follows the live file, so its entry is that file's first step.
+	entry string
+	// since is the pass watermark: runs of "<step>/<branch>" at or below the attempt are history.
+	since    map[string]int
 	branches []model.AdeTaskBranch
 	mine     []mineBranch
 	nick     map[string]string // code repo id -> nickname, else name
 }
+
+func sinceKey(stepID, branchID string) string { return stepID + "/" + branchID }
+
+// inPass says the run belongs to the task's current pass.
+func (tc *taskCtx) inPass(run model.AdeRun) bool {
+	return run.Attempt > tc.since[sinceKey(run.StepID, run.BranchID)]
+}
+
+// active says the task sits at a step of a workflow it can run.
+func (tc *taskCtx) active() bool { return tc.wf != nil && tc.entry != "" && tc.entry != entryDone }
+
+// entryDone is the entry step of a finished task.
+const entryDone = "done"
 
 func (tc *taskCtx) branch(id string) (model.AdeTaskBranch, bool) {
 	for _, br := range tc.branches {
@@ -92,14 +112,20 @@ func (b *TaskBoard) loadTaskCtx(taskID string) (*taskCtx, error) {
 	if task.ArchivedAt != nil {
 		return nil, invalid("task %s is archived", taskID)
 	}
-	tc := &taskCtx{task: task, nick: map[string]string{}}
-	if task.CurrentStageJSON != "" {
-		var st adewire.Stage
-		if err := json.Unmarshal([]byte(task.CurrentStageJSON), &st); err != nil {
-			return nil, fmt.Errorf("ade: unreadable stage of task %s: %w", taskID, err)
+	tc := &taskCtx{task: task, nick: map[string]string{}, entry: task.EntryStepID, since: map[string]int{}}
+	if wf, ok := b.taskWorkflow(task); ok {
+		tc.wf = &wf
+		if task.WorkflowJSON == "" {
+			tc.entry = ""
+			if i, ok := firstStep(wf); ok {
+				tc.entry = wf.Steps[i].ID
+			}
 		}
-		st.FillReturnLimits()
-		tc.stage = &st
+	}
+	if task.SinceJSON != "" {
+		if err := json.Unmarshal([]byte(task.SinceJSON), &tc.since); err != nil {
+			return nil, fmt.Errorf("ade: unreadable pass of task %s: %w", taskID, err)
+		}
 	}
 	live, err := b.deps.Tasks.BranchesLive()
 	if err != nil {
@@ -132,60 +158,87 @@ func cmpNonEmpty(a, b string) string {
 	return b
 }
 
-// refreshSnapshot applies workflow edits to the task's stage from the next step on (R13): the task's
-// workflow (the live file until the task starts, then its own snapshot) replaces the stage snapshot
-// when the stage still exists with the same kind.
-func (b *TaskBoard) refreshSnapshot(tc *taskCtx) {
-	if tc.stage == nil {
-		return
-	}
-	wf, ok := b.taskWorkflow(tc.task)
-	if !ok {
-		return
-	}
-	for _, st := range wf.Stages {
-		if st.ID != tc.stage.ID || st.Kind != tc.stage.Kind {
-			continue
-		}
-		raw, err := json.Marshal(st)
-		if err != nil || string(raw) == tc.task.CurrentStageJSON {
-			return
-		}
-		if err := b.deps.Tasks.SetSnapshot(tc.task.ID, string(raw)); err != nil {
-			slog.Warn("ade: refresh stage snapshot", "scope", "ade", "task", tc.task.ID, "err", err)
-			return
-		}
-		tc.task.CurrentStageJSON = string(raw)
-		tc.stage = &st
-		return
-	}
-}
-
-// plan resolves the current stage's steps to targets and latest runs.
+// plan resolves the workflow's steps to targets and the latest runs of the current pass.
 func (b *TaskBoard) plan(tc *taskCtx) ([]stepView, error) {
-	if tc.stage == nil {
-		return nil, invalid("the task has no current stage")
+	if tc.wf == nil {
+		return nil, invalid("the task has no workflow")
 	}
-	steps := stageSteps(*tc.stage)
+	steps := workflowSteps(*tc.wf)
 	latest, err := b.deps.Tasks.LatestRuns(tc.task.ID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]stepView, len(steps))
 	for i, def := range steps {
-		targets, err := stepTargets(def.RunsOn, tc.mine)
-		if err != nil {
-			return nil, invalid("step %q: %v", def.Name, err)
+		v := stepView{Def: def, Runs: map[string]model.AdeRun{}}
+		if !def.manual() {
+			if v.Targets, v.TargetErr = stepTargets(def.RunsOn, tc.mine); v.TargetErr != nil {
+				v.Targets = nil
+			}
 		}
-		v := stepView{Def: def, Targets: targets, Runs: map[string]model.AdeRun{}}
 		for _, r := range latest {
-			if r.Purpose == "" && r.StageID == tc.stage.ID && r.StepID == def.ID {
+			if r.Purpose == "" && r.StepID == def.ID && tc.inPass(r) {
 				v.Runs[r.BranchID] = r
 			}
 		}
 		out[i] = v
 	}
 	return out, nil
+}
+
+// entryIndex is the index of the task's entry step in plan, -1 when the task is not at a step.
+func (tc *taskCtx) entryIndex(plan []stepView) int {
+	if !tc.active() {
+		return -1
+	}
+	return stepIndex(plan, tc.entry)
+}
+
+// currentStepID is the step the task is at, derived from its runs: "done" when finished, "" when it has
+// no workflow position.
+func (b *TaskBoard) currentStepID(tc *taskCtx) string {
+	if tc.entry == entryDone {
+		return entryDone
+	}
+	if !tc.active() {
+		return ""
+	}
+	plan, err := b.plan(tc)
+	if err != nil {
+		return tc.entry
+	}
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return tc.entry
+	}
+	cur := currentStep(plan, entry)
+	if cur < 0 {
+		return entryDone
+	}
+	return plan[cur].Def.ID
+}
+
+// staleStep refuses when the caller named the step it saw and the task is at another one now.
+func (b *TaskBoard) staleStep(tc *taskCtx, from string) error {
+	if from != "" && b.currentStepID(tc) != from {
+		return fmt.Errorf("%w: the task is now at another step", ErrStale)
+	}
+	return nil
+}
+
+// stepNumber is a step's 1-based position among the workflow's automatic (non-manual, non-skipped)
+// steps and their count; the prompt's Step n/m.
+func stepNumber(plan []stepView, idx int) (n, of int) {
+	for i, v := range plan {
+		if v.Def.manual() || v.Def.Skip {
+			continue
+		}
+		of++
+		if i <= idx {
+			n++
+		}
+	}
+	return n, of
 }
 
 func stepIndex(plan []stepView, stepID string) int {
@@ -224,8 +277,8 @@ func (b *TaskBoard) notifySessions() {
 // --- StartRun ----------------------------------------------------------------------------------
 
 // StartRun creates the task's missing branches and worktrees, starts their prepare scripts and
-// starts the current agent or script stage's first step. Later steps follow by themselves or wait
-// for Approve.
+// starts the current step, which must be an automatic one waiting for Run. Later steps follow by
+// themselves or wait for Approve.
 func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error) {
 	mu := b.taskMu(args.TaskID)
 	mu.Lock()
@@ -234,11 +287,11 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	if err != nil {
 		return adewire.StartRunResult{}, err
 	}
-	if err := staleStage(tc, args.FromStageID); err != nil {
+	if err := b.staleStep(tc, args.FromStepID); err != nil {
 		return adewire.StartRunResult{}, err
 	}
-	if tc.stage == nil || tc.stage.Kind == "user" {
-		return adewire.StartRunResult{}, invalid("the current stage is not an automated stage")
+	if !tc.active() {
+		return adewire.StartRunResult{}, invalid("the task has no current step")
 	}
 	if err := b.snapshotWorkflow(&tc.task); err != nil {
 		return adewire.StartRunResult{}, err
@@ -247,16 +300,22 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	if err != nil {
 		return adewire.StartRunResult{}, err
 	}
-	if len(plan) == 0 {
-		return adewire.StartRunResult{}, invalid("the current stage has no steps")
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return adewire.StartRunResult{}, invalid("step %q is no longer in the workflow", tc.entry)
 	}
-	for _, v := range plan {
-		if v.started() {
-			return adewire.StartRunResult{}, invalid("stage %q already started", tc.stage.Name)
-		}
+	cur := currentStep(plan, entry)
+	if cur < 0 || plan[cur].Def.manual() || plan[cur].started() || nextAction(plan, entry).Kind != actIdle {
+		return adewire.StartRunResult{}, invalid("the current step does not wait for Run")
+	}
+	if path, _ := walkPath(plan, entry); path[0] != cur {
+		return adewire.StartRunResult{}, invalid("the current step does not wait for Run")
 	}
 	if err := b.checkBranchNames(tc, args.BranchNames); err != nil {
 		return adewire.StartRunResult{}, err
+	}
+	if plan[cur].TargetErr != nil {
+		return adewire.StartRunResult{}, invalid("step %q: %v", plan[cur].Def.Name, plan[cur].TargetErr)
 	}
 	paths, err := b.prepareWorktrees(ctx, tc, args.BranchNames)
 	if err != nil {
@@ -265,8 +324,8 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	if tc, err = b.loadTaskCtx(args.TaskID); err != nil { // branch names changed
 		return adewire.StartRunResult{}, err
 	}
-	b.setStepMessage(tc.task.ID, tc.stage.ID, plan[0].Def.ID, args.Message)
-	runs, err := b.startStep(ctx, tc, plan, 0, paths)
+	b.setStepMessage(tc.task.ID, plan[cur].Def.ID, args.Message)
+	runs, err := b.startStep(ctx, tc, plan, cur, paths)
 	if err != nil {
 		return adewire.StartRunResult{}, err
 	}
@@ -323,31 +382,34 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 	return paths, nil
 }
 
-func stepMessageKey(taskID, stageID, stepID string) string {
-	return taskID + "|" + stageID + "|" + stepID
+func stepMessageKey(taskID, stepID string) string {
+	return taskID + "|" + stepID
 }
 
 // setStepMessage keeps the Run dialog's edited text for the step's runs, retries included. It lives
 // in memory: after a restart a retry uses the composed default.
-func (b *TaskBoard) setStepMessage(taskID, stageID, stepID, message string) {
+func (b *TaskBoard) setStepMessage(taskID, stepID, message string) {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
 	if message == "" {
-		delete(b.stepMsgs, stepMessageKey(taskID, stageID, stepID))
+		delete(b.stepMsgs, stepMessageKey(taskID, stepID))
 		return
 	}
-	b.stepMsgs[stepMessageKey(taskID, stageID, stepID)] = message
+	b.stepMsgs[stepMessageKey(taskID, stepID)] = message
 }
 
-func (b *TaskBoard) stepMessage(taskID, stageID, stepID string) string {
+func (b *TaskBoard) stepMessage(taskID, stepID string) string {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
-	return b.stepMsgs[stepMessageKey(taskID, stageID, stepID)]
+	return b.stepMsgs[stepMessageKey(taskID, stepID)]
 }
 
 // startStep creates attempt-1 runs for every target of plan[idx] and launches those whose worktree
 // gate is open.
 func (b *TaskBoard) startStep(ctx context.Context, tc *taskCtx, plan []stepView, idx int, paths map[string]string) ([]model.AdeRun, error) {
+	if err := plan[idx].TargetErr; err != nil {
+		return nil, invalid("step %q: %v", plan[idx].Def.Name, err)
+	}
 	out := make([]model.AdeRun, 0, len(plan[idx].Targets))
 	for _, bid := range plan[idx].Targets {
 		run, err := b.queueRun(ctx, tc, plan, idx, bid, 1, paths[bid], runOpts{})
@@ -378,8 +440,11 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	if err != nil {
 		return model.AdeRun{}, err
 	}
+	if last, ok := b.lastRunOf(tc.task.ID, plan[idx].Def.ID, branchID); ok && attempt <= last.Attempt {
+		attempt = last.Attempt + 1 // a pass after a move starts above its history, which the watermark hides
+	}
 	run := model.AdeRun{
-		ID: b.newID(), TaskID: tc.task.ID, StageID: tc.stage.ID, StepID: plan[idx].Def.ID, BranchID: branchID,
+		ID: b.newID(), TaskID: tc.task.ID, StepID: plan[idx].Def.ID, BranchID: branchID,
 		Attempt: attempt, State: model.AdeRunPending, Loops: opts.Loops, Launch: opts.Launch,
 	}
 	open := path != "" && b.setupReady(sb, path, setups)
@@ -462,7 +527,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		return run, invalid("worktree of %s is missing", sb.Name)
 	}
 	def := plan[idx].Def
-	if def.Review != nil && tc.stage.Kind == "agent" {
+	if def.Kind == adewire.KindReview {
 		return b.enterReview(ctx, tc, def, run, sb)
 	}
 	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
@@ -493,14 +558,15 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 
 	var smart *smartStep
 	runPath := path
-	if tc.stage.Kind == "agent" && def.SmartScript != "" {
+	if def.Kind == adewire.KindAgent && def.SmartScript != "" {
 		if smart, err = b.planSmartStep(tc, sb, path, def); err != nil {
 			return run, err
 		}
 		runPath = smart.dir
 	}
 	var sessionID, prompt string
-	if tc.stage.Kind == "agent" {
+	stepN, stepOf := stepNumber(plan, idx)
+	if def.Kind == adewire.KindAgent {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
 		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
@@ -512,12 +578,12 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		default:
 			prompt = composePrompt(b.prompts(), promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
-				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: spec.Extra,
+				Step: stepN, Of: stepOf, Def: def, Message: b.stepMessage(tc.task.ID, def.ID), Extra: spec.Extra,
 				Space: b.spaceEnabled(tc.task), Context: b.rebaseContext(tc),
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
-			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID, StageID: tc.stage.ID,
+			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
 			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, ClaudeSessionID: claudeID, Cwd: runPath,
 			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
@@ -537,7 +603,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	}
 	runCtx, endRun := b.beginLive(b.live, run.ID)
 	started = true
-	if tc.stage.Kind == "agent" {
+	if def.Kind == adewire.KindAgent {
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
@@ -919,16 +985,19 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 // advanceLocked applies the step machine's next action; the task mutex is held.
 func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 	tc, err := b.loadTaskCtx(taskID)
-	if err != nil || tc.stage == nil || tc.stage.Kind == "user" {
+	if err != nil || !tc.active() {
 		return
 	}
-	b.refreshSnapshot(tc)
 	plan, err := b.plan(tc)
 	if err != nil {
 		slog.Warn("ade: plan step", "scope", "ade", "task", taskID, "err", err)
 		return
 	}
-	if rr := chainRerun(plan); len(rr) > 0 {
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return
+	}
+	if rr := chainRerun(plan, entry); len(rr) > 0 {
 		for _, r := range rr {
 			if _, err := b.queueRun(ctx, tc, plan, r.Step, r.Branch, r.Attempt, "", runOpts{Loops: r.Loops}); err != nil {
 				slog.Warn("ade: rerun after send-back", "scope", "ade", "branch", r.Branch, "err", err)
@@ -936,11 +1005,17 @@ func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 		}
 		return
 	}
-	act := nextAction(plan)
-	if act.Kind == actStart {
+	switch act := nextAction(plan, entry); act.Kind {
+	case actStart:
 		if _, err := b.startStep(ctx, tc, plan, act.Step, nil); err != nil {
 			slog.Warn("ade: start step", "scope", "ade", "task", taskID, "err", err)
 		}
+	case actComplete:
+		if err := b.deps.Tasks.SetEntryStep(taskID, entryDone, nil); err != nil {
+			slog.Warn("ade: finish workflow", "scope", "ade", "task", taskID, "err", err)
+			return
+		}
+		b.notifyBoard()
 	}
 }
 
@@ -960,7 +1035,7 @@ func (b *TaskBoard) onSetupReady(branchID string) {
 func (b *TaskBoard) launchHeldLocked(sb model.AdeTaskBranch) {
 	branchID := sb.ID
 	tc, err := b.loadTaskCtx(sb.TaskID)
-	if err != nil || tc.stage == nil || tc.stage.Kind == "user" {
+	if err != nil || !tc.active() {
 		return
 	}
 	plan, err := b.plan(tc)
@@ -988,7 +1063,7 @@ func (b *TaskBoard) launchHeldLocked(sb model.AdeTaskBranch) {
 	b.releaseHeldRounds(tc, sb, path)
 }
 
-// --- Approve, RetryRun, StageDone --------------------------------------------------------------
+// --- Approve, RetryRun, StepDone --------------------------------------------------------------
 
 // Approve starts a step that waits for approval.
 func (b *TaskBoard) Approve(ctx context.Context, args adewire.StepArgs) error {
@@ -999,18 +1074,19 @@ func (b *TaskBoard) Approve(ctx context.Context, args adewire.StepArgs) error {
 	if err != nil {
 		return err
 	}
-	if tc.stage == nil || tc.stage.ID != args.StageID {
-		return invalid("stage %s is not the task's current stage", args.StageID)
-	}
 	plan, err := b.plan(tc)
 	if err != nil {
 		return err
 	}
 	idx := stepIndex(plan, args.StepID)
 	if idx < 0 {
-		return invalid("step %s is not in stage %s", args.StepID, args.StageID)
+		return invalid("step %s is not in the workflow", args.StepID)
 	}
-	if act := nextAction(plan); act.Kind != actAwaitApproval || act.Step != idx {
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return invalid("the task has no current step")
+	}
+	if act := nextAction(plan, entry); act.Kind != actAwaitApproval || act.Step != idx {
 		return invalid("step %q is not waiting for approval", plan[idx].Def.Name)
 	}
 	_, err = b.startStep(ctx, tc, plan, idx, nil)
@@ -1039,16 +1115,13 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	if err != nil {
 		return err
 	}
-	if tc.stage == nil || tc.stage.ID != run.StageID {
-		return invalid("the run's stage is no longer current")
-	}
 	plan, err := b.plan(tc)
 	if err != nil {
 		return err
 	}
 	idx := stepIndex(plan, run.StepID)
 	if idx < 0 {
-		return invalid("the run's step is no longer in the stage")
+		return invalid("the run's step is no longer in the workflow")
 	}
 	latest, ok := plan[idx].Runs[run.BranchID]
 	if !ok || latest.ID != run.ID {
@@ -1093,16 +1166,13 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	if err != nil {
 		return err
 	}
-	if tc.stage == nil || tc.stage.ID != run.StageID {
-		return invalid("the run's stage is no longer current")
-	}
 	plan, err := b.plan(tc)
 	if err != nil {
 		return err
 	}
 	idx := stepIndex(plan, run.StepID)
 	if idx < 0 {
-		return invalid("the run's step is no longer in the stage")
+		return invalid("the run's step is no longer in the workflow")
 	}
 	latest, ok := plan[idx].Runs[run.BranchID]
 	if !ok || latest.ID != run.ID {
@@ -1122,8 +1192,8 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	return nil
 }
 
-// StageDone moves the task to the next stage, or finishes the workflow after the last.
-func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, error) {
+// StepDone ends the current manual step: the task enters the next step, or finishes after the last.
+func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -1131,38 +1201,29 @@ func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, e
 	if err != nil {
 		return adewire.Task{}, err
 	}
-	if tc.stage == nil {
-		return adewire.Task{}, invalid("the task has no current stage")
+	if !tc.active() {
+		return adewire.Task{}, invalid("the task has no current step")
 	}
-	if tc.stage.Kind != "user" {
-		plan, err := b.plan(tc)
-		if err != nil {
-			return adewire.Task{}, err
-		}
-		if act := nextAction(plan); act.Kind != actStageComplete {
-			return adewire.Task{}, invalid("stage %q has steps that are not done", tc.stage.Name)
-		}
+	plan, err := b.plan(tc)
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return adewire.Task{}, invalid("step %q is no longer in the workflow", tc.entry)
+	}
+	cur := currentStep(plan, entry)
+	if cur < 0 || !plan[cur].Def.manual() {
+		return adewire.Task{}, invalid("the current step is not a manual step")
 	}
 	if err := b.snapshotWorkflow(&tc.task); err != nil {
 		return adewire.Task{}, err
 	}
-	wf, ok := b.taskWorkflow(tc.task)
-	if !ok {
-		return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
+	next := entryDone
+	if i, more := nextStep(*tc.wf, cur); more {
+		next = tc.wf.Steps[i].ID
 	}
-	at := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == tc.stage.ID })
-	if at < 0 {
-		return adewire.Task{}, invalid("stage %q is no longer in workflow %q", tc.stage.Name, wf.Name)
-	}
-	if next, more := nextRunnable(wf, at); !more {
-		err = b.deps.Tasks.SetStage(taskID, "done", "")
-	} else {
-		var raw []byte
-		if raw, err = json.Marshal(next); err == nil {
-			err = b.deps.Tasks.SetStage(taskID, next.ID, string(raw))
-		}
-	}
-	if err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil); err != nil {
 		return adewire.Task{}, err
 	}
 	b.notifyBoard()
@@ -1173,9 +1234,9 @@ func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, e
 	return b.wireTask(task)
 }
 
-// SetTaskStage moves the task to any stage of its workflow, or to "done". Runs are kept: a stage
-// revisited shows its earlier runs as history. Refused while a run of the task is live.
-func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID, fromStageID string) (adewire.Task, error) {
+// SetTaskStep moves the task to any non-skipped step of its workflow, or to "done". The target and every
+// later step run fresh: their earlier runs stay as history. Refused while a run of the task is live.
+func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID string) (adewire.Task, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -1183,13 +1244,16 @@ func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID, fromStageID
 	if err != nil {
 		return adewire.Task{}, err
 	}
-	if err := staleStage(tc, fromStageID); err != nil {
+	if err := b.staleStep(tc, fromStepID); err != nil {
 		return adewire.Task{}, err
 	}
 	if tc.task.WorkflowID == "" {
 		return adewire.Task{}, invalid("the task has no workflow")
 	}
-	if stageID == tc.task.StageID {
+	if tc.wf == nil {
+		return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
+	}
+	if stepID == b.currentStepID(tc) {
 		return b.wireTask(tc.task)
 	}
 	running, err := b.deps.Tasks.HasRunning(taskID)
@@ -1199,29 +1263,33 @@ func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID, fromStageID
 	if running {
 		return adewire.Task{}, invalid("stop its running agents first")
 	}
-	var raw string
-	if stageID != "done" {
-		wf, ok := b.taskWorkflow(tc.task)
-		if !ok {
-			return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
+	target := -1
+	if stepID != entryDone {
+		if target = slices.IndexFunc(tc.wf.Steps, func(st adewire.WorkflowStep) bool { return st.ID == stepID }); target < 0 {
+			return adewire.Task{}, invalid("workflow %q has no step %q", tc.wf.Name, stepID)
 		}
-		at := slices.IndexFunc(wf.Stages, func(st adewire.Stage) bool { return st.ID == stageID })
-		if at < 0 {
-			return adewire.Task{}, invalid("workflow %q has no stage %q", wf.Name, stageID)
+		if tc.wf.Steps[target].Skip {
+			return adewire.Task{}, invalid("step %q is skipped in workflow %q", stepID, tc.wf.Name)
 		}
-		if wf.Stages[at].Skip {
-			return adewire.Task{}, invalid("stage %q is skipped in workflow %q", stageID, wf.Name)
-		}
-		enc, err := json.Marshal(wf.Stages[at])
-		if err != nil {
-			return adewire.Task{}, err
-		}
-		raw = string(enc)
 	}
 	if err := b.snapshotWorkflow(&tc.task); err != nil {
 		return adewire.Task{}, err
 	}
-	if err := b.deps.Tasks.SetStage(taskID, stageID, raw); err != nil {
+	var since map[string]int
+	if target >= 0 {
+		runs, err := b.deps.Tasks.LatestRuns(taskID)
+		if err != nil {
+			return adewire.Task{}, err
+		}
+		since = maps.Clone(tc.since)
+		for _, r := range runs {
+			if i := slices.IndexFunc(tc.wf.Steps, func(st adewire.WorkflowStep) bool { return st.ID == r.StepID }); r.Purpose == "" && i >= target {
+				k := sinceKey(r.StepID, r.BranchID)
+				since[k] = max(since[k], r.Attempt)
+			}
+		}
+	}
+	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since); err != nil {
 		return adewire.Task{}, err
 	}
 	b.clearStepMessages(taskID)
@@ -1379,7 +1447,7 @@ func (b *TaskBoard) Sessions(_ context.Context) (adewire.SessionsResult, error) 
 func toWireSession(s model.AdeSession) adewire.Session {
 	w := adewire.Session{
 		ID: s.ID, ClaudeSessionID: s.ClaudeSessionID, Mode: s.Mode, State: s.State, TerminalID: s.TerminalID,
-		TaskID: s.TaskID, BranchID: s.BranchID, StageID: s.StageID, StepID: s.StepID, RunID: s.RunID, Resumes: s.Resumes, Purpose: s.Purpose,
+		TaskID: s.TaskID, BranchID: s.BranchID, StepID: s.StepID, RunID: s.RunID, Resumes: s.Resumes, Purpose: s.Purpose,
 		Cwd: s.Cwd, StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt,
 	}
 	if s.Mode == model.AdeSessionModeHeadless {

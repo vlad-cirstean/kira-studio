@@ -15,17 +15,13 @@ import (
 
 const agentFlow = `id: flow
 name: Flow
-stages:
-  - id: build
-    name: build
+steps:
+  - id: one
+    name: one
     kind: agent
-    status: In progress
-    steps:
-      - id: one
-        name: one
-        runs_on: each repo
-        timeout: 1m
-        prompt: work on {branch} in {repo}
+    runs_on: each repo
+    timeout: 1m
+    prompt: work on {branch} in {repo}
 `
 
 func TestKeepAwakeManualAndAgents(t *testing.T) {

@@ -2,7 +2,7 @@
 import { t } from '@theme/i18n';
 import { Handle, Position } from '@vue-flow/core';
 
-// End of an agent stage: the target of every result that completes the stage.
+// End of the workflow: the target of every result that finishes it.
 defineProps<{ data: { w: number; h: number } }>();
 </script>
 

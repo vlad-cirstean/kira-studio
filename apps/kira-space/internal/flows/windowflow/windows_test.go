@@ -125,8 +125,7 @@ func TestFocusSessionAcrossWindows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const flow = "id: flow\nname: Flow\nstages:\n  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 1m\n        prompt: work on {branch} in {repo}\n"
+	const flow = "id: flow\nname: Flow\nsteps:\n  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 1m\n    prompt: work on {branch} in {repo}\n"
 	if entry, err := app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: flow}); err != nil || entry.Error != nil {
 		t.Fatalf("SaveWorkflowYaml: %v %+v", err, entry.Error)
 	}

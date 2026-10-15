@@ -136,7 +136,7 @@ func TestRestartKeepsUserData(t *testing.T) {
 		}
 	}
 	wf.Name = "Renamed flow"
-	wf.Stages[1].Name = "Peer review"
+	wf.Steps[1].Name = "Peer review"
 	if entry, err := app.W.AdeTask.SaveWorkflow(ctx, adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf}); err != nil || entry.Error != nil {
 		t.Fatalf("SaveWorkflow = %+v, %v", entry, err)
 	}

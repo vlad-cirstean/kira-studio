@@ -151,7 +151,7 @@ type TaskBoard struct {
 	finishes         map[string]claudeheadless.Finish // run id -> last finish_step call
 	claims           map[string]string                // branch id -> the smart script working in its worktree
 	recoveredRebases []model.AdeRun                   // rebase runs Recover interrupted; Start re-reads git for them
-	stepMsgs         map[string]string                // task|stage|step -> the Run dialog's edited message
+	stepMsgs         map[string]string                // task|step -> the Run dialog's edited message
 	agent            *claudeheadless.Server
 	wg               sync.WaitGroup // background setups and runs; Close waits
 	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
@@ -469,10 +469,10 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	}
 
 	tasks := make([]adewire.Task, 0, len(d.tasks))
-	liveHash := b.liveHasher()
+	liveWf := b.liveWorkflows()
 	for _, t := range d.tasks {
 		wt := toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
-		decorateTask(&wt, t, liveHash)
+		decorateTask(&wt, t, liveWf)
 		tasks = append(tasks, wt)
 	}
 	b.badgeTasks(tasks)
@@ -520,23 +520,17 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
 	out := adewire.Task{
 		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, GithubURL: t.GithubURL, WorkflowID: t.WorkflowID,
-		StageID: t.StageID, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
+		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
 	}
 	out.BranchIDs = append(out.BranchIDs, branchIDs...)
 	if t.JiraKey != "" || t.JiraURL != "" {
 		out.Jira = &adewire.Jira{Key: t.JiraKey, URL: t.JiraURL}
 	}
-	if t.CurrentStageJSON != "" {
-		var st adewire.Stage
-		if err := json.Unmarshal([]byte(t.CurrentStageJSON), &st); err == nil {
-			st.FillReturnLimits()
-			if st.Steps == nil {
-				st.Steps = []adewire.PipelineStep{}
-			}
-			out.CurrentStage = &st
-		} else {
-			slog.Warn("ade board: unreadable current stage", "scope", "ade", "task", t.ID, "err", err)
+	if t.SinceJSON != "" {
+		if err := json.Unmarshal([]byte(t.SinceJSON), &out.Since); err != nil || out.Since == nil {
+			out.Since = map[string]int{}
+			slog.Warn("ade board: unreadable pass of task", "scope", "ade", "task", t.ID, "err", err)
 		}
 	}
 	for _, r := range runs {
@@ -545,7 +539,7 @@ func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, review
 		}
 		w := toWireRun(r)
 		if r.Purpose == "" {
-			w.Returns = countReturns(runs, r.StageID, r.StepID, r.BranchID, r.Attempt)
+			w.Returns = countReturns(runs, r.StepID, r.BranchID, r.Attempt)
 		}
 		if rev, ok := reviews[r.ID]; ok {
 			w.Review = reviewWire(r, rev, latestRoundOf(runs, r.ID))
@@ -557,7 +551,7 @@ func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, review
 
 func toWireRun(r model.AdeRun) adewire.Run {
 	run := adewire.Run{
-		ID: r.ID, TaskID: r.TaskID, StageID: r.StageID, StepID: r.StepID, BranchID: r.BranchID, Attempt: r.Attempt,
+		ID: r.ID, TaskID: r.TaskID, StepID: r.StepID, BranchID: r.BranchID, Attempt: r.Attempt,
 		State: r.State, Loops: r.Loops, Note: r.Note, Summary: r.Summary, SessionID: r.SessionID,
 		ExitCode: r.ExitCode, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, Outcome: r.Outcome, Purpose: r.Purpose,
 		Resumable: runResumable(r),

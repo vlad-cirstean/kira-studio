@@ -1,6 +1,6 @@
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { t } from '@theme/i18n';
-import type { Launch, LaunchStageArgs, SendArgs, StartBranchArgs } from '../wire';
+import type { Launch, LaunchStepArgs, SendArgs, StartBranchArgs } from '../wire';
 
 // One target's delivery: a running TUI session (`Send`) or a fresh launch whose terminal this window
 // then opens. Turn watching is the flow's concern; `onArmed` fires at the exact moment it must arm
@@ -10,12 +10,12 @@ import type { Launch, LaunchStageArgs, SendArgs, StartBranchArgs } from '../wire
 export type DeliverTarget =
   | { kind: 'send'; sessionId: string; terminalId: string; message: string }
   | { kind: 'start'; branchId: string; message: string }
-  | { kind: 'stage'; taskId: string; message: string };
+  | { kind: 'session'; taskId: string; message: string };
 
 export interface LaunchDeps {
   send: (args: SendArgs) => Promise<void>;
   startBranch: (args: StartBranchArgs) => Promise<Launch>;
-  launchStage: (args: LaunchStageArgs) => Promise<Launch>;
+  launchStep: (args: LaunchStepArgs) => Promise<Launch>;
   openTerminalSession: (
     tabId: string,
     codeRepoId: string,
@@ -73,7 +73,7 @@ export async function deliver(
   const launch =
     target.kind === 'start'
       ? await full.startBranch({ branchId: target.branchId, message: target.message })
-      : await full.launchStage({ taskId: target.taskId, message: target.message });
+      : await full.launchStep({ taskId: target.taskId, message: target.message });
   onArmed(launch.terminalId, false);
   await openLaunch(full, launch);
   return launch;

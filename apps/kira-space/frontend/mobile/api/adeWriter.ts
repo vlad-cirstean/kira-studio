@@ -16,22 +16,22 @@ export const adeWriter = {
       { id, toIndex },
       { idempotencyKey: key },
     ),
-  setTaskStage: (taskId: string, fromStageId: string, stageId: string, key: string) =>
-    postJson<{ taskId: string; stageId: string }>(
-      '/api/ade/tasks/stage',
-      { taskId, fromStageId, stageId },
+  setTaskStep: (taskId: string, fromStepId: string, stepId: string, key: string) =>
+    postJson<{ taskId: string; stepId: string }>(
+      '/api/ade/tasks/step',
+      { taskId, fromStepId, stepId },
       { idempotencyKey: key },
     ),
-  startRun: (taskId: string, fromStageId: string, key: string) =>
+  startRun: (taskId: string, fromStepId: string, key: string) =>
     postJson<{ runIds: string[] }>(
       '/api/ade/tasks/run',
-      { taskId, fromStageId },
+      { taskId, fromStepId },
       { idempotencyKey: key },
     ),
-  launchStage: (taskId: string, fromStageId: string, key: string) =>
+  launchStep: (taskId: string, fromStepId: string, key: string) =>
     postJson<LaunchResult>(
       '/api/ade/tasks/launch',
-      { taskId, fromStageId },
+      { taskId, fromStepId },
       { idempotencyKey: key },
     ),
   sendReply: (sessionId: string, message: string, key: string) =>

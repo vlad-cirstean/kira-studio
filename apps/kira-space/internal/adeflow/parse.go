@@ -31,9 +31,27 @@ var (
 	yamlErrLine      = regexp.MustCompile(`line (\d+)`)
 	maxStepTimeout   = 24 * time.Hour
 	taskStatuses     = []string{"To do", "In progress", "In review", "Done"}
-	stageKindAlias   = map[string]string{"user": "user", "manual": "user", "agent": "agent", "automated": "agent", "script": "script"}
-	onFailureSimple  = map[string]bool{"stop": true, "retry 1": true, "retry 2": true}
 )
+
+// stepKeys are the keys beyond id, name, kind, status and skip that each step kind allows.
+var stepKeys = map[string][]string{
+	adewire.KindAgent:  {"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox"},
+	adewire.KindScript: {"command", "runs_on", "before", "results", "max_returns", "timeout"},
+	adewire.KindReview: {"review", "runs_on", "before", "results", "max_returns", "timeout", "sandbox"},
+	adewire.KindManual: {"session", "prompt"},
+}
+
+var allStepKeys = func() []string {
+	all := []string{"id", "name", "kind", "status", "skip"}
+	for _, keys := range stepKeys {
+		all = append(all, keys...)
+	}
+	slices.Sort(all)
+	return slices.Compact(all)
+}()
+
+// stagesRemoved is the error for a file in the pre-P293 format.
+const stagesRemoved = `"stages" is no longer supported: list every step under "steps" (see the Agents docs)`
 
 // Parse decodes and validates one workflow file. src is the whole file; the file stem is checked
 // separately by the Reader (Parse has no file name).
@@ -147,8 +165,16 @@ func (v *validator) boolean(m map[string]*yaml.Node, prefix, key string) bool {
 }
 
 func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
-	wf := adewire.Workflow{Stages: make([]adewire.Stage, 0)}
-	m := v.fields(root, "", "id", "name", "kira_space_mcp", "stages")
+	wf := adewire.Workflow{Steps: make([]adewire.WorkflowStep, 0)}
+	if root.Kind == yaml.MappingNode {
+		for i := 0; i+1 < len(root.Content); i += 2 {
+			if k := root.Content[i]; k.Kind == yaml.ScalarNode && k.Value == "stages" {
+				v.fail(k, "", "%s", stagesRemoved)
+				return wf
+			}
+		}
+	}
+	m := v.fields(root, "", "id", "name", "kira_space_mcp", "steps")
 	if v.err != nil {
 		return wf
 	}
@@ -161,181 +187,150 @@ func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 	if v.err != nil {
 		return wf
 	}
-	list, ok := m["stages"]
+	list, ok := m["steps"]
 	if !ok {
-		v.failMissing("", "stages")
+		v.failMissing("", "steps")
 		return wf
 	}
 	if list.Kind != yaml.SequenceNode || len(list.Content) == 0 {
-		v.fail(list, "", "stages must be a non-empty list")
+		v.fail(list, "", "steps must be a non-empty list")
 		return wf
 	}
-	seen := make(map[string]bool)
+	earlier := make(map[string]bool)
+	candidates := make(map[string]bool) // earlier steps a review may resume: agent prompt steps only
+	var nodes []*resultNodes
+	var prefixes []string
 	for i, sn := range list.Content {
-		st := v.stage(sn, i+1)
+		sp := fmt.Sprintf("step %d: ", i+1)
+		step, rn := v.step(sn, sp, earlier, candidates)
 		if v.err != nil {
 			return wf
 		}
-		if seen[st.ID] {
-			v.fail(sn, fmt.Sprintf("stage %d: ", i+1), "id %q is already used by another stage", st.ID)
-			return wf
+		earlier[step.ID] = true
+		if step.Kind == adewire.KindAgent && step.SmartScript == "" {
+			candidates[step.ID] = true
 		}
-		seen[st.ID] = true
-		wf.Stages = append(wf.Stages, st)
+		wf.Steps = append(wf.Steps, step)
+		nodes = append(nodes, rn)
+		prefixes = append(prefixes, sp)
 	}
-	if !slices.ContainsFunc(wf.Stages, func(s adewire.Stage) bool { return !s.Skip }) {
-		v.fail(list, "", "at least one stage must not be skipped")
+	if !slices.ContainsFunc(wf.Steps, func(s adewire.WorkflowStep) bool { return !s.Skip }) {
+		v.fail(list, "", "at least one step must not be skipped")
+		return wf
 	}
+	v.resolveRoutes(wf.Steps, nodes, prefixes)
 	return wf
 }
 
-func (v *validator) stage(sn *yaml.Node, num int) adewire.Stage {
-	prefix := fmt.Sprintf("stage %d: ", num)
-	st := adewire.Stage{Steps: make([]adewire.PipelineStep, 0)}
-	m := v.fields(sn, prefix, "id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout")
+// step reads one step. It returns the step and its declared result nodes (nil when it declares none).
+func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[string]bool) (adewire.WorkflowStep, *resultNodes) {
+	step := adewire.WorkflowStep{Results: []adewire.StepResult{}, AllowedTools: make([]string, 0), Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
+	sm := v.fields(sn, sp, allStepKeys...)
 	if v.err != nil {
-		return st
+		return step, nil
 	}
-	st.ID = v.str(m, prefix, "id", true)
-	if v.err == nil && !idPattern.MatchString(st.ID) {
-		v.fail(m["id"], prefix, "id must be lowercase letters, digits, - or _")
+	step.ID = v.str(sm, sp, "id", true)
+	if v.err == nil && !idPattern.MatchString(step.ID) {
+		v.fail(sm["id"], sp, "id must be lowercase letters, digits, - or _")
 	}
-	st.Name = v.str(m, prefix, "name", true)
-	rawKind := v.str(m, prefix, "kind", true)
+	if v.err == nil && earlier[step.ID] {
+		v.fail(sm["id"], sp, "id %q is already used by another step", step.ID)
+	}
+	step.Name = v.str(sm, sp, "name", true)
+	step.Kind = v.str(sm, sp, "kind", true)
 	if v.err != nil {
-		return st
+		return step, nil
 	}
-	kind, ok := stageKindAlias[rawKind]
-	if !ok {
-		v.fail(m["kind"], prefix, "kind must be user, agent or script")
-		return st
+	allowed, known := stepKeys[step.Kind]
+	if !known {
+		v.fail(sm["kind"], sp, "kind must be agent, script, review or manual")
+		return step, nil
 	}
-	st.Kind = kind
-	st.Status = v.str(m, prefix, "status", true)
-	if v.err == nil && !contains(taskStatuses, st.Status) {
-		v.fail(m["status"], prefix, "status must be To do, In progress, In review or Done")
-	}
-	st.Skip = v.boolean(m, prefix, "skip")
-	if v.err != nil {
-		return st
-	}
-	refuse := func(keys ...string) {
-		for _, k := range keys {
-			if n, has := m[k]; has {
-				v.fail(n, prefix, "%s is not allowed on %s stages", k, kind)
-				return
-			}
+	for _, k := range []string{"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox", "review", "command", "session"} {
+		if n, has := sm[k]; has && !slices.Contains(allowed, k) {
+			v.fail(n, sp, "%s is not allowed on %s steps", k, step.Kind)
+			return step, nil
 		}
 	}
-	switch kind {
-	case "user":
-		refuse("steps", "command", "runs_on", "on_failure", "timeout")
-		st.Session = v.boolean(m, prefix, "session")
+	step.Status = v.status(sm, sp, step.Kind)
+	step.Skip = v.boolean(sm, sp, "skip")
+	if v.err != nil {
+		return step, nil
+	}
+	if step.Kind == adewire.KindManual {
+		step.Session = v.boolean(sm, sp, "session")
 		if v.err != nil {
-			return st
+			return step, nil
 		}
-		if st.Session {
-			st.Prompt = v.str(m, prefix, "prompt", false)
+		if step.Session {
+			step.Prompt = v.str(sm, sp, "prompt", false)
+		} else if n, has := sm["prompt"]; has {
+			v.fail(n, sp, "prompt is not allowed on %s steps without a session", step.Kind)
+		}
+		return step, nil
+	}
+	step.RunsOn = v.runsOn(sm, sp)
+	step.Before = v.before(sm, sp)
+	var rn *resultNodes
+	if n, has := sm["results"]; has {
+		rn = v.results(n, sp)
+		if v.err == nil && step.Kind == adewire.KindScript {
+			v.scriptResults(rn, sp)
+		}
+		step.Results = rn.list
+	} else {
+		step.Results = adewire.DefaultResults()
+	}
+	step.Timeout = v.timeout(sm, sp)
+	switch step.Kind {
+	case adewire.KindScript:
+		step.Command = v.str(sm, sp, "command", true)
+	case adewire.KindReview:
+		if rv, has := sm["review"]; has {
+			step.Review = v.reviewConfig(rv, sp, candidates)
 		} else {
-			refuse("prompt")
+			step.Review = &adewire.ReviewStepConfig{SendTo: adewire.ReviewSendImplementer}
 		}
-	case "agent":
-		refuse("session", "command", "prompt", "runs_on", "on_failure", "timeout")
-		if v.err != nil {
-			return st
-		}
-		st.Steps = v.steps(m, prefix)
-	case "script":
-		refuse("steps", "session", "prompt")
-		if v.err != nil {
-			return st
-		}
-		st.Command = v.str(m, prefix, "command", true)
-		st.RunsOn = v.runsOn(m, prefix)
-		st.OnFailure = v.onFailure(m, prefix, nil)
-		st.Timeout = v.timeout(m, prefix)
+	default:
+		v.agentBody(sm, sp, &step)
 	}
-	return st
+	v.maxReturns(sm, sp, &step)
+	if n, has := sm["sandbox"]; has && v.err == nil {
+		step.Sandbox = v.sandbox(n, sp)
+	}
+	return step, rn
 }
 
-func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.PipelineStep {
-	out := make([]adewire.PipelineStep, 0)
-	list, ok := m["steps"]
-	if !ok {
-		v.failMissing(prefix, "steps")
-		return out
+// status reads a step's task status; absent, it is In review on a review step, else In progress.
+func (v *validator) status(sm map[string]*yaml.Node, sp, kind string) string {
+	if _, has := sm["status"]; !has {
+		return adewire.DefaultStatus(kind)
 	}
-	if list.Kind != yaml.SequenceNode || len(list.Content) == 0 {
-		v.fail(list, prefix, "steps must be a non-empty list")
-		return out
+	val := v.str(sm, sp, "status", true)
+	if v.err == nil && !contains(taskStatuses, val) {
+		v.fail(sm["status"], sp, "status must be To do, In progress, In review or Done")
 	}
-	earlier := make(map[string]bool)
-	candidates := make(map[string]bool) // earlier steps a review may resume: prompt steps only
-	var nodes []*resultNodes
-	var prefixes []string
-	var explicit []bool // max_returns declared on the step
-	for i, stepNode := range list.Content {
-		sp := fmt.Sprintf("%sstep %d: ", prefix[:len(prefix)-2]+", ", i+1)
-		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "review", "sandbox")
-		if v.err != nil {
-			return out
-		}
-		step := adewire.PipelineStep{AllowedTools: make([]string, 0), Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
-		step.ID = v.str(sm, sp, "id", true)
-		if v.err == nil && !idPattern.MatchString(step.ID) {
-			v.fail(sm["id"], sp, "id must be lowercase letters, digits, - or _")
-		}
-		if v.err == nil && earlier[step.ID] {
-			v.fail(sm["id"], sp, "id %q is already used by another step in this stage", step.ID)
-		}
-		step.Name = v.str(sm, sp, "name", true)
-		step.RunsOn = v.runsOn(sm, sp)
-		step.Before = v.before(sm, sp)
-		var rn *resultNodes
-		if n, has := sm["results"]; has {
-			if _, legacy := sm["on_failure"]; legacy {
-				v.fail(n, sp, "results and on_failure cannot be used together")
-			}
-			rn = v.results(n, sp)
-			step.Results = rn.list
-		} else {
-			step.OnFailure = v.onFailure(sm, sp, earlier)
-			step.Results = adewire.ImplicitResults(step.ID, step.OnFailure)
-		}
-		step.Timeout = v.timeout(sm, sp)
-		v.stepBody(sm, sp, &step, candidates)
-		set := v.maxReturns(sm, sp, &step)
-		if n, has := sm["sandbox"]; has && v.err == nil {
-			step.Sandbox = v.sandbox(n, sp)
-		}
-		if v.err != nil {
-			return out
-		}
-		earlier[step.ID] = true
-		if step.SmartScript == "" && step.Review == nil {
-			candidates[step.ID] = true
-		}
-		out = append(out, step)
-		nodes = append(nodes, rn)
-		prefixes = append(prefixes, sp)
-		explicit = append(explicit, set)
-	}
-	v.resolveRoutes(out, nodes, prefixes, explicit)
-	return out
+	return val
 }
 
-// maxReturns reads a step's return limit into step.MaxReturns and reports whether it was declared. Absent,
-// the limit is what on_failure implies, else the default; a results step may still fold a legacy result max.
-func (v *validator) maxReturns(sm map[string]*yaml.Node, sp string, step *adewire.PipelineStep) bool {
-	review := step.Review != nil
+// scriptResults refuses script results other than done (ok) and failed (not ok).
+func (v *validator) scriptResults(rn *resultNodes, sp string) {
+	if len(rn.list) == 2 {
+		d, f := rn.list[0], rn.list[1]
+		if d.ID == adewire.ResultDone && d.OK && f.ID == adewire.ResultFailed && !f.OK {
+			return
+		}
+	}
+	v.fail(rn.node, sp, "results of a script step must be done (ok: true) and failed (ok: false), in that order")
+}
+
+// maxReturns reads a step's return limit into step.MaxReturns. Absent, it is the default for the kind.
+func (v *validator) maxReturns(sm map[string]*yaml.Node, sp string, step *adewire.WorkflowStep) {
+	review := step.Kind == adewire.KindReview
 	n, has := sm["max_returns"]
 	if !has {
-		step.MaxReturns = adewire.LegacyLimit(step.OnFailure, review)
-		return false
-	}
-	if _, legacy := sm["on_failure"]; legacy {
-		v.fail(n, sp, "max_returns and on_failure cannot be used together; use results")
-		return true
+		step.MaxReturns = adewire.DefaultLimit(review)
+		return
 	}
 	lo, rule := 1, "from 1 to %d"
 	if review {
@@ -344,10 +339,9 @@ func (v *validator) maxReturns(sm map[string]*yaml.Node, sp string, step *adewir
 	val, err := strconv.Atoi(n.Value)
 	if n.Kind != yaml.ScalarNode || err != nil || val < lo || val > adewire.MaxMaxReturns {
 		v.fail(n, sp, "max_returns must be a whole number "+rule, adewire.MaxMaxReturns)
-		return true
+		return
 	}
 	step.MaxReturns = val
-	return true
 }
 
 // before reads a step's approval gate; the default is auto.
@@ -362,18 +356,8 @@ func (v *validator) before(sm map[string]*yaml.Node, sp string) string {
 	return b
 }
 
-// stepBody reads what a step runs: a prompt with its allowed tools, or a smart script with its params.
-func (v *validator) stepBody(sm map[string]*yaml.Node, sp string, step *adewire.PipelineStep, candidates map[string]bool) {
-	if rn, review := sm["review"]; review {
-		for _, key := range []string{"prompt", "allowed_tools", "smart_script", "params"} {
-			if n, has := sm[key]; has {
-				v.fail(n, sp, "%s is not allowed on review steps", key)
-				return
-			}
-		}
-		step.Review = v.reviewConfig(rn, sp, candidates)
-		return
-	}
+// agentBody reads what an agent step runs: a prompt with its allowed tools, or a smart script with its params.
+func (v *validator) agentBody(sm map[string]*yaml.Node, sp string, step *adewire.WorkflowStep) {
 	if _, smart := sm["smart_script"]; !smart {
 		if n, has := sm["params"]; has {
 			v.fail(n, sp, "params is only allowed with smart_script")
@@ -592,29 +576,6 @@ func (v *validator) runsOn(m map[string]*yaml.Node, prefix string) string {
 	return val
 }
 
-// onFailure: stop | retry 1 | retry 2 | back:<earlier step id>. earlier == nil (script stage)
-// refuses back:. Default stop.
-func (v *validator) onFailure(m map[string]*yaml.Node, prefix string, earlier map[string]bool) string {
-	n, has := m["on_failure"]
-	if !has {
-		return "stop"
-	}
-	val := v.str(m, prefix, "on_failure", true)
-	if v.err != nil || onFailureSimple[val] {
-		return val
-	}
-	if id, isBack := strings.CutPrefix(val, "back:"); isBack {
-		if earlier == nil {
-			v.fail(n, prefix, "back: is only allowed on an agent step")
-		} else if !earlier[id] {
-			v.fail(n, prefix, "back: must name an earlier step of the same stage")
-		}
-		return val
-	}
-	v.fail(n, prefix, "on_failure must be stop, retry 1, retry 2 or back:<step id>")
-	return val
-}
-
 func (v *validator) timeout(m map[string]*yaml.Node, prefix string) string {
 	val := v.str(m, prefix, "timeout", true)
 	if v.err != nil {
@@ -668,11 +629,10 @@ const (
 )
 
 // resultNodes keeps the YAML nodes of a step's declared results so routes can be checked once every
-// step id of the stage is known.
+// step id of the workflow is known.
 type resultNodes struct {
 	list []adewire.StepResult
 	next []*yaml.Node
-	max  []*yaml.Node
 	node *yaml.Node
 }
 
@@ -686,7 +646,7 @@ func (v *validator) results(n *yaml.Node, sp string) *resultNodes {
 	seen := make(map[string]bool)
 	for i, item := range n.Content {
 		rp := fmt.Sprintf("%sresult %d: ", sp, i+1)
-		m := v.fields(item, rp, "id", "ok", "description", "next", "max")
+		m := v.fields(item, rp, "id", "ok", "description", "next")
 		if v.err != nil {
 			return rn
 		}
@@ -719,14 +679,12 @@ func (v *validator) results(n *yaml.Node, sp string) *resultNodes {
 		}
 		rn.list = append(rn.list, r)
 		rn.next = append(rn.next, m["next"])
-		rn.max = append(rn.max, m["max"])
 	}
 	return rn
 }
 
-// resolveRoutes checks every declared result's route against the stage's step ids and fills the loop
-// budget. Steps without declared results (nil entries) were derived from on_failure and are already valid.
-func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultNodes, prefixes []string, explicit []bool) {
+// resolveRoutes checks every declared result's route against the workflow's step ids and marks returns.
+func (v *validator) resolveRoutes(steps []adewire.WorkflowStep, nodes []*resultNodes, prefixes []string) {
 	if v.err != nil {
 		return
 	}
@@ -738,16 +696,15 @@ func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultN
 		if rn == nil {
 			continue
 		}
-		if !v.resolveStepRoutes(steps, index, si, rn, prefixes[si], explicit[si]) {
+		if !v.resolveStepRoutes(steps, index, si, rn, prefixes[si]) {
 			return
 		}
 	}
 }
 
 // resolveStepRoutes resolves one step's results; false means a violation was recorded.
-func (v *validator) resolveStepRoutes(steps []adewire.PipelineStep, index map[string]int, si int, rn *resultNodes, sp string, explicit bool) bool {
+func (v *validator) resolveStepRoutes(steps []adewire.WorkflowStep, index map[string]int, si int, rn *resultNodes, sp string) bool {
 	forward := false
-	legacy := 0 // largest result max declared on a loop route (a file from before max_returns)
 	for ri := range rn.list {
 		r := &rn.list[ri]
 		rp := fmt.Sprintf("%sresult %d: ", sp, ri+1)
@@ -763,56 +720,20 @@ func (v *validator) resolveStepRoutes(steps []adewire.PipelineStep, index map[st
 		default:
 			target, known := index[r.Next]
 			if !known {
-				v.fail(node, rp, "next must be next, end, stop or a step id of this stage")
+				v.fail(node, rp, "next must be next, end, stop or a step id of this workflow")
 				return false
 			}
 			loop = target <= si
 		}
 		forward = forward || !loop
 		r.Loop = loop
-		m, ok := v.legacyMax(rn.max[ri], rp, loop, explicit)
-		if !ok {
-			return false
-		}
-		legacy = max(legacy, m)
 	}
 	if !forward {
-		v.fail(rn.node, sp, "at least one result must lead forward, or the stage can never finish")
+		v.fail(rn.node, sp, "at least one result must lead forward, or the step can never finish")
 		return false
-	}
-	review := steps[si].Review != nil
-	if !explicit {
-		steps[si].MaxReturns = adewire.DefaultLimit(review)
-		if legacy > 0 {
-			steps[si].MaxReturns = legacy
-		}
-	}
-	if rule, ok := adewire.LegacyOnFailure(steps[si].ID, rn.list, stepIDs(steps[:si]), steps[si].MaxReturns, review); ok {
-		steps[si].OnFailure = rule
 	}
 	steps[si].Results = rn.list
 	return true
-}
-
-// legacyMax reads a result's max, a budget from before max_returns: only on a loop route, and not beside
-// the step's max_returns. It returns 0 when none is declared.
-func (v *validator) legacyMax(node *yaml.Node, prefix string, loop, explicit bool) (int, bool) {
-	switch {
-	case node == nil:
-		return 0, true
-	case !loop:
-		v.fail(node, prefix, "max is only allowed on a route back to this step or an earlier one")
-		return 0, false
-	case explicit:
-		v.fail(node, prefix, "max moved to max_returns on the step; remove it")
-		return 0, false
-	}
-	n, err := strconv.Atoi(node.Value)
-	if node.Kind != yaml.ScalarNode || err != nil || n < 1 || n > adewire.MaxMaxReturns {
-		v.fail(node, prefix, "max must be a whole number from 1 to %d", adewire.MaxMaxReturns)
-		return 0, false
-	}
-	return n, true
 }
 
 func cmpNode(n, fallback *yaml.Node) *yaml.Node {
@@ -820,12 +741,4 @@ func cmpNode(n, fallback *yaml.Node) *yaml.Node {
 		return n
 	}
 	return fallback
-}
-
-func stepIDs(steps []adewire.PipelineStep) []string {
-	out := make([]string, len(steps))
-	for i, s := range steps {
-		out[i] = s.ID
-	}
-	return out
 }

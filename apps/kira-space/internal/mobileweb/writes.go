@@ -164,25 +164,25 @@ func writeRoute[Req, Res any](s *Server, call func(ctx context.Context, wr Write
 
 type empty struct{}
 
-// taskStageRequest is what a phone sends to act on a task: the stage it saw, so the engine can
+// taskStepRequest is what a phone sends to act on a task: the step it saw, so the engine can
 // refuse when the task has moved on. An empty value would skip the guard, so it is required.
-type taskStageRequest struct {
-	TaskID      string `json:"taskId"`
-	FromStageID string `json:"fromStageId"`
+type taskStepRequest struct {
+	TaskID     string `json:"taskId"`
+	FromStepID string `json:"fromStepId"`
 }
 
-var errFromStage = errors.New("fromStageId is required")
+var errFromStep = errors.New("fromStepId is required")
 
-func (q taskStageRequest) validate() error {
-	if q.FromStageID == "" {
-		return errFromStage
+func (q taskStepRequest) validate() error {
+	if q.FromStepID == "" {
+		return errFromStep
 	}
 	return nil
 }
 
-type taskStageResult struct {
-	TaskID  string `json:"taskId"`
-	StageID string `json:"stageId"`
+type taskStepResult struct {
+	TaskID string `json:"taskId"`
+	StepID string `json:"stepId"`
 }
 
 type runResult struct {
@@ -214,37 +214,37 @@ func (s *Server) handleBacklogMove(w http.ResponseWriter, r *http.Request, d rep
 	})(w, r, d)
 }
 
-func (s *Server) handleTaskStage(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
-	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req adewire.SetTaskStageArgs) (taskStageResult, error) {
-		if req.FromStageID == "" {
-			return taskStageResult{}, badRequest(errFromStage)
+func (s *Server) handleTaskStep(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
+	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req adewire.SetTaskStepArgs) (taskStepResult, error) {
+		if req.FromStepID == "" {
+			return taskStepResult{}, badRequest(errFromStep)
 		}
-		auditAdd(r, "task", req.TaskID, "from", req.FromStageID, "to", req.StageID)
-		t, err := wr.SetTaskStage(ctx, req)
-		return taskStageResult{TaskID: t.ID, StageID: t.StageID}, err
+		auditAdd(r, "task", req.TaskID, "from", req.FromStepID, "to", req.StepID)
+		t, err := wr.SetTaskStep(ctx, req)
+		return taskStepResult{TaskID: t.ID, StepID: t.EntryStepID}, err
 	})(w, r, d)
 }
 
 func (s *Server) handleTaskRun(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
-	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req taskStageRequest) (runResult, error) {
+	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req taskStepRequest) (runResult, error) {
 		if err := req.validate(); err != nil {
 			return runResult{}, badRequest(err)
 		}
-		auditAdd(r, "task", req.TaskID, "stage", req.FromStageID)
+		auditAdd(r, "task", req.TaskID, "step", req.FromStepID)
 		res, err := wr.StartRun(ctx, adewire.StartRunArgs{
-			TaskID: req.TaskID, FromStageID: req.FromStageID, BranchNames: map[string]string{},
+			TaskID: req.TaskID, FromStepID: req.FromStepID, BranchNames: map[string]string{},
 		})
 		return runResult{RunIDs: res.RunIDs}, err
 	})(w, r, d)
 }
 
 func (s *Server) handleTaskLaunch(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
-	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req taskStageRequest) (LaunchResult, error) {
+	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req taskStepRequest) (LaunchResult, error) {
 		if err := req.validate(); err != nil {
 			return LaunchResult{}, badRequest(err)
 		}
-		auditAdd(r, "task", req.TaskID, "stage", req.FromStageID)
-		return wr.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: req.TaskID, FromStageID: req.FromStageID})
+		auditAdd(r, "task", req.TaskID, "step", req.FromStepID)
+		return wr.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: req.TaskID, FromStepID: req.FromStepID})
 	})(w, r, d)
 }
 

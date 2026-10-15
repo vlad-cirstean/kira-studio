@@ -149,15 +149,19 @@ func (b *TaskBoard) spaceInfo(ctx context.Context, tc *taskCtx) (claudeheadless.
 	info := claudeheadless.TaskInfo{
 		Title:      taskTitle(tc.task, tc.branches),
 		JiraKey:    tc.task.JiraKey,
-		Stage:      "",
+		Step:       "",
 		Repos:      []claudeheadless.TaskRepo{},
 		Registered: make([]claudeheadless.RegisteredRepo, 0, len(cfgs)),
 	}
-	if tc.stage != nil {
-		info.Stage = tc.stage.Name
-	}
-	if wf, ok := b.taskWorkflow(tc.task); ok {
-		info.Workflow = wf.Name
+	if tc.wf != nil {
+		info.Workflow = tc.wf.Name
+		if plan, err := b.plan(tc); err == nil {
+			if entry := tc.entryIndex(plan); entry >= 0 {
+				if cur := currentStep(plan, entry); cur >= 0 {
+					info.Step = plan[cur].Def.Name
+				}
+			}
+		}
 	}
 	for _, br := range tc.branches {
 		r := claudeheadless.TaskRepo{Repo: tc.nick[br.CodeRepoID], CodeRepoID: br.CodeRepoID}
@@ -442,7 +446,7 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q claudeheadle
 			continue
 		}
 		entry := claudeheadless.RunOutcomeEntry{
-			RunID: r.ID, Kind: kind, Stage: r.StageID, Step: r.StepID, Repo: tc.nick[br.CodeRepoID], Branch: br.Name,
+			RunID: r.ID, Kind: kind, Step: r.StepID, Repo: tc.nick[br.CodeRepoID], Branch: br.Name,
 			State: r.State, FinishedAt: r.FinishedAt,
 		}
 		if r.Outcome != nil {

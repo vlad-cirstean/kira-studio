@@ -21,7 +21,7 @@ import type {
   GhSyncPlan,
   GhSyncResult,
   ImportWorkflowArgs,
-  LaunchStageArgs,
+  LaunchStepArgs,
   MoveBacklogItemArgs,
   NewWorkflowArgs,
   OntoArgs,
@@ -40,7 +40,7 @@ import type {
   SendReviewArgs,
   SetBranchBaseArgs,
   SetPlanArgs,
-  SetTaskStageArgs,
+  SetTaskStepArgs,
   SetTaskWorkflowArgs,
   StartBranchArgs,
   StartRunArgs,
@@ -267,22 +267,22 @@ export function useResumeRun() {
   return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskResumeRun(args) });
 }
 
-export function useStageDone() {
-  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStageDone(args) });
+export function useStepDone() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStepDone(args) });
 }
 
-/** Applies a stage move to a board snapshot; the backend's push reconciles the run-derived fields. */
-function withStage(board: Board, args: SetTaskStageArgs): Board {
+/** Applies a step move to a board snapshot; the backend's push reconciles the run-derived fields. */
+function withStep(board: Board, args: SetTaskStepArgs): Board {
   const tasks = board.tasks.map(
-    (t): Task => (t.id === args.taskId ? { ...t, stageId: args.stageId } : t),
+    (t): Task => (t.id === args.taskId ? { ...t, entryStepId: args.stepId } : t),
   );
   return { ...board, tasks };
 }
 
-export function useSetTaskStage() {
+export function useSetTaskStep() {
   return useMutation({
-    mutationFn: (args: SetTaskStageArgs) => control.adeTaskSetTaskStage(args),
-    ...optimisticUpdate<Board, SetTaskStageArgs>(queryClient, boardKey, withStage),
+    mutationFn: (args: SetTaskStepArgs) => control.adeTaskSetTaskStep(args),
+    ...optimisticUpdate<Board, SetTaskStepArgs>(queryClient, boardKey, withStep),
   });
 }
 
@@ -298,8 +298,8 @@ export function useTakeOver() {
   return useMutation({ mutationFn: (args: TakeOverArgs) => control.adeTaskTakeOver(args) });
 }
 
-export function useLaunchStage() {
-  return useMutation({ mutationFn: (args: LaunchStageArgs) => control.adeTaskLaunchStage(args) });
+export function useLaunchStep() {
+  return useMutation({ mutationFn: (args: LaunchStepArgs) => control.adeTaskLaunchStep(args) });
 }
 
 export function useStartBranch() {

@@ -2,6 +2,6 @@
   "workflow": null,
   "error": {
     "line": 0,
-    "message": "✕ stage 4: kind must be user, agent or script"
+    "message": "✕ step 4: kind must be agent, script, review or manual"
   }
 }

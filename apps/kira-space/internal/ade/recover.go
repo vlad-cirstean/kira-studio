@@ -51,7 +51,6 @@ func (b *TaskBoard) Recover() error {
 			b.recoveredRebases = append(b.recoveredRebases, r)
 		}
 	}
-	b.snapshotStartedTasks()
 	b.emitRuns(runs...)
 	b.notifySessions()
 	b.notifyBoard()

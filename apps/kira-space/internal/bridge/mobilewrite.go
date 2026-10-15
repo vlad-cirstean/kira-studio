@@ -25,8 +25,8 @@ func (w *MobileWriter) MoveBacklogItem(ctx context.Context, args adewire.MoveBac
 	return w.Svc.MoveBacklogItem(ctx, args)
 }
 
-func (w *MobileWriter) SetTaskStage(ctx context.Context, args adewire.SetTaskStageArgs) (adewire.Task, error) {
-	return w.Svc.SetTaskStage(ctx, args)
+func (w *MobileWriter) SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error) {
+	return w.Svc.SetTaskStep(ctx, args)
 }
 
 func (w *MobileWriter) StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error) {
@@ -37,10 +37,10 @@ func (w *MobileWriter) Send(ctx context.Context, args adewire.SendArgs) error {
 	return w.Svc.Send(ctx, args)
 }
 
-// LaunchStage opens the task's interactive stage session, then waits for a desktop window to open
+// LaunchStep opens the task's interactive step session, then waits for a desktop window to open
 // its terminal.
-func (w *MobileWriter) LaunchStage(ctx context.Context, args adewire.LaunchStageArgs) (mobileweb.LaunchResult, error) {
-	l, err := w.Svc.LaunchStage(ctx, args)
+func (w *MobileWriter) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (mobileweb.LaunchResult, error) {
+	l, err := w.Svc.LaunchStep(ctx, args)
 	if err != nil {
 		return mobileweb.LaunchResult{}, err
 	}

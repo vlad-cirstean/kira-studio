@@ -104,8 +104,6 @@ export interface NeedsItem {
   branchId: string;
   stepId: string;
   sessionId: string;
-  /** `approval`: the stage the step belongs to. */
-  stageId: string;
   /** `stale merge`: the integration branch it is stale in. */
   target: string;
   /** `Retry`: the latest failed or stuck runs to re-run. */
@@ -147,7 +145,6 @@ function item(kind: NeedsKind, o: Extra): NeedsItem {
     branchId: '',
     stepId: '',
     sessionId: '',
-    stageId: '',
     target: '',
     runIds: [],
     scope: '',
@@ -196,56 +193,58 @@ function reviewItems(c: Ctx, taskId: string, step: StepProgress): NeedsItem[] {
 }
 
 function stepItems(c: Ctx): NeedsItem[] {
+  return c.i.board.tasks.flatMap((task) => {
+    const current = c.i.progress.get(task.id)?.step;
+    return current ? currentStepItems(c, task, current) : [];
+  });
+}
+
+function currentStepItems(c: Ctx, task: Board['tasks'][number], step: StepProgress): NeedsItem[] {
   const out: NeedsItem[] = [];
-  for (const task of c.i.board.tasks) {
-    for (const step of c.i.progress.get(task.id)?.steps ?? []) {
-      for (const r of step.runs.filter((x) => x.state === 'stuck')) {
-        out.push(
-          item('stuck run', {
-            id: `stuck:${task.id}:${step.id}:${r.branchId}`,
-            taskId: task.id,
-            branchId: r.branchId,
-            stepId: step.id,
-            sessionId: r.sessionId,
-            // A script run has no session to take over: it is retried. A restart-stopped one resumes.
-            action: r.resumable ? 'Resume' : r.sessionId ? 'Take over' : 'Retry',
-            runIds: r.runId ? [r.runId] : [],
-            scope: c.nick(r.branchId),
-            what: t('space.ade.needs.what.stuck.label', {
-              name: step.name,
-              branch: c.nameOf(r.branchId),
-            }),
-            detail: r.note,
-            ageMs: c.age(c.sessionsById.get(r.sessionId)?.lastActiveAt ?? r.finishedAt),
-          }),
-        );
-      }
-      const base = { taskId: task.id, stepId: step.id, scope: runsOnLabel(step.runsOn) };
-      if (step.state === 'failed') {
-        const failed = step.runs.filter((x) => x.state === 'failed' || x.state === 'stuck');
-        out.push(
-          item('failed', {
-            ...base,
-            id: `failed:${task.id}:${step.id}`,
-            what: failedWhat(step.name, failed.find((x) => x.result)?.result ?? ''),
-            runIds: failed.flatMap((x) => (x.runId ? [x.runId] : [])),
-            detail: failed.find((x) => x.note)?.note ?? '',
-            ageMs: c.age(Math.max(0, ...failed.map((x) => x.finishedAt ?? 0))),
-          }),
-        );
-      }
-      out.push(...reviewItems(c, task.id, step));
-      if (step.approval) {
-        out.push(
-          item('approval', {
-            ...base,
-            id: `approval:${task.id}:${step.id}`,
-            stageId: c.i.progress.get(task.id)?.stage?.id ?? '',
-            what: t('space.ade.needs.what.approval.label', { name: step.name }),
-          }),
-        );
-      }
-    }
+  for (const r of step.runs.filter((x) => x.state === 'stuck')) {
+    out.push(
+      item('stuck run', {
+        id: `stuck:${task.id}:${step.id}:${r.branchId}`,
+        taskId: task.id,
+        branchId: r.branchId,
+        stepId: step.id,
+        sessionId: r.sessionId,
+        // A script run has no session to take over: it is retried. A restart-stopped one resumes.
+        action: r.resumable ? 'Resume' : r.sessionId ? 'Take over' : 'Retry',
+        runIds: r.runId ? [r.runId] : [],
+        scope: c.nick(r.branchId),
+        what: t('space.ade.needs.what.stuck.label', {
+          name: step.name,
+          branch: c.nameOf(r.branchId),
+        }),
+        detail: r.note,
+        ageMs: c.age(c.sessionsById.get(r.sessionId)?.lastActiveAt ?? r.finishedAt),
+      }),
+    );
+  }
+  const base = { taskId: task.id, stepId: step.id, scope: runsOnLabel(step.runsOn) };
+  if (step.state === 'failed') {
+    const failed = step.runs.filter((x) => x.state === 'failed' || x.state === 'stuck');
+    out.push(
+      item('failed', {
+        ...base,
+        id: `failed:${task.id}:${step.id}`,
+        what: failedWhat(step.name, failed.find((x) => x.result)?.result ?? ''),
+        runIds: failed.flatMap((x) => (x.runId ? [x.runId] : [])),
+        detail: failed.find((x) => x.note)?.note ?? '',
+        ageMs: c.age(Math.max(0, ...failed.map((x) => x.finishedAt ?? 0))),
+      }),
+    );
+  }
+  out.push(...reviewItems(c, task.id, step));
+  if (step.approval) {
+    out.push(
+      item('approval', {
+        ...base,
+        id: `approval:${task.id}:${step.id}`,
+        what: t('space.ade.needs.what.approval.label', { name: step.name }),
+      }),
+    );
   }
   return out;
 }

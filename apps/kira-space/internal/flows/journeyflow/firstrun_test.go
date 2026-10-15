@@ -34,7 +34,7 @@ func graphSubjects(t *testing.T, gs *flowharness.GitStream, repoID string) []str
 	return out
 }
 
-// A new user's first session: import, commit in a shell tab, push, run a task through its stages,
+// A new user's first session: import, commit in a shell tab, push, run a task through its steps,
 // archive it, relaunch. Everything the user set up must read back the same.
 func TestFirstRunJourney(t *testing.T) {
 	app := flowharness.New(t)
@@ -110,16 +110,16 @@ func TestFirstRunJourney(t *testing.T) {
 	if run := waitRun(t, app, task.ID, "one", "done"); run.Summary != "summary-done" {
 		t.Fatalf("run = %+v", run)
 	}
-	for _, want := range []string{"review", "ship"} {
-		if got, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil || got.StageID != want {
-			t.Fatalf("StageDone = %+v, %v, want stage %s", got, err, want)
+	for _, want := range []string{"ship", "done"} {
+		if got, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil || got.EntryStepID != want {
+			t.Fatalf("StepDone = %+v, %v, want entry step %s", got, err, want)
 		}
 	}
-	if _, err := app.W.AdeTask.SetTaskStage(ctx, adewire.SetTaskStageArgs{TaskID: task.ID, StageID: "review", FromStageID: "ship"}); err != nil {
-		t.Fatalf("SetTaskStage back: %v", err)
+	if _, err := app.W.AdeTask.SetTaskStep(ctx, adewire.SetTaskStepArgs{TaskID: task.ID, StepID: "review", FromStepID: "done"}); err != nil {
+		t.Fatalf("SetTaskStep back: %v", err)
 	}
-	if _, err := app.W.AdeTask.SetTaskStage(ctx, adewire.SetTaskStageArgs{TaskID: task.ID, StageID: "build", FromStageID: "ship"}); err == nil {
-		t.Fatal("SetTaskStage from a stale stage succeeded")
+	if _, err := app.W.AdeTask.SetTaskStep(ctx, adewire.SetTaskStepArgs{TaskID: task.ID, StepID: "one", FromStepID: "ship"}); err == nil {
+		t.Fatal("SetTaskStep from a stale step succeeded")
 	}
 
 	// A second task stays on the board; this one is archived.

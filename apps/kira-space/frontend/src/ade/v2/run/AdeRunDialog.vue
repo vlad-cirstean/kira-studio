@@ -35,7 +35,7 @@ import { useAdePromptPreview, useSpaceTools, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { ACTION_CLASS } from '../tones';
 
-// Agent stage Run dialog (SPEC2 section 5, R24): per-branch names for branches not created yet, the
+// Agent step Run dialog (SPEC2 section 5, R24): per-branch names for branches not created yet, the
 // editable message and the read-only finish_step suffix the server always appends.
 const ui = useAdeBoardUiStore();
 const { model } = usePlanModel();
@@ -45,26 +45,47 @@ const open = computed(() => card.value !== null);
 const close = (): void => {
   ui.runTaskId = null;
 };
-const stage = computed(() => card.value?.progress.stage ?? null);
+const step = computed(() => card.value?.progress.step ?? null);
+// The workflow's definition of the step being run: its prompt and smart script params.
+const def = computed(
+  () => card.value?.workflow?.steps.find((x) => x.id === step.value?.id) ?? null,
+);
+// Position among the workflow's automatic steps, as `ade.step.prompt` counts them.
+const numbering = computed(() => {
+  const auto = (card.value?.workflow?.steps ?? []).filter((x) => x.kind !== 'manual' && !x.skip);
+  return { n: auto.findIndex((x) => x.id === step.value?.id) + 1, of: auto.length };
+});
 // Both texts render in Go (ade.step.prompt, headless.finishStep.suffix), so edits in Settings show here.
 const stepPreview = useAdePromptPreview('ade.step.prompt', () =>
-  card.value && stage.value
-    ? runMessageVars({ title: card.value.title, jira: card.value.task.jira, stage: stage.value })
+  card.value && step.value
+    ? runMessageVars({
+        title: card.value.title,
+        jira: card.value.task.jira,
+        step: {
+          name: step.value.name,
+          prompt: def.value?.prompt ?? '',
+          results: step.value.results,
+        },
+        stepNumber: numbering.value.n,
+        stepCount: numbering.value.of,
+      })
     : null,
 );
 const suffixPreview = useAdePromptPreview('headless.finishStep.suffix', () =>
-  stage.value ? finishVars(stage.value.steps[0]?.results ?? []) : null,
+  step.value ? finishVars(step.value.results) : null,
 );
-// The finish instruction the first step ends with, as its results declare it.
+// The finish instruction the step ends with, as its results declare it.
 const suffix = computed(() => previewPlain(suffixPreview.data.value?.parts ?? []));
 const initial = computed(() =>
   editablePart(previewPlain(stepPreview.data.value?.parts ?? []), suffix.value),
 );
-// A smart first step runs its script's body: shown read-only, and no message is sent.
+// A smart step runs its script's body: shown read-only, and no message is sent.
 const scripts = useCustomScriptsStore();
 const smartStep = computed(() => {
-  const first = stage.value?.steps[0];
-  return first && first.smartScript !== '' ? first : null;
+  const cur = step.value;
+  return cur && cur.smartScript !== ''
+    ? { smartScript: cur.smartScript, params: def.value?.params ?? {} }
+    : null;
 });
 const smartBody = computed(() => {
   const step = smartStep.value;
@@ -151,7 +172,7 @@ const send = sending.run;
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
           </svg>
-          {{ t('space.ade.runDialog.title.title', { stage: stage?.name ?? '' }) }}
+          {{ t('space.ade.runDialog.title.title', { step: step?.name ?? '' }) }}
         </DialogTitle>
       </DialogHeader>
       <DialogBody class="flex flex-col gap-3 text-kira-md">

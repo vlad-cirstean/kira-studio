@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -353,31 +354,37 @@ func (e *engine) fakeFile(name string) string {
 	return string(raw)
 }
 
-func flowYAML(stages string) string { return "id: flow\nname: Flow\nstages:\n" + stages }
-
-func agentStage(id, steps string) string {
-	return "  - id: " + id + "\n    name: " + id + "\n    kind: agent\n    status: In progress\n    steps:\n" + steps
-}
+func flowYAML(steps string) string { return "id: flow\nname: Flow\nsteps:\n" + steps }
 
 func agentStep(id, extra string) string {
-	return "      - id: " + id + "\n        name: " + id + "\n        runs_on: each repo\n        timeout: 1m\n        prompt: work on {branch} in {repo}\n" + extra
+	return "  - id: " + id + "\n    name: " + id + "\n    kind: agent\n    runs_on: each repo\n    timeout: 1m\n    prompt: work on {branch} in {repo}\n" + extra
 }
 
-const userStage = "  - id: review\n    name: Review\n    kind: user\n    status: In review\n"
+// backTo routes the failed result to an earlier step.
+func backTo(target string) string {
+	return "    results:\n      - id: done\n        ok: true\n      - id: failed\n        ok: false\n        next: " + target + "\n"
+}
+
+// selfReturn retries the step on failure, up to limit returns.
+func selfReturn(id string, limit int) string {
+	return backTo(id) + "    max_returns: " + strconv.Itoa(limit) + "\n"
+}
+
+const manualStep = "  - id: review\n    name: Review\n    kind: manual\n    status: In review\n"
 
 // --- tests -------------------------------------------------------------------------------------
 
-func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
+func TestRunEngine_eachRepoAutoAdvanceApprovalAndStepDone(t *testing.T) {
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
 	e.repo("web")
 	e.prepare("api", "echo prepared")
-	e.workflow(flowYAML(agentStage("build",
-		agentStep("one", "        allowed_tools: [\"Bash(git *)\"]\n")+agentStep("two", "        before: approval\n")) + userStage))
+	e.workflow(flowYAML(
+		agentStep("one", "    allowed_tools: [\"Bash(git *)\"]\n") + agentStep("two", "    before: approval\n") + manualStep))
 	id := e.task("api", "web")
 
-	if _, err := e.board.StageDone(context.Background(), id); err == nil {
-		t.Fatal("StageDone accepted before the stage ran")
+	if _, err := e.board.StepDone(context.Background(), id); err == nil {
+		t.Fatal("StepDone accepted before the steps ran")
 	}
 	if runIDs := e.start(id); len(runIDs) != 2 {
 		t.Fatalf("StartRun run ids = %v, want one per repo", runIDs)
@@ -430,21 +437,18 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
 		t.Fatalf("setup log = %q", setupLog)
 	}
 
-	if err := e.board.Approve(context.Background(), adewire.StepArgs{TaskID: id, StageID: "build", StepID: "one"}); err == nil {
+	if err := e.board.Approve(context.Background(), adewire.StepArgs{TaskID: id, StepID: "one"}); err == nil {
 		t.Fatal("Approve accepted for a step that is not waiting")
 	}
-	if err := e.board.Approve(context.Background(), adewire.StepArgs{TaskID: id, StageID: "build", StepID: "two"}); err != nil {
+	if err := e.board.Approve(context.Background(), adewire.StepArgs{TaskID: id, StepID: "two"}); err != nil {
 		t.Fatal(err)
 	}
 	e.waitRun(id, "two/api", model.AdeRunDone)
 	e.waitRun(id, "two/web", model.AdeRunDone)
 
-	task, err := e.board.StageDone(context.Background(), id)
-	if err != nil || task.StageID != "review" {
-		t.Fatalf("StageDone = %+v, %v; want review", task, err)
-	}
-	if task, err = e.board.StageDone(context.Background(), id); err != nil || task.StageID != "done" {
-		t.Fatalf("StageDone after last = %+v, %v; want done", task, err)
+	task, err := e.board.StepDone(context.Background(), id)
+	if err != nil || task.EntryStepID != "done" {
+		t.Fatalf("StepDone = %+v, %v; want done", task, err)
 	}
 }
 
@@ -458,14 +462,14 @@ func TestRunEngine_failureRules(t *testing.T) {
 		note  string
 	}{
 		{"needs_input is stuck", []string{"needs_input"}, agentStep("first", ""), "first/api", model.AdeRunStuck, "summary-needs_input"},
-		{"stop keeps a failure", []string{"failed"}, agentStep("first", "        on_failure: stop\n"), "first/api", model.AdeRunFailed, "summary-failed"},
+		{"stop keeps a failure", []string{"failed"}, agentStep("first", ""), "first/api", model.AdeRunFailed, "summary-failed"},
 		{"no finish_step", []string{"nofinish"}, agentStep("first", ""), "first/api", model.AdeRunFailed, "no report: Claude ended without calling finish_step"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEngine(t, map[string][]string{"*": tc.scen})
 			e.repo("api")
-			e.workflow(flowYAML(agentStage("build", tc.steps)))
+			e.workflow(flowYAML(tc.steps))
 			id := e.task("api")
 			e.start(id)
 			r := e.waitRun(id, tc.key, tc.state)
@@ -484,7 +488,7 @@ func TestRunEngine_retryAndTimeout(t *testing.T) {
 	t.Run("RetryRun after needs_input", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"needs_input", "done"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+		e.workflow(flowYAML(agentStep("first", "")))
 		id := e.task("api")
 		e.start(id)
 		stuck := e.waitRun(id, "first/api", model.AdeRunStuck)
@@ -502,7 +506,7 @@ func TestRunEngine_retryAndTimeout(t *testing.T) {
 	t.Run("retry 1 then done", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"failed", "done"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", agentStep("first", "        on_failure: retry 1\n"))))
+		e.workflow(flowYAML(agentStep("first", selfReturn("first", 1))))
 		id := e.task("api")
 		e.start(id)
 		if r := e.waitRun(id, "first/api", model.AdeRunDone); r.Attempt != 2 {
@@ -513,7 +517,7 @@ func TestRunEngine_retryAndTimeout(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"sleep"}})
 		e.repo("api")
 		steps := strings.Replace(agentStep("first", ""), "timeout: 1m", "timeout: 1s", 1)
-		e.workflow(flowYAML(agentStage("build", steps)))
+		e.workflow(flowYAML(steps))
 		id := e.task("api")
 		e.start(id)
 		if r := e.waitRun(id, "first/api", model.AdeRunFailed); r.Note != "no report: timed out after 1s" {
@@ -527,7 +531,7 @@ func TestRunEngine_setupGate(t *testing.T) {
 	e.repo("api")
 	gate := filepath.Join(t.TempDir(), "gate")
 	e.prepare("api", "while [ ! -f "+gate+" ]; do sleep 0.05; done; exit 3")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	e.workflow(flowYAML(agentStep("first", "")))
 	id := e.task("api")
 	e.start(id)
 
@@ -562,7 +566,7 @@ func TestRunEngine_onceOnlyAndUnresolved(t *testing.T) {
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
 	e.repo("web")
-	e.workflow(flowYAML(agentStage("build", strings.Replace(agentStep("solo", ""), "each repo", "once", 1))))
+	e.workflow(flowYAML(strings.Replace(agentStep("solo", ""), "each repo", "once", 1)))
 	id := e.task("api", "web")
 	if ids := e.start(id); len(ids) != 1 {
 		t.Fatalf("once step run ids = %v", ids)
@@ -575,14 +579,14 @@ func TestRunEngine_onceOnlyAndUnresolved(t *testing.T) {
 
 	e2 := newEngine(t, nil)
 	e2.repo("api")
-	e2.workflow(flowYAML(agentStage("build", strings.Replace(agentStep("solo", ""), "each repo", "only nope", 1))))
+	e2.workflow(flowYAML(strings.Replace(agentStep("solo", ""), "each repo", "only nope", 1)))
 	id2 := e2.task("api")
 	if _, err := e2.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: id2}); err == nil || !strings.Contains(err.Error(), "nope") {
 		t.Fatalf("unresolved only: %v", err)
 	}
 }
 
-func TestRunEngine_scriptStage(t *testing.T) {
+func TestRunEngine_scriptStep(t *testing.T) {
 	script := func(command string) string {
 		return flowYAML("  - id: ship\n    name: Ship\n    kind: script\n    status: In review\n    runs_on: each repo\n    timeout: 1m\n    command: |\n      " + command + "\n")
 	}
@@ -600,7 +604,7 @@ func TestRunEngine_scriptStage(t *testing.T) {
 			t.Fatalf("log = %q", out)
 		}
 		if sessions, _ := e.board.Sessions(context.Background()); len(sessions.Sessions) != 0 {
-			t.Fatalf("script stage created sessions: %+v", sessions.Sessions)
+			t.Fatalf("script step created sessions: %+v", sessions.Sessions)
 		}
 	})
 	t.Run("non-zero exit fails", func(t *testing.T) {
@@ -670,8 +674,8 @@ func argAfterJoined(args, flag string) string {
 func TestRunEngine_setTaskWorkflow(t *testing.T) {
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", "")) + userStage))
-	other := "id: other\nname: Other\nstages:\n" + userStage
+	e.workflow(flowYAML(agentStep("first", "") + manualStep))
+	other := "id: other\nname: Other\nsteps:\n" + manualStep
 	if err := os.WriteFile(filepath.Join(e.workdir, "other.yaml"), []byte(other), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -701,7 +705,7 @@ func TestRunEngine_setTaskWorkflow(t *testing.T) {
 
 	sleeper := newEngine(t, map[string][]string{"*": {"sleep"}})
 	sleeper.repo("api")
-	sleeper.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	sleeper.workflow(flowYAML(agentStep("first", "")))
 	sid := sleeper.task("api")
 	sleeper.start(sid)
 	sleeper.waitRun(sid, "first/api", model.AdeRunRunning)

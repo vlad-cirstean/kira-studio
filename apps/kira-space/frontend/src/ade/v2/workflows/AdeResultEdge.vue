@@ -6,7 +6,7 @@ import { type EdgeData, NODE_H, type Point, RANK_SEP } from '../board/workflowGr
 
 // A route between steps, grouped by target: toned by the results on it (all ok green, all not ok red,
 // mixed neutral). Forward edges run orthogonal, jogging in the gap between ranks. A loop edge runs in
-// the left gutter of its stage and enters the target from above, dashed, with its budget.
+// the left gutter of the canvas and enters the target from above, dashed, with its budget.
 const props = defineProps<EdgeProps<EdgeData>>();
 const d = computed(() => props.data as EdgeData);
 const TONE_STROKE = {
@@ -96,7 +96,7 @@ const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ' â†
     />
     <path :d="geometry.path" class="fill-none stroke-transparent stroke-[16px]" />
   </g>
-  <EdgeLabelRenderer v-if="!d.stage">
+  <EdgeLabelRenderer v-if="!d.fixed">
     <Badge
       variant="chip"
       class="nodrag nopan pointer-events-auto absolute border border-border bg-bg text-muted-foreground"

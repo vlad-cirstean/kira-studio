@@ -30,11 +30,10 @@ type AdeSession struct {
 	Mode            string `json:"mode"`
 	TaskID          string `json:"taskId"`
 	BranchID        string `json:"branchId"`
-	StageID         string `json:"stageId"`
 	StepID          string `json:"stepId"`
 	RunID           string `json:"runId"`
 	Resumes         string `json:"resumes"`
-	// Purpose is "" for a stage or branch session, "review" for the task's one review agent.
+	// Purpose is "" for a step or branch session, "review" for the task's one review agent.
 	Purpose string `json:"purpose"`
 }
 

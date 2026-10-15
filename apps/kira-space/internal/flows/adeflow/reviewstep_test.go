@@ -28,12 +28,12 @@ func lineRange(n int) gitreview.LineRange { return gitreview.LineRange{Start: n,
 const rvImplement = "printf 'one\\ntwo\\nthree\\n' > r.txt && git add r.txt && git commit -q -m implement"
 
 func rvStep(sendTo string) string {
-	return "      - id: review\n        name: review\n        runs_on: each repo\n        timeout: 1m\n" +
-		"        review:\n          send_to: " + sendTo + "\n" +
-		"        results:\n" +
-		"          - id: approved\n            ok: true\n" +
-		"          - id: rework\n            ok: false\n            next: implement\n            max: 2\n" +
-		"          - id: rejected\n            ok: false\n            next: stop\n"
+	return "  - id: review\n    name: review\n    kind: review\n    runs_on: each repo\n    timeout: 1m\n    max_returns: 2\n" +
+		"    review:\n      send_to: " + sendTo + "\n" +
+		"    results:\n" +
+		"      - id: approved\n        ok: true\n" +
+		"      - id: rework\n        ok: false\n        next: implement\n" +
+		"      - id: rejected\n        ok: false\n        next: stop\n"
 }
 
 func rvReply(id int64, text string) fakeagent.MCPCall {
@@ -51,8 +51,8 @@ type reviewFx struct {
 
 func newReviewFx(t *testing.T, sendTo string, actions ...fakeagent.Action) *reviewFx {
 	t.Helper()
-	stages := agentStage("build", agentStep("implement", "")+rvStep(sendTo)+agentStep("verify", ""))
-	return &reviewFx{runFixture: newRunFixture(t, actions, stages)}
+	steps := agentStep("implement", "") + rvStep(sendTo) + agentStep("verify", "")
+	return &reviewFx{runFixture: newRunFixture(t, actions, steps)}
 }
 
 // toReview starts the task and waits for the review run to wait for the user.

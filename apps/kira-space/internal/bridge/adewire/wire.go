@@ -6,17 +6,22 @@ package adewire
 
 import "github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 
-// StageKind is 'user' | 'agent' | 'script'.
-type StageKind = string
+// StepKind is 'agent' | 'script' | 'review' | 'manual'.
+type StepKind = string
+
+// Step kinds.
+const (
+	KindAgent  StepKind = "agent"
+	KindScript StepKind = "script"
+	KindReview StepKind = "review"
+	KindManual StepKind = "manual"
+)
 
 // TaskStatus is 'To do' | 'In progress' | 'In review' | 'Done'.
 type TaskStatus = string
 
 // RunsOn is 'once' | 'each repo' | `only ${string}`.
 type RunsOn = string
-
-// OnFailure is 'stop' | 'retry 1' | 'retry 2' | `back:${string}`.
-type OnFailure = string
 
 // RunState is 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'done' | 'review'.
 type RunState = string
@@ -87,7 +92,7 @@ type FolderImportResult struct {
 }
 
 // StepResult is one result a step may report through finish_step. Next is RouteNext, RouteEnd,
-// RouteStop or a step id of the same stage; Loop says the route goes back to the step or an earlier one
+// RouteStop or a step id of the workflow; Loop says the route goes back to the step or an earlier one
 // (a return, counted against the step's MaxReturns).
 type StepResult struct {
 	ID          string `json:"id"`
@@ -97,23 +102,28 @@ type StepResult struct {
 	Loop        bool   `json:"loop"`
 }
 
-type PipelineStep struct {
-	ID        string       `json:"id"`
-	Name      string       `json:"name"`
-	RunsOn    RunsOn       `json:"runsOn"`
-	Before    string       `json:"before"`    // 'auto' | 'approval'
-	OnFailure OnFailure    `json:"onFailure"` // legacy rule; "" when Results are not expressible as one
-	Results   []StepResult `json:"results"`
+// WorkflowStep is one step of a workflow. Fields of another kind than Kind hold their zero value.
+type WorkflowStep struct {
+	ID      string       `json:"id"`
+	Name    string       `json:"name"`
+	Kind    StepKind     `json:"kind"`
+	Status  TaskStatus   `json:"status"`
+	Skip    bool         `json:"skip"`
+	Session bool         `json:"session"` // manual: open a Claude Code session
+	Command string       `json:"command"` // script
+	RunsOn  RunsOn       `json:"runsOn"`  // agent, script, review
+	Before  string       `json:"before"`  // 'auto' | 'approval'
+	Results []StepResult `json:"results"`
 	// MaxReturns is how many times a result may send the run back to this step or an earlier one before
 	// the run stops; 0 is no limit (review steps only).
 	MaxReturns   int      `json:"maxReturns"`
 	Timeout      string   `json:"timeout"`
-	Prompt       string   `json:"prompt"`
+	Prompt       string   `json:"prompt"` // agent prompt; manual: first session message
 	AllowedTools []string `json:"allowedTools"`
 	// SmartScript runs the named smart script instead of Prompt; Params are its values per param name.
 	SmartScript string              `json:"smartScript"`
 	Params      map[string][]string `json:"params"`
-	// Review, when set, makes this a review step: it waits for the user instead of running an agent.
+	// Review is set on review steps: they wait for the user instead of running an agent.
 	Review *ReviewStepConfig `json:"review"`
 	// Sandbox is what the step's agent may do on the machine; always set, the default when absent.
 	Sandbox StepSandbox `json:"sandbox"`
@@ -167,50 +177,18 @@ const (
 )
 
 // ReviewStepConfig is a review step's own block. Implementer names an earlier prompt step of the
-// stage whose session takes the comments; "" = the nearest earlier one.
+// workflow whose session takes the comments; "" = the nearest earlier one.
 type ReviewStepConfig struct {
 	SendTo      string `json:"sendTo"` // ReviewSendImplementer | ReviewSendNew
 	Implementer string `json:"implementer"`
-}
-
-type Stage struct {
-	ID        string         `json:"id"`
-	Name      string         `json:"name"`
-	Kind      StageKind      `json:"kind"`
-	Status    TaskStatus     `json:"status"`
-	Skip      bool           `json:"skip"`
-	Session   bool           `json:"session"`
-	Prompt    string         `json:"prompt"`
-	Steps     []PipelineStep `json:"steps"`
-	Command   string         `json:"command"`
-	RunsOn    string         `json:"runsOn"`    // RunsOn | ''
-	OnFailure string         `json:"onFailure"` // OnFailure | ''
-	Timeout   string         `json:"timeout"`
-}
-
-// FillReturnLimits gives a step of a stored snapshot that predates MaxReturns the limit its on_failure
-// implies. A review step keeps 0 (no limit). Idempotent.
-func (s *Stage) FillReturnLimits() {
-	for i := range s.Steps {
-		if st := &s.Steps[i]; st.MaxReturns == 0 && st.Review == nil {
-			st.MaxReturns = LegacyLimit(st.OnFailure, false)
-		}
-	}
-}
-
-// FillReturnLimits fills every stage's step limits; see Stage.FillReturnLimits.
-func (w *Workflow) FillReturnLimits() {
-	for i := range w.Stages {
-		w.Stages[i].FillReturnLimits()
-	}
 }
 
 type Workflow struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	// KiraSpaceMcp turns on the Kira Space tools (declare repos, request branches) for the work of a task.
-	KiraSpaceMcp bool    `json:"kiraSpaceMcp"`
-	Stages       []Stage `json:"stages"`
+	KiraSpaceMcp bool           `json:"kiraSpaceMcp"`
+	Steps        []WorkflowStep `json:"steps"`
 }
 
 type WorkflowError struct {
@@ -327,7 +305,6 @@ type Pair struct {
 type Run struct {
 	ID         string   `json:"id"`
 	TaskID     string   `json:"taskId"`
-	StageID    string   `json:"stageId"`
 	StepID     string   `json:"stepId"`
 	BranchID   string   `json:"branchId"`
 	Attempt    int      `json:"attempt"`
@@ -411,7 +388,6 @@ type RunReview struct {
 // ReviewCandidate is an agent run that can take the review comments.
 type ReviewCandidate struct {
 	RunID      string `json:"runId"`
-	Stage      string `json:"stage"`
 	Step       string `json:"step"`
 	Attempt    int    `json:"attempt"`
 	FinishedAt *int64 `json:"finishedAt"`
@@ -458,15 +434,17 @@ type ReviewEvent struct {
 }
 
 type Task struct {
-	ID           string `json:"id"`
-	Kind         string `json:"kind"` // 'task' | 'review' | 'parked'
-	Title        string `json:"title"`
-	Owner        string `json:"owner"`
-	Jira         *Jira  `json:"jira"`
-	GithubURL    string `json:"githubUrl"`
-	WorkflowID   string `json:"workflowId"`
-	StageID      string `json:"stageId"`
-	CurrentStage *Stage `json:"currentStage"`
+	ID         string `json:"id"`
+	Kind       string `json:"kind"` // 'task' | 'review' | 'parked'
+	Title      string `json:"title"`
+	Owner      string `json:"owner"`
+	Jira       *Jira  `json:"jira"`
+	GithubURL  string `json:"githubUrl"`
+	WorkflowID string `json:"workflowId"`
+	// EntryStepID is the step the task last entered; 'done' when finished, '' without a workflow.
+	EntryStepID string `json:"entryStepId"`
+	// Since is the pass watermark: "<stepId>/<branchId>" -> attempt; runs at or below it are history.
+	Since map[string]int `json:"since"`
 	// Workflow is the version a started task runs; nil until it starts. WorkflowOutdated: the live
 	// file differs from it.
 	Workflow         *Workflow `json:"workflow"`
@@ -617,7 +595,6 @@ type Session struct {
 	TerminalID      string `json:"terminalId"`
 	TaskID          string `json:"taskId"`
 	BranchID        string `json:"branchId"`
-	StageID         string `json:"stageId"`
 	StepID          string `json:"stepId"`
 	RunID           string `json:"runId"`
 	Resumes         string `json:"resumes"`
@@ -806,15 +783,14 @@ type StartRunArgs struct {
 	TaskID      string            `json:"taskId"`
 	BranchNames map[string]string `json:"branchNames"`
 	Message     string            `json:"message"`
-	// FromStageID, when set, is the stage the caller saw; the engine refuses with ErrStale when the
+	// FromStepID, when set, is the step the caller saw; the engine refuses with ErrStale when the
 	// task has moved on. Desktop leaves it empty.
-	FromStageID string `json:"fromStageId,omitempty"`
+	FromStepID string `json:"fromStepId,omitempty"`
 }
 
 type StepArgs struct {
-	TaskID  string `json:"taskId"`
-	StageID string `json:"stageId"`
-	StepID  string `json:"stepId"`
+	TaskID string `json:"taskId"`
+	StepID string `json:"stepId"`
 }
 
 type RunArgs struct {
@@ -897,12 +873,12 @@ type TakeOverArgs struct {
 	StopIfRunning bool   `json:"stopIfRunning"`
 }
 
-type LaunchStageArgs struct {
+type LaunchStepArgs struct {
 	TaskID  string `json:"taskId"`
 	Message string `json:"message"`
-	// FromStageID, when set, is the stage the caller saw; the engine refuses with ErrStale when the
+	// FromStepID, when set, is the step the caller saw; the engine refuses with ErrStale when the
 	// task has moved on. Desktop leaves it empty.
-	FromStageID string `json:"fromStageId,omitempty"`
+	FromStepID string `json:"fromStepId,omitempty"`
 }
 
 type StartBranchArgs struct {
@@ -915,12 +891,12 @@ type SetTaskWorkflowArgs struct {
 	WorkflowID string `json:"workflowId"`
 }
 
-type SetTaskStageArgs struct {
-	TaskID  string `json:"taskId"`
-	StageID string `json:"stageId"`
-	// FromStageID, when set, is the stage the caller saw; the engine refuses with ErrStale when the
+type SetTaskStepArgs struct {
+	TaskID string `json:"taskId"`
+	StepID string `json:"stepId"`
+	// FromStepID, when set, is the step the caller saw; the engine refuses with ErrStale when the
 	// task has moved on. Desktop leaves it empty.
-	FromStageID string `json:"fromStageId,omitempty"`
+	FromStepID string `json:"fromStepId,omitempty"`
 }
 
 type SendArgs struct {

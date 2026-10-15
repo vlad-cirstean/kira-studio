@@ -33,7 +33,7 @@ func argAfter(args, flag string) string {
 
 func TestResumeAfterRestart(t *testing.T) {
 	hold := filepath.Join(t.TempDir(), "hold")
-	f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}, {Name: "done"}}, agentStage("build", agentStep("one", "")))
+	f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}, {Name: "done"}}, agentStep("one", ""))
 	stuck := f.interrupted(t, "feat/api-resume")
 	if !stuck.Resumable || stuck.Outcome == nil || stuck.Outcome.Source != "restart" {
 		t.Fatalf("run after restart = %+v, want resumable with a restart outcome", stuck)
@@ -81,7 +81,7 @@ func TestResumeAfterRestart(t *testing.T) {
 
 func TestResumeLostConversation(t *testing.T) {
 	hold := filepath.Join(t.TempDir(), "hold")
-	f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}, {Name: "lost"}, {Name: "done"}}, agentStage("build", agentStep("one", "")))
+	f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}, {Name: "lost"}, {Name: "done"}}, agentStep("one", ""))
 	stuck := f.interrupted(t, "feat/api-resume-lost")
 	if err := f.app.W.AdeTask.ResumeRun(ctx, adewire.RunArgs{RunID: stuck.ID}); err != nil {
 		t.Fatalf("ResumeRun: %v", err)
@@ -121,15 +121,15 @@ func TestResumeRefused(t *testing.T) {
 		}
 	}
 
-	t.Run("script stage", func(t *testing.T) {
-		f := newRunFixture(t, nil, scriptStage("check", "'exit 2'"))
+	t.Run("script step", func(t *testing.T) {
+		f := newRunFixture(t, nil, scriptStep("check", "'exit 2'"))
 		f.start(t, "feat/api-refuse-script")
 		refuse(t, f, waitRun(t, f.app, f.taskID, "check", "stuck", "failed"))
 	})
 
 	t.Run("stopped by you", func(t *testing.T) {
 		flag := filepath.Join(t.TempDir(), "release")
-		f := newRunFixture(t, []fakeagent.Action{{Name: "done", WaitFile: flag}}, agentStage("build", agentStep("one", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done", WaitFile: flag}}, agentStep("one", ""))
 		f.start(t, "feat/api-refuse-stop")
 		running := waitRun(t, f.app, f.taskID, "one", "running")
 		if err := f.app.W.AdeTask.StopRun(ctx, adewire.RunArgs{RunID: running.ID}); err != nil {
@@ -139,7 +139,7 @@ func TestResumeRefused(t *testing.T) {
 	})
 
 	t.Run("needs input", func(t *testing.T) {
-		f := newRunFixture(t, []fakeagent.Action{{Name: "needs_input"}}, agentStage("build", agentStep("one", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "needs_input"}}, agentStep("one", ""))
 		f.start(t, "feat/api-refuse-input")
 		refuse(t, f, waitRun(t, f.app, f.taskID, "one", "stuck", "failed"))
 	})

@@ -5,7 +5,6 @@
         "attempt": 0,
         "finishedAt": 0,
         "runId": "<masked>",
-        "stage": "build",
         "step": "implement"
       }
     ],
@@ -61,7 +60,6 @@
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
-        "stageId": "build",
         "startedAt": 0,
         "state": "done",
         "stepId": "review",
@@ -90,7 +88,6 @@
       },
       "sandbox": null,
       "sessionId": "<masked>",
-      "stageId": "build",
       "startedAt": 0,
       "state": "review",
       "stepId": "review",
@@ -106,7 +103,6 @@
         "attempt": 0,
         "finishedAt": 0,
         "runId": "<masked>",
-        "stage": "build",
         "step": "implement"
       }
     ],
@@ -164,7 +160,6 @@
       },
       "sandbox": null,
       "sessionId": "<masked>",
-      "stageId": "build",
       "startedAt": 0,
       "state": "done",
       "stepId": "review",
@@ -180,7 +175,6 @@
         "attempt": 0,
         "finishedAt": 0,
         "runId": "<masked>",
-        "stage": "build",
         "step": "implement"
       }
     ],
@@ -236,7 +230,6 @@
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
-        "stageId": "build",
         "startedAt": 0,
         "state": "done",
         "stepId": "review",
@@ -265,7 +258,6 @@
       },
       "sandbox": null,
       "sessionId": "<masked>",
-      "stageId": "build",
       "startedAt": 0,
       "state": "review",
       "stepId": "review",
@@ -281,7 +273,6 @@
         "attempt": 0,
         "finishedAt": 0,
         "runId": "<masked>",
-        "stage": "build",
         "step": "implement"
       }
     ],
@@ -334,7 +325,6 @@
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
-        "stageId": "build",
         "startedAt": 0,
         "state": "stuck",
         "stepId": "review",
@@ -363,7 +353,6 @@
       },
       "sandbox": null,
       "sessionId": "<masked>",
-      "stageId": "build",
       "startedAt": 0,
       "state": "review",
       "stepId": "review",
@@ -379,7 +368,6 @@
         "attempt": 0,
         "finishedAt": 0,
         "runId": "<masked>",
-        "stage": "build",
         "step": "implement"
       }
     ],
@@ -429,7 +417,6 @@
       },
       "sandbox": null,
       "sessionId": "<masked>",
-      "stageId": "build",
       "startedAt": 0,
       "state": "review",
       "stepId": "review",
@@ -445,7 +432,6 @@
         "attempt": 0,
         "finishedAt": 0,
         "runId": "<masked>",
-        "stage": "build",
         "step": "implement"
       }
     ],
@@ -493,7 +479,6 @@
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
-        "stageId": "build",
         "startedAt": 0,
         "state": "running",
         "stepId": "review",
@@ -522,7 +507,6 @@
       },
       "sandbox": null,
       "sessionId": "<masked>",
-      "stageId": "build",
       "startedAt": 0,
       "state": "review",
       "stepId": "review",

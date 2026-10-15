@@ -164,19 +164,22 @@ const headStyle = computed(() =>
           />
           <template v-if="p.hasWorkflow && !card.parked">
             <AdeTip :text="p.workflowTip">
-              <span class="inline-flex shrink-0 items-center gap-0.5" data-testid="ade-stage-segs">
+              <span
+                class="inline-flex w-20 shrink-0 items-center gap-0.5"
+                data-testid="ade-step-segs"
+              >
                 <span
                   v-for="seg in p.segments"
                   :key="seg.id"
-                  class="h-1.5 rounded-kira-xs"
-                  :class="[seg.wide ? 'w-3.5' : 'w-2.25', segClass(seg.state)]"
+                  class="h-1.5 flex-1 rounded-kira-xs"
+                  :class="segClass(seg.state)"
                 />
               </span>
             </AdeTip>
             <span
               class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm"
               :class="labelClass"
-              data-testid="ade-stage-label"
+              data-testid="ade-step-label"
               >{{
                 p.label
               }}</span

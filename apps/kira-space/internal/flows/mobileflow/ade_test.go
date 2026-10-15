@@ -17,20 +17,16 @@ const (
 	desktopWindow = "w-main"
 	adeFlow       = `id: flow
 name: Flow
-stages:
-  - id: build
-    name: build
+steps:
+  - id: one
+    name: one
     kind: agent
-    status: In progress
-    steps:
-      - id: one
-        name: one
-        runs_on: each repo
-        timeout: 1m
-        prompt: work on {branch} in {repo}
+    runs_on: each repo
+    timeout: 1m
+    prompt: work on {branch} in {repo}
   - id: review
     name: Review
-    kind: user
+    kind: manual
     status: In review
     session: true
 `
@@ -92,9 +88,6 @@ func newFixture(t *testing.T) *fixture {
 	f.branch = f.branchOf(t)
 	if f.branch.Worktree == "" {
 		t.Fatalf("branch has no worktree: %+v", f.branch)
-	}
-	if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {
-		t.Fatal(err)
 	}
 	app.W.Windows.Add(desktopWindow, 0, nil, func() {})
 	return f

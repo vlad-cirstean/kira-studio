@@ -13,7 +13,7 @@ import type { Branch } from '../wire';
 import AdeRunLog from './AdeRunLog.vue';
 
 // One branch's prepare-script status: where it is, how long, why it failed, its output and Retry.
-// The same block sits in the Details tab, the launch dialogs and the stage block.
+// The same block sits in the Details tab, the launch dialogs and the step block.
 const props = defineProps<{ branch: Branch; repo: string; compact?: boolean }>();
 const repos = useRepos();
 const retry = useRetrySetup();

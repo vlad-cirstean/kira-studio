@@ -77,14 +77,14 @@ const currentBase = computed(() => {
 });
 
 // The launch waits behind a prepare script: show each branch's, and why it is held or refused.
-// A stage launch covers the whole task; the other kinds cover their targets.
+// A session launch covers the whole task; the other kinds cover their targets.
 const setups = computed(() => {
   const c = dialogs.ctx;
   const v = view.value;
   const spec = dialogs.spec;
   if (!c || !v || !spec || v.isArchive) return [];
   const ids =
-    spec.kind === 'stage'
+    spec.kind === 'session'
       ? [...c.graph.byBranch.values()].filter((b) => b.taskId === spec.taskId).map((b) => b.id)
       : v.targets.map((tg) => tg.branchId);
   return ids.flatMap((id) => {

@@ -104,14 +104,10 @@ func saveWorkflow(t *testing.T, app *flowharness.App, id, yaml string) {
 	}
 }
 
-func flowYAML(id, stages string) string { return "id: " + id + "\nname: Flow\nstages:\n" + stages }
-
-func agentStage(id, steps string) string {
-	return "  - id: " + id + "\n    name: " + id + "\n    kind: agent\n    status: In progress\n    steps:\n" + steps
-}
+func flowYAML(id, steps string) string { return "id: " + id + "\nname: Flow\nsteps:\n" + steps }
 
 func agentStep(id, extra string) string {
-	return "      - id: " + id + "\n        name: " + id + "\n        runs_on: each repo\n        timeout: 1m\n        prompt: work on {branch} in {repo}\n" + extra
+	return "  - id: " + id + "\n    name: " + id + "\n    kind: agent\n    runs_on: each repo\n    timeout: 1m\n    prompt: work on {branch} in {repo}\n" + extra
 }
 
 // latestRun returns the newest run of the task's step on the repo's branch, from the board.
@@ -178,7 +174,7 @@ func mustAbs(t *testing.T, p string) string {
 	return abs
 }
 
-const userStage = "  - id: review\n    name: Review\n    kind: user\n    status: In review\n    session: true\n"
+const manualStep = "  - id: signoff\n    name: Sign off\n    kind: manual\n    status: In review\n    session: true\n"
 
 func logText(t *testing.T, app *flowharness.App, kind, id string) string {
 	t.Helper()

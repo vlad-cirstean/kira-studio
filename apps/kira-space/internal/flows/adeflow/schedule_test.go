@@ -66,7 +66,7 @@ func targeted(f *autoFixture) *scripts.Schedule {
 func TestScheduleADE(t *testing.T) {
 	t.Run("smart run in the worktree holds the claim", func(t *testing.T) {
 		clock := fakeclock.New(scheduleStart)
-		f := newAutoFixture(t, agentStep("two", "        before: approval\n"), false, flowharness.WithClock(clock))
+		f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false, flowharness.WithClock(clock))
 		fields := smartFields("audit", "Audit {branch} of {task}")
 		fields.Schedule = targeted(f)
 		rec := f.script(t, fields)
@@ -83,7 +83,7 @@ func TestScheduleADE(t *testing.T) {
 		}
 
 		// The claim holds a step launch back until the run ends.
-		step := adewire.StepArgs{TaskID: f.task, StageID: "build", StepID: "two"}
+		step := adewire.StepArgs{TaskID: f.task, StepID: "two"}
 		if err := f.app.W.AdeTask.Approve(ctx, step); err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +124,7 @@ func TestScheduleADE(t *testing.T) {
 
 	t.Run("normal script claims too", func(t *testing.T) {
 		clock := fakeclock.New(scheduleStart)
-		f := newAutoFixture(t, agentStep("two", "        before: approval\n"), false, flowharness.WithClock(clock))
+		f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false, flowharness.WithClock(clock))
 		rec := f.script(t, scripts.CustomScriptFields{
 			Name: "slow", Command: `echo "branch=$KIRA_BRANCH"; sleep 30`, UseAdeDir: true, Schedule: targeted(f),
 		})
@@ -133,7 +133,7 @@ func TestScheduleADE(t *testing.T) {
 		if run.TerminalID != "" || run.Cwd != f.apiBr.Worktree || run.Kind != "script" {
 			t.Fatalf("run = %+v, want a headless run in the worktree", run)
 		}
-		step := adewire.StepArgs{TaskID: f.task, StageID: "build", StepID: "two"}
+		step := adewire.StepArgs{TaskID: f.task, StepID: "two"}
 		if err := f.app.W.AdeTask.Approve(ctx, step); err != nil {
 			t.Fatal(err)
 		}

@@ -13,9 +13,9 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// route.go routes a finished step run on its result (R4, R5): forward, to the end of the stage, to a
+// route.go routes a finished step run on its result (R4, R5): forward, to the end of the workflow, to a
 // stop, or back to this step or an earlier one. A return (a loop) is bounded by the step's ReturnLimit,
-// counted per (task, stage, step, branch) from its `back` rows and never reset. A loop to an earlier step resumes that step's
+// counted per (task, step, branch) from its `back` rows and never reset. A loop to an earlier step resumes that step's
 // Claude session with a fix line; the chain then runs again (steps.go chainRerun).
 
 // runOpts are the per-run extras queueRun carries to launch. Launch lives on the run row until the
@@ -28,6 +28,7 @@ type runOpts struct {
 // pendingLoop is a decided loop: the step to run again on one branch.
 type pendingLoop struct {
 	tc      *taskCtx
+	entry   string // step the task re-enters at, when the loop goes before its entry step
 	plan    []stepView
 	target  int
 	branch  string
@@ -64,7 +65,7 @@ func resultFor(def stepDef, out outcome) adewire.StepResult {
 // forward or end route even on a not-ok result, `failed` for a stop or a spent loop.
 func (b *TaskBoard) decideRoute(run model.AdeRun, out outcome) (*pendingLoop, outcome) {
 	tc, err := b.loadTaskCtx(run.TaskID)
-	if err != nil || tc.stage == nil || tc.stage.ID != run.StageID {
+	if err != nil || tc.wf == nil || !tc.inPass(run) {
 		return nil, out
 	}
 	plan, err := b.plan(tc)
@@ -141,7 +142,7 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 		branchName = sb.Name
 	}
 	targetDef, from := plan[target].Def, plan[idx].Def
-	prev, ran := plan[target].Runs[run.BranchID]
+	prev, ran := b.lastRunOf(run.TaskID, targetDef.ID, run.BranchID)
 	if !ran {
 		out = stopped(out)
 		out.note = fmt.Sprintf("cannot send back: %s did not run on %s", targetDef.Name, branchName)
@@ -149,6 +150,9 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 		return nil, out
 	}
 	loop.attempt, loop.opts.Loops = prev.Attempt+1, b.nextLoops(plan, run.BranchID)
+	if target < tc.entryIndex(plan) { // a return past where the task entered: it re-enters at the target
+		loop.entry = targetDef.ID
+	}
 	loop.opts.Launch = model.AdeRunLaunch{Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}
 	line := llmprompts.AdeSendBackLine.Text(b.prompts(), llmprompts.SendBackVars{From: from.Name, Branch: branchName, Reason: reason})
 	if id := b.claudeIDOfSession(prev.SessionID); id != "" {
@@ -162,7 +166,23 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 	return loop, out
 }
 
-// nextLoops is the stage round of a loop to an earlier step on a branch: one more than any run of
+// lastRunOf is the latest attempt of a step on a branch, history included.
+func (b *TaskBoard) lastRunOf(taskID, stepID, branchID string) (model.AdeRun, bool) {
+	runs, err := b.deps.Tasks.RunsOfTask(taskID)
+	if err != nil {
+		return model.AdeRun{}, false
+	}
+	var last model.AdeRun
+	found := false
+	for _, r := range runs {
+		if r.Purpose == "" && r.StepID == stepID && r.BranchID == branchID && (!found || r.Attempt > last.Attempt) {
+			last, found = r, true
+		}
+	}
+	return last, found
+}
+
+// nextLoops is the round of a loop to an earlier step on a branch: one more than any run of
 // the branch has, so the rounds stay in order across different failing steps.
 func (b *TaskBoard) nextLoops(plan []stepView, branch string) int {
 	round := 0
@@ -181,15 +201,15 @@ func (b *TaskBoard) returnsSpent(run model.AdeRun) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return countReturns(runs, run.StageID, run.StepID, run.BranchID, math.MaxInt), nil
+	return countReturns(runs, run.StepID, run.BranchID, math.MaxInt), nil
 }
 
 // countReturns counts the `back` step runs (no review round, no rebase) of one step on one branch up to
 // and including attempt upTo.
-func countReturns(runs []model.AdeRun, stage, step, branch string, upTo int) int {
+func countReturns(runs []model.AdeRun, step, branch string, upTo int) int {
 	n := 0
 	for _, r := range runs {
-		if r.Purpose == "" && r.State == model.AdeRunBack && r.StageID == stage && r.StepID == step && r.BranchID == branch && r.Attempt <= upTo {
+		if r.Purpose == "" && r.State == model.AdeRunBack && r.StepID == step && r.BranchID == branch && r.Attempt <= upTo {
 			n++
 		}
 	}
@@ -210,6 +230,13 @@ func (b *TaskBoard) claudeIDOfSession(sessionID string) string {
 
 // queue starts the loop's run; the task mutex is held.
 func (l *pendingLoop) queue(b *TaskBoard) {
+	if l.entry != "" {
+		if err := b.deps.Tasks.SetEntryStep(l.tc.task.ID, l.entry, nil); err != nil {
+			slog.Warn("ade: re-enter at loop target", "scope", "ade", "task", l.tc.task.ID, "err", err)
+			return
+		}
+		l.tc.entry = l.entry
+	}
 	if _, err := b.queueRun(b.ctx, l.tc, l.plan, l.target, l.branch, l.attempt, "", l.opts); err != nil {
 		slog.Warn("ade: loop run", "scope", "ade", "branch", l.branch, "err", err)
 	}

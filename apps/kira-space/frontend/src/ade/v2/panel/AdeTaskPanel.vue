@@ -49,7 +49,7 @@ const reviewDisabled = computed(
 );
 const notesError = ref('');
 
-/** A finished task shows Archive as its stage action; any other task gets the quiet one. */
+/** A finished task shows Archive as its step action; any other task gets the quiet one. */
 const quietArchive = computed(
   () => props.card.task.kind !== 'review' && props.card.action?.kind !== 'archive',
 );
@@ -74,7 +74,7 @@ const facts = computed(() => {
     branches: props.card.rows.length,
     repos,
     doneSteps: p.doneSteps,
-    steps: p.steps.length,
+    steps: p.totalSteps,
   });
 });
 

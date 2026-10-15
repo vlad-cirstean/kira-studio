@@ -14,13 +14,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-const reviewStagesYAML = "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-	"      - id: implement\n        name: implement\n        runs_on: each repo\n        timeout: 3m\n" +
-	"        allowed_tools: [\"Bash(sh:*)\", \"Bash(git:*)\", \"Edit\"]\n" +
-	"        prompt: \"Run exactly one Bash command: sh -c \\\"printf 'one\\\\ntwo\\\\nthree\\\\n' > notes.txt && git add notes.txt && git commit -q -m add-notes\\\" . Then call finish_step with status done and summary ok.\"\n" +
-	"      - id: review\n        name: review\n        runs_on: each repo\n        timeout: 5m\n" +
-	"        review:\n          send_to: implementer\n" +
-	"        results:\n          - id: approved\n            ok: true\n"
+const reviewStepsYAML = "  - id: implement\n    name: implement\n    kind: agent\n    runs_on: each repo\n    timeout: 3m\n" +
+	"    allowed_tools: [\"Bash(sh:*)\", \"Bash(git:*)\", \"Edit\"]\n" +
+	"    prompt: \"Run exactly one Bash command: sh -c \\\"printf 'one\\\\ntwo\\\\nthree\\\\n' > notes.txt && git add notes.txt && git commit -q -m add-notes\\\" . Then call finish_step with status done and summary ok.\"\n" +
+	"  - id: review\n    name: review\n    kind: review\n    runs_on: each repo\n    timeout: 5m\n" +
+	"    review:\n      send_to: implementer\n" +
+	"    results:\n      - id: approved\n        ok: true\n"
 
 type reviewRig struct {
 	*adeFixture
@@ -36,7 +35,7 @@ type reviewRig struct {
 func startReview(t *testing.T) *reviewRig {
 	t.Helper()
 	f := newAdeFixture(t, nil)
-	f.saveWorkflow(t, "flow", reviewStagesYAML)
+	f.saveWorkflow(t, "flow", reviewStepsYAML)
 	task := f.createTask(t, "flow")
 	b, err := f.W.AdeTask.Board(ctx)
 	if err != nil {

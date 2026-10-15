@@ -26,7 +26,6 @@
       "last": ""
     },
     "sessionId": "<masked>",
-    "stageId": "build",
     "startedAt": 0,
     "state": "failed",
     "stepId": "one",

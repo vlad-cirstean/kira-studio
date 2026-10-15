@@ -28,7 +28,7 @@ func listPrompt(t *testing.T, f *runFixture, id llmprompts.ID) llmprompts.Prompt
 
 // An edited finish instruction reaches the next run's prompt with no restart.
 func TestRunUsesEditedFinishInstruction(t *testing.T) {
-	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStage("build", agentStep("one", ""))+userStage)
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("one", "")+manualStep)
 	const id = llmprompts.ID("headless.finishStep.suffix")
 	cur := listPrompt(t, f, id)
 	if _, err := f.app.W.LlmPromptsSvc.Save(llmprompts.SaveArgs{Changes: []llmprompts.Change{{ID: id, Text: finishOverride, BaseHash: cur.Hash}}}); err != nil {
@@ -49,7 +49,7 @@ func TestRunUsesEditedFinishInstruction(t *testing.T) {
 
 // The Run dialog renders its message and finish suffix through Preview.
 func TestRunDialogPreview(t *testing.T) {
-	f := newRunFixture(t, nil, agentStage("build", agentStep("one", ""))+userStage)
+	f := newRunFixture(t, nil, agentStep("one", "")+manualStep)
 	finish := map[string]any{
 		"implicit": true,
 		"results":  []map[string]any{{"id": "done", "description": "", "ok": true}, {"id": "failed", "description": "", "ok": false}},

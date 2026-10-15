@@ -49,12 +49,12 @@ func (e *engine) claudeID(r model.AdeRun) string {
 
 func TestRunEngine_sendBack(t *testing.T) {
 	impl := agentStep("impl", "")
-	tests := agentStep("tests", "        on_failure: back:impl\n")
+	tests := agentStep("tests", backTo("impl"))
 
 	t.Run("round trip resumes the same Claude session", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"done", "failed", "done", "done"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", impl+tests)))
+		e.workflow(flowYAML(impl + tests))
 		id := e.task("api")
 		e.start(id)
 		final := e.waitRun(id, "tests/api", model.AdeRunDone)
@@ -94,14 +94,14 @@ func TestRunEngine_sendBack(t *testing.T) {
 	t.Run("three rounds then failed", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"done", "failed", "done", "failed", "done", "failed", "done", "failed"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", impl+tests)))
+		e.workflow(flowYAML(impl + tests))
 		id := e.task("api")
 		e.start(id)
 		r := e.waitRun(id, "tests/api", model.AdeRunFailed)
 		if r.Attempt != 4 || r.Note != "Stopped: tests reached its limit of 3 returns." {
 			t.Fatalf("capped tests run = %+v", r)
 		}
-		if n, _ := e.repos.AdeTasks.CountRuns(id, "build", "tests", r.BranchID, model.AdeRunBack); n != 3 {
+		if n, _ := e.repos.AdeTasks.CountRuns(id, "tests", r.BranchID, model.AdeRunBack); n != 3 {
 			t.Fatalf("back runs = %d, want 3", n)
 		}
 		time.Sleep(300 * time.Millisecond)
@@ -113,8 +113,8 @@ func TestRunEngine_sendBack(t *testing.T) {
 	t.Run("steps between the target and the failer rerun", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"done", "done", "failed", "done", "done", "done"}})
 		e.repo("api")
-		ci := agentStep("ci", "        on_failure: back:impl\n")
-		e.workflow(flowYAML(agentStage("build", impl+agentStep("tests", "")+ci)))
+		ci := agentStep("ci", backTo("impl"))
+		e.workflow(flowYAML(impl + agentStep("tests", "") + ci))
 		id := e.task("api")
 		e.start(id)
 		e.waitRun(id, "ci/api", model.AdeRunDone)
@@ -131,7 +131,7 @@ func TestRunEngine_sendBack(t *testing.T) {
 		e.repo("api")
 		e.repo("web")
 		webOnly := strings.Replace(impl, "each repo", "only web", 1)
-		e.workflow(flowYAML(agentStage("build", webOnly+tests)))
+		e.workflow(flowYAML(webOnly + tests))
 		id := e.task("api", "web")
 		e.start(id)
 		r := e.waitRun(id, "tests/api", model.AdeRunFailed)
@@ -145,7 +145,7 @@ func TestRunEngine_stopRun(t *testing.T) {
 	t.Run("running run becomes stuck and nothing advances", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"sleep"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", agentStep("first", "")+agentStep("second", ""))))
+		e.workflow(flowYAML(agentStep("first", "") + agentStep("second", "")))
 		id := e.task("api")
 		e.start(id)
 		run := e.waitRun(id, "first/api", model.AdeRunRunning)
@@ -169,7 +169,7 @@ func TestRunEngine_stopRun(t *testing.T) {
 		e.repo("api")
 		gate := filepath.Join(t.TempDir(), "gate")
 		e.prepare("api", "while [ ! -f "+gate+" ]; do sleep 0.05; done")
-		e.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+		e.workflow(flowYAML(agentStep("first", "")))
 		id := e.task("api")
 		e.start(id)
 		run := e.runs(id)["first/api"]
@@ -197,7 +197,7 @@ func TestRunEngine_stopRun(t *testing.T) {
 func TestRunEngine_recover(t *testing.T) {
 	e := newEngine(t, nil)
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", "")+agentStep("second", ""))))
+	e.workflow(flowYAML(agentStep("first", "") + agentStep("second", "")))
 	id := e.task("api")
 	branch := branchOf(t, e, id, "api")
 	now := time.Now().UnixMilli()
@@ -206,8 +206,8 @@ func TestRunEngine_recover(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	seed(model.AdeRun{ID: "r-running", TaskID: id, StageID: "build", StepID: "first", BranchID: branch, Attempt: 1, State: model.AdeRunRunning, StartedAt: &now})
-	seed(model.AdeRun{ID: "r-pending", TaskID: id, StageID: "build", StepID: "second", BranchID: branch, Attempt: 1, State: model.AdeRunPending, Note: noteWaitingSetup})
+	seed(model.AdeRun{ID: "r-running", TaskID: id, StepID: "first", BranchID: branch, Attempt: 1, State: model.AdeRunRunning, StartedAt: &now})
+	seed(model.AdeRun{ID: "r-pending", TaskID: id, StepID: "second", BranchID: branch, Attempt: 1, State: model.AdeRunPending, Note: noteWaitingSetup})
 	if err := e.repos.AdeTasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: branch, State: model.AdeSetupRunning, StartedAt: now}); err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestRunEngine_recover(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := e.repos.AdeSessions.InsertHeadless(model.AdeSession{
-		ID: "s-head", Mode: model.AdeSessionModeHeadless, TaskID: id, BranchID: branch, StageID: "build", StepID: "first",
+		ID: "s-head", Mode: model.AdeSessionModeHeadless, TaskID: id, BranchID: branch, StepID: "first",
 		RunID: "r-running", ClaudeSessionID: "c1", Cwd: "/x", State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -264,7 +264,7 @@ func TestRunEngine_recoverHeldFixRun(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, map[string][]string{"*": {"sleep", "done", "done"}})
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("impl", "")+agentStep("tests", "        on_failure: back:impl\n"))))
+	e.workflow(flowYAML(agentStep("impl", "") + agentStep("tests", backTo("impl"))))
 	id := e.task("api")
 	e.start(id)
 	first := e.waitRun(id, "impl/api", model.AdeRunRunning)
@@ -280,10 +280,10 @@ func TestRunEngine_recoverHeldFixRun(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	seed(model.AdeRun{ID: "r-tests1", TaskID: id, StageID: "build", StepID: "tests", BranchID: branch, Attempt: 1,
+	seed(model.AdeRun{ID: "r-tests1", TaskID: id, StepID: "tests", BranchID: branch, Attempt: 1,
 		State: model.AdeRunBack, Note: "x → back to impl (1 of 3)", StartedAt: &now, FinishedAt: &now})
 	spec := model.AdeRunLaunch{Note: "sent back by tests: x", ResumeID: claudeID, Prompt: "tests failed on feat/fix-login: x. Fix the implementation."}
-	seed(model.AdeRun{ID: "r-fix", TaskID: id, StageID: "build", StepID: "impl", BranchID: branch, Attempt: 2,
+	seed(model.AdeRun{ID: "r-fix", TaskID: id, StepID: "impl", BranchID: branch, Attempt: 2,
 		State: model.AdeRunPending, Loops: 1, Note: noteWaitingSetup, Launch: spec})
 	if err := e.repos.AdeTasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: branch, State: model.AdeSetupRunning, StartedAt: now}); err != nil {
 		t.Fatal(err)
@@ -349,7 +349,7 @@ func TestRunEngine_takeOver(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, map[string][]string{"*": {"sleep", "done"}})
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", "")+agentStep("second", ""))))
+	e.workflow(flowYAML(agentStep("first", "") + agentStep("second", "")))
 	id := e.task("api")
 	e.start(id)
 	run := e.waitRun(id, "first/api", model.AdeRunRunning)
@@ -407,16 +407,16 @@ func TestRunEngine_takeOver(t *testing.T) {
 	waitUntil(t, "mcp config released", func() bool { _, err := os.Stat(cfg); return os.IsNotExist(err) })
 }
 
-const userSessionStage = "  - id: spec\n    name: Spec\n    kind: user\n    status: To do\n    session: true\n    prompt: Write the spec for {task}\n"
+const manualSessionStep = "  - id: spec\n    name: Spec\n    kind: manual\n    status: To do\n    session: true\n    prompt: Write the spec for {task}\n"
 
-func TestRunEngine_launchStage(t *testing.T) {
+func TestRunEngine_launchStep(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, nil)
 	e.repo("api")
-	e.workflow(flowYAML(userSessionStage + agentStage("build", agentStep("one", ""))))
+	e.workflow(flowYAML(manualSessionStep + agentStep("one", "")))
 	id := e.task("api")
 
-	l, err := e.board.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: id})
+	l, err := e.board.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: id})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,11 +428,11 @@ func TestRunEngine_launchStage(t *testing.T) {
 	if !strings.HasSuffix(composed, want) {
 		t.Fatalf("command = %q\nwant suffix %q", composed, want)
 	}
-	if _, err := e.board.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: id}); err == nil || !strings.Contains(err.Error(), "Spec session is already running") {
-		t.Fatalf("second LaunchStage: %v", err)
+	if _, err := e.board.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: id}); err == nil || !strings.Contains(err.Error(), "Spec session is already running") {
+		t.Fatalf("second LaunchStep: %v", err)
 	}
-	if _, err := e.board.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: "nope"}); err == nil {
-		t.Fatal("LaunchStage accepted an unknown task")
+	if _, err := e.board.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: "nope"}); err == nil {
+		t.Fatal("LaunchStep accepted an unknown task")
 	}
 }
 
@@ -441,7 +441,7 @@ func TestRunEngine_startBranch(t *testing.T) {
 	t.Run("default message, one session per branch", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"done"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", agentStep("one", ""))))
+		e.workflow(flowYAML(agentStep("one", "")))
 		id := e.task("api")
 		if _, err := e.board.StartBranch(ctx, adewire.StartBranchArgs{BranchID: branchOf(t, e, id, "api")}); err == nil || !strings.Contains(err.Error(), "not created") {
 			t.Fatalf("uncreated branch: %v", err)
@@ -463,7 +463,7 @@ func TestRunEngine_startBranch(t *testing.T) {
 	t.Run("a running background run blocks it", func(t *testing.T) {
 		e := newEngine(t, map[string][]string{"*": {"sleep"}})
 		e.repo("api")
-		e.workflow(flowYAML(agentStage("build", agentStep("one", ""))))
+		e.workflow(flowYAML(agentStep("one", "")))
 		id := e.task("api")
 		e.start(id)
 		e.waitRun(id, "one/api", model.AdeRunRunning)
@@ -476,7 +476,7 @@ func TestRunEngine_startBranch(t *testing.T) {
 		e.repo("api")
 		gate := filepath.Join(t.TempDir(), "gate")
 		e.prepare("api", "while [ ! -f "+gate+" ]; do sleep 0.05; done")
-		e.workflow(flowYAML(agentStage("build", agentStep("one", ""))))
+		e.workflow(flowYAML(agentStep("one", "")))
 		id := e.task("api")
 		e.start(id)
 		_, err := e.board.StartBranch(ctx, adewire.StartBranchArgs{BranchID: branchOf(t, e, id, "api")})
@@ -491,7 +491,7 @@ func TestRunEngine_archive(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, map[string][]string{"*": {"sleep"}})
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("one", ""))))
+	e.workflow(flowYAML(agentStep("one", "")))
 	id := e.task("api")
 	run := (func() model.AdeRun { e.start(id); return e.waitRun(id, "one/api", model.AdeRunRunning) })()
 	head, _ := e.repos.AdeSessions.Get(run.SessionID)
@@ -599,7 +599,7 @@ func TestRunEngine_takeOverConcurrentOpensOnce(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, map[string][]string{"*": {"sleep", "done"}})
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("first", "")+agentStep("second", ""))))
+	e.workflow(flowYAML(agentStep("first", "") + agentStep("second", "")))
 	id := e.task("api")
 	e.start(id)
 	run := e.waitRun(id, "first/api", model.AdeRunRunning)
@@ -629,7 +629,7 @@ func TestRunEngine_startBranchReleasesRunHeldForMissingWorktree(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
-	e.workflow(flowYAML(agentStage("build", agentStep("one", "")+agentStep("two", "        before: approval\n"))))
+	e.workflow(flowYAML(agentStep("one", "") + agentStep("two", "    before: approval\n")))
 	id := e.task("api")
 	e.start(id)
 	e.waitRun(id, "one/api", model.AdeRunDone)
@@ -642,7 +642,7 @@ func TestRunEngine_startBranchReleasesRunHeldForMissingWorktree(t *testing.T) {
 		t.Fatalf("worktree = %q, %v", wt, err)
 	}
 	runGitQueue(t, e.code["api"].Root, "worktree", "remove", "--force", wt)
-	if err := e.board.Approve(ctx, adewire.StepArgs{TaskID: id, StageID: "build", StepID: "two"}); err != nil {
+	if err := e.board.Approve(ctx, adewire.StepArgs{TaskID: id, StepID: "two"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := e.runs(id)["two/api"]; got.State != model.AdeRunPending || got.Note != noteWorktreeGone {

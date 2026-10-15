@@ -59,7 +59,7 @@ type TaskInfo struct {
 	Title      string           `json:"title"`
 	JiraKey    string           `json:"jiraKey"`
 	Workflow   string           `json:"workflow"`
-	Stage      string           `json:"stage"`
+	Step       string           `json:"step"`
 	Repos      []TaskRepo       `json:"repos"`
 	Registered []RegisteredRepo `json:"registered"`
 }

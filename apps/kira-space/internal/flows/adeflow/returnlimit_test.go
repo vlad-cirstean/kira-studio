@@ -18,11 +18,11 @@ const rlScenario = "ade-return-limit"
 
 // testStep fails back to impl; maxReturns <= 0 leaves max_returns unset (the default).
 func testStep(maxReturns string) string {
-	extra := "        results:\n" +
-		"          - id: passed\n            ok: true\n" +
-		"          - id: failed\n            ok: false\n            next: impl\n"
+	extra := "    results:\n" +
+		"      - id: passed\n        ok: true\n" +
+		"      - id: failed\n        ok: false\n        next: impl\n"
 	if maxReturns != "" {
-		extra += "        max_returns: " + maxReturns + "\n"
+		extra += "    max_returns: " + maxReturns + "\n"
 	}
 	return agentStep("test", extra)
 }
@@ -54,7 +54,7 @@ func waitBacks(t *testing.T, f *runFixture, stepID string, n int) []adewire.Run 
 func TestReturnLimit(t *testing.T) {
 	t.Run("a step stops at its limit with the catalog message", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:failed", "done", "result:failed", "done", "result:failed"),
-			agentStage("build", agentStep("impl", "")+testStep("2"))+userStage)
+			agentStep("impl", "")+testStep("2")+manualStep)
 		f.start(t, "feat/api-limit")
 		stopped := waitRun(t, f.app, f.taskID, "test", "failed")
 		runs := stepRuns(t, f, "test")
@@ -80,7 +80,7 @@ func TestReturnLimit(t *testing.T) {
 		f := newRunFixture(t, []fakeagent.Action{
 			{Name: "done"}, {Name: "result:failed"}, {WaitFile: hold}, {Name: "done"},
 			{Name: "result:failed"}, {Name: "done"}, {Name: "result:failed"},
-		}, agentStage("build", agentStep("impl", "")+testStep("2"))+userStage)
+		}, agentStep("impl", "")+testStep("2")+manualStep)
 		f.start(t, "feat/api-limit-resume")
 		waitBacks(t, f, "test", 1)
 		testx.WaitUntil(t, waitFor, func() bool { _, err := os.Stat(filepath.Join(f.app.FakeDir, "api-3.args")); return err == nil })
@@ -104,7 +104,7 @@ func TestReturnLimit(t *testing.T) {
 
 	t.Run("a step without max_returns stops after 3", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:failed", "done", "result:failed", "done", "result:failed", "done", "result:failed"),
-			agentStage("build", agentStep("impl", "")+testStep(""))+userStage)
+			agentStep("impl", "")+testStep("")+manualStep)
 		f.start(t, "feat/api-limit-default")
 		stopped := waitRun(t, f.app, f.taskID, "test", "failed")
 		if stopped.Note != "Stopped: test reached its limit of 3 returns." {
@@ -113,16 +113,16 @@ func TestReturnLimit(t *testing.T) {
 	})
 
 	t.Run("a review step has no limit by default", func(t *testing.T) {
-		const review = "      - id: review\n        name: review\n        runs_on: each repo\n        timeout: 1m\n" +
-			"        review:\n          send_to: implementer\n" +
-			"        results:\n" +
-			"          - id: approved\n            ok: true\n" +
-			"          - id: rework\n            ok: false\n            next: implement\n"
+		const review = "  - id: review\n    name: review\n    kind: review\n    runs_on: each repo\n    timeout: 1m\n" +
+			"    review:\n      send_to: implementer\n" +
+			"    results:\n" +
+			"      - id: approved\n        ok: true\n" +
+			"      - id: rework\n        ok: false\n        next: implement\n"
 		script := []fakeagent.Action{{Name: "done", Sh: rvImplement}}
 		for range 4 {
 			script = append(script, fakeagent.Action{Name: "done"})
 		}
-		f := &reviewFx{runFixture: newRunFixture(t, script, agentStage("build", agentStep("implement", "")+review)+userStage)}
+		f := &reviewFx{runFixture: newRunFixture(t, script, agentStep("implement", "")+review+manualStep)}
 		f.toReview(t, "feat/api-limit-review")
 		for round := 1; round <= 4; round++ {
 			if err := f.finish("rework", "again"); err != nil {
@@ -148,8 +148,8 @@ func TestReturnLimit(t *testing.T) {
 	})
 
 	t.Run("max_returns round trips through the bound methods", func(t *testing.T) {
-		const review = "      - id: gate\n        name: Gate\n        runs_on: each repo\n        timeout: 1m\n        review:\n          send_to: new\n"
-		f := newRunFixture(t, acts("done"), agentStage("build", agentStep("impl", "")+review))
+		const review = "  - id: gate\n    name: Gate\n    kind: review\n    runs_on: each repo\n    timeout: 1m\n    review:\n      send_to: new\n"
+		f := newRunFixture(t, acts("done"), agentStep("impl", "")+review)
 		list, err := f.app.W.AdeTask.Workflows(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -161,11 +161,11 @@ func TestReturnLimit(t *testing.T) {
 			}
 		}
 		wf := *entry.Workflow
-		steps := wf.Stages[0].Steps
+		steps := wf.Steps
 		if steps[0].MaxReturns != 3 || steps[1].MaxReturns != 0 {
 			t.Fatalf("defaults = %d (agent), %d (review), want 3 and 0", steps[0].MaxReturns, steps[1].MaxReturns)
 		}
-		wf.Stages[0].Steps[0].MaxReturns = 5
+		wf.Steps[0].MaxReturns = 5
 		args := adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf, BaseHash: entry.Hash}
 		saved, err := f.app.W.AdeTask.SaveWorkflow(ctx, args)
 		if err != nil || saved.Error != nil {

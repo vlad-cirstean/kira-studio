@@ -69,9 +69,9 @@ func checkEstExtends(old, next string) error {
 	return nil
 }
 
-const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
+const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
-const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
+const adeRunColumns = `id, task_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
 // last-valid workflows.
@@ -97,13 +97,13 @@ func nullIntPtr(n sql.NullInt64) *int {
 
 func scanAdeTask(row rowScanner) (model.AdeTask, error) {
 	var t model.AdeTask
-	var stage, workflow sql.NullString
+	var since, workflow sql.NullString
 	var archived sql.NullInt64
 	if err := row.Scan(&t.ID, &t.Kind, &t.Title, &t.Owner, &t.JiraKey, &t.JiraURL, &t.GithubURL, &t.WorkflowID,
-		&t.StageID, &stage, &workflow, &t.WorkflowHash, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived); err != nil {
+		&t.EntryStepID, &since, &workflow, &t.WorkflowHash, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived); err != nil {
 		return model.AdeTask{}, err
 	}
-	t.CurrentStageJSON = stage.String
+	t.SinceJSON = since.String
 	t.WorkflowJSON = workflow.String
 	t.ArchivedAt = nullInt64Ptr(archived)
 	return t, nil
@@ -146,7 +146,7 @@ func (r *AdeTaskRepo) queryTasks(query string, args ...any) ([]model.AdeTask, er
 // ListLive returns non-archived tasks in plan order (a task with no plan row sorts last).
 func (r *AdeTaskRepo) ListLive() ([]model.AdeTask, error) {
 	return r.queryTasks(`SELECT t.id, t.kind, t.title, t.owner, t.jira_key, t.jira_url, t.github_url, t.workflow_id,
-		t.stage_id, t.current_stage_json, t.workflow_json, t.workflow_hash, t.est, t.notes, t.color, t.created_at, t.archived_at
+		t.entry_step_id, t.since_json, t.workflow_json, t.workflow_hash, t.est, t.notes, t.color, t.created_at, t.archived_at
 		FROM ade_tasks t LEFT JOIN ade_task_plan p ON p.task_id = t.id
 		WHERE t.archived_at IS NULL ORDER BY p.position IS NULL, p.position, t.created_at, t.id`)
 }
@@ -199,12 +199,12 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (mo
 	rows.Close()
 	t.Color = pickColorSlot(visible, count)
 
-	var stage any
-	if t.CurrentStageJSON != "" {
-		stage = t.CurrentStageJSON
+	var since any
+	if t.SinceJSON != "" {
+		since = t.SinceJSON
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, est, notes, color, created_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-		t.ID, t.Kind, t.Title, t.Owner, t.JiraKey, t.JiraURL, t.GithubURL, t.WorkflowID, t.StageID, stage, t.Est,
+	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, entry_step_id, since_json, est, notes, color, created_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		t.ID, t.Kind, t.Title, t.Owner, t.JiraKey, t.JiraURL, t.GithubURL, t.WorkflowID, t.EntryStepID, since, t.Est,
 		t.Notes, t.Color, t.CreatedAt); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task %s: %w", t.ID, err)
 	}
@@ -692,26 +692,29 @@ func (r *AdeTaskRepo) SetBranchOrigin(id, origin string) error {
 	return nil
 }
 
-// SetStage moves the task to a stage and stores its snapshot ("" JSON stores NULL).
-func (r *AdeTaskRepo) SetStage(taskID, stageID, stageJSON string) error {
-	var stage any
-	if stageJSON != "" {
-		stage = stageJSON
+// SetEntryStep sets the step the task last entered ("done" when finished). since, when not nil, replaces the
+// pass watermark ({"<stepId>/<branchId>": attempt}); nil keeps it.
+func (r *AdeTaskRepo) SetEntryStep(taskID, stepID string, since map[string]int) error {
+	var res sql.Result
+	var err error
+	if since == nil {
+		res, err = r.DB.Exec(`UPDATE ade_tasks SET entry_step_id = ? WHERE id = ?`, stepID, taskID)
+	} else {
+		var js []byte
+		if js, err = json.Marshal(since); err != nil {
+			return fmt.Errorf("repos: encode ade task since %s: %w", taskID, err)
+		}
+		res, err = r.DB.Exec(`UPDATE ade_tasks SET entry_step_id = ?, since_json = ? WHERE id = ?`, stepID, string(js), taskID)
 	}
-	res, err := r.DB.Exec(`UPDATE ade_tasks SET stage_id = ?, current_stage_json = ? WHERE id = ?`, stageID, stage, taskID)
 	if err != nil {
-		return fmt.Errorf("repos: set ade task stage %s: %w", taskID, err)
+		return fmt.Errorf("repos: set ade task entry step %s: %w", taskID, err)
 	}
 	return sqlitex.RequireOneRow(res, "ade task "+taskID)
 }
 
 // ResetWorkflow switches the task's workflow and restarts it: the task's runs and run logs are
-// deleted and the stage is set in one transaction ("" stageJSON stores NULL).
-func (r *AdeTaskRepo) ResetWorkflow(taskID, workflowID, stageID, stageJSON string) error {
-	var stage any
-	if stageJSON != "" {
-		stage = stageJSON
-	}
+// deleted and the entry step is set in one transaction.
+func (r *AdeTaskRepo) ResetWorkflow(taskID, workflowID, entryStepID string) error {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("repos: begin reset ade task workflow %s: %w", taskID, err)
@@ -727,8 +730,8 @@ func (r *AdeTaskRepo) ResetWorkflow(taskID, workflowID, stageID, stageJSON strin
 	if _, err := tx.Exec(`DELETE FROM ade_runs WHERE task_id = ?`, taskID); err != nil {
 		return fmt.Errorf("repos: delete ade runs %s: %w", taskID, err)
 	}
-	res, err := tx.Exec(`UPDATE ade_tasks SET workflow_id = ?, stage_id = ?, current_stage_json = ?, workflow_json = NULL, workflow_hash = '' WHERE id = ?`,
-		workflowID, stageID, stage, taskID)
+	res, err := tx.Exec(`UPDATE ade_tasks SET workflow_id = ?, entry_step_id = ?, since_json = NULL, workflow_json = NULL, workflow_hash = '' WHERE id = ?`,
+		workflowID, entryStepID, taskID)
 	if err != nil {
 		return fmt.Errorf("repos: reset ade task workflow %s: %w", taskID, err)
 	}
@@ -760,20 +763,11 @@ func (r *AdeTaskRepo) SetWorkflowSnapshot(taskID, workflowJSON, hash string) err
 	return nil
 }
 
-// SetSnapshot rewrites only the stage snapshot, keeping the stage id.
-func (r *AdeTaskRepo) SetSnapshot(taskID, stageJSON string) error {
-	res, err := r.DB.Exec(`UPDATE ade_tasks SET current_stage_json = ? WHERE id = ?`, stageJSON, taskID)
-	if err != nil {
-		return fmt.Errorf("repos: set ade task snapshot %s: %w", taskID, err)
-	}
-	return sqlitex.RequireOneRow(res, "ade task "+taskID)
-}
-
 func scanAdeRun(row rowScanner) (model.AdeRun, error) {
 	var run model.AdeRun
 	var exit, started, finished sql.NullInt64
 	var outcome string
-	if err := row.Scan(&run.ID, &run.TaskID, &run.StageID, &run.StepID, &run.BranchID, &run.Attempt, &run.State,
+	if err := row.Scan(&run.ID, &run.TaskID, &run.StepID, &run.BranchID, &run.Attempt, &run.State,
 		&run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished, &outcome, &run.Purpose, &run.SpecJSON,
 		&run.Launch.Note, &run.Launch.ResumeID, &run.Launch.Prompt, &run.Launch.Extra); err != nil {
 		return model.AdeRun{}, err
@@ -810,8 +804,8 @@ func (r *AdeTaskRepo) InsertRun(run model.AdeRun) error {
 	if err != nil {
 		return err
 	}
-	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		run.ID, run.TaskID, run.StageID, run.StepID, run.BranchID, run.Attempt, run.State,
+	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		run.ID, run.TaskID, run.StepID, run.BranchID, run.Attempt, run.State,
 		run.Loops, run.Note, run.Summary, run.SessionID, run.ExitCode, run.StartedAt, run.FinishedAt, outcome, run.Purpose, run.SpecJSON,
 		run.Launch.Note, run.Launch.ResumeID, run.Launch.Prompt, run.Launch.Extra); err != nil {
 		return fmt.Errorf("repos: insert ade run %s: %w", run.ID, err)
@@ -892,10 +886,10 @@ func (r *AdeTaskRepo) GetRun(id string) (model.AdeRun, error) {
 	return run, nil
 }
 
-// LatestRuns returns the latest attempt of every (stage, step, branch) of one task.
+// LatestRuns returns the latest attempt of every (step, branch, purpose) of one task.
 func (r *AdeTaskRepo) LatestRuns(taskID string) ([]model.AdeRun, error) {
 	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs a WHERE task_id = ? AND attempt = (
-		SELECT MAX(attempt) FROM ade_runs b WHERE b.task_id = a.task_id AND b.stage_id = a.stage_id
+		SELECT MAX(attempt) FROM ade_runs b WHERE b.task_id = a.task_id
 		AND b.step_id = a.step_id AND b.branch_id = a.branch_id AND b.purpose = a.purpose) ORDER BY COALESCE(started_at, 0), id`, taskID)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
 		run, err := scanAdeRun(rows)
@@ -1086,10 +1080,10 @@ func (r *AdeTaskRepo) FailRunningSetups(now int64, note string) ([]model.AdeTask
 }
 
 // CountRuns counts a step's runs on one branch in the given state, across attempts.
-func (r *AdeTaskRepo) CountRuns(taskID, stageID, stepID, branchID, state string) (int, error) {
+func (r *AdeTaskRepo) CountRuns(taskID, stepID, branchID, state string) (int, error) {
 	var n int
-	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE task_id = ? AND stage_id = ? AND step_id = ? AND branch_id = ? AND state = ?`,
-		taskID, stageID, stepID, branchID, state).Scan(&n); err != nil {
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE task_id = ? AND step_id = ? AND branch_id = ? AND state = ?`,
+		taskID, stepID, branchID, state).Scan(&n); err != nil {
 		return 0, fmt.Errorf("repos: count ade runs %s: %w", taskID, err)
 	}
 	return n, nil

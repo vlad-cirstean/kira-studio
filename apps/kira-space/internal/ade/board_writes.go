@@ -2,7 +2,6 @@ package ade
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,15 +24,6 @@ var ErrInvalidInput = errors.New("ade: invalid input")
 // ErrStale marks a write built from a board the caller saw before the task moved on; the bridge
 // maps it to E_CONFLICT.
 var ErrStale = errors.New("ade: task moved on")
-
-// staleStage refuses when the caller named the stage it saw and the task is elsewhere now. Called
-// under the task's lock, so no move can slip in between the check and the write.
-func staleStage(tc *taskCtx, from string) error {
-	if from != "" && tc.task.StageID != from {
-		return fmt.Errorf("%w: the task is now at another stage", ErrStale)
-	}
-	return nil
-}
 
 func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidInput, fmt.Sprintf(format, args...))
@@ -68,22 +58,17 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 		return adewire.Task{}, err
 	}
 	out := toWireTask(t, ids, runs, reviews)
-	decorateTask(&out, t, b.liveHasher())
+	decorateTask(&out, t, b.liveWorkflows())
 	b.badgeTasks([]adewire.Task{out})
 	return out, nil
 }
 
-// stageSnapshot is the JSON of a workflow's first runnable stage, the task's currentStage on creation.
-func stageSnapshot(wf adewire.Workflow) (stageID, stageJSON string, err error) {
-	first, ok := firstRunnable(wf)
-	if !ok {
-		return "", "", nil
+// firstStepID is the id of the step a workflow's new task enters, "" when every step is skipped.
+func firstStepID(wf adewire.Workflow) string {
+	if i, ok := firstStep(wf); ok {
+		return wf.Steps[i].ID
 	}
-	raw, err := json.Marshal(first)
-	if err != nil {
-		return "", "", err
-	}
-	return first.ID, string(raw), nil
+	return ""
 }
 
 func (b *TaskBoard) requireRepos(ids []string) error {
@@ -152,11 +137,7 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 		if !ok {
 			return adewire.Task{}, invalid("workflow %q not found", args.WorkflowID)
 		}
-		var err error
-		task.WorkflowID = wf.ID
-		if task.StageID, task.CurrentStageJSON, err = stageSnapshot(wf); err != nil {
-			return adewire.Task{}, err
-		}
+		task.WorkflowID, task.EntryStepID = wf.ID, firstStepID(wf)
 	}
 	for id := range args.Bases {
 		if !slices.Contains(args.CodeRepoIDs, id) {

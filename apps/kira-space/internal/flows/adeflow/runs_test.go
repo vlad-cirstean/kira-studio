@@ -21,18 +21,18 @@ type runFixture struct {
 	taskID string
 }
 
-func newRunFixture(t *testing.T, actions []fakeagent.Action, stages string) *runFixture {
+func newRunFixture(t *testing.T, actions []fakeagent.Action, steps string) *runFixture {
 	t.Helper()
-	return newRunFixtureWith(t, actions, stages)
+	return newRunFixtureWith(t, actions, steps)
 }
 
-func newRunFixtureWith(t *testing.T, actions []fakeagent.Action, stages string, opts ...flowharness.Opt) *runFixture {
+func newRunFixtureWith(t *testing.T, actions []fakeagent.Action, steps string, opts ...flowharness.Opt) *runFixture {
 	t.Helper()
 	app := flowharness.New(t, opts...)
 	claude(app, map[string][]fakeagent.Action{"*": actions})
 	repo, bare := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	rec := importRepo(t, app, repo.Dir)
-	saveWorkflow(t, app, "flow", flowYAML("flow", stages))
+	saveWorkflow(t, app, "flow", flowYAML("flow", steps))
 	task := createTask(t, app, "Fix login", "flow", rec.ID)
 	return &runFixture{app: app, repo: repo, bare: bare, repoID: rec.ID, taskID: task.ID}
 }
@@ -48,13 +48,13 @@ func (f *runFixture) start(t *testing.T, branch string) []string {
 }
 
 func TestRunLifecycle(t *testing.T) {
-	t.Run("approval, logs and stage done", func(t *testing.T) {
+	t.Run("approval, logs and step done", func(t *testing.T) {
 		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}},
-			agentStage("build", agentStep("one", "        allowed_tools: [\"Bash(git *)\"]\n")+agentStep("two", "        before: approval\n"))+userStage)
+			agentStep("one", "    allowed_tools: [\"Bash(git *)\"]\n")+agentStep("two", "    before: approval\n")+manualStep)
 		app := f.app
 		setPrepare(t, app, f.repoID, "echo prepared")
-		if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.taskID}); err == nil {
-			t.Fatal("StageDone accepted before the stage ran")
+		if _, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID}); err == nil {
+			t.Fatal("StepDone accepted before the steps ran")
 		}
 		mark := app.Events.Mark()
 		if ids := f.start(t, "feat/api-work"); len(ids) != 1 {
@@ -106,7 +106,7 @@ func TestRunLifecycle(t *testing.T) {
 		app.Events.WaitAfter(t, mark, adewire.ChannelLog, nil, waitFor)
 
 		step := func(id string) adewire.StepArgs {
-			return adewire.StepArgs{TaskID: f.taskID, StageID: "build", StepID: id}
+			return adewire.StepArgs{TaskID: f.taskID, StepID: id}
 		}
 		if err := app.W.AdeTask.Approve(ctx, step("one")); err == nil {
 			t.Fatal("Approve accepted for a step that is not waiting")
@@ -117,17 +117,14 @@ func TestRunLifecycle(t *testing.T) {
 		}
 		app.Contract(t, "ade-run", "AdeTaskService.Run#two-done", waitRun(t, app, f.taskID, "two", "done"), flowharness.Mask("startedAt", "finishedAt", "sessionId", "createdAt"))
 
-		task, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
-		if err != nil || task.StageID != "review" {
-			t.Fatalf("StageDone = %+v, %v, want stage review", task, err)
-		}
-		if task, err = app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.taskID}); err != nil || task.StageID != "done" {
-			t.Fatalf("StageDone after the last stage = %+v, %v, want done", task, err)
+		task, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
+		if err != nil || task.EntryStepID != "done" {
+			t.Fatalf("StepDone = %+v, %v, want done", task, err)
 		}
 	})
 
 	t.Run("failed run retries", func(t *testing.T) {
-		f := newRunFixture(t, []fakeagent.Action{{Name: "fail"}, {Name: "done"}}, agentStage("build", agentStep("first", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "fail"}, {Name: "done"}}, agentStep("first", ""))
 		f.start(t, "feat/api-work")
 		failed := waitRun(t, f.app, f.taskID, "first", "failed")
 		if failed.Attempt != 1 {
@@ -147,7 +144,7 @@ func TestRunLifecycle(t *testing.T) {
 
 	t.Run("stop a running agent", func(t *testing.T) {
 		flag := filepath.Join(t.TempDir(), "release")
-		f := newRunFixture(t, []fakeagent.Action{{Name: "done", WaitFile: flag}}, agentStage("build", agentStep("first", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done", WaitFile: flag}}, agentStep("first", ""))
 		f.start(t, "feat/api-work")
 		running := waitRun(t, f.app, f.taskID, "first", "running")
 		if err := f.app.W.AdeTask.StopRun(ctx, adewire.RunArgs{RunID: running.ID}); err != nil {
@@ -166,7 +163,7 @@ func TestRunLifecycle(t *testing.T) {
 	})
 
 	t.Run("failed setup blocks the run until retried", func(t *testing.T) {
-		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStage("build", agentStep("first", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("first", ""))
 		setPrepare(t, f.app, f.repoID, "exit 3")
 		f.start(t, "feat/api-work")
 		br := branchOf(t, board(t, f.app), f.taskID, f.repoID)

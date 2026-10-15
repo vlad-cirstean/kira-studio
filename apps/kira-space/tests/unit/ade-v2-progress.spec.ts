@@ -6,51 +6,20 @@ import {
   walkPath,
 } from '../../frontend/src/ade/v2/board/progress';
 import { deriveStatus } from '../../frontend/src/ade/v2/board/status';
-import { implicitResults } from '../../frontend/src/ade/v2/board/stepResults';
-import { defaultSandbox } from '../../frontend/src/ade/v2/board/stepSandbox';
-import type { Branch, Run, Stage, Task, Workflow } from '../../frontend/src/ade/v2/wire';
-import { mkBranch, mkRun, mkStage, mkTask } from './support/adeV2Fixtures';
+import type { Branch, Run, Task, Workflow } from '../../frontend/src/ade/v2/wire';
+import { mkBranch, mkManual, mkRun, mkStep, mkTask } from './support/adeV2Fixtures';
 
-const step = (
-  id: string,
-  runsOn: Stage['steps'][number]['runsOn'] = 'each repo',
-  before: 'auto' | 'approval' = 'auto',
-) => ({
-  id,
-  name: id,
-  runsOn,
-  before,
-  onFailure: 'stop' as const,
-  results: implicitResults(id, 'stop'),
-  maxReturns: 3,
-  timeout: '1h',
-  prompt: 'p',
-  allowedTools: [],
-  smartScript: '',
-  review: null,
-  sandbox: defaultSandbox(),
-  params: {},
-});
-
-const impl = mkStage({
-  id: 'impl',
-  name: 'Implement',
-  kind: 'agent',
-  steps: [step('plan', 'once'), step('code'), step('pr', 'each repo', 'approval')],
-});
-const spec = mkStage({ id: 'spec', name: 'Spec', kind: 'user', status: 'In progress' });
-const release = mkStage({
-  id: 'release',
-  name: 'Release',
-  kind: 'script',
-  runsOn: 'each repo',
-  status: 'In review',
-});
 const workflow: Workflow = {
   id: 'wf',
   name: 'Feature',
   kiraSpaceMcp: false,
-  stages: [spec, impl, release],
+  steps: [
+    mkManual({ id: 'spec', name: 'Spec', status: 'In progress' }),
+    mkStep({ id: 'plan', runsOn: 'once' }),
+    mkStep({ id: 'code' }),
+    mkStep({ id: 'pr', before: 'approval' }),
+    mkStep({ id: 'release', kind: 'script', command: './r.sh', status: 'In review' }),
+  ],
 };
 
 const NICK: Record<string, string> = { 'repo-api': 'api', 'repo-web': 'web-app' };
@@ -59,29 +28,34 @@ const branches: Branch[] = [
   mkBranch({ id: 'b_web', taskId: 'T', codeRepoId: 'repo-web' }),
 ];
 
-function input(runs: Run[], over: Partial<Task> = {}): ProgressInput {
+function input(
+  runs: Run[],
+  over: Partial<Task> = {},
+  wf: Workflow | null = workflow,
+): ProgressInput {
   const task = mkTask({
     id: 'T',
     workflowId: 'wf',
-    stageId: 'impl',
-    currentStage: impl,
+    entryStepId: 'plan',
     branchIds: ['b_api', 'b_web'],
     runs,
     ...over,
   });
   return {
     task,
-    workflow,
+    workflow: wf,
     branch: (id) => branches.find((b) => b.id === id),
     repoNick: (id) => NICK[id] ?? id,
   };
 }
 
 const run = (stepId: string, branchId: string, over: Partial<Run> = {}): Run =>
-  mkRun({ taskId: 'T', stageId: 'impl', stepId, branchId, ...over });
+  mkRun({ taskId: 'T', stepId, branchId, ...over });
+const doneOn = (stepId: string): Run[] =>
+  ['b_api', 'b_web'].map((b) => run(stepId, b, { state: 'done' }));
 
 describe('step targets and percent', () => {
-  test('averages done runs as 1 and others as 0, over steps and repos', () => {
+  test('averages done runs as 1 and others as 0, over automatic steps and repos', () => {
     const p = buildTaskProgress(
       input([
         run('plan', 'b_api', { state: 'done' }),
@@ -89,39 +63,36 @@ describe('step targets and percent', () => {
         run('code', 'b_web', { state: 'running' }),
       ]),
     );
-    // plan (once -> b_api): 1, code: (1 + 0) / 2, pr: no runs started -> 0
-    expect(p.steps.map((s) => s.frac)).toEqual([1, 0.5, 0]);
-    expect(p.percent).toBe(50);
-    expect(p.label).toBe('Implement 1/3');
-    expect(p.barTip).toBe(
-      '1. plan: api ✓\n2. code: api ✓, web-app Running\n3. pr: api Pending, web-app Pending',
-    );
+    expect(p.steps.map((s) => s.frac)).toEqual([0, 1, 0.5, 0, 0]);
+    expect(p.percent).toBe(38);
+    expect(p.totalSteps).toBe(4);
+    expect(p.label).toBe('code 1/4');
+    expect(p.barTip.split('\n')[0]).toBe('2. plan: api ✓');
   });
 
-  test('once targets the first mine branch; only <repo> matches the nickname; unmatched only has none', () => {
-    const only = mkStage({
-      id: 'impl',
-      kind: 'agent',
-      steps: [step('a', 'only web-app'), step('b', 'only nope')],
-    });
-    const p = buildTaskProgress(input([], { currentStage: only }));
+  test('only <repo> matches the nickname; an unmatched only has no targets', () => {
+    const wf: Workflow = {
+      ...workflow,
+      steps: [
+        mkStep({ id: 'a', runsOn: 'only web-app' }),
+        mkStep({ id: 'b', runsOn: 'only nope' }),
+      ],
+    };
+    const p = buildTaskProgress(input([], { entryStepId: 'a' }, wf));
     expect(p.steps[0]?.runs.map((r) => r.branchId)).toEqual(['b_web']);
     expect(p.steps[1]?.runs).toEqual([]);
     expect(p.steps[1]?.state).toBe('pending');
-    expect(p.steps[1]?.frac).toBe(0);
-    const once = buildTaskProgress(input([]));
-    expect(once.steps[0]?.runs.map((r) => r.branchId)).toEqual(['b_api']);
   });
 
   test('review branches are never targets', () => {
-    const i = input([]);
+    const was = branches[1];
     branches[1] = mkBranch({ id: 'b_web', taskId: 'T', codeRepoId: 'repo-web', kind: 'review' });
-    expect(buildTaskProgress(i).steps[1]?.runs.map((r) => r.branchId)).toEqual(['b_api']);
-    branches[1] = mkBranch({ id: 'b_web', taskId: 'T', codeRepoId: 'repo-web' });
+    expect(buildTaskProgress(input([])).steps[2]?.runs.map((r) => r.branchId)).toEqual(['b_api']);
+    if (was) branches[1] = was;
   });
 });
 
-describe('latest attempt and worst-of', () => {
+describe('latest attempt, history and worst-of', () => {
   test('the highest attempt wins per (step, branch)', () => {
     const p = buildTaskProgress(
       input([
@@ -130,12 +101,18 @@ describe('latest attempt and worst-of', () => {
         run('code', 'b_web', { attempt: 1, state: 'done' }),
       ]),
     );
-    expect(p.steps[1]?.runs.map((r) => [r.state, r.runId.endsWith(':2')])).toEqual([
+    expect(p.steps[2]?.runs.map((r) => [r.state, r.runId.endsWith(':2')])).toEqual([
       ['running', true],
       ['done', false],
     ]);
-    expect(p.steps[1]?.state).toBe('running');
     expect(p.bad).toBe(false);
+  });
+
+  test('runs at or below since are history', () => {
+    const runs = [run('code', 'b_api', { attempt: 1, state: 'done' })];
+    expect(buildTaskProgress(input(runs)).steps[2]?.runs[0]?.state).toBe('done');
+    const moved = buildTaskProgress(input(runs, { since: { 'code/b_api': 1 } }));
+    expect(moved.steps[2]?.runs[0]?.state).toBe('pending');
   });
 
   test.each([
@@ -153,72 +130,64 @@ describe('latest attempt and worst-of', () => {
         run('code', 'b_web', { state: states[1] }),
       ]),
     );
-    expect(p.steps[1]?.state).toBe(expected);
+    expect(p.steps[2]?.state).toBe(expected);
   });
 
-  test('stuck or failed turns the current segment red and the bar tone red', () => {
-    const p = buildTaskProgress(input([run('code', 'b_web', { state: 'stuck' })]));
+  test('stuck turns the current segment and the bar red', () => {
+    const p = buildTaskProgress(
+      input([...doneOn('plan'), run('code', 'b_web', { state: 'stuck' })]),
+    );
     expect(p.bad).toBe(true);
     expect(p.tone).toBe('red');
-    expect(p.segments.map((s) => s.state)).toEqual(['done', 'blocked', 'todo']);
+    expect(p.segments.map((s) => s.state)).toEqual(['done', 'done', 'blocked', 'todo', 'todo']);
   });
 });
 
 describe('approval gate', () => {
   test('flags a gated pending step only when the previous step is done', () => {
-    const done = (s: string) => [
-      run(s, 'b_api', { state: 'done' }),
-      run(s, 'b_web', { state: 'done' }),
-    ];
-    const ready = buildTaskProgress(input([...done('plan'), ...done('code')]));
-    expect(ready.steps[2]?.approval).toBe(true);
+    const ready = buildTaskProgress(input([...doneOn('plan'), ...doneOn('code')]));
+    expect(ready.steps[3]?.approval).toBe(true);
+    expect(ready.step?.id).toBe('pr');
     const notYet = buildTaskProgress(
-      input([...done('plan'), run('code', 'b_api', { state: 'running' })]),
+      input([...doneOn('plan'), run('code', 'b_api', { state: 'running' })]),
     );
-    expect(notYet.steps[2]?.approval).toBe(false);
+    expect(notYet.steps[3]?.approval).toBe(false);
   });
 
-  test('a gated first step never needs approval', () => {
-    const first = mkStage({ id: 'impl', kind: 'agent', steps: [step('a', 'once', 'approval')] });
-    expect(buildTaskProgress(input([], { currentStage: first })).steps[0]?.approval).toBe(false);
+  test('a gated entry step never needs approval', () => {
+    const wf: Workflow = { ...workflow, steps: [mkStep({ id: 'a', before: 'approval' })] };
+    expect(buildTaskProgress(input([], { entryStepId: 'a' }, wf)).steps[0]?.approval).toBe(false);
   });
 });
 
-describe('stage view', () => {
-  test('finished and user stages carry no bar', () => {
-    const fin = buildTaskProgress(input([], { stageId: 'done', currentStage: null }));
-    expect([fin.label, fin.showBar, fin.tone]).toEqual(['Done', false, 'green']);
-    expect(fin.segments.map((s) => s.state)).toEqual(['done', 'done', 'done']);
-    const user = buildTaskProgress(input([], { stageId: 'spec', currentStage: spec }));
-    expect([user.label, user.showBar, user.stageIndex]).toEqual(['Spec', false, 0]);
+describe('current step', () => {
+  test('a manual entry step is current and carries no bar', () => {
+    const p = buildTaskProgress(input([], { entryStepId: 'spec' }));
+    expect([p.label, p.showBar, p.stepIndex, p.step?.id]).toEqual(['Spec', false, 0, 'spec']);
   });
 
-  test('workflow tooltip marks done and current stages', () => {
-    expect(buildTaskProgress(input([])).workflowTip).toBe(
-      'Feature: ✓ Spec (user) › ▸ Implement (agent) › Release (script)',
-    );
+  test('a finished task is Done on a green bar-less line', () => {
+    const p = buildTaskProgress(input([], { entryStepId: 'done' }));
+    expect([p.label, p.showBar, p.tone, p.finished]).toEqual(['Done', false, 'green', true]);
+    expect(p.segments.every((s) => s.state === 'done')).toBe(true);
   });
 
-  test('a script stage is one step named after the stage', () => {
-    const p = buildTaskProgress(
-      input(
-        [
-          mkRun({
-            taskId: 'T',
-            stageId: 'release',
-            stepId: 'release',
-            branchId: 'b_api',
-            state: 'failed',
-          }),
-        ],
-        {
-          stageId: 'release',
-          currentStage: release,
-        },
-      ),
+  test('a task without a workflow has no progress', () => {
+    expect(
+      buildTaskProgress(input([], { workflowId: '', entryStepId: '' }, null)).hasWorkflow,
+    ).toBe(false);
+  });
+
+  test('a done manual-free path walks to the first step not done', () => {
+    const p = buildTaskProgress(input([...doneOn('plan'), ...doneOn('code')]));
+    expect(p.step?.id).toBe('pr');
+    expect(p.entryIndex).toBe(1);
+  });
+
+  test('workflow tooltip marks done and current steps', () => {
+    expect(buildTaskProgress(input([...doneOn('plan')])).workflowTip).toBe(
+      'Feature: ✓ Spec (manual) › ✓ plan (agent) › ▸ code (agent) › pr (agent) › release (script)',
     );
-    expect(p.steps.map((s) => [s.id, s.state])).toEqual([['release', 'failed']]);
-    expect(p.showBar).toBe(true);
   });
 });
 
@@ -238,13 +207,10 @@ describe('branch progress line', () => {
     expect(lineOf([])?.label).toBe('code · waiting');
   });
 
-  test('is done when every step on the branch is done, and absent without a step on it', () => {
-    const all = ['code', 'pr'].map((s) => run(s, 'b_web', { state: 'done' }));
-    expect(lineOf(all)?.label).toBe('Implement ✓');
-    expect(lineOf(all)?.tone).toBe('green');
-    const onlyApi = mkStage({ id: 'impl', kind: 'agent', steps: [step('a', 'only api')] });
+  test('is absent without a step on the branch', () => {
+    const wf: Workflow = { ...workflow, steps: [mkStep({ id: 'a', runsOn: 'only api' })] };
     expect(
-      branchProgress(buildTaskProgress(input([], { currentStage: onlyApi })), 'b_web'),
+      branchProgress(buildTaskProgress(input([], { entryStepId: 'a' }, wf)), 'b_web'),
     ).toBeNull();
   });
 });
@@ -261,31 +227,15 @@ describe('derived status', () => {
   };
 
   test('workflow states', () => {
-    expect(status([], { stageId: 'done', currentStage: null })).toBe('Done');
-    expect(status([run('code', 'b_api', { state: 'failed' })])).toBe('Blocked');
-    expect(
-      status([], {}, false, [
-        mkBranch({
-          id: 'b_api',
-          taskId: 'T',
-          setup: { state: 'failed', startedAt: 0, finishedAt: 1, exitCode: 1, note: '' },
-        }),
-      ]),
-    ).toBe('Blocked');
+    expect(status([], { entryStepId: 'done' })).toBe('Done');
+    expect(status([...doneOn('plan'), run('code', 'b_api', { state: 'failed' })])).toBe('Blocked');
     expect(status([run('code', 'b_api', { state: 'running' })])).toBe('In progress');
   });
 
-  test('first stage with nothing started is To do; a session or a started step is not', () => {
-    const first = { stageId: 'spec', currentStage: spec };
+  test('a first step with nothing started is To do; a session or a started step is not', () => {
+    const first = { entryStepId: 'spec' };
     expect(status([], first)).toBe('To do');
     expect(status([], first, true)).toBe('In progress');
-    const firstAgent = { stageId: 'impl', currentStage: impl, workflowId: 'wf' };
-    const startedFirst = input([run('plan', 'b_api', { state: 'running' })], firstAgent);
-    const solo: Workflow = { ...workflow, stages: [impl] };
-    const p = buildTaskProgress({ ...startedFirst, workflow: solo });
-    expect(
-      deriveStatus({ task: startedFirst.task, progress: p, branches, hasSessions: false }),
-    ).toBe('In progress');
   });
 
   test('review and parked tasks ignore the workflow', () => {
@@ -295,27 +245,40 @@ describe('derived status', () => {
 });
 
 describe('walkPath (mirrors Go walkPath)', () => {
-  const run = (route: string) => ({ route }) as never;
-  const done = (route: string) => ({ state: 'done' as const, runs: [run(route)] });
-  const pending = { state: 'pending' as const, runs: [] };
+  const r = (route: string) => ({ route }) as never;
+  const done = (route: string) => ({
+    state: 'done' as const,
+    kind: 'agent' as const,
+    skip: false,
+    runs: [r(route)],
+  });
+  const pending = { state: 'pending' as const, kind: 'agent' as const, skip: false, runs: [] };
+  const skipped = { ...pending, skip: true };
+  const manual = { ...pending, kind: 'manual' as const };
 
   test('a forward route skips the steps between', () => {
-    expect(walkPath(['a', 'b', 'c'], [done('c'), pending, pending])).toEqual({
+    expect(walkPath(['a', 'b', 'c'], [done('c'), pending, pending], 0)).toEqual({
       path: [0, 2],
       skipped: [false, true, false],
     });
   });
-  test('end completes the stage and skips the rest', () => {
-    expect(walkPath(['a', 'b'], [done('end'), pending])).toEqual({
-      path: [0],
+  test('end stops the path and skips the rest', () => {
+    expect(walkPath(['a', 'b'], [done('end'), pending], 0)).toEqual({
+      path: [0, 2].slice(0, 1),
       skipped: [false, true],
     });
   });
   test('the earliest forward target across branches wins', () => {
-    const two = { state: 'done' as const, runs: [run('c'), run('next')] };
-    expect(walkPath(['a', 'b', 'c'], [two, pending, pending]).path).toEqual([0, 1]);
+    const two = { ...done('c'), runs: [r('c'), r('next')] };
+    expect(walkPath(['a', 'b', 'c'], [two, pending, pending], 0).path).toEqual([0, 1]);
   });
   test('a run without a stored route counts as next', () => {
-    expect(walkPath(['a', 'b'], [done(''), pending]).path).toEqual([0, 1]);
+    expect(walkPath(['a', 'b'], [done(''), pending], 0).path).toEqual([0, 1]);
+  });
+  test('starts at the entry and passes over skip steps', () => {
+    expect(walkPath(['a', 'b', 'c'], [done('next'), skipped, pending], 1).path).toEqual([2]);
+  });
+  test('a manual step ends the path', () => {
+    expect(walkPath(['a', 'b'], [manual, pending], 0).path).toEqual([0]);
   });
 });

@@ -37,22 +37,8 @@ export interface SessionView {
 const basename = (path: string): string => path.split('/').filter(Boolean).pop() ?? path;
 
 function stepNameOf(workflow: Workflow | undefined, stepId: string): string {
-  for (const stage of workflow?.stages ?? []) {
-    for (const step of stage.steps) if (step.id === stepId) return step.name;
-  }
-  return stepId;
-}
-
-/** The session's own stage, by name: the task's workflow first, then its current-stage snapshot. */
-function stageNameOf(
-  workflow: Workflow | undefined,
-  task: Task | undefined,
-  stageId: string,
-): string {
-  if (!stageId) return '';
-  const hit = workflow?.stages.find((st) => st.id === stageId);
-  if (hit) return hit.name;
-  return task?.currentStage?.id === stageId ? task.currentStage.name : stageId;
+  if (!stepId) return '';
+  return workflow?.steps.find((x) => x.id === stepId)?.name ?? stepId;
 }
 
 export function sessionView(s: Session, look: SessionLookup): SessionView {
@@ -62,13 +48,13 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const repo = branch ? look.repoLabel(branch.codeRepoId) : '';
   const branchName = branch?.name ?? '';
   const workflow = task?.workflow ?? look.workflow(task?.workflowId ?? '');
-  const step = headless ? stepNameOf(workflow, s.stepId) : '';
+  const stepName = stepNameOf(workflow, s.stepId);
+  const step = headless ? stepName : '';
   const run = task?.runs.find((r) => r.id === s.runId) ?? null;
   const specLabel = t('space.ade.needs.scope.spec.label');
   const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : specLabel;
   const id = shortId(s.id);
   const review = s.purpose === 'review';
-  const stage = stageNameOf(workflow, task, s.stageId);
   const named = (...parts: string[]): string => parts.filter(Boolean).join(' · ');
   const reviewAgent = t('space.ade.review.agent.label');
   const resumed = (name: string): string =>
@@ -76,8 +62,10 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const tabName = review
     ? reviewAgent
     : headless
-      ? named(stage, step, repo)
-      : resumed(named(stage || t('space.common.claudeSession.label', { id }), repo || specLabel));
+      ? named(step, repo)
+      : resumed(
+          named(stepName || t('space.common.claudeSession.label', { id }), repo || specLabel),
+        );
   return {
     session: s,
     kind: activityKind(s),
@@ -91,14 +79,14 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     badge: headless ? 'claude -p' : 'TUI',
     stoppedLabel: review
       ? `TUI · ${reviewAgent} · ${id}`
-      : `${headless ? named(stage, step) : named('TUI', stage)} · ${scope} · ${id}`,
+      : `${headless ? named(step) : named('TUI', stepName)} · ${scope} · ${id}`,
     allLabel: review
       ? `TUI · ${reviewAgent}`
       : headless
-        ? named('claude -p', stage, step)
+        ? named('claude -p', step)
         : s.branchId
-          ? named('TUI', stage, t('space.ade.sessionList.interactive.label'))
-          : named('TUI', stage, t('space.ade.sessionList.specSession.label')),
+          ? named('TUI', stepName, t('space.ade.sessionList.interactive.label'))
+          : named('TUI', stepName, t('space.ade.sessionList.specSession.label')),
   };
 }
 

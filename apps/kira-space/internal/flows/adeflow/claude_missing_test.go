@@ -22,15 +22,15 @@ func TestLaunchWithoutClaude(t *testing.T) {
 	t.Setenv("SHELL", stub)
 	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	rec := importRepo(t, app, repo.Dir)
-	saveWorkflow(t, app, "flow", flowYAML("flow", "  - id: work\n    name: Work\n    kind: user\n    status: In progress\n    session: true\n"))
+	saveWorkflow(t, app, "flow", flowYAML("flow", "  - id: work\n    name: Work\n    kind: manual\n    status: In progress\n    session: true\n"))
 	task := createTask(t, app, "Fix login", "flow", rec.ID)
 
-	_, err := app.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+	_, err := app.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 	var ie *ipcerr.Error
 	if !errors.As(err, &ie) || ie.Code != string(ipcerr.CodeNotFound) || !strings.HasPrefix(ie.Message, "Claude Code CLI not found") {
-		t.Fatalf("LaunchStage = %v, want the claude-missing Kira error", err)
+		t.Fatalf("LaunchStep = %v, want the claude-missing Kira error", err)
 	}
-	app.Contract(t, "ade-claude-missing", "AdeTaskService.LaunchStage#claudeMissing", map[string]any{"code": ie.Code, "message": ie.Message})
+	app.Contract(t, "ade-claude-missing", "AdeTaskService.LaunchStep#claudeMissing", map[string]any{"code": ie.Code, "message": ie.Message})
 	res, err := app.W.AdeTask.Sessions(ctx)
 	if err != nil || len(res.Sessions) != 0 {
 		t.Fatalf("sessions after the failed launch = %+v, %v, want none", res.Sessions, err)

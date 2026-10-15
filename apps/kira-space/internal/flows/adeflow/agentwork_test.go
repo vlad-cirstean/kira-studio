@@ -10,7 +10,7 @@ import (
 
 func TestAgentCommitReachesBoard(t *testing.T) {
 	commit := "echo agent > agent.txt && git add -A && git commit -q -m 'agent change'"
-	f := newRunFixture(t, []fakeagent.Action{{Name: "done", Sh: commit}}, agentStage("build", agentStep("one", "")))
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done", Sh: commit}}, agentStep("one", ""))
 	app := f.app
 	f.start(t, "feat/api-work")
 	waitRun(t, app, f.taskID, "one", "done")

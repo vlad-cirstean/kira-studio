@@ -154,7 +154,7 @@ func (w *wireBatch) wireRun(r model.AdeRun) adewire.Run {
 		return out
 	}
 	if runs, ok := w.taskRuns(r.TaskID); ok {
-		out.Returns = countReturns(runs, r.StageID, r.StepID, r.BranchID, r.Attempt)
+		out.Returns = countReturns(runs, r.StepID, r.BranchID, r.Attempt)
 	}
 	rev, err := w.b.deps.Tasks.GetReview(r.ID)
 	if err != nil || rev == nil {
@@ -200,58 +200,49 @@ func (b *TaskBoard) enterReview(ctx context.Context, tc *taskCtx, def stepDef, r
 // --- candidates ----------------------------------------------------------------------------------
 
 type reviewCandidate struct {
-	run         model.AdeRun
-	stage, step string
-	allowed     []string
+	run     model.AdeRun
+	step    string
+	allowed []string
 }
 
 // reviewCandidates lists the agent runs on the review run's branch that can take the comments:
-// earlier steps of the current stage, nearest first, then earlier stages, last first.
+// earlier agent steps of the current pass, nearest first.
 func (b *TaskBoard) reviewCandidates(tc *taskCtx, review model.AdeRun) ([]reviewCandidate, error) {
+	if tc.wf == nil {
+		return nil, nil
+	}
 	latest, err := b.deps.Tasks.LatestRuns(tc.task.ID)
 	if err != nil {
 		return nil, err
 	}
-	byKey := map[string]model.AdeRun{}
+	byStep := map[string]model.AdeRun{}
 	for _, r := range latest {
-		if r.Purpose == "" && r.BranchID == review.BranchID {
-			byKey[r.StageID+"|"+r.StepID] = r
+		if r.Purpose == "" && r.BranchID == review.BranchID && tc.inPass(r) {
+			byStep[r.StepID] = r
 		}
 	}
 	var out []reviewCandidate
-	add := func(st adewire.Stage, s adewire.PipelineStep) {
-		if st.Kind != "agent" || s.SmartScript != "" || s.Review != nil {
-			return
-		}
-		r, ok := byKey[st.ID+"|"+s.ID]
-		if !ok || r.State == model.AdeRunRunning || r.State == model.AdeRunPending || b.claudeIDOfSession(r.SessionID) == "" {
-			return
-		}
-		out = append(out, reviewCandidate{run: r, stage: st.Name, step: s.Name, allowed: s.AllowedTools})
-	}
-	stage := *tc.stage
-	at := slices.IndexFunc(stage.Steps, func(s adewire.PipelineStep) bool { return s.ID == review.StepID })
+	steps := tc.wf.Steps
+	at := slices.IndexFunc(steps, func(s adewire.WorkflowStep) bool { return s.ID == review.StepID })
 	for i := at - 1; i >= 0; i-- {
-		add(stage, stage.Steps[i])
-	}
-	if wf, ok := b.taskWorkflow(tc.task); ok {
-		if si := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == stage.ID }); si > 0 {
-			for j := si - 1; j >= 0; j-- {
-				st := wf.Stages[j]
-				for i := len(st.Steps) - 1; i >= 0; i-- {
-					add(st, st.Steps[i])
-				}
-			}
+		s := steps[i]
+		if s.Kind != adewire.KindAgent || s.SmartScript != "" {
+			continue
 		}
+		r, ok := byStep[s.ID]
+		if !ok || r.State == model.AdeRunRunning || r.State == model.AdeRunPending || b.claudeIDOfSession(r.SessionID) == "" {
+			continue
+		}
+		out = append(out, reviewCandidate{run: r, step: s.Name, allowed: s.AllowedTools})
 	}
 	return out, nil
 }
 
 // defaultCandidate is the step the review block names, else the nearest candidate; -1 when none.
-func defaultCandidate(cands []reviewCandidate, def stepDef, stageID string) int {
+func defaultCandidate(cands []reviewCandidate, def stepDef) int {
 	if def.Review != nil && def.Review.Implementer != "" {
 		if i := slices.IndexFunc(cands, func(c reviewCandidate) bool {
-			return c.run.StageID == stageID && c.run.StepID == def.Review.Implementer
+			return c.run.StepID == def.Review.Implementer
 		}); i >= 0 {
 			return i
 		}
@@ -275,7 +266,7 @@ type reviewCtx struct {
 	def  stepDef
 }
 
-// reviewRun loads a review step run that is the latest of the current stage. The task mutex is held.
+// reviewRun loads a review step run that is the latest of the current pass. The task mutex is held.
 func (b *TaskBoard) reviewRun(runID string) (*reviewCtx, error) {
 	run, err := b.deps.Tasks.GetRun(runID)
 	if err != nil {
@@ -292,8 +283,8 @@ func (b *TaskBoard) reviewRun(runID string) (*reviewCtx, error) {
 	if err != nil {
 		return nil, err
 	}
-	if tc.stage == nil || tc.stage.ID != run.StageID {
-		return nil, invalid("the run's stage is no longer current")
+	if tc.wf == nil || !tc.inPass(run) {
+		return nil, invalid("the run is no longer in the current pass")
 	}
 	plan, err := b.plan(tc)
 	if err != nil {
@@ -301,7 +292,7 @@ func (b *TaskBoard) reviewRun(runID string) (*reviewCtx, error) {
 	}
 	idx := stepIndex(plan, run.StepID)
 	if idx < 0 {
-		return nil, invalid("the run's step is no longer in the stage")
+		return nil, invalid("the run's step is no longer in the workflow")
 	}
 	if latest, ok := plan[idx].Runs[run.BranchID]; !ok || latest.ID != run.ID {
 		return nil, invalid("run %s is not the latest attempt", runID)
@@ -328,7 +319,7 @@ func (b *TaskBoard) liveRound(taskID, reviewRunID string) (*model.AdeRun, error)
 // --- ReviewStep ----------------------------------------------------------------------------------
 
 // ReviewStep describes the review step of a branch for the review window; Run is nil when the
-// current stage has no review step run there.
+// current pass has no review step run there.
 func (b *TaskBoard) ReviewStep(_ context.Context, branchID string) (adewire.ReviewStepState, error) {
 	out := adewire.ReviewStepState{Results: []adewire.StepResult{}, Candidates: []adewire.ReviewCandidate{}}
 	sb, err := b.deps.Tasks.GetBranch(branchID)
@@ -339,7 +330,7 @@ func (b *TaskBoard) ReviewStep(_ context.Context, branchID string) (adewire.Revi
 	if err != nil {
 		return out, err
 	}
-	if tc.stage == nil || tc.stage.Kind != "agent" {
+	if tc.wf == nil {
 		return out, nil
 	}
 	plan, err := b.plan(tc)
@@ -382,10 +373,10 @@ func (b *TaskBoard) ReviewStep(_ context.Context, branchID string) (adewire.Revi
 	}
 	for _, c := range cands {
 		out.Candidates = append(out.Candidates, adewire.ReviewCandidate{
-			RunID: c.run.ID, Stage: c.stage, Step: c.step, Attempt: c.run.Attempt, FinishedAt: c.run.FinishedAt,
+			RunID: c.run.ID, Step: c.step, Attempt: c.run.Attempt, FinishedAt: c.run.FinishedAt,
 		})
 	}
-	if i := defaultCandidate(cands, def, run.StageID); i >= 0 {
+	if i := defaultCandidate(cands, def); i >= 0 {
 		out.DefaultTargetRunID = cands[i].run.ID
 	}
 	if round != nil {
@@ -495,7 +486,7 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 		if err != nil {
 			return err
 		}
-		pick := defaultCandidate(cands, rc.def, rc.run.StageID)
+		pick := defaultCandidate(cands, rc.def)
 		if args.TargetRunID != "" {
 			pick = slices.IndexFunc(cands, func(c reviewCandidate) bool { return c.run.ID == args.TargetRunID })
 		}
@@ -572,7 +563,7 @@ func (b *TaskBoard) queueRound(ctx context.Context, tc *taskCtx, sb model.AdeTas
 		return model.AdeRun{}, err
 	}
 	run := model.AdeRun{
-		ID: b.newID(), TaskID: tc.task.ID, StageID: rv.StageID, StepID: rv.StepID, BranchID: rv.BranchID, Attempt: attempt,
+		ID: b.newID(), TaskID: tc.task.ID, StepID: rv.StepID, BranchID: rv.BranchID, Attempt: attempt,
 		State: model.AdeRunPending, Purpose: model.AdeRunPurposeReview, SpecJSON: string(raw), Launch: launch,
 	}
 	if err := b.deps.Tasks.InsertRun(run); err != nil {
@@ -636,7 +627,7 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 	launch := run.Launch
 	sessionID, claudeID := b.newID(), cmpNonEmpty(launch.ResumeID, b.newID())
 	if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
-		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID, StageID: run.StageID,
+		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
 		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
 		State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
@@ -657,7 +648,7 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 	}
 	b.emitRuns(updated)
 	def := stepDef{ID: run.StepID, Timeout: "", AllowedTools: spec.AllowedTools}
-	for _, s := range stageSteps(*tc.stage) {
+	for _, s := range workflowSteps(*tc.wf) {
 		if s.ID == run.StepID {
 			def.Name, def.Timeout, def.Sandbox = s.Name, s.Timeout, s.Sandbox
 		}
@@ -739,7 +730,7 @@ func (b *TaskBoard) worktreeTip(sb model.AdeTaskBranch) string {
 // lost. One fallback per send. The task mutex is held.
 func (b *TaskBoard) queueFallback(lost model.AdeRun, spec model.AdeReviewSpec) {
 	tc, err := b.loadTaskCtx(lost.TaskID)
-	if err != nil || tc.stage == nil || tc.stage.ID != lost.StageID {
+	if err != nil || tc.wf == nil || !tc.inPass(lost) {
 		return
 	}
 	rv, err := b.deps.Tasks.GetRun(spec.ReviewRunID)
@@ -804,8 +795,8 @@ func (b *TaskBoard) resumeReviewRound(ctx context.Context, run model.AdeRun) err
 	if err != nil {
 		return err
 	}
-	if tc.stage == nil || tc.stage.ID != run.StageID {
-		return invalid("the run's stage is no longer current")
+	if tc.wf == nil || !tc.inPass(run) {
+		return invalid("the run is no longer in the current pass")
 	}
 	rv, err := b.deps.Tasks.GetRun(spec.ReviewRunID)
 	if err != nil {

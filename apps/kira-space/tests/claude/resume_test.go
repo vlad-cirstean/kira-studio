@@ -33,11 +33,10 @@ func holdPrompt(script string) string {
 // startHeld starts the ADE run and returns once the agent has issued its Bash call.
 func (f *adeFixture) startHeld(t *testing.T, script string) (adewire.Task, adewire.Run) {
 	t.Helper()
-	stage := "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 5m\n" +
-		"        allowed_tools: [\"Bash(sh:*)\"]\n" +
-		"        prompt: " + strconv.Quote(holdPrompt(script)) + "\n"
-	f.saveWorkflow(t, "flow", stage+userStageYAML)
+	step := "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 5m\n" +
+		"    allowed_tools: [\"Bash(sh:*)\"]\n" +
+		"    prompt: " + strconv.Quote(holdPrompt(script)) + "\n"
+	f.saveWorkflow(t, "flow", step+manualStepYAML)
 	task := f.createTask(t, "flow")
 	b, err := f.W.AdeTask.Board(ctx)
 	if err != nil {

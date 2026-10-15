@@ -13,12 +13,11 @@ import (
 
 var ctx = context.Background()
 
-const flowStages = "id: flow\nname: Flow\nstages:\n" +
-	"  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-	"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 1m\n        prompt: work on {branch} in {repo}\n" +
-	"  - id: work\n    name: Work\n    kind: user\n    status: In progress\n    session: true\n"
+const flowSteps = "id: flow\nname: Flow\nsteps:\n" +
+	"  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 1m\n    prompt: work on {branch} in {repo}\n" +
+	"  - id: work\n    name: Work\n    kind: manual\n    status: In progress\n    session: true\n"
 
-// adeTask imports a clone, saves the two-stage workflow and creates the task "Fix login".
+// adeTask imports a clone, saves the two-step workflow and creates the task "Fix login".
 func adeTask(t *testing.T, app *flowharness.App) (adewire.Task, model.CodeRepo) {
 	t.Helper()
 	dir := filepath.Join(app.Work, "api")
@@ -31,7 +30,7 @@ func adeTask(t *testing.T, app *flowharness.App) (adewire.Task, model.CodeRepo) 
 	if err != nil {
 		t.Fatalf("ImportRepo: %v", err)
 	}
-	entry, err := app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: flowStages})
+	entry, err := app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: flowSteps})
 	if err != nil || entry.Error != nil {
 		t.Fatalf("SaveWorkflowYaml: %v %+v", err, entry.Error)
 	}

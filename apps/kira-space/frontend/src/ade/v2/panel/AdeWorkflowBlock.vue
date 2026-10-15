@@ -12,10 +12,10 @@ import type { CardModel } from '../plan/usePlanModel';
 import { useSetTaskWorkflow, useSpaceTools, useWorkflows } from '../queries';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
-import AdeStageBlock from './AdeStageBlock.vue';
-import AdeStageMover from './AdeStageMover.vue';
+import AdeStepBlock from './AdeStepBlock.vue';
+import AdeStepMover from './AdeStepMover.vue';
 
-// Task tab Workflow section (SPEC2 section 7): the workflow picker, then one block per stage.
+// Task tab Workflow section (SPEC2 section 7): the workflow picker, then one block per step.
 const props = defineProps<{ card: CardModel }>();
 const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
@@ -86,11 +86,11 @@ function edit(): void {
     <Alert v-if="error" variant="error" data-testid="ade-workflow-error"
       ><AlertDescription>{{ error }}</AlertDescription></Alert
     >
-    <AdeStageMover :card="card" />
-    <AdeStageBlock v-for="b in card.blocks" :key="b.stage.id" :block="b" :card="card">
+    <AdeStepMover :card="card" />
+    <AdeStepBlock v-for="b in card.blocks" :key="b.step.id" :block="b" :card="card">
       <template #actions>
         <AdeTaskActionButton v-if="b.state === 'now'" :card="card" />
       </template>
-    </AdeStageBlock>
+    </AdeStepBlock>
   </div>
 </template>

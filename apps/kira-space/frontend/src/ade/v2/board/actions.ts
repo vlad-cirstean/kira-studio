@@ -8,7 +8,7 @@ import type { TaskProgress } from './progress';
 import { type RebaseAct, rebaseActs } from './rebaseActions';
 import type { DerivedStatus } from './status';
 
-// Left action column: task stage action and branch tag + action, both first-match tables
+// Left action column: task step action and branch tag + action, both first-match tables
 // (SPEC2 §4.2, mockup v2 lines 1855-1856 and 1934-1957).
 
 export type Tone = 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
@@ -25,7 +25,7 @@ export const STATUS_TONE: Record<DerivedStatus, Tone> = {
 
 type TaskActionKind =
   | 'archive'
-  | 'stage'
+  | 'session'
   | 'done'
   | 'finish'
   | 'takeOver'
@@ -72,9 +72,9 @@ const STATUS_LABEL = {
 export const statusLabel = (s: DerivedStatus): string => t(STATUS_LABEL[s]);
 
 function doneAction(p: TaskProgress): TaskAction {
-  const rest = p.segments.slice(p.stageIndex + 1).filter((s) => s.state !== 'skipped');
-  const last = p.stageIndex >= 0 && rest.length === 0;
-  const stage = p.stage?.name ?? '';
+  const rest = p.segments.slice(p.stepIndex + 1).filter((s) => s.state !== 'skipped');
+  const last = p.stepIndex >= 0 && rest.length === 0;
+  const step = p.step?.name ?? '';
   if (last) {
     return {
       kind: 'finish',
@@ -88,106 +88,93 @@ function doneAction(p: TaskProgress): TaskAction {
     kind: 'done',
     label: t('space.ade.board.taskAction.done.label'),
     tip: next
-      ? t('space.ade.board.taskAction.done.tooltip', { stage, next })
-      : t('space.ade.board.taskAction.doneLast.tooltip', { stage }),
+      ? t('space.ade.board.taskAction.done.tooltip', { step, next })
+      : t('space.ade.board.taskAction.doneLast.tooltip', { step }),
     tone: 'green',
   };
 }
 
-function userStageAction(i: TaskCellInput): TaskAction {
+function manualAction(i: TaskCellInput): TaskAction {
   const { progress: p, sessions } = i;
-  const stage = p.stage;
-  // The review agent is the stage's session only on the review stage.
+  const step = p.step;
+  // The review agent is the step's session only on the review step.
   const talking = sessions.some(
     (s) =>
       s.mode === 'tui' &&
       s.state === 'running' &&
-      (s.purpose !== 'review' || stage?.id === 'review'),
+      (s.purpose !== 'review' || step?.id === 'review'),
   );
-  if (stage?.session && !talking) {
+  if (step?.session && !talking) {
     return {
-      kind: 'stage',
-      label: t('space.ade.board.taskAction.stage.label', { stage: stage.name }),
-      tip: t('space.ade.board.taskAction.stage.tooltip', { stage: stage.name }),
+      kind: 'session',
+      label: t('space.ade.board.taskAction.session.label', { step: step.name }),
+      tip: t('space.ade.board.taskAction.session.tooltip', { step: step.name }),
       tone: 'claude',
     };
   }
   return doneAction(p);
 }
 
-function scriptStageAction(p: TaskProgress): TaskAction | null {
-  const sc = p.steps[0];
-  const stage = p.stage;
-  if (!sc || !stage) return null;
-  if (sc.state === 'failed' || sc.state === 'stuck') {
+function automaticAction(p: TaskProgress): TaskAction | null {
+  const s = p.step;
+  if (!s) return null;
+  const session = s.runs.find((r) => r.sessionId !== '')?.sessionId;
+  if ((s.state === 'stuck' || s.state === 'failed') && s.kind === 'agent' && session) {
+    return {
+      kind: 'takeOver',
+      label: t('common.action.takeOver.label'),
+      tip: t('space.ade.board.taskAction.takeOver.tooltip', { step: s.name }),
+      tone: 'red',
+      stepId: s.id,
+      sessionId: session,
+    };
+  }
+  if (s.state === 'failed' || s.state === 'stuck') {
+    if (s.kind === 'agent') return null;
     return {
       kind: 'retry',
       label: t('common.action.retry.label'),
       tip: t(
-        sc.state === 'failed'
+        s.state === 'failed'
           ? 'space.ade.board.taskAction.retryFailed.tooltip'
           : 'space.ade.board.taskAction.retryStuck.tooltip',
-        { stage: stage.name },
+        { step: s.name },
       ),
       tone: 'red',
-      stepId: sc.id,
+      stepId: s.id,
     };
   }
-  if (sc.state === 'pending') {
-    return {
-      kind: 'run',
-      label: t('space.ade.board.taskAction.run.label'),
-      tip: t('space.ade.board.taskAction.runScript.tooltip', { command: stage.command }),
-      tone: 'claude',
-      stepId: sc.id,
-    };
-  }
-  return sc.state === 'done' ? doneAction(p) : null;
-}
-
-function agentStageAction(p: TaskProgress): TaskAction | null {
-  const stage = p.stage;
-  if (!stage) return null;
-  const stuck = p.steps.find((s) => s.state === 'stuck' || s.state === 'failed');
-  const session = stuck?.runs.find((r) => r.sessionId !== '')?.sessionId;
-  if (stuck && session) {
-    return {
-      kind: 'takeOver',
-      label: t('common.action.takeOver.label'),
-      tip: t('space.ade.board.taskAction.takeOver.tooltip', { step: stuck.name }),
-      tone: 'red',
-      stepId: stuck.id,
-      sessionId: session,
-    };
-  }
-  const gated = p.steps.find((s) => s.approval);
-  if (gated) {
+  if (s.approval) {
     return {
       kind: 'approve',
       label: t('common.action.approve.label'),
-      tip: t('space.ade.board.taskAction.approve.tooltip', { step: gated.name }),
+      tip: t('space.ade.board.taskAction.approve.tooltip', { step: s.name }),
       tone: 'amber',
-      stepId: gated.id,
+      stepId: s.id,
     };
   }
-  if (p.steps.length && p.steps.every((s) => s.state === 'pending')) {
+  const untouched = !s.runs.some((r) => r.runId !== '');
+  if (s.state === 'pending' && untouched && p.stepIndex === p.entryIndex) {
     return {
       kind: 'run',
       label: t('space.ade.board.taskAction.run.label'),
-      tip: t('space.ade.board.taskAction.runAgents.tooltip', { stage: stage.name }),
+      tip:
+        s.kind === 'script'
+          ? t('space.ade.board.taskAction.runScript.tooltip', { command: s.command })
+          : s.kind === 'review'
+            ? t('space.ade.board.taskAction.runReview.tooltip', { step: s.name })
+            : t('space.ade.board.taskAction.runAgents.tooltip', { step: s.name }),
       tone: 'claude',
+      stepId: s.id,
     };
   }
-  return p.steps.length && p.steps.every((s) => s.state === 'done' || s.state === 'skipped')
-    ? doneAction(p)
-    : null;
+  return null;
 }
 
-function stageAction(i: TaskCellInput): TaskAction | null {
-  const stage = i.progress.stage;
-  if (!stage) return null;
-  if (stage.kind === 'user') return userStageAction(i);
-  return stage.kind === 'script' ? scriptStageAction(i.progress) : agentStageAction(i.progress);
+function stepAction(i: TaskCellInput): TaskAction | null {
+  const step = i.progress.step;
+  if (!step) return null;
+  return step.kind === 'manual' ? manualAction(i) : automaticAction(i.progress);
 }
 
 /** Header cell of a task row, `null` for a review item (it has no task row). */
@@ -227,7 +214,7 @@ export function taskCell(i: TaskCellInput): TaskCell | null {
       tone: STATUS_TONE[i.status],
       tip: t('space.ade.board.taskStatus.tooltip'),
     },
-    action: stageAction(i),
+    action: stepAction(i),
   };
 }
 

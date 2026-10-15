@@ -9,93 +9,86 @@
       "id": "flow",
       "kiraSpaceMcp": false,
       "name": "Flow",
-      "stages": [
+      "steps": [
         {
+          "allowedTools": [],
+          "before": "auto",
           "command": "",
-          "id": "build",
+          "id": "impl",
           "kind": "agent",
-          "name": "build",
-          "onFailure": "",
-          "prompt": "",
-          "runsOn": "",
-          "session": false,
-          "skip": false,
-          "status": "In progress",
-          "steps": [
+          "maxReturns": 3,
+          "name": "impl",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
             {
-              "allowedTools": [],
-              "before": "auto",
-              "id": "impl",
-              "maxReturns": 3,
-              "name": "impl",
-              "onFailure": "stop",
-              "params": {},
-              "prompt": "work on {branch} in {repo}",
-              "results": [
-                {
-                  "description": "",
-                  "id": "done",
-                  "loop": false,
-                  "next": "next",
-                  "ok": true
-                },
-                {
-                  "description": "",
-                  "id": "failed",
-                  "loop": false,
-                  "next": "stop",
-                  "ok": false
-                }
-              ],
-              "review": null,
-              "runsOn": "each repo",
-              "sandbox": {
-                "access": "write",
-                "allow": [],
-                "network": true,
-                "read": []
-              },
-              "smartScript": "",
-              "timeout": "1m"
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
             },
             {
-              "allowedTools": [],
-              "before": "auto",
-              "id": "review",
-              "maxReturns": 2,
-              "name": "review",
-              "onFailure": "",
-              "params": {},
-              "prompt": "work on {branch} in {repo}",
-              "results": [
-                {
-                  "description": "",
-                  "id": "approved",
-                  "loop": false,
-                  "next": "next",
-                  "ok": true
-                },
-                {
-                  "description": "Needs work.",
-                  "id": "changes",
-                  "loop": true,
-                  "next": "impl",
-                  "ok": false
-                }
-              ],
-              "review": null,
-              "runsOn": "each repo",
-              "sandbox": {
-                "access": "write",
-                "allow": [],
-                "network": true,
-                "read": []
-              },
-              "smartScript": "",
-              "timeout": "1m"
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
             }
           ],
-          "timeout": ""
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "review",
+          "kind": "agent",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "approved",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "Needs work.",
+              "id": "changes",
+              "loop": true,
+              "next": "impl",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
         }
       ]
     }
@@ -107,93 +100,86 @@
       "id": "flow",
       "kiraSpaceMcp": false,
       "name": "Flow",
-      "stages": [
+      "steps": [
         {
+          "allowedTools": [],
+          "before": "auto",
           "command": "",
-          "id": "build",
+          "id": "impl",
           "kind": "agent",
-          "name": "build",
-          "onFailure": "",
-          "prompt": "",
-          "runsOn": "",
-          "session": false,
-          "skip": false,
-          "status": "In progress",
-          "steps": [
+          "maxReturns": 3,
+          "name": "impl",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
             {
-              "allowedTools": [],
-              "before": "auto",
-              "id": "impl",
-              "maxReturns": 3,
-              "name": "impl",
-              "onFailure": "stop",
-              "params": {},
-              "prompt": "work on {branch} in {repo}",
-              "results": [
-                {
-                  "description": "",
-                  "id": "done",
-                  "loop": false,
-                  "next": "next",
-                  "ok": true
-                },
-                {
-                  "description": "",
-                  "id": "failed",
-                  "loop": false,
-                  "next": "stop",
-                  "ok": false
-                }
-              ],
-              "review": null,
-              "runsOn": "each repo",
-              "sandbox": {
-                "access": "write",
-                "allow": [],
-                "network": true,
-                "read": []
-              },
-              "smartScript": "",
-              "timeout": "1m"
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
             },
             {
-              "allowedTools": [],
-              "before": "auto",
-              "id": "review",
-              "maxReturns": 2,
-              "name": "review",
-              "onFailure": "stop",
-              "params": {},
-              "prompt": "work on {branch} in {repo}",
-              "results": [
-                {
-                  "description": "",
-                  "id": "approved",
-                  "loop": false,
-                  "next": "next",
-                  "ok": true
-                },
-                {
-                  "description": "Needs work.",
-                  "id": "changes",
-                  "loop": true,
-                  "next": "impl",
-                  "ok": false
-                }
-              ],
-              "review": null,
-              "runsOn": "each repo",
-              "sandbox": {
-                "access": "write",
-                "allow": [],
-                "network": true,
-                "read": []
-              },
-              "smartScript": "",
-              "timeout": "1m"
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
             }
           ],
-          "timeout": ""
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "review",
+          "kind": "agent",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "approved",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "Needs work.",
+              "id": "changes",
+              "loop": true,
+              "next": "impl",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
         }
       ]
     }

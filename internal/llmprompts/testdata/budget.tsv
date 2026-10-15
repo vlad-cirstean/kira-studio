@@ -98,7 +98,7 @@ headless.tool.git.arg.worktree	36
 headless.tool.git.arg.args	93
 ade.rebase.prompt	338
 ade.step.prompt	455
-ade.stage.message	264
+ade.manual.message	264
 ade.review.message	342
 ade.start.message	172
 ade.repoLine	79

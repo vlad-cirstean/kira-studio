@@ -12,17 +12,23 @@ import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
-import { stageMoves } from '../board/stageMoves';
+import { stepMoves } from '../board/stepMoves';
 import type { CardModel } from '../plan/usePlanModel';
-import { useSetTaskStage } from '../queries';
+import { useSetTaskStep } from '../queries';
 
-// Moves the task to any stage of its workflow, or to Done, in either direction.
+// Moves the task to any step of its workflow, or to Done, in either direction.
 const props = defineProps<{ card: CardModel }>();
-const setStage = useSetTaskStage();
+const setStep = useSetTaskStep();
 const error = ref('');
 
 const moves = computed(() =>
-  stageMoves(props.card.blocks, props.card.task.stageId, props.card.task.runs),
+  stepMoves(
+    props.card.blocks,
+    props.card.progress.finished
+      ? 'done'
+      : (props.card.progress.step?.id ?? props.card.task.entryStepId),
+    props.card.task.runs,
+  ),
 );
 const options = computed(() => moves.value.options);
 const at = computed(() => moves.value.at);
@@ -33,10 +39,10 @@ const reason = computed(() =>
   live.value ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : '',
 );
 
-async function move(stageId: string): Promise<void> {
+async function move(stepId: string): Promise<void> {
   error.value = '';
   try {
-    await setStage.mutateAsync({ taskId: props.card.task.id, stageId });
+    await setStep.mutateAsync({ taskId: props.card.task.id, stepId });
   } catch (err) {
     error.value = errorText(err);
   }
@@ -44,16 +50,16 @@ async function move(stageId: string): Promise<void> {
 </script>
 
 <template>
-  <div v-if="card.blocks.length" class="flex flex-col gap-1" data-testid="ade-stage-mover">
+  <div v-if="card.blocks.length" class="flex flex-col gap-1" data-testid="ade-step-mover">
     <div class="flex items-center gap-1">
-      <span class="text-kira-sm text-muted-foreground">{{ t('space.common.stage.label') }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{ t('space.common.step.label') }}</span>
       <TooltipIconButton
         :icon="ICON.back"
-        :label="reason || t('space.ade.stageMover.back.tooltip')"
-        :aria-label="t('space.ade.stageMover.back.tooltip')"
+        :label="reason || t('space.ade.stepMover.back.tooltip')"
+        :aria-label="t('space.ade.stepMover.back.tooltip')"
         :disabled="live || !prev"
         disabled-trigger
-        data-testid="ade-stage-back"
+        data-testid="ade-step-back"
         @click="move(prev?.id ?? '')"
       />
       <DropdownMenu>
@@ -62,14 +68,14 @@ async function move(stageId: string): Promise<void> {
             size="kira"
             :label="options[at]?.name"
             :disabled="live"
-            data-testid="ade-stage-pick"
+            data-testid="ade-step-pick"
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" data-testid="ade-stage-menu">
+        <DropdownMenuContent align="start" data-testid="ade-step-menu">
           <DropdownMenuItem
             v-for="o in options"
             :key="o.id"
-            :data-testid="`ade-stage-option-${o.id}`"
+            :data-testid="`ade-step-option-${o.id}`"
             :disabled="o.skipped"
             @select="move(o.id)"
           >
@@ -80,15 +86,15 @@ async function move(stageId: string): Promise<void> {
       </DropdownMenu>
       <TooltipIconButton
         icon="arrow-right"
-        :label="reason || t('space.ade.stageMover.next.tooltip')"
-        :aria-label="t('space.ade.stageMover.next.tooltip')"
+        :label="reason || t('space.ade.stepMover.next.tooltip')"
+        :aria-label="t('space.ade.stepMover.next.tooltip')"
         :disabled="live || !next"
         disabled-trigger
-        data-testid="ade-stage-next"
+        data-testid="ade-step-next"
         @click="move(next?.id ?? '')"
       />
     </div>
-    <Alert v-if="error" variant="error" data-testid="ade-stage-error"
+    <Alert v-if="error" variant="error" data-testid="ade-step-error"
       ><AlertDescription>{{ error }}</AlertDescription></Alert
     >
   </div>

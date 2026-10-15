@@ -50,7 +50,7 @@ export function useNeedsAction() {
         await Promise.all(n.runIds.map((runId) => resume.mutateAsync({ runId })));
       } else if (n.action === 'Open') await openSession(n.sessionId, n.taskId, n.branchId);
       else if (n.action === 'Approve') {
-        await approve.mutateAsync({ taskId: n.taskId, stageId: n.stageId, stepId: n.stepId });
+        await approve.mutateAsync({ taskId: n.taskId, stepId: n.stepId });
       } else if (n.action === 'Review') {
         reviewCode.open(n.taskId, n.branchId, null);
       } else if (n.action === 'See error') {

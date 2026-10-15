@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import { implicitResults } from '../../frontend/src/ade/v2/board/stepResults';
-import { defaultSandbox } from '../../frontend/src/ade/v2/board/stepSandbox';
+import { defaultResults } from '../../frontend/src/ade/v2/board/stepResults';
 import {
   addStep,
   aggregateEdges,
+  canMove,
   clearRoute,
   type Graph,
   type GraphNode,
   layoutWorkflow,
-  moveStage,
+  moveStep,
   NODE_H,
   NODE_W,
   normalizeOrder,
@@ -16,8 +16,8 @@ import {
   setRoute,
   setStart,
 } from '../../frontend/src/ade/v2/board/workflowGraph';
-import type { PipelineStep, StepResult, Workflow } from '../../frontend/src/ade/v2/wire';
-import { mkStage } from './support/adeV2Fixtures';
+import type { StepResult, Workflow, WorkflowStep } from '../../frontend/src/ade/v2/wire';
+import { mkManual, mkStep } from './support/adeV2Fixtures';
 
 const res = (id: string, ok: boolean, next = ok ? 'next' : 'stop', loop = false): StepResult => ({
   id,
@@ -26,34 +26,17 @@ const res = (id: string, ok: boolean, next = ok ? 'next' : 'stop', loop = false)
   next,
   loop,
 });
-const step = (id: string, results: StepResult[] = implicitResults(id, 'stop')): PipelineStep => ({
-  id,
-  name: id,
-  runsOn: 'once',
-  before: 'auto',
-  onFailure: '',
-  results,
-  maxReturns: 3,
-  timeout: '1h',
-  prompt: '',
-  allowedTools: [],
-  smartScript: '',
-  review: null,
-  sandbox: defaultSandbox(),
-  params: {},
-});
-const wfOf = (steps: PipelineStep[]): Workflow => ({
+const step = (id: string, results: StepResult[] = defaultResults()): WorkflowStep =>
+  mkStep({ id, results, runsOn: 'once' });
+const wfOf = (steps: WorkflowStep[]): Workflow => ({
   id: 'w',
   name: 'w',
   kiraSpaceMcp: false,
-  stages: [mkStage({ id: 's', kind: 'agent', steps })],
+  steps,
 });
-const stepsOf = (wf: Workflow): PipelineStep[] => wf.stages[0]?.steps ?? [];
-const next = (wf: Workflow, step: string, result: string): string =>
-  stepsOf(wf)
-    .find((s) => s.id === step)
-    ?.results.find((r) => r.id === result)?.next ?? '';
-const order = (wf: Workflow): string[] => stepsOf(wf).map((s) => s.id);
+const next = (wf: Workflow, id: string, result: string): string =>
+  wf.steps.find((s) => s.id === id)?.results.find((r) => r.id === result)?.next ?? '';
+const order = (wf: Workflow): string[] => wf.steps.map((s) => s.id);
 
 describe('aggregateEdges', () => {
   test('groups results by target and tones the edge by their ok flags', () => {
@@ -66,17 +49,16 @@ describe('aggregateEdges', () => {
       ]),
       step('b'),
     ];
-    const [e, ...rest] = aggregateEdges('s', steps, 0);
+    const [e, ...rest] = aggregateEdges(steps, 0);
     expect(rest).toHaveLength(0);
     expect(e).toMatchObject({ tone: 'neutral', results: ['good', 'fine', 'bad'], loop: false });
   });
 
   test('all ok is ok, all not ok is fail; stop draws no edge', () => {
     const steps = [step('a', [res('p', true, 'next'), res('q', false, 'end')]), step('b')];
-    const edges = aggregateEdges('s', steps, 0);
-    expect(edges.map((e) => [e.target, e.tone])).toEqual([
-      ['step:s:b', 'ok'],
-      ['end:s', 'fail'],
+    expect(aggregateEdges(steps, 0).map((e) => [e.target, e.tone])).toEqual([
+      ['step:b', 'ok'],
+      ['end', 'fail'],
     ]);
   });
 
@@ -85,16 +67,26 @@ describe('aggregateEdges', () => {
       step('a'),
       step('b', [res('ok', true), res('again', false, 'a', true), res('self', false, 'b', true)]),
     ];
-    const loops = aggregateEdges('s', steps, 1).filter((e) => e.loop);
-    expect(loops.map((e) => e.target)).toEqual(['step:s:a', 'step:s:b']);
+    expect(
+      aggregateEdges(steps, 1)
+        .filter((e) => e.loop)
+        .map((e) => e.target),
+    ).toEqual(['step:a', 'step:b']);
+  });
+
+  test('a manual step has one implicit edge to the next step and no handle', () => {
+    const [e, ...rest] = aggregateEdges([mkManual({ id: 'm' }), step('b')], 0);
+    expect(rest).toHaveLength(0);
+    expect(e).toMatchObject({ target: 'step:b', tone: 'ok', loop: false, results: [] });
+    expect(e?.sourceHandle).toBeUndefined();
   });
 });
 
 describe('setRoute', () => {
   test('an earlier target already reached forward becomes a loop edge', () => {
-    const wf = setRoute(wfOf([step('a'), step('b')]), 's', 'b', 'failed', 'a');
+    const wf = setRoute(wfOf([step('a'), step('b')]), 'b', 'failed', 'a');
     expect(order(wf)).toEqual(['a', 'b']);
-    const r = stepsOf(wf)[1]?.results[1];
+    const r = wf.steps[1]?.results[1];
     expect([r?.next, r?.loop]).toEqual(['a', true]);
   });
 
@@ -104,21 +96,21 @@ describe('setRoute', () => {
       step('b', [res('done', true, 'end'), res('failed', false)]),
       step('c'),
     ]);
-    const wf = setRoute(base, 's', 'c', 'done', 'b');
+    const wf = setRoute(base, 'c', 'done', 'b');
     expect(order(wf)).toEqual(['a', 'c', 'b']);
     expect(next(wf, 'c', 'done')).toBe('next');
-    expect(stepsOf(wf)[1]?.results[0]?.loop).toBe(false);
+    expect(wf.steps[1]?.results[0]?.loop).toBe(false);
   });
 
   test('a forward target past the next step keeps its id; the following step collapses to next', () => {
-    const wf = setRoute(wfOf([step('a'), step('b'), step('c')]), 's', 'a', 'done', 'c');
+    const wf = setRoute(wfOf([step('a'), step('b'), step('c')]), 'a', 'done', 'c');
     expect(next(wf, 'a', 'done')).toBe('c');
-    expect(next(setRoute(wf, 's', 'a', 'done', 'b'), 'a', 'done')).toBe('next');
+    expect(next(setRoute(wf, 'a', 'done', 'b'), 'a', 'done')).toBe('next');
   });
 
   test('self route is a loop edge', () => {
-    const wf = setRoute(wfOf([step('a')]), 's', 'a', 'failed', 'a');
-    expect(stepsOf(wf)[0]?.results[1]).toMatchObject({ next: 'a', loop: true });
+    const wf = setRoute(wfOf([step('a')]), 'a', 'failed', 'a');
+    expect(wf.steps[0]?.results[1]).toMatchObject({ next: 'a', loop: true });
   });
 });
 
@@ -143,10 +135,10 @@ describe('normalizeOrder', () => {
 
 describe('edits', () => {
   test('setStart turns the routes that led into the new start into loop edges', () => {
-    const wf = setStart(wfOf([step('a'), step('b')]), 's', 'b');
+    const wf = setStart(wfOf([step('a'), step('b')]), 'b');
     expect(order(wf)).toEqual(['b', 'a']);
-    expect(stepsOf(wf)[0]?.results[0]?.next).toBe('end');
-    expect(stepsOf(wf)[1]?.results[0]).toMatchObject({ next: 'b', loop: true });
+    expect(wf.steps[0]?.results[0]?.next).toBe('end');
+    expect(wf.steps[1]?.results[0]).toMatchObject({ next: 'b', loop: true });
   });
 
   test('removeStep resets routes into it to their defaults', () => {
@@ -155,113 +147,89 @@ describe('edits', () => {
       step('b'),
       step('c'),
     ]);
-    const wf = removeStep(base, 's', 'b');
+    const wf = removeStep(base, 'b');
     expect(next(wf, 'a', 'failed')).toBe('stop');
-    expect(stepsOf(wf)[0]?.results[1]?.loop).toBe(false);
+    expect(wf.steps[0]?.results[1]?.loop).toBe(false);
   });
 
   test('clearRoute restores the default of each result', () => {
     const base = wfOf([step('a', [res('done', true, 'end'), res('failed', false, 'a', true)])]);
-    const wf = clearRoute(base, 's', 'a', ['done', 'failed']);
-    expect(stepsOf(wf)[0]?.results.map((r) => [r.next, r.loop])).toEqual([
+    const wf = clearRoute(base, 'a', ['done', 'failed']);
+    expect(wf.steps[0]?.results.map((r) => [r.next, r.loop])).toEqual([
       ['next', false],
       ['stop', false],
     ]);
   });
 
-  test('addStep inserts after the given step and gets implicit results', () => {
-    const { wf, stepId } = addStep(wfOf([step('a'), step('b')]), 's', 'a');
+  test('addStep inserts a step of the kind after the given step with that kind defaults', () => {
+    const { wf, stepId } = addStep(wfOf([step('a'), step('b')]), 'review', 'a');
     expect(order(wf)[1]).toBe(stepId);
-    expect(stepsOf(wf)[1]?.results.map((r) => r.id)).toEqual(['done', 'failed']);
+    expect(wf.steps[1]).toMatchObject({ kind: 'review', maxReturns: 0 });
+    expect(wf.steps[1]?.results.map((r) => r.id)).toEqual(['approved', 'rejected']);
   });
 
-  test('moveStage reorders and ignores out-of-range indexes', () => {
-    const wf: Workflow = { ...wfOf([]), stages: ['x', 'y', 'z'].map((id) => mkStage({ id })) };
-    expect(moveStage(wf, 0, 2).stages.map((s) => s.id)).toEqual(['y', 'z', 'x']);
-    expect(moveStage(wf, 0, 9)).toBe(wf);
+  test('a manual step added has no results', () => {
+    const { wf } = addStep(wfOf([step('a')]), 'manual');
+    expect(wf.steps[1]).toMatchObject({ kind: 'manual', results: [] });
+  });
+
+  test('moveStep swaps neighbours, except across an explicit route that would turn into a return', () => {
+    const wf = wfOf([step('a'), step('b'), step('c')]);
+    expect(order(moveStep(wf, 'b', -1))).toEqual(['b', 'a', 'c']);
+    expect(moveStep(wf, 'a', -1)).toBe(wf);
+    const routed = wfOf([step('a', [res('done', true, 'b'), res('failed', false)]), step('b')]);
+    expect(canMove(routed, 'b', -1)).toBe(false);
+    expect(moveStep(routed, 'b', -1)).toBe(routed);
   });
 });
 
 describe('layoutWorkflow', () => {
-  const abs = (g: Graph, id: string): { x: number; y: number } => {
-    const n = g.nodes.find((x) => x.id === id) as GraphNode;
-    const parent = g.nodes.find((x) => x.id === n.parent);
-    return { x: n.x + (parent?.x ?? 0), y: n.y + (parent?.y ?? 0) };
-  };
-  const cx = (g: Graph, id: string): number => abs(g, id).x + NODE_W / 2;
-  const stepGraph = (steps: PipelineStep[]): Graph => layoutWorkflow(wfOf(steps));
+  const at = (g: Graph, id: string): GraphNode => g.nodes.find((x) => x.id === id) as GraphNode;
+  const cx = (g: Graph, id: string): number => at(g, id).x + NODE_W / 2;
+  const layout = (steps: WorkflowStep[]): Graph => layoutWorkflow(wfOf(steps));
 
-  test('stages stack top to bottom on one spine column; step, leaf and end nodes share one size', () => {
-    const wf = wfOf([step('a'), step('b')]);
-    wf.stages.push(
-      mkStage({ id: 't', kind: 'user' }),
-      mkStage({ id: 'u', kind: 'agent', steps: [step('c')] }),
-    );
-    const g = layoutWorkflow(wf);
-    const frames = g.nodes.filter((n) => n.kind === 'stage');
-    expect(new Set(frames.map((n) => n.w)).size).toBe(1);
-    const order = ['stage:s', 'stage:t', 'stage:u'].map(
-      (id) => g.nodes.find((n) => n.id === id) as GraphNode,
-    );
-    expect(order[0]?.y).toBeLessThan(order[1]?.y ?? 0);
-    expect(order[1]?.y).toBeLessThan(order[2]?.y ?? 0);
-    expect((order[0]?.y ?? 0) + (order[0]?.h ?? 0)).toBeLessThan(order[1]?.y ?? 0);
-    for (const n of g.nodes.filter((x) => x.kind !== 'stage'))
-      expect([n.w, n.h]).toEqual([NODE_W, NODE_H]);
-    const column = [
-      cx(g, 'step:s:a'),
-      cx(g, 'step:s:b'),
-      cx(g, 'end:s'),
-      cx(g, 'stage:t'),
-      cx(g, 'step:u:c'),
-    ];
-    expect(new Set(column).size).toBe(1);
-    expect(frames[0]?.spineX).toBe(column[0]);
+  test('steps and the end node share one size and one spine column, top to bottom', () => {
+    const g = layout([step('a'), step('b')]);
+    for (const n of g.nodes) expect([n.w, n.h]).toEqual([NODE_W, NODE_H]);
+    expect(new Set(['step:a', 'step:b', 'end'].map((id) => cx(g, id))).size).toBe(1);
+    expect(at(g, 'step:a').y).toBeLessThan(at(g, 'step:b').y);
+    expect(at(g, 'step:b').y).toBeLessThan(at(g, 'end').y);
     expect(g.height).toBeGreaterThan(0);
   });
 
-  test('a linear stage ends with the end node, strictly downward', () => {
-    const g = stepGraph([step('a'), step('b')]);
-    const y = (id: string): number => abs(g, id).y;
-    expect(y('step:s:a')).toBeLessThan(y('step:s:b'));
-    expect(y('step:s:b')).toBeLessThan(y('end:s'));
-    expect(g.edges.some((e) => e.id === 's:x')).toBe(false);
-  });
-
   test('a diamond fans out: branches share a rank, the join stays on the spine, nothing points up', () => {
-    const g = stepGraph([
+    const g = layout([
       step('a', [res('left', true, 'b'), res('right', false, 'c')]),
       step('b', [res('done', true, 'd'), res('failed', false)]),
       step('c', [res('done', true, 'd'), res('failed', false)]),
       step('d'),
     ]);
-    const p = (id: string): { x: number; y: number } => abs(g, `step:s:${id}`);
+    const p = (id: string): GraphNode => at(g, `step:${id}`);
     expect(p('b').y).toBe(p('c').y);
     expect(p('b').x).not.toBe(p('c').x);
     expect(p('d').y).toBeGreaterThan(p('b').y);
-    expect(cx(g, 'step:s:a')).toBe(cx(g, 'step:s:b'));
-    expect(cx(g, 'step:s:b')).toBe(cx(g, 'step:s:d'));
+    expect(cx(g, 'step:a')).toBe(cx(g, 'step:b'));
+    expect(cx(g, 'step:b')).toBe(cx(g, 'step:d'));
     for (const e of g.edges.filter((x) => !x.loop && x.results.length > 0))
-      expect(abs(g, e.target).y).toBeGreaterThan(abs(g, e.source).y);
+      expect(at(g, e.target).y).toBeGreaterThan(at(g, e.source).y);
   });
 
   test('a forward edge that skips a rank carries a route around the nodes between', () => {
-    const g = stepGraph([step('a', [res('done', true), res('skip', false, 'end')]), step('b')]);
-    const skip = g.edges.find((e) => e.target === 'end:s' && e.source === 'step:s:a');
+    const g = layout([step('a', [res('done', true), res('skip', false, 'end')]), step('b')]);
+    const skip = g.edges.find((e) => e.target === 'end' && e.source === 'step:a');
     expect(skip?.points?.length).toBeGreaterThan(0);
   });
 
   test('nested and overlapping loops get distinct lanes, disjoint loops share one, no loop has a route', () => {
-    const g = stepGraph([
+    const g = layout([
       step('a', [res('done', true), res('redo', false, 'a', true)]),
       step('b', [res('done', true), res('redo', false, 'b', true)]),
       step('c', [res('done', true), res('redo', false, 'b', true)]),
       step('d', [res('done', true), res('redo', false, 'b', true), res('all', false, 'a', true)]),
     ]);
     const lane = (source: string, target: string): number | undefined =>
-      g.edges.find(
-        (e) => e.loop && e.source === `step:s:${source}` && e.target === `step:s:${target}`,
-      )?.lane;
+      g.edges.find((e) => e.loop && e.source === `step:${source}` && e.target === `step:${target}`)
+        ?.lane;
     expect(lane('a', 'a')).toBe(lane('b', 'b'));
     expect(lane('c', 'b')).not.toBe(lane('b', 'b'));
     expect(lane('d', 'b')).not.toBe(lane('c', 'b'));
@@ -269,7 +237,7 @@ describe('layoutWorkflow', () => {
     expect(lane('d', 'a')).toBeDefined();
     const loops = g.edges.filter((e) => e.loop);
     expect(loops.every((e) => e.points === undefined && e.laneX !== undefined)).toBe(true);
-    const left = Math.min(...g.nodes.filter((n) => n.kind === 'step').map((n) => abs(g, n.id).x));
+    const left = Math.min(...g.nodes.filter((n) => n.kind === 'step').map((n) => n.x));
     expect(loops.every((e) => (e.laneX ?? left) < left)).toBe(true);
   });
 });

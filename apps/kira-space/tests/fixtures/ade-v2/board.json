@@ -11,21 +11,8 @@
       },
       "githubUrl": "",
       "workflowId": "bugfix",
-      "stageId": "release",
-      "currentStage": {
-        "id": "release",
-        "name": "Release",
-        "kind": "script",
-        "status": "In review",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [],
-        "command": "./scripts/release.sh --branch {branch}",
-        "runsOn": "each repo",
-        "onFailure": "stop",
-        "timeout": "15m"
-      },
+      "entryStepId": "release",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "1h",
@@ -36,7 +23,6 @@
         {
           "id": "r_T_cart_repro_b_cart",
           "taskId": "T_cart",
-          "stageId": "fix",
           "stepId": "repro",
           "branchId": "b_cart",
           "attempt": 1,
@@ -58,7 +44,6 @@
         {
           "id": "r_T_cart_fix_b_cart",
           "taskId": "T_cart",
-          "stageId": "fix",
           "stepId": "fix",
           "branchId": "b_cart",
           "attempt": 1,
@@ -80,7 +65,6 @@
         {
           "id": "r_T_cart_ci_b_cart",
           "taskId": "T_cart",
-          "stageId": "fix",
           "stepId": "ci",
           "branchId": "b_cart",
           "attempt": 1,
@@ -102,7 +86,6 @@
         {
           "id": "r_T_cart_pr_b_cart",
           "taskId": "T_cart",
-          "stageId": "fix",
           "stepId": "pr",
           "branchId": "b_cart",
           "attempt": 1,
@@ -124,7 +107,6 @@
         {
           "id": "r_T_cart_release_b_cart",
           "taskId": "T_cart",
-          "stageId": "release",
           "stepId": "release",
           "branchId": "b_cart",
           "attempt": 1,
@@ -157,202 +139,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "impl",
-      "currentStage": {
-        "id": "impl",
-        "name": "Implement",
-        "kind": "agent",
-        "status": "In progress",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [
-          {
-            "id": "plan",
-            "name": "Plan from spec",
-            "runsOn": "once",
-            "before": "auto",
-            "onFailure": "stop",
-            "timeout": "20m",
-            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "impl",
-            "name": "Implement",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 1",
-            "timeout": "2h",
-            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
-            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 1,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "tests",
-            "name": "Write tests",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "ci",
-            "name": "Make CI green",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "pr",
-            "name": "Open PRs",
-            "runsOn": "each repo",
-            "before": "approval",
-            "onFailure": "stop",
-            "timeout": "15m",
-            "prompt": "Open a draft PR for {branch} and link {jira}.",
-            "allowedTools": ["Bash(gh pr *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          }
-        ],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "plan",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "2d",
@@ -363,7 +151,6 @@
         {
           "id": "r_T_bill_plan_b_meter",
           "taskId": "T_bill",
-          "stageId": "impl",
           "stepId": "plan",
           "branchId": "b_meter",
           "attempt": 1,
@@ -385,7 +172,6 @@
         {
           "id": "r_T_bill_impl_b_meter",
           "taskId": "T_bill",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_meter",
           "attempt": 1,
@@ -407,7 +193,6 @@
         {
           "id": "r_T_bill_impl_b_bill",
           "taskId": "T_bill",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_bill",
           "attempt": 1,
@@ -429,7 +214,6 @@
         {
           "id": "r_T_bill_impl_b_billdash",
           "taskId": "T_bill",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_billdash",
           "attempt": 1,
@@ -462,21 +246,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "review",
-      "currentStage": {
-        "id": "review",
-        "name": "Review",
-        "kind": "user",
-        "status": "In review",
-        "skip": false,
-        "session": true,
-        "prompt": "Help me go through the review comments on {branch} and address them.",
-        "steps": [],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "review",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "5h",
@@ -487,7 +258,6 @@
         {
           "id": "r_T_auth_plan_b_authcb",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "plan",
           "branchId": "b_authcb",
           "attempt": 1,
@@ -509,7 +279,6 @@
         {
           "id": "r_T_auth_impl_b_authcb",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_authcb",
           "attempt": 1,
@@ -531,7 +300,6 @@
         {
           "id": "r_T_auth_impl_b_auth",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_auth",
           "attempt": 1,
@@ -553,7 +321,6 @@
         {
           "id": "r_T_auth_impl_b_authui",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_authui",
           "attempt": 1,
@@ -575,7 +342,6 @@
         {
           "id": "r_T_auth_tests_b_authcb",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_authcb",
           "attempt": 1,
@@ -597,7 +363,6 @@
         {
           "id": "r_T_auth_tests_b_auth",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_auth",
           "attempt": 1,
@@ -619,7 +384,6 @@
         {
           "id": "r_T_auth_tests_b_authui",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_authui",
           "attempt": 1,
@@ -641,7 +405,6 @@
         {
           "id": "r_T_auth_ci_b_authcb",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "ci",
           "branchId": "b_authcb",
           "attempt": 1,
@@ -663,7 +426,6 @@
         {
           "id": "r_T_auth_ci_b_auth",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "ci",
           "branchId": "b_auth",
           "attempt": 1,
@@ -685,7 +447,6 @@
         {
           "id": "r_T_auth_ci_b_authui",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "ci",
           "branchId": "b_authui",
           "attempt": 1,
@@ -707,7 +468,6 @@
         {
           "id": "r_T_auth_pr_b_authcb",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "pr",
           "branchId": "b_authcb",
           "attempt": 1,
@@ -729,7 +489,6 @@
         {
           "id": "r_T_auth_pr_b_auth",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "pr",
           "branchId": "b_auth",
           "attempt": 1,
@@ -751,7 +510,6 @@
         {
           "id": "r_T_auth_pr_b_authui",
           "taskId": "T_auth",
-          "stageId": "impl",
           "stepId": "pr",
           "branchId": "b_authui",
           "attempt": 1,
@@ -784,202 +542,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "impl",
-      "currentStage": {
-        "id": "impl",
-        "name": "Implement",
-        "kind": "agent",
-        "status": "In progress",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [
-          {
-            "id": "plan",
-            "name": "Plan from spec",
-            "runsOn": "once",
-            "before": "auto",
-            "onFailure": "stop",
-            "timeout": "20m",
-            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "impl",
-            "name": "Implement",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 1",
-            "timeout": "2h",
-            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
-            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 1,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "tests",
-            "name": "Write tests",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "ci",
-            "name": "Make CI green",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "pr",
-            "name": "Open PRs",
-            "runsOn": "each repo",
-            "before": "approval",
-            "onFailure": "stop",
-            "timeout": "15m",
-            "prompt": "Open a draft PR for {branch} and link {jira}.",
-            "allowedTools": ["Bash(gh pr *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          }
-        ],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "plan",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "3h",
@@ -990,7 +554,6 @@
         {
           "id": "r_T_hooks_plan_b_hooks",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "plan",
           "branchId": "b_hooks",
           "attempt": 1,
@@ -1012,7 +575,6 @@
         {
           "id": "r_T_hooks_impl_b_hooks",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_hooks",
           "attempt": 1,
@@ -1034,7 +596,6 @@
         {
           "id": "r_T_hooks_impl_b_hooksretry",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_hooksretry",
           "attempt": 1,
@@ -1056,7 +617,6 @@
         {
           "id": "r_T_hooks_tests_b_hooks",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_hooks",
           "attempt": 1,
@@ -1078,7 +638,6 @@
         {
           "id": "r_T_hooks_tests_b_hooksretry",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_hooksretry",
           "attempt": 1,
@@ -1100,7 +659,6 @@
         {
           "id": "r_T_hooks_ci_b_hooks",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "ci",
           "branchId": "b_hooks",
           "attempt": 1,
@@ -1122,7 +680,6 @@
         {
           "id": "r_T_hooks_ci_b_hooksretry",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "ci",
           "branchId": "b_hooksretry",
           "attempt": 1,
@@ -1144,7 +701,6 @@
         {
           "id": "r_T_hooks_pr_b_hooks",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "pr",
           "branchId": "b_hooks",
           "attempt": 1,
@@ -1166,7 +722,6 @@
         {
           "id": "r_T_hooks_pr_b_hooksretry",
           "taskId": "T_hooks",
-          "stageId": "impl",
           "stepId": "pr",
           "branchId": "b_hooksretry",
           "attempt": 1,
@@ -1199,202 +754,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "impl",
-      "currentStage": {
-        "id": "impl",
-        "name": "Implement",
-        "kind": "agent",
-        "status": "In progress",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [
-          {
-            "id": "plan",
-            "name": "Plan from spec",
-            "runsOn": "once",
-            "before": "auto",
-            "onFailure": "stop",
-            "timeout": "20m",
-            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "impl",
-            "name": "Implement",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 1",
-            "timeout": "2h",
-            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
-            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 1,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "tests",
-            "name": "Write tests",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "ci",
-            "name": "Make CI green",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "pr",
-            "name": "Open PRs",
-            "runsOn": "each repo",
-            "before": "approval",
-            "onFailure": "stop",
-            "timeout": "15m",
-            "prompt": "Open a draft PR for {branch} and link {jira}.",
-            "allowedTools": ["Bash(gh pr *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          }
-        ],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "plan",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "3d",
@@ -1405,7 +766,6 @@
         {
           "id": "r_T_search_plan_b_search",
           "taskId": "T_search",
-          "stageId": "impl",
           "stepId": "plan",
           "branchId": "b_search",
           "attempt": 1,
@@ -1427,7 +787,6 @@
         {
           "id": "r_T_search_impl_b_search",
           "taskId": "T_search",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_search",
           "attempt": 1,
@@ -1449,7 +808,6 @@
         {
           "id": "r_T_search_impl_b_searchui",
           "taskId": "T_search",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_searchui",
           "attempt": 1,
@@ -1471,7 +829,6 @@
         {
           "id": "r_T_search_tests_b_search",
           "taskId": "T_search",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_search",
           "attempt": 1,
@@ -1493,7 +850,6 @@
         {
           "id": "r_T_search_tests_b_searchui",
           "taskId": "T_search",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_searchui",
           "attempt": 1,
@@ -1515,7 +871,6 @@
         {
           "id": "r_T_search_ci_b_search",
           "taskId": "T_search",
-          "stageId": "impl",
           "stepId": "ci",
           "branchId": "b_search",
           "attempt": 1,
@@ -1545,166 +900,8 @@
       "jira": null,
       "githubUrl": "",
       "workflowId": "bugfix",
-      "stageId": "fix",
-      "currentStage": {
-        "id": "fix",
-        "name": "Fix",
-        "kind": "agent",
-        "status": "In progress",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [
-          {
-            "id": "repro",
-            "name": "Reproduce with a failing test",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "stop",
-            "timeout": "30m",
-            "prompt": "Reproduce {jira} with a failing test on {branch}.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "fix",
-            "name": "Fix",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 1",
-            "timeout": "1h",
-            "prompt": "Make the failing test pass with the smallest change.",
-            "allowedTools": ["Bash(npm test)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "fix",
-                "loop": true
-              }
-            ],
-            "maxReturns": 1,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "ci",
-            "name": "Make CI green",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 2",
-            "timeout": "1h",
-            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "ci",
-                "loop": true
-              }
-            ],
-            "maxReturns": 2,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "pr",
-            "name": "Open PR",
-            "runsOn": "each repo",
-            "before": "approval",
-            "onFailure": "stop",
-            "timeout": "15m",
-            "prompt": "Open a draft PR for {branch} and link {jira}.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          }
-        ],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "repro",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "2h",
@@ -1715,7 +912,6 @@
         {
           "id": "r_T_notif_repro_b_notif",
           "taskId": "T_notif",
-          "stageId": "fix",
           "stepId": "repro",
           "branchId": "b_notif",
           "attempt": 1,
@@ -1737,7 +933,6 @@
         {
           "id": "r_T_notif_fix_b_notif",
           "taskId": "T_notif",
-          "stageId": "fix",
           "stepId": "fix",
           "branchId": "b_notif",
           "attempt": 1,
@@ -1767,94 +962,8 @@
       "jira": null,
       "githubUrl": "",
       "workflowId": "chore",
-      "stageId": "update",
-      "currentStage": {
-        "id": "update",
-        "name": "Update",
-        "kind": "agent",
-        "status": "In progress",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [
-          {
-            "id": "update",
-            "name": "Apply the change",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "stop",
-            "timeout": "1h",
-            "prompt": "Apply the change described in the task on {branch}.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "ci",
-            "name": "Make CI green",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 2",
-            "timeout": "1h",
-            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "ci",
-                "loop": true
-              }
-            ],
-            "maxReturns": 2,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          }
-        ],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "update",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "1h",
@@ -1865,7 +974,6 @@
         {
           "id": "r_T_deps_update_b_deps",
           "taskId": "T_deps",
-          "stageId": "update",
           "stepId": "update",
           "branchId": "b_deps",
           "attempt": 1,
@@ -1887,7 +995,6 @@
         {
           "id": "r_T_deps_ci_b_deps",
           "taskId": "T_deps",
-          "stageId": "update",
           "stepId": "ci",
           "branchId": "b_deps",
           "attempt": 1,
@@ -1920,202 +1027,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "impl",
-      "currentStage": {
-        "id": "impl",
-        "name": "Implement",
-        "kind": "agent",
-        "status": "In progress",
-        "skip": false,
-        "session": false,
-        "prompt": "",
-        "steps": [
-          {
-            "id": "plan",
-            "name": "Plan from spec",
-            "runsOn": "once",
-            "before": "auto",
-            "onFailure": "stop",
-            "timeout": "20m",
-            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "impl",
-            "name": "Implement",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "retry 1",
-            "timeout": "2h",
-            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
-            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 1,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "tests",
-            "name": "Write tests",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "ci",
-            "name": "Make CI green",
-            "runsOn": "each repo",
-            "before": "auto",
-            "onFailure": "back:impl",
-            "timeout": "1h",
-            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-            "allowedTools": [],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "impl",
-                "loop": true
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          },
-          {
-            "id": "pr",
-            "name": "Open PRs",
-            "runsOn": "each repo",
-            "before": "approval",
-            "onFailure": "stop",
-            "timeout": "15m",
-            "prompt": "Open a draft PR for {branch} and link {jira}.",
-            "allowedTools": ["Bash(gh pr *)"],
-            "smartScript": "",
-            "review": null,
-            "params": {},
-            "results": [
-              {
-                "id": "done",
-                "ok": true,
-                "description": "",
-                "next": "next",
-                "loop": false
-              },
-              {
-                "id": "failed",
-                "ok": false,
-                "description": "",
-                "next": "stop",
-                "loop": false
-              }
-            ],
-            "maxReturns": 3,
-            "sandbox": {
-              "access": "write",
-              "read": [],
-              "allow": [],
-              "network": true
-            }
-          }
-        ],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "plan",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "2h",
@@ -2126,7 +1039,6 @@
         {
           "id": "r_T_push_plan_b_pushapi",
           "taskId": "T_push",
-          "stageId": "impl",
           "stepId": "plan",
           "branchId": "b_pushapi",
           "attempt": 1,
@@ -2148,7 +1060,6 @@
         {
           "id": "r_T_push_impl_b_pushapi",
           "taskId": "T_push",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_pushapi",
           "attempt": 1,
@@ -2170,7 +1081,6 @@
         {
           "id": "r_T_push_impl_b_push",
           "taskId": "T_push",
-          "stageId": "impl",
           "stepId": "impl",
           "branchId": "b_push",
           "attempt": 1,
@@ -2192,7 +1102,6 @@
         {
           "id": "r_T_push_tests_b_pushapi",
           "taskId": "T_push",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_pushapi",
           "attempt": 1,
@@ -2214,7 +1123,6 @@
         {
           "id": "r_T_push_tests_b_push",
           "taskId": "T_push",
-          "stageId": "impl",
           "stepId": "tests",
           "branchId": "b_push",
           "attempt": 1,
@@ -2247,21 +1155,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "spec",
-      "currentStage": {
-        "id": "spec",
-        "name": "Spec",
-        "kind": "user",
-        "status": "In progress",
-        "skip": false,
-        "session": true,
-        "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
-        "steps": [],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "spec",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "1d",
@@ -2282,21 +1177,8 @@
       },
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "spec",
-      "currentStage": {
-        "id": "spec",
-        "name": "Spec",
-        "kind": "user",
-        "status": "In progress",
-        "skip": false,
-        "session": true,
-        "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
-        "steps": [],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "spec",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "4h",
@@ -2314,8 +1196,8 @@
       "jira": null,
       "githubUrl": "",
       "workflowId": "",
-      "stageId": "",
-      "currentStage": null,
+      "entryStepId": "",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "",
@@ -2333,8 +1215,8 @@
       "jira": null,
       "githubUrl": "",
       "workflowId": "",
-      "stageId": "",
-      "currentStage": null,
+      "entryStepId": "",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "",
@@ -2352,21 +1234,8 @@
       "jira": null,
       "githubUrl": "",
       "workflowId": "standard",
-      "stageId": "spec",
-      "currentStage": {
-        "id": "spec",
-        "name": "Spec",
-        "kind": "user",
-        "status": "In progress",
-        "skip": false,
-        "session": true,
-        "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
-        "steps": [],
-        "command": "",
-        "runsOn": "",
-        "onFailure": "",
-        "timeout": ""
-      },
+      "entryStepId": "spec",
+      "since": {},
       "workflow": null,
       "workflowOutdated": false,
       "est": "1d",

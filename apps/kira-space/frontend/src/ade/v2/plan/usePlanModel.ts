@@ -21,8 +21,8 @@ import {
   buildTaskProgress,
   type TaskProgress,
 } from '../board/progress';
-import { buildStageBlocks, type StageBlock } from '../board/stageBlocks';
 import { type DerivedStatus, deriveStatus } from '../board/status';
+import { buildStepBlocks, type StepBlock } from '../board/stepBlocks';
 import {
   buildTimeline,
   type Ripple,
@@ -74,7 +74,7 @@ export interface CardModel {
   /** The task's workflow file, `null` when it has none or the file is gone. */
   workflow: Workflow | null;
   /** Panel Workflow block: one per stage; empty for a review or parked task. */
-  blocks: StageBlock[];
+  blocks: StepBlock[];
   status: DerivedStatus;
   tag: { label: string; tone: BranchTag['tone']; tip: string; since?: number } | null;
   /** Task stage action; which kinds render is `useTaskAction`'s call. */
@@ -189,20 +189,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     defaultTitle: taskTitle({ ...task, title: '' }, first, first ? c.prTitle(first.id) : ''),
     progress,
     workflow,
-    blocks: hidden
-      ? []
-      : buildStageBlocks(
-          {
-            task,
-            workflow,
-            branch: (bid) => graph.byBranch.get(bid),
-            repoNick: c.repoLabel,
-          },
-          workflow,
-          progress.stage,
-          progress.stageIndex,
-          progress.finished,
-        ),
+    blocks: hidden ? [] : buildStepBlocks(progress, workflow),
     status,
     tag: cell?.tag ?? null,
     action: cell?.action ?? null,

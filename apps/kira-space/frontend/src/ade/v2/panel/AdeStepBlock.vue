@@ -15,9 +15,9 @@ import type { Tone } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import type { StepRun } from '../board/progress';
 import { WAITING_SETUP_NOTES } from '../board/setupGate';
-import { nextStageId, type StageBlock } from '../board/stageBlocks';
+import { nextStepId, type StepBlock } from '../board/stepBlocks';
 import { type CardModel, usePlanModel } from '../plan/usePlanModel';
-import { useApprove, useResumeRun, useRetryRun, useSetTaskStage } from '../queries';
+import { useApprove, useResumeRun, useRetryRun, useSetTaskStep } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
@@ -27,15 +27,15 @@ import AdeRunOutcome from './AdeRunOutcome.vue';
 import AdeRunSandboxBadge from './AdeRunSandboxBadge.vue';
 import AdeSetupProgress from './AdeSetupProgress.vue';
 
-// One stage of the Workflow block: header (state chip, action slot, name, count, mode), then its
-// steps with their per-repo run lines, or the branches of the Release stage.
-const props = defineProps<{ block: StageBlock; card: CardModel }>();
+// One step of the Workflow block: header (state chip, action slot, name, mode), the step row, then
+// its per-repo run lines, or the branches of the Release step.
+const props = defineProps<{ block: StepBlock; card: CardModel }>();
 const ui = useAdeBoardUiStore();
 const takeOver = useAdeTakeOverStore();
 const approve = useApprove();
 const retry = useRetryRun();
 const resume = useResumeRun();
-const setStage = useSetTaskStage();
+const setStep = useSetTaskStep();
 const contextMenu = useContextMenuStore();
 const reviewCode = useReviewCode();
 const { model } = usePlanModel();
@@ -45,8 +45,8 @@ const mainNameOf = (codeRepoId: string): string =>
 const error = ref('');
 const openLog = ref<string | null>(null);
 
-const STATE_TONE: Record<StageBlock['state'], Tone> = {
-  done: 'green',
+const STATE_TONE: Record<StepBlock['state'], Tone> = {
+  past: 'green',
   now: 'amber',
   next: 'grey',
   skipped: 'grey',
@@ -54,11 +54,11 @@ const STATE_TONE: Record<StageBlock['state'], Tone> = {
 const current = computed(() => props.block.state === 'now');
 const skipped = computed(() => props.block.state === 'skipped');
 
-function moveTo(stageId: string): void {
+function moveTo(stepId: string): void {
   const taskId = props.card.task.id;
   delete ui.actionError[taskId];
-  setStage.mutate(
-    { taskId, stageId },
+  setStep.mutate(
+    { taskId, stepId },
     { onError: (err) => (ui.actionError[taskId] = errorText(err)) },
   );
 }
@@ -67,24 +67,24 @@ function onMenu(ev: MouseEvent): void {
   const live = props.card.task.runs.some((r) => r.state === 'running');
   const hint = live ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : undefined;
   const items: MenuItem[] = [
-    { type: 'label', label: props.block.stage.name },
+    { type: 'label', label: props.block.step.name },
     {
       type: 'item',
-      id: 'ade-stage-move-here',
-      label: t('space.ade.stageBlock.moveHere.label'),
+      id: 'ade-step-move-here',
+      label: t('space.ade.stepBlock.moveHere.label'),
       disabled: current.value || skipped.value || live,
       hint: current.value || skipped.value ? undefined : hint,
-      run: () => moveTo(props.block.stage.id),
+      run: () => moveTo(props.block.step.id),
     },
   ];
   if (current.value) {
     items.push({
       type: 'item',
-      id: 'ade-stage-skip-this',
-      label: t('space.ade.stageBlock.skipThis.label'),
+      id: 'ade-step-skip-this',
+      label: t('space.ade.stepBlock.skipThis.label'),
       disabled: live,
       hint,
-      run: () => moveTo(nextStageId(props.card.blocks, props.block.stage.id)),
+      run: () => moveTo(nextStepId(props.card.blocks, props.block.step.id)),
     });
   }
   contextMenu.openContextMenu(ev, items);
@@ -104,12 +104,12 @@ const heldRow = (rl: { run: { branchId: string }; note: string }) =>
     ? props.card.rows.find((r) => r.id === rl.run.branchId)
     : undefined;
 const STATE_LABEL = {
-  done: 'common.done.status',
+  past: 'common.done.status',
   now: 'common.now.status',
   next: 'common.action.next.label',
   skipped: 'common.skipped.status',
-} as const satisfies Record<StageBlock['state'], MessageKey>;
-const stateLabel = (s: StageBlock['state']): string => t(STATE_LABEL[s]);
+} as const satisfies Record<StepBlock['state'], MessageKey>;
+const stateLabel = (s: StepBlock['state']): string => t(STATE_LABEL[s]);
 
 const GLYPH_BOX: Record<string, string> = {
   done: 'bg-tone-green-solid text-bg',
@@ -143,14 +143,12 @@ async function run(fn: () => Promise<unknown>): Promise<void> {
   }
 }
 const onApprove = (stepId: string): Promise<void> =>
-  run(() =>
-    approve.mutateAsync({ taskId: props.card.task.id, stageId: props.block.stage.id, stepId }),
-  );
+  run(() => approve.mutateAsync({ taskId: props.card.task.id, stepId }));
 const onRetry = (runId: string): Promise<void> => run(() => retry.mutateAsync({ runId }));
 const onResume = (runId: string): Promise<void> => run(() => resume.mutateAsync({ runId }));
 
 const canTakeOver = (r: StepRun): boolean =>
-  props.block.stage.kind === 'agent' &&
+  props.block.step.kind === 'agent' &&
   r.sessionId !== '' &&
   (r.state === 'stuck' || r.state === 'failed' || r.state === 'running');
 
@@ -158,7 +156,7 @@ const released = computed(() =>
   props.block.release ? props.card.rows.filter((r) => r.branch.kind === 'mine' && !r.draft) : [],
 );
 const reviewRows = computed(() =>
-  props.block.stage.id === 'review' ? props.card.rows.filter((r) => r.branch.kind === 'mine') : [],
+  props.block.step.id === 'review' ? props.card.rows.filter((r) => r.branch.kind === 'mine') : [],
 );
 const reviewOff = (row: CardModel['rows'][number]): boolean => {
   const c = reviewCode.choiceOf(row);
@@ -171,17 +169,15 @@ const onReview = (branchId: string): void => {
 const mainBadge = (b: CardModel['rows'][number]['branch']): string => {
   const main = mainNameOf(b.codeRepoId);
   return b.mergedIntoMain
-    ? t('space.ade.progress.stageDone.label', { name: main })
-    : t('space.ade.stageBlock.mainOpen.status', { main });
+    ? t('space.ade.progress.stepDone.label', { name: main })
+    : t('space.ade.stepBlock.mainOpen.status', { main });
 };
 const chipClass = (tone: 'muted' | 'stale' | 'unknown'): string =>
   tone === 'stale' ? 'text-tone-amber' : 'text-muted-foreground';
 function logToggleLabel(runId: string): string {
   const open = openLog.value === runId;
-  if (props.block.stage.kind === 'script') {
-    return open
-      ? t('space.ade.stageBlock.hideOutput.label')
-      : t('space.ade.stageBlock.output.label');
+  if (props.block.step.kind === 'script') {
+    return open ? t('space.ade.stepBlock.hideOutput.label') : t('space.ade.stepBlock.output.label');
   }
   return open ? t('space.common.hideLog.label') : t('space.ade.needsPage.log.label');
 }
@@ -192,14 +188,14 @@ function logToggleLabel(runId: string): string {
     variant="section"
     class="gap-1 px-2 py-2"
     :class="[skipped ? 'text-muted-foreground' : '', boxClass]"
-    data-testid="ade-stage-block"
-    :data-stage-id="block.stage.id"
+    data-testid="ade-step-block"
+    :data-step-id="block.step.id"
     :data-state="block.state"
   >
     <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header holds nested interactive controls. -->
     <div
       class="flex min-h-6 items-center gap-2"
-      data-testid="ade-stage-block-head"
+      data-testid="ade-step-block-head"
       @contextmenu="onMenu"
     >
       <AdeChip
@@ -208,88 +204,76 @@ function logToggleLabel(runId: string): string {
         class="min-w-10 text-center"
       />
       <slot name="actions" />
-      <span class="text-kira-lg font-medium" data-testid="ade-stage-block-name">{{
-        block.stage.name
-      }}</span>
+      <span class="shrink-0 text-kira-sm text-subtle">{{ block.step.n }}.</span>
       <span
-        class="font-data text-kira-md font-medium text-tone-amber"
-        data-testid="ade-stage-block-count"
+        class="min-w-0 truncate text-kira-lg font-medium"
+        :class="block.step.state === 'done' ? 'text-subtle' : 'text-fg'"
+        data-testid="ade-step-name"
         >{{
-          block.count
+          block.step.name
         }}</span
       >
-      <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-stage-block-mode">{{
+      <SmartBadge v-if="block.step.smartScript" />
+      <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-step-block-mode">{{
         block.mode
       }}</span>
     </div>
 
     <div
-      v-for="sv in block.steps"
-      :key="sv.step.id"
       class="flex flex-col gap-0.5 rounded-kira-sm bg-bg px-1.5 py-1"
       data-testid="ade-step"
-      :data-step-id="sv.step.id"
+      :data-step-id="block.step.id"
     >
       <div class="flex min-h-control items-center gap-2">
         <span
           class="box-border flex size-4 shrink-0 items-center justify-center rounded-kira-sm text-kira-sm font-extrabold"
-          :class="glyphClass(sv.step.state)"
+          :class="glyphClass(block.step.state)"
           >{{
-            STEP_GLYPH[sv.step.state]
+            STEP_GLYPH[block.step.state]
           }}</span
         >
         <span
           class="shrink-0 whitespace-nowrap text-kira-sm"
-          :class="statusClass(sv.step.state)"
+          :class="statusClass(block.step.state)"
           data-testid="ade-step-status"
           >{{
-            sv.statusText
+            block.statusText
           }}</span
         >
         <Button
           variant="dialog"
-          v-if="sv.step.approval"
+          v-if="block.step.approval"
           size="kira"
           class="shrink-0 "
           :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-step-approve"
-          @click="onApprove(sv.step.id)"
+          @click="onApprove(block.step.id)"
         >
           {{ t('common.action.approve.label') }}
         </Button>
-        <span class="shrink-0 text-kira-sm text-subtle">{{ sv.step.n }}.</span>
         <span
-          class="min-w-0 flex-1 truncate text-kira-md font-medium"
-          :class="sv.step.state === 'done' ? 'text-subtle' : 'text-fg'"
-          data-testid="ade-step-name"
-          >{{
-            sv.step.name
-          }}</span
-        >
-        <SmartBadge v-if="sv.step.smartScript" />
-        <span
-          v-if="sv.routeText"
+          v-if="block.routeText"
           data-testid="ade-step-route"
           class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue"
           >{{
-            sv.routeText
+            block.routeText
           }}</span
         >
-        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">{{
-          t('space.ade.stageBlock.needsApproval.status')
+        <span v-if="block.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">{{
+          t('space.ade.stepBlock.needsApproval.status')
         }}</span>
-        <AdeTip :text="sv.scope">
+        <AdeTip v-if="block.scope" :text="block.scope">
           <span
             class="min-w-0 shrink truncate text-kira-sm text-subtle"
-            :class="block.stage.kind === 'script' ? 'font-data' : ''"
+            :class="block.step.kind === 'script' ? 'font-data' : ''"
             data-testid="ade-step-scope"
             >{{
-              sv.scope
+              block.scope
             }}</span
           >
         </AdeTip>
       </div>
-      <template v-for="rl in sv.runs" :key="rl.run.branchId">
+      <template v-for="rl in block.runs" :key="rl.run.branchId">
         <div
           class="flex min-h-control items-center gap-2 pl-6"
           data-testid="ade-run-line"
@@ -330,7 +314,7 @@ function logToggleLabel(runId: string): string {
           >
             {{ logToggleLabel(rl.run.runId) }}
           </Button>
-          <AdeTip v-if="rl.canResume" :text="t('space.ade.stageBlock.resume.tooltip')">
+          <AdeTip v-if="rl.canResume" :text="t('space.ade.stepBlock.resume.tooltip')">
             <Button
               variant="dialog"
               size="kira"
@@ -405,7 +389,7 @@ function logToggleLabel(runId: string): string {
         <AdeRunOutcome
           v-if="reportRun(rl.run.runId)"
           :run="reportRun(rl.run.runId)!"
-          :title="t('space.ade.stageBlock.report.title', { stage: block.stage.name })"
+          :title="t('space.ade.stepBlock.report.title', { step: block.step.name })"
           class="my-0.5 ml-6"
         />
         <div v-if="openLog === rl.run.runId && rl.run.runId" class="my-0.5 ml-6">
@@ -463,7 +447,7 @@ function logToggleLabel(runId: string): string {
         </TooltipDisabledTrigger>
       </AdeTip>
     </div>
-    <Alert v-if="error" variant="error" data-testid="ade-stage-block-error"
+    <Alert v-if="error" variant="error" data-testid="ade-step-block-error"
       ><AlertDescription>{{ error }}</AlertDescription></Alert
     >
   </Card>

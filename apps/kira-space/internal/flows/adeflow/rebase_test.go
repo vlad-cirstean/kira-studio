@@ -32,7 +32,7 @@ func newRbFx(t *testing.T, opts ...flowharness.Opt) (*rbFx, adewire.Task, adewir
 	repo.Commit("work a", map[string]string{"a.txt": "a\n"})
 	repo.Git("push", "-q", "origin", "feat/a")
 	repo.Checkout("main")
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
 	added, err := app.W.AdeTask.AddExistingBranch(ctx, adewire.AddExistingBranchArgs{CodeRepoID: f.repoID, Name: "feat/a"})
 	if err != nil {
 		t.Fatalf("AddExistingBranch: %v", err)
@@ -324,7 +324,7 @@ func TestRebaseRun(t *testing.T) {
 
 	t.Run("run_outcome lists the failed rebase to a later step run of the same task only", func(t *testing.T) {
 		f := newBaseFx(t)
-		saveWorkflow(t, f.app, "flow", flowYAML("flow", agentStage("build", agentStep("one", "")+agentStep("two", "        before: approval\n"))))
+		saveWorkflow(t, f.app, "flow", flowYAML("flow", agentStep("one", "")+agentStep("two", "    before: approval\n")))
 		task, br := f.task(t, "Fix", adewire.BaseChoice{})
 		claude(f.app, map[string][]fakeagent.Action{"*": {
 			{Name: "done"},
@@ -350,7 +350,7 @@ func TestRebaseRun(t *testing.T) {
 			r, ok := latestRebase(t, f.app, task.ID)
 			return ok && r.ID == res.RunID && r.State == "failed"
 		})
-		if err := f.app.W.AdeTask.Approve(ctx, adewire.StepArgs{TaskID: task.ID, StageID: "build", StepID: "two"}); err != nil {
+		if err := f.app.W.AdeTask.Approve(ctx, adewire.StepArgs{TaskID: task.ID, StepID: "two"}); err != nil {
 			t.Fatal(err)
 		}
 		waitRun(t, f.app, task.ID, "two", "done")
@@ -366,7 +366,7 @@ func TestRebaseRun(t *testing.T) {
 
 	t.Run("an approved step waits for a running rebase, then launches", func(t *testing.T) {
 		f := newBaseFx(t)
-		saveWorkflow(t, f.app, "flow", flowYAML("flow", agentStage("build", agentStep("one", "")+agentStep("two", "        before: approval\n"))))
+		saveWorkflow(t, f.app, "flow", flowYAML("flow", agentStep("one", "")+agentStep("two", "    before: approval\n")))
 		task, br := f.task(t, "Fix", adewire.BaseChoice{})
 		gate := filepath.Join(f.app.Work, "release-rebase")
 		claude(f.app, map[string][]fakeagent.Action{"*": {
@@ -387,7 +387,7 @@ func TestRebaseRun(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.app.W.AdeTask.Approve(ctx, adewire.StepArgs{TaskID: task.ID, StageID: "build", StepID: "two"}); err != nil {
+		if err := f.app.W.AdeTask.Approve(ctx, adewire.StepArgs{TaskID: task.ID, StepID: "two"}); err != nil {
 			t.Fatal(err)
 		}
 		testx.WaitUntil(t, waitFor, func() bool {

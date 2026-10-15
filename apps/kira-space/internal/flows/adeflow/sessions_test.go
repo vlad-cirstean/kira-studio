@@ -71,12 +71,12 @@ func TestInteractiveSessions(t *testing.T) {
 	app := flowharness.New(t, flowharness.WithTrackerGrace(time.Second))
 	// Call 1 is the headless run; calls 2 to 4 are interactive Claude Code processes held open by a flag file.
 	claude(app, map[string][]fakeagent.Action{"*": {
-		{Name: "done"}, {WaitFile: flag("takeover")}, {WaitFile: flag("stage")}, {Name: "sleep"},
+		{Name: "done"}, {WaitFile: flag("takeover")}, {WaitFile: flag("step")}, {Name: "sleep"},
 	}})
 	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	rec := importRepo(t, app, repo.Dir)
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))+
-		"  - id: work\n    name: Work\n    kind: user\n    status: In progress\n    session: true\n"))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")+
+		"  - id: work\n    name: Work\n    kind: manual\n    status: In progress\n    session: true\n"))
 	task := createTask(t, app, "Fix login", "flow", rec.ID)
 	br := branchOf(t, board(t, app), task.ID, rec.ID)
 	if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{br.ID: "feat/api-work"}}); err != nil {
@@ -111,23 +111,20 @@ func TestInteractiveSessions(t *testing.T) {
 	}
 	waitSession(t, app, tui.ID, "stopped")
 
-	// The user stage opens its own session; Send reaches the agent's terminal, FocusSession its window.
-	if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil {
-		t.Fatal(err)
-	}
-	stage, err := app.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+	// The manual step opens its own session; Send reaches the agent's terminal, FocusSession its window.
+	step, err := app.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stage.Cwd != br.Worktree {
-		t.Fatalf("stage launch cwd = %q, want the task worktree %q", stage.Cwd, br.Worktree)
+	if step.Cwd != br.Worktree {
+		t.Fatalf("step launch cwd = %q, want the task worktree %q", step.Cwd, br.Worktree)
 	}
-	openLaunch(t, app, stage)
-	waitSession(t, app, stage.SessionID, "running")
-	if _, err := app.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID}); err == nil {
-		t.Fatal("second LaunchStage while one session runs succeeded")
+	openLaunch(t, app, step)
+	waitSession(t, app, step.SessionID, "running")
+	if _, err := app.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID}); err == nil {
+		t.Fatal("second LaunchStep while one session runs succeeded")
 	}
-	if err := app.W.AdeTask.Send(ctx, adewire.SendArgs{SessionID: stage.SessionID, Message: "hello from the board"}); err != nil {
+	if err := app.W.AdeTask.Send(ctx, adewire.SendArgs{SessionID: step.SessionID, Message: "hello from the board"}); err != nil {
 		t.Fatal(err)
 	}
 	testx.WaitUntil(t, waitFor, func() bool {
@@ -138,7 +135,7 @@ func TestInteractiveSessions(t *testing.T) {
 		t.Fatal("Send to a headless session succeeded")
 	}
 	mark := app.Events.Mark()
-	focused, err := app.W.AdeTask.FocusSession(ctx, adewire.FocusSessionArgs{SessionID: stage.SessionID})
+	focused, err := app.W.AdeTask.FocusSession(ctx, adewire.FocusSessionArgs{SessionID: step.SessionID})
 	if err != nil || !focused {
 		t.Fatalf("FocusSession = %v, %v, want the window brought forward", focused, err)
 	}
@@ -148,14 +145,14 @@ func TestInteractiveSessions(t *testing.T) {
 	ev := app.Events.WaitAfter(t, mark, adewire.ChannelOpenSession, nil, waitFor)
 	var open adewire.OpenSessionEvent
 	ev.Decode(t, &open)
-	if ev.Window != sessionWindow || open.SessionID != stage.SessionID || open.TaskID != task.ID {
+	if ev.Window != sessionWindow || open.SessionID != step.SessionID || open.TaskID != task.ID {
 		t.Fatalf("open-session event = %+v to %q", open, ev.Window)
 	}
-	if err := os.WriteFile(flag("stage"), nil, 0o644); err != nil {
+	if err := os.WriteFile(flag("step"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	waitSession(t, app, stage.SessionID, "stopped")
-	if focused, err := app.W.AdeTask.FocusSession(ctx, adewire.FocusSessionArgs{SessionID: stage.SessionID}); err != nil || focused {
+	waitSession(t, app, step.SessionID, "stopped")
+	if focused, err := app.W.AdeTask.FocusSession(ctx, adewire.FocusSessionArgs{SessionID: step.SessionID}); err != nil || focused {
 		t.Fatalf("FocusSession on a stopped session = %v, %v, want false", focused, err)
 	}
 

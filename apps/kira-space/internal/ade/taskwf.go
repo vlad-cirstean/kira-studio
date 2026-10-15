@@ -11,8 +11,8 @@ import (
 )
 
 // A task that has not started follows the live workflow file. Its first run, first session or first
-// stage move snapshots the whole workflow; from then on every stage move reads the snapshot, so a
-// later edit applies to new work only.
+// step move snapshots the whole workflow; from then on it reads the snapshot, so a later edit applies
+// to new work only.
 
 // workflowHash hashes the canonical JSON of a workflow, the encoding adeflow.Reader records.
 func workflowHash(js []byte) string {
@@ -28,7 +28,6 @@ func (b *TaskBoard) taskWorkflow(t model.AdeTask) (adewire.Workflow, bool) {
 			slog.Warn("ade: unreadable workflow snapshot", "scope", "ade", "task", t.ID, "err", err)
 			return adewire.Workflow{}, false
 		}
-		wf.FillReturnLimits()
 		return wf, true
 	}
 	if t.WorkflowID == "" || b.deps.Workflows == nil {
@@ -58,65 +57,53 @@ func (b *TaskBoard) snapshotWorkflow(t *model.AdeTask) error {
 	return nil
 }
 
-// snapshotStartedTasks gives a task that started before snapshots existed the live workflow as its
-// snapshot: the version it began with is gone, so the current one is the best faithful answer.
-func (b *TaskBoard) snapshotStartedTasks() {
-	tasks, err := b.deps.Tasks.ListLive()
-	if err != nil {
-		slog.Warn("ade: snapshot started tasks", "scope", "ade", "err", err)
-		return
-	}
-	for _, t := range tasks {
-		if t.WorkflowID == "" || t.WorkflowJSON != "" {
-			continue
-		}
-		runs, err := b.deps.Tasks.RunsOfTask(t.ID)
-		if err != nil || len(runs) == 0 {
-			continue
-		}
-		if err := b.snapshotWorkflow(&t); err != nil {
-			slog.Warn("ade: snapshot started task", "scope", "ade", "task", t.ID, "err", err)
-		}
-	}
+// liveInfo is a workflow's live file as a task not yet started sees it: its content hash and the step a
+// new task enters.
+type liveInfo struct {
+	hash, first string
+	ok          bool
 }
 
-// decorateTask fills the wire fields that depend on the snapshot. liveHash resolves a workflow id to
-// the hash of its live file, memoised by the caller.
-func decorateTask(out *adewire.Task, t model.AdeTask, liveHash func(id string) (string, bool)) {
+// decorateTask fills the wire fields that depend on the workflow. live resolves a workflow id to its
+// live file, memoised by the caller. A task that has not started follows that file, so its entry is the
+// file's first step.
+func decorateTask(out *adewire.Task, t model.AdeTask, live func(id string) liveInfo) {
+	li := live(t.WorkflowID)
 	if t.WorkflowJSON == "" {
+		if li.ok {
+			out.EntryStepID = li.first
+		}
 		return
 	}
 	var wf adewire.Workflow
 	if err := json.Unmarshal([]byte(t.WorkflowJSON), &wf); err != nil {
 		return
 	}
-	wf.FillReturnLimits()
 	out.Workflow = &wf
-	if live, ok := liveHash(t.WorkflowID); ok {
-		out.WorkflowOutdated = live != t.WorkflowHash
+	if li.ok {
+		out.WorkflowOutdated = li.hash != t.WorkflowHash
 	}
 }
 
-// liveHasher returns a memoised id -> live workflow hash lookup.
-func (b *TaskBoard) liveHasher() func(id string) (string, bool) {
-	type entry struct {
-		hash string
-		ok   bool
-	}
-	seen := map[string]entry{}
-	return func(id string) (string, bool) {
+// liveWorkflows returns a memoised id -> live workflow lookup.
+func (b *TaskBoard) liveWorkflows() func(id string) liveInfo {
+	seen := map[string]liveInfo{}
+	return func(id string) liveInfo {
 		if e, hit := seen[id]; hit {
-			return e.hash, e.ok
+			return e
 		}
-		var e entry
-		if b.deps.Workflows != nil {
+		var e liveInfo
+		if b.deps.Workflows != nil && id != "" {
 			if wf, ok := b.deps.Workflows.Get(id); ok {
 				if js, err := json.Marshal(wf); err == nil {
-					e = entry{workflowHash(js), true}
+					e = liveInfo{hash: workflowHash(js), ok: true}
+					if i, has := firstStep(wf); has {
+						e.first = wf.Steps[i].ID
+					}
 				}
 			}
 		}
 		seen[id] = e
-		return e.hash, e.ok
+		return e
 	}
 }

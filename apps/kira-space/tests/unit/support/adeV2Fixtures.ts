@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Branch, Plan, Run, Stage, Task } from '../../../frontend/src/ade/v2/wire';
+import { defaultResults } from '../../../frontend/src/ade/v2/board/stepResults';
+import { defaultSandbox } from '../../../frontend/src/ade/v2/board/stepSandbox';
+import type { Branch, Plan, Run, Task, WorkflowStep } from '../../../frontend/src/ade/v2/wire';
 
 // Builders for the pure-logic specs: every field defaulted, a spec overrides only what it asserts on.
 
@@ -50,8 +52,8 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     jira: null,
     githubUrl: '',
     workflowId: '',
-    stageId: '',
-    currentStage: null,
+    entryStepId: '',
+    since: {},
     workflow: null,
     workflowOutdated: false,
     est: '',
@@ -64,9 +66,7 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
   };
 }
 
-export function mkRun(
-  over: Partial<Run> & Pick<Run, 'taskId' | 'stageId' | 'stepId' | 'branchId'>,
-): Run {
+export function mkRun(over: Partial<Run> & Pick<Run, 'taskId' | 'stepId' | 'branchId'>): Run {
   return {
     id: `${over.taskId}:${over.stepId}:${over.branchId}:${over.attempt ?? 1}`,
     attempt: 1,
@@ -92,21 +92,41 @@ export function mkPlan(over: Partial<Plan> = {}): Plan {
   return { day: {}, order: [], queuedAfter: {}, unpushed: {}, ...over };
 }
 
-export function mkStage(over: Partial<Stage> & Pick<Stage, 'id'>): Stage {
+export function mkStep(over: Partial<WorkflowStep> & Pick<WorkflowStep, 'id'>): WorkflowStep {
   return {
     name: over.id,
-    kind: 'user',
+    kind: 'agent',
     status: 'In progress',
     skip: false,
     session: false,
-    prompt: '',
-    steps: [],
     command: '',
-    runsOn: '',
-    onFailure: '',
-    timeout: '',
+    runsOn: 'each repo',
+    before: 'auto',
+    results: defaultResults(),
+    maxReturns: 3,
+    timeout: '1h',
+    prompt: 'p',
+    allowedTools: [],
+    smartScript: '',
+    params: {},
+    review: null,
+    sandbox: defaultSandbox(),
     ...over,
   };
+}
+
+/** A manual step: no runs, no results. */
+export function mkManual(over: Partial<WorkflowStep> & Pick<WorkflowStep, 'id'>): WorkflowStep {
+  return mkStep({
+    kind: 'manual',
+    runsOn: '',
+    before: '',
+    results: [],
+    maxReturns: 0,
+    timeout: '',
+    prompt: '',
+    ...over,
+  });
 }
 
 /** Loads `tests/fixtures/ade-v2/<name>.json` typed as its wire shape. JSON imports widen string

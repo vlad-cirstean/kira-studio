@@ -26,33 +26,36 @@ func TestParse_designSamples(t *testing.T) {
 	}
 }
 
-const head = "id: w\nname: W\nstages:\n"
-
-const agent = "  - id: a\n    name: A\n    kind: agent\n    status: In progress\n    steps:\n"
+const head = "id: w\nname: W\nsteps:\n"
 
 func step(id, extra string) string {
-	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        prompt: go\n" + extra
+	return "  - id: " + id + "\n    name: S\n    kind: agent\n    runs_on: each repo\n    timeout: 1h\n    prompt: go\n" + extra
 }
 
 func reviewStep(id, extra string) string {
-	return "      - id: " + id + "\n        name: R\n        runs_on: each repo\n        timeout: 1h\n" + extra
+	return "  - id: " + id + "\n    name: R\n    kind: review\n    runs_on: each repo\n    timeout: 1h\n" + extra
 }
 
 func smartStep(id, extra string) string {
-	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        smart_script: Summarize\n" + extra
+	return "  - id: " + id + "\n    name: S\n    kind: agent\n    runs_on: each repo\n    timeout: 1h\n    smart_script: Summarize\n" + extra
+}
+
+func scriptStep(id, extra string) string {
+	return "  - id: " + id + "\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n" + extra
+}
+
+func manual(id, extra string) string {
+	return "  - id: " + id + "\n    name: U\n    kind: manual\n    status: To do\n" + extra
 }
 
 // resultsBlock is one result item; the first call of a step opens the results list.
-func resultsBlock(id, ok, next, max string) string {
-	out := "          - id: " + id + "\n            ok: " + ok + "\n"
+func resultsBlock(id, ok, next string) string {
+	out := "      - id: " + id + "\n        ok: " + ok + "\n"
 	if next != "" {
-		out += "            next: " + next + "\n"
-	}
-	if max != "" {
-		out += "            max: " + max + "\n"
+		out += "        next: " + next + "\n"
 	}
 	if id == "a" || id == "needs_input" {
-		out = "        results:\n" + out
+		out = "    results:\n" + out
 	}
 	return out
 }
@@ -64,98 +67,97 @@ func TestParse_rules(t *testing.T) {
 		line int    // 0 = not asserted unless wantLine
 		msg  string // substring; "" = valid
 	}{
-		{"valid minimal user", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n", 0, ""},
-		{"alias manual", head + "  - id: u\n    name: U\n    kind: manual\n    status: To do\n", 0, ""},
-		{"alias automated", head + agent + step("s", ""), 0, ""},
-		{"bad kind", head + "  - id: u\n    name: U\n    kind: robot\n    status: To do\n", 6, "stage 1: kind must be user, agent or script"},
-		{"bad status", head + "  - id: u\n    name: U\n    kind: user\n    status: Wip\n", 0, "stage 1: status must be"},
-		{"unknown top key", "id: w\nname: W\nbogus: 1\nstages: []\n", 3, "unknown key"},
-		{"empty stages", "id: w\nname: W\nstages: []\n", 3, "stages must be a non-empty list"},
-		{"missing name", "id: w\nstages:\n  - id: u\n", 0, "name is required"},
-		{"bad id", "id: W!\nname: W\nstages: []\n", 1, "id must be lowercase"},
-		{"dup stage id", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n  - id: u\n    name: U\n    kind: user\n    status: To do\n", 8, "stage 2: id \"u\" is already used"},
-		{"user session prompt optional", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    session: true\n", 0, ""},
-		{"user prompt without session", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    prompt: x\n", 0, "prompt is not allowed on user stages"},
-		{"user refuses steps", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    timeout: 1h\n", 0, "timeout is not allowed on user stages"},
-		{"agent empty steps", head + agent + "      []\n", 0, "steps must be a non-empty list"},
-		{"agent refuses command", head + agent + step("s", "") + "    command: x\n", 0, "command is not allowed on agent stages"},
-		{"step id may equal stage id", head + agent + step("a", ""), 0, ""},
-		{"dup step id", head + agent + step("s", "") + step("s", ""), 0, "stage 1, step 2: id \"s\" is already used"},
-		{"runs_on only", head + agent + strings.Replace(step("s", ""), "each repo", "only api", 1), 0, ""},
-		{"runs_on only empty", head + agent + strings.Replace(step("s", ""), "each repo", "only ", 1), 0, "runs_on must be"},
-		{"runs_on bad", head + agent + strings.Replace(step("s", ""), "each repo", "twice", 1), 0, "runs_on must be"},
-		{"before bad", head + agent + step("s", "        before: maybe\n"), 0, "before must be auto or approval"},
-		{"retry 2", head + agent + step("s", "        on_failure: retry 2\n"), 0, ""},
-		{"retry 3", head + agent + step("s", "        on_failure: retry 3\n"), 0, "on_failure must be"},
-		{"back earlier", head + agent + step("s", "") + step("t", "        on_failure: back:s\n"), 0, ""},
-		{"back same step", head + agent + step("s", "        on_failure: back:s\n"), 0, "back: must name an earlier step"},
-		{"back later step", head + agent + step("s", "        on_failure: back:t\n") + step("t", ""), 0, "back: must name an earlier step"},
-		{"back other stage", head + agent + step("s", "") + "  - id: b\n    name: B\n    kind: agent\n    status: In progress\n    steps:\n" + step("t", "        on_failure: back:s\n"), 0, "stage 2, step 1: back: must name"},
-		{"results ok", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "2")), 0, ""},
-		{"results unknown target", head + agent + step("s", resultsBlock("a", "true", "nope", "")), 0, "next must be next, end, stop or a step id"},
-		{"results stop on ok", head + agent + step("s", resultsBlock("a", "true", "stop", "")), 0, "stop is only allowed on a result that is not ok"},
-		{"results max on forward", head + agent + step("s", resultsBlock("a", "true", "end", "2")), 0, "max is only allowed on a route back"},
-		{"results max range", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "11")), 0, "max must be a whole number from 1 to 10"},
-		{"results no forward", head + agent + step("s", resultsBlock("a", "false", "s", "")), 0, "at least one result must lead forward"},
-		{"max_returns ok", head + agent + step("s", "        max_returns: 10\n"), 0, ""},
-		{"max_returns zero on agent", head + agent + step("s", "        max_returns: 0\n"), 0, "max_returns must be a whole number from 1 to 10"},
-		{"max_returns over 10", head + agent + step("s", "        max_returns: 11\n"), 0, "max_returns must be a whole number from 1 to 10"},
-		{"max_returns text", head + agent + step("s", "        max_returns: lots\n"), 0, "max_returns must be a whole number"},
-		{"max_returns zero on review", head + agent + step("s", "") + reviewStep("r", "        max_returns: 0\n        review: {}\n"), 0, ""},
-		{"max_returns over 10 on review", head + agent + step("s", "") + reviewStep("r", "        max_returns: 11\n        review: {}\n"), 0, "from 0 to 10 on a review step"},
-		{"max_returns with on_failure", head + agent + step("s", "        on_failure: stop\n        max_returns: 2\n"), 0, "max_returns and on_failure cannot be used together"},
-		{"max_returns with result max", head + agent + step("s", "        max_returns: 2\n"+resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "2")), 0, "max moved to max_returns on the step"},
-		{"results with on_failure", head + agent + step("s", "        on_failure: stop\n"+resultsBlock("a", "true", "", "")), 0, "results and on_failure cannot be used together"},
-		{"results duplicate id", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "", "")+resultsBlock("b", "false", "", "")), 0, "already used by another result"},
-		{"results reserved id", head + agent + step("s", resultsBlock("needs_input", "true", "", "")), 0, "needs_input is reserved"},
-		{"results ok required", head + agent + step("s", "        results:\n          - id: a\n"), 0, "ok is required"},
-		{"results later step", head + agent + step("s", resultsBlock("a", "true", "t", "")) + step("t", ""), 0, ""},
-		{"timeout zero", head + agent + strings.Replace(step("s", ""), "1h", "0s", 1), 0, "timeout must be"},
-		{"timeout over 24h", head + agent + strings.Replace(step("s", ""), "1h", "25h", 1), 0, "timeout must be"},
-		{"timeout garbage", head + agent + strings.Replace(step("s", ""), "1h", "soon", 1), 0, "timeout must be"},
-		{"timeout required", head + agent + "      - id: s\n        name: S\n        runs_on: once\n        prompt: go\n", 0, "timeout is required"},
-		{"allowed tools ok", head + agent + step("s", "        allowed_tools:\n          - Bash(git *)\n          - Read\n          - mcp__srv__tool\n"), 0, ""},
-		{"allowed tools dup", head + agent + step("s", "        allowed_tools:\n          - Read\n          - Read\n"), 0, "listed twice"},
-		{"allowed tools bad", head + agent + step("s", "        allowed_tools:\n          - \"bad tool\"\n"), 0, "not a tool pattern"},
-		{"smart step", head + agent + smartStep("s", "        params:\n          lang: go\n          dirs: [a, b]\n"), 0, ""},
-		{"smart step no params", head + agent + smartStep("s", ""), 0, ""},
-		{"smart prompt refused", head + agent + smartStep("s", "        prompt: go\n"), 0, "prompt is not allowed with smart_script"},
-		{"smart tools refused", head + agent + smartStep("s", "        allowed_tools: [Read]\n"), 0, "allowed_tools is not allowed with smart_script"},
-		{"params alone", head + agent + step("s", "        params:\n          a: b\n"), 0, "params is only allowed with smart_script"},
-		{"smart param name", head + agent + smartStep("s", "        params:\n          Bad-Name: x\n"), 0, "param name"},
-		{"smart param nested", head + agent + smartStep("s", "        params:\n          a:\n            b: c\n"), 0, "must be text or a list of text"},
-		{"review step", head + agent + step("s", "") + reviewStep("r", "        review:\n          send_to: new\n"), 0, ""},
-		{"review defaults", head + agent + step("s", "") + reviewStep("r", "        review: {}\n"), 0, ""},
-		{"review implementer", head + agent + step("s", "") + reviewStep("r", "        review:\n          implementer: s\n"), 0, ""},
-		{"review refuses prompt", head + agent + step("s", "") + reviewStep("r", "        prompt: go\n        review: {}\n"), 0, "prompt is not allowed on review steps"},
-		{"review refuses smart", head + agent + step("s", "") + reviewStep("r", "        smart_script: X\n        review: {}\n"), 0, "smart_script is not allowed on review steps"},
-		{"review bad send_to", head + agent + step("s", "") + reviewStep("r", "        review:\n          send_to: both\n"), 0, "send_to must be implementer or new"},
-		{"review unknown key", head + agent + step("s", "") + reviewStep("r", "        review:\n          model: x\n"), 0, "unknown key"},
-		{"review not mapping", head + agent + step("s", "") + reviewStep("r", "        review: yes\n"), 0, "review must be a mapping"},
-		{"review implementer unknown", head + agent + step("s", "") + reviewStep("r", "        review:\n          implementer: nope\n"), 0, "implementer must be an earlier agent step"},
-		{"review implementer later", head + agent + reviewStep("r", "        review:\n          implementer: s\n") + step("s", ""), 0, "implementer must be an earlier agent step"},
-		{"review implementer smart", head + agent + smartStep("x", "") + reviewStep("r", "        review:\n          implementer: x\n"), 0, "implementer must be an earlier agent step"},
-		{"review implementer review", head + agent + step("s", "") + reviewStep("q", "        review: {}\n") + reviewStep("r", "        review:\n          implementer: q\n"), 0, "implementer must be an earlier agent step"},
-		{"sandbox full", head + agent + step("s", "        sandbox:\n          access: read\n          read: [~/specs, /srv/docs]\n          allow: [~/.cache/tool]\n          network: false\n"), 0, ""},
-		{"sandbox empty", head + agent + step("s", "        sandbox: {}\n"), 0, ""},
-		{"sandbox on review", head + agent + step("s", "") + reviewStep("r", "        review: {}\n        sandbox:\n          access: read\n"), 0, ""},
-		{"sandbox bad access", head + agent + step("s", "        sandbox:\n          access: full\n"), 0, "access must be write, read or off"},
-		{"sandbox unknown key", head + agent + step("s", "        sandbox:\n          net: no\n"), 0, "unknown key"},
-		{"sandbox not mapping", head + agent + step("s", "        sandbox: yes\n"), 0, "sandbox must be a mapping"},
-		{"sandbox relative path", head + agent + step("s", "        sandbox:\n          read: [specs]\n"), 0, "must be absolute or start with ~/"},
-		{"sandbox root path", head + agent + step("s", "        sandbox:\n          allow: [/]\n"), 0, "path \"/\" is not allowed"},
-		{"sandbox home path", head + agent + step("s", "        sandbox:\n          allow: [\"~\"]\n"), 0, "path \"~\" is not allowed"},
-		{"sandbox keychain path", head + agent + step("s", "        sandbox:\n          read: [~/Library/Keychains/login.keychain-db]\n"), 0, "is not allowed"},
-		{"sandbox claude dir", head + agent + step("s", "        sandbox:\n          allow: [~/.claude/]\n"), 0, "is not allowed"},
-		{"sandbox absolute home", head + agent + step("s", "        sandbox:\n          allow: [/Users/me/Library]\n"), 0, "is not allowed"},
-		{"sandbox library dir", head + agent + step("s", "        sandbox:\n          allow: [\"~/x/../Library\"]\n"), 0, "is not allowed"},
-		{"sandbox network not bool", head + agent + step("s", "        sandbox:\n          network: maybe\n"), 0, "network must be true or false"},
-		{"sandbox off alone", head + agent + step("s", "        sandbox:\n          access: off\n"), 0, ""},
-		{"sandbox off with paths", head + agent + step("s", "        sandbox:\n          access: off\n          read: [~/x]\n"), 0, "sandbox off takes no other keys"},
-		{"script ok", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n", 0, ""},
-		{"script back", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n    on_failure: back:x\n", 0, "back: is only allowed on an agent step"},
-		{"script needs command", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n", 0, "command is required"},
-		{"script refuses prompt", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: x\n    prompt: y\n", 0, "prompt is not allowed on script stages"},
+		{"valid minimal manual", head + manual("u", ""), 0, ""},
+		{"kind required", head + "  - id: u\n    name: U\n", 0, "kind is required"},
+		{"bad kind", head + "  - id: u\n    name: U\n    kind: robot\n", 6, "step 1: kind must be agent, script, review or manual"},
+		{"old kind user", head + "  - id: u\n    name: U\n    kind: user\n", 6, "kind must be agent, script, review or manual"},
+		{"bad status", head + "  - id: u\n    name: U\n    kind: manual\n    status: Wip\n", 0, "step 1: status must be"},
+		{"status optional", head + "  - id: u\n    name: U\n    kind: manual\n", 0, ""},
+		{"skip", head + manual("u", "    skip: true\n") + manual("v", ""), 0, ""},
+		{"all skipped", head + manual("u", "    skip: true\n"), 0, "at least one step must not be skipped"},
+		{"stages refused", "id: w\nname: W\nstages:\n  - id: u\n", 3, "\"stages\" is no longer supported: list every step under \"steps\" (see the Agents docs)"},
+		{"unknown top key", "id: w\nname: W\nbogus: 1\nsteps: []\n", 3, "unknown key"},
+		{"empty steps", "id: w\nname: W\nsteps: []\n", 3, "steps must be a non-empty list"},
+		{"missing name", "id: w\nsteps:\n  - id: u\n", 0, "name is required"},
+		{"bad id", "id: W!\nname: W\nsteps: []\n", 1, "id must be lowercase"},
+		{"dup step id", head + manual("u", "") + manual("u", ""), 8, "step 2: id \"u\" is already used"},
+		{"on_failure gone", head + step("s", "    on_failure: stop\n"), 0, "unknown key \"on_failure\""},
+		{"manual session prompt optional", head + manual("u", "    session: true\n"), 0, ""},
+		{"manual prompt without session", head + manual("u", "    prompt: x\n"), 0, "prompt is not allowed on manual steps without a session"},
+		{"manual refuses timeout", head + manual("u", "    timeout: 1h\n"), 0, "timeout is not allowed on manual steps"},
+		{"manual refuses results", head + manual("u", "    results: []\n"), 0, "results is not allowed on manual steps"},
+		{"agent refuses command", head + step("s", "    command: x\n"), 0, "command is not allowed on agent steps"},
+		{"agent refuses review block", head + step("s", "    review: {}\n"), 0, "review is not allowed on agent steps"},
+		{"agent refuses session", head + step("s", "    session: true\n"), 0, "session is not allowed on agent steps"},
+		{"runs_on only", head + strings.Replace(step("s", ""), "each repo", "only api", 1), 0, ""},
+		{"runs_on only empty", head + strings.Replace(step("s", ""), "each repo", "only ", 1), 0, "runs_on must be"},
+		{"runs_on bad", head + strings.Replace(step("s", ""), "each repo", "twice", 1), 0, "runs_on must be"},
+		{"before bad", head + step("s", "    before: maybe\n"), 0, "before must be auto or approval"},
+		{"results ok", head + step("s", resultsBlock("a", "true", "")+resultsBlock("b", "false", "s")), 0, ""},
+		{"results unknown target", head + step("s", resultsBlock("a", "true", "nope")), 0, "next must be next, end, stop or a step id of this workflow"},
+		{"results stop on ok", head + step("s", resultsBlock("a", "true", "stop")), 0, "stop is only allowed on a result that is not ok"},
+		{"result max gone", head + step("s", resultsBlock("a", "true", "")+resultsBlock("b", "false", "s")+"        max: 2\n"), 0, "unknown key \"max\""},
+		{"results no forward", head + step("s", resultsBlock("a", "false", "s")), 0, "at least one result must lead forward"},
+		{"max_returns ok", head + step("s", "    max_returns: 10\n"), 0, ""},
+		{"max_returns zero on agent", head + step("s", "    max_returns: 0\n"), 0, "max_returns must be a whole number from 1 to 10"},
+		{"max_returns over 10", head + step("s", "    max_returns: 11\n"), 0, "max_returns must be a whole number from 1 to 10"},
+		{"max_returns text", head + step("s", "    max_returns: lots\n"), 0, "max_returns must be a whole number"},
+		{"max_returns zero on review", head + step("s", "") + reviewStep("r", "    max_returns: 0\n    review: {}\n"), 0, ""},
+		{"max_returns over 10 on review", head + step("s", "") + reviewStep("r", "    max_returns: 11\n    review: {}\n"), 0, "from 0 to 10 on a review step"},
+		{"results duplicate id", head + step("s", resultsBlock("a", "true", "")+resultsBlock("b", "false", "")+resultsBlock("b", "false", "")), 0, "already used by another result"},
+		{"results reserved id", head + step("s", resultsBlock("needs_input", "true", "")), 0, "needs_input is reserved"},
+		{"results ok required", head + step("s", "    results:\n      - id: a\n"), 0, "ok is required"},
+		{"results later step", head + step("s", resultsBlock("a", "true", "t")) + step("t", ""), 0, ""},
+		{"results back to earlier kind", head + manual("m", "") + step("s", resultsBlock("a", "true", "")+resultsBlock("b", "false", "m")), 0, ""},
+		{"timeout zero", head + strings.Replace(step("s", ""), "1h", "0s", 1), 0, "timeout must be"},
+		{"timeout over 24h", head + strings.Replace(step("s", ""), "1h", "25h", 1), 0, "timeout must be"},
+		{"timeout garbage", head + strings.Replace(step("s", ""), "1h", "soon", 1), 0, "timeout must be"},
+		{"timeout required", head + "  - id: s\n    name: S\n    kind: agent\n    runs_on: once\n    prompt: go\n", 0, "timeout is required"},
+		{"allowed tools ok", head + step("s", "    allowed_tools:\n      - Bash(git *)\n      - Read\n      - mcp__srv__tool\n"), 0, ""},
+		{"allowed tools dup", head + step("s", "    allowed_tools:\n      - Read\n      - Read\n"), 0, "listed twice"},
+		{"allowed tools bad", head + step("s", "    allowed_tools:\n      - \"bad tool\"\n"), 0, "not a tool pattern"},
+		{"smart step", head + smartStep("s", "    params:\n      lang: go\n      dirs: [a, b]\n"), 0, ""},
+		{"smart step no params", head + smartStep("s", ""), 0, ""},
+		{"smart prompt refused", head + smartStep("s", "    prompt: go\n"), 0, "prompt is not allowed with smart_script"},
+		{"smart tools refused", head + smartStep("s", "    allowed_tools: [Read]\n"), 0, "allowed_tools is not allowed with smart_script"},
+		{"params alone", head + step("s", "    params:\n      a: b\n"), 0, "params is only allowed with smart_script"},
+		{"smart param name", head + smartStep("s", "    params:\n      Bad-Name: x\n"), 0, "param name"},
+		{"smart param nested", head + smartStep("s", "    params:\n      a:\n        b: c\n"), 0, "must be text or a list of text"},
+		{"review step", head + step("s", "") + reviewStep("r", "    review:\n      send_to: new\n"), 0, ""},
+		{"review block optional", head + step("s", "") + reviewStep("r", ""), 0, ""},
+		{"review defaults", head + step("s", "") + reviewStep("r", "    review: {}\n"), 0, ""},
+		{"review implementer", head + step("s", "") + reviewStep("r", "    review:\n      implementer: s\n"), 0, ""},
+		{"review refuses prompt", head + step("s", "") + reviewStep("r", "    prompt: go\n"), 0, "prompt is not allowed on review steps"},
+		{"review refuses smart", head + step("s", "") + reviewStep("r", "    smart_script: X\n"), 0, "smart_script is not allowed on review steps"},
+		{"review bad send_to", head + step("s", "") + reviewStep("r", "    review:\n      send_to: both\n"), 0, "send_to must be implementer or new"},
+		{"review unknown key", head + step("s", "") + reviewStep("r", "    review:\n      model: x\n"), 0, "unknown key"},
+		{"review not mapping", head + step("s", "") + reviewStep("r", "    review: yes\n"), 0, "review must be a mapping"},
+		{"review implementer unknown", head + step("s", "") + reviewStep("r", "    review:\n      implementer: nope\n"), 0, "implementer must be an earlier agent step"},
+		{"review implementer later", head + reviewStep("r", "    review:\n      implementer: s\n") + step("s", ""), 0, "implementer must be an earlier agent step"},
+		{"review implementer smart", head + smartStep("x", "") + reviewStep("r", "    review:\n      implementer: x\n"), 0, "implementer must be an earlier agent step"},
+		{"review implementer review", head + step("s", "") + reviewStep("q", "") + reviewStep("r", "    review:\n      implementer: q\n"), 0, "implementer must be an earlier agent step"},
+		{"sandbox full", head + step("s", "    sandbox:\n      access: read\n      read: [~/specs, /srv/docs]\n      allow: [~/.cache/tool]\n      network: false\n"), 0, ""},
+		{"sandbox empty", head + step("s", "    sandbox: {}\n"), 0, ""},
+		{"sandbox on review", head + step("s", "") + reviewStep("r", "    sandbox:\n      access: read\n"), 0, ""},
+		{"sandbox on script refused", head + scriptStep("r", "    sandbox: {}\n"), 0, "sandbox is not allowed on script steps"},
+		{"sandbox bad access", head + step("s", "    sandbox:\n      access: full\n"), 0, "access must be write, read or off"},
+		{"sandbox unknown key", head + step("s", "    sandbox:\n      net: no\n"), 0, "unknown key"},
+		{"sandbox not mapping", head + step("s", "    sandbox: yes\n"), 0, "sandbox must be a mapping"},
+		{"sandbox relative path", head + step("s", "    sandbox:\n      read: [specs]\n"), 0, "must be absolute or start with ~/"},
+		{"sandbox root path", head + step("s", "    sandbox:\n      allow: [/]\n"), 0, "path \"/\" is not allowed"},
+		{"sandbox home path", head + step("s", "    sandbox:\n      allow: [\"~\"]\n"), 0, "path \"~\" is not allowed"},
+		{"sandbox keychain path", head + step("s", "    sandbox:\n      read: [~/Library/Keychains/login.keychain-db]\n"), 0, "is not allowed"},
+		{"sandbox claude dir", head + step("s", "    sandbox:\n      allow: [~/.claude/]\n"), 0, "is not allowed"},
+		{"sandbox absolute home", head + step("s", "    sandbox:\n      allow: [/Users/me/Library]\n"), 0, "is not allowed"},
+		{"sandbox library dir", head + step("s", "    sandbox:\n      allow: [\"~/x/../Library\"]\n"), 0, "is not allowed"},
+		{"sandbox network not bool", head + step("s", "    sandbox:\n      network: maybe\n"), 0, "network must be true or false"},
+		{"sandbox off alone", head + step("s", "    sandbox:\n      access: off\n"), 0, ""},
+		{"sandbox off with paths", head + step("s", "    sandbox:\n      access: off\n      read: [~/x]\n"), 0, "sandbox off takes no other keys"},
+		{"script ok", head + scriptStep("r", ""), 0, ""},
+		{"script needs command", head + "  - id: r\n    name: R\n    kind: script\n    runs_on: once\n    timeout: 5m\n", 0, "command is required"},
+		{"script refuses prompt", head + scriptStep("r", "    prompt: y\n"), 0, "prompt is not allowed on script steps"},
+		{"script routes editable", head + scriptStep("r", "    results:\n      - id: done\n        ok: true\n        next: end\n      - id: failed\n        ok: false\n"), 0, ""},
+		{"script results fixed ids", head + scriptStep("r", "    results:\n      - id: done\n        ok: true\n      - id: broke\n        ok: false\n"), 0, "results of a script step must be done"},
 		{"syntax error", "id: w\n  name: [\n", 0, "unexpected content here (check the indentation)"},
 		{"empty file", "", 0, "empty"},
 	}
@@ -181,13 +183,6 @@ func TestParse_rules(t *testing.T) {
 	}
 }
 
-func TestParse_aliasMapsToWireKind(t *testing.T) {
-	wf, werr := Parse([]byte(head + "  - id: u\n    name: U\n    kind: manual\n    status: To do\n"))
-	if werr != nil || wf.Stages[0].Kind != "user" {
-		t.Fatalf("%+v %+v", wf, werr)
-	}
-}
-
 type memStore struct{ m map[string]string }
 
 func (s *memStore) LastValid() (map[string]string, error) { return s.m, nil }
@@ -209,7 +204,7 @@ func TestReader_lastValidSurvivesBreakage(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	good := head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n"
+	good := head + manual("u", "")
 	path := filepath.Join(dir, "w.yaml")
 	os.WriteFile(path, []byte(good), 0o644)
 	os.WriteFile(filepath.Join(dir, "ignored.yml"), []byte(good), 0o644)
@@ -235,35 +230,32 @@ func TestReader_lastValidSurvivesBreakage(t *testing.T) {
 }
 
 func TestParse_returnLimits(t *testing.T) {
-	loopTo := resultsBlock("a", "true", "", "") + resultsBlock("b", "false", "s", "")
+	loopTo := resultsBlock("a", "true", "") + resultsBlock("b", "false", "s")
 	cases := []struct {
 		name, src string
 		want      int
 	}{
-		{"default", head + agent + step("s", ""), 3},
-		{"declared", head + agent + step("s", "        max_returns: 5\n"), 5},
-		{"review default is no limit", head + agent + step("s", "") + reviewStep("r", "        review: {}\n"), 0},
-		{"retry N", head + agent + step("s", "        on_failure: retry 2\n"), 2},
-		{"back keeps default", head + agent + step("s", "") + step("t", "        on_failure: back:s\n"), 3},
-		{"results without max", head + agent + step("s", loopTo), 3},
-		{"legacy result max folds", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "5")), 5},
+		{"default", head + step("s", ""), 3},
+		{"declared", head + step("s", "    max_returns: 5\n"), 5},
+		{"review default is no limit", head + step("s", "") + reviewStep("r", ""), 0},
+		{"script default", head + scriptStep("s", ""), 3},
+		{"results without max", head + step("s", loopTo), 3},
 	}
 	for _, c := range cases {
 		wf, werr := Parse([]byte(c.src))
 		if werr != nil {
 			t.Fatalf("%s: %+v", c.name, werr)
 		}
-		steps := wf.Stages[0].Steps
-		if got := steps[len(steps)-1].MaxReturns; got != c.want {
+		if got := wf.Steps[len(wf.Steps)-1].MaxReturns; got != c.want {
 			t.Fatalf("%s: MaxReturns %d, want %d", c.name, got, c.want)
 		}
 	}
-	two := head + agent + step("s", "") + step("t", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "t", "2")+resultsBlock("c", "false", "s", "7"))
+	two := head + step("s", "") + step("t", resultsBlock("a", "true", "")+resultsBlock("b", "false", "t")+resultsBlock("c", "false", "s"))
 	wf, werr := Parse([]byte(two))
-	if werr != nil || wf.Stages[0].Steps[1].MaxReturns != 7 {
-		t.Fatalf("two legacy values must fold to the largest: %+v %+v", wf, werr)
+	if werr != nil {
+		t.Fatalf("%+v", werr)
 	}
-	if r := wf.Stages[0].Steps[1].Results; !r[1].Loop || !r[2].Loop || r[0].Loop {
+	if r := wf.Steps[1].Results; !r[1].Loop || !r[2].Loop || r[0].Loop {
 		t.Fatalf("loop flags: %+v", r)
 	}
 }

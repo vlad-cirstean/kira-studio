@@ -56,16 +56,19 @@ export interface RunMessageInput {
   /** Display title, the value of `{task}`. */
   title: string;
   jira: { key: string; url: string } | null;
-  /** Agent stage being run. */
-  stage: { steps: readonly { name: string; prompt: string; results: readonly ResultLike[] }[] };
+  /** The agent step being run. */
+  step: { name: string; prompt: string; results: readonly ResultLike[] };
+  /** Its 1-based position among the workflow's automatic steps, and their count. */
+  stepNumber: number;
+  stepCount: number;
 }
 
 /** Vars of `ade.step.prompt` for the Run dialog, keys in alphabetical order. Per-run placeholders (`{repo}` `{branch}`
  *  `{worktree}`) stay literal for the server to fill per run. */
 export function runMessageVars(i: RunMessageInput): Record<string, unknown> {
-  const first = i.stage.steps[0];
+  const first = i.step;
   const jira = i.jira?.key ?? '';
-  const prompt = (first?.prompt ?? '')
+  const prompt = first.prompt
     .replaceAll('{task}', i.title)
     .replaceAll('{jira}', jira)
     .replace(/\n+$/, '');
@@ -73,15 +76,15 @@ export function runMessageVars(i: RunMessageInput): Record<string, unknown> {
     branch: '{branch}',
     context: [],
     extra: '',
-    finish: finishVars(first?.results ?? []),
+    finish: finishVars(first.results),
     jiraKey: jira,
     jiraURL: i.jira?.url ?? '',
     message: '',
     repo: '{repo}',
     space: false,
-    stepCount: i.stage.steps.length,
-    stepName: first?.name ?? '',
-    stepNumber: 1,
+    stepCount: i.stepCount,
+    stepName: first.name,
+    stepNumber: i.stepNumber,
     stepPrompt: prompt,
     title: i.title,
     worktree: '{worktree}',

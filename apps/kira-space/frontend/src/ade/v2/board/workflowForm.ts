@@ -1,20 +1,16 @@
 import { t } from '@theme/i18n';
-import type { OnFailure, PipelineStep, Stage, StageKind, Workflow } from '../wire';
-import { DEFAULT_MAX_RETURNS, implicitResults } from './stepResults';
+import type { StepKind, TaskStatus, Workflow, WorkflowStep } from '../wire';
+import { DEFAULT_MAX_RETURNS, defaultResults, reviewDefaultResults } from './stepResults';
 import { defaultSandbox } from './stepSandbox';
 
-// Pure helpers behind the Workflows form editor (SPEC2 section 5.1.1). Stage and step ids are run
-// keys: they are minted once, here, and never follow a rename.
+// Pure helpers behind the Workflows form editor (SPEC2 section 5.1.1). Step ids are run keys: they
+// are minted once, here, and never follow a rename.
 
-export const STATUS_OPTIONS: readonly Stage['status'][] = [
-  'To do',
-  'In progress',
-  'In review',
-  'Done',
-];
-export const FAILURE_OPTIONS: readonly OnFailure[] = ['stop', 'retry 1', 'retry 2'];
+export const STATUS_OPTIONS: readonly TaskStatus[] = ['To do', 'In progress', 'In review', 'Done'];
 
-/** Labels for the stored `runsOn`, `onFailure` and stage kind values; the stored text stays as is. */
+export const STEP_KINDS: readonly StepKind[] = ['agent', 'script', 'review', 'manual'];
+
+/** Labels for the stored `runsOn` values; the stored text stays as is. */
 export function runsOnLabel(value: string): string {
   if (value === 'once') return t('space.ade.workflows.runsOn.once.label');
   if (value === 'each repo') return t('space.ade.workflows.runsOn.each.label');
@@ -25,97 +21,94 @@ export function runsOnLabel(value: string): string {
 
 export const PLACEHOLDER_TOKENS = '{task} {jira} {repo} {branch} {worktree}';
 
-export function failureLabel(value: OnFailure | ''): string {
-  if (value === 'stop') return t('common.action.stop.label');
-  if (value === 'retry 1') return t('space.ade.workflows.onFailure.retryOnce.label');
-  return value === 'retry 2' ? t('space.ade.workflows.onFailure.retryTwice.label') : value;
-}
-
-export function kindLabel(kind: StageKind, background = false): string {
-  if (kind === 'user') return t('common.user.label');
-  if (kind === 'script') return t('common.script.label');
-  return t(
-    background
-      ? 'space.ade.workflows.kind.agentBackground.option'
-      : 'memory.common.origin.agent.label',
-  );
+export function kindLabel(kind: StepKind): string {
+  return t(`space.ade.workflows.kind.${kind}.option`);
 }
 
 const ID_SUFFIX_LENGTH = 8;
 
-/** `prefix-<8 hex>`, never in `taken`. Runs are keyed by these ids, so a removed id must not come
- *  back: the lowest free `prefix-N` would hand a new stage or step the old one's runs. */
-function nextId(prefix: 'stage' | 'step', taken: readonly string[]): string {
+/** `step-<8 hex>`, never in `taken`. Runs are keyed by these ids, so a removed id must not come
+ *  back: the lowest free `step-N` would hand a new step the old one's runs. */
+function nextId(taken: readonly string[]): string {
   const used = new Set(taken);
   let id: string;
-  do id = `${prefix}-${crypto.randomUUID().slice(0, ID_SUFFIX_LENGTH)}`;
+  do id = `step-${crypto.randomUUID().slice(0, ID_SUFFIX_LENGTH)}`;
   while (used.has(id));
   return id;
 }
 
-export function newStep(steps: readonly PipelineStep[]): PipelineStep {
-  const id = nextId(
-    'step',
-    steps.map((s) => s.id),
-  );
-  return {
-    id,
-    results: implicitResults(id, 'stop'),
-    maxReturns: DEFAULT_MAX_RETURNS,
-    name: t('space.ade.workflows.step.defaultName.label'),
-    runsOn: 'each repo',
-    before: 'auto',
-    onFailure: 'stop',
-    timeout: '1h',
+/** The fields a kind owns at their defaults; the other kinds' fields hold their zero value. */
+function kindDefaults(kind: StepKind): Omit<WorkflowStep, 'id' | 'name'> {
+  const base: Omit<WorkflowStep, 'id' | 'name'> = {
+    kind,
+    status: kind === 'review' ? 'In review' : 'In progress',
+    skip: false,
+    session: false,
+    command: '',
+    runsOn: '',
+    before: '',
+    results: [],
+    maxReturns: 0,
+    timeout: '',
     prompt: '',
     allowedTools: [],
     smartScript: '',
+    params: {},
     review: null,
     sandbox: defaultSandbox(),
-    params: {},
+  };
+  if (kind === 'manual') return base;
+  const automatic = { ...base, runsOn: 'each repo' as const, before: 'auto' as const };
+  if (kind === 'review') {
+    return {
+      ...automatic,
+      results: reviewDefaultResults(),
+      review: { sendTo: 'implementer', implementer: '' },
+    };
+  }
+  return {
+    ...automatic,
+    results: defaultResults(),
+    maxReturns: DEFAULT_MAX_RETURNS,
+    timeout: kind === 'script' ? '10m' : '1h',
   };
 }
 
-/** The fields a kind owns; every other kind-specific field is cleared (wire comments on `Stage`). */
-export function withKind(stage: Stage, kind: StageKind): Stage {
-  const base: Stage = {
-    ...stage,
-    kind,
-    session: false,
-    prompt: '',
-    steps: [],
-    command: '',
-    runsOn: '',
-    onFailure: '',
-    timeout: '',
+export function newStep(kind: StepKind, taken: readonly string[]): WorkflowStep {
+  return {
+    id: nextId(taken),
+    name: t('space.ade.workflows.step.defaultName.label'),
+    ...kindDefaults(kind),
   };
-  if (kind === 'script') return { ...base, runsOn: 'each repo', onFailure: 'stop', timeout: '10m' };
-  return kind === 'agent' ? { ...base, steps: [newStep([])] } : base;
 }
 
-export function newStage(stages: readonly Stage[]): Stage {
-  const stage: Stage = {
-    id: nextId(
-      'stage',
-      stages.map((s) => s.id),
-    ),
-    name: t('space.ade.workflows.stage.defaultName.label'),
-    kind: 'user',
-    status: 'In progress',
-    skip: false,
-    session: false,
-    prompt: '',
-    steps: [],
-    command: '',
-    runsOn: '',
-    onFailure: '',
-    timeout: '',
+/** The step turned into `kind`: id, name, status, skip and `runs_on` (when the kind has one) stay,
+ *  everything else goes back to the kind's defaults. */
+export function withKind(step: WorkflowStep, kind: StepKind): WorkflowStep {
+  if (step.kind === kind) return step;
+  const fresh = kindDefaults(kind);
+  return {
+    ...fresh,
+    id: step.id,
+    name: step.name,
+    skip: step.skip,
+    status:
+      step.status === (step.kind === 'review' ? 'In review' : 'In progress')
+        ? fresh.status
+        : step.status,
+    runsOn: fresh.runsOn === '' ? '' : step.runsOn || fresh.runsOn,
   };
-  return stage;
 }
 
-export function runnableCount(stages: readonly Stage[]): number {
-  return stages.filter((s) => !s.skip).length;
+/** Whether changing the step's kind would drop something typed: a prompt, command or session prompt. */
+export function hasContent(step: WorkflowStep): string {
+  if (step.prompt) return step.kind === 'manual' ? 'sessionPrompt' : 'prompt';
+  if (step.command) return 'command';
+  return step.smartScript ? 'smartScript' : '';
+}
+
+export function runnableSteps(steps: readonly WorkflowStep[]): number {
+  return steps.filter((s) => !s.skip).length;
 }
 
 export function parseTools(text: string): string[] {

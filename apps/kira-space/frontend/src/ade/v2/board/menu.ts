@@ -9,7 +9,7 @@ import { type Calendar, isWeekend, LATER, nextWork, offsetToIso } from './calend
 import type { ChangeBaseChoice } from './changeBase';
 import { type RebaseAct, rebaseActs } from './rebaseActions';
 import type { ReviewChoice } from './reviewCode';
-import { nextStageId } from './stageBlocks';
+import { nextStepId } from './stepBlocks';
 
 // ---- Task context menu
 // Task context menu (P198): which entries a task shows and what each does. Pure; `useTaskMenu` maps
@@ -17,7 +17,7 @@ import { nextStageId } from './stageBlocks';
 
 export type TaskMenuCmd =
   | { kind: 'action' }
-  | { kind: 'moveStage'; stageId: string }
+  | { kind: 'moveStep'; stepId: string }
   | { kind: 'stopRuns' }
   | { kind: 'openSession'; session: Session }
   | { kind: 'showSessions' }
@@ -111,22 +111,22 @@ function copyItems(c: CardModel, sessions: readonly Session[]): TaskMenuItem[] {
   return items;
 }
 
-function stageEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
+function stepEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
   if (!c.blocks.length) return [];
-  const current = c.task.stageId;
+  const current = c.progress.step?.id ?? c.task.entryStepId;
   const items: TaskMenuItem[] = [
     ...c.blocks.map((b) => ({
-      id: `ade-task-stage-${b.stage.id}`,
-      label: b.stage.name,
-      cmd: { kind: 'moveStage', stageId: b.stage.id } as const,
-      checked: b.stage.id === current,
-      disabled: live || (b.state === 'skipped' && b.stage.id !== current),
+      id: `ade-task-step-${b.step.id}`,
+      label: b.step.name,
+      cmd: { kind: 'moveStep', stepId: b.step.id } as const,
+      checked: b.step.id === current,
+      disabled: live || (b.state === 'skipped' && b.step.id !== current),
       hint: live ? liveHint() : undefined,
     })),
     {
-      id: 'ade-task-stage-done',
+      id: 'ade-task-step-done',
       label: t('common.done.status'),
-      cmd: { kind: 'moveStage', stageId: DONE },
+      cmd: { kind: 'moveStep', stepId: DONE },
       checked: current === DONE,
       disabled: live,
       hint: live ? liveHint() : undefined,
@@ -135,18 +135,18 @@ function stageEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
   const out: TaskMenuEntry[] = [
     {
       type: 'submenu',
-      id: 'ade-task-stage',
-      label: t('space.ade.board.taskMenu.moveToStage.label'),
+      id: 'ade-task-step',
+      label: t('space.ade.board.taskMenu.moveToStep.label'),
       items,
     },
   ];
-  const at = c.blocks.find((b) => b.stage.id === current);
+  const at = c.blocks.find((b) => b.step.id === current);
   if (at) {
     out.push({
       type: 'item',
       id: 'ade-task-skip',
-      label: t('space.ade.board.taskMenu.skipStage.label', { stage: at.stage.name }),
-      cmd: { kind: 'moveStage', stageId: nextStageId(c.blocks, current) },
+      label: t('space.ade.board.taskMenu.skipStep.label', { step: at.step.name }),
+      cmd: { kind: 'moveStep', stepId: nextStepId(c.blocks, current) },
       disabled: live,
       hint: live ? liveHint() : undefined,
     });
@@ -251,7 +251,7 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
         hint: c.action.tip,
       });
     }
-    out.push(...stageEntries(c, live));
+    out.push(...stepEntries(c, live));
     if (c.task.runs.some((r) => r.state === 'running' || r.state === 'pending')) {
       out.push({
         type: 'item',

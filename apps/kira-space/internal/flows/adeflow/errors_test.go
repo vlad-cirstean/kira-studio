@@ -17,7 +17,7 @@ func TestRunWithoutClaudeOnPath(t *testing.T) {
 	app := flowharness.New(t, flowharness.WithoutClaude())
 	repo, _ := cloneWithMain(app, t.TempDir()+"/api")
 	rec := importRepo(t, app, repo.Dir)
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
 	task := createTask(t, app, "Fix login", "flow", rec.ID)
 	br := branchOf(t, board(t, app), task.ID, rec.ID)
 	_, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{br.ID: "feat/api-nocl"}})
@@ -38,7 +38,7 @@ func TestRunWithoutClaudeOnPath(t *testing.T) {
 }
 
 func TestRunClaudeExitsNonZero(t *testing.T) {
-	f := newRunFixture(t, []fakeagent.Action{{Name: "fail"}, {Name: "done"}}, agentStage("build", agentStep("one", "")))
+	f := newRunFixture(t, []fakeagent.Action{{Name: "fail"}, {Name: "done"}}, agentStep("one", ""))
 	f.start(t, "feat/api-fail")
 	failed := waitRun(t, f.app, f.taskID, "one", "failed")
 	if strings.TrimSpace(failed.Note+failed.Summary) == "" {
@@ -52,7 +52,7 @@ func TestRunClaudeExitsNonZero(t *testing.T) {
 
 func TestWorkflowYamlInvalidThenFixed(t *testing.T) {
 	app := flowharness.New(t)
-	bad := "id: flow\nname: Flow\nstages:\n  - id: build\n    name: build\n    kind: nonsense\n"
+	bad := "id: flow\nname: Flow\nsteps:\n  - id: build\n    name: build\n    kind: nonsense\n"
 	val, err := app.W.AdeTask.ValidateWorkflowYaml(ctx, adewire.ValidateWorkflowYamlArgs{Yaml: bad})
 	if err != nil || val.Error == nil || val.Error.Message == "" {
 		t.Fatalf("ValidateWorkflowYaml(bad) = %+v, %v, want a message", val, err)
@@ -66,7 +66,7 @@ func TestWorkflowYamlInvalidThenFixed(t *testing.T) {
 	if _, err := app.W.AdeTask.CreateTask(ctx, adewire.CreateTaskArgs{Title: "Fix login", CodeRepoIDs: []string{rec.ID}, WorkflowID: "flow"}); err == nil {
 		t.Fatal("a task was created on an invalid workflow")
 	}
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
 	if _, err := app.W.AdeTask.CreateTask(ctx, adewire.CreateTaskArgs{Title: "Fix login", CodeRepoIDs: []string{rec.ID}, WorkflowID: "flow"}); err != nil {
 		t.Fatalf("task on the fixed workflow: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestWorkflowYamlInvalidThenFixed(t *testing.T) {
 }
 
 func TestStaleWorkflowSaveReportsCatalogText(t *testing.T) {
-	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStage("build", agentStep("impl", "")))
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("impl", ""))
 	read, err := f.app.W.AdeTask.WorkflowYaml(ctx, adewire.FileNameArgs{FileName: "flow.yaml"})
 	if err != nil {
 		t.Fatal(err)

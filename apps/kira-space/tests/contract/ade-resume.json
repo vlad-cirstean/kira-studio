@@ -28,7 +28,6 @@
       "last": ""
     },
     "sessionId": "<masked>",
-    "stageId": "build",
     "startedAt": 0,
     "state": "failed",
     "stepId": "one",
@@ -64,7 +63,6 @@
       "last": ""
     },
     "sessionId": "<masked>",
-    "stageId": "build",
     "startedAt": 0,
     "state": "done",
     "stepId": "one",
@@ -96,7 +94,6 @@
       "last": ""
     },
     "sessionId": "<masked>",
-    "stageId": "build",
     "startedAt": 0,
     "state": "stuck",
     "stepId": "one",

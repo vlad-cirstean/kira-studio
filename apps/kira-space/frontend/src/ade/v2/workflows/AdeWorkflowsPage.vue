@@ -52,8 +52,8 @@ const importOpen = ref(false);
 const importPath = ref('');
 const listError = ref('');
 
-function stages(e: WorkflowEntry): string {
-  return e.workflow ? e.workflow.stages.map((s) => s.name).join(' › ') : '';
+function stepList(e: WorkflowEntry): string {
+  return e.workflow ? e.workflow.steps.map((s) => s.name).join(' › ') : '';
 }
 
 async function pick(fileName: string): Promise<void> {
@@ -171,9 +171,9 @@ async function createNew(): Promise<void> {
           </span>
           <span
             class="max-w-full truncate text-kira-sm text-muted-foreground"
-            data-testid="ade-wf-row-stages"
+            data-testid="ade-wf-row-steps"
             >{{
-              stages(e)
+              stepList(e)
             }}</span
           >
           <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">{{

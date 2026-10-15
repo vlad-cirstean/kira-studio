@@ -83,7 +83,7 @@ func TestWorkflows_writesAndExternalEdits(t *testing.T) {
 	}
 
 	before = emitted.Load()
-	if err := os.WriteFile(e.Path, []byte("id: smoke\nstages: [\n"), 0o644); err != nil {
+	if err := os.WriteFile(e.Path, []byte("id: smoke\nsteps: [\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	waitUntil(t, "emit after broken edit", func() bool { return emitted.Load() > before })

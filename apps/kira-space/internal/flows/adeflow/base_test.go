@@ -26,7 +26,7 @@ func newBaseFx(t *testing.T) *baseFx {
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
 	repo, bare := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	rec := importRepo(t, app, repo.Dir)
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
 	return &baseFx{app: app, repo: repo, bare: bare, repoID: rec.ID}
 }
 

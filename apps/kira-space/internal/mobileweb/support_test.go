@@ -147,14 +147,14 @@ func (f *fakeWriter) AddBacklogItem(_ context.Context, a adewire.AddBacklogItemA
 func (f *fakeWriter) MoveBacklogItem(_ context.Context, a adewire.MoveBacklogItemArgs) error {
 	return f.record("MoveBacklogItem", a)
 }
-func (f *fakeWriter) SetTaskStage(_ context.Context, a adewire.SetTaskStageArgs) (adewire.Task, error) {
-	return adewire.Task{ID: a.TaskID, StageID: a.StageID}, f.record("SetTaskStage", a)
+func (f *fakeWriter) SetTaskStep(_ context.Context, a adewire.SetTaskStepArgs) (adewire.Task, error) {
+	return adewire.Task{ID: a.TaskID, EntryStepID: a.StepID}, f.record("SetTaskStep", a)
 }
 func (f *fakeWriter) StartRun(_ context.Context, a adewire.StartRunArgs) (adewire.StartRunResult, error) {
 	return adewire.StartRunResult{RunIDs: []string{"run1"}}, f.record("StartRun", a)
 }
-func (f *fakeWriter) LaunchStage(_ context.Context, a adewire.LaunchStageArgs) (LaunchResult, error) {
-	return LaunchResult{SessionID: "sess1"}, f.record("LaunchStage", a)
+func (f *fakeWriter) LaunchStep(_ context.Context, a adewire.LaunchStepArgs) (LaunchResult, error) {
+	return LaunchResult{SessionID: "sess1"}, f.record("LaunchStep", a)
 }
 func (f *fakeWriter) Send(_ context.Context, a adewire.SendArgs) error { return f.record("Send", a) }
 func (f *fakeWriter) TakeOver(_ context.Context, a adewire.TakeOverArgs) (LaunchResult, error) {

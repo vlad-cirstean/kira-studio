@@ -9,7 +9,7 @@ import (
 )
 
 const adeSessionsSelectColumns = `id, claude_session_id, cwd, state, terminal_id, started_at, last_active_at,
-	mode, task_id, branch_id, stage_id, step_id, run_id, resumes, purpose`
+	mode, task_id, branch_id, step_id, run_id, resumes, purpose`
 
 // AdeSessionsRepo reads and writes `ade_sessions` — the history of every task Claude Code session
 // (interactive or headless) the app has spawned or resumed.
@@ -23,7 +23,7 @@ func scanAdeSessionRow(row rowScanner) (model.AdeSession, error) {
 	if err := row.Scan(
 		&rec.ID, &rec.ClaudeSessionID, &rec.Cwd,
 		&rec.State, &terminalID, &rec.StartedAt, &rec.LastActiveAt,
-		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StageID, &rec.StepID, &rec.RunID, &rec.Resumes, &rec.Purpose,
+		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StepID, &rec.RunID, &rec.Resumes, &rec.Purpose,
 	); err != nil {
 		return model.AdeSession{}, err
 	}
@@ -87,10 +87,10 @@ func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes, purpose,
+		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, step_id, run_id, resumes, purpose,
 			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
 		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
 	); err != nil {
 		return fmt.Errorf("repos: insert headless ade session %s: %w", rec.ID, err)
@@ -107,10 +107,10 @@ func (r *AdeSessionsRepo) InsertTUI(rec model.AdeSession) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes, purpose,
+		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, step_id, run_id, resumes, purpose,
 			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
 		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
 	); err != nil {
 		return fmt.Errorf("repos: insert tui ade session %s: %w", rec.ID, err)

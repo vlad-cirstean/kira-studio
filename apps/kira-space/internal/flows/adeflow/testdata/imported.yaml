@@ -1,9 +1,9 @@
 id: imported
 name: Imported flow
-stages:
+steps:
   - id: plan
     name: Plan
-    kind: user
+    kind: manual
     status: To do
   - id: ship
     name: Ship

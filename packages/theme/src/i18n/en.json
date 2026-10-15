@@ -5290,7 +5290,14 @@
         "description": "The Jira key and link line of a launch message.",
         "title": "Jira line",
         "usedBy": {
-          "body": "Included in the step, stage, review and start messages."
+          "body": "Included in the step, manual step, review and start messages."
+        }
+      },
+      "adeManualMessage": {
+        "description": "The first message of a manual step session. It carries the step name, task, repositories, notes and the step prompt.",
+        "title": "Manual step message",
+        "usedBy": {
+          "body": "Sent to Claude when a manual step session starts."
         }
       },
       "adeRebaseContextLine": {
@@ -5311,7 +5318,7 @@
         "description": "One repository line of a launch message. It shows the name, branch and worktree, or a read-only folder.",
         "title": "Repository line",
         "usedBy": {
-          "body": "Included in the stage and start messages."
+          "body": "Included in the manual step and start messages."
         }
       },
       "adeReviewComments": {
@@ -5347,13 +5354,6 @@
         "title": "Send back message",
         "usedBy": {
           "body": "Sent when a failed step sends a branch back to an earlier step."
-        }
-      },
-      "adeStageMessage": {
-        "description": "The first message of a stage session. It carries the stage name, task, repositories, notes and the stage prompt.",
-        "title": "Stage message",
-        "usedBy": {
-          "body": "Sent to Claude when a stage session starts."
         }
       },
       "adeStartMessage": {
@@ -5696,20 +5696,14 @@
       "stack": {
         "description": "The branches to rebase, root first, each with its worktree and parent."
       },
-      "stageName": {
-        "description": "The stage name."
-      },
-      "stagePrompt": {
-        "description": "The stage’s own prompt with placeholders filled in."
-      },
       "stepCount": {
-        "description": "The number of steps in the stage."
+        "description": "The number of steps in the workflow."
       },
       "stepName": {
         "description": "The step name."
       },
       "stepNumber": {
-        "description": "The position of the step in its stage, starting at 1."
+        "description": "The position of the step in its workflow, starting at 1."
       },
       "stepPrompt": {
         "description": "The step’s own prompt with placeholders filled in."
@@ -6337,12 +6331,12 @@
         "title": "Mark done?"
       },
       "moveBackConfirm": {
-        "body": "Move “{title}” back to {stage}. Its earlier runs stay as history.",
+        "body": "Move “{title}” back to {step}. Its earlier runs stay as history.",
         "confirm": "Move back",
         "title": "Move back?"
       },
       "moveForwardConfirm": {
-        "body": "Move “{title}” forward to {stage}.",
+        "body": "Move “{title}” forward to {step}.",
         "confirm": "Move forward",
         "title": "Move forward?"
       },
@@ -6350,24 +6344,23 @@
         "empty": "No workflow"
       },
       "startConfirm": {
-        "title": "Start {stage}?"
+        "title": "Start {step}?"
       },
       "startRunConfirm": {
         "body": "Agents start now in the worktrees of “{title}”."
       },
       "startSessionConfirm": {
-        "body": "A Claude Code session for {stage} opens on your computer."
+        "body": "A Claude Code session for {step} opens on your computer."
       },
-      "startThisStageConfirm": {
-        "title": "Start this stage?"
+      "startThisStepConfirm": {
+        "title": "Start this step?"
       },
-      "startThisStageSessionConfirm": {
-        "body": "A Claude Code session for this stage opens on your computer."
+      "startThisStepSessionConfirm": {
+        "body": "A Claude Code session for this step opens on your computer."
       },
       "stopFirst": {
         "hint": "Stop its running agents first to move it."
-      },
-      "thisStage": {}
+      }
     },
     "reply": {
       "dialog": {
@@ -6937,33 +6930,36 @@
           },
           "done": {
             "label": "Done ›",
-            "tooltip": "{stage} is done; move to {next}"
+            "tooltip": "{step} is done; move to {next}"
           },
           "doneLast": {
-            "tooltip": "{stage} is done"
+            "tooltip": "{step} is done"
           },
           "finish": {
             "label": "Finish ✓",
             "tooltip": "Finish the workflow"
           },
           "retryFailed": {
-            "tooltip": "{stage} failed; see its output on the task tab"
+            "tooltip": "{step} failed; see its output on the task tab"
           },
           "retryStuck": {
-            "tooltip": "{stage} is stuck; see its output on the task tab"
+            "tooltip": "{step} is stuck; see its output on the task tab"
           },
           "run": {
             "label": "▶ Run"
           },
           "runAgents": {
-            "tooltip": "Run {stage} with background agents (claude -p)"
+            "tooltip": "Run {step} with background agents (claude -p)"
+          },
+          "runReview": {
+            "tooltip": "Start {step}; it waits for your review"
           },
           "runScript": {
             "tooltip": "Run: {command}"
           },
-          "stage": {
-            "label": "▶ {stage}",
-            "tooltip": "Open an interactive Claude Code session for {stage}"
+          "session": {
+            "label": "▶ {step}",
+            "tooltip": "Open an interactive Claude Code session for {step}"
           },
           "takeOver": {
             "tooltip": "{step} needs you; continue it yourself in Claude Code"
@@ -6997,8 +6993,8 @@
           "moveToday": {
             "label": "Move to today"
           },
-          "moveToStage": {
-            "label": "Move to stage"
+          "moveToStep": {
+            "label": "Move to step"
           },
           "openGithub": {
             "label": "Open on GitHub"
@@ -7018,8 +7014,8 @@
           "showSessions": {
             "label": "Show sessions"
           },
-          "skipStage": {
-            "label": "Skip {stage}"
+          "skipStep": {
+            "label": "Skip {step}"
           },
           "stopRuns": {
             "label": "Stop running agents"
@@ -7200,14 +7196,14 @@
         "sendAnyway": {
           "label": "Send anyway"
         },
-        "stage": {
-          "title": "{stage} · interactive Claude Code"
-        },
         "start": {
           "title": "Start Claude Code (interactive)"
         },
         "startsWhenReady": {
           "loading": "Starts when ready…"
+        },
+        "step": {
+          "title": "{step} · interactive Claude Code"
         },
         "undoOverride": {
           "label": "Undo override"
@@ -7497,7 +7493,7 @@
           "status": "Not verified"
         },
         "routeEnd": {
-          "label": "→ End of stage"
+          "label": "→ End"
         },
         "tried": {
           "label": "Tried: {tried}"
@@ -7540,8 +7536,8 @@
           "notStarted": {
             "hint": "Not started."
           },
-          "stage": {
-            "hint": "In the {stage} stage."
+          "step": {
+            "hint": "At step {step}."
           },
           "stuck": {
             "hint": "A step is stuck or failed."
@@ -7670,17 +7666,20 @@
         "sentBack": {
           "label": "{step} ↩ sent back"
         },
-        "stageAgent": {
+        "stepAgent": {
           "label": "{name} (agent)"
         },
-        "stageDone": {
+        "stepDone": {
           "label": "{name} ✓"
         },
-        "stageScript": {
-          "label": "{name} (script)"
+        "stepManual": {
+          "label": "{name} (manual)"
         },
-        "stageUser": {
-          "label": "{name} (user)"
+        "stepReview": {
+          "label": "{name} (review)"
+        },
+        "stepScript": {
+          "label": "{name} (script)"
         },
         "stuck": {
           "label": "{step} · stuck"
@@ -7949,7 +7948,7 @@
           "error": "This smart script was not found."
         },
         "title": {
-          "title": "Run {stage} in the background"
+          "title": "Run {step} in the background"
         }
       },
       "sandbox": {
@@ -8041,7 +8040,7 @@
           "label": "Worktree setup"
         }
       },
-      "stage": {
+      "step": {
         "failedContinued": {
           "status": "Failed, continued"
         },
@@ -8054,9 +8053,14 @@
         "modeAgent": {
           "label": "Agent · background claude -p"
         },
-        "modeUser": {},
-        "modeUserSession": {
-          "label": "User · interactive Claude Code"
+        "modeManual": {
+          "label": "Manual · interactive Claude Code"
+        },
+        "modeOwn": {
+          "label": "Manual · your own work"
+        },
+        "modeReview": {
+          "label": "Review · waits for you"
         },
         "returns": {
           "label": "↩ {count}/{limit}",
@@ -8085,11 +8089,10 @@
           "status": "Waiting for approval"
         }
       },
-      "stageBlock": {
+      "stepBlock": {
         "hideOutput": {
           "label": "Hide output"
         },
-        "mainMerged": {},
         "mainOpen": {
           "status": "{main} —"
         },
@@ -8103,24 +8106,21 @@
           "label": "Output"
         },
         "report": {
-          "title": "{stage} report"
+          "title": "{step} report"
         },
         "resume": {
           "tooltip": "Continue the interrupted Claude session"
         },
         "skipThis": {
-          "label": "Skip this stage"
-        },
-        "state": {
-          "next": {}
+          "label": "Skip this step"
         }
       },
-      "stageMover": {
+      "stepMover": {
         "back": {
-          "tooltip": "Back one stage"
+          "tooltip": "Back one step"
         },
         "next": {
-          "tooltip": "Next stage"
+          "tooltip": "Next step"
         }
       },
       "takeOverConfirm": {
@@ -8227,9 +8227,6 @@
           }
         },
         "field": {
-          "onFailure": {
-            "label": "On failure"
-          },
           "runsOn": {
             "label": "Runs on"
           }
@@ -8243,11 +8240,8 @@
           }
         },
         "graph": {
-          "addStage": {
-            "label": "Add stage"
-          },
-          "addStageAfter": {
-            "label": "Add stage after"
+          "addStep": {
+            "label": "Add step"
           },
           "addStepAfter": {
             "label": "Add step after"
@@ -8259,7 +8253,7 @@
             "label": "Fix it in YAML"
           },
           "inspectorEmpty": {
-            "emptyHint": "Select a stage or a step to edit it. Drag from a result dot to another step to set where it goes. {tokens} are filled in per run."
+            "emptyHint": "Select a step to edit it. Drag from a result dot to another step to set where it goes. {tokens} are filled in per run."
           },
           "noValid": {
             "body": "This file has no valid version yet."
@@ -8275,9 +8269,6 @@
             "label": "Kira Space tools for agents",
             "tooltip": "Agent steps can declare repositories on the task and request branches and worktrees through Kira Space"
           },
-          "stageMenu": {
-            "aria": "Stage actions"
-          },
           "stepMenu": {
             "aria": "Step actions"
           },
@@ -8286,16 +8277,17 @@
           }
         },
         "kind": {
-          "agentBackground": {
-            "option": "Agent (background)"
-          }
-        },
-        "onFailure": {
-          "retryOnce": {
-            "label": "Retry once"
+          "agent": {
+            "option": "Agent step"
           },
-          "retryTwice": {
-            "label": "Retry twice"
+          "manual": {
+            "option": "Manual step"
+          },
+          "review": {
+            "option": "Review step"
+          },
+          "script": {
+            "option": "Script step"
           }
         },
         "page": {
@@ -8310,7 +8302,7 @@
             "example": "~/…/workflow.yaml"
           },
           "intro": {
-            "body": "A workflow is the list of stages a task goes through. User stages are yours, optionally with an interactive Claude Code session. Agent stages run Claude steps in the background with {command}. Script stages run a command. Each stage sets the task status."
+            "body": "A workflow is the list of steps a task goes through. Agent steps run Claude in the background with {command}. Script steps run a command. Review steps wait for your review. Manual steps are your own work, optionally with an interactive Claude Code session. Each step sets the task status."
           },
           "new": {
             "label": "New workflow"
@@ -8331,7 +8323,7 @@
             "aria": "Result ID"
           },
           "intro": {
-            "hint": "The agent picks one result when the step ends. Each result sets where the stage goes next."
+            "hint": "The agent picks one result when the step ends. Each result sets where the task goes next."
           },
           "notOk": {
             "label": "Failure"
@@ -8348,10 +8340,7 @@
         },
         "route": {
           "end": {
-            "option": "End of stage"
-          },
-          "next": {
-            "option": "Next step"
+            "option": "End"
           },
           "thisStep": {
             "option": "↩ This step"
@@ -8414,67 +8403,34 @@
             "hint": "Saved edits apply to work not yet started."
           }
         },
-        "stage": {
-          "defaultName": {
-            "label": "New stage"
-          }
-        },
-        "stageInspector": {
-          "addStep": {
-            "label": "Add step"
-          },
-          "command": {
-            "example": "./scripts/release.sh --branch {branch}",
-            "hint": "Runs in each branch’s worktree. A non-zero exit fails the stage. {tokens} are shell-quoted when needed."
-          },
-          "name": {
-            "aria": "Stage name"
-          },
-          "prompt": {
-            "aria": "Session prompt",
-            "placeholder": "First message for the session (optional)"
-          },
-          "remove": {
-            "label": "Remove stage"
-          },
-          "session": {
-            "label": "Open an interactive Claude Code session"
-          },
-          "skip": {
-            "label": "Skip stage"
-          },
-          "status": {
-            "tooltip": "Task status while in this stage"
-          },
-          "unskip": {
-            "label": "Don’t skip stage"
-          }
-        },
-        "stageNode": {
-          "manual": {
-            "label": "Your own work"
-          },
-          "noCommand": {
-            "label": "No command"
-          },
-          "session": {
-            "label": "Interactive Claude Code session"
-          }
-        },
         "step": {
           "defaultName": {
             "label": "New step"
           }
         },
         "stepInspector": {
-          "before": {
-            "label": "Before this step"
+          "command": {
+            "example": "./scripts/release.sh",
+            "hint": "Runs in each branch’s worktree. A non-zero exit fails the step. {tokens} are shell-quoted when needed."
+          },
+          "end": {
+            "title": "How it ends"
+          },
+          "endManual": {
+            "hint": "Moves on to the next step once you finish it."
           },
           "finishNote": {
             "hint": "Kira Space adds this finish_step instruction to the prompt."
           },
+          "kindChange": {
+            "body": "Its {field} is cleared.",
+            "title": "Change step kind"
+          },
           "makeStart": {
             "label": "Make start step"
+          },
+          "manualNote": {
+            "hint": "The run pauses here for your own work. Finish the step from the task to move on."
           },
           "maxReturns": {
             "hint": "Times a failure may send the run back. Review steps: 0 = no limit.",
@@ -8482,6 +8438,10 @@
           },
           "name": {
             "aria": "Step name"
+          },
+          "prompt": {
+            "aria": "Session prompt",
+            "placeholder": "First message for the session (optional)"
           },
           "reviewImplementer": {
             "label": "Implementer step"
@@ -8498,13 +8458,37 @@
           "scriptMissing": {
             "error": "Script not found."
           },
+          "scriptNote": {
+            "hint": "Exit code 0 ends with done, any other with failed."
+          },
+          "session": {
+            "label": "Open an interactive Claude Code session"
+          },
+          "status": {
+            "label": "Task status while in this step"
+          },
           "tools": {
             "example": "Bash(git *), Edit",
             "hint": "Passed as --allowedTools. Deny rules still win.",
             "label": "Allowed tools"
+          },
+          "unskip": {
+            "label": "Include this step"
+          },
+          "what": {
+            "title": "What it does"
+          },
+          "where": {
+            "title": "Where and when"
           }
         },
         "stepNode": {
+          "manual": {
+            "label": "Your own work"
+          },
+          "noCommand": {
+            "label": "No command"
+          },
           "resultGoes": {
             "tooltip": "{id} ({outcome}) goes to {next}"
           },
@@ -8522,6 +8506,9 @@
           },
           "sendsNew": {
             "label": "Sends to a new agent"
+          },
+          "session": {
+            "label": "Interactive Claude Code session"
           },
           "smart": {
             "label": "Smart"
@@ -8609,9 +8596,6 @@
       "showLog": {
         "label": "Show log"
       },
-      "stage": {
-        "label": "Stage"
-      },
       "status": {
         "blocked": {
           "status": "Blocked"
@@ -8625,6 +8609,9 @@
         "todo": {
           "status": "To do"
         }
+      },
+      "step": {
+        "label": "Step"
       },
       "workflow": {
         "label": "Workflow"

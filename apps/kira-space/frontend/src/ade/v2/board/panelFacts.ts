@@ -33,9 +33,7 @@ export function statusWhy(task: Task, status: DerivedStatus, progress: TaskProgr
   if (progress.finished) return t('space.ade.panelFacts.why.finished.hint');
   if (status === 'Blocked') return t('space.ade.panelFacts.why.stuck.hint');
   if (status === 'To do') return t('space.ade.panelFacts.why.notStarted.hint');
-  return progress.stage
-    ? t('space.ade.panelFacts.why.stage.hint', { stage: progress.stage.name })
-    : '';
+  return progress.step ? t('space.ade.panelFacts.why.step.hint', { step: progress.step.name }) : '';
 }
 
 /** `Today–Wed 23 · 3 branches in api, web-app · 1/5 steps`. */

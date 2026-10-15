@@ -408,7 +408,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	cwd := t.TempDir()
 
 	res, err := tr.Prepare(PrepareArgs{
-		TaskID: "t1", BranchID: "b1", StageID: "impl", StepID: "s1", Cwd: cwd, Resumes: "claude-9",
+		TaskID: "t1", BranchID: "b1", StepID: "s1", Cwd: cwd, Resumes: "claude-9",
 		ExtraArgs: []string{"--add-dir", "/x y"}, Message: "go on",
 	})
 	if err != nil {
@@ -425,7 +425,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if err != nil || rec == nil {
 		t.Fatalf("record = %v, %v", rec, err)
 	}
-	if rec.Mode != model.AdeSessionModeTUI || rec.TaskID != "t1" || rec.BranchID != "b1" || rec.StageID != "impl" ||
+	if rec.Mode != model.AdeSessionModeTUI || rec.TaskID != "t1" || rec.BranchID != "b1" ||
 		rec.StepID != "s1" || rec.Resumes != "claude-9" || rec.ClaudeSessionID != "claude-9" || rec.RunID != "" {
 		t.Fatalf("record = %+v", rec)
 	}

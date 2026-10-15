@@ -52,19 +52,19 @@ func TestPhoneEventStream(t *testing.T) {
 		t.Fatalf("backlog after the %q event = %s", backlog.Event, r.Body)
 	}
 
-	if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {
+	if _, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {
 		t.Fatal(err)
 	}
 	stream.wait(t, adewire.ChannelBoard, waitFor)
 	var board adewire.Board
 	p.get("/api/ade/board").json(t, &board)
-	var stage string
+	var entry string
 	for _, tk := range board.Tasks {
 		if tk.ID == f.task.ID {
-			stage = tk.StageID
+			entry = tk.EntryStepID
 		}
 	}
-	if stage != "done" {
-		t.Fatalf("board after the event shows task stage %q, want done", stage)
+	if entry != "done" {
+		t.Fatalf("board after the event shows task entry %q, want done", entry)
 	}
 }

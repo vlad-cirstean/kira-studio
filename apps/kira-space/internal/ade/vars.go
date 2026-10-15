@@ -91,20 +91,20 @@ func repoLineVars(repos []repoLine) []llmprompts.RepoLineVars {
 	return out
 }
 
-// composeStageMessage is the first message of a user stage's interactive session (SPEC2 section 5).
-// The stage prompt sees every writable repo, joined with ", ".
-func composeStageMessage(src llmprompts.Source, stage adewire.Stage, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
-	v := llmprompts.StageVars{
-		StageName: stage.Name, Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
+// composeManualMessage is the first message of a manual step's interactive session (SPEC2 section 5).
+// The step prompt sees every writable repo, joined with ", ".
+func composeManualMessage(src llmprompts.Source, step adewire.WorkflowStep, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+	v := llmprompts.ManualVars{
+		StepName: step.Name, Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
 		Notes: capNotes(notes), Repos: repoLineVars(repos),
 	}
-	if stage.Prompt != "" {
-		v.StagePrompt = substitute(stage.Prompt, repoVars(title, jiraKey, repos), false)
+	if step.Prompt != "" {
+		v.StepPrompt = substitute(step.Prompt, repoVars(title, jiraKey, repos), false)
 	}
-	return llmprompts.AdeStageMessage.Text(src, v)
+	return llmprompts.AdeManualMessage.Text(src, v)
 }
 
-// repoVars is the stage prompt's variable set: every writable repo, joined with ", ".
+// repoVars is the manual step prompt's variable set: every writable repo, joined with ", ".
 func repoVars(title, jiraKey string, repos []repoLine) runVars {
 	vars := runVars{Task: title, Jira: jiraKey}
 	var nicks, names, trees []string
@@ -135,7 +135,7 @@ func composeReviewMessage(src llmprompts.Source, title, jiraKey, jiraURL, notes 
 }
 
 // composeStartMessage is the first message of a branch-level Start session (SPEC2 section 9); step
-// is the first step not done, "" when the stage has none.
+// is the first step not done, "" when the workflow has none.
 func composeStartMessage(src llmprompts.Source, title, jiraKey, jiraURL string, repo repoLine, step string, context []string) string {
 	return llmprompts.AdeStartMessage.Text(src, llmprompts.StartVars{
 		Title: title, JiraKey: jiraKey, JiraURL: jiraURL,

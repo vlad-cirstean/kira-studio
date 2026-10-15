@@ -7,6 +7,8 @@ import type { PlanCard } from './useAgentsModel';
 export type TaskIntent = 'back' | 'next' | 'start';
 
 const message = (err: unknown): string => errorText(err);
+const currentStepId = (c: PlanCard): string =>
+  c.progress.finished ? 'done' : (c.progress.step?.id ?? c.task.entryStepId);
 
 /** The Back, Next and Start buttons of one plan card: the confirm text for each, and the write. */
 export function useTaskActions(card: () => PlanCard) {
@@ -15,18 +17,18 @@ export function useTaskActions(card: () => PlanCard) {
   const error = ref('');
   let key = newIntentKey();
 
-  const stageName = computed(() => card().progress.stage?.name ?? '');
+  const stepName = computed(() => card().progress.step?.name ?? '');
   /** Start maps to the same two calls the desktop's action makes; other actions stay desktop only. */
   const startKind = computed<'run' | 'launch' | null>(() => {
     const kind = card().action?.kind;
     if (kind === 'run') return 'run';
-    return kind === 'stage' ? 'launch' : null;
+    return kind === 'session' ? 'launch' : null;
   });
   const busy = computed(
     () =>
-      writes.setTaskStage.isPending.value ||
+      writes.setTaskStep.isPending.value ||
       writes.startRun.isPending.value ||
-      writes.launchStage.isPending.value,
+      writes.launchStep.isPending.value,
   );
 
   const dialog = computed(() => {
@@ -37,7 +39,7 @@ export function useTaskActions(card: () => PlanCard) {
           title: t('mobile.plan.moveBackConfirm.title'),
           text: t('mobile.plan.moveBackConfirm.body', {
             title: c.title,
-            stage: c.moves.prev?.name ?? '',
+            step: c.moves.prev?.name ?? '',
           }),
           confirmLabel: t('mobile.plan.moveBackConfirm.confirm'),
         };
@@ -49,7 +51,7 @@ export function useTaskActions(card: () => PlanCard) {
           ),
           text: t('mobile.plan.moveForwardConfirm.body', {
             title: c.title,
-            stage: c.moves.next?.name ?? '',
+            step: c.moves.next?.name ?? '',
           }),
           confirmLabel: t(
             done ? 'mobile.plan.markDoneConfirm.confirm' : 'mobile.plan.moveForwardConfirm.confirm',
@@ -58,9 +60,9 @@ export function useTaskActions(card: () => PlanCard) {
       }
       case 'start':
         return {
-          title: stageName.value
-            ? t('mobile.plan.startConfirm.title', { stage: stageName.value })
-            : t('mobile.plan.startThisStageConfirm.title'),
+          title: stepName.value
+            ? t('mobile.plan.startConfirm.title', { step: stepName.value })
+            : t('mobile.plan.startThisStepConfirm.title'),
           text: startText(c.title),
           confirmLabel: t('common.action.start.label'),
         };
@@ -71,9 +73,9 @@ export function useTaskActions(card: () => PlanCard) {
 
   function startText(title: string): string {
     if (startKind.value === 'run') return t('mobile.plan.startRunConfirm.body', { title });
-    return stageName.value
-      ? t('mobile.plan.startSessionConfirm.body', { stage: stageName.value })
-      : t('mobile.plan.startThisStageSessionConfirm.body');
+    return stepName.value
+      ? t('mobile.plan.startSessionConfirm.body', { step: stepName.value })
+      : t('mobile.plan.startThisStepSessionConfirm.body');
   }
 
   function ask(next: TaskIntent): void {
@@ -88,22 +90,22 @@ export function useTaskActions(card: () => PlanCard) {
 
   async function confirm(): Promise<void> {
     const c = card();
-    const from = c.task.stageId;
+    const from = currentStepId(c);
     error.value = '';
     try {
       if (intent.value === 'back' || intent.value === 'next') {
         const target = intent.value === 'back' ? c.moves.prev : c.moves.next;
         if (!target) return;
-        await writes.setTaskStage.mutateAsync({
+        await writes.setTaskStep.mutateAsync({
           taskId: c.task.id,
-          fromStageId: from,
-          stageId: target.id,
+          fromStepId: from,
+          stepId: target.id,
           key,
         });
       } else if (intent.value === 'start' && startKind.value === 'run') {
-        await writes.startRun.mutateAsync({ taskId: c.task.id, fromStageId: from, key });
+        await writes.startRun.mutateAsync({ taskId: c.task.id, fromStepId: from, key });
       } else if (intent.value === 'start' && startKind.value === 'launch') {
-        await writes.launchStage.mutateAsync({ taskId: c.task.id, fromStageId: from, key });
+        await writes.launchStep.mutateAsync({ taskId: c.task.id, fromStepId: from, key });
       }
       intent.value = null;
     } catch (err) {

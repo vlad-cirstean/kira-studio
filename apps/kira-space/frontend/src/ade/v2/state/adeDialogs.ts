@@ -7,7 +7,7 @@ import {
   type DialogSpec,
   mergeSpec,
   rebaseSpec,
-  stageSpec,
+  sessionSpec,
   startSpec,
 } from '../dialog/compose';
 import { deleteAnyway, type FlowDeps, requestArchive, sendDialog } from '../dialog/flow';
@@ -18,7 +18,7 @@ import {
   useAbortRebase,
   useArchiveRisk,
   useArchiveTask,
-  useLaunchStage,
+  useLaunchStep,
   useRebase,
   useRecordMerge,
   useSend,
@@ -51,7 +51,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
 
   const sendM = useSend();
   const startM = useStartBranch();
-  const stageM = useLaunchStage();
+  const stepM = useLaunchStep();
   const rebaseM = useRebase();
   const baseM = useSetBranchBase();
   const abortM = useAbortRebase();
@@ -86,7 +86,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
       launch: {
         send: (a) => sendM.mutateAsync(a),
         startBranch: (a) => startM.mutateAsync(a),
-        launchStage: (a) => stageM.mutateAsync(a),
+        launchStep: (a) => stepM.mutateAsync(a),
         ...launchOpener.deps,
       },
       turns: { watch: adeTurns.watch },
@@ -174,9 +174,9 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     if (c) open(mergeSpec(c, branchId, target));
   }
 
-  function stage(taskId: string): void {
+  function session(taskId: string): void {
     const c = ctx.value;
-    if (c) open(stageSpec(c, taskId));
+    if (c) open(sessionSpec(c, taskId));
   }
 
   function start(branchId: string): void {
@@ -211,7 +211,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     confirmAbort,
     pickBase,
     merge,
-    stage,
+    session,
     start,
     pick,
   };

@@ -48,9 +48,9 @@ func mergeFiles(a, b map[string]string) map[string]string {
 	return a
 }
 
-func (f *adeFixture) saveWorkflow(t *testing.T, id, stages string) {
+func (f *adeFixture) saveWorkflow(t *testing.T, id, steps string) {
 	t.Helper()
-	entry, err := f.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: id + ".yaml", Yaml: "id: " + id + "\nname: Flow\nstages:\n" + stages})
+	entry, err := f.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: id + ".yaml", Yaml: "id: " + id + "\nname: Flow\nsteps:\n" + steps})
 	if err != nil || entry.Error != nil {
 		t.Fatalf("SaveWorkflowYaml: %v %+v", err, entry.Error)
 	}
@@ -66,13 +66,12 @@ func (f *adeFixture) createTask(t *testing.T, workflow string) adewire.Task {
 }
 
 const (
-	agentStageYAML = "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 2m\n" +
-		"        prompt: This step has no work. Call finish_step with status done and summary ok.\n"
-	userStageYAML = "  - id: work\n    name: Work\n    kind: user\n    status: In progress\n    session: true\n"
+	agentStepYAML = "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 2m\n" +
+		"    prompt: This step has no work. Call finish_step with status done and summary ok.\n"
+	manualStepYAML = "  - id: work\n    name: Work\n    kind: manual\n    status: In progress\n    session: true\n"
 )
 
-// startRun starts the task's agent stage on branch and returns the run once it left running.
+// startRun starts the task's agent step on branch and returns the run once it left running.
 func (f *adeFixture) startRun(t *testing.T, task adewire.Task, branch string) adewire.Run {
 	t.Helper()
 	b, err := f.W.AdeTask.Board(ctx)
@@ -155,7 +154,7 @@ func TestAdeHeadlessRun(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			f.saveWorkflow(t, "flow", agentStageYAML+userStageYAML)
+			f.saveWorkflow(t, "flow", agentStepYAML+manualStepYAML)
 			run := f.startRun(t, f.createTask(t, "flow"), "feat/real-claude")
 			log := f.runLog(t, run.ID)
 			if !c.wantDone {
@@ -179,13 +178,12 @@ func TestAdeHeadlessRun(t *testing.T) {
 // from the finish_step schema, and the run keeps the chosen id.
 func TestAdeStepResults(t *testing.T) {
 	f := newAdeFixture(t, nil)
-	stage := "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 2m\n" +
-		"        prompt: This step has no work. Call finish_step with status pass and summary ok.\n" +
-		"        results:\n" +
-		"          - id: pass\n            ok: true\n            description: The step has nothing left to do.\n" +
-		"          - id: retry_later\n            ok: false\n            description: Something is missing.\n"
-	f.saveWorkflow(t, "flow", stage+userStageYAML)
+	step := "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 2m\n" +
+		"    prompt: This step has no work. Call finish_step with status pass and summary ok.\n" +
+		"    results:\n" +
+		"      - id: pass\n        ok: true\n        description: The step has nothing left to do.\n" +
+		"      - id: retry_later\n        ok: false\n        description: Something is missing.\n"
+	f.saveWorkflow(t, "flow", step+manualStepYAML)
 	run := f.startRun(t, f.createTask(t, "flow"), "feat/real-claude")
 	log := f.runLog(t, run.ID)
 	if run.State != "done" || run.Outcome == nil || run.Outcome.Result != "pass" || run.Outcome.Route != "next" {
@@ -194,13 +192,13 @@ func TestAdeStepResults(t *testing.T) {
 	f.requireCostUnder(t)
 }
 
-// TestAdeStageSession opens a stage's TUI session in the real claude, drives it with Send and
+// TestAdeManualSession opens a manual step's TUI session in the real claude, drives it with Send and
 // follows it through the hooks.
-func TestAdeStageSession(t *testing.T) {
+func TestAdeManualSession(t *testing.T) {
 	f := newAdeFixture(t, nil)
-	f.saveWorkflow(t, "flow", userStageYAML)
+	f.saveWorkflow(t, "flow", manualStepYAML)
 	task := f.createTask(t, "flow")
-	launch, err := f.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+	launch, err := f.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +275,7 @@ func TestAdeRebaseRun(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			f := newAdeFixture(t, nil)
-			f.saveWorkflow(t, "flow", agentStageYAML)
+			f.saveWorkflow(t, "flow", agentStepYAML)
 			f.repo.Git("checkout", "-q", "-b", "feat/a", "main")
 			files := map[string]string{"a.txt": "a\n"}
 			if c.branchBody != "" {

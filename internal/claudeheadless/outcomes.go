@@ -23,7 +23,6 @@ type OutcomeQuery struct {
 type RunOutcomeEntry struct {
 	RunID      string `json:"runId"`
 	Kind       string `json:"kind"`
-	Stage      string `json:"stage"`
 	Step       string `json:"step"`
 	Repo       string `json:"repo"`
 	Branch     string `json:"branch"`

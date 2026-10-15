@@ -17,7 +17,7 @@ import (
 // doneFixture runs the task's single step to done, so its worktree exists.
 func doneFixture(t *testing.T, branch string) (*runFixture, adewire.Branch) {
 	t.Helper()
-	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStage("build", agentStep("one", "")))
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("one", ""))
 	f.start(t, branch)
 	waitRun(t, f.app, f.taskID, "one", "done")
 	return f, branchOf(t, board(t, f.app), f.taskID, f.repoID)
@@ -132,7 +132,7 @@ func TestReviewWindowAndAgent(t *testing.T) {
 
 func TestRestartRecovery(t *testing.T) {
 	hold := filepath.Join(t.TempDir(), "hold")
-	f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}, {Name: "done"}}, agentStage("build", agentStep("one", "")))
+	f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}, {Name: "done"}}, agentStep("one", ""))
 	app := f.app
 	f.start(t, "feat/api-restart")
 	run := waitRun(t, app, f.taskID, "one", "running")
@@ -183,7 +183,7 @@ func githubClone(t *testing.T, app *flowharness.App) (adewire.Branch, string) {
 	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	gitOut(t, repo.Dir, "remote", "set-url", "origin", "https://github.com/acme/api.git")
 	rec := importRepo(t, app, repo.Dir)
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
 	task := createTask(t, app, "Fix login", "flow", rec.ID)
 	br := branchOf(t, board(t, app), task.ID, rec.ID)
 	if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{br.ID: "feat/api-gh"}}); err != nil {

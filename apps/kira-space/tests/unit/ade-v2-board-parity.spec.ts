@@ -17,7 +17,7 @@ import type {
   Workflow,
   WorkflowsResult,
 } from '../../frontend/src/ade/v2/wire';
-import { loadFixture, mkBranch, mkPlan, mkRun, mkStage, mkTask } from './support/adeV2Fixtures';
+import { loadFixture, mkBranch, mkPlan, mkRun, mkStep, mkTask } from './support/adeV2Fixtures';
 import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 
 // Parity: the board logic over the P143 fixtures equals the mockup's own `renderVals()` for status,
@@ -47,9 +47,6 @@ const SETTINGS = {
 
 // The product words differ from the mockup's only by sentence case (P265): compare lowercased.
 const lc = (v: string | undefined) => v?.toLowerCase();
-// P265: the run state `stuck` reads "Needs you" and `back` reads "sent back" in the catalog.
-const oursWording = (v: string | undefined) =>
-  v?.replace(/\bstuck\b/g, 'needs you').replace(/\bback\b/g, 'sent back');
 const lcAll = (v: readonly string[]) => v.map((x) => x.toLowerCase());
 
 /** Branch id -> what the new logic shows instead of the mockup, with the reason. */
@@ -75,7 +72,6 @@ function normalizeBoard(raw: Board, sess: SessionsResult): Board {
           s.activity === 'input' &&
           s.taskId === t.id &&
           s.branchId === r.branchId &&
-          s.stageId === r.stageId &&
           s.stepId === r.stepId,
       );
       return r.state === 'running' && stuck ? { ...r, state: 'stuck' as const } : r;
@@ -204,26 +200,13 @@ describe('per task', () => {
     }
   });
 
-  test('stage label, percent and segment widths equal the mockup', () => {
+  // The mockup groups steps into stages; the flat model counts steps, so only show-bar parity holds.
+  test('bar visibility equals the mockup and the label names the current step', () => {
     for (const t of tasks().filter((x) => x.kind === 'task')) {
       const p = progress.get(t.id) as TaskProgress;
-      const phase = boxOf(t.id).rows[0].phase;
-      expect([t.id, p.label, `${p.percent}%`, p.showBar]).toEqual([
-        t.id,
-        phase.label,
-        phase.pct,
-        phase.showBar,
-      ]);
-      expect(p.segments.length).toBe(phase.segs.length);
-    }
-  });
-
-  test('workflow and bar tooltips equal the mockup', () => {
-    for (const t of tasks().filter((x) => x.kind === 'task')) {
-      const p = progress.get(t.id) as TaskProgress;
-      const phase = boxOf(t.id).rows[0].phase;
-      expect([t.id, lc(p.workflowTip)]).toEqual([t.id, oursWording(lc(phase.tip))]);
-      if (p.showBar) expect([t.id, lc(p.barTip)]).toEqual([t.id, oursWording(lc(phase.barTip))]);
+      expect([t.id, p.showBar]).toEqual([t.id, boxOf(t.id).rows[0].phase.showBar]);
+      expect(p.segments.length).toBe(p.steps.length);
+      expect([t.id, p.label.startsWith(p.step?.name ?? 'Done')]).toEqual([t.id, true]);
     }
   });
 });
@@ -432,9 +415,9 @@ describe('rebase-conflict check states', () => {
   });
 });
 
-describe('script stage recovery', () => {
+describe('script step recovery', () => {
   const actionFor = (state: 'failed' | 'stuck') => {
-    const script = mkStage({
+    const script = mkStep({
       id: 'release',
       kind: 'script',
       command: 'make release',
@@ -445,13 +428,12 @@ describe('script stage recovery', () => {
       id: 't',
       branchIds: ['b'],
       workflowId: 'w',
-      stageId: 'release',
-      currentStage: script,
-      runs: [mkRun({ taskId: 't', stageId: 'release', stepId: 'release', branchId: 'b', state })],
+      entryStepId: 'release',
+      runs: [mkRun({ taskId: 't', stepId: 'release', branchId: 'b', state })],
     });
     const p = buildTaskProgress({
       task: t,
-      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, stages: [script] },
+      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, steps: [script] },
       branch: () => b,
       repoNick: (id) => id,
     });
@@ -467,7 +449,7 @@ describe('script stage recovery', () => {
 
 describe('Needs you extras (R16)', () => {
   const needsFor = (sessionId: string, finishedAt: number | null) => {
-    const script = mkStage({
+    const script = mkStep({
       id: 'release',
       kind: 'script',
       command: 'make release',
@@ -478,13 +460,11 @@ describe('Needs you extras (R16)', () => {
       id: 't',
       branchIds: ['b'],
       workflowId: 'w',
-      stageId: 'release',
-      currentStage: script,
+      entryStepId: 'release',
       runs: [
         mkRun({
           id: 'run-1',
           taskId: 't',
-          stageId: 'release',
           stepId: 'release',
           branchId: 'b',
           state: 'stuck',
@@ -496,7 +476,7 @@ describe('Needs you extras (R16)', () => {
     });
     const p = buildTaskProgress({
       task: t,
-      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, stages: [script] },
+      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, steps: [script] },
       branch: () => b,
       repoNick: (id) => id,
     });

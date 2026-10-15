@@ -15,11 +15,11 @@ import type {
 } from '../wire';
 
 // Pure templates and view model of the Claude dialog (mockup `dlg`, SPEC2 sections 5, 6, 9, 10).
-// No Vue, no clock; `AdeClaudeDialog.vue` wraps `composeDialog` in a computed. The stage and start
-// templates mirror the server defaults (`composeStageMessage`, `composeStartMessage`): an unedited
+// No Vue, no clock; `AdeClaudeDialog.vue` wraps `composeDialog` in a computed. The session and start
+// templates mirror the server defaults (`composeManualMessage`, `composeStartMessage`): an unedited
 // message is sent as `''` and the server composes it, so these only show what it will say.
 
-type DialogKind = 'rebase' | 'queue' | 'changeBase' | 'merge' | 'stage' | 'start' | 'archive';
+type DialogKind = 'rebase' | 'queue' | 'changeBase' | 'merge' | 'session' | 'start' | 'archive';
 
 export interface DialogTarget {
   branchId: string;
@@ -42,7 +42,7 @@ export interface DialogSpec {
   stack?: string[];
   /** merge: the integration branch. */
   target?: string;
-  /** stage / archive: the task. */
+  /** session / archive: the task. */
   taskId?: string;
   /** archive: only the branches at risk. */
   risk?: ArchiveRisk;
@@ -67,8 +67,10 @@ export interface DialogCtx {
   repoState: (codeRepoId: string) => { mainName: string; remote: string };
   repo: (codeRepoId: string) => { nick: string; name: string; root: string };
   taskTitle: (taskId: string) => string;
-  /** First step of the task's current agent stage that is not done, `''` otherwise. */
+  /** The task's current step when it is automatic and not done, `''` otherwise. */
   openStep: (taskId: string) => string;
+  /** The task's current step: its name and the first-message prompt of a manual step; `null` without one. */
+  currentStep: (taskId: string) => { name: string; prompt: string } | null;
 }
 
 interface DialogChip {
@@ -209,11 +211,11 @@ export function mergeSpec(ctx: DialogCtx, branchId: string, target: string): Dia
   };
 }
 
-export function stageSpec(ctx: DialogCtx, taskId: string): DialogSpec {
-  const stage = taskOf(ctx, taskId)?.currentStage?.name ?? t('space.common.stage.label');
+export function sessionSpec(ctx: DialogCtx, taskId: string): DialogSpec {
+  const step = ctx.currentStep(taskId)?.name ?? t('space.common.step.label');
   return {
-    kind: 'stage',
-    title: t('space.ade.claudeDialog.stage.title', { stage }),
+    kind: 'session',
+    title: t('space.ade.claudeDialog.step.title', { step }),
     taskId,
     targets: [],
   };
@@ -297,21 +299,21 @@ function repoLine(ctx: DialogCtx, b: Branch): string {
     : `- Repo: ${repo.nick} (read only, in ${repo.root})`;
 }
 
-function stageMessage(ctx: DialogCtx, spec: DialogSpec): string {
+function sessionMessage(ctx: DialogCtx, spec: DialogSpec): string {
   const taskId = spec.taskId ?? '';
   const t = taskOf(ctx, taskId);
   const title = ctx.taskTitle(taskId);
-  const stage = t?.currentStage;
+  const step = ctx.currentStep(taskId);
   const branches = (t?.branchIds ?? []).flatMap((id) => branchOf(ctx, id) ?? []);
-  const lines = [`${stage?.name ?? 'Stage'}: ${title}`];
+  const lines = [`${step?.name ?? 'Step'}: ${title}`];
   const jira = jiraLine(t);
   if (jira) lines.push(jira);
   const own = branches.filter((b) => b.kind === 'mine' && b.name !== '');
   for (const b of branches) lines.push(repoLine(ctx, b));
   if (t?.notes) lines.push(`- Notes: ${t.notes}`);
-  if (stage?.prompt) {
+  if (step?.prompt) {
     lines.push(
-      substitute(stage.prompt, {
+      substitute(step.prompt, {
         task: title,
         jira: t?.jira?.key ?? '',
         repo: own.map((b) => ctx.repo(b.codeRepoId).nick).join(', '),
@@ -345,8 +347,8 @@ export function templateFor(ctx: DialogCtx, spec: DialogSpec, state: DialogState
       return mergeMessage(ctx, spec, state.push);
     case 'archive':
       return archiveMessage(ctx, spec);
-    case 'stage':
-      return stageMessage(ctx, spec);
+    case 'session':
+      return sessionMessage(ctx, spec);
     default:
       return startMessage(ctx, spec);
   }
@@ -426,7 +428,7 @@ function sendLabel(spec: DialogSpec, overridden: boolean, noOp: boolean): string
     case 'queue':
     case 'changeBase':
       return t('space.ade.claudeDialog.runInBackground.label');
-    case 'stage':
+    case 'session':
       return t('space.ade.board.taskMenu.openSession.label');
     case 'start':
       return t('common.action.start.label');

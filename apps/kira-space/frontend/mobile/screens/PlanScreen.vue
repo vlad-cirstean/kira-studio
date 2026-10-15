@@ -8,7 +8,7 @@ import { ref } from 'vue';
 import { useAgentsModel } from '../state/useAgentsModel';
 import PlanTaskCard from './PlanTaskCard.vue';
 
-// The plan by day, in plan order. Tap a task for its workflow stages.
+// The plan by day, in plan order. Tap a task for its workflow steps.
 const { model, boardQuery } = useAgentsModel();
 const open = ref<string | null>(null);
 </script>

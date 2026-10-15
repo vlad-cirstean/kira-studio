@@ -1,19 +1,13 @@
 package adewire
 
-import (
-	"slices"
-	"strconv"
-	"strings"
-)
-
-// Result routes: a result's Next is one of these or a step id of the same stage.
+// Result routes: a result's Next is one of these or a step id of the workflow.
 const (
 	RouteNext = "next"
 	RouteEnd  = "end"
 	RouteStop = "stop"
 )
 
-// Implicit result ids of a step that declares none.
+// Default result ids of a step that declares none.
 const (
 	ResultDone   = "done"
 	ResultFailed = "failed"
@@ -33,16 +27,6 @@ func DefaultLimit(review bool) int {
 	return DefaultMaxReturns
 }
 
-// LegacyLimit is the return limit an on_failure rule implies: retry N gives N, anything else the default.
-func LegacyLimit(onFailure string, review bool) int {
-	if n, ok := strings.CutPrefix(onFailure, "retry "); ok {
-		if v, err := strconv.Atoi(n); err == nil && v > 0 {
-			return v
-		}
-	}
-	return DefaultLimit(review)
-}
-
 // DefaultRoute is where a result goes when it names no route.
 func DefaultRoute(ok bool) string {
 	if ok {
@@ -51,44 +35,18 @@ func DefaultRoute(ok bool) string {
 	return RouteStop
 }
 
-// ImplicitResults are the results of a step with no declared ones, derived from its legacy on_failure
-// rule (stop | retry N | back:<step>). stepID is the step itself, the target of a retry.
-func ImplicitResults(stepID, onFailure string) []StepResult {
-	failed := StepResult{ID: ResultFailed, Next: RouteStop}
-	if n, ok := strings.CutPrefix(onFailure, "retry "); ok {
-		if v, err := strconv.Atoi(n); err == nil && v > 0 {
-			failed.Next, failed.Loop = stepID, true
-		}
-	} else if id, ok := strings.CutPrefix(onFailure, "back:"); ok {
-		failed.Next, failed.Loop = id, true
+// DefaultResults are the results of a step that declares none: done goes on, failed stops the run.
+func DefaultResults() []StepResult {
+	return []StepResult{
+		{ID: ResultDone, OK: true, Next: RouteNext},
+		{ID: ResultFailed, Next: RouteStop},
 	}
-	return []StepResult{{ID: ResultDone, OK: true, Next: RouteNext}, failed}
 }
 
-// LegacyOnFailure is the on_failure rule that results and the step's return limit equal, when they equal
-// one exactly. earlier lists the step ids before stepID in its stage.
-func LegacyOnFailure(stepID string, results []StepResult, earlier []string, maxReturns int, review bool) (string, bool) {
-	if len(results) != 2 {
-		return "", false
+// DefaultStatus is the task status of a step that sets none.
+func DefaultStatus(kind StepKind) TaskStatus {
+	if kind == KindReview {
+		return "In review"
 	}
-	d, f := results[0], results[1]
-	if d.ID != ResultDone || !d.OK || d.Description != "" || d.Next != RouteNext ||
-		f.ID != ResultFailed || f.OK || f.Description != "" {
-		return "", false
-	}
-	var rule string
-	switch {
-	case f.Next == RouteStop:
-		rule = "stop"
-	case f.Next == stepID && (maxReturns == 1 || maxReturns == 2):
-		rule = "retry " + strconv.Itoa(maxReturns)
-	case f.Next != stepID && slices.Contains(earlier, f.Next):
-		rule = "back:" + f.Next
-	default:
-		return "", false
-	}
-	if maxReturns != LegacyLimit(rule, review) {
-		return "", false
-	}
-	return rule, true
+	return "In progress"
 }

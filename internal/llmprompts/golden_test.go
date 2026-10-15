@@ -71,11 +71,11 @@ func TestGolden(t *testing.T) {
 		{"ade.step.prompt.declared-results", AdeStepPrompt.id, step(func(v *StepVars) { v.Finish = declared })},
 		{"ade.step.prompt.empty-step-prompt", AdeStepPrompt.id, step(func(v *StepVars) { v.StepPrompt, v.StepNumber, v.StepCount = "", 1, 1 })},
 
-		{"ade.stage.message.full", AdeStageMessage.id, StageVars{
-			StageName: "Review", Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: repos,
-			StagePrompt: "Check kira-space on feat/a in /wt/kira-space/feat-a for Add login form.",
+		{"ade.manual.message.full", AdeManualMessage.id, ManualVars{
+			StepName: "Review", Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: repos,
+			StepPrompt: "Check kira-space on feat/a in /wt/kira-space/feat-a for Add login form.",
 		}},
-		{"ade.stage.message.minimal", AdeStageMessage.id, StageVars{StageName: "Plan", Title: "Add login form", Repos: repos[:1]}},
+		{"ade.manual.message.minimal", AdeManualMessage.id, ManualVars{StepName: "Plan", Title: "Add login form", Repos: repos[:1]}},
 		{"ade.review.message.full", AdeReviewMessage.id, ReviewVars{Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: repos}},
 		{"ade.review.message.minimal", AdeReviewMessage.id, ReviewVars{Title: "Add login form", Repos: repos[:1]}},
 		{"ade.start.message.step", AdeStartMessage.id, StartVars{

@@ -24,12 +24,12 @@ const sbScenario = "ade-sandbox"
 
 var sbMask = flowharness.Mask("id", "taskId", "branchId", "sessionId", "startedAt", "finishedAt", "createdAt", "exitCode", "attempt", "at", "profile")
 
-func newSandboxFx(t *testing.T, fake *sandboxtest.Fake, actions []fakeagent.Action, stages string) *runFixture {
+func newSandboxFx(t *testing.T, fake *sandboxtest.Fake, actions []fakeagent.Action, steps string) *runFixture {
 	t.Helper()
 	if fake.Dir == "" {
 		fake.Dir = t.TempDir()
 	}
-	return newRunFixtureWith(t, actions, stages, flowharness.WithSandbox(fake))
+	return newRunFixtureWith(t, actions, steps, flowharness.WithSandbox(fake))
 }
 
 func sandboxOf(t *testing.T, f *runFixture, runID string) adewire.RunSandboxDetail {
@@ -42,7 +42,7 @@ func sandboxOf(t *testing.T, f *runFixture, runID string) adewire.RunSandboxDeta
 }
 
 func sbStep(id, sandbox string) string {
-	return agentStage("build", agentStep(id, sandbox))
+	return agentStep(id, sandbox)
 }
 
 func mustContain(t *testing.T, what, got string, wants ...string) {
@@ -97,7 +97,7 @@ func TestSandboxStepDefault(t *testing.T) {
 
 func TestSandboxReadStep(t *testing.T) {
 	fake := &sandboxtest.Fake{}
-	f := newSandboxFx(t, fake, []fakeagent.Action{{Name: "done"}}, sbStep("one", "        sandbox:\n          access: read\n"))
+	f := newSandboxFx(t, fake, []fakeagent.Action{{Name: "done"}}, sbStep("one", "    sandbox:\n      access: read\n"))
 	f.start(t, "feat/api-sb")
 	run := waitRun(t, f.app, f.taskID, "one", "done")
 	d := sandboxOf(t, f, run.ID)
@@ -111,7 +111,7 @@ func TestSandboxReadStep(t *testing.T) {
 
 func TestSandboxOff(t *testing.T) {
 	fake := &sandboxtest.Fake{}
-	f := newSandboxFx(t, fake, []fakeagent.Action{{Name: "done"}}, sbStep("one", "        sandbox:\n          access: off\n"))
+	f := newSandboxFx(t, fake, []fakeagent.Action{{Name: "done"}}, sbStep("one", "    sandbox:\n      access: off\n"))
 	f.start(t, "feat/api-sb")
 	run := waitRun(t, f.app, f.taskID, "one", "done")
 	if run.Sandbox == nil || run.Sandbox.Access != "off" || run.Sandbox.Enforced {
@@ -240,7 +240,7 @@ func TestSandboxTools(t *testing.T) {
 
 	t.Run("read step cannot push", func(t *testing.T) {
 		f := newSandboxFx(t, &sandboxtest.Fake{}, []fakeagent.Action{{MCP: []fakeagent.MCPCall{tolerated(call("push_branch", nil))}, Name: "done"}},
-			sbStep("one", "        sandbox:\n          access: read\n"))
+			sbStep("one", "    sandbox:\n      access: read\n"))
 		f.start(t, "feat/api-sb")
 		waitRun(t, f.app, f.taskID, "one", "done")
 		mustContain(t, "push result", result(f, "push_branch"), "push is not allowed in a read-only step")
@@ -252,15 +252,15 @@ func TestSandboxTools(t *testing.T) {
 
 func TestSandboxReviewRound(t *testing.T) {
 	gate := filepath.Join(t.TempDir(), "gate")
-	stages := agentStage("build", agentStep("implement", "")+
-		"      - id: review\n        name: review\n        runs_on: each repo\n        timeout: 1m\n"+
-		"        sandbox:\n          network: false\n"+
-		"        review:\n          send_to: implementer\n"+
-		"        results:\n          - id: approved\n            ok: true\n")
+	steps := agentStep("implement", "") +
+		"  - id: review\n    name: review\n    kind: review\n    runs_on: each repo\n    timeout: 1m\n" +
+		"    sandbox:\n      network: false\n" +
+		"    review:\n      send_to: implementer\n" +
+		"    results:\n      - id: approved\n        ok: true\n"
 	f := &reviewFx{runFixture: newRunFixtureWith(t, []fakeagent.Action{
 		{Name: "done", Sh: rvImplement},
 		{Sh: "echo fixed >> r.txt && git commit -q -am fix", MCP: []fakeagent.MCPCall{rvReply(1, "renamed")}, WaitFile: gate, Name: "done"},
-	}, stages, flowharness.WithSandbox(&sandboxtest.Fake{Dir: t.TempDir()}))}
+	}, steps, flowharness.WithSandbox(&sandboxtest.Fake{Dir: t.TempDir()}))}
 	f.toReview(t, "feat/api-sb")
 	f.window(t)
 	f.comment(t, 1, "rename this", "")

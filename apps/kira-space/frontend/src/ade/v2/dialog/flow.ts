@@ -179,10 +179,10 @@ async function sendLaunch(deps: FlowDeps, spec: DialogSpec, state: DialogState):
   const message = state.msg ?? '';
   try {
     const launch =
-      spec.kind === 'stage'
+      spec.kind === 'session'
         ? await deliver(
             deps.launch,
-            { kind: 'stage', taskId: spec.taskId ?? '', message },
+            { kind: 'session', taskId: spec.taskId ?? '', message },
             () => {},
           )
         : await deliver(
@@ -190,7 +190,7 @@ async function sendLaunch(deps: FlowDeps, spec: DialogSpec, state: DialogState):
             { kind: 'start', branchId: spec.branchId ?? '', message },
             () => {},
           );
-    if (spec.kind === 'stage') announce(deps, launch, spec.taskId ?? '', '');
+    if (spec.kind === 'session') announce(deps, launch, spec.taskId ?? '', '');
     else announce(deps, launch, taskOfBranch(deps, spec.branchId ?? ''), spec.branchId ?? '');
     deps.closeDialog();
   } catch (err) {

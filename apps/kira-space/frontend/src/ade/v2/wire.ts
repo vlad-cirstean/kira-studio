@@ -60,15 +60,10 @@ export interface FolderImportResult {
 }
 
 // ---- workflows (§5.1.1, D2, D6, D13)
-export type StageKind = 'user' | 'agent' | 'script';
+export type StepKind = 'agent' | 'script' | 'review' | 'manual';
 export type TaskStatus = 'To do' | 'In progress' | 'In review' | 'Done';
 export type RunsOn = 'once' | 'each repo' | `only ${string}` /* nickname */;
-export type OnFailure =
-  | 'stop'
-  | 'retry 1'
-  | 'retry 2'
-  | `back:${string}` /* earlier step id, same stage */;
-/** A result a step may report through finish_step. `next` is 'next' | 'end' | 'stop' or a step id of the same stage; `loop` says the route goes back to the step or an earlier one (a return, counted against the step's `maxReturns`). */
+/** A result a step may report through finish_step. `next` is 'next' | 'end' | 'stop' or a step id of the workflow; `loop` says the route goes back to the step or an earlier one (a return, counted against the step's `maxReturns`). */
 export interface StepResult {
   id: string;
   ok: boolean;
@@ -76,17 +71,25 @@ export interface StepResult {
   next: string;
   loop: boolean;
 }
-export interface PipelineStep {
+/** One step of a workflow. Fields of another kind than `kind` hold their zero value. */
+export interface WorkflowStep {
   id: string;
   name: string;
-  runsOn: RunsOn;
-  before: 'auto' | 'approval';
-  /** Legacy rule; '' when `results` do not reduce to one. */
-  onFailure: OnFailure | '';
+  kind: StepKind;
+  status: TaskStatus;
+  skip: boolean /* no task enters it by moving forward */;
+  /** Manual: open a Claude Code session. */
+  session: boolean;
+  /** Script. */
+  command: string;
+  /** Agent, script, review; '' on a manual step. */
+  runsOn: RunsOn | '';
+  before: 'auto' | 'approval' | '';
   results: StepResult[];
   /** Returns a result may make to this step or an earlier one before the run stops; 0 = no limit (review steps only). */
   maxReturns: number;
   timeout: string;
+  /** Agent prompt; manual: the session's first message. */
   prompt: string;
   allowedTools: string[] /* D6, [] = none added */;
   /** Name of the smart script that replaces `prompt`; '' = a prompt step. */
@@ -107,31 +110,17 @@ export interface StepSandbox {
   allow: string[];
   network: boolean;
 }
-interface ReviewStepConfig {
+export interface ReviewStepConfig {
   sendTo: 'implementer' | 'new';
-  /** Earlier prompt step of the stage whose session takes the comments; '' = the nearest one. */
+  /** Earlier prompt step whose session takes the comments; '' = the nearest one. */
   implementer: string;
-}
-export interface Stage {
-  id: string;
-  name: string;
-  kind: StageKind;
-  status: TaskStatus;
-  skip: boolean; // no task enters it by moving forward
-  session: boolean;
-  prompt: string; // user ('' / false otherwise)
-  steps: PipelineStep[]; // agent ([] otherwise)
-  command: string;
-  runsOn: RunsOn | '';
-  onFailure: OnFailure | '';
-  timeout: string; // script ('' otherwise; script onFailure never back:, D13)
 }
 export interface Workflow {
   id: string;
   name: string;
   /** Turns on the Kira Space tools (declare repos, request branches) for the work of a task. */
   kiraSpaceMcp: boolean;
-  stages: Stage[];
+  steps: WorkflowStep[];
 }
 export interface WorkflowError {
   line: number /* 0 = not line-specific */;
@@ -243,8 +232,7 @@ export type RunState = 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'do
 export interface Run {
   id: string;
   taskId: string;
-  stageId: string;
-  stepId: string /* script stage: stage id */;
+  stepId: string;
   branchId: string /* once: first branch, D12 */;
   attempt: number;
   state: RunState;
@@ -311,7 +299,6 @@ export interface RunReview {
 /** An agent run that can take the review comments. */
 interface ReviewCandidate {
   runId: string;
-  stage: string;
   step: string;
   attempt: number;
   finishedAt: number | null;
@@ -388,8 +375,11 @@ export interface Task {
   jira: Jira | null;
   githubUrl: string;
   workflowId: string /* '' = none */;
-  stageId: string /* stage id | 'done' | '' */;
-  currentStage: Stage | null /* W13 */;
+  entryStepId: string /* the step the task last entered | 'done' | '' without a workflow */;
+  since: Record<
+    string,
+    number
+  > /* '<stepId>/<branchId>' -> attempt; runs at or below it are history */;
   workflow: Workflow | null /* the version a started task runs; null until it starts */;
   workflowOutdated: boolean /* the live file differs from `workflow` */;
   est: string /* '' none; extend-only, D16 */;
@@ -529,7 +519,6 @@ export interface Session {
   terminalId: string /* tui */;
   taskId: string;
   branchId: string /* '' = task-level */;
-  stageId: string;
   stepId: string;
   runId: string /* headless */;
   resumes: string /* headless claude id */;
@@ -822,11 +811,10 @@ export interface StartRunArgs {
   taskId: string;
   branchNames: Record<string, string> /* branchId -> name, '' = derived from the task title */;
   message: string;
-  fromStageId?: string;
+  fromStepId?: string;
 }
 export interface StepArgs {
   taskId: string;
-  stageId: string;
   stepId: string;
 }
 export interface RunArgs {
@@ -844,10 +832,10 @@ export interface TakeOverArgs {
   sessionId: string;
   stopIfRunning: boolean /* false on a running run = E_BAD_REQUEST, D3 */;
 }
-export interface LaunchStageArgs {
+export interface LaunchStepArgs {
   taskId: string;
   message: string;
-  fromStageId?: string;
+  fromStepId?: string;
 }
 export interface StartBranchArgs {
   branchId: string;
@@ -857,10 +845,10 @@ export interface SetTaskWorkflowArgs {
   taskId: string;
   workflowId: string;
 }
-export interface SetTaskStageArgs {
+export interface SetTaskStepArgs {
   taskId: string;
-  stageId: string;
-  fromStageId?: string;
+  stepId: string;
+  fromStepId?: string;
 }
 export interface SendArgs {
   sessionId: string;

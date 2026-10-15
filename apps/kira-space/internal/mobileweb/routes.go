@@ -99,7 +99,7 @@ func (s *Server) routes() []route {
 		}),
 		write("/api/ade/backlog/items", "backlog.add", permWrite, s.handleBacklogAdd),
 		write("/api/ade/backlog/move", "backlog.move", permWrite, s.handleBacklogMove),
-		write("/api/ade/tasks/stage", "task.stage", permWrite, s.handleTaskStage),
+		write("/api/ade/tasks/step", "task.step", permWrite, s.handleTaskStep),
 		write("/api/ade/tasks/run", "task.run", permWrite, s.handleTaskRun),
 		write("/api/ade/tasks/launch", "task.launch", permWrite, s.handleTaskLaunch),
 		write("/api/agent/sessions/{id}/send", "session.send", permAgentInput, s.handleSessionSend),

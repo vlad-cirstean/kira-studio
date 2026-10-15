@@ -366,10 +366,10 @@ const spaceControl = {
   adeTaskApprove: (args: V2.StepArgs): Promise<void> => unwrap(AdeTaskService.Approve(args)),
   adeTaskRetryRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.RetryRun(args)),
   adeTaskResumeRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.ResumeRun(args)),
-  adeTaskStageDone: (args: V2.TaskArgs): Promise<V2.Task> =>
-    unwrap(AdeTaskService.StageDone(args)).then((r) => trust<V2.Task>(r)),
-  adeTaskSetTaskStage: (args: V2.SetTaskStageArgs): Promise<V2.Task> =>
-    unwrap(AdeTaskService.SetTaskStage(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskStepDone: (args: V2.TaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.StepDone(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskSetTaskStep: (args: V2.SetTaskStepArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.SetTaskStep(args)).then((r) => trust<V2.Task>(r)),
   adeTaskRetrySetup: (args: V2.BranchArgs): Promise<void> =>
     unwrap(AdeTaskService.RetrySetup(args)),
   adeTaskReadLog: (args: V2.ReadLogArgs): Promise<V2.LogPage> =>
@@ -387,8 +387,8 @@ const spaceControl = {
     unwrap(AdeTaskService.FinishReview(args)),
   adeTaskTakeOver: (args: V2.TakeOverArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.TakeOver(args)).then((r) => trust<V2.Launch>(r)),
-  adeTaskLaunchStage: (args: V2.LaunchStageArgs): Promise<V2.Launch> =>
-    unwrap(AdeTaskService.LaunchStage(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskLaunchStep: (args: V2.LaunchStepArgs): Promise<V2.Launch> =>
+    unwrap(AdeTaskService.LaunchStep(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskStartBranch: (args: V2.StartBranchArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.StartBranch(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskRebasePreview: (args: V2.OntoArgs): Promise<V2.RebasePreview> =>

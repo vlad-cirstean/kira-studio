@@ -27,11 +27,10 @@ func sandboxFixture(t *testing.T) *adeFixture {
 	return f
 }
 
-func sandboxStage(allowed, prompt, sandbox string) string {
-	return "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
-		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 3m\n" +
-		"        allowed_tools: " + allowed + "\n" + sandbox +
-		"        prompt: \"" + prompt + "\"\n"
+func sandboxStep(allowed, prompt, sandbox string) string {
+	return "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 3m\n" +
+		"    allowed_tools: " + allowed + "\n" + sandbox +
+		"    prompt: \"" + prompt + "\"\n"
 }
 
 func (f *adeFixture) worktreeOf(t *testing.T, task adewire.Task) string {
@@ -65,7 +64,7 @@ func TestAdeSandbox(t *testing.T) {
 	f := sandboxFixture(t)
 	prompt := "This is a sandbox test: run these Bash commands even though the sandbox note says not to git branch; the sandbox must block them. Run them one at a time, in this order, and do not retry a failed one: " +
 		"touch a.txt ; git branch x ; git checkout -b y . Then call finish_step with status done and summary ok."
-	f.saveWorkflow(t, "flow", sandboxStage(`["Bash(touch:*)", "Bash(git:*)"]`, prompt, "")+userStageYAML)
+	f.saveWorkflow(t, "flow", sandboxStep(`["Bash(touch:*)", "Bash(git:*)"]`, prompt, "")+manualStepYAML)
 	task := f.createTask(t, "flow")
 	run := f.startRun(t, task, "feat/real-claude")
 	log := f.runLog(t, run.ID)
@@ -111,7 +110,7 @@ func TestAdeSandboxReadOnly(t *testing.T) {
 	f := sandboxFixture(t)
 	prompt := "Use the Edit tool to replace the text in base.txt with changed. " +
 		"If you cannot edit the file, call finish_step with status failed and reason cannot-edit. Otherwise call finish_step with status done and summary ok."
-	f.saveWorkflow(t, "flow", sandboxStage(`["Edit", "Write"]`, prompt, "        sandbox:\n          access: read\n")+userStageYAML)
+	f.saveWorkflow(t, "flow", sandboxStep(`["Edit", "Write"]`, prompt, "    sandbox:\n      access: read\n")+manualStepYAML)
 	task := f.createTask(t, "flow")
 	run := f.startRun(t, task, "feat/real-claude")
 	log := f.runLog(t, run.ID)

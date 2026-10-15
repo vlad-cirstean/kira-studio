@@ -66,7 +66,7 @@ func TestSmartScriptRun(t *testing.T) {
 
 	t.Run("in task worktree", func(t *testing.T) {
 		f := newAdeFixture(t, nil)
-		f.saveWorkflow(t, "flow", agentStageYAML)
+		f.saveWorkflow(t, "flow", agentStepYAML)
 		task := f.createTask(t, "flow")
 		if r := f.startRun(t, task, "feat/api-auto"); r.State != "done" {
 			t.Fatalf("step run = %s, want done", r.State)

@@ -21,28 +21,25 @@ var ctx = context.Background()
 
 const waitFor = 20 * time.Second
 
-// workflowYAML: an automated build stage, then two user stages.
+// workflowYAML: an automated step, then two manual steps.
 const workflowYAML = `id: flow
 name: Flow
-stages:
-  - id: build
-    name: Build
+steps:
+  - id: one
+    name: one
     kind: agent
     status: In progress
-    steps:
-      - id: one
-        name: one
-        runs_on: each repo
-        timeout: 1m
-        prompt: work on {branch} in {repo}
+    runs_on: each repo
+    timeout: 1m
+    prompt: work on {branch} in {repo}
   - id: review
     name: Review
-    kind: user
+    kind: manual
     status: In review
     session: true
   - id: ship
     name: Ship
-    kind: user
+    kind: manual
     status: In review
     session: true
 `

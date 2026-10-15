@@ -28,7 +28,6 @@
       "last": ""
     },
     "sessionId": "<masked>",
-    "stageId": "build",
     "startedAt": 0,
     "state": "done",
     "stepId": "one",
@@ -64,7 +63,6 @@
       "last": ""
     },
     "sessionId": "<masked>",
-    "stageId": "build",
     "startedAt": 0,
     "state": "done",
     "stepId": "two",
@@ -172,7 +170,6 @@
     ]
   },
   "args:AdeTaskService.Approve": {
-    "stageId": "build",
     "stepId": "two",
     "taskId": "<id:3>"
   },

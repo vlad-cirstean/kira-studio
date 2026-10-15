@@ -224,7 +224,7 @@ func TestTaskBranches(t *testing.T) {
 	})
 
 	// A new branch: the not-created branch of a second task gets its worktree on StartRun.
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", ""))))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
 	task := createTask(t, app, "Ship it", "flow", rec.ID)
 	br := branchOf(t, board(t, app), task.ID, rec.ID)

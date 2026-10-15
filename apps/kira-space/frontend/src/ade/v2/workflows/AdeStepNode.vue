@@ -6,6 +6,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import VarText from '@theme/components/VarText.vue';
@@ -15,15 +19,18 @@ import { Handle, Position } from '@vue-flow/core';
 import { useEventListener } from '@vueuse/core';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, ref, useTemplateRef } from 'vue';
+import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { promptParts } from '../automation/smartStepBody';
-import { runsOnLabel } from '../board/workflowForm';
+import type { Tone } from '../board/actions';
+import { kindLabel, runsOnLabel, STEP_KINDS } from '../board/workflowForm';
 import { resultHandleId, type StepNodeData } from '../board/workflowGraph';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
+import type { StepKind } from '../wire';
 import { useStepRemoval } from './useStepRemoval';
 
-// One agent step on the canvas: name, what it runs, and one connector per result. Fixed size; full
-// text lives in the inspector.
+// One step on the canvas: number, name, kind, what it runs, and one connector per result. Fixed size;
+// full text lives in the inspector.
 const props = defineProps<{ data: StepNodeData }>();
 const draft = useAdeWorkflowDraftStore();
 const { confirmRemoveStep } = useStepRemoval();
@@ -35,17 +42,33 @@ useEventListener(root, 'contextmenu', (e: MouseEvent) => {
   menuOpen.value = true;
 });
 const step = computed(() => props.data.step);
+const KIND_TONE: Record<StepKind, Tone> = {
+  agent: 'amber',
+  script: 'green',
+  review: 'blue',
+  manual: 'grey',
+};
+const manual = computed(() => step.value.kind === 'manual');
 const body = computed(() => {
-  const review = step.value.review;
-  if (review)
+  const s = step.value;
+  if (s.kind === 'review' && s.review)
     return t(
-      review.sendTo === 'new'
+      s.review.sendTo === 'new'
         ? 'space.ade.workflows.stepNode.sendsNew.label'
         : 'space.ade.workflows.stepNode.sendsImplementer.label',
     );
-  return step.value.smartScript ? `✦ ${step.value.smartScript}` : step.value.prompt;
+  if (s.kind === 'script') return s.command || t('space.ade.workflows.stepNode.noCommand.label');
+  if (s.kind === 'manual')
+    return t(
+      s.session
+        ? 'space.ade.workflows.stepNode.session.label'
+        : 'space.ade.workflows.stepNode.manual.label',
+    );
+  return s.smartScript ? `✦ ${s.smartScript}` : s.prompt;
 });
-const parts = computed(() => promptParts(body.value));
+const parts = computed(() =>
+  step.value.kind === 'agent' ? promptParts(body.value) : [body.value],
+);
 const loops = computed(() => step.value.results.some((r) => r.loop));
 const LABEL_MAX = 4;
 const labelled = computed(() => step.value.results.length <= LABEL_MAX);
@@ -62,11 +85,16 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
 <template>
   <div
     class="flex flex-col rounded-kira border bg-elevated text-kira-sm"
-    :class="data.selected ? 'border-info' : 'border-border-strong'"
+    :class="[
+      data.selected ? 'border-info' : 'border-border-strong',
+      step.skip ? 'border-dashed text-muted-foreground' : '',
+    ]"
     :style="{ width: `${data.w}px`, height: `${data.h}px` }"
     data-testid="ade-wf-node"
     :data-step-id="step.id"
     :data-start="data.start"
+    :data-kind="step.kind"
+    :data-skipped="step.skip"
     ref="root"
     :data-selected="data.selected"
   >
@@ -86,13 +114,22 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
       <AdeTip v-if="data.start" :text="t('common.action.start.label')"
         ><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip
       >
+      <span class="shrink-0 font-medium" data-testid="ade-wf-node-number"
+        >{{ data.index + 1 }}.</span
+      >
       <span
         class="min-w-0 flex-1 truncate text-kira-md font-medium"
+        :class="step.skip ? 'line-through' : ''"
         data-testid="ade-wf-node-name"
         >{{
           step.name
         }}</span
       >
+      <AdeChip
+        :label="kindLabel(step.kind)"
+        :tone="KIND_TONE[step.kind]"
+        data-testid="ade-wf-node-kind"
+      />
       <span
         v-if="step.before === 'approval'"
         class="shrink-0 text-warn-text"
@@ -105,7 +142,7 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
         t('space.ade.workflows.stepNode.smart.label')
       }}</span>
       <span
-        v-if="step.sandbox.access !== 'write'"
+        v-if="(step.kind === 'agent' || step.kind === 'review') && step.sandbox.access !== 'write'"
         class="shrink-0"
         :class="step.sandbox.access === 'off' ? 'text-warn-text' : 'text-muted-foreground'"
         data-testid="ade-wf-node-sandbox"
@@ -117,9 +154,6 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
           )
         }}</span
       >
-      <span v-if="step.review" class="shrink-0 text-info" data-testid="ade-wf-node-review">{{
-        t('space.ade.board.branchTag.review.label')
-      }}</span>
       <span v-if="loops" class="shrink-0 text-muted-foreground" data-testid="ade-wf-node-returns">{{
         step.maxReturns > 0
           ? t('space.ade.workflows.stepNode.returns.label', { limit: step.maxReturns })
@@ -139,37 +173,82 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger data-testid="ade-wf-step-add-after">
+              {{ t('space.ade.workflows.graph.addStepAfter.label') }}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem
+                v-for="k in STEP_KINDS"
+                :key="k"
+                :data-testid="`ade-wf-step-add-after-${k}`"
+                @select="draft.createStep(k, step.id)"
+              >
+                {{ kindLabel(k) }}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
-            data-testid="ade-wf-step-add-after"
-            @select="draft.createStep(data.stageId, step.id)"
+            :disabled="!data.canUp"
+            data-testid="ade-wf-step-up"
+            @select="draft.moveStepBy(step.id, -1)"
           >
-            {{ t('space.ade.workflows.graph.addStepAfter.label') }}
+            {{ t('common.moveUp.tooltip') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            :disabled="!data.canDown"
+            data-testid="ade-wf-step-down"
+            @select="draft.moveStepBy(step.id, 1)"
+          >
+            {{ t('common.moveDown.tooltip') }}
           </DropdownMenuItem>
           <DropdownMenuItem
             :disabled="data.start"
             data-testid="ade-wf-step-start"
-            @select="draft.makeStart(data.stageId, step.id)"
+            @select="draft.makeStart(step.id)"
           >
             {{ t('space.ade.workflows.stepInspector.makeStart.label') }}
           </DropdownMenuItem>
           <DropdownMenuItem
+            :disabled="!step.skip && !data.canSkip"
+            data-testid="ade-wf-step-skip"
+            @select="draft.patchStep(step.id, { skip: !step.skip })"
+          >
+            {{
+              step.skip
+                ? t('space.ade.workflows.stepInspector.unskip.label')
+                : t('space.ade.stepBlock.skipThis.label')
+            }}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
             class="text-error"
+            :disabled="!data.canRemove"
             data-testid="ade-wf-step-remove"
-            @select="fireAndForget(confirmRemoveStep(data.stageId, step.id), 'adeWorkflows')"
+            @select="fireAndForget(confirmRemoveStep(step.id), 'adeWorkflows')"
           >
             {{ t('common.action.remove.label') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-    <div class="truncate px-2 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
+    <div v-if="!manual" class="truncate px-2 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
     <div
       class="truncate px-2 text-muted-foreground [&>span]:whitespace-nowrap"
+      :class="step.kind === 'script' ? 'font-data' : ''"
       data-testid="ade-wf-node-prompt"
     >
       <VarText :parts="parts" />
     </div>
-    <div class="mt-auto flex border-t border-border">
+    <Handle
+      v-if="manual"
+      id="out"
+      type="source"
+      :position="Position.Bottom"
+      class="!size-2 !border-0 !bg-muted-foreground"
+    />
+    <div v-else class="mt-auto flex border-t border-border">
       <AdeTip v-for="r in step.results" :key="r.id" :text="tip(r)">
         <span
           class="relative flex min-w-0 flex-1 items-center justify-center gap-1 px-1 py-1"

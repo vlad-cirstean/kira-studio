@@ -14,7 +14,7 @@ import {
 } from '../board/menu';
 import { taskPatch } from '../board/panelFacts';
 import { reviewChoices } from '../board/reviewCode';
-import { useSetPlan, useSetTaskStage, useStopRun, useUpdateTask } from '../queries';
+import { useSetPlan, useSetTaskStep, useStopRun, useUpdateTask } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useTaskAction } from '../run/useTaskAction';
 import { useSessionViews } from '../sessions/useSessionViews';
@@ -36,7 +36,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const { model, today, sessions } = usePlanModel();
   const { view } = useSessionViews();
   const { perform } = useTaskAction(card);
-  const setStage = useSetTaskStage();
+  const setStep = useSetTaskStep();
   const setPlan = useSetPlan();
   const stopRun = useStopRun();
   const update = useUpdateTask();
@@ -58,8 +58,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       switch (cmd.kind) {
         case 'action':
           return await perform();
-        case 'moveStage':
-          await setStage.mutateAsync({ taskId, stageId: cmd.stageId });
+        case 'moveStep':
+          await setStep.mutateAsync({ taskId, stepId: cmd.stepId });
           return;
         case 'stopRuns':
           await Promise.all(

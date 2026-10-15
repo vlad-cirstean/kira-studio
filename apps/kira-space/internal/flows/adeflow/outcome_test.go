@@ -11,13 +11,13 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func scriptStage(id, command string) string {
-	return "  - id: " + id + "\n    name: " + id + "\n    kind: script\n    status: In progress\n    runs_on: each repo\n    timeout: 1m\n    command: " + command + "\n"
+func scriptStep(id, command string) string {
+	return "  - id: " + id + "\n    name: " + id + "\n    kind: script\n    runs_on: each repo\n    timeout: 1m\n    command: " + command + "\n"
 }
 
 func TestRunOutcomes(t *testing.T) {
 	t.Run("agent reports done", func(t *testing.T) {
-		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStage("build", agentStep("one", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("one", ""))
 		f.start(t, "feat/api-done")
 		r := waitRun(t, f.app, f.taskID, "one", "done")
 		if o := r.Outcome; o == nil || o.Status != "done" || o.Source != "agent" || !o.Reported {
@@ -27,7 +27,7 @@ func TestRunOutcomes(t *testing.T) {
 
 	t.Run("agent ends without a report", func(t *testing.T) {
 		zero := 0
-		f := newRunFixture(t, []fakeagent.Action{{Exit: &zero}}, agentStage("build", agentStep("one", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Exit: &zero}}, agentStep("one", ""))
 		f.start(t, "feat/api-silent")
 		r := waitRun(t, f.app, f.taskID, "one", "stuck", "failed")
 		if o := r.Outcome; o == nil || o.Status != "failed" || o.Reported || o.Reason != "no report: Claude ended without calling finish_step" {
@@ -36,7 +36,7 @@ func TestRunOutcomes(t *testing.T) {
 	})
 
 	t.Run("script exits non-zero", func(t *testing.T) {
-		f := newRunFixture(t, nil, scriptStage("check", "'echo oops >&2; exit 2'"))
+		f := newRunFixture(t, nil, scriptStep("check", "'echo oops >&2; exit 2'"))
 		f.start(t, "feat/api-script")
 		r := waitRun(t, f.app, f.taskID, "check", "stuck", "failed")
 		o := r.Outcome
@@ -47,7 +47,7 @@ func TestRunOutcomes(t *testing.T) {
 
 	t.Run("stop cancels", func(t *testing.T) {
 		flag := filepath.Join(t.TempDir(), "release")
-		f := newRunFixture(t, []fakeagent.Action{{Name: "done", WaitFile: flag}}, agentStage("build", agentStep("one", "")))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done", WaitFile: flag}}, agentStep("one", ""))
 		f.start(t, "feat/api-stop")
 		running := waitRun(t, f.app, f.taskID, "one", "running")
 		if err := f.app.W.AdeTask.StopRun(ctx, adewire.RunArgs{RunID: running.ID}); err != nil {
@@ -61,7 +61,7 @@ func TestRunOutcomes(t *testing.T) {
 
 	t.Run("restart interrupts", func(t *testing.T) {
 		hold := filepath.Join(t.TempDir(), "hold")
-		f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}}, agentStage("build", agentStep("one", "")))
+		f := newRunFixture(t, []fakeagent.Action{{WaitFile: hold}}, agentStep("one", ""))
 		f.start(t, "feat/api-restart-outcome")
 		waitRun(t, f.app, f.taskID, "one", "running")
 		testx.WaitUntil(t, waitFor, func() bool { _, err := os.Stat(filepath.Join(f.app.FakeDir, "api-1.args")); return err == nil })

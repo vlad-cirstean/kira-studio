@@ -159,8 +159,13 @@ func TestScheduleValidation(t *testing.T) {
 	}
 
 	fires, err := app.W.ScriptRuns.NextFires(scriptruns.NextFiresArgs{Cron: "0 9 * * 1-5", Timezone: "UTC", Count: 3})
-	if err != nil || len(fires) != 3 || fires[1]-fires[0] != 24*time.Hour.Milliseconds() {
+	if err != nil || len(fires) != 3 {
 		t.Fatalf("NextFires = %v, %v", fires, err)
+	}
+	for _, ms := range fires {
+		if wd := time.UnixMilli(ms).UTC().Weekday(); wd == time.Saturday || wd == time.Sunday {
+			t.Fatalf("NextFires has a weekend fire: %v", fires)
+		}
 	}
 	if _, err := app.W.ScriptRuns.NextFires(scriptruns.NextFiresArgs{Cron: "* * *", Timezone: "UTC"}); errCode(err) != "E_BAD_REQUEST" ||
 		!strings.Contains(err.Error(), "cron needs 5 fields") {

@@ -3,9 +3,9 @@ import { type TaskAction, taskCell } from '@ade/board/actions';
 import { taskTitle } from '@ade/board/labels';
 import { buildNeedsYou } from '@ade/board/needsYou';
 import { buildTaskProgress, type TaskProgress } from '@ade/board/progress';
-import { buildStageBlocks, type StageBlock } from '@ade/board/stageBlocks';
-import { type StageMoves, stageMoves } from '@ade/board/stageMoves';
 import { type DerivedStatus, deriveStatus } from '@ade/board/status';
+import { buildStepBlocks, type StepBlock } from '@ade/board/stepBlocks';
+import { type StepMoves, stepMoves } from '@ade/board/stepMoves';
 import { localIso } from '@ade/localDay';
 import { taskColor } from '@ade/palette';
 import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
@@ -24,15 +24,15 @@ export interface PlanCard {
   color: string;
   progress: TaskProgress;
   status: DerivedStatus;
-  blocks: StageBlock[];
+  blocks: StepBlock[];
   /** Needs-you headline for this task, '' when none. */
   attention: string;
   /** Repo nicknames of the task's branches. */
   repos: string[];
-  /** The desktop's stage action for the task (Run, Stage session, Take over, ...), if any. */
+  /** The desktop's step action for the task (Run, Step session, Take over, ...), if any. */
   action: TaskAction | null;
-  /** Where the stage buttons can go from here. */
-  moves: StageMoves;
+  /** Where the step buttons can go from here. */
+  moves: StepMoves;
   /** Running interactive Claude Code sessions of the task. */
   tuiSessions: Session[];
 }
@@ -111,13 +111,7 @@ export const useAgentsModel = createSharedComposable(() => {
         hasSessions: sessions.value.some((s) => s.taskId === task.id),
       });
       const taskSessions = sessions.value.filter((s) => s.taskId === task.id);
-      const blocks = buildStageBlocks(
-        i,
-        i.workflow,
-        taskProgress.stage ?? task.currentStage,
-        taskProgress.stageIndex,
-        taskProgress.finished,
-      );
+      const blocks = buildStepBlocks(taskProgress, i.workflow);
       cards.set(task.id, {
         task,
         title: taskTitle(task, branches[0], ''),
@@ -130,7 +124,11 @@ export const useAgentsModel = createSharedComposable(() => {
         action:
           taskCell({ task, progress: taskProgress, status, branches, sessions: taskSessions })
             ?.action ?? null,
-        moves: stageMoves(blocks, task.stageId, task.runs),
+        moves: stepMoves(
+          blocks,
+          taskProgress.finished ? 'done' : (taskProgress.step?.id ?? task.entryStepId),
+          task.runs,
+        ),
         tuiSessions: taskSessions.filter((s) => s.mode === 'tui' && s.state === 'running'),
       });
     }

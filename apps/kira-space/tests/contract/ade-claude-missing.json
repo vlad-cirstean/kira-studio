@@ -1,5 +1,5 @@
 {
-  "AdeTaskService.LaunchStage#claudeMissing": {
+  "AdeTaskService.LaunchStep#claudeMissing": {
     "code": "E_NOT_FOUND",
     "message": "Claude Code CLI not found. Install it, then retry. Looked in: claude (on PATH), <home>/.claude/local/claude, <home>/.local/bin/claude, claude (in <tmp>/stub-shell login shell)."
   }

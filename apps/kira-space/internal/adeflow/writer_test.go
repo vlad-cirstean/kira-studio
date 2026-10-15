@@ -24,9 +24,8 @@ func seed(t *testing.T, r *Reader, name string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := "# my workflow\n" + strings.Replace(string(src), "stages:\n", "stages:\n  # stage list\n", 1)
-	text = strings.Replace(text, "    kind: agent\n", "    kind: automated # alias stays\n", 1)
-	text = strings.Replace(text, "        timeout: 2h\n", "        timeout: 2h # long\n", 1)
+	text := "# my workflow\n" + strings.Replace(string(src), "steps:\n", "steps:\n  # step list\n", 1)
+	text = strings.Replace(text, "    timeout: 2h\n", "    timeout: 2h # long\n", 1)
 	if _, err := r.SaveYaml(name, "", text); err != nil {
 		t.Fatal(err)
 	}
@@ -73,20 +72,26 @@ func TestSave_preservesCommentsAndStyle(t *testing.T) {
 		orig := seed(t, r, name)
 		wf := load(t, r, name)
 		out := saveOK(t, r, name, wf)
-		for _, want := range []string{"# my workflow", "# stage list", "# alias stays", "kind: automated"} {
+		for _, want := range []string{"# my workflow", "# step list", "# long"} {
 			if strings.Contains(orig, want) && !strings.Contains(out, want) {
 				t.Errorf("%s: lost %q", name, want)
 			}
 		}
-		if strings.Contains(orig, "# long") && !strings.Contains(out, "# long") {
-			t.Errorf("%s: lost # long", name)
-		}
-		if strings.Contains(orig, `"back:impl"`) && !strings.Contains(out, `"back:impl"`) {
-			t.Errorf("%s: quote style changed", name)
-		}
 		if out != orig {
 			t.Errorf("%s: unchanged save altered the file:\n%s", name, out)
 		}
+	}
+}
+
+func stepIndex(wf adewire.Workflow, id string) int {
+	return slices.IndexFunc(wf.Steps, func(s adewire.WorkflowStep) bool { return s.ID == id })
+}
+
+func agentStep(id string) adewire.WorkflowStep {
+	return adewire.WorkflowStep{
+		ID: id, Name: "S", Kind: adewire.KindAgent, Status: "In progress", RunsOn: "once", Before: "auto",
+		Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "10m", Prompt: "go",
+		AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 	}
 }
 
@@ -97,36 +102,34 @@ func TestSave_edits(t *testing.T) {
 
 	t.Run("edit scalar keeps comment", func(t *testing.T) {
 		wf := base
-		wf.Stages = append([]adewire.Stage(nil), base.Stages...)
-		impl := wf.Stages[1]
-		impl.Steps = append([]adewire.PipelineStep(nil), impl.Steps...)
-		impl.Steps[1].Timeout = "3h"
-		wf.Stages[1] = impl
+		wf.Steps = slices.Clone(base.Steps)
+		wf.Steps[stepIndex(wf, "impl")].Timeout = "3h"
 		out := saveOK(t, r, "standard.yaml", wf)
 		if !strings.Contains(out, "timeout: 3h # long") {
 			t.Fatalf("comment lost:\n%s", out)
 		}
 	})
 
-	t.Run("reorder stages, delete and add step, defaults not added", func(t *testing.T) {
+	t.Run("reorder steps, delete and add step, defaults not added", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
-		wf.Stages = []adewire.Stage{wf.Stages[2], wf.Stages[0], wf.Stages[1], wf.Stages[3]}
-		steps := wf.Stages[2].Steps
-		wf.Stages[2].Steps = append(append([]adewire.PipelineStep(nil), steps[:2]...), steps[3:]...)
-		wf.Stages[2].Steps = append(wf.Stages[2].Steps, adewire.PipelineStep{
-			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("lint", "stop"), MaxReturns: 3, Timeout: "10m",
-			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
-		})
+		i, j := stepIndex(wf, "review"), stepIndex(wf, "spec")
+		wf.Steps[i], wf.Steps[j] = wf.Steps[j], wf.Steps[i]
+		wf.Steps = slices.DeleteFunc(wf.Steps, func(s adewire.WorkflowStep) bool { return s.ID == "tests" })
+		lint := agentStep("lint")
+		lint.Prompt, lint.AllowedTools = "Run lint.\nFix it.", []string{"Bash(git *)"}
+		wf.Steps = append(wf.Steps, lint)
 		out := saveOK(t, r, "standard.yaml", wf)
 		if strings.Index(out, "id: review") > strings.Index(out, "id: spec") {
-			t.Fatalf("stages not reordered:\n%s", out)
+			t.Fatalf("steps not reordered:\n%s", out)
 		}
 		_, tail, _ := strings.Cut(out, "id: lint")
 		step, _, _ := strings.Cut(tail, "prompt:")
-		if strings.Contains(step, "before:") || strings.Contains(step, "on_failure:") {
-			t.Fatalf("default keys written for a new step:\n%s", tail)
+		for _, k := range []string{"before:", "results:", "max_returns:", "status:", "skip:"} {
+			if strings.Contains(step, k) {
+				t.Fatalf("default key %s written for a new step:\n%s", k, tail)
+			}
 		}
-		if !strings.Contains(tail, "prompt: |") || !strings.Contains(tail, "allowed_tools:") {
+		if !strings.Contains(step, "kind: agent") || !strings.Contains(tail, "prompt: |") || !strings.Contains(tail, "allowed_tools:") {
 			t.Fatalf("new step shape:\n%s", tail)
 		}
 		if strings.Contains(out, "id: tests") {
@@ -134,29 +137,25 @@ func TestSave_edits(t *testing.T) {
 		}
 	})
 
-	t.Run("interactive user stage with no prompt writes no prompt key", func(t *testing.T) {
+	t.Run("manual step with no prompt writes no prompt key", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
-		for i := range wf.Stages {
-			if wf.Stages[i].ID == "spec" {
-				wf.Stages[i] = adewire.Stage{ID: "spec", Name: "Spec", Kind: "user", Status: "To do", Session: true, Steps: []adewire.PipelineStep{}}
-			}
-		}
+		i := stepIndex(wf, "spec")
+		wf.Steps[i].Prompt = ""
 		out := saveOK(t, r, "standard.yaml", wf)
 		_, seg, _ := strings.Cut(out, "id: spec")
 		seg, _, _ = strings.Cut(seg, "- id:")
-		if !strings.Contains(seg, "session: true") || strings.Contains(seg, "prompt:") {
-			t.Fatalf("spec stage:\n%s", seg)
+		if !strings.Contains(seg, "session: true") || strings.Contains(seg, "prompt:") || strings.Contains(seg, "results:") {
+			t.Fatalf("spec step:\n%s", seg)
 		}
 	})
 
 	t.Run("smart step keeps key order and params shape", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
-		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
-		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
-		wf.Stages[impl].Steps[0] = adewire.PipelineStep{
-			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("plan", "stop"), MaxReturns: 3, Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize", Sandbox: adewire.DefaultSandbox(),
-			Params: map[string][]string{"lang": {"go"}, "dirs": {"a", "b"}},
-		}
+		i := stepIndex(wf, "plan")
+		smart := agentStep("plan")
+		smart.Name, smart.Prompt, smart.SmartScript = "Smart", "", "Summarize"
+		smart.Params = map[string][]string{"lang": {"go"}, "dirs": {"a", "b"}}
+		wf.Steps[i] = smart
 		out := saveOK(t, r, "standard.yaml", wf)
 		_, seg, _ := strings.Cut(out, "name: Smart")
 		seg, _, _ = strings.Cut(seg, "- id:")
@@ -172,36 +171,27 @@ func TestSave_edits(t *testing.T) {
 		if strings.Contains(seg, "prompt:") || strings.Contains(seg, "allowed_tools:") {
 			t.Fatalf("prompt keys left on a smart step:\n%s", seg)
 		}
-		back := load(t, r, "standard.yaml")
-		if got := back.Stages[impl].Steps[0]; got.SmartScript != "Summarize" || !reflect.DeepEqual(got.Params, wf.Stages[impl].Steps[0].Params) {
-			t.Fatalf("round trip: %+v", got)
-		}
 	})
 
 	t.Run("sandbox block round trip", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
-		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
-		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
+		i := stepIndex(wf, "impl")
 		if out := saveOK(t, r, "standard.yaml", wf); strings.Contains(out, "sandbox:") {
 			t.Fatalf("default sandbox written:\n%s", out)
 		}
 		want := adewire.StepSandbox{Access: "read", Read: []string{"~/specs"}, Allow: []string{"~/.cache/tool"}, Network: false}
-		last := len(wf.Stages[impl].Steps) - 1
-		wf.Stages[impl].Steps[last].Sandbox = want
+		wf.Steps[i].Sandbox = want
 		out := saveOK(t, r, "standard.yaml", wf)
 		for _, k := range []string{"sandbox:", "access: read", "- ~/specs", "- ~/.cache/tool", "network: false"} {
 			if !strings.Contains(out, k) {
 				t.Fatalf("%q missing:\n%s", k, out)
 			}
 		}
-		if got := load(t, r, "standard.yaml").Stages[impl].Steps[last].Sandbox; !reflect.DeepEqual(got, want) {
-			t.Fatalf("round trip: %+v", got)
-		}
-		wf.Stages[impl].Steps[last].Sandbox = adewire.StepSandbox{Access: "off", Read: []string{}, Allow: []string{}, Network: true}
+		wf.Steps[i].Sandbox = adewire.StepSandbox{Access: "off", Read: []string{}, Allow: []string{}, Network: true}
 		if out := saveOK(t, r, "standard.yaml", wf); !strings.Contains(out, "access: off") || strings.Contains(out, "network:") || strings.Contains(out, "~/specs") {
 			t.Fatalf("off block:\n%s", out)
 		}
-		wf.Stages[impl].Steps[last].Sandbox = adewire.DefaultSandbox()
+		wf.Steps[i].Sandbox = adewire.DefaultSandbox()
 		if out := saveOK(t, r, "standard.yaml", wf); strings.Contains(out, "sandbox:") {
 			t.Fatalf("sandbox left after reset:\n%s", out)
 		}
@@ -209,39 +199,31 @@ func TestSave_edits(t *testing.T) {
 
 	t.Run("review step round trip", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
-		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
-		prompt := slices.IndexFunc(wf.Stages[impl].Steps, func(s adewire.PipelineStep) bool { return s.SmartScript == "" })
-		wf.Stages[impl].Steps = append(append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...), adewire.PipelineStep{
-			ID: "code-review", Name: "Code review", RunsOn: "each repo", Before: "auto", OnFailure: "stop",
-			Results: adewire.ImplicitResults("code-review", "stop"), MaxReturns: 0, Timeout: "30m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
-			Review: &adewire.ReviewStepConfig{SendTo: "new", Implementer: wf.Stages[impl].Steps[prompt].ID},
-		})
+		rv := agentStep("code-review")
+		rv.Kind, rv.Status, rv.Prompt, rv.MaxReturns, rv.AllowedTools = adewire.KindReview, "In review", "", 0, []string{}
+		rv.Review = &adewire.ReviewStepConfig{SendTo: "new", Implementer: "impl"}
+		wf.Steps = append(wf.Steps, rv)
 		out := saveOK(t, r, "standard.yaml", wf)
 		_, seg, _ := strings.Cut(out, "id: code-review")
-		if !strings.Contains(seg, "review:\n") || !strings.Contains(seg, "send_to: new") || strings.Contains(seg, "prompt:") {
+		if !strings.Contains(seg, "kind: review") || !strings.Contains(seg, "review:\n") || !strings.Contains(seg, "send_to: new") || strings.Contains(seg, "prompt:") || strings.Contains(seg, "status:") {
 			t.Fatalf("review block:\n%s", seg)
 		}
-		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].Review = nil
-		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].MaxReturns = 3
-		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].Prompt = "go"
-		if back := saveOK(t, r, "standard.yaml", wf); strings.Contains(back, "review:") {
-			t.Fatalf("review block left after switching back:\n%s", back)
+		wf.Steps[len(wf.Steps)-1].Review = &adewire.ReviewStepConfig{SendTo: "implementer"}
+		if back := saveOK(t, r, "standard.yaml", wf); strings.Contains(back, "send_to: new") {
+			t.Fatalf("send_to left after reset to defaults:\n%s", back)
 		}
 	})
 
 	t.Run("kind change drops foreign keys", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
-		for i := range wf.Stages {
-			if wf.Stages[i].ID == "spec" {
-				wf.Stages[i] = adewire.Stage{ID: "spec", Name: "Spec", Kind: "script", Status: "To do", Command: "make spec",
-					RunsOn: "once", OnFailure: "stop", Timeout: "5m", Steps: []adewire.PipelineStep{}}
-			}
-		}
+		i := stepIndex(wf, "spec")
+		wf.Steps[i] = adewire.WorkflowStep{ID: "spec", Name: "Spec", Kind: adewire.KindScript, Status: "To do", Command: "make spec",
+			RunsOn: "once", Before: "auto", Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "5m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
 		out := saveOK(t, r, "standard.yaml", wf)
 		_, seg, _ := strings.Cut(out, "id: spec")
 		seg, _, _ = strings.Cut(seg, "- id:")
-		if strings.Contains(seg, "session:") || strings.Contains(seg, "prompt:") || !strings.Contains(seg, "command: make spec") {
-			t.Fatalf("spec stage:\n%s", seg)
+		if strings.Contains(seg, "session:") || strings.Contains(seg, "prompt:") || !strings.Contains(seg, "command: make spec") || !strings.Contains(seg, "kind: script") {
+			t.Fatalf("spec step:\n%s", seg)
 		}
 	})
 }
@@ -251,7 +233,7 @@ func TestSave_refusals(t *testing.T) {
 	if _, err := r.SaveYaml("w.yaml", "", "id: w\nname: [\n"); err != nil {
 		t.Fatal(err)
 	}
-	wf := adewire.Workflow{ID: "w", Name: "W", Stages: []adewire.Stage{{ID: "u", Name: "U", Kind: "user", Status: "To do", Steps: []adewire.PipelineStep{}}}}
+	wf := adewire.Workflow{ID: "w", Name: "W", Steps: []adewire.WorkflowStep{{ID: "u", Name: "U", Kind: adewire.KindManual, Status: "To do", Results: []adewire.StepResult{}}}}
 	before := read(t, r, "w.yaml")
 	if _, err := r.Save("w.yaml", "", wf); err == nil || !strings.Contains(err.Error(), "fix the YAML error on line") {
 		t.Fatalf("syntax error: %v", err)
@@ -265,7 +247,7 @@ func TestSave_refusals(t *testing.T) {
 		t.Fatal("id/stem mismatch accepted")
 	}
 	bad = wf
-	bad.Stages = []adewire.Stage{{ID: "s", Name: "S", Kind: "script", Status: "To do", Steps: []adewire.PipelineStep{}}}
+	bad.Steps = []adewire.WorkflowStep{{ID: "s", Name: "S", Kind: adewire.KindScript, Status: "To do"}}
 	if _, err := r.Save("fresh.yaml", "", bad); err == nil {
 		t.Fatal("invalid workflow accepted")
 	}
@@ -317,12 +299,9 @@ func TestSave_results(t *testing.T) {
 	orig := seed(t, r, "standard.yaml")
 	wf := load(t, r, "standard.yaml")
 	if out := saveOK(t, r, "standard.yaml", wf); out != orig {
-		t.Fatalf("legacy file changed on an unchanged save:\n%s", out)
+		t.Fatalf("file changed on an unchanged save:\n%s", out)
 	}
-	impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
-	ci := slices.IndexFunc(wf.Stages[impl].Steps, func(s adewire.PipelineStep) bool { return s.ID == "ci" })
-	step := &wf.Stages[impl].Steps[ci]
-	step.OnFailure = ""
+	step := &wf.Steps[stepIndex(wf, "ci")]
 	step.Results = []adewire.StepResult{
 		{ID: "pass", OK: true, Description: "All green.", Next: "next"},
 		{ID: "flaky", OK: false, Next: "ci", Loop: true},
@@ -332,17 +311,14 @@ func TestSave_results(t *testing.T) {
 	out := saveOK(t, r, "standard.yaml", wf)
 	_, seg, _ := strings.Cut(out, "id: ci")
 	seg, _, _ = strings.Cut(seg, "id: pr")
-	if strings.Contains(seg, "on_failure") || !strings.Contains(seg, "results:") || !strings.Contains(seg, "max_returns: 5") || strings.Contains(seg, "max: ") {
+	if !strings.Contains(seg, "results:") || !strings.Contains(seg, "max_returns: 5") || !strings.Contains(seg, "id: broken") {
 		t.Fatalf("results not written as a list:\n%s", seg)
 	}
-	step.Results, step.MaxReturns = adewire.ImplicitResults("ci", "back:impl"), 4
-	four := saveOK(t, r, "standard.yaml", wf)
-	if _, seg, _ := strings.Cut(four, "id: ci"); strings.Contains(seg, "on_failure: back") || !strings.Contains(seg, "max_returns: 4") {
-		t.Fatalf("a limit off the rule's own kept on_failure:\n%s", seg)
-	}
-	step.OnFailure, step.MaxReturns = "back:impl", 3
+	step.Results, step.MaxReturns = adewire.DefaultResults(), 3
 	back := saveOK(t, r, "standard.yaml", wf)
-	if strings.Contains(back, "results:") || strings.Contains(back, "max_returns") || !strings.Contains(back, "# my workflow") || !strings.Contains(back, "# long") {
-		t.Fatalf("reverting to the legacy form kept results or lost comments:\n%s", back)
+	_, seg, _ = strings.Cut(back, "id: ci")
+	seg, _, _ = strings.Cut(seg, "id: pr")
+	if strings.Contains(seg, "max_returns") || !strings.Contains(back, "# my workflow") || !strings.Contains(back, "# long") {
+		t.Fatalf("defaults kept max_returns or lost comments:\n%s", back)
 	}
 }

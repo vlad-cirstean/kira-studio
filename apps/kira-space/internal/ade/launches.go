@@ -14,7 +14,7 @@ import (
 )
 
 // launches.go starts interactive Claude Code sessions for a task: Take over a run's session,
-// the interactive stage, and a single branch's Start. The terminal itself is mounted by the UI from
+// the interactive manual step, and a single branch's Start. The terminal itself is mounted by the UI from
 // the returned Launch; the tracker records the row when the terminal composes its command.
 
 // tuiBinding ties a TUI record to the agent MCP grant its launch registered; runID is the taken-over
@@ -160,7 +160,7 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 		return adewire.Launch{}, err
 	}
 
-	pa := PrepareArgs{TaskID: rec.TaskID, BranchID: rec.BranchID, StageID: rec.StageID, StepID: rec.StepID, Cwd: cwd}
+	pa := PrepareArgs{TaskID: rec.TaskID, BranchID: rec.BranchID, StepID: rec.StepID, Cwd: cwd}
 	// Resume pins the recorded cwd, so a TUI record whose directory moved resumes by conversation id.
 	if rec.Mode == model.AdeSessionModeTUI && !moved {
 		pa.Resume = rec.ID
@@ -249,7 +249,7 @@ func (b *TaskBoard) stopForTakeOver(rec *model.AdeSession, stop bool) error {
 	return b.awaitEnd(done)
 }
 
-// finishableRun is the taken-over run when it is the latest attempt of the current stage and waits for
+// finishableRun is the taken-over run when it is the latest attempt of its step in the current pass and waits for
 // a decision (R14), else "": its TUI can then report through finish_step.
 func (b *TaskBoard) finishableRun(tc *taskCtx, rec *model.AdeSession) string {
 	run, err := b.deps.Tasks.GetRun(rec.RunID)
@@ -263,7 +263,7 @@ func (b *TaskBoard) finishableRun(tc *taskCtx, rec *model.AdeSession) string {
 		}
 		return run.ID
 	}
-	if !b.isLatestOfCurrentStage(tc, run) {
+	if !b.isLatestInPass(tc, run) {
 		return ""
 	}
 	return run.ID
@@ -316,12 +316,12 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	return launchOf(res), nil
 }
 
-// stepResultsOf are the results of a step of the task's current stage; none when it has no such step.
+// stepResultsOf are the results of a step of the task's workflow; none when it has no such step.
 func stepResultsOf(tc *taskCtx, stepID string) []adewire.StepResult {
-	if tc.stage == nil {
+	if tc.wf == nil {
 		return nil
 	}
-	for _, d := range stageSteps(*tc.stage) {
+	for _, d := range workflowSteps(*tc.wf) {
 		if d.ID == stepID {
 			return d.Results
 		}
@@ -329,8 +329,8 @@ func stepResultsOf(tc *taskCtx, stepID string) []adewire.StepResult {
 	return nil
 }
 
-func (b *TaskBoard) isLatestOfCurrentStage(tc *taskCtx, run model.AdeRun) bool {
-	if tc.stage == nil || tc.stage.ID != run.StageID {
+func (b *TaskBoard) isLatestInPass(tc *taskCtx, run model.AdeRun) bool {
+	if tc.wf == nil || !tc.inPass(run) {
 		return false
 	}
 	plan, err := b.plan(tc)
@@ -398,7 +398,7 @@ func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
 		return
 	}
 	tc, err := b.loadTaskCtx(run.TaskID)
-	if err != nil || !b.isLatestOfCurrentStage(tc, run) {
+	if err != nil || !b.isLatestInPass(tc, run) {
 		return
 	}
 	switch f.Status {
@@ -416,10 +416,10 @@ func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
 	}
 }
 
-// --- LaunchStage, StartBranch --------------------------------------------------------------------
+// --- LaunchStep, StartBranch ---------------------------------------------------------------------
 
-// LaunchStage opens the interactive session of the task's current user stage (R15).
-func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArgs) (adewire.Launch, error) {
+// LaunchStep opens the interactive session of the task's current manual step (R15).
+func (b *TaskBoard) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (adewire.Launch, error) {
 	tr, err := b.tracker()
 	if err != nil {
 		return adewire.Launch{}, err
@@ -431,24 +431,33 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	if err := staleStage(tc, args.FromStageID); err != nil {
+	if err := b.staleStep(tc, args.FromStepID); err != nil {
 		return adewire.Launch{}, err
 	}
-	if tc.stage == nil || tc.stage.Kind != "user" || !tc.stage.Session {
-		return adewire.Launch{}, invalid("the current stage has no interactive session")
+	plan, err := b.plan(tc)
+	if err != nil {
+		return adewire.Launch{}, err
 	}
-	stage := *tc.stage
-	if stage.ID == reviewStageID {
-		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, args.Message, &stage)
+	entry := tc.entryIndex(plan)
+	cur := -1
+	if entry >= 0 {
+		cur = currentStep(plan, entry)
+	}
+	if cur < 0 || !plan[cur].Def.manual() || !plan[cur].Def.Session {
+		return adewire.Launch{}, invalid("the current step has no interactive session")
+	}
+	step := tc.wf.Steps[cur]
+	if step.ID == reviewStepID {
+		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, args.Message, &step)
 		return l, err
 	}
-	if open, err := b.runningTUI(func(s model.AdeSession) bool { return s.TaskID == tc.task.ID && s.StageID == stage.ID }); err != nil {
+	if open, err := b.runningTUI(func(s model.AdeSession) bool { return s.TaskID == tc.task.ID && s.StepID == step.ID }); err != nil {
 		return adewire.Launch{}, err
 	} else if open != nil {
-		return adewire.Launch{}, invalid("a %s session is already running", stage.Name)
+		return adewire.Launch{}, invalid("a %s session is already running", step.Name)
 	}
-	if tr.hasPending(func(p pendingIntent) bool { return p.TaskID == tc.task.ID && p.StageID == stage.ID && p.Purpose == "" }) {
-		return adewire.Launch{}, invalid("a %s launch is already starting", stage.Name)
+	if tr.hasPending(func(p pendingIntent) bool { return p.TaskID == tc.task.ID && p.StepID == step.ID && p.Purpose == "" }) {
+		return adewire.Launch{}, invalid("a %s launch is already starting", step.Name)
 	}
 
 	if err := b.snapshotWorkflow(&tc.task); err != nil {
@@ -460,9 +469,9 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 	}
 	message := args.Message
 	if message == "" {
-		message = composeStageMessage(b.prompts(), stage, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
+		message = composeManualMessage(b.prompts(), step, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
 	}
-	pa := PrepareArgs{TaskID: tc.task.ID, StageID: stage.ID, Cwd: cwd, Message: message}
+	pa := PrepareArgs{TaskID: tc.task.ID, StepID: step.ID, Cwd: cwd, Message: message}
 	if len(extra) > 0 {
 		pa.ExtraArgs = append([]string{"--add-dir"}, extra...)
 	}
@@ -583,19 +592,18 @@ func (b *TaskBoard) checkNoBackgroundRun(sb model.AdeTaskBranch) error {
 	return nil
 }
 
-// firstOpenStep names the current agent stage's first step that is not done, "" otherwise.
+// firstOpenStep names the current step when it is an automatic one, "" otherwise.
 func (b *TaskBoard) firstOpenStep(tc *taskCtx) string {
-	if tc.stage == nil || tc.stage.Kind != "agent" {
-		return ""
-	}
 	plan, err := b.plan(tc)
 	if err != nil {
 		return ""
 	}
-	for _, v := range plan {
-		if v.state() != model.AdeRunDone {
-			return v.Def.Name
-		}
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return ""
+	}
+	if cur := currentStep(plan, entry); cur >= 0 && !plan[cur].Def.manual() {
+		return plan[cur].Def.Name
 	}
 	return ""
 }

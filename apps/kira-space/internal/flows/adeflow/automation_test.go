@@ -63,7 +63,7 @@ func newAutoFixture(t *testing.T, extraStep string, draft bool, opts ...flowharn
 		ids[name] = importRepo(t, app, repo.Dir).ID
 	}
 	f.api, f.web, f.docs = ids["api"], ids["web"], ids["docs"]
-	saveWorkflow(t, app, "flow", flowYAML("flow", agentStage("build", agentStep("one", "")+extraStep)+userStage))
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")+extraStep+manualStep))
 	task := createTask(t, app, "Fix login", "flow", f.api, f.web)
 	f.task = task.ID
 	b := board(t, app)
@@ -286,7 +286,7 @@ func TestAutomationRun(t *testing.T) {
 	})
 
 	t.Run("gate both ways", func(t *testing.T) {
-		f := newAutoFixture(t, agentStep("two", "        before: approval\n"), false)
+		f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false)
 		rec := f.script(t, smartFields("audit", "Audit {branch}"))
 		args := scriptruns.RunArgs{ScriptID: rec.ID, TaskID: f.task, BranchID: f.apiBr.ID}
 
@@ -303,7 +303,7 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatal("an interactive session started in a worktree an automation holds")
 		}
 
-		step := adewire.StepArgs{TaskID: f.task, StageID: "build", StepID: "two"}
+		step := adewire.StepArgs{TaskID: f.task, StepID: "two"}
 		if err := f.app.W.AdeTask.Approve(ctx, step); err != nil {
 			t.Fatalf("Approve: %v", err)
 		}
@@ -337,12 +337,12 @@ func TestAutomationRun(t *testing.T) {
 	})
 
 	t.Run("held step survives a restart", func(t *testing.T) {
-		f := newAutoFixture(t, agentStep("two", "        before: approval\n"), false)
+		f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false)
 		rec := f.script(t, smartFields("audit", "Audit {branch}"))
 		args := scriptruns.RunArgs{ScriptID: rec.ID, TaskID: f.task, BranchID: f.apiBr.ID}
 		f.start(t, args)
 		waitCall(t, f.app, "api", 2)
-		step := adewire.StepArgs{TaskID: f.task, StageID: "build", StepID: "two"}
+		step := adewire.StepArgs{TaskID: f.task, StepID: "two"}
 		if err := f.app.W.AdeTask.Approve(ctx, step); err != nil {
 			t.Fatal(err)
 		}
@@ -442,7 +442,7 @@ func errCode(err error) string {
 }
 
 func smartStepYAML(script, extra string) string {
-	return "      - id: s1\n        name: s1\n        runs_on: each repo\n        timeout: 2m\n        smart_script: " + script + "\n" + extra
+	return "  - id: s1\n    name: s1\n    kind: agent\n    runs_on: each repo\n    timeout: 2m\n    smart_script: " + script + "\n" + extra
 }
 
 // runOnly starts the run; a launch error is the run's own failure, which the board records.
@@ -468,10 +468,10 @@ func TestAutomationStep(t *testing.T) {
 		}
 	}
 	level := []scripts.Param{{Name: "level", Type: scripts.ParamSelect, Options: []string{"low", "high"}, Required: true}}
-	stage := func(extra string) string { return agentStage("build", smartStepYAML("lint", extra)) }
+	lintStep := func(extra string) string { return smartStepYAML("lint", extra) }
 
 	t.Run("runs the script", func(t *testing.T) {
-		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, stage("        params:\n          level: high\n"))
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, lintStep("    params:\n      level: high\n"))
 		smart(f, "lint", "Lint {branch} at {level} for {task}", level, nil)
 		r := runOnly(t, f, "feat/api-lint")
 		if r.State != "done" {
@@ -496,16 +496,16 @@ func TestAutomationStep(t *testing.T) {
 			name, extra, want string
 			setup             func(f *runFixture)
 		}{
-			{"unknown script", "        params:\n          level: high\n", `smart script "lint": not found`, func(*runFixture) {}},
-			{"duplicate name", "        params:\n          level: high\n", `smart script "lint": 2 scripts have that name`, func(f *runFixture) {
+			{"unknown script", "    params:\n      level: high\n", `smart script "lint": not found`, func(*runFixture) {}},
+			{"duplicate name", "    params:\n      level: high\n", `smart script "lint": 2 scripts have that name`, func(f *runFixture) {
 				smart(f, "lint", "a", level, nil)
 				smart(f, "lint", "b", level, nil)
 			}},
 			{"missing param", "", `smart script "lint": needs a value for level`, func(f *runFixture) { smart(f, "lint", "x {level}", level, nil) }},
-			{"not an option", "        params:\n          level: extreme\n", "is not an option of level", func(f *runFixture) { smart(f, "lint", "x {level}", level, nil) }},
+			{"not an option", "    params:\n      level: extreme\n", "is not an option of level", func(f *runFixture) { smart(f, "lint", "x {level}", level, nil) }},
 		} {
 			t.Run(c.name, func(t *testing.T) {
-				f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, stage(c.extra))
+				f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, lintStep(c.extra))
 				c.setup(f)
 				r := runOnly(t, f, "feat/api-bad")
 				if r.State != "failed" || !strings.HasPrefix(r.Note, "could not start: ") || !strings.Contains(r.Note, c.want) {
@@ -521,7 +521,7 @@ func TestAutomationStep(t *testing.T) {
 			t.Fatal(err)
 		}
 		zero := 0
-		f := newRunFixture(t, []fakeagent.Action{{Emit: result, Exit: &zero}}, stage("        params:\n          level: low\n"))
+		f := newRunFixture(t, []fakeagent.Action{{Emit: result, Exit: &zero}}, lintStep("    params:\n      level: low\n"))
 		smart(f, "lint", "x {level}", level, nil)
 		r := runOnly(t, f, "feat/api-budget")
 		o := r.Outcome
@@ -532,7 +532,7 @@ func TestAutomationStep(t *testing.T) {
 
 	t.Run("step timeout wins", func(t *testing.T) {
 		f := newRunFixture(t, []fakeagent.Action{{Name: "sleep"}},
-			agentStage("build", "      - id: s1\n        name: s1\n        runs_on: each repo\n        timeout: 2s\n        smart_script: lint\n        params:\n          level: low\n"))
+			"  - id: s1\n    name: s1\n    kind: agent\n    runs_on: each repo\n    timeout: 2s\n    smart_script: lint\n    params:\n      level: low\n")
 		smart(f, "lint", "x {level}", level, func(s *scripts.Smart) { s.Timeout = "15m" })
 		r := runOnly(t, f, "feat/api-timeout")
 		if o := r.Outcome; o == nil || o.Source != "timeout" || !strings.Contains(o.Reason, "2s") {
@@ -542,7 +542,7 @@ func TestAutomationStep(t *testing.T) {
 }
 
 func TestRunOutcomeAutomation(t *testing.T) {
-	f := newAutoFixture(t, agentStep("two", "        before: approval\n"), false)
+	f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false)
 	call := func(kind string) fakeagent.MCPCall {
 		return fakeagent.MCPCall{Server: claudeheadless.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": kind}}
 	}
@@ -558,7 +558,7 @@ func TestRunOutcomeAutomation(t *testing.T) {
 		t.Fatalf("script run = %+v, want a reason", failed)
 	}
 
-	if err := f.app.W.AdeTask.Approve(ctx, adewire.StepArgs{TaskID: f.task, StageID: "build", StepID: "two"}); err != nil {
+	if err := f.app.W.AdeTask.Approve(ctx, adewire.StepArgs{TaskID: f.task, StepID: "two"}); err != nil {
 		t.Fatal(err)
 	}
 	testx.WaitUntil(t, waitFor, func() bool {

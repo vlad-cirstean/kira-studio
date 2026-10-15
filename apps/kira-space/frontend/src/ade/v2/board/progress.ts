@@ -2,22 +2,23 @@ import { type MessageKey, t } from '@theme/i18n';
 import { runStateLabel } from '../runState';
 import type {
   Branch,
-  OnFailure,
   RunReview,
   RunSandboxBadge,
   RunState,
   RunsOn,
-  Stage,
+  StepKind,
   StepResult,
   Task,
+  TaskStatus,
   Workflow,
+  WorkflowStep,
 } from '../wire';
-import { implicitResults, legacyMaxReturns } from './stepResults';
+import { defaultResults } from './stepResults';
 
 // Pure port of mockup v2 `renderVals()` step aggregation (1423-1466), `phasePills` (1672-1702) and
 // `branchProg` (1768-1787). Runs are the backend's: a stuck run arrives as `state: 'stuck'`.
 
-/** `skipped`: a route went past the step, so it never runs. */
+/** `skipped`: a route went past the step, or the step is marked skip; it never runs. */
 export type StepState = 'pending' | 'running' | 'review' | 'stuck' | 'failed' | 'done' | 'skipped';
 
 export interface StepRun {
@@ -47,20 +48,28 @@ export interface StepRun {
 
 export interface StepProgress {
   id: string;
-  /** 1-based position inside the stage. */
+  /** 1-based position in the workflow. */
   n: number;
   name: string;
+  kind: StepKind;
+  /** The step is marked skip. */
+  skip: boolean;
+  /** Task status while the task is at this step. */
+  status: TaskStatus;
+  /** Manual step: opens a Claude Code session. */
+  session: boolean;
+  /** Script step: the shell command; '' on other kinds. */
+  command: string;
   runsOn: RunsOn;
   before: 'auto' | 'approval';
-  onFailure: OnFailure | '';
-  /** The step's results with their routes. */
+  /** The step's results with their routes; empty on a manual step. */
   results: StepResult[];
   /** Returns the step may make before the run stops; 0 = no limit. */
   maxReturns: number;
   /** Name of the smart script the step runs, else ''. */
   smartScript: string;
   state: StepState;
-  /** One entry per target branch, in task branch order; a branch without a run is `pending`. */
+  /** One entry per target branch, in task branch order; a branch without a run is `pending`. Empty on a manual step. */
   runs: StepRun[];
   /** Pending, gated on approval, and the previous step is done. */
   approval: boolean;
@@ -68,12 +77,10 @@ export interface StepProgress {
   frac: number;
 }
 
-interface StageSegment {
+export interface StepSegment {
   id: string;
   name: string;
-  kind: Stage['kind'];
-  /** Agent stages draw wider. */
-  wide: boolean;
+  kind: StepKind;
   state: 'done' | 'current' | 'blocked' | 'todo' | 'skipped';
 }
 
@@ -82,17 +89,23 @@ type ProgressTone = 'green' | 'red' | 'amber';
 export interface TaskProgress {
   hasWorkflow: boolean;
   finished: boolean;
-  stage: Stage | null;
-  /** Index of the current stage in the workflow, -1 when the workflow file is unavailable. */
-  stageIndex: number;
+  /** The step the task is at; null when finished or the workflow file is unavailable. */
+  step: StepProgress | null;
+  /** Index of the current step in the workflow, -1 when finished or the workflow is unavailable. */
+  stepIndex: number;
+  /** Index of the step the task last entered; steps before it are history. */
+  entryIndex: number;
   steps: StepProgress[];
+  /** Automatic steps done or skipped. */
   doneSteps: number;
-  /** A step of the current stage is stuck or failed. */
+  /** Automatic steps of the workflow, skipped ones not counted. */
+  totalSteps: number;
+  /** The current step is stuck or failed. */
   bad: boolean;
-  segments: StageSegment[];
+  segments: StepSegment[];
   /** `Spec`, `Implement 2/5`, `Done`. */
   label: string;
-  /** Precise bar for agent and script stages. */
+  /** Precise bar while the current step is automatic. */
   showBar: boolean;
   percent: number;
   tone: ProgressTone;
@@ -134,50 +147,52 @@ function runFraction(r: StepRun): number {
   return r.state === 'done' ? 1 : 0;
 }
 
-interface StepDef {
-  id: string;
-  name: string;
-  runsOn: RunsOn;
-  before: 'auto' | 'approval';
-  onFailure: OnFailure | '';
-  results: StepResult[];
-  maxReturns: number;
-  smartScript: string;
-}
-
-function stepDefs(stage: Stage): StepDef[] {
-  if (stage.kind === 'user') return [];
-  if (stage.kind === 'script') {
-    return [
-      {
-        id: stage.id,
-        name: stage.name,
-        runsOn: stage.runsOn || 'once',
-        before: 'auto',
-        onFailure: stage.onFailure || 'stop',
-        results: implicitResults(stage.id, stage.onFailure || 'stop'),
-        maxReturns: legacyMaxReturns(stage.onFailure || 'stop'),
-        smartScript: '',
-      },
-    ];
-  }
-  return stage.steps.map((s) => ({
+/** The step defaults for display: kind-fixed fields filled in. */
+function stepDef(
+  s: WorkflowStep,
+): Omit<StepProgress, 'n' | 'state' | 'runs' | 'approval' | 'frac'> {
+  const manual = s.kind === 'manual';
+  return {
     id: s.id,
     name: s.name,
-    runsOn: s.runsOn,
-    before: s.before,
-    onFailure: s.onFailure,
-    results: s.results?.length ? s.results : implicitResults(s.id, s.onFailure || 'stop'),
+    kind: s.kind,
+    skip: s.skip,
+    status: s.status,
+    session: s.session,
+    command: s.command,
+    runsOn: s.runsOn || 'once',
+    before: s.before === 'approval' ? 'approval' : 'auto',
+    results: manual ? [] : s.results?.length ? s.results : defaultResults(),
     maxReturns: s.maxReturns,
     smartScript: s.smartScript,
-  }));
+  };
 }
 
-/** Latest-attempt run of `(stage, step, branch)` (W12). */
-function latestRun(task: Task, stageId: string, stepId: string, branchId: string): StepRun | null {
+const emptyRun = (branchId: string): StepRun => ({
+  branchId,
+  state: 'pending',
+  loops: 0,
+  returns: 0,
+  note: '',
+  reason: '',
+  result: '',
+  ok: null,
+  route: '',
+  runId: '',
+  sessionId: '',
+  finishedAt: null,
+  resumable: false,
+  review: null,
+  sandbox: null,
+});
+
+/** Latest-attempt run of `(step, branch)` in the task's current pass (W12): runs at or below the
+ *  watermark are history. */
+function latestRun(task: Task, stepId: string, branchId: string): StepRun | null {
+  const since = task.since[`${stepId}/${branchId}`] ?? 0;
   let best: Task['runs'][number] | null = null;
   for (const r of task.runs) {
-    if (r.stageId !== stageId || r.stepId !== stepId || r.branchId !== branchId) continue;
+    if (r.stepId !== stepId || r.branchId !== branchId || r.attempt <= since) continue;
     if (!best || r.attempt > best.attempt) best = r;
   }
   if (!best) return null;
@@ -216,20 +231,26 @@ function forwardTarget(ids: readonly string[], i: number, runs: readonly StepRun
   return Math.max(next, i + 1);
 }
 
-/** The route path of a stage: from the first step, a done step moves to its forward target and the
- *  first step not done ends the path. `skipped` marks the steps the route went past. Mirrors Go
- *  `walkPath`. */
+/** The route path of a task: from the entry step, a skipped step is passed over, a done step moves
+ *  to its forward target and the first step not done (a manual step never is) ends the path.
+ *  `skipped` marks the steps the route went past. Mirrors Go `walkPath`. */
 export function walkPath(
   ids: readonly string[],
-  steps: readonly { state: StepState; runs: readonly StepRun[] }[],
+  steps: readonly { state: StepState; kind: StepKind; skip: boolean; runs: readonly StepRun[] }[],
+  entry: number,
 ): { path: number[]; skipped: boolean[] } {
   const path: number[] = [];
   const skipped = ids.map(() => false);
-  let i = 0;
+  let i = Math.max(entry, 0);
   while (i < ids.length) {
-    path.push(i);
     const step = steps[i];
-    if (step?.state !== 'done') break;
+    if (step?.skip) {
+      skipped[i] = true;
+      i++;
+      continue;
+    }
+    path.push(i);
+    if (!step || step.kind === 'manual' || step.state !== 'done') break;
     const next = forwardTarget(ids, i, step.runs);
     for (let j = i + 1; j < next && j < ids.length; j++) skipped[j] = true;
     i = next;
@@ -237,59 +258,63 @@ export function walkPath(
   return { path, skipped };
 }
 
-/** Steps of the task's current stage with per-branch runs, step state and approval flag. */
-export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
-  const defs = stepDefs(stage);
-  const built = defs.map((def, idx) => {
-    const runs = stepTargets(i, def.runsOn).map(
-      (branchId): StepRun =>
-        latestRun(i.task, stage.id, def.id, branchId) ?? {
-          branchId,
-          state: 'pending',
-          loops: 0,
-          returns: 0,
-          note: '',
-          reason: '',
-          result: '',
-          ok: null,
-          route: '',
-          runId: '',
-          sessionId: '',
-          finishedAt: null,
-          resumable: false,
-          review: null,
-          sandbox: null,
-        },
-    );
+/** Every step of the workflow with per-branch runs, step state and approval flag. */
+export function buildSteps(i: ProgressInput, workflow: Workflow): StepProgress[] {
+  const built = workflow.steps.map((s, idx): StepProgress => {
+    const def = stepDef(s);
+    const runs =
+      s.kind === 'manual'
+        ? []
+        : stepTargets(i, s.runsOn).map(
+            (branchId): StepRun => latestRun(i.task, s.id, branchId) ?? emptyRun(branchId),
+          );
     const state = aggregate(runs.map((r) => r.state));
     const frac = runs.length ? runs.reduce((acc, r) => acc + runFraction(r), 0) / runs.length : 0;
     return { ...def, n: idx + 1, state, runs, approval: false, frac };
   });
+  const entry = entryIndex(i.task, built);
   const { path, skipped } = walkPath(
-    defs.map((d) => d.id),
+    built.map((s) => s.id),
     built,
+    entry,
   );
   const end = path[path.length - 1] ?? -1;
   return built.map((s, idx) => {
-    if (skipped[idx]) return { ...s, state: 'skipped', frac: 1 };
-    const approval = s.state === 'pending' && s.before === 'approval' && idx > 0 && idx === end;
+    if (s.skip || skipped[idx]) return { ...s, state: 'skipped', frac: 1 };
+    const started = s.runs.some((r) => r.runId !== '');
+    const approval =
+      s.kind !== 'manual' &&
+      s.state === 'pending' &&
+      s.before === 'approval' &&
+      !started &&
+      idx === end &&
+      idx !== path[0];
     return { ...s, approval };
   });
 }
 
+function entryIndex(task: Task, steps: readonly { id: string }[]): number {
+  return Math.max(
+    steps.findIndex((s) => s.id === task.entryStepId),
+    0,
+  );
+}
+
 export function buildTaskProgress(i: ProgressInput): TaskProgress {
   const { task, workflow } = i;
-  const stage = task.currentStage;
-  const finished = task.workflowId !== '' && task.stageId === 'done';
-  const hasWorkflow = finished || stage !== null;
+  const finished = task.workflowId !== '' && task.entryStepId === 'done';
+  const live = !finished && workflow !== null && task.entryStepId !== '';
+  const hasWorkflow = finished || live;
   if (!hasWorkflow) {
     return {
       hasWorkflow: false,
       finished: false,
-      stage: null,
-      stageIndex: -1,
+      step: null,
+      stepIndex: -1,
+      entryIndex: -1,
       steps: [],
       doneSteps: 0,
+      totalSteps: 0,
       bad: false,
       segments: [],
       label: '',
@@ -300,39 +325,46 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
       workflowTip: '',
     };
   }
-  const stages: readonly Stage[] = workflow?.stages ?? (stage ? [stage] : []);
-  const found = stage ? stages.findIndex((s) => s.id === stage.id) : -1;
-  const idx = finished ? stages.length : found;
-  const steps = !finished && stage ? buildSteps(i, stage) : [];
-  const bad = steps.some((s) => s.state === 'stuck' || s.state === 'failed');
-  const doneSteps = steps.filter((s) => s.state === 'done' || s.state === 'skipped').length;
-  const frac = steps.length ? steps.reduce((acc, s) => acc + s.frac, 0) / steps.length : 0;
-  const segments = stages.map((s, k): StageSegment => {
-    let state: StageSegment['state'] = 'todo';
-    if (s.skip && k !== idx) state = 'skipped';
+  const steps = workflow ? buildSteps(i, workflow) : [];
+  const { path } = walkPath(
+    steps.map((s) => s.id),
+    steps,
+    entryIndex(task, steps),
+  );
+  const idx = finished ? steps.length : (path[path.length - 1] ?? -1);
+  const step = !finished && idx >= 0 ? (steps[idx] ?? null) : null;
+  const auto = steps.filter((s) => s.kind !== 'manual' && !s.skip);
+  const bad = step !== null && (step.state === 'stuck' || step.state === 'failed');
+  const doneSteps = auto.filter((s) => s.state === 'done' || s.state === 'skipped').length;
+  const frac = auto.length ? auto.reduce((acc, s) => acc + s.frac, 0) / auto.length : 0;
+  const segments = steps.map((s, k): StepSegment => {
+    let state: StepSegment['state'] = 'todo';
+    if (s.state === 'skipped') state = 'skipped';
     else if (k < idx) state = 'done';
-    else if (k === idx) state = bad ? 'blocked' : 'current';
-    return { id: s.id, name: s.name, kind: s.kind, wide: s.kind === 'agent', state };
+    else if (k === idx) state = s.state === 'done' ? 'done' : bad ? 'blocked' : 'current';
+    return { id: s.id, name: s.name, kind: s.kind, state };
   });
   const label =
-    finished || !stage
+    finished || !step
       ? t('common.done.status')
-      : stage.name + (stage.kind === 'agent' ? ` ${doneSteps}/${steps.length}` : '');
+      : step.name + (step.kind === 'manual' ? '' : ` ${doneSteps}/${auto.length}`);
   const nick = (id: string): string => i.repoNick(i.branch(id)?.codeRepoId ?? '');
   return {
     hasWorkflow: true,
     finished,
-    stage: finished ? null : stage,
-    stageIndex: workflow ? idx : -1,
+    step,
+    stepIndex: workflow && !finished ? idx : -1,
+    entryIndex: workflow && !finished ? entryIndex(task, steps) : -1,
     steps,
     doneSteps,
+    totalSteps: auto.length,
     bad,
     segments,
     label,
-    showBar: !finished && stage !== null && stage.kind !== 'user',
+    showBar: !finished && step !== null && step.kind !== 'manual',
     percent: Math.round(frac * 100),
     tone: finished ? 'green' : bad ? 'red' : 'amber',
-    barTip: steps
+    barTip: auto
       .map((s) =>
         t('space.ade.progress.tipLine.tooltip', {
           n: s.n,
@@ -350,19 +382,21 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
       .join('\n'),
     workflowTip: t('theme.varText.aria', {
       name: workflow?.name ?? task.workflowId,
-      value: stages
-        .map((s, k) => `${k < idx ? '✓ ' : k === idx ? '▸ ' : ''}${stageKindLabel(s)}`)
+      value: steps
+        .map((s, k) => `${k < idx ? '✓ ' : k === idx ? '▸ ' : ''}${stepKindLabel(s)}`)
         .join(' › '),
     }),
   };
 }
 
-const STAGE_KIND = {
-  agent: 'space.ade.progress.stageAgent.label',
-  script: 'space.ade.progress.stageScript.label',
-  user: 'space.ade.progress.stageUser.label',
-} as const satisfies Record<Stage['kind'], MessageKey>;
-const stageKindLabel = (s: Stage): string => t(STAGE_KIND[s.kind], { name: s.name });
+const STEP_KIND = {
+  agent: 'space.ade.progress.stepAgent.label',
+  script: 'space.ade.progress.stepScript.label',
+  review: 'space.ade.progress.stepReview.label',
+  manual: 'space.ade.progress.stepManual.label',
+} as const satisfies Record<StepKind, MessageKey>;
+const stepKindLabel = (s: { kind: StepKind; name: string }): string =>
+  t(STEP_KIND[s.kind], { name: s.name });
 
 export type BranchSegState = 'done' | 'running' | 'bad' | 'pending';
 
@@ -374,12 +408,12 @@ export interface BranchProgress {
   tip: string;
 }
 
-/** One branch's own line during agent/script stages; `null` outside them or without a step on it. */
+/** One branch's own line while the task is at an automatic step; `null` otherwise or without a step on it. */
 export function branchProgress(p: TaskProgress, branchId: string): BranchProgress | null {
-  const stage = p.stage;
-  if (!stage || stage.kind === 'user') return null;
+  const current = p.step;
+  if (!current || current.kind === 'manual') return null;
   const own: { step: StepProgress; run: StepRun }[] = [];
-  for (const step of p.steps) {
+  for (const step of p.steps.slice(Math.max(p.entryIndex, 0))) {
     if (step.state === 'skipped') continue;
     const run = step.runs.find((r) => r.branchId === branchId);
     if (run) own.push({ step, run });
@@ -394,7 +428,7 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
   let label: string;
   let tone: BranchProgress['tone'] = 'amber';
   if (!pos) {
-    label = t('space.ade.progress.stageDone.label', { name: stage.name });
+    label = t('space.ade.progress.stepDone.label', { name: current.name });
     tone = 'green';
   } else if (pos.run.state === 'back') {
     label =

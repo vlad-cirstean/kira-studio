@@ -80,7 +80,7 @@ func TestRealClaudeSettingsUntouched(t *testing.T) {
 		check(t, "terminal agent session")
 	})
 
-	f.saveWorkflow(t, "flow", agentStageYAML+userStageYAML)
+	f.saveWorkflow(t, "flow", agentStepYAML+manualStepYAML)
 	task := f.createTask(t, "flow")
 
 	t.Run("ade headless run", func(t *testing.T) {
@@ -90,11 +90,8 @@ func TestRealClaudeSettingsUntouched(t *testing.T) {
 		check(t, "ade headless run")
 	})
 
-	t.Run("ade tui stage", func(t *testing.T) {
-		if _, err := f.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil {
-			t.Fatal(err)
-		}
-		launch, err := f.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+	t.Run("ade manual step", func(t *testing.T) {
+		launch, err := f.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +106,7 @@ func TestRealClaudeSettingsUntouched(t *testing.T) {
 		f.waitAgentEvent(t, mark, launch.TerminalID, "SessionStart", 60*time.Second)
 		_ = f.W.Terminal.Close(terminal.CloseArgs{TerminalID: launch.TerminalID})
 		time.Sleep(time.Second)
-		check(t, "ade tui stage")
+		check(t, "ade manual step")
 	})
 
 	t.Run("smart script run", func(t *testing.T) {

@@ -167,24 +167,21 @@ func agentTab2(t *testing.T, app *flowharness.App, id string) string {
 	return cwd
 }
 
-func TestAdeStageSessionNote(t *testing.T) {
+func TestAdeManualSessionNote(t *testing.T) {
 	app, sink := newApp(t, flowharness.WithTrackerGrace(time.Second))
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}, {Name: "sleep"}}})
 	setCooldown(t, time.Millisecond)
 	task, rec := adeTask(t, app)
 	startRun(t, app, task, rec.ID)
 	waitRunDone(t, app, task.ID)
-	if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil {
-		t.Fatal(err)
-	}
-	launch, err := app.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+	launch, err := app.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	openAgent2(t, app, launch)
 	testx.WaitUntil(t, waitFor, func() bool { _, ok := app.W.Tracker.RecordOf(launch.TerminalID); return ok })
 
-	stop(t, app, launch.TerminalID, launch.Cwd, "stage done")
+	stop(t, app, launch.TerminalID, launch.Cwd, "step done")
 	finished := sink.ofKind(agentnotify.KindFinished)
 	if len(finished) != 1 {
 		t.Fatalf("finished notes = %+v, want one", finished)
@@ -246,10 +243,7 @@ func TestClickRevealsAdeSession(t *testing.T) {
 	task, rec := adeTask(t, app)
 	startRun(t, app, task, rec.ID)
 	waitRunDone(t, app, task.ID)
-	if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil {
-		t.Fatal(err)
-	}
-	launch, err := app.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+	launch, err := app.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 	if err != nil {
 		t.Fatal(err)
 	}

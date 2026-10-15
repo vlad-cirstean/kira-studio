@@ -88,23 +88,23 @@ func TestPhoneWrites(t *testing.T) {
 		t.Fatalf("backlog after move = %v, want first second", got)
 	}
 
-	// The task sits in its review stage; prev and next walk it through the workflow.
-	if got := f.taskNow(t).StageID; got != "review" {
-		t.Fatalf("task stage = %q, want review", got)
+	// The task sits at its manual step; prev and next walk it through the workflow.
+	if got := f.taskNow(t).EntryStepID; got != "one" {
+		t.Fatalf("task entry step = %q, want one", got)
 	}
-	if r := p.post("/api/ade/tasks/stage", map[string]string{"taskId": f.task.ID, "stageId": "build"}); r.Status != http.StatusBadRequest {
-		t.Fatalf("stage move without fromStageId = %d %s, want 400", r.Status, r.Body)
+	if r := p.post("/api/ade/tasks/step", map[string]string{"taskId": f.task.ID, "stepId": "one"}); r.Status != http.StatusBadRequest {
+		t.Fatalf("step move without fromStepId = %d %s, want 400", r.Status, r.Body)
 	}
-	if r := p.post("/api/ade/tasks/stage", map[string]string{"taskId": f.task.ID, "stageId": "review", "fromStageId": "build"}); r.Status == http.StatusOK {
-		t.Fatalf("stage move from a stale stage succeeded: %s", r.Body)
+	if r := p.post("/api/ade/tasks/step", map[string]string{"taskId": f.task.ID, "stepId": "one", "fromStepId": "one"}); r.Status == http.StatusOK {
+		t.Fatalf("step move from a stale step succeeded: %s", r.Body)
 	}
-	for _, step := range []struct{ from, to string }{{"review", "build"}, {"build", "review"}} {
-		r := p.post("/api/ade/tasks/stage", map[string]string{"taskId": f.task.ID, "stageId": step.to, "fromStageId": step.from})
+	for _, move := range []struct{ from, to string }{{"review", "one"}, {"one", "review"}} {
+		r := p.post("/api/ade/tasks/step", map[string]string{"taskId": f.task.ID, "stepId": move.to, "fromStepId": move.from})
 		if r.Status != http.StatusOK {
-			t.Fatalf("stage %s to %s = %d %s", step.from, step.to, r.Status, r.Body)
+			t.Fatalf("step %s to %s = %d %s", move.from, move.to, r.Status, r.Body)
 		}
-		if got := f.taskNow(t).StageID; got != step.to {
-			t.Fatalf("task stage = %q, want %q", got, step.to)
+		if got := f.taskNow(t).EntryStepID; got != move.to {
+			t.Fatalf("task entry step = %q, want %q", got, move.to)
 		}
 	}
 
@@ -124,7 +124,7 @@ func TestPhoneWrites(t *testing.T) {
 		}
 		launched <- open
 	}()
-	r = p.post("/api/ade/tasks/launch", map[string]string{"taskId": f.task.ID, "fromStageId": "review"})
+	r = p.post("/api/ade/tasks/launch", map[string]string{"taskId": f.task.ID, "fromStepId": "review"})
 	if r.Status != http.StatusOK {
 		t.Fatalf("launch = %d %s", r.Status, r.Body)
 	}

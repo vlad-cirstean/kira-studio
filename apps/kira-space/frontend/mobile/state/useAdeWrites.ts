@@ -56,25 +56,25 @@ export function useAdeWrites() {
     },
   });
 
-  const setTaskStage = useMutation({
-    mutationFn: (v: { taskId: string; fromStageId: string; stageId: string; key: string }) =>
-      adeWriter.setTaskStage(v.taskId, v.fromStageId, v.stageId, v.key),
+  const setTaskStep = useMutation({
+    mutationFn: (v: { taskId: string; fromStepId: string; stepId: string; key: string }) =>
+      adeWriter.setTaskStep(v.taskId, v.fromStepId, v.stepId, v.key),
     retry,
     onError,
     onSettled: () => invalidate(boardKey),
   });
 
   const startRun = useMutation({
-    mutationFn: (v: { taskId: string; fromStageId: string; key: string }) =>
-      adeWriter.startRun(v.taskId, v.fromStageId, v.key),
+    mutationFn: (v: { taskId: string; fromStepId: string; key: string }) =>
+      adeWriter.startRun(v.taskId, v.fromStepId, v.key),
     retry,
     onError,
     onSettled: () => invalidate(boardKey, sessionsKey),
   });
 
-  const launchStage = useMutation({
-    mutationFn: (v: { taskId: string; fromStageId: string; key: string }) =>
-      adeWriter.launchStage(v.taskId, v.fromStageId, v.key),
+  const launchStep = useMutation({
+    mutationFn: (v: { taskId: string; fromStepId: string; key: string }) =>
+      adeWriter.launchStep(v.taskId, v.fromStepId, v.key),
     retry,
     onError,
     onSettled: () => invalidate(boardKey, sessionsKey),
@@ -97,9 +97,9 @@ export function useAdeWrites() {
   return {
     addBacklogItem,
     moveBacklogItem,
-    setTaskStage,
+    setTaskStep,
     startRun,
-    launchStage,
+    launchStep,
     sendReply,
     takeOver,
   };

@@ -20,9 +20,9 @@ type LaunchResult struct {
 type Writer interface {
 	AddBacklogItem(ctx context.Context, args adewire.AddBacklogItemArgs) (adewire.BacklogItem, error)
 	MoveBacklogItem(ctx context.Context, args adewire.MoveBacklogItemArgs) error
-	SetTaskStage(ctx context.Context, args adewire.SetTaskStageArgs) (adewire.Task, error)
+	SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error)
 	StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error)
-	LaunchStage(ctx context.Context, args adewire.LaunchStageArgs) (LaunchResult, error)
+	LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (LaunchResult, error)
 	Send(ctx context.Context, args adewire.SendArgs) error
 	TakeOver(ctx context.Context, args adewire.TakeOverArgs) (LaunchResult, error)
 }

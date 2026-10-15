@@ -169,7 +169,7 @@ func (r *Reader) Import(srcPath string) (adewire.WorkflowEntry, error) {
 	return r.entry(file, p)
 }
 
-// New creates a minimal valid one-stage user workflow named name. The file name is the slug of the
+// New creates a minimal valid one-step manual workflow named name. The file name is the slug of the
 // name, suffixed -2, -3 ... when taken.
 func (r *Reader) New(name string) (adewire.WorkflowEntry, error) {
 	name = strings.TrimSpace(name)
@@ -186,8 +186,8 @@ func (r *Reader) New(name string) (adewire.WorkflowEntry, error) {
 		}
 		id = fmt.Sprintf("%s-%d", base, n)
 	}
-	wf := adewire.Workflow{ID: id, Name: name, Stages: []adewire.Stage{
-		{ID: "work", Name: "Work", Kind: "user", Status: "In progress", Steps: []adewire.PipelineStep{}},
+	wf := adewire.Workflow{ID: id, Name: name, Steps: []adewire.WorkflowStep{
+		{ID: "work", Name: "Work", Kind: adewire.KindManual, Status: adewire.DefaultStatus(adewire.KindManual), Results: []adewire.StepResult{}},
 	}}
 	out, err := encodeWorkflow(&yaml.Node{}, wf)
 	if err != nil {
@@ -315,10 +315,9 @@ const (
 )
 
 var (
-	topOrder    = []string{"id", "name", "kira_space_mcp", "stages"}
-	stageOrder  = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
+	topOrder    = []string{"id", "name", "kira_space_mcp", "steps"}
 	resultOrder = []string{"id", "ok", "description", "next"}
-	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "max_returns", "timeout", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
+	stepOrder   = []string{"id", "name", "kind", "status", "skip", "session", "runs_on", "before", "results", "max_returns", "timeout", "command", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -488,80 +487,69 @@ func applyWorkflow(root *yaml.Node, wf adewire.Workflow) {
 	} else if i, _ := find(root, "kira_space_mcp"); i >= 0 {
 		root.Content = append(root.Content[:i], root.Content[i+2:]...)
 	}
-	ids := make([]string, len(wf.Stages))
-	for i, s := range wf.Stages {
-		ids[i] = s.ID
+	ids := make([]string, len(wf.Steps))
+	for i, st := range wf.Steps {
+		ids[i] = st.ID
 	}
-	_, old := find(root, "stages")
-	put(root, "stages", syncItems(old, ids, func(i int, item *yaml.Node) { applyStage(item, wf.Stages[i]) }), topOrder)
+	_, old := find(root, "steps")
+	put(root, "steps", syncItems(old, ids, func(i int, item *yaml.Node) { applyStep(item, wf.Steps[i]) }), topOrder)
 }
 
-func applyStage(m *yaml.Node, st adewire.Stage) {
-	setScalar(m, "id", kText, st.ID, true, stageOrder)
-	setScalar(m, "name", kText, st.Name, true, stageOrder)
-	if _, k := find(m, "kind"); k == nil || k.Kind != yaml.ScalarNode || stageKindAlias[strings.TrimSpace(k.Value)] != st.Kind {
-		setScalar(m, "kind", kText, st.Kind, true, stageOrder)
-	}
-	setScalar(m, "status", kText, st.Status, true, stageOrder)
-	keep := map[string]bool{"id": true, "name": true, "kind": true, "status": true}
-	if st.Skip {
-		keep["skip"] = true
-		setScalar(m, "skip", kBool, "true", true, stageOrder)
-	}
-	switch st.Kind {
-	case "user":
-		keep["session"] = true
-		setScalar(m, "session", kBool, fmt.Sprint(st.Session), st.Session, stageOrder)
-		if st.Session && st.Prompt != "" {
-			keep["prompt"] = true
-			setScalar(m, "prompt", kBlock, st.Prompt, true, stageOrder)
-		}
-	case "agent":
-		keep["steps"] = true
-		ids := make([]string, len(st.Steps))
-		for i, s := range st.Steps {
-			ids[i] = s.ID
-		}
-		_, old := find(m, "steps")
-		put(m, "steps", syncItems(old, ids, func(i int, item *yaml.Node) { applyStep(item, st.Steps[i], ids[:i]) }), stageOrder)
-	case "script":
-		for _, k := range []string{"command", "runs_on", "on_failure", "timeout"} {
-			keep[k] = true
-		}
-		setScalar(m, "command", kBlock, st.Command, true, stageOrder)
-		setScalar(m, "runs_on", kText, st.RunsOn, true, stageOrder)
-		setScalar(m, "on_failure", kText, defaultStr(st.OnFailure, "stop"), st.OnFailure != "" && st.OnFailure != "stop", stageOrder)
-		setScalar(m, "timeout", kText, st.Timeout, true, stageOrder)
-	}
-	dropOthers(m, keep)
-}
-
-func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
-	if s.MaxReturns == 0 && s.Review == nil {
-		s.MaxReturns = adewire.LegacyLimit(s.OnFailure, false)
-	}
+// applyStep writes one step: the keys of its kind, and none of another kind's (a kind change leaves them behind).
+func applyStep(m *yaml.Node, s adewire.WorkflowStep) {
 	setScalar(m, "id", kText, s.ID, true, stepOrder)
 	setScalar(m, "name", kText, s.Name, true, stepOrder)
+	setScalar(m, "kind", kText, s.Kind, true, stepOrder)
+	def := adewire.DefaultStatus(s.Kind)
+	setScalar(m, "status", kText, defaultStr(s.Status, def), s.Status != "" && s.Status != def, stepOrder)
+	if s.Skip {
+		setScalar(m, "skip", kBool, "true", true, stepOrder)
+	} else {
+		dropKeys(m, "skip")
+	}
+	keep := map[string]bool{"id": true, "name": true, "kind": true, "status": true, "skip": true}
+	for _, k := range stepKeys[s.Kind] {
+		keep[k] = true
+	}
+	dropOthers(m, keep)
+	if s.Kind == adewire.KindManual {
+		setScalar(m, "session", kBool, fmt.Sprint(s.Session), s.Session, stepOrder)
+		if s.Session && s.Prompt != "" {
+			setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
+		} else {
+			dropKeys(m, "prompt")
+		}
+		return
+	}
 	setScalar(m, "runs_on", kText, s.RunsOn, true, stepOrder)
 	setScalar(m, "before", kText, defaultStr(s.Before, "auto"), s.Before != "" && s.Before != "auto", stepOrder)
-	applyResults(m, s, earlier)
+	applyResults(m, s)
 	setScalar(m, "timeout", kText, s.Timeout, true, stepOrder)
-	applySandbox(m, s.Sandbox)
-	if s.Review != nil {
-		dropKeys(m, "smart_script", "params", "prompt", "allowed_tools")
-		applyReview(m, *s.Review)
-		return
+	switch s.Kind {
+	case adewire.KindScript:
+		setScalar(m, "command", kBlock, s.Command, true, stepOrder)
+	case adewire.KindReview:
+		applySandbox(m, s.Sandbox)
+		applyReview(m, defaultReview(s.Review))
+	default:
+		applySandbox(m, s.Sandbox)
+		if s.SmartScript == "" {
+			dropKeys(m, "smart_script", "params")
+			setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
+			setList(m, "allowed_tools", s.AllowedTools, stepOrder)
+			return
+		}
+		dropKeys(m, "prompt", "allowed_tools")
+		setScalar(m, "smart_script", kText, s.SmartScript, true, stepOrder)
+		setParams(m, s.Params)
 	}
-	dropKeys(m, "review")
-	if s.SmartScript == "" {
-		dropKeys(m, "smart_script", "params")
-		setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
-		setList(m, "allowed_tools", s.AllowedTools, stepOrder)
-		return
+}
+
+func defaultReview(r *adewire.ReviewStepConfig) adewire.ReviewStepConfig {
+	if r == nil {
+		return adewire.ReviewStepConfig{SendTo: adewire.ReviewSendImplementer}
 	}
-	dropKeys(m, "prompt", "allowed_tools")
-	setScalar(m, "smart_script", kText, s.SmartScript, true, stepOrder)
-	setParams(m, s.Params)
+	return *r
 }
 
 // applySandbox writes a step's sandbox block, or removes it when the policy is the default so a
@@ -597,15 +585,20 @@ func applySandbox(m *yaml.Node, sb adewire.StepSandbox) {
 	}
 }
 
-// applyReview writes a review step's block; send_to is always spelled out, implementer only when set.
+// applyReview writes a review step's block. It is optional: an all-default block is not added to a file
+// without one.
 func applyReview(m *yaml.Node, r adewire.ReviewStepConfig) {
+	sendTo := defaultStr(r.SendTo, adewire.ReviewSendImplementer)
 	_, rn := find(m, "review")
+	if rn == nil && sendTo == adewire.ReviewSendImplementer && r.Implementer == "" {
+		return
+	}
 	if rn == nil || rn.Kind != yaml.MappingNode {
 		rn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		put(m, "review", rn, stepOrder)
 	}
 	order := []string{"send_to", "implementer"}
-	setScalar(rn, "send_to", kText, defaultStr(r.SendTo, adewire.ReviewSendImplementer), true, order)
+	setScalar(rn, "send_to", kText, sendTo, sendTo != adewire.ReviewSendImplementer, order)
 	if r.Implementer == "" {
 		dropKeys(rn, "implementer")
 	} else {
@@ -613,31 +606,65 @@ func applyReview(m *yaml.Node, r adewire.ReviewStepConfig) {
 	}
 }
 
-// applyResults writes a step's routing: the legacy on_failure rule when the results equal one
-// (an implicit pair), else a results list. A step with no results is read as its on_failure rule.
-func applyResults(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
+// applyResults writes a step's routing: max_returns when it is not the kind's default, and a results list
+// when the results are not the defaults (or the file already has one).
+func applyResults(m *yaml.Node, s adewire.WorkflowStep) {
 	results := s.Results
 	if len(results) == 0 {
-		results = adewire.ImplicitResults(s.ID, defaultStr(s.OnFailure, "stop"))
+		results = adewire.DefaultResults()
 	}
-	review := s.Review != nil
-	if rule, ok := adewire.LegacyOnFailure(s.ID, results, earlier, s.MaxReturns, review); ok {
-		dropKeys(m, "results", "max_returns")
-		setScalar(m, "on_failure", kText, rule, rule != "stop", stepOrder)
-		return
-	}
-	dropKeys(m, "on_failure")
-	if s.MaxReturns != adewire.DefaultLimit(review) {
+	review := s.Kind == adewire.KindReview
+	if def := adewire.DefaultLimit(review); s.MaxReturns != def {
 		setScalar(m, "max_returns", kInt, strconv.Itoa(s.MaxReturns), true, stepOrder)
-	} else {
+	} else if _, cur := find(m, "max_returns"); cur != nil && cur.Value != strconv.Itoa(def) {
 		dropKeys(m, "max_returns")
+	}
+	_, old := find(m, "results")
+	switch {
+	case old != nil && sameResults(results, nodeResults(old)):
+		return
+	case sameResults(results, adewire.DefaultResults()):
+		dropKeys(m, "results")
+		return
 	}
 	ids := make([]string, len(results))
 	for i, r := range results {
 		ids[i] = r.ID
 	}
-	_, old := find(m, "results")
 	put(m, "results", syncItems(old, ids, func(i int, item *yaml.Node) { applyResult(item, results[i]) }), stepOrder)
+}
+
+// nodeResults reads the results a file spells out, without validating them.
+func nodeResults(n *yaml.Node) []adewire.StepResult {
+	var out []adewire.StepResult
+	for _, item := range n.Content {
+		if item.Kind != yaml.MappingNode {
+			continue
+		}
+		r := adewire.StepResult{}
+		for i := 0; i+1 < len(item.Content); i += 2 {
+			val := item.Content[i+1].Value
+			switch item.Content[i].Value {
+			case "id":
+				r.ID = strings.TrimSpace(val)
+			case "ok":
+				r.OK = val == "true"
+			case "description":
+				r.Description = strings.TrimSpace(val)
+			case "next":
+				r.Next = strings.TrimSpace(val)
+			}
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// sameResults compares what a file spells out: id, ok, description and route.
+func sameResults(a, b []adewire.StepResult) bool {
+	return slices.EqualFunc(a, b, func(x, y adewire.StepResult) bool {
+		return x.ID == y.ID && x.OK == y.OK && x.Description == y.Description && defaultStr(x.Next, adewire.DefaultRoute(x.OK)) == defaultStr(y.Next, adewire.DefaultRoute(y.OK))
+	})
 }
 
 func applyResult(m *yaml.Node, r adewire.StepResult) {
@@ -653,7 +680,6 @@ func applyResult(m *yaml.Node, r adewire.StepResult) {
 	} else {
 		dropKeys(m, "next")
 	}
-	dropKeys(m, "max")
 }
 
 // dropKeys removes keys a step of this shape does not allow.
@@ -721,7 +747,7 @@ func defaultStr(v, def string) string {
 	return v
 }
 
-// dropOthers removes keys a stage of this kind does not allow (a kind change leaves them behind).
+// dropOthers removes keys not in keep.
 func dropOthers(m *yaml.Node, keep map[string]bool) {
 	for i := 0; i+1 < len(m.Content); {
 		if keep[m.Content[i].Value] {

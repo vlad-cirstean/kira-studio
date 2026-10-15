@@ -43,10 +43,11 @@ func TestStepState(t *testing.T) {
 
 func TestNextAction(t *testing.T) {
 	one := []string{"a"}
-	auto := stepDef{ID: "s", Before: "auto", OnFailure: "stop"}
-	gated := stepDef{ID: "g", Before: "approval", OnFailure: "stop"}
-	retry2 := stepDef{ID: "r", Before: "auto", OnFailure: "retry 2"}
-	back := stepDef{ID: "b", Before: "auto", OnFailure: "back:s"}
+	auto := stepDef{ID: "s", Before: "auto"}
+	gated := stepDef{ID: "g", Before: "approval"}
+	retry2 := stepDef{ID: "r", Before: "auto"}
+	failing := stepDef{ID: "b", Before: "auto"}
+	manual := stepDef{ID: "m", Kind: "manual"}
 	done := view(auto, one, run("a", "done", 1))
 
 	for name, tc := range map[string]struct {
@@ -60,12 +61,13 @@ func TestNextAction(t *testing.T) {
 		"running waits":                     {[]stepView{view(auto, one, run("a", "running", 1)), view(auto, one)}, action{Kind: actIdle, Step: 0}},
 		"stuck waits for a person":          {[]stepView{view(retry2, one, run("a", "stuck", 1))}, action{Kind: actIdle, Step: 0}},
 		"stop leaves failed":                {[]stepView{view(auto, one, run("a", "failed", 1))}, action{Kind: actIdle, Step: 0}},
-		"a capped back failure idles":       {[]stepView{done, view(back, one, run("a", "failed", 1))}, action{Kind: actIdle, Step: 1}},
-		"all done completes the stage":      {[]stepView{done, view(auto, one, run("a", "done", 2))}, action{Kind: actStageComplete, Step: 1}},
-		"no steps (user stage) stays idle":  {nil, action{Kind: actIdle}},
+		"a failed step idles":               {[]stepView{done, view(failing, one, run("a", "failed", 1))}, action{Kind: actIdle, Step: 1}},
+		"all done completes the workflow":   {[]stepView{done, view(auto, one, run("a", "done", 2))}, action{Kind: actComplete, Step: 1}},
+		"a manual step waits for the user":  {[]stepView{done, view(manual, nil)}, action{Kind: actWaitUser, Step: 1}},
+		"no steps completes":                {nil, action{Kind: actComplete}},
 		"done step before a stuck one idle": {[]stepView{done, view(auto, one, run("a", "stuck", 1)), view(auto, one)}, action{Kind: actIdle, Step: 1}},
 	} {
-		if got := nextAction(tc.steps); !reflect.DeepEqual(got, tc.want) {
+		if got := nextAction(tc.steps, 0); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s: action = %+v, want %+v", name, got, tc.want)
 		}
 	}
@@ -102,10 +104,10 @@ func loopRun(branch, state string, attempt, loops int) model.AdeRun {
 
 func TestChainRerun(t *testing.T) {
 	one := []string{"a"}
-	impl := stepDef{ID: "impl", Before: "auto", OnFailure: "stop"}
-	tests := stepDef{ID: "tests", Before: "auto", OnFailure: "back:impl"}
-	ci := stepDef{ID: "ci", Before: "auto", OnFailure: "back:impl"}
-	gated := stepDef{ID: "gate", Before: "approval", OnFailure: "stop"}
+	impl := stepDef{ID: "impl", Before: "auto"}
+	tests := stepDef{ID: "tests", Before: "auto"}
+	ci := stepDef{ID: "ci", Before: "auto"}
+	gated := stepDef{ID: "gate", Before: "approval"}
 
 	for name, tc := range map[string]struct {
 		steps []stepView
@@ -141,7 +143,7 @@ func TestChainRerun(t *testing.T) {
 				view(tests, []string{"a", "b"}, loopRun("a", "back", 1, 0), loopRun("b", "done", 1, 0))},
 			[]rerun{{Step: 1, Branch: "a", Attempt: 2, Loops: 1}}},
 	} {
-		if got := chainRerun(tc.steps); !reflect.DeepEqual(got, tc.want) {
+		if got := chainRerun(tc.steps, 0); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s: reruns = %+v, want %+v", name, got, tc.want)
 		}
 	}
@@ -165,14 +167,14 @@ func TestWalkPath(t *testing.T) {
 			[]stepView{view(def("x"), one, routed("a", 1, ""), routed("b", 1, "")), view(def("y"), one)}, []int{0, 1}, []bool{false, false}},
 		"a forward route skips steps": {
 			[]stepView{view(def("x"), one, routed("a", 1, "z"), routed("b", 1, "z")), view(def("y"), one), view(def("z"), one)}, []int{0, 2}, []bool{false, true, false}},
-		"end completes the stage": {
+		"end completes the workflow": {
 			[]stepView{view(def("x"), one, routed("a", 1, "end"), routed("b", 1, "end")), view(def("y"), one)}, []int{0}, []bool{false, true}},
 		"the earliest forward target across branches wins": {
 			[]stepView{view(def("x"), one, routed("a", 1, "z"), routed("b", 1, "next")), view(def("y"), one), view(def("z"), one)}, []int{0, 1}, []bool{false, false, false}},
 		"the path ends at the first step not done": {
 			[]stepView{view(def("x"), one, routed("a", 1, "next"), routed("b", 1, "next")), view(def("y"), one, run("a", "running", 1)), view(def("z"), one)}, []int{0, 1}, []bool{false, false, false}},
 	} {
-		path, skipped := walkPath(tc.steps)
+		path, skipped := walkPath(tc.steps, 0)
 		if !reflect.DeepEqual(path, tc.path) || !reflect.DeepEqual(skipped, tc.skipped) {
 			t.Errorf("%s: path %v skipped %v, want %v %v", name, path, skipped, tc.path, tc.skipped)
 		}
@@ -183,12 +185,12 @@ func TestNextAction_route(t *testing.T) {
 	one := []string{"a"}
 	def := func(id string) stepDef { return stepDef{ID: id, Before: "auto"} }
 	skipTo := []stepView{view(def("x"), one, routed("a", 1, "z")), view(def("y"), one), view(def("z"), one)}
-	if got := nextAction(skipTo); got != (action{Kind: actStart, Step: 2}) {
+	if got := nextAction(skipTo, 0); got != (action{Kind: actStart, Step: 2}) {
 		t.Errorf("a skipped step started: %+v", got)
 	}
 	end := []stepView{view(def("x"), one, routed("a", 1, "end")), view(def("y"), one)}
-	if got := nextAction(end); got.Kind != actStageComplete {
-		t.Errorf("end did not complete the stage: %+v", got)
+	if got := nextAction(end, 0); got.Kind != actComplete {
+		t.Errorf("end did not complete the workflow: %+v", got)
 	}
 }
 
@@ -202,7 +204,20 @@ func TestChainRerun_route(t *testing.T) {
 		view(def("review"), one, loopRun("a", "back", 1, 0)),
 	}
 	want := []rerun{{Step: 2, Branch: "a", Attempt: 2, Loops: 1}}
-	if got := chainRerun(steps); !reflect.DeepEqual(got, want) {
+	if got := chainRerun(steps, 0); !reflect.DeepEqual(got, want) {
 		t.Errorf("reruns = %+v, want %+v", got, want)
+	}
+}
+
+func TestWalkPath_entry(t *testing.T) {
+	one := []string{"a"}
+	def := func(id string) stepDef { return stepDef{ID: id, Before: "auto"} }
+	steps := []stepView{view(def("x"), one, routed("a", 1, "")), view(def("y"), one), view(def("z"), one)}
+	path, _ := walkPath(steps, 1)
+	if !reflect.DeepEqual(path, []int{1}) {
+		t.Errorf("path from entry 1 = %v, want [1]", path)
+	}
+	if got := currentStep(steps, 1); got != 1 {
+		t.Errorf("currentStep = %d, want 1", got)
 	}
 }

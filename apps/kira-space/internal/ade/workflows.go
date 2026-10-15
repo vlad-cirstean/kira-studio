@@ -88,8 +88,8 @@ func (b *TaskBoard) ValidateWorkflowYaml(_ context.Context, src string) adewire.
 	return adeflow.ValidateYaml(src)
 }
 
-// SaveWorkflow rewrites a file from the structured workflow. Running tasks keep the stage snapshot
-// they started with; an edit applies from the next stage or step on.
+// SaveWorkflow rewrites a file from the structured workflow. Running tasks keep the snapshot
+// they started with; an edit applies to new work only.
 func (b *TaskBoard) SaveWorkflow(_ context.Context, args adewire.SaveWorkflowArgs) (adewire.WorkflowEntry, error) {
 	e, err := b.deps.Workflows.Save(args.FileName, args.BaseHash, args.Workflow)
 	if err != nil {

@@ -45,12 +45,12 @@ func TestClaudeSettingsUntouched(t *testing.T) {
 
 	t.Run("ade_session_start", func(t *testing.T) {
 		rec := importRepo(t, app, repo.Dir)
-		saveWorkflow(t, app, "flow", "id: flow\nname: Flow\nstages:\n  - id: work\n    name: Work\n    kind: user\n    status: In progress\n    session: true\n")
+		saveWorkflow(t, app, "flow", "id: flow\nname: Flow\nsteps:\n  - id: work\n    name: Work\n    kind: manual\n    status: In progress\n    session: true\n")
 		task, err := app.W.AdeTask.CreateTask(ctx, adewire.CreateTaskArgs{Title: "Fix login", CodeRepoIDs: []string{rec.ID}, WorkflowID: "flow"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		launch, err := app.W.AdeTask.LaunchStage(ctx, adewire.LaunchStageArgs{TaskID: task.ID})
+		launch, err := app.W.AdeTask.LaunchStep(ctx, adewire.LaunchStepArgs{TaskID: task.ID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +120,7 @@ func TestClaudeSettingsUntouched(t *testing.T) {
 		}}); err != nil {
 			t.Fatal(err)
 		}
-		saveWorkflow(t, app, "smartflow", "id: smartflow\nname: Flow\nstages:\n  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n      - id: s1\n        name: s1\n        runs_on: each repo\n        timeout: 2m\n        smart_script: lint\n")
+		saveWorkflow(t, app, "smartflow", "id: smartflow\nname: Flow\nsteps:\n  - id: s1\n    name: s1\n    kind: agent\n    runs_on: each repo\n    timeout: 2m\n    smart_script: lint\n")
 		task, err := app.W.AdeTask.CreateTask(ctx, adewire.CreateTaskArgs{Title: "Lint it", CodeRepoIDs: []string{rec.ID}, WorkflowID: "smartflow"})
 		if err != nil {
 			t.Fatal(err)

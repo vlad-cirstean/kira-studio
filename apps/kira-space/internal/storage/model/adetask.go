@@ -25,27 +25,28 @@ const (
 	AdeSetupFailed  = "failed"
 )
 
-// AdeTask is one row of ade_tasks. CurrentStageJSON is the stage snapshot taken on stage entry;
-// "" stores NULL. WorkflowJSON is the whole workflow the task began with ("" = not started, follows
+// AdeTask is one row of ade_tasks. EntryStepID is the step the task last entered ("done" when finished,
+// "" without a workflow). SinceJSON is the pass watermark, {"<stepId>/<branchId>": attempt}; "" stores
+// NULL. WorkflowJSON is the whole workflow the task began with ("" = not started, follows
 // the live file) and WorkflowHash its content hash.
 type AdeTask struct {
-	ID               string
-	Kind             string
-	Title            string
-	Owner            string
-	JiraKey          string
-	JiraURL          string
-	GithubURL        string
-	WorkflowID       string
-	StageID          string
-	CurrentStageJSON string
-	WorkflowJSON     string
-	WorkflowHash     string
-	Est              string
-	Notes            string
-	Color            int
-	CreatedAt        int64
-	ArchivedAt       *int64
+	ID           string
+	Kind         string
+	Title        string
+	Owner        string
+	JiraKey      string
+	JiraURL      string
+	GithubURL    string
+	WorkflowID   string
+	EntryStepID  string
+	SinceJSON    string
+	WorkflowJSON string
+	WorkflowHash string
+	Est          string
+	Notes        string
+	Color        int
+	CreatedAt    int64
+	ArchivedAt   *int64
 }
 
 // Validate asserts what no SQL constraint covers.
@@ -119,7 +120,6 @@ type AdeTaskPlanRow struct {
 type AdeRun struct {
 	ID         string
 	TaskID     string
-	StageID    string
 	StepID     string
 	BranchID   string
 	Attempt    int

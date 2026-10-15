@@ -12,11 +12,12 @@ import (
 // steps.go is the pure half of the step machine: which branches a step runs on, a step's aggregate
 // state and the next action. It mirrors frontend ade/v2/board/progress.ts, which fixes the rules.
 
-// stepDef is one step of the current stage. A script stage is one step whose id is the stage id and
-// whose Prompt is the command.
+// stepDef is one step of the workflow. A script step's Prompt is its command; a manual step's is its
+// session's first message.
 type stepDef struct {
-	ID, Name, RunsOn, Before, OnFailure, Timeout, Prompt string
-	// Results are the step's declared (or implicit) results with their routes.
+	ID, Name, Kind, RunsOn, Before, Timeout, Prompt string
+	Skip, Session                                   bool
+	// Results are the step's declared (or default) results with their routes.
 	Results []adewire.StepResult
 	// ReturnLimit is how many returns the step may make before the run stops; 0 is no limit.
 	ReturnLimit  int
@@ -32,34 +33,42 @@ type stepDef struct {
 	Sandbox adewire.StepSandbox
 }
 
-// stageSteps lists a stage's steps; a user stage has none.
-func stageSteps(st adewire.Stage) []stepDef {
-	switch st.Kind {
-	case "script":
-		runsOn := st.RunsOn
-		if runsOn == "" {
-			runsOn = "once"
+// manual says the step is the user's own work: no runs, no branch targets.
+func (d stepDef) manual() bool { return d.Kind == adewire.KindManual }
+
+// workflowSteps lists a workflow's steps in order.
+func workflowSteps(wf adewire.Workflow) []stepDef {
+	out := make([]stepDef, len(wf.Steps))
+	for i, s := range wf.Steps {
+		results := s.Results
+		if len(results) == 0 && s.Kind != adewire.KindManual {
+			results = adewire.DefaultResults()
 		}
-		onFailure := st.OnFailure
-		if onFailure == "" {
-			onFailure = "stop"
+		prompt := s.Prompt
+		if s.Kind == adewire.KindScript {
+			prompt = s.Command
 		}
-		return []stepDef{{ID: st.ID, Name: st.Name, RunsOn: runsOn, Before: "auto", OnFailure: onFailure,
-			Results: adewire.ImplicitResults(st.ID, onFailure), ReturnLimit: adewire.LegacyLimit(onFailure, false), Timeout: st.Timeout, Prompt: st.Command, Sandbox: adewire.DefaultSandbox()}}
-	case "agent":
-		out := make([]stepDef, len(st.Steps))
-		for i, s := range st.Steps {
-			results := s.Results
-			if len(results) == 0 { // a snapshot from before results: its on_failure rule
-				results = adewire.ImplicitResults(s.ID, cmpNonEmpty(s.OnFailure, "stop"))
-			}
-			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure, Results: results, ReturnLimit: s.MaxReturns,
-				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools,
-				SmartScript: s.SmartScript, Params: s.Params, Review: s.Review, Sandbox: s.Sandbox.Normalized()}
+		out[i] = stepDef{ID: s.ID, Name: s.Name, Kind: s.Kind, RunsOn: s.RunsOn, Before: s.Before, Timeout: s.Timeout, Prompt: prompt,
+			Skip: s.Skip, Session: s.Session, Results: results, ReturnLimit: s.MaxReturns, AllowedTools: s.AllowedTools,
+			SmartScript: s.SmartScript, Params: s.Params, Review: s.Review, Sandbox: s.Sandbox.Normalized()}
+		if s.Kind == adewire.KindScript || s.Kind == adewire.KindManual {
+			out[i].Sandbox = adewire.DefaultSandbox()
 		}
-		return out
 	}
-	return nil
+	return out
+}
+
+// firstStep is the index of the first step a task enters: the first one not skipped.
+func firstStep(wf adewire.Workflow) (int, bool) { return nextStep(wf, -1) }
+
+// nextStep is the index of the first non-skipped step after index from.
+func nextStep(wf adewire.Workflow, from int) (int, bool) {
+	for i := from + 1; i < len(wf.Steps); i++ {
+		if !wf.Steps[i].Skip {
+			return i, true
+		}
+	}
+	return -1, false
 }
 
 // mineBranch is a task's mine branch with its repo's display name (nickname, else name).
@@ -93,11 +102,13 @@ func stepTargets(runsOn string, mine []mineBranch) ([]string, error) {
 	return out, nil
 }
 
-// stepView is a step with its targets and the latest run per target branch.
+// stepView is a step with its targets and the latest run per target branch in the task's current pass.
 type stepView struct {
 	Def     stepDef
 	Targets []string
-	Runs    map[string]model.AdeRun
+	// TargetErr is why the step has no branches to run on; it only matters when the step starts.
+	TargetErr error
+	Runs      map[string]model.AdeRun
 }
 
 // state is the worst-of aggregate: stuck > failed > running/back > pending; done when all targets are done.
@@ -139,7 +150,8 @@ const (
 	actIdle actionKind = iota
 	actStart
 	actAwaitApproval
-	actStageComplete
+	actWaitUser // the path ends at a manual step
+	actComplete // the path ends past the last step
 )
 
 // action is nextAction's answer. Step is the index of the step it concerns.
@@ -158,7 +170,7 @@ func (d stepDef) resultOf(id string) (adewire.StepResult, bool) {
 }
 
 // routeIndex resolves a run's stored forward route to the index of the step after steps[i]; len(steps)
-// = the stage is complete. A run with no stored route (before results) counts as `next`.
+// = the workflow is complete. A run with no stored route (before results) counts as `next`.
 func routeIndex(steps []stepView, i int, route string) int {
 	switch route {
 	case "", adewire.RouteNext:
@@ -194,14 +206,20 @@ func forwardTarget(steps []stepView, i int, branches []string) int {
 	return next
 }
 
-// walkPath follows the stage's routes from the first step: a done step moves to its forward target,
-// the first step not done ends the path. skipped marks the steps the route went past.
-func walkPath(steps []stepView) (path []int, skipped []bool) {
+// walkPath follows the workflow's routes from the entry step: a skipped step is passed over, a done
+// step moves to its forward target, the first step not done (a manual step never is) ends the path.
+// skipped marks the steps the route went past.
+func walkPath(steps []stepView, entry int) (path []int, skipped []bool) {
 	skipped = make([]bool, len(steps))
-	i := 0
+	i := max(entry, 0)
 	for i < len(steps) {
+		if steps[i].Def.Skip {
+			skipped[i] = true
+			i++
+			continue
+		}
 		path = append(path, i)
-		if steps[i].state() != model.AdeRunDone {
+		if steps[i].Def.manual() || steps[i].state() != model.AdeRunDone {
 			break
 		}
 		next := forwardTarget(steps, i, steps[i].Targets)
@@ -211,6 +229,20 @@ func walkPath(steps []stepView) (path []int, skipped []bool) {
 		i = next
 	}
 	return path, skipped
+}
+
+// currentStep is the step the task is at: the end of the route path from the entry. -1 when the path
+// runs past the last step.
+func currentStep(steps []stepView, entry int) int {
+	path, _ := walkPath(steps, entry)
+	if len(path) == 0 {
+		return -1
+	}
+	i := path[len(path)-1]
+	if !steps[i].Def.manual() && steps[i].state() == model.AdeRunDone {
+		return -1
+	}
+	return i
 }
 
 // rerun is one step run chainRerun queues again on a branch.
@@ -225,7 +257,7 @@ type rerun struct {
 // (R4). Walking the branch's route path, round is the highest loops among the done runs so far; a
 // done or `back` run with fewer loops than the round is stale and is queued again with loops =
 // round. A missing, running, pending, stuck or failed run ends the walk.
-func chainRerun(steps []stepView) []rerun {
+func chainRerun(steps []stepView, entry int) []rerun {
 	var branches []string
 	seen := map[string]bool{}
 	for _, s := range steps {
@@ -240,9 +272,9 @@ func chainRerun(steps []stepView) []rerun {
 walk:
 	for _, bid := range branches {
 		round := 0
-		for i := 0; i < len(steps); {
+		for i := max(entry, 0); i < len(steps); {
 			s := steps[i]
-			if !slices.Contains(s.Targets, bid) {
+			if s.Def.Skip || !slices.Contains(s.Targets, bid) {
 				i++
 				continue
 			}
@@ -271,24 +303,27 @@ walk:
 	return out
 }
 
-// nextAction looks at the last step of the route path: the first one not done. A running, stuck or
-// failed step waits (a failure was routed when it was recorded: looped, continued or stopped). A
-// pending step with runs waits on its worktree gate; without runs it starts (auto) or waits for
-// Approve, except the first, which only StartRun starts. A path that ends past the last step = the
-// stage is complete; the user moves on with StageDone.
-func nextAction(steps []stepView) action {
-	if len(steps) == 0 {
-		return action{Kind: actIdle}
+// nextAction looks at the end of the route path from the entry step: the first step not done. A
+// manual step waits for the user. A running, stuck or failed step waits (a failure was routed when it
+// was recorded: looped, continued or stopped). A pending step with runs waits on its worktree gate;
+// without runs it starts (auto) or waits for Approve, except the first of the path, which only
+// StartRun starts. A path that runs past the last step = the workflow is complete.
+func nextAction(steps []stepView, entry int) action {
+	path, _ := walkPath(steps, entry)
+	if len(path) == 0 {
+		return action{Kind: actComplete, Step: len(steps)}
 	}
-	path, _ := walkPath(steps)
 	i := path[len(path)-1]
 	s := steps[i]
+	if s.Def.manual() {
+		return action{Kind: actWaitUser, Step: i}
+	}
 	switch s.state() {
 	case model.AdeRunDone:
-		return action{Kind: actStageComplete, Step: i}
+		return action{Kind: actComplete, Step: i}
 	case model.AdeRunPending:
 		switch {
-		case s.started() || i == 0:
+		case s.started() || i == path[0]:
 			return action{Kind: actIdle, Step: i}
 		case s.Def.Before == "approval":
 			return action{Kind: actAwaitApproval, Step: i}

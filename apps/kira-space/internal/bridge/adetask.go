@@ -130,12 +130,12 @@ func adeTaskError(err error) error {
 
 var adeWorkflowIDRe = regexp.MustCompile(`^[a-z0-9_-]{1,64}$`)
 
-// validateAdeFromStage checks the optional stale-guard stage id.
-func validateAdeFromStage(id string) error {
+// validateAdeFromStep checks the optional stale-guard step id.
+func validateAdeFromStep(id string) error {
 	if id == "" {
 		return nil
 	}
-	return validateAdeItemID(id, "fromStageId")
+	return validateAdeItemID(id, "fromStepId")
 }
 
 func adeTaskInvalid(msg string) error { return ipcerr.Contract("%s", msg) }
@@ -699,7 +699,7 @@ func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs
 	if len(args.Message) > adeMaxMessageBytes {
 		return adewire.StartRunResult{}, adeMessageTooLong()
 	}
-	if err := validateAdeFromStage(args.FromStageID); err != nil {
+	if err := validateAdeFromStep(args.FromStepID); err != nil {
 		return adewire.StartRunResult{}, err
 	}
 	r, err := s.Engine.StartRun(ctx, args)
@@ -719,9 +719,6 @@ func (s *AdeTaskService) SetTaskWorkflow(ctx context.Context, args adewire.SetTa
 
 func (s *AdeTaskService) Approve(ctx context.Context, args adewire.StepArgs) error {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
-		return err
-	}
-	if err := validateAdeItemID(args.StageID, "stageId"); err != nil {
 		return err
 	}
 	if err := validateAdeItemID(args.StepID, "stepId"); err != nil {
@@ -783,25 +780,25 @@ func (s *AdeTaskService) FinishReview(ctx context.Context, args adewire.FinishRe
 	return adeTaskError(s.Engine.FinishReview(ctx, args))
 }
 
-func (s *AdeTaskService) StageDone(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
+func (s *AdeTaskService) StepDone(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
-	t, err := s.Engine.StageDone(ctx, args.TaskID)
+	t, err := s.Engine.StepDone(ctx, args.TaskID)
 	return t, adeTaskError(err)
 }
 
-func (s *AdeTaskService) SetTaskStage(ctx context.Context, args adewire.SetTaskStageArgs) (adewire.Task, error) {
+func (s *AdeTaskService) SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
-	if err := validateAdeItemID(args.StageID, "stageId"); err != nil {
+	if err := validateAdeItemID(args.StepID, "stepId"); err != nil {
 		return adewire.Task{}, err
 	}
-	if err := validateAdeFromStage(args.FromStageID); err != nil {
+	if err := validateAdeFromStep(args.FromStepID); err != nil {
 		return adewire.Task{}, err
 	}
-	t, err := s.Engine.SetTaskStage(ctx, args.TaskID, args.StageID, args.FromStageID)
+	t, err := s.Engine.SetTaskStep(ctx, args.TaskID, args.StepID, args.FromStepID)
 	return t, adeTaskError(err)
 }
 
@@ -855,17 +852,17 @@ func (s *AdeTaskService) TakeOver(ctx context.Context, args adewire.TakeOverArgs
 	return l, adeTaskError(err)
 }
 
-func (s *AdeTaskService) LaunchStage(ctx context.Context, args adewire.LaunchStageArgs) (adewire.Launch, error) {
+func (s *AdeTaskService) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (adewire.Launch, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Launch{}, err
 	}
 	if len(args.Message) > adeMaxMessageBytes {
 		return adewire.Launch{}, adeMessageTooLong()
 	}
-	if err := validateAdeFromStage(args.FromStageID); err != nil {
+	if err := validateAdeFromStep(args.FromStepID); err != nil {
 		return adewire.Launch{}, err
 	}
-	l, err := s.Engine.LaunchStage(ctx, args)
+	l, err := s.Engine.LaunchStep(ctx, args)
 	return l, adeTaskError(err)
 }
 

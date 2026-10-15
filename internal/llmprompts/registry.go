@@ -145,15 +145,15 @@ type StepVars struct {
 	Finish     FinishVars `json:"finish"`
 }
 
-// StageVars fills the stage message. StagePrompt arrives substituted; Notes arrive capped.
-type StageVars struct {
-	StageName   string         `json:"stageName"`
-	Title       string         `json:"title"`
-	JiraKey     string         `json:"jiraKey"`
-	JiraURL     string         `json:"jiraURL"`
-	Notes       string         `json:"notes"`
-	Repos       []RepoLineVars `json:"repos"`
-	StagePrompt string         `json:"stagePrompt"`
+// ManualVars fills the manual step message. StepPrompt arrives substituted; Notes arrive capped.
+type ManualVars struct {
+	StepName   string         `json:"stepName"`
+	Title      string         `json:"title"`
+	JiraKey    string         `json:"jiraKey"`
+	JiraURL    string         `json:"jiraURL"`
+	Notes      string         `json:"notes"`
+	Repos      []RepoLineVars `json:"repos"`
+	StepPrompt string         `json:"stepPrompt"`
 }
 
 // ReviewVars fills the review message. Notes arrive capped.
@@ -165,7 +165,7 @@ type ReviewVars struct {
 	Repos   []RepoLineVars `json:"repos"`
 }
 
-// StartVars fills the Start message; StepName is empty when the stage has no open step.
+// StartVars fills the Start message; StepName is empty when the workflow has no open step.
 type StartVars struct {
 	Title        string   `json:"title"`
 	JiraKey      string   `json:"jiraKey"`
@@ -771,7 +771,7 @@ var HeadlessReviewReplyAck = define(Entry{
 // HeadlessToolTaskInfo describes the task_info tool.
 var HeadlessToolTaskInfo = define(Entry{
 	ID: "headless.tool.task_info", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "task_info",
-	Default: `Your Kira Space task: title, Jira key, workflow, stage, its repos and branches, and repos registered in Kira Space.`,
+	Default: `Your Kira Space task: title, Jira key, workflow, step, its repos and branches, and repos registered in Kira Space.`,
 }, NoVars{})
 
 // HeadlessToolDeclareRepos describes the declare_repos tool.
@@ -895,20 +895,20 @@ Step {{.StepNumber}}/{{.StepCount}}: {{.StepName}}{{if .StepPrompt}}
 	Context: []string{}, Finish: FinishVars{Implicit: true, Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}},
 })
 
-// AdeStageMessage is the first message of a user stage session.
-var AdeStageMessage = define(Entry{
-	ID: "ade.stage.message", Kind: KindMessage, Apps: spaceApp, Applies: NextCall,
-	TitleKey:   "llmPrompts.entry.adeStageMessage.title",
-	PurposeKey: "llmPrompts.entry.adeStageMessage.description",
-	UsedByKey:  "llmPrompts.entry.adeStageMessage.usedBy.body",
-	Default: `{{.StageName}}: {{.Title}}{{if .JiraKey}}
+// AdeManualMessage is the first message of a manual step session.
+var AdeManualMessage = define(Entry{
+	ID: "ade.manual.message", Kind: KindMessage, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeManualMessage.title",
+	PurposeKey: "llmPrompts.entry.adeManualMessage.description",
+	UsedByKey:  "llmPrompts.entry.adeManualMessage.usedBy.body",
+	Default: `{{.StepName}}: {{.Title}}{{if .JiraKey}}
 {{template "ade.jiraLine" .}}{{end}}{{range .Repos}}
 {{template "ade.repoLine" .}}{{end}}{{if .Notes}}
-- Notes: {{.Notes}}{{end}}{{if .StagePrompt}}
-{{.StagePrompt}}{{end}}`,
-}, StageVars{
-	StageName: "Review", Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
-	Notes: "Check the error states.", StagePrompt: "Check kira-space on feat/login.",
+- Notes: {{.Notes}}{{end}}{{if .StepPrompt}}
+{{.StepPrompt}}{{end}}`,
+}, ManualVars{
+	StepName: "Review", Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
+	Notes: "Check the error states.", StepPrompt: "Check kira-space on feat/login.",
 	Repos: []RepoLineVars{
 		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},

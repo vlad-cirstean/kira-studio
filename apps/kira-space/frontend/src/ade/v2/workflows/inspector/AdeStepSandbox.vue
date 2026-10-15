@@ -20,9 +20,9 @@ import {
   parsePaths,
   pathsValid,
   TOOLCHAINS,
-} from '../board/stepSandbox';
-import { useWorkflows } from '../queries';
-import type { SandboxAccess, StepSandbox } from '../wire';
+} from '../../board/stepSandbox';
+import { useWorkflows } from '../../queries';
+import type { SandboxAccess, StepSandbox } from '../../wire';
 
 // A step's agent sandbox: access level, extra folders, network.
 const props = defineProps<{ sandbox: StepSandbox; stepId: string }>();

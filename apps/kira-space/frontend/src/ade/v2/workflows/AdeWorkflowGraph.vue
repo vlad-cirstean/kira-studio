@@ -10,6 +10,12 @@ import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
 import { Input } from '@theme/components/ui/input';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
@@ -19,13 +25,13 @@ import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
 import AdeTip from '../AdeTip.vue';
-import { PLACEHOLDER_TOKENS } from '../board/workflowForm';
+import { kindLabel, PLACEHOLDER_TOKENS, STEP_KINDS } from '../board/workflowForm';
 import {
+  canMove,
   type EdgeData,
   type GraphEdge,
   type GraphNode,
   layoutWorkflow,
-  type StageNodeData,
   type StepNodeData,
 } from '../board/workflowGraph';
 import { useSaveWorkflow } from '../queries';
@@ -34,14 +40,12 @@ import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { Workflow, WorkflowEntry } from '../wire';
 import AdeEndNode from './AdeEndNode.vue';
 import AdeResultEdge from './AdeResultEdge.vue';
-import AdeStageGroupNode from './AdeStageGroupNode.vue';
-import AdeStageInspector from './AdeStageInspector.vue';
 import AdeStepInspector from './AdeStepInspector.vue';
 import AdeStepNode from './AdeStepNode.vue';
 import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
 import { useStepRemoval } from './useStepRemoval';
 
-// Graph mode: edits a local draft of the last valid workflow as a canvas of stages and steps, one
+// Graph mode: edits a local draft of the last valid workflow as a canvas of steps, one
 // connector per step result; Save writes it whole, Discard drops the edits. Layout is automatic and
 // locked: top to bottom, one node size, native vertical scroll, no zoom or pan.
 const props = defineProps<{ entry: WorkflowEntry }>();
@@ -97,31 +101,21 @@ const layout = computed(() =>
 );
 const edgeSel = ref('');
 
-function nodeData(
-  n: GraphNode,
-  wf: Workflow,
-): StepNodeData | StageNodeData | { w: number; h: number } {
-  const stage = wf.stages.find((s) => s.id === n.stageId);
-  const sel = draft.selection;
+function nodeData(n: GraphNode, wf: Workflow): StepNodeData | { w: number; h: number } {
   const base = { w: n.w, h: n.h };
-  if (!stage || n.kind === 'end') return base;
-  if (n.kind === 'step') {
-    const step = stage.steps.find((s) => s.id === n.stepId);
-    return {
-      ...base,
-      step,
-      stageId: stage.id,
-      start: stage.steps[0]?.id === n.stepId,
-      selected: sel?.kind === 'step' && sel.stepId === n.stepId && sel.stageId === n.stageId,
-    } as StepNodeData;
-  }
+  const index = wf.steps.findIndex((s) => s.id === n.stepId);
+  const step = wf.steps[index];
+  if (n.kind === 'end' || !step) return base;
   return {
     ...base,
-    stage,
-    index: wf.stages.indexOf(stage),
-    count: wf.stages.length,
-    selected: sel?.kind === 'stage' && sel.stageId === stage.id,
-    spineX: n.spineX,
+    step,
+    index,
+    start: index === 0,
+    selected: draft.selection?.stepId === step.id,
+    canUp: canMove(wf, step.id, -1),
+    canDown: canMove(wf, step.id, 1),
+    canRemove: wf.steps.length > 1,
+    canSkip: draft.canSkip,
   };
 }
 
@@ -130,16 +124,15 @@ const flowNodes = computed<Node[]>(() => {
   if (!wf) return [];
   return layout.value.nodes.map((n) => ({
     id: n.id,
-    type: n.kind === 'stage' ? 'stage' : n.kind,
+    type: n.kind,
     position: { x: n.x, y: n.y },
-    parentNode: n.parent,
     draggable: false,
     data: nodeData(n, wf),
   }));
 });
 const flowEdges = computed<Edge[]>(() =>
   layout.value.edges.map((e) => {
-    const stage = e.results.length === 0;
+    const fixed = e.results.length === 0;
     const data: EdgeData = {
       tone: e.tone,
       loop: e.loop,
@@ -149,14 +142,14 @@ const flowEdges = computed<Edge[]>(() =>
       points: e.points,
       lane: e.lane,
       laneX: e.laneX,
-      stage,
+      fixed,
     };
     return {
       id: e.id,
       type: 'result',
       source: e.source,
       target: e.target,
-      sourceHandle: stage ? 'out' : e.sourceHandle,
+      sourceHandle: fixed ? 'out' : e.sourceHandle,
       targetHandle: e.loop ? 'loop-in' : 'in',
       selectable: false,
       ariaLabel: t('space.ade.workflows.graph.edge.aria', { source: e.source, target: e.target }),
@@ -170,13 +163,7 @@ const byId = (id: string): GraphNode | undefined => layout.value.nodes.find((n) 
 function validConnection(c: Connection): boolean {
   const s = byId(c.source);
   const t = byId(c.target);
-  return (
-    !!s &&
-    !!t &&
-    s.kind === 'step' &&
-    (t.kind === 'step' || t.kind === 'end') &&
-    s.stageId === t.stageId
-  );
+  return !!s && !!t && s.kind === 'step' && (t.kind === 'step' || t.kind === 'end');
 }
 function onConnect(c: Connection): void {
   if (!validConnection(c)) return;
@@ -184,22 +171,18 @@ function onConnect(c: Connection): void {
   const t = byId(c.target) as GraphNode;
   const resultId = (c.sourceHandle ?? '').replace(/^r:/, '');
   if (s.stepId && resultId)
-    draft.route(s.stageId, s.stepId, resultId, t.kind === 'end' ? 'end' : (t.stepId ?? 'end'));
+    draft.route(s.stepId, resultId, t.kind === 'end' ? 'end' : (t.stepId ?? 'end'));
 }
 function onNodeClick({ node }: { node: Node }): void {
   const n = byId(node.id);
   edgeSel.value = '';
-  if (!n) return;
-  if (n.kind === 'step' && n.stepId)
-    draft.select({ kind: 'step', stageId: n.stageId, stepId: n.stepId });
-  else if (n.kind === 'stage' || n.kind === 'leaf')
-    draft.select({ kind: 'stage', stageId: n.stageId });
+  if (n?.kind === 'step' && n.stepId) draft.select({ stepId: n.stepId });
 }
 function onEdgeClick({ edge }: { edge: Edge }): void {
   const e = layout.value.edges.find((x) => x.id === edge.id);
-  if (!e?.stepId) return;
+  if (!e?.stepId || e.results.length === 0) return;
   edgeSel.value = e.id;
-  draft.select({ kind: 'step', stageId: e.stageId, stepId: e.stepId });
+  draft.select({ stepId: e.stepId });
 }
 function onPaneClick(): void {
   edgeSel.value = '';
@@ -237,10 +220,10 @@ async function deleteSelection(): Promise<void> {
   const edge: GraphEdge | undefined = layout.value.edges.find((x) => x.id === edgeSel.value);
   const sel = draft.selection;
   if (edge?.stepId) {
-    draft.clear(edge.stageId, edge.stepId, edge.results);
+    draft.clear(edge.stepId, edge.results);
     edgeSel.value = '';
-  } else if (sel?.kind === 'step') {
-    await confirmRemoveStep(sel.stageId, sel.stepId);
+  } else if (sel && (draft.draft?.steps.length ?? 0) > 1) {
+    await confirmRemoveStep(sel.stepId);
   }
 }
 useShortcut(root, ['tree.delete'], () => fireAndForget(deleteSelection(), 'adeWorkflows'), {
@@ -345,22 +328,33 @@ onBeforeUnmount(() => {
               @pane-click="onPaneClick"
             >
               <template #node-step="p"><AdeStepNode :data="p.data" /></template>
-              <template #node-stage="p"><AdeStageGroupNode :data="p.data" /></template>
-              <template #node-leaf="p"><AdeStageGroupNode :data="p.data" /></template>
               <template #node-end="p"><AdeEndNode :data="p.data" /></template>
               <template #edge-result="p"><AdeResultEdge v-bind="p" /></template>
             </VueFlow>
           </div>
           <div class="flex justify-center pb-4">
-            <Button
-              variant="dialog"
-              size="kira-lg"
-              class="border-dashed bg-transparent"
-              data-testid="ade-wf-add-stage"
-              @click="draft.createStage()"
-            >
-              {{ t('space.ade.workflows.graph.addStage.label') }}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="dialog"
+                  size="kira-lg"
+                  class="border-dashed bg-transparent"
+                  data-testid="ade-wf-add-step"
+                >
+                  {{ t('space.ade.workflows.graph.addStep.label') }}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center">
+                <DropdownMenuItem
+                  v-for="k in STEP_KINDS"
+                  :key="k"
+                  :data-testid="`ade-wf-add-step-${k}`"
+                  @select="draft.createStep(k)"
+                >
+                  {{ kindLabel(k) }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -376,17 +370,10 @@ onBeforeUnmount(() => {
       <div class="min-w-0 flex-1">
         <div class="h-full overflow-auto p-3" data-testid="ade-wf-inspector">
           <AdeStepInspector
-            v-if="draft.step && draft.stage"
+            v-if="draft.step"
             :key="draft.step.id"
-            :stage-id="draft.stage.id"
             :step="draft.step"
-            :steps="draft.stage.steps"
-            :scopes="scopes"
-          />
-          <AdeStageInspector
-            v-else-if="draft.stage"
-            :key="draft.stage.id"
-            :stage="draft.stage"
+            :steps="draft.draft.steps"
             :scopes="scopes"
           />
           <FieldDescription v-else data-testid="ade-wf-inspector-empty">

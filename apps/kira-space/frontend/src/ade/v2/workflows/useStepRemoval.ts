@@ -4,21 +4,19 @@ import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 
 /** Removes a step after the user confirms; shared by the Delete shortcut and the step menu. */
 export function useStepRemoval(): {
-  confirmRemoveStep: (stageId: string, stepId: string) => Promise<void>;
+  confirmRemoveStep: (stepId: string) => Promise<void>;
 } {
   const draft = useAdeWorkflowDraftStore();
   const confirm = useConfirmDialogStore();
-  async function confirmRemoveStep(stageId: string, stepId: string): Promise<void> {
-    const name =
-      draft.draft?.stages.find((s) => s.id === stageId)?.steps.find((s) => s.id === stepId)?.name ??
-      '';
+  async function confirmRemoveStep(stepId: string): Promise<void> {
+    const name = draft.draft?.steps.find((s) => s.id === stepId)?.name ?? '';
     const ok = await confirm.confirm({
       title: t('space.ade.workflows.graph.removeStepConfirm.title'),
       message: t('space.ade.workflows.graph.removeStepConfirm.body', { name }),
       confirmLabel: t('common.action.remove.label'),
       tone: 'danger',
     });
-    if (ok) draft.deleteStep(stageId, stepId);
+    if (ok) draft.deleteStep(stepId);
   }
   return { confirmRemoveStep };
 }

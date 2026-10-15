@@ -34,9 +34,17 @@ export function useDialogCtx() {
       },
       taskTitle: (id) => m.cardFor(id)?.title ?? '',
       openStep: (id) => {
-        const p = m.cardFor(id)?.progress;
-        if (p?.stage?.kind !== 'agent') return '';
-        return p.steps.find((s) => s.state !== 'done')?.name ?? '';
+        const s = m.cardFor(id)?.progress.step;
+        return s && s.kind !== 'manual' && s.state !== 'done' ? s.name : '';
+      },
+      currentStep: (id) => {
+        const card = m.cardFor(id);
+        const cur = card?.progress.step;
+        if (!card || !cur) return null;
+        return {
+          name: cur.name,
+          prompt: card.workflow?.steps.find((x) => x.id === cur.id)?.prompt ?? '',
+        };
       },
     };
   });

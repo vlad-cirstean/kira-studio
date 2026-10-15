@@ -1,22 +1,22 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { cloneWorkflow, newStage, runnableCount } from '../board/workflowForm';
+import { cloneWorkflow, runnableSteps } from '../board/workflowForm';
 import {
   addResult,
   addStep,
   clearRoute,
-  moveStage,
+  moveStep,
   patchResult,
   removeResult,
   removeStep,
   setRoute,
   setStart,
 } from '../board/workflowGraph';
-import type { Stage, StepResult, Workflow } from '../wire';
+import type { StepKind, StepResult, Workflow, WorkflowStep } from '../wire';
 
-export type Selection =
-  | { kind: 'stage'; stageId: string }
-  | { kind: 'step'; stageId: string; stepId: string };
+export interface Selection {
+  stepId: string;
+}
 
 // The graph editor's draft: a local copy of the last valid workflow that every canvas and inspector
 // edit changes. Save writes it whole (with the file hash it was built on, so a change made elsewhere
@@ -31,16 +31,10 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
   const conflict = ref(false);
   const selection = ref<Selection | null>(null);
 
-  const stage = computed(
-    () => draft.value?.stages.find((s) => s.id === selection.value?.stageId) ?? null,
+  const step = computed(
+    () => draft.value?.steps.find((s) => s.id === selection.value?.stepId) ?? null,
   );
-  const step = computed(() => {
-    const sel = selection.value;
-    return sel?.kind === 'step'
-      ? (stage.value?.steps.find((s) => s.id === sel.stepId) ?? null)
-      : null;
-  });
-  const canSkip = computed(() => runnableCount(draft.value?.stages ?? []) > 1);
+  const canSkip = computed(() => runnableSteps(draft.value?.steps ?? []) > 1);
 
   function open(wf: Workflow | null, hash = ''): void {
     draft.value = wf ? cloneWorkflow(wf) : null;
@@ -69,12 +63,7 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     draft.value = next;
     dirty.value = true;
     const sel = selection.value;
-    if (sel && !next.stages.find((s) => s.id === sel.stageId)) selection.value = null;
-    else if (
-      sel?.kind === 'step' &&
-      !next.stages.find((s) => s.id === sel.stageId)?.steps.some((s) => s.id === sel.stepId)
-    )
-      selection.value = { kind: 'stage', stageId: sel.stageId };
+    if (sel && !next.steps.some((s) => s.id === sel.stepId)) selection.value = null;
   }
   /** After a save: clean only when nothing changed while it was in flight. */
   function saved(sent: string, hash: string): void {
@@ -91,88 +80,58 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
   function patchWorkflow(p: Partial<Pick<Workflow, 'name' | 'kiraSpaceMcp'>>): void {
     if (draft.value) edit({ ...draft.value, ...p });
   }
-  function patchStage(stageId: string, p: Partial<Stage>): void {
+  function patchStep(stepId: string, p: Partial<WorkflowStep>): void {
     const w = wf();
-    if (w) edit({ ...w, stages: w.stages.map((s) => (s.id === stageId ? { ...s, ...p } : s)) });
+    if (w) edit({ ...w, steps: w.steps.map((x) => (x.id === stepId ? { ...x, ...p } : x)) });
   }
-  function replaceStage(next: Stage): void {
+  /** The step replaced whole, e.g. after a kind change. */
+  function replaceStep(next: WorkflowStep): void {
     const w = wf();
-    if (w) edit({ ...w, stages: w.stages.map((s) => (s.id === next.id ? next : s)) });
+    if (w) edit({ ...w, steps: w.steps.map((x) => (x.id === next.id ? next : x)) });
   }
-  function patchStep(stageId: string, stepId: string, p: Partial<Stage['steps'][number]>): void {
+  /** A new step of `kind` at the end, or right after `afterId`; it becomes the selection. */
+  function createStep(kind: StepKind, afterId?: string): void {
     const w = wf();
     if (!w) return;
-    edit({
-      ...w,
-      stages: w.stages.map((s) =>
-        s.id === stageId
-          ? { ...s, steps: s.steps.map((x) => (x.id === stepId ? { ...x, ...p } : x)) }
-          : s,
-      ),
-    });
-  }
-  /** A new stage at the end, or right after `afterStageId`. */
-  function createStage(afterStageId?: string): void {
-    const w = wf();
-    if (!w) return;
-    const fresh = newStage(w.stages);
-    const at = afterStageId
-      ? w.stages.findIndex((s) => s.id === afterStageId) + 1
-      : w.stages.length;
-    const stages = [...w.stages];
-    stages.splice(at, 0, fresh);
-    edit({ ...w, stages });
-    selection.value = { kind: 'stage', stageId: fresh.id };
-  }
-  function removeStage(stageId: string): void {
-    const w = wf();
-    if (w) edit({ ...w, stages: w.stages.filter((s) => s.id !== stageId) });
-  }
-  function moveStageBy(stageId: string, delta: number): void {
-    const w = wf();
-    if (!w) return;
-    const from = w.stages.findIndex((s) => s.id === stageId);
-    edit(moveStage(w, from, from + delta));
-  }
-  function createStep(stageId: string, after?: string): void {
-    const w = wf();
-    if (!w) return;
-    const r = addStep(w, stageId, after);
+    const r = addStep(w, kind, afterId);
     edit(r.wf);
-    selection.value = { kind: 'step', stageId, stepId: r.stepId };
+    selection.value = { stepId: r.stepId };
   }
-  function deleteStep(stageId: string, stepId: string): void {
+  function deleteStep(stepId: string): void {
     const w = wf();
-    if (w) edit(removeStep(w, stageId, stepId));
+    if (w) edit(removeStep(w, stepId));
   }
-  function makeStart(stageId: string, stepId: string): void {
+  function moveStepBy(stepId: string, delta: -1 | 1): void {
     const w = wf();
-    if (w) edit(setStart(w, stageId, stepId));
+    if (w) edit(moveStep(w, stepId, delta));
   }
-  function route(stageId: string, stepId: string, resultId: string, target: string): void {
+  function makeStart(stepId: string): void {
     const w = wf();
-    if (w) edit(setRoute(w, stageId, stepId, resultId, target));
+    if (w) edit(setStart(w, stepId));
   }
-  function clear(stageId: string, stepId: string, resultIds: string[]): void {
+  function route(stepId: string, resultId: string, target: string): void {
     const w = wf();
-    if (w) edit(clearRoute(w, stageId, stepId, resultIds));
+    if (w) edit(setRoute(w, stepId, resultId, target));
   }
-  function createResult(stageId: string, stepId: string): void {
+  function clear(stepId: string, resultIds: string[]): void {
     const w = wf();
-    if (w) edit(addResult(w, stageId, stepId));
+    if (w) edit(clearRoute(w, stepId, resultIds));
   }
-  function deleteResult(stageId: string, stepId: string, resultId: string): void {
+  function createResult(stepId: string): void {
     const w = wf();
-    if (w) edit(removeResult(w, stageId, stepId, resultId));
+    if (w) edit(addResult(w, stepId));
+  }
+  function deleteResult(stepId: string, resultId: string): void {
+    const w = wf();
+    if (w) edit(removeResult(w, stepId, resultId));
   }
   function changeResult(
-    stageId: string,
     stepId: string,
     resultId: string,
     p: Partial<Pick<StepResult, 'id' | 'ok' | 'description'>>,
   ): void {
     const w = wf();
-    if (w) edit(patchResult(w, stageId, stepId, resultId, p));
+    if (w) edit(patchResult(w, stepId, resultId, p));
   }
 
   return {
@@ -182,7 +141,6 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     baseHash,
     conflict,
     selection,
-    stage,
     step,
     canSkip,
     open,
@@ -192,13 +150,10 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     rebase,
     select,
     patchWorkflow,
-    patchStage,
-    replaceStage,
     patchStep,
-    createStage,
-    removeStage,
-    moveStageBy,
+    replaceStep,
     createStep,
+    moveStepBy,
     deleteStep,
     makeStart,
     route,

@@ -14,7 +14,7 @@ import { useAuthStore } from '../state/auth';
 import type { PlanCard } from '../state/useAgentsModel';
 import { useTaskActions } from '../state/useTaskActions';
 
-// One planned task: status, current stage and progress, expanding to every stage and its steps.
+// One planned task: status, current step and progress, expanding to every step.
 const props = defineProps<{ card: PlanCard; open: boolean }>();
 defineEmits<{ toggle: [] }>();
 
@@ -46,7 +46,7 @@ const stopFirst = computed(() => props.card.moves.live);
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
           <AdeChip :label="statusLabel(card.status)" :tone="tone" />
-          <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{
+          <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-step">{{
             card.progress.label
           }}</span>
           <AdeChip v-for="repo in card.repos" :key="repo" :label="repo" tone="grey" />
@@ -64,41 +64,26 @@ const stopFirst = computed(() => props.card.moves.live);
     <ol
       v-if="open"
       class="m-0 flex list-none flex-col gap-2 px-3 pb-3 pl-8"
-      data-testid="plan-stages"
+      data-testid="plan-steps"
     >
       <li v-if="!card.blocks.length" class="text-kira-sm text-subtle">{{
         t('mobile.plan.noWorkflow.empty')
       }}</li>
       <li
         v-for="block in card.blocks"
-        :key="block.stage.id"
-        class="flex flex-col gap-0.5"
+        :key="block.step.id"
+        class="flex items-center gap-2 text-kira-sm"
         :data-state="block.state"
       >
+        <StatusDot :color="`var(--color-tone-${block.tone}-solid)`" />
         <span
-          class="flex items-center gap-2 text-kira-md"
+          class="min-w-0 flex-1 truncate"
           :class="block.state === 'now' ? 'font-medium text-fg' : 'text-muted-foreground'"
+          >{{
+            block.step.name
+          }}</span
         >
-          <span aria-hidden="true">{{
-            block.state === 'done' ? '✓' : block.state === 'now' ? '▸' : '○'
-          }}</span>
-          {{ block.stage.name }}
-          <span v-if="block.count" class="text-kira-sm text-subtle">{{ block.count }}</span>
-          <span v-if="block.state === 'skipped'" class="text-kira-sm text-subtle">{{
-            t('common.skipped.status')
-          }}</span>
-        </span>
-        <ul v-if="block.steps.length" class="m-0 flex list-none flex-col gap-0.5 p-0 pl-5">
-          <li
-            v-for="view in block.steps"
-            :key="view.step.id"
-            class="flex items-center gap-2 text-kira-sm"
-          >
-            <StatusDot :color="`var(--color-tone-${view.tone}-solid)`" />
-            <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ view.step.name }}</span>
-            <span class="text-subtle">{{ view.statusText }}</span>
-          </li>
-        </ul>
+        <span class="text-subtle">{{ block.statusText }}</span>
       </li>
     </ol>
 
@@ -111,7 +96,7 @@ const stopFirst = computed(() => props.card.moves.live);
         size="touch"
         variant="dialog"
         :disabled="stopFirst || !card.moves.prev"
-        data-testid="plan-stage-back"
+        data-testid="plan-step-back"
         @click="actions.ask('back')"
       >
         {{ t('common.action.back.label') }}
@@ -120,7 +105,7 @@ const stopFirst = computed(() => props.card.moves.live);
         size="touch"
         variant="dialog"
         :disabled="stopFirst || !card.moves.next"
-        data-testid="plan-stage-next"
+        data-testid="plan-step-next"
         @click="actions.ask('next')"
       >
         {{ t('common.action.next.label') }}
