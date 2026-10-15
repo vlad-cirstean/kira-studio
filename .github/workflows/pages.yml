@@ -1,4 +1,3 @@
-# Deploys site/ to GitHub Pages. Copy to .github/workflows/pages.yml (docs/DEV_ENVIRONMENT.md).
 name: Pages
 
 on:

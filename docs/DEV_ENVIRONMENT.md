@@ -44,14 +44,13 @@ means it hasn't been applied yet; don't recreate one that already exists for the
 and don't let this workaround become an excuse to touch workflow files more often than the task
 needs.
 
-Pending now: `docs/pending-workflows/pages.yml` (P280, GitHub Pages deploy). Go live:
+`.github/workflows/pages.yml` (P280, GitHub Pages deploy) is live. Remaining steps to go live:
 
-1. On a Mac session, move it to `.github/workflows/pages.yml` in one commit; push.
-2. In GitHub: Settings > Pages > Build and deployment > Source = GitHub Actions.
-3. Merge the chapter branch to `main`, or run the "Pages" workflow by hand on `main`. The
+1. In GitHub: Settings > Pages > Build and deployment > Source = GitHub Actions.
+2. Merge the chapter branch to `main`, or run the "Pages" workflow by hand on `main`. The
    `github-pages` environment accepts deployments from `main` only, by default. A run from another
    branch fails unless that branch is added under Settings > Environments > github-pages.
-4. Open `https://vlad-cirstean.github.io/kira-studio/`.
+3. Open `https://vlad-cirstean.github.io/kira-studio/`.
 
 ## Presentation screenshots and site check (P280)
 
