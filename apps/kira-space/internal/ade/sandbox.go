@@ -57,7 +57,8 @@ func (b *TaskBoard) sandboxInput(run model.AdeRun, l agentLaunch, sd adewire.Ste
 	in := agentsandbox.Input{
 		RunID: run.ID, Access: agentsandbox.Access(sd.Access), Read: sd.Read, Allow: sd.Allow, Network: sd.Network,
 		Scratch: filepath.Join(b.deps.AgentDir, "sandbox", run.ID), Cache: filepath.Join(b.deps.AgentDir, "sandbox-cache"),
-		Ports: []int{b.agent.Port()}, RunDir: l.path,
+		ConfigDir: b.deps.AgentDir,
+		Ports:     []int{b.agent.Port()}, RunDir: l.path,
 	}
 	if b.deps.SandboxKeychain != nil {
 		in.Keychain = b.deps.SandboxKeychain()

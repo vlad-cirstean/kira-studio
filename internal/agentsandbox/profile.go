@@ -77,6 +77,9 @@ func Profile(p Policy, rt Runtime) string {
 		}
 	}
 	allowRead = append(allowRead, sub(p.Scratch), sub(p.Cache))
+	if p.ConfigDir != "" {
+		allowRead = append(allowRead, rx("^"+regexp.QuoteMeta(p.ConfigDir)+"/"+regexp.QuoteMeta(p.RunID)+`-([0-9]+|user)\.mcp\.json$`))
+	}
 	b.rule("allow", "file-read-data", dedupe(allowRead)...)
 	if !p.Keychain && rt.Home != "" {
 		b.rule("deny", "file-read-data", sub(filepath.Join(rt.Home, "Library", "Keychains")))

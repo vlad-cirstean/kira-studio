@@ -46,6 +46,8 @@ type Policy struct {
 	Scratch string
 	// Cache is the shared build-cache root, <AgentDir>/sandbox-cache.
 	Cache string
+	// ConfigDir holds the run's --mcp-config files; only those files are readable, not the folder.
+	ConfigDir string
 	// Ports are the loopback ports the run reaches: the kira-ade MCP server, the allowlist proxy.
 	Ports []int
 	// Branch maps a worktree to the branch it may advance.
@@ -76,8 +78,10 @@ type Input struct {
 	Keychain    bool
 	Scratch     string
 	Cache       string
-	Ports       []int
-	Branch      map[string]string
+	// ConfigDir is the folder the run's MCP config files are written to: <run>-<n>.mcp.json and <run>-user.mcp.json.
+	ConfigDir string
+	Ports     []int
+	Branch    map[string]string
 }
 
 // Denial is one blocked operation.
@@ -154,6 +158,9 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 	}
 	notes := append(append([]string{}, n1...), n2...)
 	p.Read = appendUnique(p.Read, readExtra...)
+	if in.ConfigDir != "" {
+		p.ConfigDir = realPath(filepath.Clean(in.ConfigDir))
+	}
 	p.Allow = allowExtra
 	if err := ensureDirs(in, &p); err != nil {
 		return Policy{}, nil, err

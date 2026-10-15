@@ -4,6 +4,8 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -23,6 +25,8 @@ func fakeRuntime() Runtime {
 const (
 	scratch = "/Users/ada/Library/Application Support/Kira/agent/sandbox/run-1"
 	cache   = "/Users/ada/Library/Application Support/Kira/agent/sandbox-cache"
+
+	configDir = "/Users/ada/Library/Application Support/Kira/agent"
 )
 
 func linked(wt, name string) GitLayout {
@@ -33,7 +37,7 @@ func basePolicy() Policy {
 	wt := "/Users/ada/src/app-wt/feat"
 	return Policy{
 		RunID: "run-1", Access: AccessWrite, Write: []string{wt}, RunDir: wt, Network: true,
-		Git: []GitLayout{linked(wt, "feat")}, Scratch: scratch, Cache: cache, Ports: []int{4100},
+		Git: []GitLayout{linked(wt, "feat")}, Scratch: scratch, Cache: cache, ConfigDir: configDir, Ports: []int{4100},
 		Branch: map[string]string{wt: "task/feat"},
 	}
 }
@@ -114,5 +118,34 @@ func TestProfileGolden(t *testing.T) {
 				t.Fatalf("profile drifted from %s; run go test ./internal/agentsandbox -update and review the diff\n%s", path, got)
 			}
 		})
+	}
+}
+
+// Every --mcp-config file a run gets must be readable inside its sandbox.
+func TestProfileAllowsMCPConfigs(t *testing.T) {
+	p := basePolicy()
+	prof := Profile(p, fakeRuntime())
+	allowRead := prof[strings.Index(prof, "(allow file-read-data"):]
+	allowRead = allowRead[:strings.Index(allowRead, "))\n")+1]
+	var res []*regexp.Regexp
+	for _, m := range regexp.MustCompile(`\(regex #"([^"]+)"\)`).FindAllStringSubmatch(allowRead, -1) {
+		res = append(res, regexp.MustCompile(m[1]))
+	}
+	for _, name := range []string{"run-1-7.mcp.json", "run-1-user.mcp.json"} {
+		path := p.ConfigDir + "/" + name
+		ok := false
+		for _, re := range res {
+			ok = ok || re.MatchString(path)
+		}
+		if !ok {
+			t.Errorf("no read allow for %s", path)
+		}
+	}
+	for _, name := range []string{"run-2-7.mcp.json", "run-1-7.mcp.json.bak", "run-1-x.mcp.json"} {
+		for _, re := range res {
+			if re.MatchString(p.ConfigDir + "/" + name) {
+				t.Errorf("read allow too wide: %s", name)
+			}
+		}
 	}
 }

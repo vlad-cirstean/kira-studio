@@ -33,7 +33,8 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 	}
 	in := agentsandbox.Input{
 		RunID: runID, Access: agentsandbox.AccessWrite, Worktrees: []string{p.dir.Path}, Network: true,
-		Scratch: filepath.Join(s.Home, "sandbox", runID), Cache: filepath.Join(s.Home, "sandbox-cache"), Ports: []int{port},
+		Scratch: filepath.Join(s.Home, "sandbox", runID), Cache: filepath.Join(s.Home, "sandbox-cache"),
+		ConfigDir: filepath.Join(s.Home, "automations-mcp"), Ports: []int{port},
 	}
 	if s.SandboxKeychain != nil {
 		in.Keychain = s.SandboxKeychain()
