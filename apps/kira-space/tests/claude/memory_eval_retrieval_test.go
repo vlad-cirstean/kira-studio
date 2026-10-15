@@ -150,11 +150,12 @@ type roundData struct {
 	ref, name string
 	recs      map[string]runRecord
 	grades    map[string]scoreGrades
+	scored    map[string]bool
 }
 
 func loadRound(ref string) (roundData, error) {
 	dir := roundDirOf(ref)
-	rd := roundData{ref: ref, name: filepath.Base(ref), recs: loadRecords(filepath.Join(dir, "facts.jsonl")), grades: map[string]scoreGrades{}}
+	rd := roundData{ref: ref, name: filepath.Base(ref), recs: loadRecords(filepath.Join(dir, "facts.jsonl")), grades: map[string]scoreGrades{}, scored: scoredSources(dir)}
 	if len(rd.recs) == 0 {
 		return rd, fmt.Errorf("%s: no facts.jsonl records", ref)
 	}
@@ -203,6 +204,14 @@ func buildQueries(man evalManifest, rd roundData, srcs []evalSource) ([]qMeta, i
 			if g.Covered == "full" || g.Covered == "partial" {
 				answers[g.ID] = g.By
 			}
+		}
+		if os.Getenv("KIRA_EVAL_CONTROL") == "1" {
+			// Negative control: every query gets the next item's answers, so hit rates must collapse.
+			rot := map[string][]string{}
+			for i, it := range ql.Items {
+				rot[it.ID] = answers[ql.Items[(i+1)%len(ql.Items)].ID]
+			}
+			answers = rot
 		}
 		for _, it := range ql.Items {
 			for _, form := range []string{"question", "query"} {
@@ -295,10 +304,14 @@ func gatherFacts(man evalManifest, cfg storeCfg, primary roundData, srcs []evalS
 	if err := add(primary, srcs, keys); err != nil {
 		return nil, err
 	}
+	own := map[string]bool{}
+	for _, s := range srcs {
+		own[s.ID] = true
+	}
 	for _, d := range distract {
 		var list []evalSource
 		for _, s := range man.Sources {
-			if _, ok := d.recs[s.ID]; ok {
+			if _, ok := d.recs[s.ID]; ok && !own[s.ID] && (d.scored == nil || d.scored[s.ID]) {
 				list = append(list, s)
 			}
 		}
@@ -325,7 +338,7 @@ func seedStore(ctx context.Context, dir string, facts []seedFact) (*seededStore,
 		doc := memfmt.Doc{Group: groups[gk], Title: f.key.Source, From: f.src.fileName(), Version: 2, Keywords: f.keywords, Updated: evalDocDate,
 			Provenance: memfmt.Provenance{Origin: memory.OriginAgent, Scope: memory.ScopeProject, Project: evalProject},
 			Facts:      []memfmt.Fact{{ID: id, Fact: f.fact, Reason: f.reason, Section: f.section}}}
-		res, err := ss.kw.ApplyDoc(ctx, memory.ApplyDocRequest{Doc: doc, Path: f.src.fileName()})
+		res, err := ss.kw.ApplyDoc(ctx, memory.ApplyDocRequest{Doc: doc, FileID: "eval-" + f.key.Round + "-" + f.key.Source, Path: f.src.fileName()})
 		if err != nil {
 			ss.close()
 			return nil, err
@@ -580,7 +593,7 @@ func evalRetrieval(t *testing.T, man evalManifest) {
 				}
 			}
 		}
-		out := retrievalFile{Round: rd.name, RunsDir: filepath.Base(envOr("KIRA_EVAL_RUNS_DIR", "P285-runs")), Set: set, Queries: qs, Dropped: dropped,
+		out := retrievalFile{Round: rd.name, RunsDir: runsOf(ref) + controlSuffix(), Set: set, Queries: qs, Dropped: dropped,
 			Ranks: map[string][]int{}, Agg: map[string]map[string]agg{}, Chars5: map[string]float64{}, Calibration: map[string]calib{},
 			StylePairs: map[string]map[string]any{}, DocPairs: map[string]map[string]any{}}
 		for _, s := range srcs {
@@ -621,7 +634,11 @@ func evalRetrieval(t *testing.T, man evalManifest) {
 		stylePairs(ctx, t, emb, man, rd, srcs, useRecipes, &out)
 		out.Seconds = int(time.Since(begin).Seconds())
 		raw, _ := json.Marshal(out)
-		path := filepath.Join(evalRunsDir(), "retrieval", out.RunsDir+"__"+rd.name+".json")
+		suffix := ""
+		if set == "holdout" {
+			suffix = "@holdout"
+		}
+		path := filepath.Join(evalRunsDir(), "retrieval", out.RunsDir+"__"+rd.name+suffix+".json")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -631,6 +648,21 @@ func evalRetrieval(t *testing.T, man evalManifest) {
 		base := out.Agg["full/base/fact/hybrid"]["all"]
 		t.Logf("%s: %d queries (%d leak-dropped), %d facts, hybrid MRR %.3f hit@10 %.3f (cond %.3f), %ds", rd.name, len(qs), dropped, out.Facts, base.MRR, base.Hit10, base.CHit10, out.Seconds)
 	}
+}
+
+func controlSuffix() string {
+	if os.Getenv("KIRA_EVAL_CONTROL") == "1" {
+		return "-control"
+	}
+	return ""
+}
+
+// runsOf is the runs dir a round reference lives in.
+func runsOf(ref string) string {
+	if i := strings.Index(ref, "/"); i > 0 {
+		return ref[:i]
+	}
+	return filepath.Base(envOr("KIRA_EVAL_RUNS_DIR", "P285-runs"))
 }
 
 func variantKey(c storeCfg, recipe, mode string) string { return c.name() + "/" + recipe + "/" + mode }
@@ -941,7 +973,7 @@ type cmpForm struct {
 func loadRetrieval(name string) (retrievalFile, error) {
 	var f retrievalFile
 	dir := filepath.Join(evalRunsDir(), "retrieval")
-	for _, cand := range []string{name, envOr("KIRA_EVAL_RUNS_DIR", "P285-runs") + "__" + name} {
+	for _, cand := range []string{name, runsOf(name) + "__" + name} {
 		raw, err := os.ReadFile(filepath.Join(dir, strings.ReplaceAll(cand, "/", "__")+".json"))
 		if err == nil {
 			return f, json.Unmarshal(raw, &f)
