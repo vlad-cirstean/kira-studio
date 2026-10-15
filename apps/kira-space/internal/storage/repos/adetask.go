@@ -986,7 +986,8 @@ func (r *AdeTaskRepo) SetReviewDedicated(runID, claudeID string) error {
 
 // Reviews returns the send state of every review run, by run id.
 func (r *AdeTaskRepo) Reviews() (map[string]model.AdeReview, error) {
-	rows, err := r.DB.Query(`SELECT run_id, route, target_run_id, dedicated_claude_id, rounds FROM ade_reviews`)
+	rows, err := r.DB.Query(`SELECT run_id, route, target_run_id, dedicated_claude_id, rounds FROM ade_reviews
+		WHERE run_id IN (SELECT id FROM ade_runs WHERE task_id IN (SELECT id FROM ade_tasks WHERE archived_at IS NULL))`)
 	list, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeReview, bool, error) {
 		var v model.AdeReview
 		err := rows.Scan(&v.RunID, &v.Route, &v.TargetRunID, &v.DedicatedClaudeID, &v.Rounds)
