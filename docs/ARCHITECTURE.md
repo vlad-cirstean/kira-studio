@@ -5779,6 +5779,8 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   beyond the listed denies.
 - **`~/.claude.json` is writable to a sandboxed agent (P287).** It holds the user's MCP servers; the CLI writes
   it on every run.
+- **A network-off profile allows every loopback port (P287).** Local dev servers and test DBs need it, so a local forward proxy or tunnel on `localhost` lets a `network: false` run bypass the allowlist. Restricting remote loopback to `Policy.Ports` needs an opt-in for runs that bind local servers. `Policy.Ports` only feeds the profile header comment.
+- **A short-lived process of a sandboxed run can lose its denial (P292).** The system-wide denial stream names a pid, and an exited pid is attributed only when its process name matches an earlier denial of the run.
 - **Hooks and build scripts an agent edits run unsandboxed later (P287).** Kira's own git operations and the
   user run them outside the sandbox.
 - **The sandbox is unverified on a real Mac (P287).** Linux checks the generator and flows only. Delete once
