@@ -22,6 +22,9 @@ Ledger: `spend-p291.jsonl`. Phase cap 20 USD.
 | round-p291-v1t pipeline | 1.794 | 6.017 |
 | round-p291-v1t gate | 1.626 | 7.643 |
 | round-p291-v1t score judge | 1.892 | 9.535 |
+| round-p291-xt pipeline | 1.727 | 11.262 |
+| round-p291-xt gate | 1.065 | 12.327 |
+| round-p291-xt score judge | 1.712 | 14.038 |
 
 ## Bands (D9, identical-code pairs, hybrid/keyword on tuning, end-to-end)
 
@@ -134,3 +137,34 @@ Verdict (D10, D31):
 - A1 fails. Hybrid delta +0.019 is under `band_R` 0.026 (not even marginal), and `C_doc` 1.017 breaks the size rule.
 - A4 form fails. `C_store` 0.908 is above the base 0.661: the unified pipeline stores 49% more facts, which the style cannot offset.
 - Reading for the user's goals: recall and token recall rise sharply (`R_ess` +0.092, token recall +0.22) and retrieval is not worse; storage is not smaller than the source (`C_doc` 1.017). The gate trades recall for size by rule, so V1T is not adopted. 6b then 6a revert (D31), then XT (style on the extract pipeline).
+
+## Step 7 XT round (`round-p291-xt`: current extract pipeline plus the `memory.factStyle` fragment, commit `a487cbc18`)
+
+Run 4.503 USD (est. 4.2). Same setup as V1T (tuning, distractors `round-p3-holdout`, 310 facts in the store).
+
+| metric | base `round-p3-01` | XT | rule (D10 A4 form) |
+|---|---|---|---|
+| hybrid MRR | 0.886 | 0.891 (+0.005, CI [-0.019, +0.028]) | >= 0.860: pass |
+| keyword MRR | 0.863 | 0.872 (+0.009, CI [-0.014, +0.032]) | >= 0.843: pass |
+| hybrid hit@10 | 0.957 | 0.976 | reported |
+| `R_ess` | 0.885 | 0.949 | >= 0.865: pass |
+| `R_all` | 0.689 | 0.792 | reported |
+| unsupported | 0.005 | 0.008 | <= 0.020: pass |
+| token recall | 0.607 | 0.761 | >= 0.583: pass |
+| `C_fact` | 0.434 | 0.498 | < 1.0: pass |
+| `C_store` | 0.661 | 0.753 | < 1.0 pass; < base 0.661: FAIL |
+| `C_doc` | 0.734 | 0.844 | < 1.0: pass |
+| stored facts | 209 | 246 (254 extracted) | reported |
+| atomic / standalone / `P` (judge) | 0.746 / 0.981 / 0.737 | 0.695 / 0.984 / 0.679 | reported |
+
+Verdict: A4 fails on one rule, `C_store(XT) < C_store(base)`. The pipeline stored 18% more facts (recall rose, `R_ess` +0.064), so total stored size grew although each fact is shorter. The same-facts post-pass showed the style shrinks `C_store` by 4.5% (D26); a recall gain of that size hides it. Reverted per D31.
+Reading for the user's goals: XT keeps retrieval (MRR +0.005, inside the band), raises recall (`R_ess` 0.949, `R_all` 0.792, token recall 0.761) and stays under the source size (`C_doc` 0.844, `C_fact` 0.498, about half of the source). It is not adopted only because the relative `C_store` rule is strict; the commit stays in git history for a one-line re-apply (`git revert` of the revert).
+
+## Step 8-9b adoption verdicts
+
+- A1 unified import: not adopted (V1T, above).
+- A2 embedding recipe (`fact-kw`): not adopted. Deltas +0.005 and +0.006 on two bases, CI lower bound under 0, under the 0.02 floor. V1T and XT show +0.011 and +0.002 for the same recipe.
+- A3 subject and aspect keys: not adopted (`sa-fact-kw` +0.004 and +0.014 over `fact`, under 0.02).
+- A4 telegraphic style: not adopted (XT, above; V1T, above). D26 passed with `tele-guard`.
+- A5 read-time grouping: not adopted (returned chars at 5 rise 4.1x).
+- D20: merge rule unchanged. D12: constants unchanged (calibration fits).
