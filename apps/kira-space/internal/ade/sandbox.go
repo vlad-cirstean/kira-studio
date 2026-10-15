@@ -210,18 +210,23 @@ func (b *TaskBoard) applySandbox(spec claudeheadless.Spec, sr *sandboxRun, l age
 const denialFlushEvery = time.Second
 
 // watchSandbox starts the denial watch for pid and returns the stop function. A repeated denial
-// only counts in memory; the count reaches the row on the next new denial, once per
-// denialFlushEvery, and at stop.
+// only counts in memory; the count reaches the row at most once per denialFlushEvery, via a
+// trailing timer, and at stop.
 func (b *TaskBoard) watchSandbox(run model.AdeRun, sr *sandboxRun, sink *logSink, pid int) func() {
 	var (
 		mu      sync.Mutex
 		pending int
 		flushed time.Time
+		timer   *time.Timer
 	)
 	flush := func(listJSON string) {
 		mu.Lock()
 		n := pending
 		pending, flushed = 0, time.Now()
+		if timer != nil {
+			timer.Stop()
+			timer = nil
+		}
 		mu.Unlock()
 		b.countDenials(run.ID, n, listJSON)
 	}
@@ -229,9 +234,12 @@ func (b *TaskBoard) watchSandbox(run model.AdeRun, sr *sandboxRun, sink *logSink
 		if !sr.tracker.Add(d) {
 			mu.Lock()
 			pending++
-			due := time.Since(flushed) >= denialFlushEvery
+			wait := denialFlushEvery - time.Since(flushed)
+			if wait > 0 && timer == nil {
+				timer = time.AfterFunc(wait, func() { flush("") })
+			}
 			mu.Unlock()
-			if due {
+			if wait <= 0 {
 				flush("")
 			}
 			return
@@ -253,12 +261,7 @@ func (b *TaskBoard) watchSandbox(run model.AdeRun, sr *sandboxRun, sink *logSink
 	})
 	return func() {
 		stop()
-		mu.Lock()
-		n := pending
-		mu.Unlock()
-		if n > 0 {
-			flush("")
-		}
+		flush("")
 	}
 }
 
