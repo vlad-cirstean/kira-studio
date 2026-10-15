@@ -786,3 +786,7 @@ recurring post-pass. D32 lifts the earlier ban on rewriting existing stored memo
 - The SPEC P291 row does not name the telegraphic direction yet; the orchestrator adds it as a user
   decision so verification checks against it.
 - Retrieval on 10-source stores understates difficulty at scale.
+
+## 10. Result
+
+Implemented. Numbers, rounds, gate arithmetic and spend: `P291-report.md`, `P291-runs/results.md`. Kept: retrieval, keys, telegraph and compare harness, `internal/textloss`, docs. Not adopted (gates failed): A1 V1T, A2, A3, A4 (V1T and XT), A5. Prompts back at the pre-P291 text (`promptsizes -compare before.json` shows 0 changes). Ports stay in git: V1T `9b96da41f`, XT `a487cbc18`.

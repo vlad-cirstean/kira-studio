@@ -168,3 +168,5 @@ Reading for the user's goals: XT keeps retrieval (MRR +0.005, inside the band), 
 - A4 telegraphic style: not adopted (XT, above; V1T, above). D26 passed with `tele-guard`.
 - A5 read-time grouping: not adopted (returned chars at 5 rise 4.1x).
 - D20: merge rule unchanged. D12: constants unchanged (calibration fits).
+
+Keys cost (Q6, `round-p3-01`): subject plus aspect add 26.0 chars per fact (209 facts, about 19% of the 139-char mean fact), cost 0.403 USD per two rounds. 173 distinct subjects over 209 facts; 22 subjects repeat (largest: `runner` 6, `kira studio` 5), so a subject key alone merges few facts. Cross-round key drift and the merge-by-key proxy were not computed: the retrieval gain fails first (A3 gate), so the merge question is moot.
