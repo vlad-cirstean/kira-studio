@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -654,14 +653,4 @@ func evalScoreTele(t *testing.T, man evalManifest) {
 func sectionOf(s evalSource, reason string) string {
 	sec, _ := memfmt.ParseLocator(reason, s.fileName())
 	return sec
-}
-
-// sortedKeys is a small helper for deterministic output.
-func sortedKeys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }

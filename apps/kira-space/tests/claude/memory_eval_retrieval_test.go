@@ -945,11 +945,6 @@ func docPairs(ctx context.Context, t *testing.T, emb *evalEmbedder, man evalMani
 
 // Compare.
 
-type cmpSide struct {
-	file    retrievalFile
-	variant string
-}
-
 type cmpOut struct {
 	A       string             `json:"a"`
 	B       string             `json:"b"`
