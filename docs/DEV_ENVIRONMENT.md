@@ -518,7 +518,15 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
    read-only test must leave the file unchanged.
 4. In the app: run a workflow step, open the run-line lock badge, check the denial list and **View profile**.
    Run `sandbox-exec -f <copied profile> /usr/bin/true` from a terminal; it must exit 0.
-5. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
+5. Profile order (P292): writes to `~/.claude/settings.json`, hook dirs and `~/Library/Keychains` stay denied
+   inside a sandboxed run even with a broad allow path (later rules win). The policy refuses `~`, `~/Library`
+   and `~/.claude` as allow or read paths; also try one through a symlink.
+6. Denial attribution (P292 B3): a short-lived child, such as `git` run by `bash`, exits before the watcher
+   walks its parents. Denial is attributed only when a process of the same name was already attributed.
+   Check the first denial from a new short-lived binary shows in the run-line badge; if not, record the miss.
+7. Plain HTTP (P292 A1): with network off and a real client, `curl http://example.com` through the proxy must
+   fail with a 4xx or connection error. `curl https://<allowed host>` must still work.
+8. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
 
 ## Load, disk and test scope (P236-P251)
 
