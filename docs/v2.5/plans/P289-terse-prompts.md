@@ -191,7 +191,7 @@ in the results ledger (§8) in the same or next commit.
 
 Step 5. After G3, G2 and G1 land: eval `round-p289-01` (§5). Commit outputs. Decide per §5; reverts as D13.
 
-Step 6 (pending after the P289 implementer pass: runs once P288 is Done). Sweep for P286-P288 prompts (runs as soon as the P288 row is Done; if P288 was Done at Step 0,
+Step 6 (done). Sweep for P286-P288 prompts (runs as soon as the P288 row is Done; if P288 was Done at Step 0,
 it runs now). `promptsizes -compare before.json` lists ids absent from `before.json` or changed since it
 by another phase; each gets the style audit and §3 where it has filler or repetition; rows of the touched
 integration (ADE row for workflow prompts; the P287 macOS and sandbox rows its plan adds). Commit
@@ -199,8 +199,7 @@ integration (ADE row for workflow prompts; the P287 macOS and sandbox rows its p
 stays open: the SPEC row says so, D10 keeps P287/P288 prompts in check meanwhile, and the orchestrator
 runs Step 6 as a follow-up commit once P288 lands.
 
-Step 6 resume state: P286 entries have `budget.tsv` lines (added at P286 landing, already terse). P287-P288 entries have no `budget.tsv` line, so `checkprompts` (part of `bun run lint`)
-fails for them until each gets one. Sweep adds the lines. Open until P288 lands.
+Step 6 resume state: done. All P286-P288 entries have `budget.tsv` lines and need no rewrite (see Results).
 
 Step 7. `feat(llmprompts): terse style and size budget check` (C-guard): D10 in `checkprompts`, generate
 `budget.tsv` from final `promptsizes` output. `bun run lint` green.
@@ -307,7 +306,7 @@ estimate under 0.01 per run), copied into §8.
 - Ids with no row exercising them (D12).
 - Allowed protected-token losses (copy of `allowed-losses.tsv` with reasons).
 
-### Results (implementer, Steps 0-5 and 7; Step 6 pending)
+### Results (implementer, Steps 0-7)
 
 Base `2bed9cefc`. Step 0: P286, P287, P288 not Done at start; scope = the 126 entries of the base.
 Commands: `go run ./internal/llmprompts/cmd/promptsizes -compare docs/v2.5/plans/P289-runs/before.json`
@@ -441,8 +440,13 @@ rewrites were by hand under §3. (5) Memory MCP, gate and extract texts shrank 1
 at the P285 Part 2 floor. (6) Tests that asserted old default text now assert the new default or the
 registry render (`mcpserver` and `memoryflow` prepared line, `adeflow` override check, two UI specs).
 
-**Step 6 pending.** The sweep of P286-P288 prompts runs after P288 lands (orchestrator). `budget.tsv`
-has no line for those prompts yet, so `checkprompts` fails on them until each gets a line (D10 design).
+**Step 6 done, no edits.** Sweep base `e9c6697b5` against `0ba9fd2aa`: 14 new entries, 0 changed. P288 adds
+none. All carry `budget.tsv` lines (added with P286/P287), all already terse; `checkprompts` and
+`go test ./internal/llmprompts/...` green. Entries (chars, tok): `ade.review.comments` 323/108,
+`ade.review.round.message` 574/192, `ade.review.followup.message` 400/134, `headless.sandbox.note` 331/111,
+`headless.tool.fetch_remote` 63/21 (+arg 28/10), `headless.tool.push_branch` 60/20 (+arg 51/17),
+`headless.tool.reply_review_comment` 63/21 (+3 args 34/44/53), `headless.reviewReply.ack` 6/2. No rewrite, so
+no real `claude` rows run, no reverts, no spend. Final size result unchanged: -3.5 % (target 25 % missed).
 
 ## 9. Docs and close-out
 
