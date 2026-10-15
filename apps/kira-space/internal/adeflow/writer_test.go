@@ -114,7 +114,7 @@ func TestSave_edits(t *testing.T) {
 		steps := wf.Stages[2].Steps
 		wf.Stages[2].Steps = append(append([]adewire.PipelineStep(nil), steps[:2]...), steps[3:]...)
 		wf.Stages[2].Steps = append(wf.Stages[2].Steps, adewire.PipelineStep{
-			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("lint", "stop"), Timeout: "10m",
+			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("lint", "stop"), MaxReturns: 3, Timeout: "10m",
 			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 		})
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -154,7 +154,7 @@ func TestSave_edits(t *testing.T) {
 		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
 		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
 		wf.Stages[impl].Steps[0] = adewire.PipelineStep{
-			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("plan", "stop"), Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize", Sandbox: adewire.DefaultSandbox(),
+			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("plan", "stop"), MaxReturns: 3, Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize", Sandbox: adewire.DefaultSandbox(),
 			Params: map[string][]string{"lang": {"go"}, "dirs": {"a", "b"}},
 		}
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -213,7 +213,7 @@ func TestSave_edits(t *testing.T) {
 		prompt := slices.IndexFunc(wf.Stages[impl].Steps, func(s adewire.PipelineStep) bool { return s.SmartScript == "" })
 		wf.Stages[impl].Steps = append(append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...), adewire.PipelineStep{
 			ID: "code-review", Name: "Code review", RunsOn: "each repo", Before: "auto", OnFailure: "stop",
-			Results: adewire.ImplicitResults("code-review", "stop"), Timeout: "30m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
+			Results: adewire.ImplicitResults("code-review", "stop"), MaxReturns: 0, Timeout: "30m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 			Review: &adewire.ReviewStepConfig{SendTo: "new", Implementer: wf.Stages[impl].Steps[prompt].ID},
 		})
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -222,6 +222,7 @@ func TestSave_edits(t *testing.T) {
 			t.Fatalf("review block:\n%s", seg)
 		}
 		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].Review = nil
+		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].MaxReturns = 3
 		wf.Stages[impl].Steps[len(wf.Stages[impl].Steps)-1].Prompt = "go"
 		if back := saveOK(t, r, "standard.yaml", wf); strings.Contains(back, "review:") {
 			t.Fatalf("review block left after switching back:\n%s", back)
@@ -324,18 +325,24 @@ func TestSave_results(t *testing.T) {
 	step.OnFailure = ""
 	step.Results = []adewire.StepResult{
 		{ID: "pass", OK: true, Description: "All green.", Next: "next"},
-		{ID: "flaky", OK: false, Next: "ci", Max: 5},
-		{ID: "broken", OK: false, Next: "impl", Max: 3},
+		{ID: "flaky", OK: false, Next: "ci", Loop: true},
+		{ID: "broken", OK: false, Next: "impl", Loop: true},
 	}
+	step.MaxReturns = 5
 	out := saveOK(t, r, "standard.yaml", wf)
 	_, seg, _ := strings.Cut(out, "id: ci")
 	seg, _, _ = strings.Cut(seg, "id: pr")
-	if strings.Contains(seg, "on_failure") || !strings.Contains(seg, "results:") || !strings.Contains(seg, "max: 5") || strings.Contains(seg, "max: 3") {
+	if strings.Contains(seg, "on_failure") || !strings.Contains(seg, "results:") || !strings.Contains(seg, "max_returns: 5") || strings.Contains(seg, "max: ") {
 		t.Fatalf("results not written as a list:\n%s", seg)
 	}
-	step.OnFailure, step.Results = "back:impl", adewire.ImplicitResults("ci", "back:impl")
+	step.Results, step.MaxReturns = adewire.ImplicitResults("ci", "back:impl"), 4
+	four := saveOK(t, r, "standard.yaml", wf)
+	if _, seg, _ := strings.Cut(four, "id: ci"); strings.Contains(seg, "on_failure: back") || !strings.Contains(seg, "max_returns: 4") {
+		t.Fatalf("a limit off the rule's own kept on_failure:\n%s", seg)
+	}
+	step.OnFailure, step.MaxReturns = "back:impl", 3
 	back := saveOK(t, r, "standard.yaml", wf)
-	if strings.Contains(back, "results:") || !strings.Contains(back, "# my workflow") || !strings.Contains(back, "# long") {
+	if strings.Contains(back, "results:") || strings.Contains(back, "max_returns") || !strings.Contains(back, "# my workflow") || !strings.Contains(back, "# long") {
 		t.Fatalf("reverting to the legacy form kept results or lost comments:\n%s", back)
 	}
 }

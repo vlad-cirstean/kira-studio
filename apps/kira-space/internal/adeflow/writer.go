@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -316,8 +317,8 @@ const (
 var (
 	topOrder    = []string{"id", "name", "kira_space_mcp", "stages"}
 	stageOrder  = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
-	resultOrder = []string{"id", "ok", "description", "next", "max"}
-	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "timeout", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
+	resultOrder = []string{"id", "ok", "description", "next"}
+	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "max_returns", "timeout", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -536,6 +537,9 @@ func applyStage(m *yaml.Node, st adewire.Stage) {
 }
 
 func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
+	if s.MaxReturns == 0 && s.Review == nil {
+		s.MaxReturns = adewire.LegacyLimit(s.OnFailure, false)
+	}
 	setScalar(m, "id", kText, s.ID, true, stepOrder)
 	setScalar(m, "name", kText, s.Name, true, stepOrder)
 	setScalar(m, "runs_on", kText, s.RunsOn, true, stepOrder)
@@ -616,12 +620,18 @@ func applyResults(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
 	if len(results) == 0 {
 		results = adewire.ImplicitResults(s.ID, defaultStr(s.OnFailure, "stop"))
 	}
-	if rule, ok := adewire.LegacyOnFailure(s.ID, results, earlier); ok {
-		dropKeys(m, "results")
+	review := s.Review != nil
+	if rule, ok := adewire.LegacyOnFailure(s.ID, results, earlier, s.MaxReturns, review); ok {
+		dropKeys(m, "results", "max_returns")
 		setScalar(m, "on_failure", kText, rule, rule != "stop", stepOrder)
 		return
 	}
 	dropKeys(m, "on_failure")
+	if s.MaxReturns != adewire.DefaultLimit(review) {
+		setScalar(m, "max_returns", kInt, strconv.Itoa(s.MaxReturns), true, stepOrder)
+	} else {
+		dropKeys(m, "max_returns")
+	}
 	ids := make([]string, len(results))
 	for i, r := range results {
 		ids[i] = r.ID
@@ -643,11 +653,7 @@ func applyResult(m *yaml.Node, r adewire.StepResult) {
 	} else {
 		dropKeys(m, "next")
 	}
-	if r.Max != 0 && r.Max != adewire.DefaultLoopMax {
-		setScalar(m, "max", kInt, fmt.Sprint(r.Max), true, resultOrder)
-	} else {
-		dropKeys(m, "max")
-	}
+	dropKeys(m, "max")
 }
 
 // dropKeys removes keys a step of this shape does not allow.

@@ -272,9 +272,10 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 	candidates := make(map[string]bool) // earlier steps a review may resume: prompt steps only
 	var nodes []*resultNodes
 	var prefixes []string
+	var explicit []bool // max_returns declared on the step
 	for i, stepNode := range list.Content {
 		sp := fmt.Sprintf("%sstep %d: ", prefix[:len(prefix)-2]+", ", i+1)
-		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "timeout", "prompt", "allowed_tools", "smart_script", "params", "review", "sandbox")
+		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "review", "sandbox")
 		if v.err != nil {
 			return out
 		}
@@ -302,6 +303,7 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		}
 		step.Timeout = v.timeout(sm, sp)
 		v.stepBody(sm, sp, &step, candidates)
+		set := v.maxReturns(sm, sp, &step)
 		if n, has := sm["sandbox"]; has && v.err == nil {
 			step.Sandbox = v.sandbox(n, sp)
 		}
@@ -315,9 +317,36 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		out = append(out, step)
 		nodes = append(nodes, rn)
 		prefixes = append(prefixes, sp)
+		explicit = append(explicit, set)
 	}
-	v.resolveRoutes(out, nodes, prefixes)
+	v.resolveRoutes(out, nodes, prefixes, explicit)
 	return out
+}
+
+// maxReturns reads a step's return limit into step.MaxReturns and reports whether it was declared. Absent,
+// the limit is what on_failure implies, else the default; a results step may still fold a legacy result max.
+func (v *validator) maxReturns(sm map[string]*yaml.Node, sp string, step *adewire.PipelineStep) bool {
+	review := step.Review != nil
+	n, has := sm["max_returns"]
+	if !has {
+		step.MaxReturns = adewire.LegacyLimit(step.OnFailure, review)
+		return false
+	}
+	if _, legacy := sm["on_failure"]; legacy {
+		v.fail(n, sp, "max_returns and on_failure cannot be used together; use results")
+		return true
+	}
+	lo, rule := 1, "from 1 to %d"
+	if review {
+		lo, rule = 0, "from 0 to %d on a review step"
+	}
+	val, err := strconv.Atoi(n.Value)
+	if n.Kind != yaml.ScalarNode || err != nil || val < lo || val > adewire.MaxMaxReturns {
+		v.fail(n, sp, "max_returns must be a whole number "+rule, adewire.MaxMaxReturns)
+		return true
+	}
+	step.MaxReturns = val
+	return true
 }
 
 // before reads a step's approval gate; the default is auto.
@@ -669,7 +698,7 @@ func (v *validator) results(n *yaml.Node, sp string) *resultNodes {
 
 // resolveRoutes checks every declared result's route against the stage's step ids and fills the loop
 // budget. Steps without declared results (nil entries) were derived from on_failure and are already valid.
-func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultNodes, prefixes []string) {
+func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultNodes, prefixes []string, explicit []bool) {
 	if v.err != nil {
 		return
 	}
@@ -683,6 +712,7 @@ func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultN
 		}
 		sp := prefixes[si]
 		forward := false
+		legacy := 0 // largest result max declared on a loop route (a file from before max_returns)
 		for ri := range rn.list {
 			r := &rn.list[ri]
 			rp := fmt.Sprintf("%sresult %d: ", sp, ri+1)
@@ -704,40 +734,50 @@ func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultN
 				loop = target <= si
 			}
 			forward = forward || !loop
-			if !v.loopMax(r, rn.max[ri], rp, loop) {
+			r.Loop = loop
+			m, ok := v.legacyMax(rn.max[ri], rp, loop, explicit[si])
+			if !ok {
 				return
 			}
+			legacy = max(legacy, m)
 		}
 		if !forward {
 			v.fail(rn.node, sp, "at least one result must lead forward, or the stage can never finish")
 			return
 		}
-		if legacy, ok := adewire.LegacyOnFailure(steps[si].ID, rn.list, stepIDs(steps[:si])); ok {
-			steps[si].OnFailure = legacy
+		review := steps[si].Review != nil
+		if !explicit[si] {
+			steps[si].MaxReturns = adewire.DefaultLimit(review)
+			if legacy > 0 {
+				steps[si].MaxReturns = legacy
+			}
+		}
+		if rule, ok := adewire.LegacyOnFailure(steps[si].ID, rn.list, stepIDs(steps[:si]), steps[si].MaxReturns, review); ok {
+			steps[si].OnFailure = rule
 		}
 		steps[si].Results = rn.list
 	}
 }
 
-// loopMax sets r.Max: the declared budget on a loop route, 0 on a forward one (where a budget is an error).
-func (v *validator) loopMax(r *adewire.StepResult, node *yaml.Node, prefix string, loop bool) bool {
+// legacyMax reads a result's max, a budget from before max_returns: only on a loop route, and not beside
+// the step's max_returns. It returns 0 when none is declared.
+func (v *validator) legacyMax(node *yaml.Node, prefix string, loop, explicit bool) (int, bool) {
 	switch {
-	case node == nil && loop:
-		r.Max = adewire.DefaultLoopMax
 	case node == nil:
-		r.Max = 0
+		return 0, true
 	case !loop:
 		v.fail(node, prefix, "max is only allowed on a route back to this step or an earlier one")
-		return false
-	default:
-		n, err := strconv.Atoi(node.Value)
-		if node.Kind != yaml.ScalarNode || err != nil || n < 1 || n > adewire.MaxLoopMax {
-			v.fail(node, prefix, "max must be a whole number from 1 to %d", adewire.MaxLoopMax)
-			return false
-		}
-		r.Max = n
+		return 0, false
+	case explicit:
+		v.fail(node, prefix, "max moved to max_returns on the step; remove it")
+		return 0, false
 	}
-	return true
+	n, err := strconv.Atoi(node.Value)
+	if node.Kind != yaml.ScalarNode || err != nil || n < 1 || n > adewire.MaxMaxReturns {
+		v.fail(node, prefix, "max must be a whole number from 1 to %d", adewire.MaxMaxReturns)
+		return 0, false
+	}
+	return n, true
 }
 
 func cmpNode(n, fallback *yaml.Node) *yaml.Node {

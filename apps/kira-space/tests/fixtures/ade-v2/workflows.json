@@ -50,16 +50,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "stop",
-                    "max": 0
+                    "loop": false
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -85,16 +86,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "impl",
-                    "max": 1
+                    "loop": true
                   }
                 ],
+                "maxReturns": 1,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -120,16 +122,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "impl",
-                    "max": 3
+                    "loop": true
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -155,16 +158,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "impl",
-                    "max": 3
+                    "loop": true
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -190,16 +194,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "stop",
-                    "max": 0
+                    "loop": false
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -296,16 +301,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "stop",
-                    "max": 0
+                    "loop": false
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -331,16 +337,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "fix",
-                    "max": 1
+                    "loop": true
                   }
                 ],
+                "maxReturns": 1,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -366,16 +373,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "ci",
-                    "max": 2
+                    "loop": true
                   }
                 ],
+                "maxReturns": 2,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -401,16 +409,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "stop",
-                    "max": 0
+                    "loop": false
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -479,16 +488,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "stop",
-                    "max": 0
+                    "loop": false
                   }
                 ],
+                "maxReturns": 3,
                 "sandbox": {
                   "access": "write",
                   "read": [],
@@ -514,16 +524,17 @@
                     "ok": true,
                     "description": "",
                     "next": "next",
-                    "max": 0
+                    "loop": false
                   },
                   {
                     "id": "failed",
                     "ok": false,
                     "description": "",
                     "next": "ci",
-                    "max": 2
+                    "loop": true
                   }
                 ],
+                "maxReturns": 2,
                 "sandbox": {
                   "access": "write",
                   "read": [],

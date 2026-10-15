@@ -97,6 +97,14 @@ func TestParse_rules(t *testing.T) {
 		{"results max on forward", head + agent + step("s", resultsBlock("a", "true", "end", "2")), 0, "max is only allowed on a route back"},
 		{"results max range", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "11")), 0, "max must be a whole number from 1 to 10"},
 		{"results no forward", head + agent + step("s", resultsBlock("a", "false", "s", "")), 0, "at least one result must lead forward"},
+		{"max_returns ok", head + agent + step("s", "        max_returns: 10\n"), 0, ""},
+		{"max_returns zero on agent", head + agent + step("s", "        max_returns: 0\n"), 0, "max_returns must be a whole number from 1 to 10"},
+		{"max_returns over 10", head + agent + step("s", "        max_returns: 11\n"), 0, "max_returns must be a whole number from 1 to 10"},
+		{"max_returns text", head + agent + step("s", "        max_returns: lots\n"), 0, "max_returns must be a whole number"},
+		{"max_returns zero on review", head + agent + step("s", "") + reviewStep("r", "        max_returns: 0\n        review: {}\n"), 0, ""},
+		{"max_returns over 10 on review", head + agent + step("s", "") + reviewStep("r", "        max_returns: 11\n        review: {}\n"), 0, "from 0 to 10 on a review step"},
+		{"max_returns with on_failure", head + agent + step("s", "        on_failure: stop\n        max_returns: 2\n"), 0, "max_returns and on_failure cannot be used together"},
+		{"max_returns with result max", head + agent + step("s", "        max_returns: 2\n"+resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "2")), 0, "max moved to max_returns on the step"},
 		{"results with on_failure", head + agent + step("s", "        on_failure: stop\n"+resultsBlock("a", "true", "", "")), 0, "results and on_failure cannot be used together"},
 		{"results duplicate id", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "", "")+resultsBlock("b", "false", "", "")), 0, "already used by another result"},
 		{"results reserved id", head + agent + step("s", resultsBlock("needs_input", "true", "", "")), 0, "needs_input is reserved"},
@@ -220,5 +228,39 @@ func TestReader_lastValidSurvivesBreakage(t *testing.T) {
 	}
 	if _, ok := r.Get("w"); !ok {
 		t.Fatal("Get w")
+	}
+}
+
+func TestParse_returnLimits(t *testing.T) {
+	loopTo := resultsBlock("a", "true", "", "") + resultsBlock("b", "false", "s", "")
+	cases := []struct {
+		name, src string
+		want      int
+	}{
+		{"default", head + agent + step("s", ""), 3},
+		{"declared", head + agent + step("s", "        max_returns: 5\n"), 5},
+		{"review default is no limit", head + agent + step("s", "") + reviewStep("r", "        review: {}\n"), 0},
+		{"retry N", head + agent + step("s", "        on_failure: retry 2\n"), 2},
+		{"back keeps default", head + agent + step("s", "") + step("t", "        on_failure: back:s\n"), 3},
+		{"results without max", head + agent + step("s", loopTo), 3},
+		{"legacy result max folds", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "5")), 5},
+	}
+	for _, c := range cases {
+		wf, werr := Parse([]byte(c.src))
+		if werr != nil {
+			t.Fatalf("%s: %+v", c.name, werr)
+		}
+		steps := wf.Stages[0].Steps
+		if got := steps[len(steps)-1].MaxReturns; got != c.want {
+			t.Fatalf("%s: MaxReturns %d, want %d", c.name, got, c.want)
+		}
+	}
+	two := head + agent + step("s", "") + step("t", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "t", "2")+resultsBlock("c", "false", "s", "7"))
+	wf, werr := Parse([]byte(two))
+	if werr != nil || wf.Stages[0].Steps[1].MaxReturns != 7 {
+		t.Fatalf("two legacy values must fold to the largest: %+v %+v", wf, werr)
+	}
+	if r := wf.Stages[0].Steps[1].Results; !r[1].Loop || !r[2].Loop || r[0].Loop {
+		t.Fatalf("loop flags: %+v", r)
 	}
 }

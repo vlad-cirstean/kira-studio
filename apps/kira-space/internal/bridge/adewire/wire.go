@@ -87,26 +87,29 @@ type FolderImportResult struct {
 }
 
 // StepResult is one result a step may report through finish_step. Next is RouteNext, RouteEnd,
-// RouteStop or a step id of the same stage; Max is the loop budget of a route back to the step or an
-// earlier one, 0 on a forward route.
+// RouteStop or a step id of the same stage; Loop says the route goes back to the step or an earlier one
+// (a return, counted against the step's MaxReturns).
 type StepResult struct {
 	ID          string `json:"id"`
 	OK          bool   `json:"ok"`
 	Description string `json:"description"`
 	Next        string `json:"next"`
-	Max         int    `json:"max"`
+	Loop        bool   `json:"loop"`
 }
 
 type PipelineStep struct {
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	RunsOn       RunsOn       `json:"runsOn"`
-	Before       string       `json:"before"`    // 'auto' | 'approval'
-	OnFailure    OnFailure    `json:"onFailure"` // legacy rule; "" when Results are not expressible as one
-	Results      []StepResult `json:"results"`
-	Timeout      string       `json:"timeout"`
-	Prompt       string       `json:"prompt"`
-	AllowedTools []string     `json:"allowedTools"`
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	RunsOn    RunsOn       `json:"runsOn"`
+	Before    string       `json:"before"`    // 'auto' | 'approval'
+	OnFailure OnFailure    `json:"onFailure"` // legacy rule; "" when Results are not expressible as one
+	Results   []StepResult `json:"results"`
+	// MaxReturns is how many times a result may send the run back to this step or an earlier one before
+	// the run stops; 0 is no limit (review steps only).
+	MaxReturns   int      `json:"maxReturns"`
+	Timeout      string   `json:"timeout"`
+	Prompt       string   `json:"prompt"`
+	AllowedTools []string `json:"allowedTools"`
 	// SmartScript runs the named smart script instead of Prompt; Params are its values per param name.
 	SmartScript string              `json:"smartScript"`
 	Params      map[string][]string `json:"params"`
@@ -183,6 +186,23 @@ type Stage struct {
 	RunsOn    string         `json:"runsOn"`    // RunsOn | ''
 	OnFailure string         `json:"onFailure"` // OnFailure | ''
 	Timeout   string         `json:"timeout"`
+}
+
+// FillReturnLimits gives a step of a stored snapshot that predates MaxReturns the limit its on_failure
+// implies. A review step keeps 0 (no limit). Idempotent.
+func (s *Stage) FillReturnLimits() {
+	for i := range s.Steps {
+		if st := &s.Steps[i]; st.MaxReturns == 0 && st.Review == nil {
+			st.MaxReturns = LegacyLimit(string(st.OnFailure), false)
+		}
+	}
+}
+
+// FillReturnLimits fills every stage's step limits; see Stage.FillReturnLimits.
+func (w *Workflow) FillReturnLimits() {
+	for i := range w.Stages {
+		w.Stages[i].FillReturnLimits()
+	}
 }
 
 type Workflow struct {
@@ -320,6 +340,8 @@ type Run struct {
 	StartedAt  *int64   `json:"startedAt"`
 	FinishedAt *int64   `json:"finishedAt"`
 	Purpose    string   `json:"purpose"` // '' step run | 'rebase'
+	// Returns is how many times this branch's step went back up to and including this attempt.
+	Returns int `json:"returns"`
 	// Resumable says a restart stopped the run mid-session; ResumeRun continues it.
 	Resumable bool `json:"resumable"`
 	// Review is set on a review step run only.
