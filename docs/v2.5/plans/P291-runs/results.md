@@ -102,5 +102,5 @@ Telegraph post-pass (D24/D25, `tele` = every fact restyled, `tele-guard` = facts
 - Token recall: 0.607 -> 0.601 (`p3-01`), 0.631 -> 0.630 (`p2-02`); band_tok 0.024: pass.
 - Token check (D27): residual losses after one retry in `tele`: 14 of 209 facts on `p3-01`, mostly capitalised names or ids that repeat in one fact (for example `P257 | P257`), above the 0.01 rule. `tele` fails the token rule alone; `tele-guard` decides (failing facts keep full text).
 - TJ (Opus score judge over `tele` facts, `p3-01`): `R_ess` 0.885 -> 0.878 (-0.007, rule -0.020), unsupported 0.005 -> 0.010 (+0.005, rule +0.010), `R_all` 0.689 -> 0.681. Judge-bias deltas (reported, not gated): atomic 0.746 -> 0.770, standalone 0.981 -> 0.957, `P` 0.737 -> 0.727, reason ok 0.665 -> 0.699.
-- Style-pair cosine of a full fact with its rewrite: p10 above `DocFloor` 0.85 on both bases (`stylePairs` in the retrieval files).
+- Style-pair cosine of a full fact with its rewrite: p10 0.980 (`p3-01`, 209 pairs) and 0.982 (`p2-02`, 414), none below `DocFloor` 0.85; subject cut in 3 and 1 facts.
 - D26 verdict: passes with `tele-guard`. Non-inferior retrieval on two bases and hold-out, `C_store` lower, TJ inside rules, token rule met by the guard. Gain is small (about 7% fact chars, 4.5% `C_store`).
