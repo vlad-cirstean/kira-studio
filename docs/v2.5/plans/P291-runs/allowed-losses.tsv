@@ -2,3 +2,23 @@
 memory.import.finalize.system	negation "never" (5 to 4)	evidence-quote clause dropped: evidence no longer exists
 memory.import.verify.system	"evidence"	field dropped with the evidence quote
 memory.import.verify.system	negation "not" (2 to 1)	clause "where not asked for" dropped with the evidence field
+memory.distill.system	actions {{template "memory.dataHygiene"}} {{if .Instructions}} {{end}} {{.MaxLines}} changed to {{template "memory.dataHygiene"}} {{template "memory.factStyle"}} {{if .Instructions}} {{end}} {{.MaxLines}}	fragment memory.factStyle added to the template
+memory.distill.system	negation "except" (1 to 0)	style sentence moved into memory.factStyle, which holds the negation list
+memory.distill.system	negation "never" (5 to 4)	style sentence moved into memory.factStyle, which holds the negation list
+memory.distill.system	negation "no" (4 to 1)	style sentence moved into memory.factStyle, which holds the negation list
+memory.distill.system	negation "not" (2 to 1)	style sentence moved into memory.factStyle, which holds the negation list
+memory.distill.system	negation "only" (5 to 4)	style sentence moved into memory.factStyle, which holds the negation list
+memory.gate.system	"actually"	hedge-word example list replaced by memory.factStyle ("hedges")
+memory.gate.system	"basically"	hedge-word example list replaced by memory.factStyle ("hedges")
+memory.gate.system	"just"	hedge-word example list replaced by memory.factStyle ("hedges")
+memory.gate.system	"really"	hedge-word example list replaced by memory.factStyle ("hedges")
+memory.gate.system	"simply"	hedge-word example list replaced by memory.factStyle ("hedges")
+memory.gate.system	actions {{template "memory.dataHygiene"}} {{.MaxKeywords}} changed to {{template "memory.dataHygiene"}} {{template "memory.factStyle"}} {{.MaxKeywords}}	fragment memory.factStyle added to the template
+memory.gate.system	negation "except" (1 to 0)	style sentence moved into memory.factStyle, which holds the negation list
+memory.gate.system	negation "never" (6 to 5)	style sentence moved into memory.factStyle, which holds the negation list
+memory.gate.system	negation "no" (7 to 6)	style sentence moved into memory.factStyle, which holds the negation list
+memory.gate.system	negation "not" (6 to 5)	style sentence moved into memory.factStyle, which holds the negation list
+memory.gate.system	negation "only" (9 to 7)	style sentence moved into memory.factStyle, which holds the negation list
+memory.import.finalize.system	actions {{template "memory.dataHygiene"}} {{.MaxItems}} changed to {{template "memory.dataHygiene"}} {{template "memory.factStyle"}} {{.MaxItems}}	fragment memory.factStyle added to the template
+memory.import.verify.system	actions {{template "memory.dataHygiene"}} {{.MaxFacts}} changed to {{template "memory.dataHygiene"}} {{template "memory.factStyle"}} {{.MaxFacts}}	fragment memory.factStyle added to the template
+memory.reconcile.system	actions {{template "memory.dataHygiene"}} changed to {{template "memory.dataHygiene"}} {{template "memory.factStyle"}}	fragment memory.factStyle added to the template
