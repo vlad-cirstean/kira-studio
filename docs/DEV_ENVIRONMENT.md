@@ -526,7 +526,10 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
    Check the first denial from a new short-lived binary shows in the run-line badge; if not, record the miss.
 7. Plain HTTP (P292 A1): with network off and a real client, `curl http://example.com` through the proxy must
    fail with a 4xx or connection error. `curl https://<allowed host>` must still work.
-8. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
+8. MCP config read (P292 round 2): the profile allows reading a run's MCP config files by regex. Run an ADE step
+   with an MCP server under the sandbox; it must start and list its tools. Other files in the same temp dir stay
+   unreadable.
+9. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
 
 ## Load, disk and test scope (P236-P251)
 

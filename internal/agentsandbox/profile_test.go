@@ -125,8 +125,9 @@ func TestProfileGolden(t *testing.T) {
 func TestProfileAllowsMCPConfigs(t *testing.T) {
 	p := basePolicy()
 	prof := Profile(p, fakeRuntime())
-	allowRead := prof[strings.Index(prof, "(allow file-read-data"):]
-	allowRead = allowRead[:strings.Index(allowRead, "))\n")+1]
+	_, allowRead, _ := strings.Cut(prof, "(allow file-read-data")
+	allowRead, _, _ = strings.Cut(allowRead, "))\n")
+	allowRead += ")"
 	var res []*regexp.Regexp
 	for _, m := range regexp.MustCompile(`\(regex #"([^"]+)"\)`).FindAllStringSubmatch(allowRead, -1) {
 		res = append(res, regexp.MustCompile(m[1]))
