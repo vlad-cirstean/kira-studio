@@ -54,20 +54,6 @@ const gate = {
   defaultText: 'Judge each fact.',
   text: 'Judge each fact.',
 };
-const factStyle = {
-  ...listed,
-  id: 'memory.factStyle',
-  kind: 'fragment',
-  titleKey: 'llmPrompts.entry.memoryFactStyle.title',
-  purposeKey: 'llmPrompts.entry.memoryFactStyle.description',
-  usedByKey: 'llmPrompts.entry.memoryFactStyle.usedBy.body',
-  hash: 'fact-style-hash',
-  vars: [],
-  fragments: [],
-  schema: '',
-  defaultText: 'Telegraphic: keep only words that carry meaning.',
-  text: 'Telegraphic: keep only words that carry meaning.',
-};
 const finishStep = {
   ...listed,
   id: 'headless.tool.finish_step',
@@ -259,29 +245,4 @@ test('a conflict shows the error and keeps the draft', async ({ relaunch }) => {
   await expect(window.locator('[data-testid="settings-save-error"]')).toHaveText(CONFLICT.message);
   await expect(window.locator('[data-testid="settings-dialog"]')).toBeVisible();
   await expect.poll(() => promptEditorText(promptEditor(window))).toBe(editText);
-});
-
-test('lists the fact-style fragment and saves an edit of it', async ({ relaunch }) => {
-  const edited = 'Keep every word.';
-  const { window, control } = await relaunch({
-    control: [
-      { channel: IPC.llmPromptsList, response: promptList(gate, factStyle) },
-      previewOf(factStyle.id, undefined, noFindings),
-      previewOf(factStyle.id, edited, noFindings),
-      { channel: IPC.llmPromptsSave, response: promptList(gate, { ...factStyle, text: edited }) },
-    ],
-  });
-  await openPrompts(window);
-
-  await expect(promptRow(window, factStyle.id)).toContainText('Fact style');
-  await expect(promptBadges(window, factStyle.id)).toHaveCount(0);
-  await promptRow(window, factStyle.id).click();
-  await typeDraft(window, edited);
-  await window.locator('[data-testid="settings-save"]').click();
-
-  await expect(window.locator('[data-testid="settings-dialog"]')).toHaveCount(0);
-  const [save] = calls(control, IPC.llmPromptsSave);
-  expect(save.args).toEqual({
-    changes: [{ id: factStyle.id, text: edited, baseHash: factStyle.hash }],
-  });
 });

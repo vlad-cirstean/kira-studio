@@ -12,44 +12,24 @@ import (
 
 const (
 	gateMarker   = "EDITED-GATE-MARKER"
-	gateOverride = gateMarker + ` keeps at most {{.MaxKeywords}} keywords. {{template "memory.dataHygiene"}} {{template "memory.factStyle"}}`
-	styleMarker  = "EDITED-STYLE-MARKER keep every word."
+	gateOverride = gateMarker + ` keeps at most {{.MaxKeywords}} keywords. {{template "memory.dataHygiene"}}`
 )
 
 func overrideGate(t *testing.T, app *flowharness.App) {
-	t.Helper()
-	override(t, app, llmprompts.MemoryGateSystem.ID(), gateOverride)
-}
-
-func override(t *testing.T, app *flowharness.App, id llmprompts.ID, text string) {
 	t.Helper()
 	l, err := app.W.LlmPromptsSvc.List()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range l.Prompts {
-		if p.ID == id {
-			if _, err := app.W.LlmPromptsSvc.Save(llmprompts.SaveArgs{Changes: []llmprompts.Change{{ID: p.ID, Text: text, BaseHash: p.Hash}}}); err != nil {
+		if p.ID == llmprompts.MemoryGateSystem.ID() {
+			if _, err := app.W.LlmPromptsSvc.Save(llmprompts.SaveArgs{Changes: []llmprompts.Change{{ID: p.ID, Text: gateOverride, BaseHash: p.Hash}}}); err != nil {
 				t.Fatalf("Save: %v", err)
 			}
 			return
 		}
 	}
-	t.Fatalf("%s not listed", id)
-}
-
-// An edited fact-style fragment reaches the gate system text the next store call sends.
-func TestStoreUsesEditedFactStyle(t *testing.T) {
-	app := flowharness.New(t)
-	gate(t, app, "gate-accept.json")
-	override(t, app, llmprompts.MemoryFactStyle.ID(), styleMarker)
-	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err != nil {
-		t.Fatal(err)
-	}
-	args := recordedArgs(t, app)
-	if len(args) == 0 || !strings.Contains(args[0], styleMarker) {
-		t.Fatalf("gate call args = %q, want the edited fact style in the system prompt", args)
-	}
+	t.Fatal("memory.gate.system not listed")
 }
 
 // An edited gate prompt reaches the next in-app gate call.

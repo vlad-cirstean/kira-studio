@@ -1,11 +1,10 @@
 # id<TAB>max rendered-example runes (promptsizes). Ratchet: a new or longer prompt needs a visible line change.
-memory.factStyle	547
 memory.dataHygiene	177
-memory.gate.system	3490
-memory.reconcile.system	1913
-memory.distill.system	1983
-memory.import.finalize.system	3109
-memory.import.verify.system	1806
+memory.gate.system	3316
+memory.reconcile.system	1344
+memory.distill.system	1763
+memory.import.finalize.system	2529
+memory.import.verify.system	1230
 memory.mcp.instructions	1644
 memory.mcp.tool.store_memory	490
 memory.mcp.tool.store_memory.arg.items	66
