@@ -78,7 +78,7 @@ func Omit(keys ...string) ContractOption {
 //
 // Normalisation keeps the file stable and machine independent: UUIDs become <id:n> and RFC3339
 // timestamps <time> (second resolution makes equality between two of them run-dependent); ids are
-// numbered by first appearance across everything the test stores in that file, so equal ids stay
+// numbered by first appearance, in object keys too, across everything the test stores in that file, so equal ids stay
 // equal, also between keys. Replace swaps paths and URLs for placeholders.
 func Contract(t testing.TB, dir, scenario, key string, got any, opts ...ContractOption) {
 	t.Helper()
@@ -176,7 +176,7 @@ func (n *normalizer) walk(v any) any {
 				out[k] = zero(x[k])
 				continue
 			}
-			out[k] = n.walk(x[k])
+			out[n.str(k)] = n.walk(x[k])
 		}
 		return out
 	case []any:

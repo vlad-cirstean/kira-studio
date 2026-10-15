@@ -812,8 +812,8 @@
       }
     ],
     "since": {
-      "implement/8126ec7c-d11a-4987-a528-3497861d8733": 1,
-      "review/8126ec7c-d11a-4987-a528-3497861d8733": 1
+      "implement/<id:1>": 1,
+      "review/<id:1>": 1
     },
     "title": "Fix login",
     "workflow": {
@@ -995,27 +995,6 @@
     "owner": "",
     "runs": [
       {
-        "attempt": 3,
-        "branchId": "<masked>",
-        "exitCode": null,
-        "finishedAt": null,
-        "id": "<masked>",
-        "loops": 1,
-        "note": "",
-        "outcome": null,
-        "purpose": "",
-        "resumable": false,
-        "returns": 1,
-        "review": null,
-        "sandbox": null,
-        "sessionId": "<masked>",
-        "startedAt": null,
-        "state": "pending",
-        "stepId": "review",
-        "summary": "",
-        "taskId": "<masked>"
-      },
-      {
         "attempt": 1,
         "branchId": "<masked>",
         "exitCode": 0,
@@ -1144,10 +1123,36 @@
         "stepId": "implement",
         "summary": "summary-done",
         "taskId": "<masked>"
+      },
+      {
+        "attempt": 3,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": null,
+        "id": "<masked>",
+        "loops": 1,
+        "note": "",
+        "outcome": null,
+        "purpose": "",
+        "resumable": false,
+        "returns": 1,
+        "review": {
+          "note": "",
+          "phase": "waiting",
+          "round": 0,
+          "route": "implementer"
+        },
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "review",
+        "stepId": "review",
+        "summary": "",
+        "taskId": "<masked>"
       }
     ],
     "since": {
-      "review/e8d767f8-7dee-4c37-9e78-0e0acb09fca4": 1
+      "review/<id:1>": 1
     },
     "title": "Fix login",
     "workflow": {

@@ -148,6 +148,7 @@ func TestFlatSteps(t *testing.T) {
 		if again.Attempt != 2 {
 			t.Fatalf("implement = %+v, want attempt 2 after the return", again)
 		}
+		waitRun(t, f.app, f.taskID, "review", "review")
 		returned := entryOf(t, f)
 		f.app.Contract(t, "ade-flat-steps", "AdeTaskService.Task#return", returned, taskMask)
 		var back adewire.Run
