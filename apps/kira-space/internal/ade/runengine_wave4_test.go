@@ -98,7 +98,7 @@ func TestRunEngine_sendBack(t *testing.T) {
 		id := e.task("api")
 		e.start(id)
 		r := e.waitRun(id, "tests/api", model.AdeRunFailed)
-		if r.Attempt != 4 || r.Note != "summary-failed (sent back 3 times)" {
+		if r.Attempt != 4 || r.Note != "Stopped: tests reached its limit of 3 returns." {
 			t.Fatalf("capped tests run = %+v", r)
 		}
 		if n, _ := e.repos.AdeTasks.CountRuns(id, "build", "tests", r.BranchID, model.AdeRunBack); n != 3 {

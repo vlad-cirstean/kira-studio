@@ -530,6 +530,7 @@ func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, review
 	if t.CurrentStageJSON != "" {
 		var st adewire.Stage
 		if err := json.Unmarshal([]byte(t.CurrentStageJSON), &st); err == nil {
+			st.FillReturnLimits()
 			if st.Steps == nil {
 				st.Steps = []adewire.PipelineStep{}
 			}
@@ -543,6 +544,9 @@ func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, review
 			continue
 		}
 		w := toWireRun(r)
+		if r.Purpose == "" {
+			w.Returns = countReturns(runs, r.StageID, r.StepID, r.BranchID, r.Attempt)
+		}
 		if rev, ok := reviews[r.ID]; ok {
 			w.Review = reviewWire(r, rev, latestRoundOf(runs, r.ID))
 		}

@@ -28,6 +28,7 @@ func (b *TaskBoard) taskWorkflow(t model.AdeTask) (adewire.Workflow, bool) {
 			slog.Warn("ade: unreadable workflow snapshot", "scope", "ade", "task", t.ID, "err", err)
 			return adewire.Workflow{}, false
 		}
+		wf.FillReturnLimits()
 		return wf, true
 	}
 	if t.WorkflowID == "" || b.deps.Workflows == nil {
@@ -89,6 +90,7 @@ func decorateTask(out *adewire.Task, t model.AdeTask, liveHash func(id string) (
 	if err := json.Unmarshal([]byte(t.WorkflowJSON), &wf); err != nil {
 		return
 	}
+	wf.FillReturnLimits()
 	out.Workflow = &wf
 	if live, ok := liveHash(t.WorkflowID); ok {
 		out.WorkflowOutdated = live != t.WorkflowHash

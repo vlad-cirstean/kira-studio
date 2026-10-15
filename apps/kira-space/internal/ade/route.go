@@ -3,16 +3,19 @@ package ade
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
+	"strconv"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 // route.go routes a finished step run on its result (R4, R5): forward, to the end of the stage, to a
-// stop, or back to this step or an earlier one. A loop is bounded by its result's max, counted per
-// (task, stage, step, branch, result) and never reset. A loop to an earlier step resumes that step's
+// stop, or back to this step or an earlier one. A return (a loop) is bounded by the step's ReturnLimit,
+// counted per (task, stage, step, branch) from its `back` rows and never reset. A loop to an earlier step resumes that step's
 // Claude session with a fix line; the chain then runs again (steps.go chainRerun).
 
 // runOpts are the per-run extras queueRun carries to launch. Launch lives on the run row until the
@@ -107,28 +110,29 @@ func stopped(out outcome) outcome {
 // decideLoop routes a result back to plan[target] (the step itself when target == idx).
 func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, out outcome, res adewire.StepResult, idx, target int) (*pendingLoop, outcome) {
 	reason := cmpNonEmpty(out.summary, out.note)
-	spent, err := b.loopsSpent(run, res.ID)
+	spent, err := b.returnsSpent(run)
 	if err != nil {
-		slog.Warn("ade: count loop rounds", "scope", "ade", "run", run.ID, "err", err)
+		slog.Warn("ade: count returns", "scope", "ade", "run", run.ID, "err", err)
 		return nil, stopped(out)
 	}
 	round := spent + 1
 	self := target == idx
-	if round > res.Max {
-		verb := "sent back"
-		if self {
-			verb = "retried"
-		}
+	limit := plan[idx].Def.ReturnLimit
+	if limit > 0 && round > limit {
 		out = stopped(out)
-		out.note = fmt.Sprintf("%s (%s %d times)", reason, verb, res.Max)
+		out.note = i18n.T("backend.space.ade.returnLimit.body", map[string]string{"step": plan[idx].Def.Name, "limit": strconv.Itoa(limit)})
 		out.out.Reason = out.note
 		return nil, out
+	}
+	count := strconv.Itoa(round)
+	if limit > 0 {
+		count += " of " + strconv.Itoa(limit)
 	}
 	loop := &pendingLoop{tc: tc, plan: plan, target: target, branch: run.BranchID, attempt: run.Attempt + 1, opts: runOpts{Loops: run.Loops}}
 	out.state = model.AdeRunBack
 	if self {
 		out.out.Route = "retry"
-		out.note = fmt.Sprintf("retry %d of %d", round, res.Max)
+		out.note = "retry " + count
 		out.out.Reason = cmpNonEmpty(reason, out.note)
 		return loop, out
 	}
@@ -153,7 +157,7 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 		loop.opts.Launch.Extra = line
 	}
 	out.out.Route = "back:" + targetDef.ID
-	out.note = fmt.Sprintf("%s → back to %s (%d of %d)", reason, targetDef.Name, round, res.Max)
+	out.note = fmt.Sprintf("%s → back to %s (%s)", reason, targetDef.Name, count)
 	out.out.Reason = out.note
 	return loop, out
 }
@@ -170,27 +174,26 @@ func (b *TaskBoard) nextLoops(plan []stepView, branch string) int {
 	return round + 1
 }
 
-// loopsSpent counts the earlier `back` runs of the run's step and branch that reported the result.
-// A back run from before results has no result id: it counts as `failed`.
-func (b *TaskBoard) loopsSpent(run model.AdeRun, resultID string) (int, error) {
+// returnsSpent counts the earlier returns of the run's step and branch: its `back` step runs, whatever
+// result sent them back.
+func (b *TaskBoard) returnsSpent(run model.AdeRun) (int, error) {
 	runs, err := b.deps.Tasks.RunsOfTask(run.TaskID)
 	if err != nil {
 		return 0, err
 	}
+	return countReturns(runs, run.StageID, run.StepID, run.BranchID, math.MaxInt), nil
+}
+
+// countReturns counts the `back` step runs (no review round, no rebase) of one step on one branch up to
+// and including attempt upTo.
+func countReturns(runs []model.AdeRun, stage, step, branch string, upTo int) int {
 	n := 0
 	for _, r := range runs {
-		if r.StageID != run.StageID || r.StepID != run.StepID || r.BranchID != run.BranchID || r.State != model.AdeRunBack {
-			continue
-		}
-		got := adewire.ResultFailed
-		if r.Outcome != nil && r.Outcome.Result != "" {
-			got = r.Outcome.Result
-		}
-		if got == resultID {
+		if r.Purpose == "" && r.State == model.AdeRunBack && r.StageID == stage && r.StepID == step && r.BranchID == branch && r.Attempt <= upTo {
 			n++
 		}
 	}
-	return n, nil
+	return n
 }
 
 // claudeIDOfSession is the Claude session id behind an ade_sessions record id, "" when unknown.

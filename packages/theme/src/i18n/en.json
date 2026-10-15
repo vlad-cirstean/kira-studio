@@ -1089,6 +1089,9 @@
         "resumeNotResumable": {
           "body": "Only a run Kira Space interrupted can resume."
         },
+        "returnLimit": {
+          "body": "Stopped: {step} reached its limit of {limit} returns."
+        },
         "reviewConversationReset": {
           "body": "The previous review conversation ran in {path}, which no longer exists. Started a new one."
         },

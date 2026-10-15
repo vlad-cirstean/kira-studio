@@ -17,7 +17,9 @@ import (
 type stepDef struct {
 	ID, Name, RunsOn, Before, OnFailure, Timeout, Prompt string
 	// Results are the step's declared (or implicit) results with their routes.
-	Results      []adewire.StepResult
+	Results []adewire.StepResult
+	// ReturnLimit is how many returns the step may make before the run stops; 0 is no limit.
+	ReturnLimit  int
 	AllowedTools []string
 	// DisallowedTools become --disallowedTools; only the rebase step sets them.
 	DisallowedTools []string
@@ -43,7 +45,7 @@ func stageSteps(st adewire.Stage) []stepDef {
 			onFailure = "stop"
 		}
 		return []stepDef{{ID: st.ID, Name: st.Name, RunsOn: runsOn, Before: "auto", OnFailure: onFailure,
-			Results: adewire.ImplicitResults(st.ID, onFailure), Timeout: st.Timeout, Prompt: st.Command, Sandbox: adewire.DefaultSandbox()}}
+			Results: adewire.ImplicitResults(st.ID, onFailure), ReturnLimit: adewire.LegacyLimit(onFailure, false), Timeout: st.Timeout, Prompt: st.Command, Sandbox: adewire.DefaultSandbox()}}
 	case "agent":
 		out := make([]stepDef, len(st.Steps))
 		for i, s := range st.Steps {
@@ -51,7 +53,7 @@ func stageSteps(st adewire.Stage) []stepDef {
 			if len(results) == 0 { // a snapshot from before results: its on_failure rule
 				results = adewire.ImplicitResults(s.ID, cmpNonEmpty(s.OnFailure, "stop"))
 			}
-			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure, Results: results,
+			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure, Results: results, ReturnLimit: s.MaxReturns,
 				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools,
 				SmartScript: s.SmartScript, Params: s.Params, Review: s.Review, Sandbox: s.Sandbox.Normalized()}
 		}

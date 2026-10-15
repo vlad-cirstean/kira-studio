@@ -13,11 +13,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-// reviewResults are the results of a review step: approved moves on, changes loops back to impl.
-func reviewResults(max int) string {
+// reviewResults are the results of a review step: approved moves on, changes loops back to impl. A
+// positive maxReturns sets the step's return limit.
+func reviewResults(maxReturns int) string {
 	m := ""
-	if max > 0 {
-		m = "            max: " + strconv.Itoa(max) + "\n"
+	if maxReturns > 0 {
+		m = "        max_returns: " + strconv.Itoa(maxReturns) + "\n"
 	}
 	return "        results:\n" +
 		"          - id: approved\n            ok: true\n" +
@@ -80,7 +81,7 @@ func TestBranching(t *testing.T) {
 		}
 	})
 
-	t.Run("a fix round counts against its result's loop budget", func(t *testing.T) {
+	t.Run("a fix round counts against the step's return limit", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:changes", "done", "result:approved"),
 			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(2))))
 		f.start(t, "feat/api-work")
@@ -105,7 +106,7 @@ func TestBranching(t *testing.T) {
 		f.app.Contract(t, "ade-branching", "AdeTaskService.Run#review-back", back, runMask)
 	})
 
-	t.Run("a spent loop budget stops the stage", func(t *testing.T) {
+	t.Run("a spent return limit stops the stage", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:changes", "done", "result:changes", "done", "result:changes"),
 			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(2))))
 		f.start(t, "feat/api-work")
@@ -119,7 +120,7 @@ func TestBranching(t *testing.T) {
 			return last.State == "failed"
 		})
 		res, route := resultOf(last)
-		if res != "changes" || route != "stop" || !strings.Contains(last.Note, "sent back 2 times") {
+		if res != "changes" || route != "stop" || last.Note != "Stopped: review reached its limit of 2 returns." {
 			t.Fatalf("last review = %+v, want failed with result changes, route stop and the spent note", last)
 		}
 		f.app.Contract(t, "ade-branching", "AdeTaskService.Run#review-spent", last, runMask)
@@ -194,8 +195,9 @@ func TestBranching(t *testing.T) {
 		review := &wf.Stages[0].Steps[1]
 		review.Results = []adewire.StepResult{
 			{ID: "approved", OK: true, Next: "next"},
-			{ID: "changes", Description: "Needs work.", Next: "impl", Max: 2},
+			{ID: "changes", Description: "Needs work.", Next: "impl", Loop: true},
 		}
+		review.MaxReturns = 2
 		args := adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf, BaseHash: entry.Hash}
 		saved, err := f.app.W.AdeTask.SaveWorkflow(ctx, args)
 		if err != nil || saved.Error != nil {
@@ -205,7 +207,7 @@ func TestBranching(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, want := range []string{"results:", "id: changes", "next: impl", "max: 2", "description: Needs work."} {
+		for _, want := range []string{"results:", "id: changes", "next: impl", "max_returns: 2", "description: Needs work."} {
 			if !strings.Contains(y.Yaml, want) {
 				t.Fatalf("saved yaml lacks %q:\n%s", want, y.Yaml)
 			}
@@ -213,7 +215,7 @@ func TestBranching(t *testing.T) {
 		f.app.Contract(t, "ade-workflow-results", "args:AdeTaskService.SaveWorkflow", args, flowharness.Mask("baseHash"))
 		f.app.Contract(t, "ade-workflow-results", "AdeTaskService.SaveWorkflow", saved, flowharness.Mask("hash"))
 		got := saved.Workflow.Stages[0].Steps[1].Results
-		if len(got) != 2 || got[1].ID != "changes" || got[1].Max != 2 || got[1].Next != "impl" {
+		if len(got) != 2 || got[1].ID != "changes" || !got[1].Loop || saved.Workflow.Stages[0].Steps[1].MaxReturns != 2 || got[1].Next != "impl" {
 			t.Fatalf("saved results = %+v", got)
 		}
 	})

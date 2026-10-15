@@ -98,6 +98,7 @@ func (b *TaskBoard) loadTaskCtx(taskID string) (*taskCtx, error) {
 		if err := json.Unmarshal([]byte(task.CurrentStageJSON), &st); err != nil {
 			return nil, fmt.Errorf("ade: unreadable stage of task %s: %w", taskID, err)
 		}
+		st.FillReturnLimits()
 		tc.stage = &st
 	}
 	live, err := b.deps.Tasks.BranchesLive()

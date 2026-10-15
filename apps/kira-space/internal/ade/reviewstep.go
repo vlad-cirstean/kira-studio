@@ -101,6 +101,9 @@ func (b *TaskBoard) wireRun(r model.AdeRun) adewire.Run {
 	if r.Purpose != "" {
 		return w
 	}
+	if runs, err := b.deps.Tasks.RunsOfTask(r.TaskID); err == nil {
+		w.Returns = countReturns(runs, r.StageID, r.StepID, r.BranchID, r.Attempt)
+	}
 	rev, err := b.deps.Tasks.GetReview(r.ID)
 	if err != nil || rev == nil {
 		return w
