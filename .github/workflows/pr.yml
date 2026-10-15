@@ -15,10 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Only the work that genuinely needs macOS: cgo-aware go vet/build (catches darwin build-tag
+  # breaks) and the darwin&&cgo-only test packages. Everything else that used to live here (lint,
+  # typecheck, the frontend builds as their own check, lint:dead, verify:packaging) doesn't touch
+  # cgo or darwin build tags, so it moved to checks-linux — a cheaper, usually-faster runner, and
+  # it now runs in parallel with this job instead of serialized in front of it.
   checks:
     name: checks (macOS)
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -47,11 +52,8 @@ jobs:
           key: wails-bindings-${{ hashFiles('go.mod') }}
       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh, apps/kira-studio/frontend/src/bridge/*.ts import them directly; the two caches above make this a no-op on a hit — setup.sh still validates the cached wails3 binary against go.mod's pinned version/toolchain before trusting it)
         run: sh scripts/setup.sh
-      - name: GNU grep for scripts/check-theme-classes.sh (macOS grep has no -P)
-        run: brew install grep
-      - run: bun run lint
-      - run: bun run typecheck
-      - run: bun run build:studio
+      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can even compile the root package for both apps — checks-linux covers the frontend build as its own check; this is only here so the embed below has something to compile)
+        run: bun run build:studio
       - run: bun run build:space
       - name: Cache golangci-lint binary (P94 — keyed on the install script, which pins the version, and go.mod, which pins the toolchain it's built against; built from source since neither the prebuilt binary nor golangci/golangci-lint-action tolerate this repo's go.mod toolchain pin, docs/DEV_ENVIRONMENT.md)
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -59,7 +61,6 @@ jobs:
           path: ~/go/bin/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ hashFiles('scripts/install-golangci-lint.sh', 'go.mod') }}
       - run: bun run lint:go
-      - run: bun run lint:dead
       - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
         run: go build ./...
       - name: Go unit tests, darwin-relevant packages only (v1.4 P1 — container-tests already runs the full ./... on Linux with Docker, covering every non-container case here too, so a macOS-only full run was pure duplication; these five have real darwin&&cgo test/implementation files — secrets, metrics, localauth, gitclient, datagrip)
@@ -70,16 +71,59 @@ jobs:
             ./apps/kira-studio/internal/localauth/... \
             ./apps/kira-space/internal/gitclient \
             ./apps/kira-studio/internal/datagrip/...
+
+  # Everything checks (macOS) used to also run that doesn't touch cgo or darwin build tags — lint,
+  # typecheck, the frontend builds as their own check, lint:dead, verify:packaging (its own artifact
+  # checks are skipped here since this job never packages a .app/.dmg). Runs on ubuntu-latest, in
+  # parallel with checks (macOS) rather than serialized behind it.
+  checks-linux:
+    name: checks (Linux)
+    needs: wails-linux-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/go/bin/wails3
+          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            apps/kira-studio/frontend/bindings
+            apps/kira-studio/.task
+          key: wails-bindings-${{ hashFiles('go.mod') }}
+      - name: Generate Wails bindings
+        run: sh scripts/setup.sh
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run build:studio
+      - run: bun run build:space
+      - run: bun run lint:dead
       - run: bun run verify:packaging
 
-  # Builds and caches the Linux wails3 CLI once, so `ui` and `container-tests` — both ubuntu-latest,
-  # both otherwise independent of each other — don't race to `go install` the same binary in
-  # parallel on a go.mod-hash cache miss. Their own "Cache wails3 CLI"/"Cache generated Wails
-  # bindings" steps still run (a job's cache isn't visible until restored on that job's own runner),
-  # but land as cache hits instead of rebuilding.
+  # Builds and caches the Linux wails3 CLI once, so `checks-linux`, `ui` and `container-tests` —
+  # all ubuntu-latest, all otherwise independent of each other — don't race to `go install` the
+  # same binary in parallel on a go.mod-hash cache miss. Their own "Cache wails3 CLI"/"Cache
+  # generated Wails bindings" steps still run (a job's cache isn't visible until restored on that
+  # job's own runner), but land as cache hits instead of rebuilding. No longer gated behind checks
+  # (macOS) — it doesn't consume anything that job produces, so it now starts immediately.
   wails-linux-cli:
     name: wails-linux-cli (Linux)
-    needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -117,7 +161,7 @@ jobs:
 
   ui:
     name: ui (Linux)
-    needs: [checks, wails-linux-cli]
+    needs: [checks, checks-linux, wails-linux-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -175,7 +219,7 @@ jobs:
 
   container-tests:
     name: container-tests (Linux)
-    needs: [checks, wails-linux-cli]
+    needs: [checks, checks-linux, wails-linux-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
