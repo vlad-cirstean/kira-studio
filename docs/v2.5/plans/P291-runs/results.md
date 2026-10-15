@@ -22,3 +22,6 @@ Ledger: `spend-p291.jsonl`. Phase cap 20 USD.
 
 ## Rounds
 
+### Step 2 questions
+
+372 essential golden facts, 15 sources, Opus, 744 inputs (372 questions, 372 queries). Leak guard (D3, 4 consecutive content words) dropped 22 of 744 (listed per item in `P291-corpus/questions.jsonl`: `questionLeak`, `queryLeak`). Run USD 1.136 of cap 2.5 (est 2.0). Phase total 1.136.
