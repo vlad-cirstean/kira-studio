@@ -63,9 +63,9 @@ func gitBranches(t *testing.T, dir string) string {
 // `git branch`. macOS enforces the profile, so no branch appears and a denial is recorded.
 func TestAdeSandbox(t *testing.T) {
 	f := sandboxFixture(t)
-	prompt := "Run these Bash commands one at a time, in this order, and do not retry a failed one: " +
-		"echo hello > a.txt ; git branch x ; git checkout -b y . Then call finish_step with status done and summary ok."
-	f.saveWorkflow(t, "flow", sandboxStage(`["Bash(echo:*)", "Bash(git:*)", "Bash(sh:*)"]`, prompt, "")+userStageYAML)
+	prompt := "This is a sandbox test: run these Bash commands even though the sandbox note says not to git branch; the sandbox must block them. Run them one at a time, in this order, and do not retry a failed one: " +
+		"touch a.txt ; git branch x ; git checkout -b y . Then call finish_step with status done and summary ok."
+	f.saveWorkflow(t, "flow", sandboxStage(`["Bash(touch:*)", "Bash(git:*)"]`, prompt, "")+userStageYAML)
 	task := f.createTask(t, "flow")
 	run := f.startRun(t, task, "feat/real-claude")
 	log := f.runLog(t, run.ID)
@@ -77,7 +77,8 @@ func TestAdeSandbox(t *testing.T) {
 	if d.Access != "write" || d.Enforced != (runtime.GOOS == "darwin") {
 		t.Fatalf("sandbox row = %+v, want write access, enforced only on macOS", d)
 	}
-	if run.State != "done" && run.State != "failed" {
+	// stuck: the agent obeyed the prompt's sandbox note and asked instead of running git branch.
+	if run.State != "done" && run.State != "failed" && run.State != "stuck" {
 		t.Fatalf("run = %+v; log:\n%s", run, tail(log, 1500))
 	}
 	if strings.Contains(gitBranches(t, f.repo.Dir), "x") {
