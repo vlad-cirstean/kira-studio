@@ -35,11 +35,11 @@ async function open(page: Page, id: string): Promise<void> {
 const step = (page: Page, stepId: string) =>
   page.locator(`${t('ade-step-block')}[data-step-id="${stepId}"]`);
 
-/** T_alerts moved to a not yet started Implement step of the standard workflow. */
-function alertsInImpl(b: AdeBoardFx): void {
+/** T_alerts moved to a not yet started Plan step of the standard workflow. */
+function alertsInPlan(b: AdeBoardFx): void {
   const alerts = b.tasks.find((x) => x.id === 'T_alerts');
   if (!alerts) throw new Error('fixture tasks missing');
-  alerts.entryStepId = 'impl';
+  alerts.entryStepId = 'plan';
   alerts.workflowId = 'standard';
   alerts.runs = [];
 }
@@ -63,14 +63,14 @@ test('Edit workflows opens the Workflows page', async ({ relaunch }) => {
 });
 
 test('the Run dialog shows the default message and the read-only suffix', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInPlan));
   await page.locator(cellAction('T_alerts', 'run')).click();
   const dialog = page.locator(t('ade-run-dialog'));
-  await expect(dialog).toContainText('Run Implement in the background');
+  await expect(dialog).toContainText('Run Plan from spec in the background');
   await expect(dialog.locator(t('ade-run-branch'))).toHaveCount(2);
   const msg = dialog.locator(t('ade-run-message'));
   await expect(msg).toHaveValue(
-    /^Task: .*\n- Jira: PAY-130 \S+\n- Repo: \{repo\} · Branch: \{branch\} · Worktree: \{worktree\}\nStep 1\/5: Plan from spec\n/,
+    /^Task: .*\n- Jira: PAY-130 \S+\n- Repo: \{repo\} · Branch: \{branch\} · Worktree: \{worktree\}\nStep 1\/6: Plan from spec\n/,
   );
   await expect(dialog.locator(t('ade-run-suffix'))).toHaveText(previewText('finish'));
   await expect(dialog.locator(t('ade-run-suffix'))).toContainText('call finish_step');
@@ -95,7 +95,7 @@ test('the Run dialog asks no branch names when the workflow has Kira Space tools
   const wfs = adeFixture<{ workflows: { workflow: { kiraSpaceMcp: boolean } }[] }>('workflows');
   for (const w of wfs.workflows) if (w.workflow) w.workflow.kiraSpaceMcp = true;
   const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskBoard, response: adeBoard(alertsInImpl) },
+    { channel: IPC.adeTaskBoard, response: adeBoard(alertsInPlan) },
     { channel: IPC.adeTaskWorkflows, response: wfs },
     ...runPreviewSnapshots(),
   ]);
@@ -113,7 +113,7 @@ test('the Run dialog asks no branch names when the workflow has Kira Space tools
 });
 
 test('an edited message is sent and Reset restores the default', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInPlan));
   await page.locator(cellAction('T_alerts', 'run')).click();
   const dialog = page.locator(t('ade-run-dialog'));
   const msg = dialog.locator(t('ade-run-message'));
@@ -133,7 +133,7 @@ test('an edited message is sent and Reset restores the default', async ({ relaun
 });
 
 test('Cancel closes the Run dialog without a call', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInPlan));
   await page.locator(cellAction('T_alerts', 'run')).click();
   await page.locator(t('ade-run-cancel')).click();
   await expect(page.locator(t('ade-run-dialog'))).toBeHidden();
@@ -195,16 +195,26 @@ test('Retry also covers a stuck run and the step line offers it', async ({ relau
 
 test('Done and Finish call StepDone', async ({ relaunch }) => {
   const fx = adeFixture<{
-    workflows: { workflow: { steps: { id: string; session: boolean; prompt: string }[] } | null }[];
+    workflows: {
+      fileName: string;
+      workflow: { steps: { id: string; kind: string; session: boolean; prompt: string }[] } | null;
+    }[];
   }>('workflows');
-  const review = fx.workflows[0]?.workflow?.steps.find((x) => x.id === 'review');
+  const release = fx.workflows
+    .find((w) => w.fileName === 'bugfix.yaml')
+    ?.workflow?.steps.find((x) => x.id === 'release');
+  if (!release) throw new Error('bugfix release step missing');
+  const review = fx.workflows
+    .find((w) => w.fileName === 'standard.yaml')
+    ?.workflow?.steps.find((x) => x.id === 'review');
   if (review) Object.assign(review, { session: false, prompt: '' });
+  // A manual last step without a session: its action reads Finish.
+  Object.assign(release, { kind: 'manual', session: false, prompt: '', command: '' });
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskWorkflows, response: fx },
     ...boardWith((b) => {
       const cart = b.tasks.find((x) => x.id === 'T_cart');
-      const run = cart?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
-      if (run) run.state = 'done';
+      if (cart) cart.runs = cart.runs.filter((r) => r.stepId !== 'release');
       for (const r of b.tasks.find((x) => x.id === 'T_hooks')?.runs ?? []) r.state = 'done';
     }),
   ]);
@@ -224,13 +234,15 @@ test('a failed action shows its error in the panel', async ({ relaunch }) => {
   await expect(page.locator(t('ade-panel-action-error'))).toContainText('run is not failed');
 });
 
-test('a send-back shows on the step line with its loop and note', async ({ relaunch }) => {
+test('a send-back shows on the step that was sent back with its loop and note', async ({
+  relaunch,
+}) => {
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_push');
-  const impl = step(page, 'impl');
-  await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
+  const tests = step(page, 'tests');
+  await expect(tests.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
   await expect(
-    impl.locator(t('ade-run-note')).filter({ hasText: '2 failing tests' }),
+    tests.locator(t('ade-run-note')).filter({ hasText: '2 failing tests' }),
   ).not.toHaveCount(0);
 });
 
@@ -257,7 +269,7 @@ function branchingWorkflows(maxReturns = 3): ControlSnapshot {
   return { channel: IPC.adeTaskWorkflows, response: fx };
 }
 
-test('a result that loops back shows its route on the step and the sent-back line', async ({
+test('a result that loops back shows its route on its step and the sent-back line', async ({
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch, [
@@ -278,11 +290,11 @@ test('a result that loops back shows its route on the step and the sent-back lin
     }),
   ]);
   await open(page, 'T_push');
-  const impl = step(page, 'impl');
+  const tests = step(page, 'tests');
   await expect(
-    impl.locator(t('ade-step-route')).filter({ hasText: 'changes ↩ Implement' }),
+    tests.locator(t('ade-step-route')).filter({ hasText: 'changes ↩ Implement' }),
   ).toHaveCount(1);
-  await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
+  await expect(tests.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
 });
 
 interface ContractRun {
@@ -330,7 +342,7 @@ test("contract: a fix round counts against the step's return limit", async ({ re
     step(page, 'impl').locator(t('ade-run-note')).filter({ hasText: 'fix round 1 of 2' }),
   ).toHaveCount(1);
   await expect(
-    step(page, 'impl').locator(t('ade-run-note')).filter({ hasText: back.note }),
+    step(page, 'tests').locator(t('ade-run-note')).filter({ hasText: back.note }),
   ).toHaveCount(1);
 });
 

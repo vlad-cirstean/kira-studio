@@ -49,6 +49,7 @@ test('workflow graph: Delete removes the selected step, but edits text inside a 
   const step = page.locator(`${t('ade-wf-node')}[data-step-id="plan"]`);
   await step.click();
 
+  await page.locator(t('ade-wf-step-advanced')).click();
   await page.locator(t('ade-wf-step-tools')).fill('Read, Grep');
   await page.locator(t('ade-wf-step-tools')).press('Meta+Backspace');
   await expect(page.locator(t('confirm-dialog-confirm'))).toHaveCount(0);

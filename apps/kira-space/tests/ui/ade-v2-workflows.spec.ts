@@ -148,10 +148,13 @@ test('switching the kind to Review confirms, then saves a review block with appr
 
 test('a kind switch on an empty step needs no confirmation', async ({ relaunch }) => {
   const { window: page } = await openWorkflows(relaunch);
-  await node(page, 'review').click();
+  await page.locator(t('ade-wf-add-step')).click();
+  await page.locator(t('ade-wf-add-step-agent')).click();
+  const fresh = page.locator(`${t('ade-wf-node')}[data-step-id^="step-"]`);
+  await fresh.click();
   await page.locator(t('ade-wf-step-kind-script')).click();
   await expect(page.locator(t('confirm-dialog'))).toHaveCount(0);
-  await expect(node(page, 'review')).toHaveAttribute('data-kind', 'script');
+  await expect(fresh).toHaveAttribute('data-kind', 'script');
   await expect(page.locator(t('ade-wf-step-command'))).toBeVisible();
 });
 
@@ -187,7 +190,9 @@ test('edges are green for ok results, red for not ok, and a loop is dashed', asy
   relaunch,
 }) => {
   const { window: page } = await openWorkflows(relaunch);
-  await expect(page.locator(`${t('ade-wf-edge')}[data-tone="ok"]`).first()).toBeVisible();
+  await expect(
+    page.locator(`${t('ade-wf-edge')}[data-tone="ok"][data-results="done"]`).first(),
+  ).toBeVisible();
   const loop = page.locator(`${t('ade-wf-edge')}[data-loop="true"]`);
   await expect(loop).toHaveCount(3);
   for (const e of await loop.all()) {

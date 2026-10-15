@@ -57,7 +57,7 @@ func TestRunDialogPreview(t *testing.T) {
 	step := map[string]any{
 		"title": "Usage alerts by email", "jiraKey": "PAY-130", "jiraURL": "https://acme.atlassian.net/browse/PAY-130",
 		"repo": "{repo}", "branch": "{branch}", "worktree": "{worktree}",
-		"stepNumber": 1, "stepCount": 5, "stepName": "Plan from spec",
+		"stepNumber": 1, "stepCount": 6, "stepName": "Plan from spec",
 		"stepPrompt": "Read the task spec and the Jira ticket PAY-130. Write an implementation plan per repo. Do not change code yet.",
 		"message":    "", "extra": "", "context": []string{}, "space": false, "finish": finish,
 	}

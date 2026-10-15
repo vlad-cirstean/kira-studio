@@ -105,7 +105,6 @@ test('loop edges run in a gutter left of the nodes', async ({ relaunch }) => {
 test('an edit lays the graph out again', async ({ relaunch }) => {
   const page = await open(relaunch);
   const end = page.locator(t('ade-wf-end-node')).first();
-  const endBefore = await box(end);
   await page.locator(t('ade-wf-add-step')).click();
   await page.locator(t('ade-wf-add-step-agent')).click();
   const fresh = page.locator(`${t('ade-wf-node')}[data-step-id^="step-"]`);
@@ -114,7 +113,7 @@ test('an edit lays the graph out again', async ({ relaunch }) => {
   const added = await box(fresh);
   expect(added.y).toBeGreaterThan(last.y);
   expect(Math.round(added.x + added.width / 2)).toBe(Math.round(last.x + last.width / 2));
-  expect((await box(end)).y).toBeGreaterThan(endBefore.y);
+  expect((await box(end)).y).toBeGreaterThan(added.y);
 });
 
 test('contract: a backend workflow with a result loop lays out on one spine', async ({

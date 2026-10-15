@@ -143,7 +143,7 @@
         "var": "Worktree"
       },
       {
-        "text": "\nStep 1/5: ",
+        "text": "\nStep 1/6: ",
         "value": "",
         "var": ""
       },
@@ -217,7 +217,7 @@
       "message": "",
       "repo": "{repo}",
       "space": false,
-      "stepCount": 5,
+      "stepCount": 6,
       "stepName": "Plan from spec",
       "stepNumber": 1,
       "stepPrompt": "Read the task spec and the Jira ticket PAY-130. Write an implementation plan per repo. Do not change code yet.",

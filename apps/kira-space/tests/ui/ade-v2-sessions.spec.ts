@@ -42,7 +42,7 @@ test('tabs are named after the step; the pane shows the full Claude session id w
   const { window: page } = await openPlan(relaunch);
   await openSessions(page, 'T_bill');
   await expect(page.locator(t('ade-session-tab-tk01'))).toContainText('Implement · ');
-  await expect(page.locator(t('ade-session-tab-b1c2'))).toContainText('Implement · Implement · ');
+  await expect(page.locator(t('ade-session-tab-b1c2'))).toContainText('Implement · ');
   await expect(page.locator(t('ade-session-tab-tk01'))).not.toContainText('claude ');
 
   await page.evaluate(() => {

@@ -333,7 +333,7 @@
       "terminalId": "term-tk01",
       "taskId": "T_bill",
       "branchId": "b_billdash",
-      "stepId": "",
+      "stepId": "impl",
       "runId": "",
       "resumes": "claude-9d10",
       "purpose": "",

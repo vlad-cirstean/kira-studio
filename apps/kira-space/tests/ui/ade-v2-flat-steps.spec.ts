@@ -11,6 +11,8 @@ import { IPC } from './support/ipcChannels';
 const t = (id: string) => `[data-testid="${id}"]`;
 const card = (page: Page, id: string) =>
   page.locator(`[data-testid="ade-card"][data-task-id="${id}"]`);
+const cellAction = (id: string, kind: string) =>
+  `${t('ade-task')}[data-task-id="${id}"] ${t('ade-task-cells')} ${t(`ade-task-action-${kind}`)}`;
 const block = (page: Page, id: string) =>
   page.locator(`${t('ade-step-block')}[data-step-id="${id}"]`);
 const node = (page: Page, id: string) => page.locator(`${t('ade-wf-node')}[data-step-id="${id}"]`);
@@ -26,7 +28,7 @@ interface WorkflowsFx {
 }
 
 async function openTask(page: Page, id: string): Promise<void> {
-  await card(page, id).click();
+  await card(page, id).locator(t('ade-card-head')).click();
   await expect(page.locator(t('ade-panel'))).toBeVisible();
 }
 
@@ -45,9 +47,9 @@ test('contract: a created task starts on the first step and the panel lists ever
   await expect(card(page, 'T_alerts').locator(t('ade-step-label'))).toContainText('Spec');
 });
 
-test('a manual first step shows the Session action on its card', async ({ relaunch }) => {
+test('a manual first step with a running session offers Done on its card', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await expect(card(page, 'T_alerts').locator(t('ade-task-action-session'))).toBeVisible();
+  await expect(page.locator(cellAction('T_alerts', 'done'))).toBeVisible();
 });
 
 test('contract: Move task here and the step mover send SetTaskStep with the target step', async ({
@@ -79,15 +81,23 @@ test('a step moved back shows pending while its earlier runs stay hidden', async
     const task = b.tasks.find((x) => x.id === 'T_hooks');
     if (!task) throw new Error('T_hooks missing');
     task.entryStepId = 'impl';
-    const branch = task.runs.find((r) => r.stepId === 'impl');
-    if (branch) task.since = { [`impl/${String(branch.branchId)}`]: 1 };
+    const since: Record<string, number> = {};
+    for (const r of task.runs) {
+      const step = String(r.stepId);
+      if (['impl', 'tests', 'ci', 'pr'].includes(step)) {
+        since[`${step}/${String(r.branchId)}`] = Number(r.attempt);
+      }
+    }
+    task.since = since;
   });
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: edit },
   ]);
   await openTask(page, 'T_hooks');
-  await expect(block(page, 'impl')).toBeVisible();
-  await expect(block(page, 'impl').locator(t('ade-run-status'))).toHaveCount(0);
+  const status = block(page, 'impl').locator(t('ade-run-status'));
+  await expect(status).toHaveCount(0);
+  await expect(block(page, 'impl').locator(t('ade-step-status'))).toContainText('Pending');
+  await expect(block(page, 'plan').locator(t('ade-step-status'))).toContainText('Done');
 });
 
 test('contract: a return past the entry step shows the returns used on the chip', async ({
@@ -98,11 +108,22 @@ test('contract: a return past the entry step shows the returns used on the chip'
     'AdeTaskService.Task#return',
   );
   expect(back.entryStepId).toBe('implement');
-  expect(back.runs.some((r) => r.returns === 1)).toBe(true);
-  const { window: page } = await openPlan(relaunch);
+  const used = back.runs.find((r) => r.returns > 0)?.returns ?? 0;
+  expect(used).toBe(1);
+  const edit = adeBoard((b) => {
+    const run = b.tasks
+      .find((x) => x.id === 'T_push')
+      ?.runs.find((r) => r.stepId === 'impl' && r.branchId === 'b_push');
+    if (!run) throw new Error('T_push impl run missing');
+    run.returns = used;
+  });
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: edit },
+  ]);
   await openTask(page, 'T_push');
-  const chip = page.locator(t('ade-run-returns')).first();
-  await expect(chip).toContainText('↩');
+  const chip = block(page, 'impl').locator(t('ade-run-returns'));
+  await expect(chip).toHaveCount(1);
+  await expect(chip).toContainText('↩ 1');
 });
 
 test('contract: the inspector switches field groups per kind, keeps Advanced closed, and saves kinds', async ({
@@ -117,6 +138,7 @@ test('contract: the inspector switches field groups per kind, keeps Advanced clo
   await node(page, 'ci').click();
   await expect(page.locator(t('ade-wf-step-tools'))).toBeHidden();
   await page.locator(t('ade-wf-step-kind-script')).click();
+  await page.locator(t('confirm-dialog-confirm')).click();
   await expect(page.locator(t('ade-wf-step-command'))).toBeVisible();
   await expect(page.locator(t('ade-wf-step-prompt'))).toHaveCount(0);
 
