@@ -211,13 +211,14 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 	}
 
 	// P124: the parsers return nil for "none" (a root commit, no trailers, no ref); the wire
-	// contract declares all three non-null arrays, and CommitMeta.vue's "Show more" render threw on
-	// `decoration: null`.
+	// contract declares all four non-null arrays, and CommitMeta.vue's "Show more" render threw on
+	// `decoration: null`. `files` is the same shape: a commit whose name-status diff reports no
+	// entries leaves it nil, and FileTree.vue's `filterFiles` throws on `files: null`.
 	detail := porcelain.CommitDetail{
 		SHA: meta.SHA, Parents: nonNil(meta.Parents), Author: meta.Author, Committer: meta.Committer,
 		Subject: meta.Subject, Body: body, Trailers: nonNil(trailers), Signature: sig,
 		Decoration: nonNil(meta.Decoration), ParentIndex: parentIndex,
-		Files: files,
+		Files: nonNil(files),
 	}
 	if e.cacheGeneration() == gen {
 		e.detail.set(sha, parentIndex, detail)

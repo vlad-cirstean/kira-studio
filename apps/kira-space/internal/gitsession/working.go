@@ -51,5 +51,5 @@ func (e *RepoEntry) WorkingDetail(ctx context.Context) ([]porcelain.FileChange, 
 		}
 		changes = append(changes, porcelain.FileChange{Kind: porcelain.FileAdded, Path: entry.Path})
 	}
-	return changes, nil
+	return nonNil(changes), nil
 }
