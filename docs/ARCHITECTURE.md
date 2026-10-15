@@ -5780,6 +5780,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   beyond the listed denies.
 - **`~/.claude.json` is writable to a sandboxed agent (P287).** It holds the user's MCP servers; the CLI writes
   it on every run.
+- **`~/.claude` root scripts are writable to a sandboxed agent (P292).** Writes to all of `~/.claude` are allowed;
+  denies cover only named config files and the extension dirs. A script a user's `settings.json` points at outside
+  them (for example `statusline-command.sh`) runs unsandboxed in the next interactive session. An allowlist of the
+  subdirs the CLI needs cannot be checked without a real Mac.
+- **Toolchain presets grant writes to toolchain binaries (P287, P292).** The Node, Go, Rust and Python presets add
+  write paths such as `~/.nvm`, `~/go` and `~/.cargo`, so an agent can replace a binary the user runs later.
+  Narrowing the presets to cache dirs is a user decision (P287 plan).
 - **A network-off profile allows every loopback port (P287).** Local dev servers and test DBs need it, so a local forward proxy or tunnel on `localhost` lets a `network: false` run bypass the allowlist. Restricting remote loopback to `Policy.Ports` needs an opt-in for runs that bind local servers. `Policy.Ports` only feeds the profile header comment.
 - **A short-lived process of a sandboxed run can lose its denial (P292).** The system-wide denial stream names a pid, and an exited pid is attributed only when its process name matches an earlier denial of the run.
 - **Hooks and build scripts an agent edits run unsandboxed later (P287).** Kira's own git operations and the
