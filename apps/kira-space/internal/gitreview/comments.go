@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -175,23 +176,31 @@ func (s *Store) ReplyComment(ctx context.Context, repoID, branch string, id int6
 		[]any{reply, at.UnixMilli(), state}, id)
 }
 
-// MarkSent stamps sent_at on the given comments of this session.
+// MarkSent stamps sent_at on the given comments of this session with one update and one notify.
 func (s *Store) MarkSent(ctx context.Context, repoID, branch string, ids []int64, at time.Time) error {
-	for _, id := range ids {
-		if _, err := s.updateComment(ctx, repoID, branch, `sent_at = ?`, []any{at.UnixMilli()}, id); err != nil {
-			return err
-		}
+	if len(ids) == 0 {
+		return nil
 	}
-	return nil
+	_, err := s.updateComments(ctx, repoID, branch, `sent_at = ?`, []any{at.UnixMilli()}, ids)
+	return err
 }
 
 func (s *Store) updateComment(ctx context.Context, repoID, branch, set string, args []any, id int64) (bool, error) {
+	return s.updateComments(ctx, repoID, branch, set, args, []int64{id})
+}
+
+func (s *Store) updateComments(ctx context.Context, repoID, branch, set string, args []any, ids []int64) (bool, error) {
 	db, err := s.conn()
 	if err != nil {
 		return false, err
 	}
-	args = append(args, id, repoID, branch)
-	res, err := db.ExecContext(ctx, `UPDATE review_comment SET `+set+` WHERE id = ? AND session_id = (
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	args = append([]any{}, args...)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	args = append(args, repoID, branch)
+	res, err := db.ExecContext(ctx, `UPDATE review_comment SET `+set+` WHERE id IN (`+marks+`) AND session_id = (
 		SELECT id FROM review_session WHERE repo_id = ? AND branch = ?
 	)`, args...)
 	if err != nil {
