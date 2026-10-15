@@ -15,6 +15,10 @@ Ledger: `spend-p291.jsonl`. Phase cap 20 USD.
 
 | item | USD | phase total |
 |---|---|---|
+| questions (Opus) | 1.136 | 1.136 |
+| keys (Sonnet) | 0.403 | 1.539 |
+| telegraph (Sonnet) | 1.038 | 2.577 |
+| TJ score judge (Opus) | 1.645 | 4.223 |
 
 ## Bands (D9, identical-code pairs, hybrid/keyword on tuning, end-to-end)
 
@@ -82,3 +86,21 @@ Footprint (free; tuning aggregate; `C_store` = fact + non-locator reason + keywo
 | round-p3-01 | 0.502 | 0.434 | 0.661 | 0.863 | 0.734 | 0.607 |
 
 Token recall is low across all rounds (0.58-0.63): golden facts are Opus paraphrases, so capitalized words and numbers in them often have no verbatim twin in stored facts. Only differences between rounds are used. `C_store` differs from `C_rec` because the `Stated in` locator counts in `C_rec` but not in `C_store`; the older rounds stored non-locator reasons, hence `C_store` above 1.0 for rounds 00a-final (Part 1/2 reason text), a size problem the locator-only reason of Part 3 removed.
+
+## Step 5 keys, telegraph, verdicts (free analysis over paid post-pass outputs)
+
+Keys (D18/D11, same facts, hybrid MRR delta vs `fact`, paired bootstrap 95% CI):
+- `fact-kw`: `round-p3-01` +0.005 [-0.000, +0.011]; `round-p2-02` +0.006 [-0.003, +0.014]; hold-out -0.006 [-0.022, +0.011].
+- `sec-fact`: +0.001 [-0.007, +0.009]; +0.000 [-0.009, +0.010].
+- `sa-fact-kw` (subject, aspect keys): 0.890 vs 0.886 on `p3-01` (+0.004); 0.913 vs 0.899 on `p2-02` (+0.014). Under 0.02.
+- Verdict: A2 (embedding recipe) and A3 (subject, aspect keys) fail D11 (mean delta >= 0.02 with CI lower bound > 0). Not adopted. Gate keywords already carry the effect (`nokw` costs 0.012). A5 grouping fails chars rule (above).
+
+Telegraph post-pass (D24/D25, `tele` = every fact restyled, `tele-guard` = facts failing the token check keep full text, `mixed` = restyle fact in embed text only):
+- Hybrid MRR delta vs `full` (`fact`): `p3-01` -0.004 [-0.010, +0.000] (tele), -0.004 [-0.010, +0.001] (tele-guard); `p2-02` -0.002 [-0.009, +0.003] both; hold-out -0.000 [-0.009, +0.009] both. Non-inferiority margin `band_R` 0.026: lower bounds -0.010, -0.009, -0.009 pass.
+- Keyword MRR delta vs `full`: `p3-01` -0.001 [-0.003, +0.000]; `p2-02` +0.001 [-0.001, +0.002]; hold-out -0.003 [-0.009, +0.000]. Margin `band_Rk` 0.020: pass.
+- Size (footprint, `KIRA_EVAL_STYLE=tele`): fact chars `p3-01` 28996 -> 27001 (style-only ratio 0.931), `p2-02` 36701 -> 34571 (0.942). `C_fact` 0.434 -> 0.404 and 0.549 -> 0.517; `C_store` 0.661 -> 0.631 and 0.910 -> 0.878. Returned chars at 5: 1100 -> 1045 (`tele`), 1052 (`tele-guard`). The D14 estimate of 15-30% fact cut was too high: measured 6-7%, because gate-trimmed facts are already terse.
+- Token recall: 0.607 -> 0.601 (`p3-01`), 0.631 -> 0.630 (`p2-02`); band_tok 0.024: pass.
+- Token check (D27): residual losses after one retry in `tele`: 14 of 209 facts on `p3-01`, mostly capitalised names or ids that repeat in one fact (for example `P257 | P257`), above the 0.01 rule. `tele` fails the token rule alone; `tele-guard` decides (failing facts keep full text).
+- TJ (Opus score judge over `tele` facts, `p3-01`): `R_ess` 0.885 -> 0.878 (-0.007, rule -0.020), unsupported 0.005 -> 0.010 (+0.005, rule +0.010), `R_all` 0.689 -> 0.681. Judge-bias deltas (reported, not gated): atomic 0.746 -> 0.770, standalone 0.981 -> 0.957, `P` 0.737 -> 0.727, reason ok 0.665 -> 0.699.
+- Style-pair cosine of a full fact with its rewrite: p10 above `DocFloor` 0.85 on both bases (`stylePairs` in the retrieval files).
+- D26 verdict: passes with `tele-guard`. Non-inferior retrieval on two bases and hold-out, `C_store` lower, TJ inside rules, token rule met by the guard. Gain is small (about 7% fact chars, 4.5% `C_store`).
