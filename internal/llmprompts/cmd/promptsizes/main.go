@@ -21,6 +21,7 @@ import (
 	"github.com/google/renameio/v2"
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/textloss"
 )
 
 type snap struct {
@@ -109,7 +110,7 @@ func compareTo(file, allowedFile string, ids []string, cur map[string]snap) int 
 		}
 		changed++
 		fmt.Printf("%s\t%d\t%d\t%d\t%d\t%+.1f%%\n", id, b.Chars, a.Chars, b.Tokens, a.Tokens, pct(b.Chars, a.Chars))
-		for _, l := range lost(b.Default, a.Default, fields[id]) {
+		for _, l := range textloss.Lost(b.Default, a.Default, fields[id]) {
 			if !allow[id+"\t"+l] {
 				problems = append(problems, fmt.Sprintf("%s: lost %s", id, l))
 			}
