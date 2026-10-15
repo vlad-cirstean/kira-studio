@@ -137,6 +137,9 @@ func recipeText(recipe string, f seedFact) string {
 		}
 		return f.section + ": " + f.fact + kw
 	case "sa-fact":
+		if f.subject == "" {
+			return f.fact + kw
+		}
 		return f.subject + ", " + f.aspect + ": " + f.fact + kw
 	}
 	return f.fact
@@ -292,7 +295,7 @@ func gatherFacts(man evalManifest, cfg storeCfg, primary roundData, srcs []evalS
 					sf.keywords = nil
 				case "kw-sa":
 					if !wantKeys {
-						return fmt.Errorf("fts kw-sa needs keys")
+						break
 					}
 					sf.keywords = append([]string{k.Subject, k.Aspect}, f.Keywords...)
 				}
