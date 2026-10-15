@@ -34,24 +34,29 @@ var (
 const discoverTimeout = 20 * time.Second
 
 // DiscoverRuntime probes once per app session. The probe is detached from the caller's context, so
-// one stopped run cannot shrink the set for the rest of the session. A probe that finds no claude is
-// not cached; the next launch retries.
+// one stopped run cannot shrink the set for the rest of the session. A probe that finds no claude or
+// times out reading the login shell PATH is not cached; the next launch retries. The lock is not held
+// across the probe, so concurrent launches do not queue behind a slow shell.
 func DiscoverRuntime(_ context.Context, claudeBin string) Runtime {
 	rtMu.Lock()
-	defer rtMu.Unlock()
-	if rtVal != nil {
-		return *rtVal
+	cached := rtVal
+	rtMu.Unlock()
+	if cached != nil {
+		return *cached
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), discoverTimeout)
 	defer cancel()
-	rt := discover(ctx, claudeBin)
-	if rt.ClaudePrefix != "" {
+	rt, complete := discover(ctx, claudeBin)
+	if complete {
+		rtMu.Lock()
 		rtVal = &rt
+		rtMu.Unlock()
 	}
 	return rt
 }
 
-func discover(ctx context.Context, claudeBin string) Runtime {
+// discover reports whether the probe is complete enough to cache.
+func discover(ctx context.Context, claudeBin string) (Runtime, bool) {
 	rt := Runtime{SSHAuthSock: os.Getenv("SSH_AUTH_SOCK")}
 	if h, err := os.UserHomeDir(); err == nil {
 		rt.Home = realPath(h)
@@ -63,10 +68,11 @@ func discover(ctx context.Context, claudeBin string) Runtime {
 	} else {
 		slog.Warn("sandbox: claude not resolved", "scope", "agentsandbox", "err", err)
 	}
-	rt.PathPrefixes = shellPathPrefixes(ctx, rt.Home)
+	var pathOK bool
+	rt.PathPrefixes, pathOK = shellPathPrefixes(ctx, rt.Home)
 	rt.UserTemp = getconf(ctx, "DARWIN_USER_TEMP_DIR")
 	rt.UserCache = getconf(ctx, "DARWIN_USER_CACHE_DIR")
-	return rt
+	return rt, rt.ClaudePrefix != "" && pathOK
 }
 
 func realPath(p string) string {
@@ -85,19 +91,20 @@ func claudePrefix(bin string) string {
 	return dir
 }
 
-func shellPathPrefixes(ctx context.Context, home string) []string {
+// shellPathPrefixes reports ok=false when the probe ran and failed; nothing to probe is ok.
+func shellPathPrefixes(ctx context.Context, home string) ([]string, bool) {
 	shell := os.Getenv("SHELL")
 	if !filepath.IsAbs(shell) || home == "" {
-		return nil
+		return nil, true
 	}
 	sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	out, err := toolexec.RunIO(sctx, shell, []string{"-l", "-i", "-c", `printf %s "$PATH"`}, "", os.Environ(), nil)
 	if err != nil {
 		slog.Warn("sandbox: login shell PATH probe failed", "scope", "agentsandbox", "err", err)
-		return nil
+		return nil, false
 	}
-	return PathPrefixes(string(out), home)
+	return PathPrefixes(string(out), home), true
 }
 
 // PathPrefixes keeps each PATH entry under home as its parent (the toolchain root), or the entry
