@@ -20,7 +20,7 @@ sidebar:
 - Rebase and review (Kira Space).
 - Database MCP (Kira Studio).
 
-Text you write yourself stays outside this list. That covers smart script bodies and workflow stage and step prompts.
+Text you write yourself stays outside this list. That covers smart script bodies and workflow step prompts.
 
 ## Kinds
 

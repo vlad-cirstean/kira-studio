@@ -4090,9 +4090,8 @@ and `docs/v2.0/plans/`.
 ### Model and scope
 
 - A task owns branches across repos. A branch is `mine` (created here, has a name), `review` (another
-  author's) or `parked` (kept out of the merge order; shown as Not merging). A task follows a workflow of stages, kind `user`,
-  `agent` or `script`; each stage holds steps (agent stages: `claude -p` per step; script stages: a
-  shell command). A step runs `once` (first mine branch in task order), `each repo` or `only <repo>`. One run per step and branch.
+  author's) or `parked` (kept out of the merge order; shown as Not merging). A task follows a workflow, a flat list of steps of kind `agent`
+  (`claude -p`), `script` (a shell command), `review` or `manual` (your own work, optionally an interactive session). A step runs `once` (first mine branch in task order), `each repo` or `only <repo>`. One run per step and branch.
 - Task status is derived from the workflow and runs, never typed (D10): the Status field is read-only.
 - Backlog items are not on the plan until promoted.
 
@@ -4102,7 +4101,7 @@ and `docs/v2.0/plans/`.
   `ade-board`, `adeflow.Reader` over `<home>/workflows`, the `claudeheadless` `finish_step` server, the
   `Tracker`, log sink, session store). It calls `Recover()` then `Start()`, and installs
   `board.OnTUIStopped` as the tracker's stopped handler.
-- `bridge.AdeTaskService` binds 58 methods (`grep -c '^func (s \*AdeTaskService)'`; one `adeTask*` entry
+- `bridge.AdeTaskService` binds 64 methods (`grep -c '^func (s \*AdeTaskService)'`; one `adeTask*` entry
   each in `frontend/src/bridge/index.ts`). Push channels (`bridge/adewire/channels.go`): `kira:adetask:` +
   `board`, `backlog`, `workflows`, `repos`, `runs`, `log`, `sessions`
   and `open-session` (`EmitTo` one window).
@@ -4124,6 +4123,7 @@ and `docs/v2.0/plans/`.
   (P199; `agent` for branches an agent created). `0019`: `ade_worktree_setup.note` (P202 failure reason).
   `0026`: `ade_runs.outcome_json` (P242). `0027`: `ade_task_branches.base_branch_id`, `base_pending_from`, `ade_runs.purpose`, `spec_json` (P241).
   `0036`: rebuilds `ade_runs` (states add `review`, purposes add `review`) and adds `ade_reviews` (P286).
+  `0038` (P293): resets ADE task, run and session data for the flat model (no backward compatibility); tasks carry `entry_step_id` and `since_json`.
   Space's `0020` is scripts, not ADE.
   Space's `0024` (P222) adds `code_repos.color`, not ADE.
 - Per-repo colour (P222): `code_repos.color` is a `PaletteColor` name, never empty. Migration 0024
@@ -4183,25 +4183,24 @@ and `docs/v2.0/plans/`.
 
 - YAML files in `<home>/workflows`, parsed by `adeflow.Reader`. No workflow is seeded (D2). The folder is
   watched (`fsnotify`); a broken edit keeps the last valid version and reports `line` plus a message.
-  The writer keeps key order and comments. Aliases `manual`/`automated` map to `user`/`agent`.
-  Step `allowed_tools` feeds the headless `--allowedTools` list.
+  The writer keeps key order and comments.
+  A flat list `steps` of `kind: agent|script|review|manual` (P293); `kind` is required and each kind allows its own keys
+  (agent: `runs_on before results max_returns timeout prompt allowed_tools smart_script params sandbox`; script:
+  `command runs_on before results max_returns timeout`; review: `review runs_on before results max_returns timeout
+  sandbox`; manual: `session` and, with it, `prompt`). Top-level `stages` fails with "stages" is no longer
+  supported: list every step under "steps". Agent `allowed_tools` feeds the headless `--allowedTools` list.
 - Sample workflows (`apps/kira-space/internal/adeflow/testdata/`) import and validate in the app.
-- Step results (P247): an agent step may declare `results:` (1 to 12): `id`, `ok` (required), `description`
+- Step results (P247): an agent step may declare `results:` (a script step has the fixed `done` and `failed`, only `next` editable; a manual step has none) (1 to 12): `id`, `ok` (required), `description`
   (one line, at most 200), `next` (`next|end|stop|<step id>`, default `next` for ok and `stop` for not ok),
   `needs_input` is reserved; at least one result must route forward. Wire: `StepResult.loop` (route targets the
   step or an earlier one) replaces the old per-result `max`; limit is `PipelineStep.MaxReturns` (P288, see Return
-  limit). The parser always materializes `Results`; `OnFailure` is set only when results and limit equal a legacy
-  form (`adewire.LegacyLimit`). The writer writes `on_failure` then (old files save byte-identical) and
-  `results` plus `max_returns` otherwise. `adewire/results.go` holds `ImplicitResults`, `DefaultLimit`,
-  `LegacyLimit`, `LegacyOnFailure`.
+  limit). The parser always materializes `Results`; the writer writes `results` plus `max_returns` when they differ from
+  the defaults (`adewire/results.go`: `ImplicitResults`, `DefaultLimit`). `on_failure` and `retry` are gone.
 - Return limit (P288): `max_returns` per step; agent default 3, range 1..10; review default 0 (no limit), range
   0..10. A return is a result routed to the step itself or an earlier one. Counter: `ade_runs` rows in state `back`
-  with purpose '' per (task, stage, step, branch), no migration, never reset, survives restart and Resume
+  with purpose '' per (task, step, branch), no migration, never reset, survives restart and Resume
   (`countReturns`, `Run.Returns`). `decideLoop` stops at the limit with catalog note
-  `backend.space.ade.returnLimit.body`. Legacy: `retry N` gives N; a result `max` on loop routes folds to the
-  largest; `max_returns` with `on_failure` or a result `max` is a parse error. Writer drops result `max`, writes
-  `max_returns` only when it differs from the implied default. `FillReturnLimits` fills snapshots stored before
-  P288 on decode. UI: `↩ n/N` chip on the run line (red when spent), `↩ ≤N` on the node, Max returns in the
+  `backend.space.ade.returnLimit.body`. UI: `↩ n/N` chip on the run line (red when spent), `↩ ≤N` on the node, Max returns in the
   step inspector.
 - Graph editor (P247, `ade/v2/workflows/`): the Workflows page edits a draft (`state/adeWorkflowDraft.ts`)
   as a Vue Flow canvas (`@vue-flow/core`, MIT) with `@dagrejs/dagre` auto-layout on every edit; no stored
@@ -4209,24 +4208,24 @@ and `docs/v2.0/plans/`.
   green for all ok, red for all not ok, neutral for mixed; loop edges dashed; `setRoute` turns an
   edge into a loop when the target already leads to the source, else moves the target after it;
   `normalizeOrder` keeps the start first and forward routes pointing later). A result dot dragged to a step,
-  or the route select in the inspector, sets `next`. No stage strip (P288): stage and step menus (`⋯`, right click on a step) add, move (Move up/down), skip and remove; `+ Step` per stage and `+ Add stage` under the canvas add. The editor
+  or the route select in the inspector, sets `next`. Flat (P293): no stage frames. The step menu (`⋯`, right click) has Add step after (per kind), Move up/down (off when the swap would turn an explicit forward id route into a return, `canMove`), Make start, Skip and Remove (off for the last step); `+ Add step` under the canvas picks a kind. A manual step draws one implicit `done` edge to the next step. The inspector (`workflows/inspector/`) has a Kind switch and name, then sections What it does, Where and when, How it ends and a collapsed Advanced (timeout, tools, task status, skip, sandbox); a kind change that would drop a prompt, command or session prompt confirms first (`hasContent`, `withKind`). The editor
   mode is `graph | yaml`; the graph editor loads asynchronously so the board bundle stays free of Vue Flow.
-  Layout is locked (P255): top to bottom only, every node `256x104`, stages stacked on one spine column,
-  `results:` branches fan to the side, loops run dashed in a left gutter of the stage and enter the target
+  Layout is locked (P255): top to bottom only, every node `256x104`, steps and the end node on one spine column,
+  `results:` branches fan to the side, loops run dashed in a left gutter and enter the target
   from above, native vertical scroll, no zoom or pan (viewport shrinks only to fit width).
 - Edits save explicitly (P196): Save and Discard in the graph and YAML editors, Cmd/Ctrl+S, no autosave;
   leaving with unsaved edits (list switch, import/new, mode toggle, shell tab change) asks through
   `ConfirmDialog`. Validation stays debounced.
 - Review step (P286): a step with `review: {send_to: implementer|new, implementer}` (`adewire.ReviewStepConfig`,
   parser and writer in `adeflow`) takes no prompt, tools or smart script; `timeout` stays required. Reaching it,
-  `startRun` calls `enterReview` (`ade/reviewstep.go`): the run goes to state `review` and the stage waits.
+  `startRun` calls `enterReview` (`ade/reviewstep.go`): the run goes to state `review` and the step waits.
   Wire `Run.review` carries phase `waiting|sent|working|stuck|done`, round and note; the phase derives from the
   latest round. A send is a round: its own `ade_runs` row (`purpose = 'review'`, `spec_json` =
   `model.AdeReviewSpec` with the comment ids, route and head before/after), run through `superviseAgent` with the
   `reply_review_comment` tool and implicit results. `LatestRuns` partitions by purpose and `plan()` skips
   `Purpose != ''`, so rounds never count as step runs; `toWireTask` hides them behind the review run.
   `ade_reviews(run_id, route, target_run_id, dedicated_claude_id, rounds)` holds the send state.
-  Route `implementer` resumes the Claude session of the chosen candidate (`ReviewStep` lists the stage's agent
+  Route `implementer` resumes the Claude session of the chosen candidate (`ReviewStep` lists the workflow's agent
   runs; default the nearest earlier); route `new` launches one dedicated session reused by later rounds. A lost
   target (`EndResumeLost`) fails the round with `outcome.lost` and `queueFallback` starts a round on `new` with
   the note. `RecoverRunning` keeps `launch_resume_id` for review rounds, so a quit leaves the round `stuck`
@@ -4236,17 +4235,20 @@ and `docs/v2.0/plans/`.
   next step's send-back note. Bound: `ReviewStep`, `SendReview`, `FinishReview`; push `kira:adetask:review`
   `{taskId, branchId}`.
 - Task snapshot (P196, `ade/taskwf.go`): a task follows the live file until its first run, session
-  or stage move. Then `snapshotWorkflow` (idempotent, first wins) stores the whole workflow in
-  `ade_tasks.workflow_json` with a sha256 `workflow_hash`, and `StageDone`, `SetTaskStage` and
-  `refreshSnapshot` read that snapshot. Wire: `Task.workflow` (null until started),
+  or move. Then `snapshotWorkflow` (idempotent, first wins) stores the whole workflow in
+  `ade_tasks.workflow_json` with a sha256 `workflow_hash`, and `StepDone`, `SetTaskStep` and
+  `refreshSnapshot` read that snapshot. A not-started task shows the live file's first step as its entry. Wire: `Task.workflow` (null until started),
   `Task.workflowOutdated` (drift flag, shown as an "updated, applies to new work only" badge).
   `SetTaskWorkflow` on a started task with no live run still resets the task and now clears the
   snapshot. `Recover` backfills a started task that has none from the current live file.
-- Stage `skip: true` (P197; `adeflow` parse/write emits it only when set; `adewire.Stage.Skip`): stage
-  advance (`firstRunnable`, `nextRunnable` in `ade/stages.go`) and `SetTaskStage` pass over or refuse
-  a skipped stage; a workflow needs at least one runnable stage. A skipped stage the task already sits
-  on stays current. `SetTaskStage(taskId, stageId)` (P192) moves a task to any stage or `done` in
-  either direction, refused while a run of the task is live.
+- Position (P293): `Task.entryStepId` (the step last entered; `done` when finished; `` without a workflow)
+  plus `Task.since` (`{"<stepId>/<branchId>": attempt}`): runs at or below it are history, so moving back
+  reruns a step without deleting runs. The current step is derived by `walkPath` from the entry: skip steps
+  are passed over, a done step moves to its `forwardTarget`, the first step not done (a manual step never is)
+  ends the path. The path running past the last step, or an `end` route, finishes the task. `skip: true`
+  steps (`adewire.WorkflowStep.Skip`) are passed over by moves and routes; a workflow needs one unskipped
+  step. `SetTaskStep(taskId, stepId)` moves to any step or `done`, refused while a run of the task is live;
+  `StepDone` finishes a manual step. The stale guard `FromStepID` compares with the derived current step.
 - Workflow flag `kira_space_mcp: true` (wire `kiraSpaceMcp`, P199) enables agent tools, below.
 
 ### Run engine
@@ -4263,14 +4265,13 @@ and `docs/v2.0/plans/`.
   implicit grants keep the shared servers and `done|failed|needs_input`. `FinishStepSuffixFor(results)`
   names the ids; the TS mirror is `finishStepSuffix`.
   A run that ends without it fails with `ended without finish_step`; timeout is `failed`; script
-  stages fail by exit code.
+  steps fail by exit code.
 - Step machine (`steps.go`, `route.go`, `runs.go`, P247): a step starts `auto` or waits for `approval`.
-  Every step has results; `on_failure` (`stop`, `retry 1|2`, `back:<step>`) is the legacy form of the
-  implicit pair `done` (ok, next) and `failed` (not ok, that rule). `decideRoute` maps the reported result
+  Every automatic step has results; The implicit pair is `done` (ok, next) and `failed` (not ok, stop). `decideRoute` maps the reported result
   to a route: `next`, a later step (steps between are skipped, a view only), `end`, `stop`, or a loop to
   the step itself or an earlier one. A forward or `end` route marks the run `done` (a not-ok result keeps
   outcome status `failed`), `stop` or a spent loop marks it `failed`, a loop marks it `back`. Loop counts
-  are cumulative per task, stage, step and branch against the step's `max_returns`. A self loop starts a
+  are cumulative per task, step and branch against the step's `max_returns`. A self loop starts a
   fresh attempt; an earlier-step loop queues a fix run of the target with `claude -p --resume <session id>`
   (same Claude session), `loops` is the round epoch. The fix run's resume spec sits on its run row until launch, so a run held behind a setup resumes the same Claude session after restart. No report (crash, timeout) takes the step's `failed` result, else stops. `walkPath` follows the routes; `nextAction` and `chainRerun` use that path. The run outcome stores `result` and `route`. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
@@ -4299,7 +4300,7 @@ and `docs/v2.0/plans/`.
   `--resume` with `--session-id` is an error, so a resumed launch drops `--session-id`.
 - Spec: `AdeTaskRepo.RecoverRunning` writes `launch_resume_id` from `ade_sessions.claude_session_id` in the
   same `UPDATE` that marks the run `stuck`, only for agent and smart-step runs (`purpose = ''` with a
-  session). Rebase and script-stage runs, user stops and `needs_input` runs get none. `adewire.Run.resumable`
+  session). Rebase and script-step runs, user stops and `needs_input` runs get none. `adewire.Run.resumable`
   is `stuck` plus that id.
 - `TaskBoard.ResumeRun` clears the old spec first (a second click refuses), then queues attempt+1 with
   `Launch{ResumeID, Prompt: RunResumeLine, Note: "resumed after restart"}`; `startRun` reuses the Claude id
@@ -4344,7 +4345,7 @@ and `docs/v2.0/plans/`.
   agent reads why a rebase failed. Kind `automation` returns the task's ended script runs the same way. The P238 notification titles a rebase run `Rebase <verdict> · <task>`.
 - UI rule: `board/rebaseActions.ts` decides every rebase act; tag action, panel header, fix menu, task menu
   and the card button share it. `adeDialogs.act` runs one. No automatic rebase and no popup when a base
-  moves. Merge, archive, stage and start dialogs still deliver to a TUI session.
+  moves. Merge, archive, session and start dialogs still deliver to a TUI session.
 
 ### Interactive sessions
 
@@ -4354,7 +4355,7 @@ and `docs/v2.0/plans/`.
   terminal through the ordinary `TerminalService.Open`; `ComposeAgent` consumes the intent, inserts the
   `ade_sessions` row as `running` and appends hooks env, `--settings` and the initial prompt.
   Reconcile stops a record only when its terminal is gone and a 30s grace window has passed.
-- `LaunchStage`, `StartBranch`, `TakeOver` build the launch. The user message follows ` -- ` in argv so
+- `LaunchStep`, `StartBranch`, `TakeOver` build the launch. The user message follows ` -- ` in argv so
   it cannot parse as a flag. A resume runs in the recorded cwd; a missing cwd is an `ErrInvalidInput`
   (no recreation). `StartBranch` refuses a second session on a branch (`a session is already open on ...`).
   A taken-over run can still call `finish_step` from the TUI (R14). Take over confirms when the run is
@@ -4381,7 +4382,7 @@ and `docs/v2.0/plans/`.
   hook writes fail with EPERM. `allow` entries never open these (the protections come last).
 - **Default and scope.** A step without a `sandbox` block is `write`, network on. Covers headless agents from
   `superviseAgent` (steps, review rounds, rebase runs with every stack worktree writable) and `scriptruns`
-  smart runs in dir mode `worktree`. Not covered: TUI sessions and Take over, script stages, setup
+  smart runs in dir mode `worktree`. Not covered: TUI sessions and Take over, script steps, setup
   scripts, folder-mode automations, memory `claude` calls.
 - **Enforcer seam.** `Enforcer` (`Support`, `Prepare`, `Watch`). `System()` is real on darwin; elsewhere
   `Support{Enforced:false, Reason: NotEnforcedKey}` and `Prepare` still builds profile, flags and env but no
@@ -4525,12 +4526,12 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
   (full output stored). Until `ready`, pipeline steps for that branch wait (`waiting for worktree setup`)
   and Start/Take over are not offered. `Retry setup` reruns it (recreates the worktree). Attaching a remote-only branch creates a local branch
   from `<remote>/<name>` (origin preferred) that tracks it (`ade/setup.go` `ensureWorktree`, P231).
-- Failure reason (P202): every start path (`StartRun`, `LaunchStage`, `StartBranch`, `TakeOver`, review
+- Failure reason (P202): every start path (`StartRun`, `LaunchStep`, `StartBranch`, `TakeOver`, review
   agent, `AddExistingBranch`, `RetrySetup`, `request_branch`) records it in `ade_worktree_setup.note`
   (wire `WorktreeSetup.note`, `recordSetupFailure`). A launch blocked by a pending setup returns
   `E_PREPARING` (`ErrSetupPending`) and the UI waits (`useSetupWait`) and starts when ready.
 - One `ScriptProgress` component (`packages/theme`: running, ready, failed, elapsed, `actions` slot)
-  serves ADE (`AdeSetupProgress`, `AdeWorktreeSetup`: launch dialogs, stage block, needs-you) and
+  serves ADE (`AdeSetupProgress`, `AdeWorktreeSetup`: launch dialogs, step block, needs-you) and
   git-ui (`WorktreeDialog`, toolbar strip with `Output` popover via `PrepareOutput.vue`, Cancel while
   running). `OpsState` keeps `worktreePrepareStatus`, `StartedAt`, `FinishedAt`, `LastPath`; a failure
   stays until `dismissWorktreePrepareResult()`, success fades after 5 s. The Space Git window still
@@ -4562,8 +4563,8 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
   `CodeWorkspaceService.SetRepoHidden`, `AdeTaskService.SetFolderHidden`. "Remove repository…" lives in
   the dialog's repo head (`ViewToolbar`), always behind `confirmRemoveCodeRepo`, which names the scan
   folder that would re-import it.
-- Session tabs (P193) are named `<stage> · <step> · <repo>` (headless) or `<stage> · <repo|spec>` (TUI),
-  from the session's own `stageId`; review keeps `Review agent`. `AdeSessionId.vue` shows the full
+- Session tabs (P193) are named `<step> · <repo>` (headless) or `<step> · <repo|spec>` (TUI),
+  from the session's own `stepId`; review keeps `Review agent`. `AdeSessionId.vue` shows the full
   Claude session id with a copy button (VueUse `useClipboard`).
 - Task context menu (P198, `board/taskMenu.ts`, `plan/useTaskMenu.ts`): right-click, Shift+F10 or the
   panel header's More actions button, built on existing calls. The menu primitive is the workbench
@@ -4593,7 +4594,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Since-review: the `review_session` is pinned (`SetPinned`, gitreview `0003`) so rebases cannot drop the
   reviewed blobs. The diff's left side is the stored snapshot (`review.snapshot`), not a git ref. A renamed
   unchanged file keeps its review.
-- Review agent: one interactive TUI session per task, row `purpose = 'review'` (unique per task), stage id
+- Review agent: one interactive TUI session per task, row `purpose = 'review'` (unique per task), step id
   `review`, cwd the first created branch's worktree, other branches via `--add-dir`. Stopped row resumes
   with `--resume` and the same `claudeSessionId`. Recorded cwd gone: old row loses `purpose`, a new one
   launches. `TakeOver` of the row goes through `launchReviewAgent`. Questions paste bracketed through
@@ -4612,7 +4613,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - One entry rule (P240): `board/reviewCode.ts` `reviewChoice` hides (parked), disables with a reason (uncreated
   branch, `ahead === 0`, with or without uncommitted changes) or enables each branch; `useReviewCode` is the
   one caller of `OpenReviewWindow`. Controls: card head, branch row, task and branch menus, both panels,
-  review stage block, `ade.reviewCode` (Cmd/Ctrl+Shift+R, local binding, no `accel.go` row). A task with
+  review step block, `ade.reviewCode` (Cmd/Ctrl+Shift+R, local binding, no `accel.go` row). A task with
   several branches shows a picker. Interpolated UI values render through `VarText` (`packages/theme`,
   `TextPart`): the resolved value in a marked chip. `MenuItem.hint` takes `TextPart[]`.
 
@@ -4681,7 +4682,7 @@ replies and full terminal attach for Claude Code sessions.
   audit action. Reads: `/api/me`, `/api/events`, `/api/ade/{board,prs,sessions,workflows,backlog,repos,log}`,
   `/api/agent/sessions`. `/api/ade/sessions`, `/api/agent/sessions` and their SSE channels drop `cwd`
   (`withoutCwd`). Public: `POST /api/pair`. Writes, all POST: `/api/ade/backlog/{items,move}`,
-  `/api/ade/tasks/{stage,run,launch}`, `/api/agent/sessions/{id}/{send,take-over}`; upgrade:
+  `/api/ade/tasks/{step,run,launch}`, `/api/agent/sessions/{id}/{send,take-over}`; upgrade:
   `GET /api/agent/sessions/{id}/terminal`. No other POST exists; a test checks every non-GET row has a
   permission and an action.
 - Write chain per route: `csrfGuard` (Origin check, also on the upgrade) then deadline, `withDevice`,
@@ -4698,7 +4699,7 @@ replies and full terminal attach for Claude Code sessions.
   and path replays the stored status and body; another path is 422 `E_IDEMPOTENCY_MISMATCH`; still
   running is 409 `E_IN_FLIGHT`; 5xx results are not stored. Write rate per device 1/s burst 10;
   terminal attach 1 per 2 s burst 3.
-- Stale guard: `FromStageID` on `SetTaskStageArgs`, `StartRunArgs`, `LaunchStageArgs`, checked inside
+- Stale guard: `FromStepID` on `SetTaskStepArgs`, `StartRunArgs`, `LaunchStepArgs`, checked inside
   `taskMu`; mismatch is `ade.ErrStale` (bridge `E_STALE`, HTTP 409). Desktop leaves it empty.
 - Launch rendezvous: PTYs stay window-owned. A phone `launch` or `take-over` makes the server `EmitTo`
   `kira:mobile:openLaunch` to one real (non-ephemeral) window; that window runs the desktop's own
@@ -4740,7 +4741,7 @@ replies and full terminal attach for Claude Code sessions.
 - Phone writes: TanStack mutations (`useAdeWrites`), one `Idempotency-Key` per tap (retry only on a
   lost response). Reorder drags by a handle through `useSortableReorder` and an optimistic
   `withMovedItem`. Start, Back, Next and Take over confirm in a shadcn `Dialog`. Shared with desktop:
-  `stageMoves`, `withMovedItem`, `useLaunchOpener`. Terminal screen `/terminal/:sessionId` (outside the
+  `stepMoves`, `withMovedItem`, `useLaunchOpener`. Terminal screen `/terminal/:sessionId` (outside the
   tab shell): xterm through `terminalRenderer`, VueUse `useWebSocket`, key bar (Esc, Tab, Shift Tab,
   Ctrl C, arrows honouring application cursor mode, Enter, sticky Ctrl), compose row (paste plus
   Enter), A-/A+ font size (8 to 20), refit on `visualViewport` resize.
@@ -5247,7 +5248,7 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
 - **Registry.** `registry.go` is the one file with prompt text. Entry: id, kind, apps, title/purpose/usedBy
   catalog keys, applies-when, default, required fragments, fixed output schema. Typed handle
   `Prompt[V]` with `Text(src, vars)`; `NoVars` for entries without variables. 139 entries: Space lists 115,
-  Studio 34. User-authored text (smart-script bodies, workflow stage and step prompts) stays out, as do
+  Studio 34. User-authored text (smart-script bodies, workflow step prompts) stays out, as do
   tool and server names, tool error strings and result data formatting.
 - **Kinds.** `system`, `message`, `suffix`, `instructions`, `tool`, `argument` (one MCP tool property
   description; carries `Parent` tool and `Field`), `toolResult`, `fragment` (included via `{{template}}`).
@@ -5491,7 +5492,7 @@ Docker module against a real engine), `termflow` (terminals, scripts, runs). Sha
 nested Go modules (own `go.mod`, `replace` to the repo module), so `go test ./...`, `lint:go`, CI and hooks never
 see them. They boot the real `appwire.Build` with the real `claude` CLI (haiku, a temp `HOME`, a 0.05 USD cap per
 run) and assert what fakes cannot: hook injection and payload contract, that the user's Claude settings stay
-untouched, ADE headless runs, step results, TUI stage sessions and rebase runs, smart scripts, the memory gate and
+untouched, ADE headless runs, step results, TUI step sessions and rebase runs, smart scripts, the memory gate and
 import, the Database MCP install. Opt-in and token-costing: `bun run test:claude`, `test:claude:space`,
 `test:claude:studio`; the per-area command rows are in `docs/DEV_ENVIRONMENT.md`, "Real `claude` tests".
 

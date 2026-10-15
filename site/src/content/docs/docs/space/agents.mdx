@@ -44,41 +44,65 @@ A workflow is a YAML file in the `workflows` folder of the Space home, `~/.kira-
 
 The app watches the folder. A broken edit keeps the last valid version and reports the line.
 
-A workflow holds stages. A stage has a kind:
+A workflow lists its steps under `steps`, in order. Every step has an `id`, a `name`, a `kind` and a task `status` while the task sits on it. A top-level `stages` key is refused: list every step under `steps`.
 
-- `user`: you do the work.
-- `agent`: Claude Code runs each step headless.
-- `script`: one shell command, no steps.
+A step has one of four kinds:
 
-An agent step or a script stage runs `once`, for `each repo`, or `only <repo>`.
+- `agent`: Claude Code runs a `prompt` headless.
+- `script`: one shell `command` runs in each branch worktree. Exit code 0 ends with `done`, any other with `failed`.
+- `review`: the run waits for you. See [Review steps](#review-steps).
+- `manual`: your own work. `session: true` opens an interactive Claude Code session, with an optional `prompt` as its first message.
+
+An agent, script or review step runs `once`, for `each repo`, or `only <repo>`. It starts automatically or waits for your approval (`before: approval`). A step with `skip: true` is passed over; at least one step must stay unskipped.
+
+```yaml
+id: feature
+name: Feature
+steps:
+  - id: spec
+    name: Spec
+    kind: manual
+    session: true
+  - id: impl
+    name: Implement
+    kind: agent
+    runs_on: each repo
+    prompt: Implement the spec for {repo} on {branch}.
+  - id: release
+    name: Release
+    kind: script
+    command: ./scripts/release.sh --branch {branch}
+```
 
 ### Results and routes
 
-An agent step can declare 1 to 12 results. Each result has an `id`, an `ok` flag and a `next` route:
+An agent step can declare 1 to 12 results. Each result has an `id`, an `ok` flag and a `next` route. A script step has the fixed results `done` and `failed`; set only their `next`. A manual step has no results and moves to the next step when you finish it.
 
 - `next`: the next step.
 - A step id: that step. A later step skips the steps between. An earlier step makes a loop.
-- `end`: the end of the stage.
+- `end`: the end of the workflow.
 - `stop`: stop the task. Only a result that is not ok can use it.
 
-A route to the step itself or an earlier step is a return. The step's `max_returns` limits them per task, stage, step and branch. The count survives restart and Resume.
+A route to the step itself or an earlier step is a return. The step's `max_returns` limits them per task, step and branch. The count survives restart and Resume.
 
-- Agent step: 1 to 10, default 3.
+- Agent and script step: 1 to 10, default 3.
 - Review step: 0 to 10, default 0. `0` means no limit.
 
 At the limit the run stops with `Stopped: <step> reached its limit of <n> returns.` Retry the step to continue.
 
-Older files still load. `retry N` becomes `max_returns: N`. A result `max` on a loop route becomes the largest value. `max_returns` with `on_failure`, or with a result `max`, is refused. Saving never writes a result `max`.
-
-A run that ends with no report takes the step's `failed` result. A step without declared results stops on failure, or follows its `on_failure` rule: `stop`, `retry 1`, `retry 2` or `back:<step id>`.
+A run that ends with no report takes the step's `failed` result.
 
 ### Graph editor
 
 The Workflows page edits a workflow as a graph or as YAML. Save with `Cmd+S`. Nothing saves automatically. Leaving with unsaved edits asks first.
 
-Edit on the canvas. `+ Step` in a stage adds a step. `+ Add stage` under the graph adds a stage. The `⋯` menu on a stage has Add step, Add stage after, Move up, Move down, Skip and Remove. The `⋯` menu on a step, or a right click, has Add step after, Make start and Remove. Select a step to edit its fields, including **Max returns**, in the inspector.
+Edit on the canvas. `+ Add step` under the graph adds a step of a kind you pick. The `⋯` menu on a step, or a right click, has Add step after, Move up, Move down, Make start, Skip and Remove. Move is off when it would turn a forward route into a return. Select a step to edit it in the inspector. The inspector shows the kind switch and the name, then three sections: what the step does, where and when it runs, and how it ends. **Advanced** holds the timeout, allowed tools, task status, skip and sandbox. Changing the kind clears the prompt, command or session prompt, after a confirmation.
 
-A task follows the live file until its first run, session or stage move. After that it keeps a snapshot, and an updated file applies to new work only.
+A task follows the live file until its first run, session or move. After that it keeps a snapshot, and an updated file applies to new work only.
+
+### Moving a task
+
+The step block on a task offers Back and Next, and the task menu offers **Move to step**. Moving to an earlier step keeps the later runs as history; the step runs again. Moving to a later step passes over the steps between. **Done** finishes the task.
 
 ### Review steps
 
@@ -137,8 +161,6 @@ Linux and Windows write the profile but do not enforce it. The badge says `Not e
 ## Runs
 
 A headless run starts `claude -p` in the branch worktree. The agent reports through the `finish_step` tool. A run that ends without calling it fails with `no report: Claude ended without calling finish_step`.
-
-A step starts automatically or waits for your approval.
 
 A run that came back shows `↩ n/N`: returns used of the limit. A step with no limit shows `↩ n`. The chip turns red when the limit stops the run.
 

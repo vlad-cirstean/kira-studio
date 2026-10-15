@@ -37,7 +37,7 @@ Device tokens expire after 30 days. Pair again after that. **Revoke** removes a 
 
 Each paired phone has two switches in the device list:
 
-- **Changes**: reorder the backlog, move tasks between stages, start runs.
+- **Changes**: reorder the backlog, move tasks between steps, start runs.
 - **Agent input**: reply to agents and control their terminals.
 
 Agent input also needs the global switch **Let phones reply to agents and control their terminals**. It is off by default. A new pairing gets Changes on and Agent input off.
