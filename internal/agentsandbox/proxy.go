@@ -51,7 +51,7 @@ func ProxyAllowlist(getenv func(string) string) Allowlist {
 	}
 }
 
-// Proxy is the loopback CONNECT proxy a network-off run reaches the model API through.
+// Proxy is the loopback CONNECT-only proxy a network-off run reaches the model API through.
 type Proxy struct {
 	addr   string
 	srv    *http.Server
@@ -89,6 +89,13 @@ func StartProxy(h *hub, allow Allowlist) (*Proxy, error) {
 			return reject()
 		}
 		return goproxy.OkConnect, host
+	})
+	// Plain HTTP carries no CONNECT, so the allowlist never sees it: refuse every such request.
+	gp.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		if runID, ok := p.runFor(req.Header.Get("Proxy-Authorization")); ok {
+			h.emit(runID, Denial{At: time.Now(), Op: "network", Target: req.URL.Host, Process: "proxy"})
+		}
+		return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusForbidden, "blocked by the Kira sandbox")
 	})
 	p.srv = &http.Server{Handler: gp, ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = p.srv.Serve(ln) }()
