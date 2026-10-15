@@ -272,12 +272,12 @@ export interface RunSandboxBadge {
   /** The last kept denial as `op target`; '' when none. */
   last: string;
 }
-export interface SandboxSupport {
+interface SandboxSupport {
   enforced: boolean;
   /** The notice text when not enforced. */
   reason: string;
 }
-export interface SandboxDenial {
+interface SandboxDenial {
   at: number;
   op: string;
   target: string;
