@@ -63,6 +63,9 @@ func (f *Fake) Prepare(p agentsandbox.Policy, rt agentsandbox.Runtime) (agentsan
 	return pr, nil
 }
 
+// Release is a no-op: the fake registers nothing per run.
+func (f *Fake) Release(string) {}
+
 func (f *Fake) Watch(pid int, runID string, on func(agentsandbox.Denial)) func() {
 	f.mu.Lock()
 	defer f.mu.Unlock()

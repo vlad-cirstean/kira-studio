@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
@@ -33,6 +35,7 @@ type sandboxRun struct {
 	grant    *claudeheadless.SandboxGrant
 	scratch  string
 	notes    []string
+	release  func()
 }
 
 // sandboxTarget is what the sandbox git tools act on: the run's own repo, branch and worktree.
@@ -120,6 +123,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 		return nil, err
 	}
 	sr.policy, sr.prep, sr.notes, sr.scratch, sr.keychain = pol, prep, notes, pol.Scratch, pol.Keychain
+	sr.release = func() { b.deps.Sandbox.Release(run.ID) }
 	sr.grant = sandboxGrantFor(rebase, sr.access)
 	if sr.grant != nil {
 		sb, err := b.deps.Tasks.GetBranch(run.BranchID)
@@ -156,7 +160,13 @@ func (b *TaskBoard) storeSandbox(runID string, sr *sandboxRun, enforced bool, re
 }
 
 func (sr *sandboxRun) cleanup() {
-	if sr != nil && sr.scratch != "" {
+	if sr == nil {
+		return
+	}
+	if sr.release != nil {
+		sr.release()
+	}
+	if sr.scratch != "" {
 		_ = os.RemoveAll(sr.scratch)
 	}
 }
@@ -196,13 +206,39 @@ func (b *TaskBoard) applySandbox(spec claudeheadless.Spec, sr *sandboxRun, l age
 	return spec
 }
 
-// watchSandbox starts the denial watch for pid and returns the stop function.
+// denialFlushEvery bounds how often repeated denials write the run row.
+const denialFlushEvery = time.Second
+
+// watchSandbox starts the denial watch for pid and returns the stop function. A repeated denial
+// only counts in memory; the count reaches the row on the next new denial, once per
+// denialFlushEvery, and at stop.
 func (b *TaskBoard) watchSandbox(run model.AdeRun, sr *sandboxRun, sink *logSink, pid int) func() {
-	return b.deps.Sandbox.Watch(pid, run.ID, func(d agentsandbox.Denial) {
+	var (
+		mu      sync.Mutex
+		pending int
+		flushed time.Time
+	)
+	flush := func(listJSON string) {
+		mu.Lock()
+		n := pending
+		pending, flushed = 0, time.Now()
+		mu.Unlock()
+		b.countDenials(run.ID, n, listJSON)
+	}
+	stop := b.deps.Sandbox.Watch(pid, run.ID, func(d agentsandbox.Denial) {
 		if !sr.tracker.Add(d) {
-			b.countDenial(run.ID, "")
+			mu.Lock()
+			pending++
+			due := time.Since(flushed) >= denialFlushEvery
+			mu.Unlock()
+			if due {
+				flush("")
+			}
 			return
 		}
+		mu.Lock()
+		pending++
+		mu.Unlock()
 		sink.add(logStdout, fmt.Sprintf("sandbox denied %s %s (%s)", d.Op, d.Target, d.Process))
 		list, _ := sr.tracker.Snapshot()
 		raw, err := json.Marshal(list)
@@ -210,18 +246,27 @@ func (b *TaskBoard) watchSandbox(run model.AdeRun, sr *sandboxRun, sink *logSink
 			slog.Warn("ade: encode sandbox denials", "scope", "ade", "run", run.ID, "err", err)
 			return
 		}
-		b.countDenial(run.ID, string(raw))
+		flush(string(raw))
 		if cur, err := b.deps.Tasks.GetRun(run.ID); err == nil {
 			b.emitRuns(cur)
 		}
 	})
+	return func() {
+		stop()
+		mu.Lock()
+		n := pending
+		mu.Unlock()
+		if n > 0 {
+			flush("")
+		}
+	}
 }
 
-func (b *TaskBoard) countDenial(runID, listJSON string) {
-	if b.deps.RunSandbox == nil {
+func (b *TaskBoard) countDenials(runID string, delta int, listJSON string) {
+	if b.deps.RunSandbox == nil || delta == 0 {
 		return
 	}
-	if err := b.deps.RunSandbox.AddDenial(runID, listJSON); err != nil {
+	if err := b.deps.RunSandbox.AddDenials(runID, delta, listJSON); err != nil {
 		slog.Warn("ade: count sandbox denial", "scope", "ade", "run", runID, "err", err)
 	}
 }

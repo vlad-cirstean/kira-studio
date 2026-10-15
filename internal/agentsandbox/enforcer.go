@@ -41,6 +41,9 @@ type Enforcer interface {
 	Prepare(p Policy, rt Runtime) (Prepared, error)
 	// Watch reports denials for the process tree rooted at pid until stop is called.
 	Watch(pid int, runID string, on func(Denial)) (stop func())
+	// Release drops what Prepare registered for runID. It is idempotent and covers a run that
+	// never reached Watch.
+	Release(runID string)
 }
 
 // System is the real enforcer: Seatbelt on darwin, declared-only elsewhere.
@@ -86,6 +89,8 @@ func (s *system) Watch(pid int, runID string, on func(Denial)) func() {
 	}
 }
 
+func (s *system) Release(runID string) { s.proxy.release(runID) }
+
 func (s *system) proxyURL(runID string) (string, error) {
 	s.proxy.once.Do(func() {
 		p, err := StartProxy(s.hub, ProxyAllowlist(osGetenv))
@@ -126,7 +131,8 @@ func (h *hub) add(runID string, on func(Denial)) func() {
 }
 
 // emit delivers every denial to its run. Denial.Count is how often (op, target) occurred so far,
-// so the consumer keeps the first of each and still counts all.
+// so the consumer keeps the first of each and still counts all. Once a run has MaxDenials distinct
+// pairs, new ones are not remembered and arrive as repeats.
 func (h *hub) emit(runID string, d Denial) bool {
 	h.mu.Lock()
 	r := h.runs[runID]
@@ -135,8 +141,12 @@ func (h *hub) emit(runID string, d Denial) bool {
 		return false
 	}
 	key := [2]string{d.Op, d.Target}
-	r.seen[key]++
-	d.Count = r.seen[key]
+	if _, known := r.seen[key]; known || len(r.seen) < MaxDenials {
+		r.seen[key]++
+		d.Count = r.seen[key]
+	} else {
+		d.Count = 2 // past the cap: counts as a repeat, never kept
+	}
 	on := r.on
 	h.mu.Unlock()
 	on(d)

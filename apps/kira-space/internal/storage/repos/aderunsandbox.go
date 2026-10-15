@@ -80,13 +80,13 @@ func (r *AdeRunSandboxRepo) Badges(runIDs []string) (map[string]AdeRunSandbox, e
 	return out, rows.Err()
 }
 
-// AddDenial counts one more denial; denialsJSON, when not empty, replaces the stored list.
-func (r *AdeRunSandboxRepo) AddDenial(runID, denialsJSON string) error {
+// AddDenials counts delta more denials; denialsJSON, when not empty, replaces the stored list.
+func (r *AdeRunSandboxRepo) AddDenials(runID string, delta int, denialsJSON string) error {
 	var err error
 	if denialsJSON == "" {
-		_, err = r.DB.Exec(`UPDATE ade_run_sandbox SET denial_count = denial_count + 1 WHERE run_id = ?`, runID)
+		_, err = r.DB.Exec(`UPDATE ade_run_sandbox SET denial_count = denial_count + ? WHERE run_id = ?`, delta, runID)
 	} else {
-		_, err = r.DB.Exec(`UPDATE ade_run_sandbox SET denial_count = denial_count + 1, denials_json = ? WHERE run_id = ?`, denialsJSON, runID)
+		_, err = r.DB.Exec(`UPDATE ade_run_sandbox SET denial_count = denial_count + ?, denials_json = ? WHERE run_id = ?`, delta, denialsJSON, runID)
 	}
 	if err != nil {
 		return fmt.Errorf("repos: count sandbox denial %s: %w", runID, err)

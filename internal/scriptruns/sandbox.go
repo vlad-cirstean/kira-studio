@@ -23,6 +23,7 @@ type smartSandbox struct {
 	prep    agentsandbox.Prepared
 	tracker agentsandbox.Tracker
 	tools   bool
+	release func()
 }
 
 // prepareSandbox returns nil when the run is not confined.
@@ -47,11 +48,12 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 		_ = os.RemoveAll(pol.Scratch)
 		return nil, err
 	}
-	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil}, nil
+	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, release: func() { s.Sandbox.Release(runID) }}, nil
 }
 
 func (sb *smartSandbox) cleanup() {
 	if sb != nil {
+		sb.release()
 		_ = os.RemoveAll(sb.policy.Scratch)
 	}
 }

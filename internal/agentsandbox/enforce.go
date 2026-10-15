@@ -18,6 +18,14 @@ func osGetenv(k string) string { return os.Getenv(k) }
 // Prepare renders the profile and, on darwin, writes it and checks it compiles before claude
 // starts, so a promised policy never silently drops.
 func (s *system) Prepare(p Policy, rt Runtime) (Prepared, error) {
+	pr, err := s.prepare(p, rt)
+	if err != nil {
+		s.Release(p.RunID)
+	}
+	return pr, err
+}
+
+func (s *system) prepare(p Policy, rt Runtime) (Prepared, error) {
 	enforced := s.Support().Enforced
 	proxyURL := ""
 	if enforced && !p.Network {
