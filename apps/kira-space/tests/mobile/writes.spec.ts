@@ -59,14 +59,14 @@ test.describe('with write access', () => {
       .locator(t('plan-task'))
       .filter({ hasText: 'Cart total test fails intermittently' });
     await card.locator('button').first().click();
-    await card.locator(t('plan-stage-next')).click();
+    await card.locator(t('plan-step-next')).click();
     for (const id of ['confirm-cancel', 'confirm-yes']) {
       const box = await page.locator(t(id)).boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
   });
 
-  test('Next asks first, then moves the task from the stage the phone saw', async ({
+  test('Next asks first, then moves the task from the step the phone saw', async ({
     page,
     server,
   }) => {
@@ -75,19 +75,19 @@ test.describe('with write access', () => {
       .locator(t('plan-task'))
       .filter({ hasText: 'Cart total test fails intermittently' });
     await card.locator('button').first().click();
-    await card.locator(t('plan-stage-next')).click();
+    await card.locator(t('plan-step-next')).click();
     await expect(page.locator(t('confirm-dialog'))).toBeVisible();
-    expect(posts(server, '/api/ade/tasks/stage')).toHaveLength(0);
+    expect(posts(server, '/api/ade/tasks/step')).toHaveLength(0);
     await page.locator(t('confirm-yes')).click();
-    await expect.poll(() => posts(server, '/api/ade/tasks/stage').length).toBe(1);
-    const sent = posts(server, '/api/ade/tasks/stage')[0] as { body: string; key: string };
-    const body = JSON.parse(sent.body) as { taskId: string; fromStageId: string; stageId: string };
-    expect(body.fromStageId).not.toBe(body.stageId);
+    await expect.poll(() => posts(server, '/api/ade/tasks/step').length).toBe(1);
+    const sent = posts(server, '/api/ade/tasks/step')[0] as { body: string; key: string };
+    const body = JSON.parse(sent.body) as { taskId: string; fromStepId: string; stepId: string };
+    expect(body.fromStepId).not.toBe(body.stepId);
     expect(sent.key).not.toBe('');
   });
 
   test('a stale move shows the server message and keeps the card', async ({ page, server }) => {
-    server.state.failNext.set('/api/ade/tasks/stage', {
+    server.state.failNext.set('/api/ade/tasks/step', {
       status: 409,
       code: 'E_CONFLICT',
       message: 'The task moved on the computer. Refresh and try again.',
@@ -97,7 +97,7 @@ test.describe('with write access', () => {
       .locator(t('plan-task'))
       .filter({ hasText: 'Cart total test fails intermittently' });
     await card.locator('button').first().click();
-    await card.locator(t('plan-stage-next')).click();
+    await card.locator(t('plan-step-next')).click();
     await page.locator(t('confirm-yes')).click();
     await expect(page.locator(t('confirm-dialog'))).toContainText('moved on the computer');
   });
@@ -119,5 +119,5 @@ test('without write access the controls are replaced by a hint', async ({ page, 
     .locator('button')
     .first()
     .click();
-  await expect(page.locator(t('plan-stage-next'))).toHaveCount(0);
+  await expect(page.locator(t('plan-step-next'))).toHaveCount(0);
 });

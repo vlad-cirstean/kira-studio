@@ -46,7 +46,7 @@ test('a waiting review shows on the run line and opens the review window', async
   const { window: page, control } = await openPlan(relaunch, boardWithReview('waiting'));
   await openTask(page);
   const line = page
-    .locator(`${t('ade-stage-block')}[data-stage-id="impl"]`)
+    .locator(`${t('ade-step-block')}[data-step-id="impl"]`)
     .locator(`${t('ade-run-line')}[data-branch-id="b_billdash"]`);
   await expect(line.locator(t('ade-run-status'))).toHaveText('Waiting for review');
   await line.locator(t('ade-run-review')).click();

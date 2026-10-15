@@ -38,7 +38,7 @@ test('loads the archived history into the day bands', async ({ relaunch }) => {
   await expect(load).toHaveCount(0);
 });
 
-test('a card shows its stage, progress, span and clamped title', async ({ relaunch }) => {
+test('a card shows its step, progress, span and clamped title', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const search = card(page, 'T_search');
   await expect(search.locator('[data-testid="ade-step-label"]')).toHaveText('Implement 3/5');

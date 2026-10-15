@@ -172,7 +172,7 @@ test('a branch with only uncommitted changes is disabled and says why', async ({
   expect(calls(control)).toHaveLength(0);
 });
 
-test('an open failure shows in the panel and the stage block', async ({ relaunch }) => {
+test('an open failure shows in the panel and the step block', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskOpenReviewWindow, error: { code: 'failed', message: 'no window' } },
   ]);
@@ -183,7 +183,7 @@ test('an open failure shows in the panel and the stage block', async ({ relaunch
   await page
     .locator(`${t('ade-review-row')}[data-branch-id="b_auth"] ${t('ade-review-code')}`)
     .click();
-  await expect(page.locator(t('ade-stage-block-error'))).toContainText('no window');
+  await expect(page.locator(t('ade-step-block-error'))).toContainText('no window');
 });
 
 test('the earlier entry points still open their branch', async ({ relaunch }) => {

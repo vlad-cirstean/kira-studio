@@ -1,11 +1,10 @@
 import type { Page } from '@playwright/test';
 import { previewText } from './adePromptPreview';
 import { expect, test } from './fixtures';
-import { adeFixture, openPlan } from './support/adeV2';
+import { adeFixture, openWorkflows } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
-import type { ControlSnapshot } from './support/types';
 
 // The Workflows page: list, Graph and YAML editors, import and new.
 
@@ -16,41 +15,32 @@ interface WorkflowsFx {
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
-async function openWorkflows(
-  relaunch: Parameters<typeof openPlan>[0],
-  extra: readonly ControlSnapshot[] = [],
-) {
-  const app = await openPlan(relaunch, extra);
-  await app.window.locator(t('ade-tab-workflows')).click();
-  await app.window.locator(t('ade-workflows')).waitFor();
-  return app;
+interface SavedStep {
+  id: string;
+  kind: string;
+  skip: boolean;
+  allowedTools: string[];
+  review: { sendTo: string; implementer: string } | null;
+  maxReturns: number;
+  results: { id: string; ok: boolean; next: string; loop: boolean; description: string }[];
 }
-
 interface SavedWorkflow {
-  workflow: {
-    stages: {
-      id: string;
-      skip: boolean;
-      steps: {
-        id: string;
-        allowedTools: string[];
-        review: { sendTo: string; implementer: string } | null;
-        maxReturns: number;
-        results: { id: string; ok: boolean; next: string; loop: boolean; description: string }[];
-      }[];
-    }[];
-  };
+  workflow: { steps: SavedStep[] };
 }
 
 const node = (page: Page, step: string) =>
   page.locator(`${t('ade-wf-node')}[data-step-id="${step}"]`);
-const frame = (page: Page, stage: string) =>
-  page.locator(`${t('ade-wf-stage-node')}[data-stage-id="${stage}"]`);
-const selectStage = (page: Page, stage: string) =>
-  frame(page, stage).click({ position: { x: 8, y: 8 } });
-const stageMenu = async (page: Page, stage: string, item: string): Promise<void> => {
-  await frame(page, stage).locator(t('ade-wf-stage-menu')).click();
+const stepOf = (out: SavedWorkflow, id: string): SavedStep | undefined =>
+  out.workflow.steps.find((x) => x.id === id);
+const ids = (out: SavedWorkflow): string[] => out.workflow.steps.map((x) => x.id);
+const menuItem = async (page: Page, step: string, item: string): Promise<void> => {
+  await node(page, step).locator(t('ade-wf-step-menu')).click();
   await page.locator(t(item)).click();
+};
+/** Opens the inspector's collapsed Advanced section. */
+const openAdvanced = async (page: Page): Promise<void> => {
+  const toggle = page.locator(t('ade-wf-step-advanced'));
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
 };
 
 async function saved(
@@ -77,13 +67,15 @@ test('an empty folder shows the explanation', async ({ relaunch }) => {
   );
 });
 
-test('the list shows each file with its stages and flags a broken one', async ({ relaunch }) => {
+test('the list shows each file with its steps and flags a broken one', async ({ relaunch }) => {
   const fx = adeFixture<WorkflowsFx>('workflows');
   const { window: page } = await openWorkflows(relaunch);
   await expect(page.locator(t('ade-wf-row'))).toHaveCount(fx.workflows.length);
   const first = page.locator(t('ade-wf-row')).first();
   await expect(first.locator(t('ade-wf-row-name'))).toContainText('Standard feature');
-  await expect(first.locator(t('ade-wf-row-stages'))).toContainText('Spec › Implement › Review');
+  await expect(first.locator(t('ade-wf-row-steps'))).toContainText(
+    'Spec › Plan from spec › Implement',
+  );
   await expect(first.locator(t('ade-wf-row-used'))).toContainText('Used by');
   await expect(page.locator(t('ade-wf-row-error'))).toHaveCount(1);
   await page.locator(t('ade-wf-row')).last().click();
@@ -101,51 +93,52 @@ test('the graph saves on Save, never on its own, with ids unchanged', async ({ r
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const args = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
     fileName: string;
-    workflow: { id: string; name: string; stages: { id: string; steps: { id: string }[] }[] };
+    workflow: { id: string; name: string; steps: { id: string }[] };
   };
   expect(args.fileName).toBe('standard.yaml');
   expect(args.workflow.name).toBe('Standard feature v2');
   expect(args.workflow.id).toBe('standard');
-  expect(args.workflow.stages.map((s) => s.id)).toEqual(['spec', 'impl', 'review', 'release']);
-  expect(args.workflow.stages[1]?.steps.map((s) => s.id)).toEqual([
+  expect(args.workflow.steps.map((s) => s.id)).toEqual([
+    'spec',
     'plan',
     'impl',
     'tests',
     'ci',
     'pr',
+    'review',
+    'release',
   ]);
 });
 
 test('a new step gets a fresh id and Allowed tools becomes allowedTools', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
-  await selectStage(page, 'impl');
-  await page.locator(`${t('ade-wf-add-step')}[data-stage-id="impl"]`).click();
+  await page.locator(t('ade-wf-add-step')).click();
+  await page.locator(t('ade-wf-add-step-agent')).click();
   const added = await saved(page, control, 1);
-  expect(added.workflow.stages[1]?.steps.at(-1)?.id).toMatch(/^step-[0-9a-f]{8}$/);
+  expect(added.workflow.steps.at(-1)?.id).toMatch(/^step-[0-9a-f]{8}$/);
+  expect(added.workflow.steps.at(-1)?.kind).toBe('agent');
 
   await node(page, 'plan').click();
+  await openAdvanced(page);
   await page.locator(t('ade-wf-step-tools')).fill('Read, Grep, Bash(git diff:*)');
   const tools = await saved(page, control, 2);
-  expect(tools.workflow.stages[1]?.steps[0]?.allowedTools).toEqual([
-    'Read',
-    'Grep',
-    'Bash(git diff:*)',
-  ]);
+  expect(stepOf(tools, 'plan')?.allowedTools).toEqual(['Read', 'Grep', 'Bash(git diff:*)']);
 });
 
-test('the Review mode saves a review block with approved and rejected results', async ({
+test('switching the kind to Review confirms, then saves a review block with approved and rejected results', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openWorkflows(relaunch);
-  await selectStage(page, 'impl');
   await node(page, 'pr').click();
-  await page.locator(t('ade-wf-step-mode-review')).click();
+  await page.locator(t('ade-wf-step-kind-review')).click();
+  await page.locator(t('confirm-dialog-confirm')).click();
   await expect(page.locator(t('ade-wf-step-review'))).toBeVisible();
-  await expect(page.locator(t('ade-wf-step-tools'))).toHaveCount(0);
-  await expect(node(page, 'pr').locator(t('ade-wf-node-review'))).toBeVisible();
+  await expect(page.locator(t('ade-wf-step-prompt'))).toHaveCount(0);
+  await expect(node(page, 'pr')).toHaveAttribute('data-kind', 'review');
   await page.locator(t('ade-wf-step-review-send-to')).selectOption('new');
   const args = await saved(page, control, 1);
-  const step = args.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
+  const step = stepOf(args, 'pr');
+  expect(step?.kind).toBe('review');
   expect(step?.review).toEqual({ sendTo: 'new', implementer: '' });
   expect(step?.results.map((r) => [r.id, r.ok])).toEqual([
     ['approved', true],
@@ -153,13 +146,41 @@ test('the Review mode saves a review block with approved and rejected results', 
   ]);
 });
 
-test('the canvas has no up or down buttons', async ({ relaunch }) => {
+test('a kind switch on an empty step needs no confirmation', async ({ relaunch }) => {
   const { window: page } = await openWorkflows(relaunch);
-  await node(page, 'plan').click();
-  await expect(page.locator(t('ade-wf-step'))).toBeVisible();
-  for (const id of ['ade-wf-step-up', 'ade-wf-step-down', 'ade-wf-stage-up', 'ade-wf-stage-down']) {
-    await expect(page.locator(t(id))).toHaveCount(0);
-  }
+  await node(page, 'review').click();
+  await page.locator(t('ade-wf-step-kind-script')).click();
+  await expect(page.locator(t('confirm-dialog'))).toHaveCount(0);
+  await expect(node(page, 'review')).toHaveAttribute('data-kind', 'script');
+  await expect(page.locator(t('ade-wf-step-command'))).toBeVisible();
+});
+
+test('the inspector groups a step into What it does, Where and when and How it ends', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openWorkflows(relaunch);
+  await node(page, 'ci').click();
+  for (const section of ['what', 'where', 'end'])
+    await expect(page.locator(t(`ade-wf-step-section-${section}`))).toBeVisible();
+  await expect(page.locator(t('ade-wf-step-tools'))).toBeHidden();
+  await openAdvanced(page);
+  await expect(page.locator(t('ade-wf-step-tools'))).toBeVisible();
+  await node(page, 'spec').click();
+  await expect(page.locator(t('ade-wf-step-section-where'))).toHaveCount(0);
+  await expect(page.locator(t('ade-wf-step-session'))).toBeVisible();
+});
+
+test('the step menu moves a step up and down, and the first step cannot go up', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  await node(page, 'ci').locator(t('ade-wf-step-menu')).click();
+  await page.locator(t('ade-wf-step-up')).click();
+  await node(page, 'spec').locator(t('ade-wf-step-menu')).click();
+  await expect(page.locator(t('ade-wf-step-up'))).toHaveAttribute('data-disabled', '');
+  await page.keyboard.press('Escape');
+  const out = await saved(page, control, 1);
+  expect(ids(out)).toEqual(['spec', 'plan', 'impl', 'ci', 'tests', 'pr', 'review', 'release']);
 });
 
 test('edges are green for ok results, red for not ok, and a loop is dashed', async ({
@@ -185,7 +206,7 @@ test('the route select sets where a result goes and saves it in results', async 
     4,
   );
   const out = await saved(page, control, 1);
-  const pr = out.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
+  const pr = stepOf(out, 'pr');
   expect(pr?.results.find((r) => r.id === 'failed')).toMatchObject({
     ok: false,
     next: 'plan',
@@ -198,14 +219,14 @@ test('contract: a result built in the editor saves as the backend takes it', asy
 }) => {
   const sent = contract<{
     workflow: {
-      stages: { steps: { id: string; maxReturns: number; results: Record<string, unknown>[] }[] }[];
+      steps: { id: string; maxReturns: number; results: Record<string, unknown>[] }[];
     };
   }>('ade-workflow-results', 'args:AdeTaskService.SaveWorkflow');
-  const want = sent.workflow.stages[0]?.steps
+  const want = sent.workflow.steps
     .find((x) => x.id === 'review')
     ?.results.find((r) => r.id === 'changes');
   expect(want).toMatchObject({ next: 'impl', loop: true });
-  const wantLimit = sent.workflow.stages[0]?.steps.find((x) => x.id === 'review')?.maxReturns;
+  const wantLimit = sent.workflow.steps.find((x) => x.id === 'review')?.maxReturns;
   expect(wantLimit).toBe(2);
   const { window: page, control } = await openWorkflows(relaunch);
   await node(page, 'tests').click();
@@ -217,7 +238,7 @@ test('contract: a result built in the editor saves as the backend takes it', asy
   await row.locator(t('ade-wf-result-route')).selectOption(String(want?.next));
   await page.locator(t('ade-wf-step-max-returns')).fill(String(wantLimit));
   const out = await saved(page, control, 1);
-  const tests = out.workflow.stages[1]?.steps.find((x) => x.id === 'tests');
+  const tests = stepOf(out, 'tests');
   expect(tests?.results.find((r) => r.id === 'changes')).toEqual(want);
   expect(tests?.maxReturns).toBe(wantLimit);
 });
@@ -230,7 +251,7 @@ test('dragging a result dot to another step sets its route', async ({ relaunch }
   const target = node(page, 'impl').locator('[data-handleid="in"]');
   await dot.dragTo(target);
   const out = await saved(page, control, 1);
-  const pr = out.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
+  const pr = stepOf(out, 'pr');
   expect(pr?.results.find((r) => r.id === 'failed')).toMatchObject({ next: 'impl', loop: true });
 });
 
@@ -244,7 +265,7 @@ test('a result added in the inspector gets its own connector', async ({ relaunch
   await row.locator(t('ade-wf-result-id')).fill('flaky');
   await row.locator(t('ade-wf-result-route')).selectOption('end');
   const out = await saved(page, control, 1);
-  const ci = out.workflow.stages[1]?.steps.find((x) => x.id === 'ci');
+  const ci = stepOf(out, 'ci');
   expect(ci?.results.map((r) => [r.id, r.next])).toEqual([
     ['done', 'next'],
     ['failed', 'impl'],
@@ -259,44 +280,23 @@ test('Delete removes the selected step after asking', async ({ relaunch }) => {
   await page.locator(t('confirm-dialog-confirm')).click();
   await expect(node(page, 'ci')).toHaveCount(0);
   const out = await saved(page, control, 1);
-  expect(out.workflow.stages[1]?.steps.map((x) => x.id)).toEqual(['plan', 'impl', 'tests', 'pr']);
+  expect(ids(out)).toEqual(['spec', 'plan', 'impl', 'tests', 'pr', 'review', 'release']);
 });
 
-test('the stage menu moves a stage up and down', async ({ relaunch }) => {
-  const { window: page, control } = await openWorkflows(relaunch);
-  await stageMenu(page, 'review', 'ade-wf-stage-up');
-  await expect(page.locator(t('ade-wf-stage-node')).nth(1)).toHaveAttribute(
-    'data-stage-id',
-    'review',
-  );
-  await frame(page, 'spec').locator(t('ade-wf-stage-menu')).click();
-  await expect(page.locator(t('ade-wf-stage-up'))).toHaveAttribute('data-disabled', '');
-  await page.keyboard.press('Escape');
-  const out = await saved(page, control, 1);
-  expect(out.workflow.stages.map((x) => x.id)).toEqual(['spec', 'review', 'impl', 'release']);
-});
-
-test('the toolbar row above the graph is gone; stages and steps add on the graph', async ({
-  relaunch,
-}) => {
+test('steps add from the graph button and from the step menu, by kind', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   await expect(page.locator(t('ade-wf-strip-row'))).toHaveCount(0);
-  await expect(page.locator(t('ade-wf-strip-chip'))).toHaveCount(0);
-  await page.locator(t('ade-wf-add-stage')).click();
-  await stageMenu(page, 'impl', 'ade-wf-stage-add-after');
+  await page.locator(t('ade-wf-add-step')).click();
+  await page.locator(t('ade-wf-add-step-manual')).click();
   await node(page, 'ci').locator(t('ade-wf-step-menu')).click();
   await page.locator(t('ade-wf-step-add-after')).click();
+  await page.locator(t('ade-wf-step-add-after-script')).click();
   const out = await saved(page, control, 1);
-  expect(out.workflow.stages).toHaveLength(6);
-  expect(out.workflow.stages[1]?.id).toBe('impl');
-  expect(out.workflow.stages[2]?.id).toMatch(/^stage-/);
-  expect(out.workflow.stages[1]?.steps.map((x) => x.id).slice(0, 4)).toEqual([
-    'plan',
-    'impl',
-    'tests',
-    'ci',
-  ]);
-  expect(out.workflow.stages[1]?.steps).toHaveLength(6);
+  expect(out.workflow.steps).toHaveLength(10);
+  expect(ids(out).slice(0, 5)).toEqual(['spec', 'plan', 'impl', 'tests', 'ci']);
+  expect(out.workflow.steps[5]?.kind).toBe('script');
+  expect(out.workflow.steps.at(-1)?.kind).toBe('manual');
+  expect(out.workflow.steps.at(-1)?.results).toEqual([]);
 });
 
 test('the step menu makes a step the start and removes one after asking', async ({ relaunch }) => {
@@ -309,8 +309,8 @@ test('the step menu makes a step the start and removes one after asking', async 
   await page.locator(t('confirm-dialog-confirm')).click();
   await expect(node(page, 'ci')).toHaveCount(0);
   const out = await saved(page, control, 1);
-  expect(out.workflow.stages[1]?.steps[0]?.id).toBe('tests');
-  expect(out.workflow.stages[1]?.steps.some((x) => x.id === 'ci')).toBe(false);
+  expect(ids(out)[0]).toBe('tests');
+  expect(ids(out)).not.toContain('ci');
 });
 
 test('Max returns is a step field: agent steps take 1 to 10, review steps 0', async ({
@@ -324,13 +324,13 @@ test('Max returns is a step field: agent steps take 1 to 10, review steps 0', as
   await field.fill('4');
   await expect(node(page, 'ci').locator(t('ade-wf-node-returns'))).toHaveText('↩ ≤4');
   await node(page, 'pr').click();
-  await page.locator(t('ade-wf-step-mode-review')).click();
+  await page.locator(t('ade-wf-step-kind-review')).click();
+  await page.locator(t('confirm-dialog-confirm')).click();
   await expect(field).toHaveValue('0');
   await expect(field).toHaveAttribute('min', '0');
   const out = await saved(page, control, 1);
-  const stage = out.workflow.stages[1];
-  expect(stage?.steps.find((x) => x.id === 'ci')?.maxReturns).toBe(4);
-  expect(stage?.steps.find((x) => x.id === 'pr')?.maxReturns).toBe(0);
+  expect(stepOf(out, 'ci')?.maxReturns).toBe(4);
+  expect(stepOf(out, 'pr')?.maxReturns).toBe(0);
 });
 
 test('a refused save shows the error and a Switch to YAML link', async ({ relaunch }) => {
@@ -401,23 +401,31 @@ test('an invalid YAML shows its line and keeps the last valid version', async ({
       channel: IPC.adeTaskValidateWorkflowYaml,
       response: {
         workflow: null,
-        error: { line: 7, message: 'kind must be user, agent or script' },
+        error: { line: 7, message: 'kind must be agent, script, review or manual' },
       },
     },
   ]);
   await openYaml(page);
   await page.locator(t('ade-wf-yaml')).fill('id: x\n');
   await expect(page.locator(t('ade-wf-yaml-msg'))).toContainText(
-    '✕ Line 7: kind must be user, agent or script (the last valid version stays in use)',
+    '✕ Line 7: kind must be agent, script, review or manual (the last valid version stays in use)',
   );
 });
 
 test('line 0 shows the message alone', async ({ relaunch }) => {
-  const { window: page } = await openWorkflows(relaunch);
+  const { window: page } = await openWorkflows(relaunch, [
+    {
+      channel: IPC.adeTaskValidateWorkflowYaml,
+      response: {
+        workflow: null,
+        error: { line: 0, message: 'step 4: kind must be agent, script, review or manual' },
+      },
+    },
+  ]);
   await openYaml(page);
   await page.locator(t('ade-wf-yaml')).fill('id: x\n');
   await expect(page.locator(t('ade-wf-yaml-msg'))).toContainText(
-    '✕ stage 4: kind must be user, agent or script',
+    '✕ step 4: kind must be agent, script, review or manual',
   );
   await expect(page.locator(t('ade-wf-yaml-msg'))).not.toContainText('✕ ✕');
 });
@@ -481,20 +489,19 @@ test('Cmd+S saves the open editor', async ({ relaunch }) => {
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
 });
 
-test('the stage menu skips a stage, and the last runnable stage cannot be skipped', async ({
+test('the step menu skips a step, and the last runnable step cannot be skipped', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openWorkflows(relaunch);
-  const skipItem = page.locator(t('ade-wf-stage-skip'));
-  const skip = (id: string): Promise<void> => stageMenu(page, id, 'ade-wf-stage-skip');
+  const skipItem = page.locator(t('ade-wf-step-skip'));
+  const skip = (id: string): Promise<void> => menuItem(page, id, 'ade-wf-step-skip');
   await skip('impl');
-  await expect(frame(page, 'impl')).toHaveAttribute('data-skipped', 'true');
+  await expect(node(page, 'impl')).toHaveAttribute('data-skipped', 'true');
   const out = await saved(page, control, 1);
-  expect(out.workflow.stages.map((s) => s.skip)).toEqual([false, true, false, false]);
+  expect(out.workflow.steps.filter((x) => x.skip).map((x) => x.id)).toEqual(['impl']);
 
-  await skip('spec');
-  await skip('review');
-  await frame(page, 'release').locator(t('ade-wf-stage-menu')).click();
+  for (const id of ['spec', 'plan', 'tests', 'ci', 'pr', 'review']) await skip(id);
+  await node(page, 'release').locator(t('ade-wf-step-menu')).click();
   await expect(skipItem).toHaveAttribute('data-disabled', '');
 });
 

@@ -4,12 +4,12 @@ import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
 // Contract ade-claude-missing. Backend half: adeflow TestLaunchWithoutClaude.
-test('contract: launching a stage without the claude CLI shows the install message', async ({
+test('contract: launching a step without the claude CLI shows the install message', async ({
   relaunch,
 }) => {
   const failure = contract<{ code: string; message: string }>(
     'ade-claude-missing',
-    'AdeTaskService.LaunchStage#claudeMissing',
+    'AdeTaskService.LaunchStep#claudeMissing',
   );
   expect(failure.message).toContain('Claude Code CLI not found');
   const sessions = adeFixture<{ sessions: { id: string }[] }>('sessions');
@@ -18,11 +18,11 @@ test('contract: launching a stage without the claude CLI shows the install messa
       channel: IPC.adeTaskSessions,
       response: { ...sessions, sessions: sessions.sessions.filter((s) => s.id !== '9ab0') },
     },
-    { channel: IPC.adeTaskLaunchStage, error: failure },
+    { channel: IPC.adeTaskLaunchStep, error: failure },
   ]);
   await page
     .locator(
-      '[data-testid="ade-task"][data-task-id="T_auth"] [data-testid="ade-task-action-stage"]',
+      '[data-testid="ade-task"][data-task-id="T_auth"] [data-testid="ade-task-action-session"]',
     )
     .click();
   await page.locator('[data-testid="ade-dialog-send"]').click();

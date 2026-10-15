@@ -5,7 +5,7 @@ import type { CardModel } from '../plan/usePlanModel';
 import { ACTION_CLASS } from '../tones';
 import { useTaskAction } from './useTaskAction';
 
-// The task's stage action: `▶ Run`, `▶ <Stage>`, `Take over`, `Approve`, `Retry`, `Done ›`, `Finish ✓`,
+// The task's step action: `▶ Run`, `▶ <Step>`, `Take over`, `Approve`, `Retry`, `Done ›`, `Finish ✓`,
 // `Archive`; nothing otherwise.
 const props = defineProps<{ card: CardModel }>();
 const { action, perform, busy } = useTaskAction(() => props.card);

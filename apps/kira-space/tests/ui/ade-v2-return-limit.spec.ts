@@ -25,8 +25,12 @@ interface ContractRun {
 interface WorkflowsFx {
   workflows: {
     workflow: {
-      stages: {
-        steps: { id: string; maxReturns: number; review?: unknown; results: unknown[] }[];
+      steps: {
+        id: string;
+        kind: string;
+        maxReturns: number;
+        review?: unknown;
+        results: unknown[];
       }[];
     };
   }[];
@@ -34,10 +38,13 @@ interface WorkflowsFx {
 
 function workflows(maxReturns: number, review = false): ControlSnapshot {
   const fx = adeFixture<WorkflowsFx>('workflows');
-  const tests = fx.workflows[0]?.workflow.stages[1]?.steps.find((s) => s.id === 'tests');
+  const tests = fx.workflows[0]?.workflow.steps.find((s) => s.id === 'tests');
   if (tests) {
     tests.maxReturns = maxReturns;
-    if (review) tests.review = { sendTo: 'implementer', implementer: '' };
+    if (review) {
+      tests.kind = 'review';
+      tests.review = { sendTo: 'implementer', implementer: '' };
+    }
     tests.results = [
       { id: 'approved', ok: true, description: '', next: 'next', loop: false },
       { id: 'changes', ok: false, description: '', next: 'impl', loop: true },
@@ -74,7 +81,7 @@ async function open(page: Page): Promise<void> {
 
 const testsLine = (page: Page) =>
   page
-    .locator(`${t('ade-stage-block')}[data-stage-id="impl"]`)
+    .locator(`${t('ade-step-block')}[data-step-id="tests"]`)
     .locator(`${t('ade-run-line')}[data-branch-id="b_push"]`)
     .filter({ has: page.locator(t('ade-run-returns')) });
 
@@ -119,9 +126,9 @@ test('contract: a review step without a limit counts returns and shows no limit'
 
 test('contract: the editor saves Max returns as the backend takes it', async ({ relaunch }) => {
   const sent = contract<{
-    workflow: { stages: { steps: { id: string; maxReturns: number }[] }[] };
+    workflow: { steps: { id: string; maxReturns: number }[] };
   }>('ade-return-limit', 'args:AdeTaskService.SaveWorkflow');
-  const want = sent.workflow.stages[0]?.steps.find((s) => s.id === 'impl')?.maxReturns;
+  const want = sent.workflow.steps.find((s) => s.id === 'impl')?.maxReturns;
   expect(want).toBe(5);
   const { window: page, control } = await openPlan(relaunch, [workflows(5)]);
   await page.locator(t('ade-tab-workflows')).click();
@@ -134,15 +141,15 @@ test('contract: the editor saves Max returns as the backend takes it', async ({ 
   await expect(
     page.locator(`${t('ade-wf-node')}[data-step-id="tests"]`).locator(t('ade-wf-node-returns')),
   ).toHaveText('↩ ≤4');
-  await page.locator(t('ade-wf-step-mode-review')).click();
+  await page.locator(t('ade-wf-step-kind-review')).click();
+  await page.locator(t('confirm-dialog-confirm')).click();
   await expect(field).toHaveAttribute('min', '0');
   await field.fill('0');
   await expect(field).toHaveValue('0');
   await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const args = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
-    workflow: { stages: { steps: { id: string; maxReturns: number }[] }[] };
+    workflow: { steps: { id: string; maxReturns: number }[] };
   };
-  const steps = args.workflow.stages.flatMap((s) => s.steps);
-  expect(steps.find((s) => s.id === 'tests')?.maxReturns).toBe(0);
+  expect(args.workflow.steps.find((s) => s.id === 'tests')?.maxReturns).toBe(0);
 });

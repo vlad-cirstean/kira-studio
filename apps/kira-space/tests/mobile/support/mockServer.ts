@@ -106,7 +106,7 @@ function writeReply(path: string, body: string): unknown {
   if (path === '/api/ade/backlog/items')
     return { id: 'i-new', text: args.text, addedAt: 0, jira: null, githubUrl: '', notes: '' };
   if (path === '/api/ade/backlog/move') return {};
-  if (path === '/api/ade/tasks/stage') return { taskId: args.taskId, stageId: args.stageId };
+  if (path === '/api/ade/tasks/step') return { taskId: args.taskId, stepId: args.stepId };
   if (path === '/api/ade/tasks/run') return { runIds: ['run-new'] };
   if (path === '/api/ade/tasks/launch') return { sessionId: 'sp22' };
   const session = /^\/api\/agent\/sessions\/([^/]+)\/(send|take-over)$/.exec(path);

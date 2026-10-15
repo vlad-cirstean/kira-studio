@@ -29,7 +29,6 @@ function rebaseRun(id: string, branchId: string, taskId: string, over: Record<st
   return {
     id,
     taskId,
-    stageId: '',
     stepId: '',
     branchId,
     attempt: 1,
@@ -381,7 +380,7 @@ test('no dialog opens on board load or when a run changes a base', async ({ rela
   await expect(page.locator(t('ade-dialog'))).toHaveCount(0);
 });
 
-test('a failed step that reported detail shows it in its stage block', async ({ relaunch }) => {
+test('a failed step that reported detail shows it in its step block', async ({ relaunch }) => {
   const { window: page } = await open(relaunch, (b) => {
     const run = b.tasks
       .find((x) => x.id === 'T_cart')

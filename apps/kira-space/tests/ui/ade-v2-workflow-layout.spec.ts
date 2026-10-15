@@ -48,9 +48,6 @@ test('every node has the same size', async ({ relaunch }) => {
   const picks = [
     ...(await page.locator(t('ade-wf-node')).all()),
     page.locator(t('ade-wf-end-node')).first(),
-    ...['spec', 'review', 'release'].map((id) =>
-      page.locator(`${t('ade-wf-stage-node')}[data-stage-id="${id}"]`),
-    ),
   ];
   const sizes = new Set<string>();
   for (const el of picks) {
@@ -60,11 +57,11 @@ test('every node has the same size', async ({ relaunch }) => {
   expect(sizes.size).toBe(1);
 });
 
-test('stages run top to bottom and the spine shares one column', async ({ relaunch }) => {
+test('steps run top to bottom and the spine shares one column', async ({ relaunch }) => {
   const page = await open(relaunch);
-  const stages = page.locator(t('ade-wf-stage-node'));
+  const steps = page.locator(t('ade-wf-node'));
   const ys: number[] = [];
-  for (let i = 0; i < (await stages.count()); i += 1) ys.push((await box(stages.nth(i))).y);
+  for (let i = 0; i < (await steps.count()); i += 1) ys.push((await box(steps.nth(i))).y);
   expect(ys).toEqual([...ys].sort((a, b) => a - b));
   const centres: number[] = [];
   for (const id of ['plan', 'impl', 'tests', 'ci', 'pr']) {
@@ -109,13 +106,14 @@ test('an edit lays the graph out again', async ({ relaunch }) => {
   const page = await open(relaunch);
   const end = page.locator(t('ade-wf-end-node')).first();
   const endBefore = await box(end);
-  await page.locator(`${t('ade-wf-add-step')}[data-stage-id="impl"]`).click();
+  await page.locator(t('ade-wf-add-step')).click();
+  await page.locator(t('ade-wf-add-step-agent')).click();
   const fresh = page.locator(`${t('ade-wf-node')}[data-step-id^="step-"]`);
   await expect(fresh).toHaveCount(1);
-  const pr = await box(node(page, 'pr'));
+  const last = await box(node(page, 'release'));
   const added = await box(fresh);
-  expect(added.y).toBeGreaterThan(pr.y);
-  expect(Math.round(added.x + added.width / 2)).toBe(Math.round(pr.x + pr.width / 2));
+  expect(added.y).toBeGreaterThan(last.y);
+  expect(Math.round(added.x + added.width / 2)).toBe(Math.round(last.x + last.width / 2));
   expect((await box(end)).y).toBeGreaterThan(endBefore.y);
 });
 
@@ -128,7 +126,6 @@ test('contract: a backend workflow with a result loop lays out on one spine', as
       response: contract('ade-branching', 'AdeTaskService.Workflows'),
     },
   ]);
-  await expect(page.locator(`${t('ade-wf-stage-node')}[data-stage-id="build"]`)).toBeVisible();
   await expect(page.locator(t('ade-wf-node'))).toHaveCount(2);
 
   const sizes = new Set<string>();

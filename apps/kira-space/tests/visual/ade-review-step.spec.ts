@@ -14,15 +14,16 @@ reviewTest('review window workflow tab after a round', async ({ relaunch }) => {
 });
 
 interface Fx {
-  workflows: { workflow: { stages: { steps: Record<string, unknown>[] }[] } }[];
+  workflows: { workflow: { steps: Record<string, unknown>[] } }[];
 }
 
 test('workflow graph with a review step', async ({ relaunch }) => {
   const fx = adeFixture<Fx>('workflows');
-  const steps = fx.workflows[0]?.workflow.stages[1]?.steps ?? [];
+  const steps = fx.workflows[0]?.workflow.steps;
   const tests = steps.find((s) => s.id === 'tests');
   if (tests) {
     tests.prompt = '';
+    tests.kind = 'review';
     tests.review = { sendTo: 'implementer', implementer: '' };
     tests.maxReturns = 0;
     tests.results = [

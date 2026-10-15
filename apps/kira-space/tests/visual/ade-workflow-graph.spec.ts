@@ -3,14 +3,14 @@ import { adeFixture, openPlan } from '../ui/support/adeV2';
 import { IPC } from '../ui/support/ipcChannels';
 
 // P247: the graph workflow editor with a branching step: a review that loops back, a trivial exit to
-// the end of the stage, and the inspector open on it.
+// the end of the workflow, and the inspector open on it.
 interface Fx {
-  workflows: { workflow: { stages: { steps: { id: string; results: unknown[] }[] }[] } }[];
+  workflows: { workflow: { steps: { id: string; results: unknown[] }[] } }[];
 }
 
 test('workflow graph editor with branching results', async ({ relaunch }) => {
   const fx = adeFixture<Fx>('workflows');
-  const tests = fx.workflows[0]?.workflow.stages[1]?.steps.find((s) => s.id === 'tests');
+  const tests = fx.workflows[0]?.workflow.steps.find((s) => s.id === 'tests');
   if (tests)
     tests.results = [
       { id: 'passed', ok: true, description: 'Tests pass.', next: 'next', loop: false },
@@ -27,11 +27,11 @@ test('workflow graph editor with branching results', async ({ relaunch }) => {
   );
 });
 
-// P255: the locked top-to-bottom layout with a diamond fan-out, a forward skip to the end of the stage
+// P255: the locked top-to-bottom layout with a diamond fan-out, a forward skip to the end of the workflow
 // and two nested loops.
 test('workflow graph editor branches, skips and nested loops', async ({ relaunch }) => {
   const fx = adeFixture<Fx>('workflows');
-  const steps = fx.workflows[0]?.workflow.stages[1]?.steps;
+  const steps = fx.workflows[0]?.workflow.steps;
   const route = (id: string, results: [string, boolean, string, boolean][]): void => {
     const step = steps?.find((s) => s.id === id);
     if (step)
@@ -69,3 +69,17 @@ test('workflow graph editor branches, skips and nested loops', async ({ relaunch
     'workflow-graph-branches.png',
   );
 });
+
+for (const [kind, step, shot] of [
+  ['manual', 'spec', 'workflow-graph-manual.png'],
+  ['script', 'release', 'workflow-graph-script.png'],
+] as const) {
+  test(`workflow graph editor with a ${kind} step selected`, async ({ relaunch }) => {
+    const fx = adeFixture<Fx>('workflows');
+    const { window } = await openPlan(relaunch, [{ channel: IPC.adeTaskWorkflows, response: fx }]);
+    await window.setViewportSize({ width: 1400, height: 1750 });
+    await window.locator('[data-testid="ade-tab-workflows"]').click();
+    await window.locator(`[data-testid="ade-wf-node"][data-step-id="${step}"]`).click();
+    await expect(window.locator('[data-testid="ade-wf-editor"]')).toHaveScreenshot(shot);
+  });
+}

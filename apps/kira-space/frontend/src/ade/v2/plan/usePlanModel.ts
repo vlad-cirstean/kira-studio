@@ -52,7 +52,7 @@ export interface BranchRowModel {
   /** Second line: `no branch yet · from main`, or a review item's PR title. */
   context: string;
   tag: BranchTag;
-  /** Own progress line while the task is in an agent or script stage. */
+  /** Own progress line while the task is in an agent or script step. */
   prog: { segs: BranchSegState[]; label: string; tone: BranchProgress['tone']; tip: string } | null;
   ripple: boolean;
   /** Merged-into and deployed chips of the second line, nothing for a branch not in any target. */
@@ -73,11 +73,11 @@ export interface CardModel {
   progress: TaskProgress;
   /** The task's workflow file, `null` when it has none or the file is gone. */
   workflow: Workflow | null;
-  /** Panel Workflow block: one per stage; empty for a review or parked task. */
+  /** Panel Workflow block: one per step; empty for a review or parked task. */
   blocks: StepBlock[];
   status: DerivedStatus;
   tag: { label: string; tone: BranchTag['tone']; tip: string; since?: number } | null;
-  /** Task stage action; which kinds render is `useTaskAction`'s call. */
+  /** Task step action; which kinds render is `useTaskAction`'s call. */
   action: TaskAction | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
   meta: string;

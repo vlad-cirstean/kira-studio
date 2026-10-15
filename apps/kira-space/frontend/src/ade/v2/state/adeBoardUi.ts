@@ -23,7 +23,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const focusRebaseLog = ref(false);
   /** Task whose agent Run dialog is open. */
   const runTaskId = ref<string | null>(null);
-  /** Last failed stage action per task, shown in the panel header until the next attempt. */
+  /** Last failed step action per task, shown in the panel header until the next attempt. */
   const actionError = ref<Record<string, string>>({});
   /** Per repo: what the last fetch changed, shown on its chip until the next fetch. */
   const refreshSummary = ref<Record<string, string>>({});

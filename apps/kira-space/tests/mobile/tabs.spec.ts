@@ -42,7 +42,7 @@ test('contract: Backlog lists what the backend returns', async ({ page }) => {
   await expect(items.first()).toContainText('Write the docs');
 });
 
-test('Plan groups tasks by day and expands a task into its stages', async ({ page }) => {
+test('Plan groups tasks by day and expands a task into its steps', async ({ page }) => {
   await page.locator(t('tab-plan')).click();
   await expect(page).toHaveURL(/\/plan$/);
   const labels = await page
@@ -64,8 +64,8 @@ test('Plan groups tasks by day and expands a task into its stages', async ({ pag
     .filter({ hasText: 'Cart total test fails intermittently' });
   await expect(cart.locator(t('ade-chip')).first()).toBeVisible();
   await cart.locator('button').first().click();
-  await expect(cart.locator(t('plan-stages'))).toBeVisible();
-  await expect(cart.locator(t('plan-stages'))).toContainText('Release');
+  await expect(cart.locator(t('plan-steps'))).toBeVisible();
+  await expect(cart.locator(t('plan-steps'))).toContainText('Release');
 });
 
 test('every tab fits the screen width', async ({ page }) => {

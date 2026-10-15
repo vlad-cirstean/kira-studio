@@ -4,7 +4,7 @@ import { adeBoard, adeFixture, openPlan } from './support/adeV2';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
-// Stage and start launches, the task's Take over and the `!` targets.
+// Step and start launches, the task's Take over and the `!` targets.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const row = (id: string) => `[data-testid="ade-branch-row"][data-branch-id="${id}"]`;
@@ -29,18 +29,18 @@ async function editedSend(page: Page, text: string): Promise<void> {
   await page.locator(t('ade-dialog-send')).click();
 }
 
-test('▶ <Stage> opens the dialog and an unedited message goes as an empty string', async ({
+test('▶ <Step> opens the dialog and an unedited message goes as an empty string', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskSessions, response: sessionsWithout(['9ab0']) },
   ]);
-  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-stage')}`).click();
+  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-session')}`).click();
   await expect(page.locator(t('ade-dialog'))).toBeVisible();
   await expect(page.locator(t('ade-dialog-message'))).not.toHaveValue('');
   await page.locator(t('ade-dialog-send')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskLaunchStage)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskLaunchStage)[0]?.args).toEqual({
+  await expect.poll(() => calls(control, IPC.adeTaskLaunchStep)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskLaunchStep)[0]?.args).toEqual({
     taskId: 'T_auth',
     message: '',
   });
@@ -48,14 +48,14 @@ test('▶ <Stage> opens the dialog and an unedited message goes as an empty stri
   await expect(page.locator(t('ade-dialog'))).toBeHidden();
 });
 
-test('▶ <Stage> sends an edited message as written', async ({ relaunch }) => {
+test('▶ <Step> sends an edited message as written', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskSessions, response: sessionsWithout(['9ab0']) },
   ]);
-  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-stage')}`).click();
+  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-session')}`).click();
   await editedSend(page, 'Review only the auth module.');
-  await expect.poll(() => calls(control, IPC.adeTaskLaunchStage)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskLaunchStage)[0]?.args).toEqual({
+  await expect.poll(() => calls(control, IPC.adeTaskLaunchStep)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskLaunchStep)[0]?.args).toEqual({
     taskId: 'T_auth',
     message: 'Review only the auth module.',
   });
@@ -149,25 +149,25 @@ test('a launch behind a running prepare script shows its progress and waits', as
     { channel: IPC.adeTaskBoard, response: authBoard('running') },
     { channel: IPC.adeTaskSessions, response: sessionsWithout(['9ab0']) },
     {
-      channel: IPC.adeTaskLaunchStage,
+      channel: IPC.adeTaskLaunchStep,
       error: {
         code: 'E_PREPARING',
         message: 'preparing the worktree of feat/oauth-login; try again when it is ready',
       },
     },
   ]);
-  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-stage')}`).click();
+  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-session')}`).click();
   await expect(page.locator(t('ade-dialog-setup')).first()).toContainText('Preparing worktree');
   await page.locator(t('ade-dialog-send')).click();
   await expect(page.locator(t('ade-dialog-send'))).toHaveText('Starts when ready…');
   await expect(page.locator(t('ade-dialog-send'))).toBeDisabled();
   await expect(page.locator(t('ade-dialog-error'))).toHaveCount(0);
-  await expect.poll(() => calls(control, IPC.adeTaskLaunchStage).length).toBeGreaterThan(1);
+  await expect.poll(() => calls(control, IPC.adeTaskLaunchStep).length).toBeGreaterThan(1);
   await page.locator(t('ade-dialog-cancel')).click();
   await expect(page.locator(t('ade-dialog'))).toBeHidden();
-  const sent = calls(control, IPC.adeTaskLaunchStage).length;
+  const sent = calls(control, IPC.adeTaskLaunchStep).length;
   await page.waitForTimeout(2600);
-  expect(calls(control, IPC.adeTaskLaunchStage)).toHaveLength(sent);
+  expect(calls(control, IPC.adeTaskLaunchStep)).toHaveLength(sent);
 });
 
 test('a launch behind a failed prepare script shows why and Retry setup', async ({ relaunch }) => {
@@ -175,7 +175,7 @@ test('a launch behind a failed prepare script shows why and Retry setup', async 
     { channel: IPC.adeTaskBoard, response: authBoard('failed', 'exited with status 1') },
     { channel: IPC.adeTaskSessions, response: sessionsWithout(['9ab0']) },
   ]);
-  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-stage')}`).click();
+  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-session')}`).click();
   const block = page.locator(t('ade-dialog-setup')).first();
   await expect(block).toContainText('Worktree setup failed');
   await expect(block.locator(t('script-progress-reason'))).toHaveText('exited with status 1');

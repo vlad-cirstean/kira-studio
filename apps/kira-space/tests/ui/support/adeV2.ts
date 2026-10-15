@@ -75,7 +75,7 @@ export function adeBoard(edit: (board: AdeBoardFx) => void): AdeBoardFx {
 export interface AdeBoardFx {
   tasks: ({
     id: string;
-    stageId: string;
+    entryStepId: string;
     workflowId: string;
     runs: Record<string, unknown>[];
   } & Record<string, unknown>)[];
@@ -125,14 +125,14 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskSetTaskWorkflow, response: adeFixture('task') },
     { channel: IPC.adeTaskApprove },
     { channel: IPC.adeTaskRetryRun },
-    { channel: IPC.adeTaskStageDone, response: adeFixture('task') },
-    { channel: IPC.adeTaskSetTaskStage, response: adeFixture('task') },
+    { channel: IPC.adeTaskStepDone, response: adeFixture('task') },
+    { channel: IPC.adeTaskSetTaskStep, response: adeFixture('task') },
     { channel: IPC.adeTaskRetrySetup },
     { channel: IPC.adeTaskReadLog, response: adeFixture('log-page') },
     { channel: IPC.adeTaskSessions, response: adeFixture('sessions') },
     { channel: IPC.adeTaskStopRun },
     { channel: IPC.adeTaskTakeOver, response: adeFixture('launch') },
-    { channel: IPC.adeTaskLaunchStage, response: adeFixture('launch') },
+    { channel: IPC.adeTaskLaunchStep, response: adeFixture('launch') },
     { channel: IPC.adeTaskStartBranch, response: adeFixture('launch') },
     { channel: IPC.adeTaskSend },
     { channel: IPC.adeTaskFocusSession, response: true },
@@ -223,4 +223,15 @@ export async function openBillTask(page: Page): Promise<void> {
     .locator('[data-testid="ade-card"][data-task-id="T_bill"] [data-testid="ade-card-head"]')
     .click();
   await page.locator('[data-testid="ade-panel"]').waitFor();
+}
+
+/** Boots into the Workflows tab. */
+export async function openWorkflows(
+  relaunch: Parameters<typeof openPlan>[0],
+  extra: readonly ControlSnapshot[] = [],
+) {
+  const app = await openPlan(relaunch, extra);
+  await app.window.locator('[data-testid="ade-tab-workflows"]').click();
+  await app.window.locator('[data-testid="ade-workflows"]').waitFor();
+  return app;
 }

@@ -436,29 +436,29 @@ test('a ready setup shows its status without a log', async ({ relaunch }) => {
   await expect(setup.locator('[data-testid="ade-run-log"]')).toHaveCount(0);
 });
 
-test('the stage mover goes back, picks any stage and is off while a run is live', async ({
+test('the step mover goes back, picks any step and is off while a run is live', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openPlan(relaunch);
-  const moves = () => control.log().filter((e) => e.channel === IPC.adeTaskSetTaskStage);
+  const moves = () => control.log().filter((e) => e.channel === IPC.adeTaskSetTaskStep);
 
   await openTask(page, 'T_auth');
-  await page.locator('[data-testid="ade-stage-back"]').click();
+  await page.locator('[data-testid="ade-step-back"]').click();
   await expect.poll(moves).toHaveLength(1);
-  expect(moves()[0]?.args).toEqual({ taskId: 'T_auth', stageId: 'impl' });
+  expect(moves()[0]?.args).toEqual({ taskId: 'T_auth', stepId: 'pr' });
 
-  await page.locator('[data-testid="ade-stage-pick"]').click();
-  await page.locator('[data-testid="ade-stage-option-done"]').click();
+  await page.locator('[data-testid="ade-step-pick"]').click();
+  await page.locator('[data-testid="ade-step-option-done"]').click();
   await expect.poll(moves).toHaveLength(2);
-  expect(moves()[1]?.args).toEqual({ taskId: 'T_auth', stageId: 'done' });
+  expect(moves()[1]?.args).toEqual({ taskId: 'T_auth', stepId: 'done' });
 
   await openTask(page, 'T_alerts');
-  await expect(page.locator('[data-testid="ade-stage-back"]')).toBeDisabled();
-  await expect(page.locator('[data-testid="ade-stage-next"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="ade-step-back"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="ade-step-next"]')).toBeEnabled();
 
   await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-stage-pick"]')).toBeDisabled();
-  await expect(page.locator('[data-testid="ade-stage-next"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="ade-step-pick"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="ade-step-next"]')).toBeDisabled();
 });
 
 test('a started task on an older workflow version says so', async ({ relaunch }) => {
@@ -479,25 +479,25 @@ test('a started task on an older workflow version says so', async ({ relaunch })
   await expect(page.locator('[data-testid="ade-workflow-outdated"]')).toHaveCount(0);
 });
 
-test('a skipped stage is dimmed, cannot be entered, and Skip this stage jumps past it', async ({
+test('a skipped step is dimmed, cannot be entered, and Skip this step jumps past it', async ({
   relaunch,
 }) => {
   const workflows = adeFixture<{
-    workflows: { workflow: { stages: { id: string; skip: boolean }[] } | null }[];
+    workflows: { workflow: { steps: { id: string; skip: boolean }[] } | null }[];
   }>('workflows');
-  for (const s of workflows.workflows[0]?.workflow?.stages ?? []) s.skip = s.id === 'impl';
+  for (const s of workflows.workflows[0]?.workflow?.steps ?? []) s.skip = s.id === 'plan';
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskWorkflows, response: workflows },
   ]);
-  const moves = () => control.log().filter((e) => e.channel === IPC.adeTaskSetTaskStage);
+  const moves = () => control.log().filter((e) => e.channel === IPC.adeTaskSetTaskStep);
 
   await openTask(page, 'T_alerts');
-  const skipped = page.locator('[data-testid="ade-stage-block"][data-stage-id="impl"]');
+  const skipped = page.locator('[data-testid="ade-step-block"][data-step-id="plan"]');
   await expect(skipped).toHaveAttribute('data-state', 'skipped');
   await expect(skipped).toContainText('Skipped');
 
-  await page.locator('[data-testid="ade-stage-pick"]').click();
-  await expect(page.locator('[data-testid="ade-stage-option-impl"]')).toHaveAttribute(
+  await page.locator('[data-testid="ade-step-pick"]').click();
+  await expect(page.locator('[data-testid="ade-step-option-plan"]')).toHaveAttribute(
     'data-disabled',
     '',
   );
@@ -505,12 +505,12 @@ test('a skipped stage is dimmed, cannot be entered, and Skip this stage jumps pa
 
   await page
     .locator(
-      '[data-testid="ade-stage-block"][data-stage-id="spec"] [data-testid="ade-stage-block-head"]',
+      '[data-testid="ade-step-block"][data-step-id="spec"] [data-testid="ade-step-block-head"]',
     )
     .click({ button: 'right', position: { x: 200, y: 8 } });
-  await page.locator('[data-testid="menu-item-ade-stage-skip-this"]').click();
+  await page.locator('[data-testid="menu-item-ade-step-skip-this"]').click();
   await expect.poll(moves).toHaveLength(1);
-  expect(moves()[0]?.args).toEqual({ taskId: 'T_alerts', stageId: 'review' });
+  expect(moves()[0]?.args).toEqual({ taskId: 'T_alerts', stepId: 'impl' });
 });
 
 test('agent-made branches carry a sparkle and the workflow shows its Kira Space tools', async ({

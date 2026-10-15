@@ -14,7 +14,7 @@ import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
-// Workflow block, run lines, the Run dialog and the stage actions on the Plan.
+// Workflow block, run lines, the Run dialog and the step actions on the Plan.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const task = (id: string) => `[data-testid="ade-task"][data-task-id="${id}"]`;
@@ -32,17 +32,15 @@ async function open(page: Page, id: string): Promise<void> {
   await expect(page.locator(t('ade-panel'))).toBeVisible();
 }
 
-const stage = (page: Page, stageId: string) =>
-  page.locator(`${t('ade-stage-block')}[data-stage-id="${stageId}"]`);
+const step = (page: Page, stepId: string) =>
+  page.locator(`${t('ade-step-block')}[data-step-id="${stepId}"]`);
 
-/** T_alerts moved to a not yet started Implement stage of the standard workflow. */
+/** T_alerts moved to a not yet started Implement step of the standard workflow. */
 function alertsInImpl(b: AdeBoardFx): void {
-  const bill = b.tasks.find((x) => x.id === 'T_bill');
   const alerts = b.tasks.find((x) => x.id === 'T_alerts');
-  if (!bill || !alerts) throw new Error('fixture tasks missing');
-  alerts.stageId = 'impl';
+  if (!alerts) throw new Error('fixture tasks missing');
+  alerts.entryStepId = 'impl';
   alerts.workflowId = 'standard';
-  alerts.currentStage = bill.currentStage;
   alerts.runs = [];
 }
 
@@ -146,7 +144,7 @@ test('a pushed runs event updates the step line', async ({ relaunch }) => {
   const ev = adeFixture<{ runs: Record<string, unknown>[] }>('event-runs');
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_bill');
-  const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
+  const line = step(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
   await expect(line.locator(t('ade-run-status'))).toHaveText('Running');
   await emitRuns(page, [{ ...ev.runs[0], state: 'done' }]);
   await expect(line.locator(t('ade-run-glyph'))).toHaveText('✓');
@@ -165,7 +163,6 @@ test('Approve sends the gated step', async ({ relaunch }) => {
   await expect.poll(() => calls(control, IPC.adeTaskApprove)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskApprove)[0]?.args).toEqual({
     taskId: 'T_hooks',
-    stageId: 'impl',
     stepId: 'pr',
   });
 });
@@ -189,29 +186,34 @@ test('Retry also covers a stuck run and the step line offers it', async ({ relau
     }),
   );
   await open(page, 'T_cart');
-  await stage(page, 'release').locator(t('ade-run-retry')).click();
+  await step(page, 'release').locator(t('ade-run-retry')).click();
   await expect.poll(() => calls(control, IPC.adeTaskRetryRun)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskRetryRun)[0]?.args).toEqual({
     runId: 'r_T_cart_release_b_cart',
   });
 });
 
-test('Done and Finish call StageDone', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(
-    relaunch,
-    boardWith((b) => {
+test('Done and Finish call StepDone', async ({ relaunch }) => {
+  const fx = adeFixture<{
+    workflows: { workflow: { steps: { id: string; session: boolean; prompt: string }[] } | null }[];
+  }>('workflows');
+  const review = fx.workflows[0]?.workflow?.steps.find((x) => x.id === 'review');
+  if (review) Object.assign(review, { session: false, prompt: '' });
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskWorkflows, response: fx },
+    ...boardWith((b) => {
       const cart = b.tasks.find((x) => x.id === 'T_cart');
       const run = cart?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
       if (run) run.state = 'done';
       for (const r of b.tasks.find((x) => x.id === 'T_hooks')?.runs ?? []) r.state = 'done';
     }),
-  );
+  ]);
   await page.locator(cellAction('T_hooks', 'done')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskStageDone)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskStageDone)[0]?.args).toEqual({ taskId: 'T_hooks' });
+  await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskStepDone)[0]?.args).toEqual({ taskId: 'T_hooks' });
   await page.locator(cellAction('T_cart', 'finish')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskStageDone)).toHaveLength(2);
-  expect(calls(control, IPC.adeTaskStageDone)[1]?.args).toEqual({ taskId: 'T_cart' });
+  await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(2);
+  expect(calls(control, IPC.adeTaskStepDone)[1]?.args).toEqual({ taskId: 'T_cart' });
 });
 
 test('a failed action shows its error in the panel', async ({ relaunch }) => {
@@ -225,7 +227,7 @@ test('a failed action shows its error in the panel', async ({ relaunch }) => {
 test('a send-back shows on the step line with its loop and note', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_push');
-  const impl = stage(page, 'impl');
+  const impl = step(page, 'impl');
   await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
   await expect(
     impl.locator(t('ade-run-note')).filter({ hasText: '2 failing tests' }),
@@ -237,10 +239,10 @@ test('a send-back shows on the step line with its loop and note', async ({ relau
 function branchingWorkflows(maxReturns = 3): ControlSnapshot {
   const fx = adeFixture<{
     workflows: {
-      workflow: { stages: { steps: { id: string; maxReturns: number; results: unknown[] }[] }[] };
+      workflow: { steps: { id: string; maxReturns: number; results: unknown[] }[] };
     }[];
   }>('workflows');
-  const steps = fx.workflows[0]?.workflow.stages[1]?.steps ?? [];
+  const steps = fx.workflows[0]?.workflow.steps ?? [];
   // The fixture's other back edge to Implement (ci) is dropped so only the review-style step loops.
   const ci = steps.find((x) => x.id === 'ci');
   if (ci) ci.results = [{ id: 'done', ok: true, description: '', next: 'next', loop: false }];
@@ -276,7 +278,7 @@ test('a result that loops back shows its route on the step and the sent-back lin
     }),
   ]);
   await open(page, 'T_push');
-  const impl = stage(page, 'impl');
+  const impl = step(page, 'impl');
   await expect(
     impl.locator(t('ade-step-route')).filter({ hasText: 'changes ↩ Implement' }),
   ).toHaveCount(1);
@@ -311,10 +313,10 @@ test("contract: a fix round counts against the step's return limit", async ({ re
   const back = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#review-back');
   const { workflows } = contract<{
     workflows: {
-      workflow: { stages: { steps: { id: string; maxReturns: number }[] }[] };
+      workflow: { steps: { id: string; maxReturns: number }[] };
     }[];
   }>('ade-branching', 'AdeTaskService.Workflows');
-  const budget = workflows[0]?.workflow.stages[0]?.steps.find((s) => s.id === 'review')?.maxReturns;
+  const budget = workflows[0]?.workflow.steps.find((s) => s.id === 'review')?.maxReturns;
   expect(budget).toBe(2);
   const { window: page } = await openPlan(relaunch, [
     branchingWorkflows(budget),
@@ -325,10 +327,10 @@ test("contract: a fix round counts against the step's return limit", async ({ re
   ]);
   await open(page, 'T_push');
   await expect(
-    stage(page, 'impl').locator(t('ade-run-note')).filter({ hasText: 'fix round 1 of 2' }),
+    step(page, 'impl').locator(t('ade-run-note')).filter({ hasText: 'fix round 1 of 2' }),
   ).toHaveCount(1);
   await expect(
-    stage(page, 'impl').locator(t('ade-run-note')).filter({ hasText: back.note }),
+    step(page, 'impl').locator(t('ade-run-note')).filter({ hasText: back.note }),
   ).toHaveCount(1);
 });
 
@@ -339,7 +341,7 @@ test('contract: a run without claude on PATH shows its reason', async ({ relaunc
     boardWith((b) => placeRun(b, 'impl', failed)),
   );
   await open(page, 'T_push');
-  const line = stage(page, 'impl')
+  const line = step(page, 'impl')
     .locator(`${t('ade-run-line')}[data-branch-id="b_push"]`)
     .filter({ has: page.locator(t('ade-run-retry')) });
   await expect(line.locator(t('ade-run-status'))).toHaveText('Failed');
@@ -347,7 +349,7 @@ test('contract: a run without claude on PATH shows its reason', async ({ relaunc
   await expect(line.locator(t('ade-run-retry'))).toBeVisible();
 });
 
-test('contract: a spent loop shows the result and that the stage stopped', async ({ relaunch }) => {
+test('contract: a spent loop shows the result and that the step stopped', async ({ relaunch }) => {
   const spent = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#review-spent');
   const { window: page } = await openPlan(
     relaunch,
@@ -369,7 +371,7 @@ test('Log opens the run log and appends pushed chunks', async ({ relaunch }) => 
   const page0 = await openPlan(relaunch);
   const page = page0.window;
   await open(page, 'T_bill');
-  const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
+  const line = step(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
   await line.locator(t('ade-run-log-toggle')).click();
   const log = page.locator(t('ade-run-log'));
   await expect(log).toBeVisible();
@@ -387,24 +389,23 @@ test('a script run offers Output, and the Release block lists the branches', asy
 }) => {
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_cart');
-  await expect(stage(page, 'release').locator(t('ade-run-log-toggle'))).toHaveText('Output');
-  await expect(stage(page, 'release').locator(t('ade-release-row'))).toHaveCount(1);
+  await expect(step(page, 'release').locator(t('ade-run-log-toggle'))).toHaveText('Output');
+  await expect(step(page, 'release').locator(t('ade-release-row'))).toHaveCount(1);
 });
 
-// Contract ade-run. Backend half: adeflow TestRunLifecycle ("approval, logs and stage done"). Fixture
+// Contract ade-run. Backend half: adeflow TestRunLifecycle ("approval, logs and step done"). Fixture
 // ids replace the backend's; every other field is the backend's.
 test('contract: a finished step run shows done', async ({ relaunch }) => {
   const one = contract<Record<string, unknown>>('ade-run', 'AdeTaskService.Run#one-done');
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_bill');
-  const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
+  const line = step(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
   await expect(line.locator(t('ade-run-status'))).toHaveText('Running');
   await emitRuns(page, [
     {
       ...one,
       id: 'r_T_bill_impl_b_bill',
       taskId: 'T_bill',
-      stageId: 'impl',
       stepId: 'impl',
       branchId: 'b_bill',
       startedAt: 1_790_035_200_000,

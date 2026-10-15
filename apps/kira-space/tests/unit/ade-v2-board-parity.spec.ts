@@ -21,7 +21,7 @@ import { loadFixture, mkBranch, mkPlan, mkRun, mkStep, mkTask } from './support/
 import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 
 // Parity: the board logic over the P143 fixtures equals the mockup's own `renderVals()` for status,
-// stage label and percent, task action, branch tag and actions, base marker, day bands and the
+// step label and percent, task action, branch tag and actions, base marker, day bands and the
 // Needs-you list. The fixtures describe the mockup's default data, with four input normalizations
 // the mockup derives itself and the wire carries as backend facts:
 //   1. a running headless run whose session waits for input is `stuck` (the mockup reads the session);
@@ -182,7 +182,7 @@ describe('per task', () => {
     };
   };
 
-  test('status chip and stage action equal the mockup', () => {
+  test('status chip and step action equal the mockup', () => {
     for (const t of tasks()) {
       const box = boxOf(t.id);
       const { cell } = cellOf(t.id);

@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { scriptRunSchema } from '@shared/domain/scriptRuns';
 import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
-import { adeBoard, openPlan } from './support/adeV2';
+import { adeBoard, adeFixture, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -291,18 +291,21 @@ test('the Automations entry asks for the task and the run dialog lists tasks', a
 });
 
 function smartStepBoard(): ControlSnapshot {
+  const wf = structuredClone(
+    adeFixture<{ workflows: { workflow: { steps: Record<string, unknown>[] } }[] }>('workflows')
+      .workflows[0]?.workflow,
+  );
+  const step = wf?.steps.find((x) => x.id === 'impl');
+  if (!wf || !step) throw new Error('fixture workflow missing');
+  Object.assign(step, { smartScript: SMART.name, prompt: '' });
   return {
     channel: IPC.adeTaskBoard,
     response: adeBoard((b) => {
       const alerts = b.tasks.find((x) => x.id === 'T_alerts');
-      const bill = b.tasks.find((x) => x.id === 'T_bill') as unknown as {
-        currentStage: { steps: Record<string, unknown>[] };
-      };
       if (!alerts) throw new Error('fixture task missing');
-      const step = { ...bill.currentStage.steps[0], smartScript: SMART.name, prompt: '' };
-      alerts.stageId = 'impl';
+      alerts.entryStepId = 'impl';
       alerts.workflowId = 'standard';
-      alerts.currentStage = { ...bill.currentStage, steps: [step] } as never;
+      alerts.workflow = wf as never;
       alerts.runs = [];
     }),
   };
@@ -331,20 +334,19 @@ test('the step inspector toggles to a smart script and saves smart_script with p
   await page.locator(t('ade-workflows')).waitFor();
   await page.locator(`${t('ade-wf-node')}[data-step-id="plan"]`).click();
   const step = page.locator(t('ade-wf-step'));
-  await expect(step.locator(t('ade-wf-step-tools'))).toBeVisible();
+  await expect(step.locator(t('ade-wf-step-prompt'))).toBeVisible();
   await step.locator(t('ade-wf-step-mode-smart')).click();
   await expect(step.locator(t('ade-wf-step-script'))).toHaveValue('Review diff');
-  await expect(step.locator(t('ade-wf-step-tools'))).toHaveCount(0);
+  await expect(step.locator(t('ade-wf-step-prompt'))).toHaveCount(0);
   await expect(
     step.locator(`${t('ade-wf-step-body')} [data-testid="var-chip"][data-var="branch"]`),
   ).toBeVisible();
   await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const args = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
-    workflow: { stages: { steps: { smartScript: string; prompt: string }[] }[] };
+    workflow: { steps: { smartScript: string; prompt: string }[] };
   };
-  const steps = args.workflow.stages.flatMap((st) => st.steps);
-  expect(steps.filter((x) => x.smartScript === 'Review diff')).toHaveLength(1);
+  expect(args.workflow.steps.filter((x) => x.smartScript === 'Review diff')).toHaveLength(1);
 });
 
 test('the automation submenu shows a disabled hint without scripts', async ({ relaunch }) => {
@@ -453,7 +455,6 @@ test('contract: a step run waits behind a running automation', async ({ relaunch
                 ...waiting,
                 id: r.id,
                 taskId: r.taskId,
-                stageId: r.stageId,
                 stepId: r.stepId,
                 branchId: r.branchId,
               }

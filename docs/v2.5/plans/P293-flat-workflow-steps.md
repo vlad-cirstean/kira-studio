@@ -540,3 +540,30 @@ first missing commit.
   legacy spellings of §1.4.
 - Mobile UI redesign beyond renames and step moves.
 - Cleanup of orphaned task worktrees on disk.
+
+## Result (implementer)
+
+Commits on `p293`: `748f003b1` (Go, frontend, mobile, unit specs, fixtures), `1041c3aef` (docs), plus the
+spec commit after it. Steps 1-9 and 11 done; 10 and 12 (full test pass, real `claude` row) left to the
+test-and-fix agent. Hook (lint, typecheck) green on every commit, no `--no-verify`.
+
+Deviations:
+- Go steps 1-5 and 7-8 landed in one commit: Go and hand-written TS wire compile together, hook typechecks both.
+- `since` holds only the target and later steps. Lenient `TargetErr`. A not-started task follows the live
+  file's first step. `snapshotStartedTasks` removed.
+- Wire drops `Session.StageID`, `ReviewCandidate.Stage`, `RunOutcomeEntry.Stage`.
+- Engine fix in `queueRun`: attempt bumps past history.
+- `task_info` default says "step". Fixed pre-existing `TestScheduleValidation` weekday flake.
+- Frontend: `canMove` blocks only explicit id routes; Remove disabled for a one-step workflow;
+  `buildStepBlocks(progress, workflow)`; new keys `runReview.tooltip`, `modeOwn`. Kind labels read "Agent
+  step" etc. (catalog duplicate rule).
+- Parity tests against the stage-shaped mockup oracle replaced. `AdeStepBlock` `reviewRows` still checks
+  `step.id === 'review'`.
+- New UI spec uses the contract for shape checks and fixture boards for UI state; the return-chip and
+  moved-step scenarios are thin and may need tightening once run. `openWorkflows` moved to `support/adeV2.ts`.
+- `rg -i stage` guard: survivors are git/grid/update staging, the rejection message and its docs mention.
+
+Not run (for test-and-fix): UI suite (`ade-v2-flat-steps` and all edited ade specs, copy-coverage,
+consistency, ui-leftovers), mobile suite, unit suite, Go `-race` on touched packages, e2e, real `claude` row.
+Visual baselines to re-record on Linux: `workflow-graph`, `workflow-graph-branches`, `workflow-graph-review`;
+new `workflow-graph-manual`, `workflow-graph-script`; `sandbox-popover` only if its diff shows change.

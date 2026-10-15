@@ -43,7 +43,7 @@ async function openCart(page: Page): Promise<void> {
   await expect(page.locator(t('ade-panel'))).toBeVisible();
 }
 
-const release = (page: Page) => page.locator(`${t('ade-stage-block')}[data-stage-id="release"]`);
+const release = (page: Page) => page.locator(`${t('ade-step-block')}[data-step-id="release"]`);
 
 test('contract: a restart-stopped run offers Resume on its step line and in Needs you', async ({
   relaunch,
@@ -91,5 +91,5 @@ test('contract: a refused Resume shows its error on the step', async ({ relaunch
   ]);
   await openCart(page);
   await release(page).locator(t('ade-run-resume')).click();
-  await expect(release(page).locator(t('ade-stage-block-error'))).toContainText(refused.message);
+  await expect(release(page).locator(t('ade-step-block-error'))).toContainText(refused.message);
 });

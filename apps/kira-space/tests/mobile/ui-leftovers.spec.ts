@@ -21,13 +21,13 @@ test.describe('paired phone', () => {
     await app();
   });
 
-  test('plan stage buttons and the backlog add row are touch sized', async ({ page }) => {
+  test('plan step buttons and the backlog add row are touch sized', async ({ page }) => {
     await page.locator(t('tab-plan')).click();
     const card = page
       .locator(t('plan-task'))
       .filter({ hasText: 'Cart total test fails intermittently' });
     await card.locator('button').first().click();
-    await expectTouch(page, ['plan-stage-back', 'plan-stage-next']);
+    await expectTouch(page, ['plan-step-back', 'plan-step-next']);
     await page.locator(t('tab-backlog')).click();
     await expectTouch(page, ['backlog-add', 'backlog-add-submit']);
   });

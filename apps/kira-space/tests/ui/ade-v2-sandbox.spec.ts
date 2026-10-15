@@ -58,7 +58,7 @@ function sandboxControl(key: string, run: Wire = {}): ControlSnapshot[] {
 
 const line = (page: Page) =>
   page
-    .locator(`${t('ade-stage-block')}[data-stage-id="impl"]`)
+    .locator(`${t('ade-step-block')}[data-step-id="impl"]`)
     .locator(`${t('ade-run-line')}[data-branch-id="b_billdash"]`);
 
 test('contract: the run line shows the policy in the popover', async ({ relaunch }) => {
@@ -122,22 +122,20 @@ test('contract: an OS that cannot enforce shows Not enforced', async ({ relaunch
 });
 
 interface WorkflowsFx {
-  workflows: { workflow: { stages: { id: string; steps: Wire[] }[] } }[];
+  workflows: { workflow: { steps: Wire[] } }[];
   sandbox: { enforced: boolean; reason: string };
 }
 
-async function openStep(page: Page, step: string, stage = 'impl'): Promise<void> {
+async function openStep(page: Page, step: string): Promise<void> {
   await page.locator(t('ade-tab-workflows')).click();
   await page.locator(t('ade-workflows')).waitFor();
-  await page
-    .locator(`${t('ade-wf-stage-node')}[data-stage-id="${stage}"]`)
-    .click({ position: { x: 8, y: 8 } });
   await page.locator(`${t('ade-wf-node')}[data-step-id="${step}"]`).click();
+  await page.locator(t('ade-wf-step-advanced')).click();
   await expect(page.locator(t('ade-wf-step-sandbox'))).toBeVisible();
 }
 
 interface Saved {
-  workflow: { stages: { steps: { id: string; sandbox: Wire }[] }[] };
+  workflow: { steps: { id: string; sandbox: Wire }[] };
 }
 
 async function saved(page: Page, control: Parameters<typeof calls>[0]): Promise<Saved> {
@@ -163,7 +161,7 @@ test('the inspector edits access, paths, preset and network, and Save carries th
   );
   await page.locator(t('ade-wf-sandbox-network')).click();
   const args = await saved(page, control);
-  const step = args.workflow.stages[1]?.steps.find((s) => s.id === 'plan');
+  const step = args.workflow.steps.find((s) => s.id === 'plan');
   expect(step?.sandbox).toEqual({
     access: 'write',
     read: ['~/notes'],
@@ -183,7 +181,7 @@ test('Read only drops the allow list and Off warns', async ({ relaunch }) => {
   await expect(page.locator(t('ade-wf-sandbox-off'))).toContainText('full rights');
   await expect(node.locator(t('ade-wf-node-sandbox'))).toHaveText('No sandbox');
   const args = await saved(page, control);
-  expect(args.workflow.stages[1]?.steps.find((s) => s.id === 'plan')?.sandbox.access).toBe('off');
+  expect(args.workflow.steps.find((s) => s.id === 'plan')?.sandbox.access).toBe('off');
 });
 
 test('an OS that cannot enforce shows the notice in the inspector', async ({ relaunch }) => {

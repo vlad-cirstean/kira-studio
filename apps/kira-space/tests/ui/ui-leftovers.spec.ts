@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
-import { FIXED_NOW, openPlan } from './support/adeV2';
+import { FIXED_NOW, openPlan, openWorkflows } from './support/adeV2';
 import { gitStreamParams } from './support/gitStreamMock';
 import { BASE_RESULTS, PORT_CONTROL, PORT_REPO, SHA_A, SHA_B } from './support/gitUiPortFixtures';
 import { calls } from './support/ipcCalls';
@@ -38,14 +38,7 @@ test('the notes toolbar toggles expose aria-pressed', async ({ relaunch }) => {
 });
 
 interface SavedWorkflow {
-  workflow: { stages: { id: string; steps: { id: string }[] }[] };
-}
-
-async function openWorkflows(relaunch: Parameters<typeof openPlan>[0]) {
-  const app = await openPlan(relaunch);
-  await app.window.locator(t('ade-tab-workflows')).click();
-  await app.window.locator(t('ade-workflows')).waitFor();
-  return app;
+  workflow: { steps: { id: string }[] };
 }
 
 // tree.delete is Cmd+Backspace on a Mac userAgent, which Playwright's WebKit always reports.
@@ -68,7 +61,7 @@ test('workflow graph: Delete removes the selected step, but edits text inside a 
   await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const saved = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as SavedWorkflow;
-  expect(saved.workflow.stages.flatMap((s) => s.steps.map((x) => x.id))).not.toContain('plan');
+  expect(saved.workflow.steps.map((x) => x.id)).not.toContain('plan');
 });
 
 test('the review code event opens the review; a window keydown does not', async ({ relaunch }) => {

@@ -16,17 +16,17 @@ async function menuIds(page: Page): Promise<string[]> {
     .evaluateAll((els) => els.map((e) => (e.getAttribute('data-testid') ?? '').slice(10)));
 }
 
-test('right-click moves the task to another stage', async ({ relaunch }) => {
+test('right-click moves the task to another step', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await page.locator(card('T_alerts')).click({ button: 'right', position: { x: 60, y: 30 } });
   await expect(page.locator(t('ade-panel'))).toBeVisible();
-  await page.locator(item('ade-task-stage')).click();
-  await expect(page.locator(item('ade-task-stage-spec'))).toBeVisible();
-  await page.locator(item('ade-task-stage-review')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSetTaskStage)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskSetTaskStage)[0]?.args).toEqual({
+  await page.locator(item('ade-task-step')).click();
+  await expect(page.locator(item('ade-task-step-spec'))).toBeVisible();
+  await page.locator(item('ade-task-step-review')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSetTaskStep)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskSetTaskStep)[0]?.args).toEqual({
     taskId: 'T_alerts',
-    stageId: 'review',
+    stepId: 'review',
   });
 });
 
@@ -75,7 +75,7 @@ test('a review item gets the reduced set', async ({ relaunch }) => {
   const ids = await menuIds(page);
   expect(ids).toContain('ade-task-sessions');
   expect(ids).toContain('ade-task-archive');
-  expect(ids).not.toContain('ade-task-stage');
+  expect(ids).not.toContain('ade-task-step');
   expect(ids).not.toContain('ade-task-park');
   expect(ids).not.toContain('ade-task-plan');
 });

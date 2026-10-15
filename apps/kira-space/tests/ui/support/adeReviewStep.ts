@@ -9,7 +9,7 @@ import { IPC } from './ipcChannels';
 
 export const t = (id: string) => `[data-testid="${id}"]`;
 export const target = adeFixture<{ gitRepoId: string }>('review-target');
-export const IDS = { taskId: 'T_bill', stageId: 'impl', stepId: 'impl', branchId: 'b_billdash' };
+export const IDS = { taskId: 'T_bill', stepId: 'impl', branchId: 'b_billdash' };
 export const RUN_ID = 'r_T_bill_impl_b_billdash';
 export const ROUND_ID = 'r_round_1';
 export const IMPL_ID = 'r_T_bill_impl_b_meter';

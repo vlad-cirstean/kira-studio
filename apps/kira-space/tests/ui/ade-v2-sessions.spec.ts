@@ -36,7 +36,7 @@ test('the task strip lists interactive sessions first, then the most recent runs
   await expect(page.locator(t('ade-stopped-row'))).toHaveCount(2);
 });
 
-test('tabs are named after the stage; the pane shows the full Claude session id with a copy button', async ({
+test('tabs are named after the step; the pane shows the full Claude session id with a copy button', async ({
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch);

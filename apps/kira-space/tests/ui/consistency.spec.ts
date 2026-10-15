@@ -153,7 +153,7 @@ test('a 5000-line run log renders a window of rows and follows the tail', async 
   const { window: page } = await openPlan(relaunch);
   await page.locator(`${t('ade-card')}[data-task-id="T_bill"] ${t('ade-card-head')}`).click();
   const line = page
-    .locator(`${t('ade-stage-block')}[data-stage-id="impl"]`)
+    .locator(`${t('ade-step-block')}[data-step-id="impl"]`)
     .locator(`${t('ade-run-line')}[data-branch-id="b_bill"]`);
   await line.locator(t('ade-run-log-toggle')).click();
   const log = page.locator(t('ade-run-log'));

@@ -102,11 +102,6 @@ test('workflows page, editor and inspectors', async ({ relaunch }) => {
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
   await page.locator(t('ade-wf-row')).first().click();
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
-  await page
-    .locator(t('ade-wf-stage-node'))
-    .first()
-    .click({ position: { x: 8, y: 8 } });
-  await expectCatalogText(page.locator(t('ade-workflows')), { allow });
   await page.locator(t('ade-wf-node')).first().click();
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
 });
@@ -115,18 +110,16 @@ test('run dialog', async ({ relaunch }) => {
   const board = adeFixture<{
     tasks: {
       id: string;
-      stageId: string;
       workflowId: string;
-      currentStage: unknown;
+      entryStepId: string;
       runs: unknown[];
     }[];
   }>('board');
   const bill = board.tasks.find((x) => x.id === 'T_bill');
   const alerts = board.tasks.find((x) => x.id === 'T_alerts');
   if (!bill || !alerts) throw new Error('fixture tasks missing');
-  alerts.stageId = 'impl';
   alerts.workflowId = 'standard';
-  alerts.currentStage = bill.currentStage;
+  alerts.entryStepId = 'impl';
   alerts.runs = [];
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: board },
