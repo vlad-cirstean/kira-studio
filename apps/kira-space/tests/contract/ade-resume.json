@@ -19,6 +19,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -54,6 +55,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -85,6 +87,7 @@
     },
     "purpose": "",
     "resumable": true,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",

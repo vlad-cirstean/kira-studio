@@ -19,6 +19,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -54,6 +55,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "returns": 1,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -76,10 +78,10 @@
     "finishedAt": 0,
     "id": "<id:2>",
     "loops": 2,
-    "note": "summary-changes (sent back 2 times)",
+    "note": "Stopped: review reached its limit of 2 returns.",
     "outcome": {
       "exitCode": 0,
-      "reason": "summary-changes (sent back 2 times)",
+      "reason": "Stopped: review reached its limit of 2 returns.",
       "reported": true,
       "result": "changes",
       "route": "stop",
@@ -89,6 +91,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "returns": 2,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -114,7 +117,7 @@
       {
         "error": null,
         "fileName": "flow.yaml",
-        "hash": "c5304efc287f9e182b3325ad686f454f4bfc5802ce9d1757ce624c590d3c1b5d",
+        "hash": "1fa0ba7e77a76f171624c50161fd0310922d5bcdf59c5aba20e3a71ec3a1dd8f",
         "path": "<space>/workflows/flow.yaml",
         "usedBy": 1,
         "workflow": {
@@ -138,6 +141,7 @@
                   "allowedTools": [],
                   "before": "auto",
                   "id": "impl",
+                  "maxReturns": 3,
                   "name": "impl",
                   "onFailure": "stop",
                   "params": {},
@@ -146,14 +150,14 @@
                     {
                       "description": "",
                       "id": "done",
-                      "max": 0,
+                      "loop": false,
                       "next": "next",
                       "ok": true
                     },
                     {
                       "description": "",
                       "id": "failed",
-                      "max": 0,
+                      "loop": false,
                       "next": "stop",
                       "ok": false
                     }
@@ -173,6 +177,7 @@
                   "allowedTools": [],
                   "before": "auto",
                   "id": "review",
+                  "maxReturns": 2,
                   "name": "review",
                   "onFailure": "",
                   "params": {},
@@ -181,14 +186,14 @@
                     {
                       "description": "",
                       "id": "approved",
-                      "max": 0,
+                      "loop": false,
                       "next": "next",
                       "ok": true
                     },
                     {
                       "description": "",
                       "id": "changes",
-                      "max": 2,
+                      "loop": true,
                       "next": "impl",
                       "ok": false
                     }

@@ -166,6 +166,7 @@
     },
     "purpose": "rebase",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -227,6 +228,7 @@
     },
     "purpose": "rebase",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",
@@ -279,6 +281,7 @@
     },
     "purpose": "rebase",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",

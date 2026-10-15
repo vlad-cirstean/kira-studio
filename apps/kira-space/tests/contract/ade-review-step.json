@@ -14,21 +14,21 @@
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "next",
         "ok": true
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 2,
+        "loop": true,
         "next": "implement",
         "ok": false
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "stop",
         "ok": false
       }
@@ -57,6 +57,7 @@
         },
         "purpose": "review",
         "resumable": false,
+        "returns": 0,
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
@@ -80,6 +81,7 @@
       "outcome": null,
       "purpose": "",
       "resumable": false,
+      "returns": 0,
       "review": {
         "note": "",
         "phase": "waiting",
@@ -113,21 +115,21 @@
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "next",
         "ok": true
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 2,
+        "loop": true,
         "next": "implement",
         "ok": false
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "stop",
         "ok": false
       }
@@ -153,6 +155,7 @@
       },
       "purpose": "",
       "resumable": false,
+      "returns": 0,
       "review": {
         "note": "",
         "phase": "done",
@@ -186,21 +189,21 @@
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "next",
         "ok": true
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 2,
+        "loop": true,
         "next": "implement",
         "ok": false
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "stop",
         "ok": false
       }
@@ -229,6 +232,7 @@
         },
         "purpose": "review",
         "resumable": false,
+        "returns": 0,
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
@@ -252,6 +256,7 @@
       "outcome": null,
       "purpose": "",
       "resumable": false,
+      "returns": 0,
       "review": {
         "note": "The implementer session is gone. Sent to a new review agent.",
         "phase": "waiting",
@@ -285,21 +290,21 @@
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "next",
         "ok": true
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 2,
+        "loop": true,
         "next": "implement",
         "ok": false
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "stop",
         "ok": false
       }
@@ -325,6 +330,7 @@
         },
         "purpose": "review",
         "resumable": true,
+        "returns": 0,
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
@@ -348,6 +354,7 @@
       "outcome": null,
       "purpose": "",
       "resumable": false,
+      "returns": 0,
       "review": {
         "note": "interrupted: Kira Space closed while it ran",
         "phase": "stuck",
@@ -381,21 +388,21 @@
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "next",
         "ok": true
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 2,
+        "loop": true,
         "next": "implement",
         "ok": false
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "stop",
         "ok": false
       }
@@ -413,6 +420,7 @@
       "outcome": null,
       "purpose": "",
       "resumable": false,
+      "returns": 0,
       "review": {
         "note": "",
         "phase": "waiting",
@@ -446,21 +454,21 @@
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "next",
         "ok": true
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 2,
+        "loop": true,
         "next": "implement",
         "ok": false
       },
       {
         "description": "",
         "id": "<masked>",
-        "max": 0,
+        "loop": false,
         "next": "stop",
         "ok": false
       }
@@ -481,6 +489,7 @@
         "outcome": null,
         "purpose": "review",
         "resumable": false,
+        "returns": 0,
         "review": null,
         "sandbox": null,
         "sessionId": "<masked>",
@@ -504,6 +513,7 @@
       "outcome": null,
       "purpose": "",
       "resumable": false,
+      "returns": 0,
       "review": {
         "note": "",
         "phase": "working",

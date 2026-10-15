@@ -10,6 +10,7 @@
     "outcome": null,
     "purpose": "",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": null,
     "sessionId": "<masked>",

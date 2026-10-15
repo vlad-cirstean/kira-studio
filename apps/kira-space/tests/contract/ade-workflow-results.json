@@ -26,6 +26,7 @@
               "allowedTools": [],
               "before": "auto",
               "id": "impl",
+              "maxReturns": 3,
               "name": "impl",
               "onFailure": "stop",
               "params": {},
@@ -34,14 +35,14 @@
                 {
                   "description": "",
                   "id": "done",
-                  "max": 0,
+                  "loop": false,
                   "next": "next",
                   "ok": true
                 },
                 {
                   "description": "",
                   "id": "failed",
-                  "max": 0,
+                  "loop": false,
                   "next": "stop",
                   "ok": false
                 }
@@ -61,6 +62,7 @@
               "allowedTools": [],
               "before": "auto",
               "id": "review",
+              "maxReturns": 2,
               "name": "review",
               "onFailure": "",
               "params": {},
@@ -69,14 +71,14 @@
                 {
                   "description": "",
                   "id": "approved",
-                  "max": 0,
+                  "loop": false,
                   "next": "next",
                   "ok": true
                 },
                 {
                   "description": "Needs work.",
                   "id": "changes",
-                  "max": 2,
+                  "loop": true,
                   "next": "impl",
                   "ok": false
                 }
@@ -122,6 +124,7 @@
               "allowedTools": [],
               "before": "auto",
               "id": "impl",
+              "maxReturns": 3,
               "name": "impl",
               "onFailure": "stop",
               "params": {},
@@ -130,14 +133,14 @@
                 {
                   "description": "",
                   "id": "done",
-                  "max": 0,
+                  "loop": false,
                   "next": "next",
                   "ok": true
                 },
                 {
                   "description": "",
                   "id": "failed",
-                  "max": 0,
+                  "loop": false,
                   "next": "stop",
                   "ok": false
                 }
@@ -157,6 +160,7 @@
               "allowedTools": [],
               "before": "auto",
               "id": "review",
+              "maxReturns": 2,
               "name": "review",
               "onFailure": "stop",
               "params": {},
@@ -165,14 +169,14 @@
                 {
                   "description": "",
                   "id": "approved",
-                  "max": 0,
+                  "loop": false,
                   "next": "next",
                   "ok": true
                 },
                 {
                   "description": "Needs work.",
                   "id": "changes",
-                  "max": 2,
+                  "loop": true,
                   "next": "impl",
                   "ok": false
                 }

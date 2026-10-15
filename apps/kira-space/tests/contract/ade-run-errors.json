@@ -17,6 +17,7 @@
     },
     "purpose": "",
     "resumable": false,
+    "returns": 0,
     "review": null,
     "sandbox": {
       "access": "write",
