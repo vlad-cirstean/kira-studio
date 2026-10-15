@@ -77,7 +77,7 @@ export interface StepProgress {
   frac: number;
 }
 
-export interface StepSegment {
+interface StepSegment {
   id: string;
   name: string;
   kind: StepKind;
@@ -259,7 +259,7 @@ export function walkPath(
 }
 
 /** Every step of the workflow with per-branch runs, step state and approval flag. */
-export function buildSteps(i: ProgressInput, workflow: Workflow): StepProgress[] {
+function buildSteps(i: ProgressInput, workflow: Workflow): StepProgress[] {
   const built = workflow.steps.map((s, idx): StepProgress => {
     const def = stepDef(s);
     const runs =
