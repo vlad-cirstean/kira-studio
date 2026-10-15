@@ -49,7 +49,7 @@ function sandboxControl(key: string, run: Wire = {}): ControlSnapshot[] {
       channel: IPC.adeTaskRunSandbox,
       response: {
         ...detail,
-        profile: detail.profile === '' ? '' : PROFILE,
+        profile: detail.access === 'off' ? '' : PROFILE,
         denials: detail.denials.map((d) => ({ ...d, at: 1_790_036_400_000 })),
       },
     },
@@ -108,7 +108,9 @@ test('Take over warns that it leaves the sandbox', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, sandboxControl('denied'));
   await openBillTask(page);
   await line(page).locator(t('ade-run-takeover')).hover();
-  await expect(page.getByRole('tooltip')).toContainText('Takes over without the sandbox.');
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText(
+    'Takes over without the sandbox.',
+  );
 });
 
 test('contract: an OS that cannot enforce shows Not enforced', async ({ relaunch }) => {
