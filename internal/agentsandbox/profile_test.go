@@ -86,7 +86,7 @@ func TestProfileGolden(t *testing.T) {
 		},
 		"allow_over_common": func() (Policy, Runtime) {
 			p := basePolicy()
-			p.Allow = []string{"/Users/ada/src/app/.git", "/Users/ada/.cache/my-tool"}
+			p.Allow = []string{"/Users/ada/src/app/.git", "/Users/ada/.cache/my-tool", "/Users/ada/.claude/hooks"}
 			return p, rt
 		},
 		"path_escaping": func() (Policy, Runtime) {

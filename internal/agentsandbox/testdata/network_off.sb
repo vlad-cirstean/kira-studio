@@ -62,17 +62,6 @@
   (subpath "/Users/ada/.claude")
   (regex #"^/Users/ada/\.claude\.json")
   (subpath "/Users/ada/.kira-memory"))
-(deny file-write*
-  (literal "/Users/ada/.claude/settings.json")
-  (literal "/Users/ada/.claude/settings.local.json")
-  (literal "/Users/ada/.claude/CLAUDE.md")
-  (literal "/Users/ada/.claude/keybindings.json")
-  (subpath "/Users/ada/.claude/commands")
-  (subpath "/Users/ada/.claude/agents")
-  (subpath "/Users/ada/.claude/skills")
-  (subpath "/Users/ada/.claude/plugins")
-  (subpath "/Users/ada/.claude/hooks")
-  (subpath "/Users/ada/.claude/output-styles"))
 
 ;; worktrees
 (allow file-write*
@@ -104,6 +93,20 @@
 (deny file-write-unlink file-write-data file-write-mode
   (regex #"^/Users/ada/src/app/\.git/objects/[0-9a-f]{2}/[0-9a-f]{38,62}$")
   (regex #"^/Users/ada/src/app/\.git/objects/pack/pack-[0-9a-f]+\.(pack|idx|rev|bitmap|keep)$"))
+
+;; protections
+(deny file-write*
+  (literal "/Users/ada/.claude/settings.json")
+  (literal "/Users/ada/.claude/settings.local.json")
+  (literal "/Users/ada/.claude/CLAUDE.md")
+  (literal "/Users/ada/.claude/keybindings.json")
+  (subpath "/Users/ada/.claude/commands")
+  (subpath "/Users/ada/.claude/agents")
+  (subpath "/Users/ada/.claude/skills")
+  (subpath "/Users/ada/.claude/plugins")
+  (subpath "/Users/ada/.claude/hooks")
+  (subpath "/Users/ada/.claude/output-styles")
+  (subpath "/Users/ada/Library/Keychains"))
 
 ;; network
 (deny network*)

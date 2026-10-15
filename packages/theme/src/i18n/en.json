@@ -8381,7 +8381,7 @@
             "body": "Agent runs with your full rights."
           },
           "pathInvalid": {
-            "error": "Use absolute paths or paths starting with ~/."
+            "error": "Use absolute paths or paths starting with ~/. Root, home and credential or config folders are not allowed."
           },
           "paths": {
             "hint": "One path per line, absolute or starting with ~/."

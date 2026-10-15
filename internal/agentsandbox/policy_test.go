@@ -52,6 +52,41 @@ func TestResolvePolicy(t *testing.T) {
 	}
 }
 
+func TestResolvePolicyRejectsProtectedPaths(t *testing.T) {
+	real, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(real, "home")
+	wt := filepath.Join(real, "wt")
+	mustMkdir(t, filepath.Join(home, ".claude", "projects"), filepath.Join(home, "Library", "Keychains", "db"), filepath.Join(home, "src"), wt)
+	rt := Runtime{Home: home}
+	resolve := func(read, allow string) error {
+		in := Input{RunID: "r", Access: AccessWrite, Worktrees: []string{wt}, Scratch: filepath.Join(real, "s"), Cache: filepath.Join(real, "c")}
+		if read != "" {
+			in.Read = []string{read}
+		}
+		if allow != "" {
+			in.Allow = []string{allow}
+		}
+		_, _, err := ResolvePolicy(in, rt)
+		return err
+	}
+	for _, bad := range []string{"~", home, "~/.claude", home + "/.claude", "~/Library", "~/Library/Keychains", "~/Library/Keychains/db", real} {
+		if resolve("", bad) == nil {
+			t.Errorf("allow %q accepted", bad)
+		}
+		if resolve(bad, "") == nil {
+			t.Errorf("read %q accepted", bad)
+		}
+	}
+	for _, ok := range []string{"~/src", "~/.claude/projects"} {
+		if err := resolve("", ok); err != nil {
+			t.Errorf("allow %q: %v", ok, err)
+		}
+	}
+}
+
 func mustMkdir(t *testing.T, dirs ...string) {
 	t.Helper()
 	for _, d := range dirs {

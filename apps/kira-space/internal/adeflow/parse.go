@@ -5,6 +5,7 @@ package adeflow
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -453,7 +454,7 @@ func (v *validator) sandboxPaths(m map[string]*yaml.Node, sp, key string) []stri
 			v.fail(e, sp, "path %q is not allowed", truncate(p, 80))
 		case p != "~" && !strings.HasPrefix(p, "~/") && !strings.HasPrefix(p, "/"):
 			v.fail(e, sp, "path %q must be absolute or start with ~/", p)
-		case p == "/" || p == "~" || strings.TrimRight(p, "/") == "~" || strings.HasPrefix(strings.TrimRight(p, "/")+"/", "~/Library/Keychains/"):
+		case protectedSandboxPath(p):
 			v.fail(e, sp, "path %q is not allowed", p)
 		default:
 			out = append(out, p)
@@ -463,6 +464,17 @@ func (v *validator) sandboxPaths(m map[string]*yaml.Node, sp, key string) []stri
 		}
 	}
 	return out
+}
+
+// protectedSandboxPath reports whether p is the root, the home folder or an ancestor of it, a
+// folder holding Claude's config or the keychain directory, or inside the keychain directory.
+func protectedSandboxPath(p string) bool {
+	c := path.Clean(p)
+	switch c {
+	case "/", "~", "~/Library", "~/.claude", ".":
+		return true
+	}
+	return strings.HasPrefix(c, "..") || strings.HasPrefix(c+"/", "~/Library/Keychains/")
 }
 
 func truncate(s string, n int) string {

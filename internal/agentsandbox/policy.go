@@ -143,12 +143,12 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		}
 		p.RunDir = r
 	}
-	keychains := filepath.Join(rt.Home, "Library", "Keychains")
-	readExtra, n1, err := extraPaths(real, in.Read, keychains)
+	guard := newGuard(rt.Home)
+	readExtra, n1, err := extraPaths(real, in.Read, guard)
 	if err != nil {
 		return Policy{}, nil, err
 	}
-	allowExtra, n2, err := extraPaths(real, in.Allow, keychains)
+	allowExtra, n2, err := extraPaths(real, in.Allow, guard)
 	if err != nil {
 		return Policy{}, nil, err
 	}
@@ -174,9 +174,43 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 	return p, notes, nil
 }
 
-// extraPaths canonicalizes user paths. A missing one is skipped with a note; one inside the keychain
-// directory is an error.
-func extraPaths(real func(string) (string, error), list []string, keychains string) ([]string, []string, error) {
+// guard holds the paths no read or allow entry may cover: the keychain directory, and the Claude
+// config directory, whose hooks run unsandboxed. An entry may not equal or contain either; the
+// keychain directory also rejects an entry inside it. The profile denies writes inside ~/.claude
+// configs itself.
+type guard struct{ keychain, claude []string }
+
+func newGuard(home string) guard {
+	if home == "" {
+		return guard{}
+	}
+	both := func(p string) []string {
+		out := []string{p}
+		if r, err := filepath.EvalSymlinks(p); err == nil && r != p {
+			out = append(out, r)
+		}
+		return out
+	}
+	return guard{keychain: both(filepath.Join(home, "Library", "Keychains")), claude: both(filepath.Join(home, ".claude"))}
+}
+
+func (g guard) covers(path string) bool {
+	for _, p := range g.keychain {
+		if under(path, p) || under(p, path) {
+			return true
+		}
+	}
+	for _, p := range g.claude {
+		if under(p, path) {
+			return true
+		}
+	}
+	return false
+}
+
+// extraPaths canonicalizes user paths. A missing one is skipped with a note; one that covers a
+// guarded path (home, ~/Library, ~/.claude, the keychain directory) is an error.
+func extraPaths(real func(string) (string, error), list []string, g guard) ([]string, []string, error) {
 	var out, notes []string
 	for _, e := range list {
 		r, err := real(e)
@@ -184,7 +218,7 @@ func extraPaths(real func(string) (string, error), list []string, keychains stri
 			notes = append(notes, i18n.T("backend.space.ade.sandbox.pathMissing.body", map[string]string{"path": e}))
 			continue
 		}
-		if r == keychains || strings.HasPrefix(r, keychains+string(filepath.Separator)) {
+		if g.covers(r) {
 			return nil, nil, fmt.Errorf("agentsandbox: path %q is not allowed", e)
 		}
 		out = appendUnique(out, r)

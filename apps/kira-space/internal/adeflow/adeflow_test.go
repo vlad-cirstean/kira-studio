@@ -146,6 +146,8 @@ func TestParse_rules(t *testing.T) {
 		{"sandbox root path", head + agent + step("s", "        sandbox:\n          allow: [/]\n"), 0, "path \"/\" is not allowed"},
 		{"sandbox home path", head + agent + step("s", "        sandbox:\n          allow: [\"~\"]\n"), 0, "path \"~\" is not allowed"},
 		{"sandbox keychain path", head + agent + step("s", "        sandbox:\n          read: [~/Library/Keychains/login.keychain-db]\n"), 0, "is not allowed"},
+		{"sandbox claude dir", head + agent + step("s", "        sandbox:\n          allow: [~/.claude/]\n"), 0, "is not allowed"},
+		{"sandbox library dir", head + agent + step("s", "        sandbox:\n          allow: [\"~/x/../Library\"]\n"), 0, "is not allowed"},
 		{"sandbox network not bool", head + agent + step("s", "        sandbox:\n          network: maybe\n"), 0, "network must be true or false"},
 		{"sandbox off alone", head + agent + step("s", "        sandbox:\n          access: off\n"), 0, ""},
 		{"sandbox off with paths", head + agent + step("s", "        sandbox:\n          access: off\n          read: [~/x]\n"), 0, "sandbox off takes no other keys"},

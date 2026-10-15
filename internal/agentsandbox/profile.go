@@ -99,17 +99,6 @@ func Profile(p Policy, rt Runtime) string {
 		allowWrite = append(allowWrite, sub(filepath.Join(h, ".claude")), rx("^"+regexp.QuoteMeta(h)+`/\.claude\.json`), sub(filepath.Join(h, ".kira-memory")))
 	}
 	b.rule("allow", "file-write*", allowWrite...)
-	if rt.Home != "" {
-		protect := make([]string, 0, len(claudeConfigFiles)+len(claudeExtensionDirs))
-		for _, f := range claudeConfigFiles {
-			protect = append(protect, lit(filepath.Join(rt.Home, ".claude", f)))
-		}
-		for _, d := range claudeExtensionDirs {
-			protect = append(protect, sub(filepath.Join(rt.Home, ".claude", d)))
-		}
-		b.rule("deny", "file-write*", protect...)
-	}
-
 	if len(p.Allow) > 0 {
 		b.section("allow paths")
 		b.rule("allow", "file-write*", subs(p.Allow)...)
@@ -121,6 +110,8 @@ func Profile(p Policy, rt Runtime) string {
 		gitRules(b, p)
 	}
 
+	protectWrites(b, rt)
+
 	b.section("network")
 	if !p.Network {
 		b.line("(deny network*)")
@@ -131,6 +122,23 @@ func Profile(p Policy, rt Runtime) string {
 		b.line(fmt.Sprintf("(deny network-outbound (remote unix-socket (path-literal %s)))", q(rt.SSHAuthSock)))
 	}
 	return b.String()
+}
+
+// protectWrites denies the config, hook and keychain writes last, so no allow path reopens them.
+func protectWrites(b *sbpl, rt Runtime) {
+	if rt.Home == "" {
+		return
+	}
+	protect := make([]string, 0, len(claudeConfigFiles)+len(claudeExtensionDirs)+1)
+	for _, f := range claudeConfigFiles {
+		protect = append(protect, lit(filepath.Join(rt.Home, ".claude", f)))
+	}
+	for _, d := range claudeExtensionDirs {
+		protect = append(protect, sub(filepath.Join(rt.Home, ".claude", d)))
+	}
+	protect = append(protect, sub(filepath.Join(rt.Home, "Library", "Keychains")))
+	b.section("protections")
+	b.rule("deny", "file-write*", protect...)
 }
 
 // gitRules emits the minimal git write set per worktree, protections last so no allow path reopens
