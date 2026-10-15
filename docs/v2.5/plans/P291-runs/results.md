@@ -19,6 +19,9 @@ Ledger: `spend-p291.jsonl`. Phase cap 20 USD.
 | keys (Sonnet) | 0.403 | 1.539 |
 | telegraph (Sonnet) | 1.038 | 2.577 |
 | TJ score judge (Opus) | 1.645 | 4.223 |
+| round-p291-v1t pipeline | 1.794 | 6.017 |
+| round-p291-v1t gate | 1.626 | 7.643 |
+| round-p291-v1t score judge | 1.892 | 9.535 |
 
 ## Bands (D9, identical-code pairs, hybrid/keyword on tuning, end-to-end)
 
@@ -104,3 +107,30 @@ Telegraph post-pass (D24/D25, `tele` = every fact restyled, `tele-guard` = facts
 - TJ (Opus score judge over `tele` facts, `p3-01`): `R_ess` 0.885 -> 0.878 (-0.007, rule -0.020), unsupported 0.005 -> 0.010 (+0.005, rule +0.010), `R_all` 0.689 -> 0.681. Judge-bias deltas (reported, not gated): atomic 0.746 -> 0.770, standalone 0.981 -> 0.957, `P` 0.737 -> 0.727, reason ok 0.665 -> 0.699.
 - Style-pair cosine of a full fact with its rewrite: p10 0.980 (`p3-01`, 209 pairs) and 0.982 (`p2-02`, 414), none below `DocFloor` 0.85; subject cut in 3 and 1 facts.
 - D26 verdict: passes with `tele-guard`. Non-inferior retrieval on two bases and hold-out, `C_store` lower, TJ inside rules, token rule met by the guard. Gain is small (about 7% fact chars, 4.5% `C_store`).
+
+## Step 7 V1T round (`round-p291-v1t`: 6a unified import plus 6b fragment, tuning)
+
+Run 5.312 USD (est. 4.5): pipeline 1.794, gate 1.626, judge 1.892. Retrieval distractors `round-p3-holdout`, hybrid `fact` recipe, `full` style, 375 facts in the store.
+
+| metric | base `round-p3-01` | V1T | rule (D10) |
+|---|---|---|---|
+| hybrid MRR | 0.886 | 0.905 (+0.019, CI [-0.005, +0.043]) | A1: > 0.912; A4: >= 0.860 |
+| keyword MRR | 0.863 | 0.891 (+0.028, CI [+0.006, +0.052]) | >= 0.843 |
+| hybrid hit@10 | 0.957 | 0.978 | reported |
+| `R_ess` | 0.885 | 0.977 | >= 0.865 |
+| `R_all` | 0.689 | 0.886 | reported |
+| unsupported | 0.005 | 0.003 | <= 0.020 |
+| token recall | 0.607 | 0.828 | >= 0.583 |
+| `C_distill` | 0.502 | 0.668 | reported |
+| `C_fact` | 0.434 | 0.597 | < 1.0 |
+| `C_store` | 0.661 | 0.908 | < 1.0; A4: < 0.661 |
+| `C_doc` | 0.734 | 1.017 | < 1.0 |
+| stored facts | 209 | 311 (389 distilled) | reported |
+| atomic / standalone / `P` (judge) | 0.746 / 0.981 / 0.737 | 0.746 / 0.955 / 0.717 | reported |
+
+Per-source `R_ess` rose on 8 of 10 sources (doc-readme 0.84 -> 0.99, plan-p153 0.88 -> 1.00, cmt-runner-go 0.93 -> 1.00). Per-source `C_doc` over 1.0: doc-arch-prompts 1.15 (base 1.01).
+
+Verdict (D10, D31):
+- A1 fails. Hybrid delta +0.019 is under `band_R` 0.026 (not even marginal), and `C_doc` 1.017 breaks the size rule.
+- A4 form fails. `C_store` 0.908 is above the base 0.661: the unified pipeline stores 49% more facts, which the style cannot offset.
+- Reading for the user's goals: recall and token recall rise sharply (`R_ess` +0.092, token recall +0.22) and retrieval is not worse; storage is not smaller than the source (`C_doc` 1.017). The gate trades recall for size by rule, so V1T is not adopted. 6b then 6a revert (D31), then XT (style on the extract pipeline).
