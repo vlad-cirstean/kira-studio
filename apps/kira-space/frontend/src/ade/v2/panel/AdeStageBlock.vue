@@ -380,6 +380,11 @@ function logToggleLabel(runId: string): string {
           >
             {{ t('common.action.retry.label') }}
           </Button>
+          <AdeTip v-if="rl.returns" :text="rl.returnsTip">
+            <span class="shrink-0" data-testid="ade-run-returns" :data-spent="rl.returnsSpent"
+              ><AdeChip :label="rl.returns" :tone="rl.returnsSpent ? 'red' : 'amber'" /></span
+            >
+          </AdeTip>
           <AdeTip v-if="rl.note" :text="rl.note">
             <span
               class="min-w-0 truncate text-kira-sm text-muted-foreground"

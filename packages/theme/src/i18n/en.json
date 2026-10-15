@@ -8058,6 +8058,14 @@
         "modeUserSession": {
           "label": "User · interactive Claude Code"
         },
+        "returns": {
+          "label": "↩ {count}/{limit}",
+          "tooltip": "Returned {count} of {limit} times"
+        },
+        "returnsUnlimited": {
+          "label": "↩ {count}",
+          "tooltip": "Returned {count} time, no limit | Returned {count} times, no limit"
+        },
         "routeBack": {
           "label": "{id} ↩ {step}"
         },

@@ -22,6 +22,11 @@ interface RunLine {
   status: string;
   /** The run's own note, else `fix round n of max` for a fix run (`fix round n` without a budget). */
   note: string;
+  /** `↩ 2/3` (`↩ 2` with no limit) once the step went back; '' before. */
+  returns: string;
+  returnsTip: string;
+  /** The run stopped because the step used all its returns. */
+  returnsSpent: boolean;
   /** Log (agent) / Output (script) opens the run's log: shown once the run started. */
   hasLog: boolean;
   canRetry: boolean;
@@ -125,7 +130,27 @@ function fixRound(loops: number, max: number): string {
     : t('space.ade.stage.fixRound.status', { count: loops });
 }
 
-function runLine(r: StepRun, max: number): RunLine {
+function returnsChip(
+  r: StepRun,
+  limit: number,
+): Pick<RunLine, 'returns' | 'returnsTip' | 'returnsSpent'> {
+  if (r.returns === 0) return { returns: '', returnsTip: '', returnsSpent: false };
+  const vars = { count: r.returns, limit };
+  const spent = r.state === 'failed' && r.route === 'stop' && limit > 0 && r.returns >= limit;
+  return limit > 0
+    ? {
+        returns: t('space.ade.stage.returns.label', vars),
+        returnsTip: t('space.ade.stage.returns.tooltip', vars),
+        returnsSpent: spent,
+      }
+    : {
+        returns: t('space.ade.stage.returnsUnlimited.label', vars),
+        returnsTip: t('space.ade.stage.returnsUnlimited.tooltip', vars),
+        returnsSpent: false,
+      };
+}
+
+function runLine(r: StepRun, max: number, limit: number): RunLine {
   const g = RUN_GLYPH[r.state];
   const started = r.state !== 'pending' && r.runId !== '';
   return {
@@ -134,6 +159,7 @@ function runLine(r: StepRun, max: number): RunLine {
     tone: g.tone,
     status: runStatus(r),
     note: r.reason || r.note || fixRound(r.loops, max),
+    ...returnsChip(r, limit),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
     canResume: r.resumable,
@@ -181,7 +207,9 @@ export function buildStageBlocks(
           scope: script ? stage.command : runsOnLabel(s.runsOn),
           gated: s.before === 'approval',
           routeText: routeText(s, stage),
-          runs: showRuns(s, script) ? s.runs.map((r) => runLine(r, backLimit(steps, s.id))) : [],
+          runs: showRuns(s, script)
+            ? s.runs.map((r) => runLine(r, backLimit(steps, s.id), s.maxReturns))
+            : [],
         }),
       ),
       count:
