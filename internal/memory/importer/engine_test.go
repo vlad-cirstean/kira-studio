@@ -655,14 +655,16 @@ func TestIdleClaimsDoNotScaleWithExtractedFiles(t *testing.T) {
 	}
 	settle := time.Since(start)
 	const ticks = 200
-	start = time.Now()
+	// Fastest tick, not the mean: a scheduler stall under load inflates the mean only.
+	idle := time.Duration(1<<63 - 1)
 	for i := 0; i < ticks; i++ {
+		start = time.Now()
 		if _, ok, err := h.e.st.claimFinalize(); err != nil || ok {
 			t.Fatalf("idle claimFinalize ok=%v err=%v", ok, err)
 		}
+		idle = min(idle, time.Since(start))
 	}
-	idle := time.Since(start) / ticks
-	t.Logf("files=%d chunks=%d settle(first tick)=%s idle tick=%s", files, chunks, settle, idle)
+	t.Logf("files=%d chunks=%d settle(first tick)=%s fastest idle tick=%s", files, chunks, settle, idle)
 	if idle*10 > settle {
 		t.Errorf("idle tick %s is not far below the one-off settle %s: claims scan files per tick", idle, settle)
 	}
