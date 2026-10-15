@@ -18,8 +18,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
-// Judge calls run Opus through a direct `claude -p`: memory.Call pins the pipeline's `sonnet`, and the
-// grader must be a different, stronger model. Same isolation flags as memory.claudeArgs.
+// Judge calls run through a direct `claude -p`: memory.Call pins the pipeline's `sonnet`, and the
+// grader must be a different, stronger model (Opus). Same isolation flags as memory.claudeArgs.
 const (
 	goldenBudget = "1.00"
 	scoreBudget  = "1.50"
@@ -31,7 +31,8 @@ type judgeResult struct {
 	Model  string
 }
 
-func judgeCall(ctx context.Context, system string, schema []byte, input any, budget string) (judgeResult, error) {
+// judgeCall runs one schema call on model: opus for golden, score and questions, sonnet for keys and telegraph.
+func judgeCall(ctx context.Context, model, system string, schema []byte, input any, budget string) (judgeResult, error) {
 	var res judgeResult
 	in, err := json.Marshal(input)
 	if err != nil {
@@ -44,7 +45,7 @@ func judgeCall(ctx context.Context, system string, schema []byte, input any, bud
 	defer os.RemoveAll(dir)
 	c, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(c, "claude", "-p", "--model", "opus", "--safe-mode", "--setting-sources", "", "--strict-mcp-config",
+	cmd := exec.CommandContext(c, "claude", "-p", "--model", model, "--safe-mode", "--setting-sources", "", "--strict-mcp-config",
 		"--tools", "", "--disable-slash-commands", "--no-session-persistence", "--permission-prompts", "none",
 		"--output-format", "json", "--json-schema", string(schema), "--system-prompt", system, "--max-budget-usd", budget)
 	cmd.Dir = dir
@@ -141,7 +142,7 @@ func authorGolden(ctx context.Context, s evalSource, text string) (goldenLine, e
 		return goldenLine{}, err
 	}
 	input := map[string]any{"source": map[string]string{"id": s.ID, "path": s.Path, "category": s.Category, "text": text}}
-	res, err := judgeCall(ctx, string(system), schema, input, goldenBudget)
+	res, err := judgeCall(ctx, "opus", string(system), schema, input, goldenBudget)
 	evalSpend("golden", s.ID, res.Cost)
 	if err != nil {
 		return goldenLine{}, err
@@ -249,7 +250,7 @@ func scoreSource(ctx context.Context, s evalSource, text string, gold goldenLine
 	var lastErr error
 	model := ""
 	for range 2 {
-		res, err := judgeCall(ctx, string(system), schema, in, scoreBudget)
+		res, err := judgeCall(ctx, "opus", string(system), schema, in, scoreBudget)
 		evalSpend("judge", s.ID, res.Cost)
 		if res.Model != "" {
 			model = res.Model

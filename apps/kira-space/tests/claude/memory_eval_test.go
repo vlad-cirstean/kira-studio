@@ -25,7 +25,16 @@ import (
 // dollars. Run with `bun run eval:memory`. Env:
 //
 //	KIRA_EVAL_MODE     prepare | golden | run | footprint (free: re-renders finished rounds, no claude)
-//	KIRA_EVAL_ROUNDS   footprint mode: comma-separated round names
+//	                   P291: questions | keys | telegraph | score (paid); retrieval | compare (free)
+//	KIRA_EVAL_ROUNDS   footprint, keys, telegraph, score, retrieval, compare: comma-separated round names
+//	                   (a bare name lives in the runs dir; "<dir>/<round>" under docs/v2.5/plans)
+//	KIRA_EVAL_RUNS_DIR runs dir name under docs/v2.5/plans (default P285-runs; P291 uses P291-runs)
+//	KIRA_EVAL_MODEL_HOME  home of the embedding model files (retrieval; default <user cache>/kira-eval)
+//	KIRA_EVAL_RECIPES  retrieval: embedding recipes (fact, fact-kw, sec-fact, sec-fact-kw, sa-fact, sa-fact-kw)
+//	KIRA_EVAL_STYLES   retrieval: full, tele, tele-guard, mixed, mixed-swap (default full)
+//	KIRA_EVAL_STYLE    footprint, score: tele judges or sizes a round's telegraph facts
+//	KIRA_EVAL_VARIANTS compare: two variant keys, one per side
+//	KIRA_EVAL_EMBED_WORKER  internal: the test binary re-executed as the embedding worker
 //	KIRA_EVAL_SET      tuning | holdout | all (run default tuning; prepare and golden default all)
 //	KIRA_EVAL_ROUND    round name, the output dir under docs/v2.5/plans/P285-runs
 //	KIRA_EVAL_PROMPTS  JSON map {prompt id: text} overriding registry prompts for the run
@@ -43,8 +52,15 @@ func TestMemoryIngestEval(t *testing.T) {
 		t.Fatal(err)
 	}
 	mode := os.Getenv("KIRA_EVAL_MODE")
-	if mode == "footprint" {
+	switch mode {
+	case "footprint":
 		evalFootprint(t, man)
+		return
+	case "retrieval":
+		evalRetrieval(t, man)
+		return
+	case "compare":
+		evalCompare(t)
 		return
 	}
 	real, err := exec.LookPath("claude")
@@ -58,8 +74,16 @@ func TestMemoryIngestEval(t *testing.T) {
 		evalGolden(t, man, envOr("KIRA_EVAL_SET", "all"))
 	case "run":
 		evalRun(t, man, real)
+	case "questions":
+		evalQuestions(t, man)
+	case "keys":
+		evalKeys(t, man)
+	case "telegraph":
+		evalTelegraph(t, man)
+	case "score":
+		evalScoreTele(t, man)
 	default:
-		t.Fatalf("KIRA_EVAL_MODE = %q, want prepare, golden, run or footprint", mode)
+		t.Fatalf("KIRA_EVAL_MODE = %q, want prepare, golden, run, footprint, questions, keys, telegraph, score, retrieval or compare", mode)
 	}
 }
 
@@ -392,7 +416,7 @@ func evalRun(t *testing.T, man evalManifest, realClaude string) {
 		}()
 	}
 	wg.Wait()
-	writeScores(t, roundDir, cfg, set, srcs, texts, golden, recs, grades, judgeModel, capped, failed)
+	writeScores(t, roundDir, "scores.json", cfg, set, srcs, texts, golden, recs, grades, judgeModel, capped, failed)
 	t.Logf("run spend %.3f USD, phase total %.3f USD", runSpent(), phaseSpent())
 	if len(failed) > 0 {
 		t.Fatalf("incomplete round: %v", failed)
@@ -543,7 +567,7 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	return rec, nil
 }
 
-func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []evalSource, texts map[string]string,
+func writeScores(t *testing.T, roundDir, file string, cfg evalCfg, set string, srcs []evalSource, texts map[string]string,
 	golden map[string]goldenLine, recs map[string]runRecord, grades map[string]scoreGrades, judgeModel string, capped bool, failed map[string]string) {
 	type missed struct {
 		ID          string `json:"id"`
@@ -617,7 +641,7 @@ func writeScores(t *testing.T, roundDir string, cfg evalCfg, set string, srcs []
 	out["costUsd"] = map[string]float64{"job": pipe, "gate": gate, "extractShareOfJob": extract}
 	out["thisProcessSpendUsd"] = runSpent()
 	raw, _ := json.MarshalIndent(out, "", "  ")
-	if err := os.WriteFile(filepath.Join(roundDir, "scores.json"), append(raw, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(roundDir, file), append(raw, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	r := agg.ratios()

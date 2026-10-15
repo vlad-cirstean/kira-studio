@@ -76,6 +76,47 @@ func lostSet(old, cur []string) []string {
 	return out
 }
 
+// Names lists the memory-text names of s: capitalized words after the first word and all-caps words.
+func Names(s string) []string { return names(s) }
+
+// Recall counts the protected tokens of old (numbers, backtick and quoted spans, identifiers, paths,
+// names, negations) and how many of them cur keeps. A negation counts once per occurrence in old.
+func Recall(old, cur string) (total, kept int) {
+	ob, nb := actionRe.ReplaceAllString(old, ""), actionRe.ReplaceAllString(cur, "")
+	sets := func(s string) [][]string {
+		var out [][]string
+		for _, re := range []*regexp.Regexp{numberRe, backtickRe, quotedRe, identRe} {
+			out = append(out, uniq(re.FindAllString(s, -1)))
+		}
+		return append(out, paths(s), names(s))
+	}
+	os, ns := sets(ob), sets(nb)
+	for i := range os {
+		for _, tok := range os[i] {
+			total++
+			if slices.Contains(ns[i], tok) {
+				kept++
+			}
+		}
+	}
+	nn := counts(lowerAll(negationRe.FindAllString(nb, -1)))
+	for w, c := range counts(lowerAll(negationRe.FindAllString(ob, -1))) {
+		total += c
+		kept += min(c, nn[w])
+	}
+	return total, kept
+}
+
+func uniq(in []string) []string {
+	var out []string
+	for _, x := range in {
+		if !slices.Contains(out, x) {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
 // paths are the unique tokens holding "/", trimmed of surrounding punctuation.
 func paths(s string) []string {
 	var out []string

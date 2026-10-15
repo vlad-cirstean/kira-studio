@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
+	"github.com/kirathecat/kira-studio/internal/textloss"
 )
 
 const (
@@ -77,6 +78,16 @@ type footprintRow struct {
 	CFact       float64 `json:"cFact"`
 	CRec        float64 `json:"cRec"`
 	CDoc        float64 `json:"cDoc"`
+	// P291: StoreRunes = fact + non-locator reason + keywords (locators are doc metadata); DistillRunes =
+	// the lines finalize received; Tok* count protected tokens of covered golden facts found in their
+	// answering stored facts (D27); SubjectCut: facts that lose every name of their full text.
+	StoreRunes   int     `json:"storeRunes"`
+	DistillRunes int     `json:"distillRunes"`
+	CStore       float64 `json:"cStore"`
+	CDistill     float64 `json:"cDistill"`
+	TokTotal     int     `json:"tokTotal"`
+	TokKept      int     `json:"tokKept"`
+	SubjectCut   int     `json:"subjectCut,omitempty"`
 }
 
 type footprintSum struct {
@@ -91,6 +102,15 @@ type footprintSum struct {
 	CFact      float64 `json:"cFact"`
 	CRec       float64 `json:"cRec"`
 	CDoc       float64 `json:"cDoc"`
+
+	StoreRunes   int     `json:"storeRunes"`
+	DistillRunes int     `json:"distillRunes"`
+	CStore       float64 `json:"cStore"`
+	CDistill     float64 `json:"cDistill"`
+	TokTotal     int     `json:"tokTotal"`
+	TokKept      int     `json:"tokKept"`
+	TokenRecall  float64 `json:"tokenRecall"`
+	SubjectCut   int     `json:"subjectCut,omitempty"`
 }
 
 func (s *footprintSum) add(r footprintRow) {
@@ -102,12 +122,20 @@ func (s *footprintSum) add(r footprintRow) {
 	s.RecRunes += r.RecRunes
 	s.DocRunes += r.DocRunes
 	s.DocTokens += r.DocTokens
+	s.StoreRunes += r.StoreRunes
+	s.DistillRunes += r.DistillRunes
+	s.TokTotal += r.TokTotal
+	s.TokKept += r.TokKept
+	s.SubjectCut += r.SubjectCut
 }
 
 func (s *footprintSum) done() {
 	s.CFact = div(float64(s.FactRunes), float64(s.SrcRunes))
 	s.CRec = div(float64(s.RecRunes), float64(s.SrcRunes))
 	s.CDoc = div(float64(s.DocRunes), float64(s.SrcRunes))
+	s.CStore = div(float64(s.StoreRunes), float64(s.SrcRunes))
+	s.CDistill = div(float64(s.DistillRunes), float64(s.SrcRunes))
+	s.TokenRecall = div(float64(s.TokKept), float64(s.TokTotal))
 }
 
 func footprintOf(s evalSource, text string, rec runRecord) footprintRow {
@@ -124,7 +152,43 @@ func footprintOf(s evalSource, text string, rec runRecord) footprintRow {
 	r.CFact = div(float64(r.FactRunes), float64(r.SrcRunes))
 	r.CRec = div(float64(r.RecRunes), float64(r.SrcRunes))
 	r.CDoc = div(float64(r.DocRunes), float64(r.SrcRunes))
+	for _, f := range rec.Stored {
+		r.StoreRunes += utf8.RuneCountInString(f.Fact) + utf8.RuneCountInString(strings.Join(f.Keywords, " "))
+		if !isLocator(f.Reason) {
+			r.StoreRunes += utf8.RuneCountInString(f.Reason)
+		}
+	}
+	for _, e := range rec.Extracted {
+		r.DistillRunes += utf8.RuneCountInString(e.Fact)
+	}
+	r.CStore = div(float64(r.StoreRunes), float64(r.SrcRunes))
+	r.CDistill = div(float64(r.DistillRunes), float64(r.SrcRunes))
 	return r
+}
+
+// tokenRecall counts, over the golden facts covered full or partial, the protected tokens of the
+// golden fact found in the union of its answering stored facts (D27).
+func tokenRecall(gold goldenLine, grades scoreGrades, stored []storedFact) (total, kept int) {
+	byID := map[string]string{}
+	for _, f := range stored {
+		byID[f.ID] = f.Fact
+	}
+	text := map[string]string{}
+	for _, f := range gold.Facts {
+		text[f.ID] = f.Fact
+	}
+	for _, g := range grades.Golden {
+		if g.Covered != "full" && g.Covered != "partial" {
+			continue
+		}
+		var parts []string
+		for _, id := range g.By {
+			parts = append(parts, byID[id])
+		}
+		a, b := textloss.Recall(text[g.ID], strings.Join(parts, " \n "))
+		total, kept = total+a, kept+b
+	}
+	return total, kept
 }
 
 // titleOf is the document title the chunker reads, so the rendered header matches a real import.
@@ -143,13 +207,16 @@ func evalFootprint(t *testing.T, man evalManifest) {
 	if rounds[0] == "" {
 		t.Fatal("KIRA_EVAL_ROUNDS is required for footprint mode")
 	}
+	style := envOr("KIRA_EVAL_STYLE", "full")
+	golden, _ := loadGolden()
 	for _, round := range rounds {
 		round = strings.TrimSpace(round)
-		dir := filepath.Join(evalRunsDir(), round)
+		dir := roundDirOf(round)
 		recs := loadRecords(filepath.Join(dir, "facts.jsonl"))
 		if len(recs) == 0 {
 			t.Fatalf("%s: no facts.jsonl records", round)
 		}
+		rd, _ := loadRound(round)
 		scored := scoredSources(dir)
 		format := "p273"
 		rows := []footprintRow{}
@@ -163,7 +230,24 @@ func evalFootprint(t *testing.T, man evalManifest) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			row := footprintOf(s, text, rec)
+			full := footprintOf(s, text, rec)
+			row := full
+			if style != "full" {
+				stored, ok := styleFacts(round, s.ID, rec, style)
+				if !ok {
+					t.Fatalf("%s/%s: no %s facts", round, s.ID, style)
+				}
+				rec.Stored = stored
+				row = footprintOf(s, text, rec)
+			}
+			row.TokTotal, row.TokKept = tokenRecall(golden[s.ID], rd.grades[s.ID], rec.Stored)
+			if style != "full" {
+				for i, f := range recs[s.ID].Stored {
+					if len(textloss.Names(f.Fact)) > 0 && len(textloss.Names(rec.Stored[i].Fact)) == 0 {
+						row.SubjectCut++
+					}
+				}
+			}
 			if doc, _ := renderedDoc(rec, titleOf(text, s), s.ID+"."+s.Kind, evalDocDate); strings.Contains(doc, "\nkira-memory: 2\n") {
 				format = "v2"
 			}
@@ -179,13 +263,20 @@ func evalFootprint(t *testing.T, man evalManifest) {
 		for _, sum := range []*footprintSum{&tuning, &holdout, &all} {
 			sum.done()
 		}
-		raw, _ := json.MarshalIndent(map[string]any{"round": round, "format": format, "sources": rows,
+		raw, _ := json.MarshalIndent(map[string]any{"round": round, "format": format, "style": style, "sources": rows,
 			"tuning": tuning, "holdout": holdout, "all": all}, "", "  ")
-		out := filepath.Join(dir, "footprint-"+format+".json")
+		outDir := filepath.Join(evalRunsDir(), filepath.Base(round))
+		_ = os.MkdirAll(outDir, 0o755)
+		name := "footprint-" + format
+		if style != "full" {
+			name += "-" + style
+		}
+		out := filepath.Join(outDir, name+".json")
 		if err := os.WriteFile(out, append(raw, '\n'), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("%s %s: tuning C_fact %.3f C_rec %.3f C_doc %.3f; all C_doc %.3f", round, format, tuning.CFact, tuning.CRec, tuning.CDoc, all.CDoc)
+		t.Logf("%s %s %s: tuning C_distill %.3f C_fact %.3f C_store %.3f C_rec %.3f C_doc %.3f token recall %.3f (%d/%d); all C_doc %.3f", round, format, style,
+			tuning.CDistill, tuning.CFact, tuning.CStore, tuning.CRec, tuning.CDoc, tuning.TokenRecall, tuning.TokKept, tuning.TokTotal, all.CDoc)
 	}
 }
 
