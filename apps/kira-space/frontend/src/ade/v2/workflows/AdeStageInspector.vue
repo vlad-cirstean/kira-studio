@@ -1,20 +1,11 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@theme/components/ui/dropdown-menu';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
-import { ICON } from '@theme/icons';
 import { statusLabel } from '../board/actions';
 import {
   FAILURE_OPTIONS,
@@ -54,36 +45,6 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         data-testid="ade-wf-stage-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :aria-label="t('space.ade.workflows.stageInspector.actions.aria')"
-            data-testid="ade-wf-stage-menu"
-          >
-            <CodiconIcon :name="ICON.moreActions" :size="13" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            :disabled="!stage.skip && !draft.canSkip"
-            data-testid="ade-wf-stage-skip"
-            @select="patch({ skip: !stage.skip })"
-          >
-            {{
-              stage.skip ? t('space.ade.workflows.stageInspector.unskip.label') : t('space.ade.workflows.stageInspector.skip.label')
-            }}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            class="text-error"
-            data-testid="ade-wf-stage-remove"
-            @select="draft.removeStage(stage.id)"
-          >
-            {{ t('space.ade.workflows.stageInspector.remove.label') }}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
       <Label :for="n('kind')">{{ t('common.field.type.label') }}</Label>
@@ -189,16 +150,5 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         />
       </div>
     </div>
-
-    <Button
-      v-else
-      variant="dialog"
-      size="kira-lg"
-      class="self-start border-dashed bg-transparent"
-      data-testid="ade-wf-add-step"
-      @click="draft.createStep(stage.id)"
-    >
-      {{ t('space.ade.workflows.stageInspector.addStep.label') }}
-    </Button>
   </div>
 </template>

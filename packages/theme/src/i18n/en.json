@@ -8238,6 +8238,12 @@
           "addStage": {
             "label": "Add stage"
           },
+          "addStageAfter": {
+            "label": "Add stage after"
+          },
+          "addStepAfter": {
+            "label": "Add step after"
+          },
           "edge": {
             "aria": "Connection from {source} to {target}"
           },
@@ -8260,6 +8266,12 @@
           "spaceTools": {
             "label": "Kira Space tools for agents",
             "tooltip": "Agent steps can declare repositories on the task and request branches and worktrees through Kira Space"
+          },
+          "stageMenu": {
+            "aria": "Stage actions"
+          },
+          "stepMenu": {
+            "aria": "Step actions"
           },
           "switchYaml": {
             "label": "Switch to YAML"
@@ -8400,9 +8412,6 @@
           }
         },
         "stageInspector": {
-          "actions": {
-            "aria": "Stage actions"
-          },
           "addStep": {
             "label": "Add step"
           },
@@ -8480,9 +8489,6 @@
           },
           "scriptMissing": {
             "error": "Script not found."
-          },
-          "startStep": {
-            "label": "Start step"
           },
           "tools": {
             "example": "Bash(git *), Edit",

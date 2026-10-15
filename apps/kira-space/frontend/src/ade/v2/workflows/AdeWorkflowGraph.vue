@@ -15,15 +15,11 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue-flow/core';
 import { useElementSize } from '@vueuse/core';
-import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
-import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
-import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
-import type { Tone } from '../board/actions';
-import { kindLabel, PLACEHOLDER_TOKENS } from '../board/workflowForm';
+import { PLACEHOLDER_TOKENS } from '../board/workflowForm';
 import {
   type EdgeData,
   type GraphEdge,
@@ -35,7 +31,7 @@ import {
 import { useSaveWorkflow } from '../queries';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
-import type { StageKind, Workflow, WorkflowEntry } from '../wire';
+import type { Workflow, WorkflowEntry } from '../wire';
 import AdeEndNode from './AdeEndNode.vue';
 import AdeResultEdge from './AdeResultEdge.vue';
 import AdeStageGroupNode from './AdeStageGroupNode.vue';
@@ -43,6 +39,7 @@ import AdeStageInspector from './AdeStageInspector.vue';
 import AdeStepInspector from './AdeStepInspector.vue';
 import AdeStepNode from './AdeStepNode.vue';
 import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
+import { useStepRemoval } from './useStepRemoval';
 
 // Graph mode: edits a local draft of the last valid workflow as a canvas of stages and steps, one
 // connector per step result; Save writes it whole, Discard drops the edits. Layout is automatic and
@@ -52,7 +49,7 @@ const wfUi = useAdeWorkflowsUiStore();
 const draft = useAdeWorkflowDraftStore();
 const repos = useRepos();
 const save = useSaveWorkflow();
-const confirm = useConfirmDialogStore();
+const { confirmRemoveStep } = useStepRemoval();
 const { setViewport } = useVueFlow();
 
 draft.open(props.entry.workflow, props.entry.hash);
@@ -95,9 +92,6 @@ function overwrite(): void {
   void saveNow();
 }
 
-const KIND_TONE: Record<StageKind, Tone> = { user: 'blue', agent: 'amber', script: 'green' };
-const strip = computed(() => [...(draft.draft?.stages ?? [])]);
-
 const layout = computed(() =>
   draft.draft ? layoutWorkflow(draft.draft) : { nodes: [], edges: [], width: 0, height: 0 },
 );
@@ -116,6 +110,7 @@ function nodeData(
     return {
       ...base,
       step,
+      stageId: stage.id,
       start: stage.steps[0]?.id === n.stepId,
       selected: sel?.kind === 'step' && sel.stepId === n.stepId && sel.stageId === n.stageId,
     } as StepNodeData;
@@ -124,6 +119,7 @@ function nodeData(
     ...base,
     stage,
     index: wf.stages.indexOf(stage),
+    count: wf.stages.length,
     selected: sel?.kind === 'stage' && sel.stageId === stage.id,
     spineX: n.spineX,
   };
@@ -244,31 +240,12 @@ async function deleteSelection(): Promise<void> {
     draft.clear(edge.stageId, edge.stepId, edge.results);
     edgeSel.value = '';
   } else if (sel?.kind === 'step') {
-    const ok = await confirm.confirm({
-      title: t('space.ade.workflows.graph.removeStepConfirm.title'),
-      message: t('space.ade.workflows.graph.removeStepConfirm.body', {
-        name: draft.step?.name ?? '',
-      }),
-      confirmLabel: t('common.action.remove.label'),
-      tone: 'danger',
-    });
-    if (ok) draft.deleteStep(sel.stageId, sel.stepId);
+    await confirmRemoveStep(sel.stageId, sel.stepId);
   }
 }
 useShortcut(root, ['tree.delete'], () => fireAndForget(deleteSelection(), 'adeWorkflows'), {
   ignoreTextFields: true,
 });
-
-const stripEl = useTemplateRef<HTMLElement>('stripEl');
-useSortableReorder(
-  stripEl,
-  () => strip.value.map((s) => s.id),
-  (from, to) => {
-    const ids = strip.value.map((s) => s.id);
-    draft.reorderStages(ids.indexOf(from), ids.indexOf(to));
-  },
-  { draggable: '[data-testid="ade-wf-strip-chip"]', direction: 'horizontal', keyboard: true },
-);
 
 onBeforeUnmount(() => {
   wfUi.dirty = false;
@@ -314,43 +291,6 @@ onBeforeUnmount(() => {
           }}</Label>
         </AdeTip>
       </div>
-    </div>
-    <div class="flex items-center gap-2" data-testid="ade-wf-strip-row">
-      <div
-        ref="stripEl"
-        class="flex min-w-0 flex-wrap items-center gap-1.5"
-        data-testid="ade-wf-strip"
-      >
-        <Button
-          v-for="(s, i) in strip"
-          :key="s.id"
-          type="button"
-          variant="dialog"
-          size="kira"
-          class="cursor-grab gap-1.5 px-2 text-kira-sm"
-          :class="[
-            draft.selection?.stageId === s.id ? 'border-info' : '',
-            s.skip ? 'text-muted-foreground' : '',
-          ]"
-          data-testid="ade-wf-strip-chip"
-          :data-stage-id="s.id"
-          :data-skipped="s.skip"
-          @click="draft.select({ kind: 'stage', stageId: s.id })"
-        >
-          <span class="font-medium">{{ i + 1 }}.</span>
-          <span :class="s.skip ? 'line-through' : ''">{{ s.name }}</span>
-          <AdeChip :label="kindLabel(s.kind)" :tone="KIND_TONE[s.kind]" />
-        </Button>
-      </div>
-      <Button
-        variant="dialog"
-        size="kira-lg"
-        class="border-dashed bg-transparent"
-        data-testid="ade-wf-add-stage"
-        @click="draft.createStage()"
-      >
-        {{ t('space.ade.workflows.graph.addStage.label') }}
-      </Button>
     </div>
     <div ref="split" class="flex min-h-96 flex-1 rounded-kira border border-border bg-bg">
       <div class="relative min-w-0" :style="{ flex: `0 0 ${graphPane.size.value}%` }">
@@ -410,6 +350,17 @@ onBeforeUnmount(() => {
               <template #node-end="p"><AdeEndNode :data="p.data" /></template>
               <template #edge-result="p"><AdeResultEdge v-bind="p" /></template>
             </VueFlow>
+          </div>
+          <div class="flex justify-center pb-4">
+            <Button
+              variant="dialog"
+              size="kira-lg"
+              class="border-dashed bg-transparent"
+              data-testid="ade-wf-add-stage"
+              @click="draft.createStage()"
+            >
+              {{ t('space.ade.workflows.graph.addStage.label') }}
+            </Button>
           </div>
         </div>
       </div>

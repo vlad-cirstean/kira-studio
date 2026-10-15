@@ -1,17 +1,39 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
+import { Button } from '@theme/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
 import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
+import { ICON } from '@theme/icons';
 import { Handle, Position } from '@vue-flow/core';
-import { computed } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
+import { computed, ref, useTemplateRef } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { promptParts } from '../automation/smartStepBody';
 import { runsOnLabel } from '../board/workflowForm';
 import { resultHandleId, type StepNodeData } from '../board/workflowGraph';
+import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
+import { useStepRemoval } from './useStepRemoval';
 
 // One agent step on the canvas: name, what it runs, and one connector per result. Fixed size; full
 // text lives in the inspector.
 const props = defineProps<{ data: StepNodeData }>();
+const draft = useAdeWorkflowDraftStore();
+const { confirmRemoveStep } = useStepRemoval();
+const menuOpen = ref(false);
+const root = useTemplateRef<HTMLElement>('root');
+useEventListener(root, 'contextmenu', (e: MouseEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+  menuOpen.value = true;
+});
 const step = computed(() => props.data.step);
 const body = computed(() => {
   const review = step.value.review;
@@ -45,6 +67,7 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
     data-testid="ade-wf-node"
     :data-step-id="step.id"
     :data-start="data.start"
+    ref="root"
     :data-selected="data.selected"
   >
     <Handle
@@ -102,6 +125,42 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
           ? t('space.ade.workflows.stepNode.returns.label', { limit: step.maxReturns })
           : t('space.ade.workflows.stepNode.returnsUnlimited.label')
       }}</span>
+      <DropdownMenu v-model:open="menuOpen">
+        <DropdownMenuTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            class="nodrag nopan shrink-0"
+            :aria-label="t('space.ade.workflows.graph.stepMenu.aria')"
+            data-testid="ade-wf-step-menu"
+            @click.stop
+          >
+            <CodiconIcon :name="ICON.moreActions" :size="13" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            data-testid="ade-wf-step-add-after"
+            @select="draft.createStep(data.stageId, step.id)"
+          >
+            {{ t('space.ade.workflows.graph.addStepAfter.label') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            :disabled="data.start"
+            data-testid="ade-wf-step-start"
+            @select="draft.makeStart(data.stageId, step.id)"
+          >
+            {{ t('space.ade.workflows.stepInspector.makeStart.label') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            class="text-error"
+            data-testid="ade-wf-step-remove"
+            @select="fireAndForget(confirmRemoveStep(data.stageId, step.id), 'adeWorkflows')"
+          >
+            {{ t('common.action.remove.label') }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
     <div class="truncate px-2 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>
     <div

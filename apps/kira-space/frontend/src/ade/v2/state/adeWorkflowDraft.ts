@@ -111,20 +111,28 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
       ),
     });
   }
-  function createStage(): void {
+  /** A new stage at the end, or right after `afterStageId`. */
+  function createStage(afterStageId?: string): void {
     const w = wf();
     if (!w) return;
     const fresh = newStage(w.stages);
-    edit({ ...w, stages: [...w.stages, fresh] });
+    const at = afterStageId
+      ? w.stages.findIndex((s) => s.id === afterStageId) + 1
+      : w.stages.length;
+    const stages = [...w.stages];
+    stages.splice(at, 0, fresh);
+    edit({ ...w, stages });
     selection.value = { kind: 'stage', stageId: fresh.id };
   }
   function removeStage(stageId: string): void {
     const w = wf();
     if (w) edit({ ...w, stages: w.stages.filter((s) => s.id !== stageId) });
   }
-  function reorderStages(from: number, to: number): void {
+  function moveStageBy(stageId: string, delta: number): void {
     const w = wf();
-    if (w) edit(moveStage(w, from, to));
+    if (!w) return;
+    const from = w.stages.findIndex((s) => s.id === stageId);
+    edit(moveStage(w, from, from + delta));
   }
   function createStep(stageId: string, after?: string): void {
     const w = wf();
@@ -189,7 +197,7 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     patchStep,
     createStage,
     removeStage,
-    reorderStages,
+    moveStageBy,
     createStep,
     deleteStep,
     makeStart,

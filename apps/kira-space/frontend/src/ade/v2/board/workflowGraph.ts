@@ -617,6 +617,7 @@ export function moveStage(wf: Workflow, from: number, to: number): Workflow {
 /** What a step node shows. */
 export interface StepNodeData {
   step: PipelineStep;
+  stageId: string;
   start: boolean;
   selected: boolean;
   w: number;
@@ -626,6 +627,8 @@ export interface StepNodeData {
 export interface StageNodeData {
   stage: Stage;
   index: number;
+  /** Stages in the workflow, for the Move down bound. */
+  count: number;
   selected: boolean;
   w: number;
   h: number;

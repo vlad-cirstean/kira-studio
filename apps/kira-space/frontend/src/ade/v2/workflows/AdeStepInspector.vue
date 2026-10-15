@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
@@ -131,7 +130,6 @@ function onReturns(v: string | number): void {
   patch({ maxReturns: Math.min(MAX_RETURNS, Math.max(minReturns.value, n)) });
 }
 const id = (k: string): string => `ade-wf-step-${k}-${props.step.id}`;
-const isStart = computed(() => props.steps[0]?.id === props.step.id);
 </script>
 
 <template>
@@ -148,26 +146,6 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
-      <Button
-        variant="dialog"
-        size="kira"
-        :disabled="isStart"
-        data-testid="ade-wf-step-start"
-        @click="draft.makeStart(stageId, step.id)"
-      >
-        {{
-          isStart ? t('space.ade.workflows.stepInspector.startStep.label') : t('space.ade.workflows.stepInspector.makeStart.label')
-        }}
-      </Button>
-      <Button
-        variant="dialog"
-        size="kira"
-        class="text-error"
-        data-testid="ade-wf-step-remove"
-        @click="draft.deleteStep(stageId, step.id)"
-      >
-        {{ t('common.action.remove.label') }}
-      </Button>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
       <Label :for="id('scope')">{{ t('space.ade.workflows.field.runsOn.label') }}</Label>
