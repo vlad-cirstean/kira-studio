@@ -24,6 +24,7 @@ const body = computed(() => {
   return step.value.smartScript ? `✦ ${step.value.smartScript}` : step.value.prompt;
 });
 const parts = computed(() => promptParts(body.value));
+const loops = computed(() => step.value.results.some((r) => r.loop));
 const LABEL_MAX = 4;
 const labelled = computed(() => step.value.results.length <= LABEL_MAX);
 const tip = (r: StepNodeData['step']['results'][number]): string => {
@@ -95,6 +96,11 @@ const tip = (r: StepNodeData['step']['results'][number]): string => {
       >
       <span v-if="step.review" class="shrink-0 text-info" data-testid="ade-wf-node-review">{{
         t('space.ade.board.branchTag.review.label')
+      }}</span>
+      <span v-if="loops" class="shrink-0 text-muted-foreground" data-testid="ade-wf-node-returns">{{
+        step.maxReturns > 0
+          ? t('space.ade.workflows.stepNode.returns.label', { limit: step.maxReturns })
+          : t('space.ade.workflows.stepNode.returnsUnlimited.label')
       }}</span>
     </div>
     <div class="truncate px-2 text-subtle">{{ runsOnLabel(step.runsOn) }}</div>

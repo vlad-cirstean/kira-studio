@@ -147,7 +147,6 @@ const flowEdges = computed<Edge[]>(() =>
     const data: EdgeData = {
       tone: e.tone,
       loop: e.loop,
-      max: e.max,
       results: e.results,
       selected: e.id === edgeSel.value,
       spine: e.spine ?? false,

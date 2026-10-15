@@ -7,7 +7,6 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
-import { MAX_LOOP_MAX } from '../board/stepResults';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
 
@@ -89,20 +88,6 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           <option value="end">{{ t('space.ade.workflows.route.end.option') }}</option>
           <option v-if="!r.ok" value="stop">{{ t('common.action.stop.label') }}</option>
         </NativeSelect>
-        <template v-if="r.max > 0">
-          <Label :for="id('max', r.id)">{{ t('space.ade.workflows.results.max.label') }}</Label>
-          <Input
-            :id="id('max', r.id)"
-            type="number"
-            min="1"
-            :max="MAX_LOOP_MAX"
-            :model-value="r.max"
-            size="kira"
-            class="w-14"
-            data-testid="ade-wf-result-max"
-            @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { max: Number(v) })"
-          />
-        </template>
       </div>
     </Card>
     <Button

@@ -72,6 +72,7 @@ export function mkRun(
     attempt: 1,
     state: 'pending',
     loops: 0,
+    returns: 0,
     note: '',
     summary: '',
     sessionId: '',

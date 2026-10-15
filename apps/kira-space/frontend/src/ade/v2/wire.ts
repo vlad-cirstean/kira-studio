@@ -68,13 +68,13 @@ export type OnFailure =
   | 'retry 1'
   | 'retry 2'
   | `back:${string}` /* earlier step id, same stage */;
-/** A result a step may report through finish_step. `next` is 'next' | 'end' | 'stop' or a step id of the same stage; `max` is the loop budget of a route back to the step or an earlier one, 0 on a forward route. */
+/** A result a step may report through finish_step. `next` is 'next' | 'end' | 'stop' or a step id of the same stage; `loop` says the route goes back to the step or an earlier one (a return, counted against the step's `maxReturns`). */
 export interface StepResult {
   id: string;
   ok: boolean;
   description: string;
   next: string;
-  max: number;
+  loop: boolean;
 }
 export interface PipelineStep {
   id: string;
@@ -84,6 +84,8 @@ export interface PipelineStep {
   /** Legacy rule; '' when `results` do not reduce to one. */
   onFailure: OnFailure | '';
   results: StepResult[];
+  /** Returns a result may make to this step or an earlier one before the run stops; 0 = no limit (review steps only). */
+  maxReturns: number;
   timeout: string;
   prompt: string;
   allowedTools: string[] /* D6, [] = none added */;
@@ -257,6 +259,8 @@ export interface Run {
   outcome: AdeRunOutcome | null;
   /** 'rebase' for a rebase run (outside the workflow), '' for a step run. */
   purpose: '' | 'rebase' | 'review';
+  /** Times this branch's step went back, up to and including this attempt. */
+  returns: number;
   /** A restart stopped the run mid-session: Resume continues its Claude conversation. */
   resumable: boolean;
   /** Where a review step run stands; null on every other run. */

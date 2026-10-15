@@ -2,8 +2,22 @@ import type { OnFailure, StepResult } from '../wire';
 
 // Pure mirror of Go `adewire/results.go`: the implicit results of a step with none declared.
 
-export const DEFAULT_LOOP_MAX = 3;
-export const MAX_LOOP_MAX = 10;
+export const DEFAULT_MAX_RETURNS = 3;
+export const MAX_RETURNS = 10;
+
+/** The return limit of a step that sets none: 0 (no limit) for a review step. */
+export function defaultMaxReturns(review: boolean): number {
+  return review ? 0 : DEFAULT_MAX_RETURNS;
+}
+
+/** The limit a legacy rule implies: `retry N` gives N, anything else the default. */
+export function legacyMaxReturns(onFailure: OnFailure | '', review = false): number {
+  if (onFailure.startsWith('retry ')) {
+    const n = Number.parseInt(onFailure.slice(6), 10);
+    if (n > 0) return n;
+  }
+  return defaultMaxReturns(review);
+}
 
 /** Where a result goes when it names no route. */
 export function defaultRoute(ok: boolean): string {
@@ -13,8 +27,8 @@ export function defaultRoute(ok: boolean): string {
 /** The results a new review step starts with: approved moves on, rejected stops the run. */
 export function reviewDefaultResults(): StepResult[] {
   return [
-    { id: 'approved', ok: true, description: '', next: 'next', max: 0 },
-    { id: 'rejected', ok: false, description: '', next: 'stop', max: 0 },
+    { id: 'approved', ok: true, description: '', next: 'next', loop: false },
+    { id: 'rejected', ok: false, description: '', next: 'stop', loop: false },
   ];
 }
 
@@ -34,12 +48,18 @@ export function hasReviewDefaultResults(results: readonly StepResult[]): boolean
 
 /** `done` (ok) and `failed` (not ok), the failed route derived from the legacy rule. */
 export function implicitResults(stepId: string, onFailure: OnFailure | ''): StepResult[] {
-  const failed: StepResult = { id: 'failed', ok: false, description: '', next: 'stop', max: 0 };
+  const failed: StepResult = {
+    id: 'failed',
+    ok: false,
+    description: '',
+    next: 'stop',
+    loop: false,
+  };
   if (onFailure.startsWith('retry ')) {
     const n = Number.parseInt(onFailure.slice(6), 10);
-    if (n > 0) Object.assign(failed, { next: stepId, max: n });
+    if (n > 0) Object.assign(failed, { next: stepId, loop: true });
   } else if (onFailure.startsWith('back:')) {
-    Object.assign(failed, { next: onFailure.slice(5), max: DEFAULT_LOOP_MAX });
+    Object.assign(failed, { next: onFailure.slice(5), loop: true });
   }
-  return [{ id: 'done', ok: true, description: '', next: 'next', max: 0 }, failed];
+  return [{ id: 'done', ok: true, description: '', next: 'next', loop: false }, failed];
 }

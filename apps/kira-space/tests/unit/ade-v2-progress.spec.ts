@@ -22,6 +22,7 @@ const step = (
   before,
   onFailure: 'stop' as const,
   results: implicitResults(id, 'stop'),
+  maxReturns: 3,
   timeout: '1h',
   prompt: 'p',
   allowedTools: [],

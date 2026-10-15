@@ -1,6 +1,6 @@
 import { t } from '@theme/i18n';
 import type { OnFailure, PipelineStep, Stage, StageKind, Workflow } from '../wire';
-import { implicitResults } from './stepResults';
+import { DEFAULT_MAX_RETURNS, implicitResults } from './stepResults';
 import { defaultSandbox } from './stepSandbox';
 
 // Pure helpers behind the Workflows form editor (SPEC2 section 5.1.1). Stage and step ids are run
@@ -61,6 +61,7 @@ export function newStep(steps: readonly PipelineStep[]): PipelineStep {
   return {
     id,
     results: implicitResults(id, 'stop'),
+    maxReturns: DEFAULT_MAX_RETURNS,
     name: t('space.ade.workflows.step.defaultName.label'),
     runsOn: 'each repo',
     before: 'auto',

@@ -19,12 +19,12 @@ import {
 import type { PipelineStep, StepResult, Workflow } from '../../frontend/src/ade/v2/wire';
 import { mkStage } from './support/adeV2Fixtures';
 
-const res = (id: string, ok: boolean, next = ok ? 'next' : 'stop', max = 0): StepResult => ({
+const res = (id: string, ok: boolean, next = ok ? 'next' : 'stop', loop = false): StepResult => ({
   id,
   ok,
   description: '',
   next,
-  max,
+  loop,
 });
 const step = (id: string, results: StepResult[] = implicitResults(id, 'stop')): PipelineStep => ({
   id,
@@ -33,6 +33,7 @@ const step = (id: string, results: StepResult[] = implicitResults(id, 'stop')): 
   before: 'auto',
   onFailure: '',
   results,
+  maxReturns: 3,
   timeout: '1h',
   prompt: '',
   allowedTools: [],
@@ -79,16 +80,13 @@ describe('aggregateEdges', () => {
     ]);
   });
 
-  test('an earlier or own target is a loop with its budget', () => {
+  test('an earlier or own target is a loop edge', () => {
     const steps = [
       step('a'),
-      step('b', [res('ok', true), res('again', false, 'a', 2), res('self', false, 'b', 5)]),
+      step('b', [res('ok', true), res('again', false, 'a', true), res('self', false, 'b', true)]),
     ];
     const loops = aggregateEdges('s', steps, 1).filter((e) => e.loop);
-    expect(loops.map((e) => [e.target, e.max])).toEqual([
-      ['step:s:a', 2],
-      ['step:s:b', 5],
-    ]);
+    expect(loops.map((e) => e.target)).toEqual(['step:s:a', 'step:s:b']);
   });
 });
 
@@ -97,7 +95,7 @@ describe('setRoute', () => {
     const wf = setRoute(wfOf([step('a'), step('b')]), 's', 'b', 'failed', 'a');
     expect(order(wf)).toEqual(['a', 'b']);
     const r = stepsOf(wf)[1]?.results[1];
-    expect([r?.next, r?.max]).toEqual(['a', 3]);
+    expect([r?.next, r?.loop]).toEqual(['a', true]);
   });
 
   test('an earlier target that cannot reach the source moves after it', () => {
@@ -109,7 +107,7 @@ describe('setRoute', () => {
     const wf = setRoute(base, 's', 'c', 'done', 'b');
     expect(order(wf)).toEqual(['a', 'c', 'b']);
     expect(next(wf, 'c', 'done')).toBe('next');
-    expect(stepsOf(wf)[1]?.results[0]?.max).toBe(0);
+    expect(stepsOf(wf)[1]?.results[0]?.loop).toBe(false);
   });
 
   test('a forward target past the next step keeps its id; the following step collapses to next', () => {
@@ -120,7 +118,7 @@ describe('setRoute', () => {
 
   test('self route is a loop edge', () => {
     const wf = setRoute(wfOf([step('a')]), 's', 'a', 'failed', 'a');
-    expect(stepsOf(wf)[0]?.results[1]).toMatchObject({ next: 'a', max: 3 });
+    expect(stepsOf(wf)[0]?.results[1]).toMatchObject({ next: 'a', loop: true });
   });
 });
 
@@ -148,26 +146,26 @@ describe('edits', () => {
     const wf = setStart(wfOf([step('a'), step('b')]), 's', 'b');
     expect(order(wf)).toEqual(['b', 'a']);
     expect(stepsOf(wf)[0]?.results[0]?.next).toBe('end');
-    expect(stepsOf(wf)[1]?.results[0]).toMatchObject({ next: 'b', max: 3 });
+    expect(stepsOf(wf)[1]?.results[0]).toMatchObject({ next: 'b', loop: true });
   });
 
   test('removeStep resets routes into it to their defaults', () => {
     const base = wfOf([
-      step('a', [res('done', true, 'c'), res('failed', false, 'b', 2)]),
+      step('a', [res('done', true, 'c'), res('failed', false, 'b', true)]),
       step('b'),
       step('c'),
     ]);
     const wf = removeStep(base, 's', 'b');
     expect(next(wf, 'a', 'failed')).toBe('stop');
-    expect(stepsOf(wf)[0]?.results[1]?.max).toBe(0);
+    expect(stepsOf(wf)[0]?.results[1]?.loop).toBe(false);
   });
 
   test('clearRoute restores the default of each result', () => {
-    const base = wfOf([step('a', [res('done', true, 'end'), res('failed', false, 'a', 2)])]);
+    const base = wfOf([step('a', [res('done', true, 'end'), res('failed', false, 'a', true)])]);
     const wf = clearRoute(base, 's', 'a', ['done', 'failed']);
-    expect(stepsOf(wf)[0]?.results.map((r) => [r.next, r.max])).toEqual([
-      ['next', 0],
-      ['stop', 0],
+    expect(stepsOf(wf)[0]?.results.map((r) => [r.next, r.loop])).toEqual([
+      ['next', false],
+      ['stop', false],
     ]);
   });
 
@@ -255,10 +253,10 @@ describe('layoutWorkflow', () => {
 
   test('nested and overlapping loops get distinct lanes, disjoint loops share one, no loop has a route', () => {
     const g = stepGraph([
-      step('a', [res('done', true), res('redo', false, 'a', 2)]),
-      step('b', [res('done', true), res('redo', false, 'b', 2)]),
-      step('c', [res('done', true), res('redo', false, 'b', 2)]),
-      step('d', [res('done', true), res('redo', false, 'b', 2), res('all', false, 'a', 2)]),
+      step('a', [res('done', true), res('redo', false, 'a', true)]),
+      step('b', [res('done', true), res('redo', false, 'b', true)]),
+      step('c', [res('done', true), res('redo', false, 'b', true)]),
+      step('d', [res('done', true), res('redo', false, 'b', true), res('all', false, 'a', true)]),
     ]);
     const lane = (source: string, target: string): number | undefined =>
       g.edges.find(

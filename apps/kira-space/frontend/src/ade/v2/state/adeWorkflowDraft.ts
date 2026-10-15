@@ -161,7 +161,7 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     stageId: string,
     stepId: string,
     resultId: string,
-    p: Partial<Pick<StepResult, 'id' | 'ok' | 'description' | 'max'>>,
+    p: Partial<Pick<StepResult, 'id' | 'ok' | 'description'>>,
   ): void {
     const w = wf();
     if (w) edit(patchResult(w, stageId, stepId, resultId, p));

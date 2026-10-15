@@ -78,21 +78,20 @@ function stepStatusText(s: StepProgress): string {
   return runStateLabel(s.state);
 }
 
-/** The step's non-default routes, `changes ↩ Implement (max 3)`, `trivial → end`; '' when it has none. */
+/** The step's non-default routes, `changes ↩ Implement`, `trivial → end`; '' when it has none. */
 function routeText(s: StepProgress, stage: Stage): string {
+  const at = new Map(stage.steps.map((x, i) => [x.id, i]));
+  const own = at.get(s.id) ?? -1;
   const nameOf = (id: string): string => stage.steps.find((x) => x.id === id)?.name ?? id;
   const parts: string[] = [];
   for (const r of s.results) {
     if (r.next === defaultRoute(r.ok)) continue;
     if (r.next === 'end') parts.push(t('space.ade.stage.routeEnd.label', { id: r.id }));
     else if (r.next === 'stop') parts.push(t('space.ade.stage.routeStop.label', { id: r.id }));
-    else if (r.max > 0 && r.next === s.id) {
-      parts.push(t('space.ade.stage.routeRetry.label', { id: r.id, max: r.max }));
-    } else if (r.max > 0) {
-      parts.push(
-        t('space.ade.stage.routeBack.label', { id: r.id, step: nameOf(r.next), max: r.max }),
-      );
-    } else parts.push(t('space.ade.stage.routeGoto.label', { id: r.id, step: nameOf(r.next) }));
+    else if (r.next === s.id) parts.push(t('space.ade.stage.routeRetry.label', { id: r.id }));
+    else if ((at.get(r.next) ?? Number.POSITIVE_INFINITY) <= own)
+      parts.push(t('space.ade.stage.routeBack.label', { id: r.id, step: nameOf(r.next) }));
+    else parts.push(t('space.ade.stage.routeGoto.label', { id: r.id, step: nameOf(r.next) }));
   }
   return parts.join(' · ');
 }
@@ -110,14 +109,13 @@ function runStatus(r: StepRun): string {
   return runStateLabel(r.state);
 }
 
-/** Loop budget of the results that send the stage back to step `id`: the largest `max`, 0 when none. */
-function backMax(steps: readonly StepProgress[], id: string): number {
-  let max = 0;
+/** Limit of the steps that send the stage back to step `id`: the largest `maxReturns`, 0 when none. */
+function backLimit(steps: readonly StepProgress[], id: string): number {
+  let limit = 0;
   for (const s of steps) {
-    if (s.id === id) continue;
-    for (const r of s.results) if (r.next === id && r.max > max) max = r.max;
+    if (s.id !== id && s.results.some((r) => r.next === id)) limit = Math.max(limit, s.maxReturns);
   }
-  return max;
+  return limit;
 }
 
 function fixRound(loops: number, max: number): string {
@@ -183,7 +181,7 @@ export function buildStageBlocks(
           scope: script ? stage.command : runsOnLabel(s.runsOn),
           gated: s.before === 'approval',
           routeText: routeText(s, stage),
-          runs: showRuns(s, script) ? s.runs.map((r) => runLine(r, backMax(steps, s.id))) : [],
+          runs: showRuns(s, script) ? s.runs.map((r) => runLine(r, backLimit(steps, s.id))) : [],
         }),
       ),
       count:

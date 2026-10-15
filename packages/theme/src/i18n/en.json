@@ -8059,7 +8059,7 @@
           "label": "User · interactive Claude Code"
         },
         "routeBack": {
-          "label": "{id} ↩ {step} (max {max})"
+          "label": "{id} ↩ {step}"
         },
         "routeEnd": {
           "label": "{id} → end"
@@ -8068,7 +8068,7 @@
           "label": "{id} → {step}"
         },
         "routeRetry": {
-          "label": "{id} ↻ retry (max {max})"
+          "label": "{id} ↻ retry"
         },
         "routeStop": {
           "label": "{id} → stop"
@@ -8313,9 +8313,6 @@
           "intro": {
             "hint": "The agent picks one result when the step ends. Each result sets where the stage goes next."
           },
-          "max": {
-            "label": "Maximum loops"
-          },
           "notOk": {
             "label": "Failure"
           },
@@ -8462,6 +8459,10 @@
           "makeStart": {
             "label": "Make start step"
           },
+          "maxReturns": {
+            "hint": "Times a failure may send the run back. Review steps: 0 = no limit.",
+            "label": "Max returns"
+          },
           "name": {
             "aria": "Step name"
           },
@@ -8495,6 +8496,12 @@
           },
           "resultStops": {
             "tooltip": "{id} ({outcome}) stops the run"
+          },
+          "returns": {
+            "label": "↩ ≤{limit}"
+          },
+          "returnsUnlimited": {
+            "label": "↩ No limit"
           },
           "sendsImplementer": {
             "label": "Sends to the implementer"

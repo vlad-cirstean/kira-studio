@@ -1,12 +1,12 @@
 import dagre from '@dagrejs/dagre';
 import type { PipelineStep, Stage, StepResult, Workflow } from '../wire';
-import { DEFAULT_LOOP_MAX, defaultRoute, MAX_LOOP_MAX } from './stepResults';
+import { defaultRoute } from './stepResults';
 import { newStep } from './workflowForm';
 
 // Pure model behind the graph workflow editor (P247): the workflow as nodes and edges, the auto-layout,
 // and every edit the canvas and the inspector make. All edits return a new workflow. Routes live in
-// `StepResult.next`; a loop edge is one with `max > 0`, which the parser demands exactly when the target
-// is the step itself or an earlier one.
+// `StepResult.next`; a loop edge is a result with `loop`, which the parser sets exactly when the target
+// is the step itself or an earlier one. The return limit lives on the step (`maxReturns`).
 
 type EdgeTone = 'ok' | 'fail' | 'neutral';
 
@@ -56,7 +56,6 @@ export interface GraphEdge {
   results: string[];
   tone: EdgeTone;
   loop: boolean;
-  max: number;
   /** On the main success path: drawn straight. */
   spine?: boolean;
   /** Absolute route of a forward edge that skips ranks. */
@@ -110,7 +109,6 @@ export function aggregateEdges(
       results: rs.map((r) => r.id),
       tone: oks === rs.length ? 'ok' : oks === 0 ? 'fail' : 'neutral',
       loop: t <= i,
-      max: Math.max(...rs.map((r) => r.max)),
     } satisfies GraphEdge;
   });
 }
@@ -371,7 +369,6 @@ export function layoutWorkflow(wf: Workflow): Graph {
         results: [],
         tone: 'neutral',
         loop: false,
-        max: 0,
         spine: true,
       });
     prev = id;
@@ -403,9 +400,7 @@ function reclassify(steps: PipelineStep[]): void {
   steps.forEach((s, i) => {
     for (const r of s.results) {
       const t = at.get(r.next);
-      if (t === undefined) r.max = 0;
-      else if (t <= i) r.max = r.max > 0 ? r.max : DEFAULT_LOOP_MAX;
-      else r.max = 0;
+      r.loop = t !== undefined && t <= i;
     }
   });
 }
@@ -435,7 +430,7 @@ function reaches(steps: readonly PipelineStep[], from: string, to: string): bool
     const s = steps[i];
     if (!s) return false;
     return s.results.some((r) => {
-      if (r.max > 0 || r.next === 'end' || r.next === 'stop') return false;
+      if (r.loop || r.next === 'end' || r.next === 'stop') return false;
       const t = r.next === 'next' ? steps[i + 1]?.id : r.next;
       return t !== undefined && walk(t);
     });
@@ -456,7 +451,7 @@ export function normalizeOrder(steps: readonly PipelineStep[]): PipelineStep[] {
   const incoming = new Map<string, Set<string>>(out.map((s) => [s.id, new Set()]));
   for (const s of out)
     for (const r of s.results)
-      if (r.max === 0 && ids.has(r.next) && r.next !== start.id && r.next !== s.id)
+      if (!r.loop && ids.has(r.next) && r.next !== start.id && r.next !== s.id)
         incoming.get(r.next)?.add(s.id);
   const order: PipelineStep[] = [start];
   const done = new Set([start.id]);
@@ -490,17 +485,10 @@ export function setRoute(
     const si = steps.indexOf(step);
     const ti = steps.findIndex((s) => s.id === target);
     r.next = target;
-    if (ti < 0) {
-      r.max = 0;
-      return normalizeOrder(steps);
-    }
-    const loop = ti <= si && (ti === si || reaches(steps, target, stepId));
-    r.max = loop ? clampMax(r.max || DEFAULT_LOOP_MAX) : 0;
+    r.loop = ti >= 0 && ti <= si && (ti === si || reaches(steps, target, stepId));
     return normalizeOrder(steps);
   });
 }
-
-const clampMax = (n: number): number => Math.min(MAX_LOOP_MAX, Math.max(1, Math.trunc(n) || 1));
 
 /** The route a result falls back to once its edge is removed. */
 export function clearRoute(
@@ -515,7 +503,7 @@ export function clearRoute(
     for (const r of step.results)
       if (resultIds.includes(r.id)) {
         r.next = defaultRoute(r.ok);
-        r.max = 0;
+        r.loop = false;
       }
     return normalizeOrder(steps);
   });
@@ -537,7 +525,7 @@ export function addResult(wf: Workflow, stageId: string, stepId: string): Workfl
         ok: true,
         description: '',
         next: 'next',
-        max: 0,
+        loop: false,
       });
     return steps;
   });
@@ -563,7 +551,7 @@ export function patchResult(
   stageId: string,
   stepId: string,
   resultId: string,
-  patch: Partial<Pick<StepResult, 'id' | 'ok' | 'description' | 'max'>>,
+  patch: Partial<Pick<StepResult, 'id' | 'ok' | 'description'>>,
 ): Workflow {
   return mapStage(wf, stageId, (steps) => {
     const r = steps.find((s) => s.id === stepId)?.results.find((x) => x.id === resultId);
@@ -571,7 +559,6 @@ export function patchResult(
     Object.assign(r, patch);
     if (patch.ok !== undefined && r.next === defaultRoute(!patch.ok))
       r.next = defaultRoute(patch.ok);
-    if (patch.max !== undefined) r.max = clampMax(patch.max);
     return steps;
   });
 }
@@ -601,7 +588,7 @@ export function removeStep(wf: Workflow, stageId: string, stepId: string): Workf
       for (const r of s.results)
         if (r.next === stepId) {
           r.next = defaultRoute(r.ok);
-          r.max = 0;
+          r.loop = false;
         }
     return normalizeOrder(out);
   });
@@ -647,7 +634,6 @@ export interface StageNodeData {
 export interface EdgeData {
   tone: EdgeTone;
   loop: boolean;
-  max: number;
   results: string[];
   selected: boolean;
   spine: boolean;

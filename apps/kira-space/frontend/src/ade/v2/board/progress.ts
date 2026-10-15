@@ -12,7 +12,7 @@ import type {
   Task,
   Workflow,
 } from '../wire';
-import { implicitResults } from './stepResults';
+import { implicitResults, legacyMaxReturns } from './stepResults';
 
 // Pure port of mockup v2 `renderVals()` step aggregation (1423-1466), `phasePills` (1672-1702) and
 // `branchProg` (1768-1787). Runs are the backend's: a stuck run arrives as `state: 'stuck'`.
@@ -24,6 +24,8 @@ export interface StepRun {
   branchId: string;
   state: RunState;
   loops: number;
+  /** Times the step went back, up to and including this run. */
+  returns: number;
   note: string;
   /** The stored outcome's reason, '' while none. */
   reason: string;
@@ -53,6 +55,8 @@ export interface StepProgress {
   onFailure: OnFailure | '';
   /** The step's results with their routes. */
   results: StepResult[];
+  /** Returns the step may make before the run stops; 0 = no limit. */
+  maxReturns: number;
   /** Name of the smart script the step runs, else ''. */
   smartScript: string;
   state: StepState;
@@ -137,6 +141,7 @@ interface StepDef {
   before: 'auto' | 'approval';
   onFailure: OnFailure | '';
   results: StepResult[];
+  maxReturns: number;
   smartScript: string;
 }
 
@@ -151,6 +156,7 @@ function stepDefs(stage: Stage): StepDef[] {
         before: 'auto',
         onFailure: stage.onFailure || 'stop',
         results: implicitResults(stage.id, stage.onFailure || 'stop'),
+        maxReturns: legacyMaxReturns(stage.onFailure || 'stop'),
         smartScript: '',
       },
     ];
@@ -162,6 +168,7 @@ function stepDefs(stage: Stage): StepDef[] {
     before: s.before,
     onFailure: s.onFailure,
     results: s.results?.length ? s.results : implicitResults(s.id, s.onFailure || 'stop'),
+    maxReturns: s.maxReturns,
     smartScript: s.smartScript,
   }));
 }
@@ -178,6 +185,7 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
     branchId,
     state: best.state,
     loops: best.loops,
+    returns: best.returns,
     note: best.note,
     reason: best.outcome?.reason ?? '',
     result: best.outcome?.result ?? '',
@@ -239,6 +247,7 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
           branchId,
           state: 'pending',
           loops: 0,
+          returns: 0,
           note: '',
           reason: '',
           result: '',

@@ -14,9 +14,12 @@ import { useCustomScriptsStore } from '../../../state/customScripts';
 import { promptParts, smartBodyParts } from '../automation/smartStepBody';
 import { finishVars, previewTextParts } from '../board/runMessage';
 import {
+  DEFAULT_MAX_RETURNS,
+  defaultMaxReturns,
   hasImplicitResults,
   hasReviewDefaultResults,
   implicitResults,
+  MAX_RETURNS,
   reviewDefaultResults,
 } from '../board/stepResults';
 import { formatTools, parseTools, runsOnLabel } from '../board/workflowForm';
@@ -67,10 +70,18 @@ function setMode(v: string): void {
       allowedTools: [],
       params: {},
       ...(hasImplicitResults(props.step.id, results) ? { results: reviewDefaultResults() } : {}),
+      ...(props.step.maxReturns === DEFAULT_MAX_RETURNS
+        ? { maxReturns: defaultMaxReturns(true) }
+        : {}),
     });
     return;
   }
-  const restore = wasReview ? { results: implicitResults(props.step.id, 'stop') } : {};
+  const restore = {
+    ...(wasReview ? { results: implicitResults(props.step.id, 'stop') } : {}),
+    ...(props.step.review && props.step.maxReturns === 0
+      ? { maxReturns: DEFAULT_MAX_RETURNS }
+      : {}),
+  };
   if (v === 'smart') {
     patch({
       review: null,
@@ -112,6 +123,12 @@ watch(
 function onTools(v: string | number): void {
   toolsText.value = String(v);
   patch({ allowedTools: parseTools(toolsText.value) });
+}
+const minReturns = computed(() => (props.step.review ? 0 : 1));
+function onReturns(v: string | number): void {
+  const n = Math.trunc(Number(v));
+  if (Number.isNaN(n)) return;
+  patch({ maxReturns: Math.min(MAX_RETURNS, Math.max(minReturns.value, n)) });
 }
 const id = (k: string): string => `ade-wf-step-${k}-${props.step.id}`;
 const isStart = computed(() => props.steps[0]?.id === props.step.id);
@@ -183,6 +200,23 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-timeout"
         @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
       />
+      <Label :for="id('max-returns')">{{
+        t('space.ade.workflows.stepInspector.maxReturns.label')
+      }}</Label>
+      <Input
+        :id="id('max-returns')"
+        type="number"
+        :min="minReturns"
+        :max="MAX_RETURNS"
+        :model-value="step.maxReturns"
+        size="kira"
+        class="w-14"
+        data-testid="ade-wf-step-max-returns"
+        @update:model-value="onReturns"
+      />
+      <span class="text-subtle" data-testid="ade-wf-step-max-returns-hint">{{
+        t('space.ade.workflows.stepInspector.maxReturns.hint')
+      }}</span>
     </div>
     <SecondaryTabs
       :model-value="mode"

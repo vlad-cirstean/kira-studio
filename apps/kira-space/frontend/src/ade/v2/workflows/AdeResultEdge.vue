@@ -76,9 +76,7 @@ const geometry = computed(() => {
   pts.push({ x, y: ty - HALF_GAP }, { x: tx, y: ty - HALF_GAP }, { x: tx, y: ty });
   return { path: smoothCorners(pts), x: sx, y: sy + DROP, anchor: 'centre' };
 });
-const label = computed(
-  () => `${d.value.results.join(', ')}${d.value.loop ? ` ↩ ≤${d.value.max}` : ''}`,
-);
+const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ' ↩' : ''}`);
 </script>
 
 <template>
