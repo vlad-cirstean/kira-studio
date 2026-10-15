@@ -193,7 +193,7 @@ type Stage struct {
 func (s *Stage) FillReturnLimits() {
 	for i := range s.Steps {
 		if st := &s.Steps[i]; st.MaxReturns == 0 && st.Review == nil {
-			st.MaxReturns = LegacyLimit(string(st.OnFailure), false)
+			st.MaxReturns = LegacyLimit(st.OnFailure, false)
 		}
 	}
 }

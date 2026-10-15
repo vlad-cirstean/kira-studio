@@ -710,53 +710,60 @@ func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultN
 		if rn == nil {
 			continue
 		}
-		sp := prefixes[si]
-		forward := false
-		legacy := 0 // largest result max declared on a loop route (a file from before max_returns)
-		for ri := range rn.list {
-			r := &rn.list[ri]
-			rp := fmt.Sprintf("%sresult %d: ", sp, ri+1)
-			node := cmpNode(rn.next[ri], rn.node)
-			loop := false
-			switch r.Next {
-			case adewire.RouteNext, adewire.RouteEnd:
-			case adewire.RouteStop:
-				if r.OK {
-					v.fail(node, rp, "stop is only allowed on a result that is not ok")
-					return
-				}
-			default:
-				target, known := index[r.Next]
-				if !known {
-					v.fail(node, rp, "next must be next, end, stop or a step id of this stage")
-					return
-				}
-				loop = target <= si
-			}
-			forward = forward || !loop
-			r.Loop = loop
-			m, ok := v.legacyMax(rn.max[ri], rp, loop, explicit[si])
-			if !ok {
-				return
-			}
-			legacy = max(legacy, m)
-		}
-		if !forward {
-			v.fail(rn.node, sp, "at least one result must lead forward, or the stage can never finish")
+		if !v.resolveStepRoutes(steps, index, si, rn, prefixes[si], explicit[si]) {
 			return
 		}
-		review := steps[si].Review != nil
-		if !explicit[si] {
-			steps[si].MaxReturns = adewire.DefaultLimit(review)
-			if legacy > 0 {
-				steps[si].MaxReturns = legacy
-			}
-		}
-		if rule, ok := adewire.LegacyOnFailure(steps[si].ID, rn.list, stepIDs(steps[:si]), steps[si].MaxReturns, review); ok {
-			steps[si].OnFailure = rule
-		}
-		steps[si].Results = rn.list
 	}
+}
+
+// resolveStepRoutes resolves one step's results; false means a violation was recorded.
+func (v *validator) resolveStepRoutes(steps []adewire.PipelineStep, index map[string]int, si int, rn *resultNodes, sp string, explicit bool) bool {
+	forward := false
+	legacy := 0 // largest result max declared on a loop route (a file from before max_returns)
+	for ri := range rn.list {
+		r := &rn.list[ri]
+		rp := fmt.Sprintf("%sresult %d: ", sp, ri+1)
+		node := cmpNode(rn.next[ri], rn.node)
+		loop := false
+		switch r.Next {
+		case adewire.RouteNext, adewire.RouteEnd:
+		case adewire.RouteStop:
+			if r.OK {
+				v.fail(node, rp, "stop is only allowed on a result that is not ok")
+				return false
+			}
+		default:
+			target, known := index[r.Next]
+			if !known {
+				v.fail(node, rp, "next must be next, end, stop or a step id of this stage")
+				return false
+			}
+			loop = target <= si
+		}
+		forward = forward || !loop
+		r.Loop = loop
+		m, ok := v.legacyMax(rn.max[ri], rp, loop, explicit)
+		if !ok {
+			return false
+		}
+		legacy = max(legacy, m)
+	}
+	if !forward {
+		v.fail(rn.node, sp, "at least one result must lead forward, or the stage can never finish")
+		return false
+	}
+	review := steps[si].Review != nil
+	if !explicit {
+		steps[si].MaxReturns = adewire.DefaultLimit(review)
+		if legacy > 0 {
+			steps[si].MaxReturns = legacy
+		}
+	}
+	if rule, ok := adewire.LegacyOnFailure(steps[si].ID, rn.list, stepIDs(steps[:si]), steps[si].MaxReturns, review); ok {
+		steps[si].OnFailure = rule
+	}
+	steps[si].Results = rn.list
+	return true
 }
 
 // legacyMax reads a result's max, a budget from before max_returns: only on a loop route, and not beside
