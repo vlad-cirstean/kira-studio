@@ -15,9 +15,9 @@ import (
 
 // enforceEnv is a fake home with a repo, a linked worktree on branch task/a and a second branch.
 type enforceEnv struct {
-	home, repo, wt, other string
-	pol                   Policy
-	rt                    Runtime
+	home, repo, wt string
+	pol            Policy
+	rt             Runtime
 }
 
 func gitIn(t *testing.T, dir string, args ...string) {
