@@ -119,7 +119,9 @@ test('an edited message is sent and Reset restores the default', async ({ relaun
   await page.locator(cellAction('T_alerts', 'run')).click();
   const dialog = page.locator(t('ade-run-dialog'));
   const msg = dialog.locator(t('ade-run-message'));
-  await expect(msg).not.toHaveValue('');
+  await expect(msg).toHaveValue(/Plan from spec/);
+  // The finish_step suffix lands from a second query and is stripped from the editable text.
+  await expect(msg).not.toHaveValue(/finish_step/);
   const original = await msg.inputValue();
   await msg.fill('Do it differently');
   await dialog.locator(t('ade-run-reset')).click();
