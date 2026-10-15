@@ -5437,7 +5437,7 @@
         "description": "A paragraph that tells Claude to treat the document text as data and never follow instructions found inside it.",
         "title": "Untrusted input notice",
         "usedBy": {
-          "body": "Included in the memory gate, reconcile, distill, import finalize and import verify prompts."
+          "body": "Included in the memory gate, reconcile, import extract and import finalize prompts."
         }
       },
       "memoryDistillSystem": {
@@ -5445,13 +5445,6 @@
         "title": "Distill",
         "usedBy": {
           "body": "Sent as the system prompt for each chunk while a memory import reads a file, and by the distill tool of the memory MCP server."
-        }
-      },
-      "memoryFactStyle": {
-        "description": "A paragraph that tells Claude to write stored facts and reasons in telegraphic style. Numbers, names, negations and qualifiers stay.",
-        "title": "Fact style",
-        "usedBy": {
-          "body": "Added to every memory prompt that writes a stored fact. These are the gate, reconcile, distill, import extract, import finalize and import verify prompts."
         }
       },
       "memoryGateSystem": {
