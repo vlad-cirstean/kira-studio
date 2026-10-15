@@ -13,9 +13,9 @@ test('workflow graph editor with branching results', async ({ relaunch }) => {
   const tests = fx.workflows[0]?.workflow.stages[1]?.steps.find((s) => s.id === 'tests');
   if (tests)
     tests.results = [
-      { id: 'passed', ok: true, description: 'Tests pass.', next: 'next', max: 0 },
-      { id: 'changes', ok: false, description: 'Needs work.', next: 'impl', max: 3 },
-      { id: 'trivial', ok: true, description: 'Nothing to test.', next: 'end', max: 0 },
+      { id: 'passed', ok: true, description: 'Tests pass.', next: 'next', loop: false },
+      { id: 'changes', ok: false, description: 'Needs work.', next: 'impl', loop: true },
+      { id: 'trivial', ok: true, description: 'Nothing to test.', next: 'end', loop: false },
     ];
   const { window } = await openPlan(relaunch, [{ channel: IPC.adeTaskWorkflows, response: fx }]);
   await window.setViewportSize({ width: 1400, height: 1750 });
@@ -32,34 +32,34 @@ test('workflow graph editor with branching results', async ({ relaunch }) => {
 test('workflow graph editor branches, skips and nested loops', async ({ relaunch }) => {
   const fx = adeFixture<Fx>('workflows');
   const steps = fx.workflows[0]?.workflow.stages[1]?.steps;
-  const route = (id: string, results: [string, boolean, string, number][]): void => {
+  const route = (id: string, results: [string, boolean, string, boolean][]): void => {
     const step = steps?.find((s) => s.id === id);
     if (step)
-      step.results = results.map(([rid, ok, next, max]) => ({
+      step.results = results.map(([rid, ok, next, loop]) => ({
         id: rid,
         ok,
         description: '',
         next,
-        max,
+        loop,
       }));
   };
   route('plan', [
-    ['left', true, 'impl', 0],
-    ['right', true, 'tests', 0],
-    ['skip', true, 'end', 0],
+    ['left', true, 'impl', false],
+    ['right', true, 'tests', false],
+    ['skip', true, 'end', false],
   ]);
   route('impl', [
-    ['done', true, 'ci', 0],
-    ['retry', false, 'impl', 2],
+    ['done', true, 'ci', false],
+    ['retry', false, 'impl', true],
   ]);
-  route('tests', [['done', true, 'ci', 0]]);
+  route('tests', [['done', true, 'ci', false]]);
   route('ci', [
-    ['done', true, 'pr', 0],
-    ['failed', false, 'impl', 3],
+    ['done', true, 'pr', false],
+    ['failed', false, 'impl', true],
   ]);
   route('pr', [
-    ['done', true, 'end', 0],
-    ['failed', false, 'plan', 2],
+    ['done', true, 'end', false],
+    ['failed', false, 'plan', true],
   ]);
   const { window } = await openPlan(relaunch, [{ channel: IPC.adeTaskWorkflows, response: fx }]);
   await window.setViewportSize({ width: 1400, height: 1750 });

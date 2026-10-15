@@ -109,8 +109,7 @@ test('an edit lays the graph out again', async ({ relaunch }) => {
   const page = await open(relaunch);
   const end = page.locator(t('ade-wf-end-node')).first();
   const endBefore = await box(end);
-  await page.locator(`${t('ade-wf-strip-chip')}[data-stage-id="impl"]`).click();
-  await page.locator(t('ade-wf-add-step')).click();
+  await page.locator(`${t('ade-wf-add-step')}[data-stage-id="impl"]`).click();
   const fresh = page.locator(`${t('ade-wf-node')}[data-step-id^="step-"]`);
   await expect(fresh).toHaveCount(1);
   const pr = await box(node(page, 'pr'));

@@ -102,7 +102,10 @@ test('workflows page, editor and inspectors', async ({ relaunch }) => {
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
   await page.locator(t('ade-wf-row')).first().click();
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
-  await page.locator(t('ade-wf-strip-chip')).first().click();
+  await page
+    .locator(t('ade-wf-stage-node'))
+    .first()
+    .click({ position: { x: 8, y: 8 } });
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });
   await page.locator(t('ade-wf-node')).first().click();
   await expectCatalogText(page.locator(t('ade-workflows')), { allow });

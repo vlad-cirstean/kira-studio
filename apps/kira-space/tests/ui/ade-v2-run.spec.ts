@@ -234,22 +234,24 @@ test('a send-back shows on the step line with its loop and note', async ({ relau
 
 // Same scenario as the flows/adeflow branching test: a review step whose `changes` result loops back to
 // Implement, here with the stored run outcome the backend writes.
-function branchingWorkflows(max = 3): ControlSnapshot {
+function branchingWorkflows(maxReturns = 3): ControlSnapshot {
   const fx = adeFixture<{
     workflows: {
-      workflow: { stages: { steps: { id: string; results: unknown[] }[] }[] };
+      workflow: { stages: { steps: { id: string; maxReturns: number; results: unknown[] }[] }[] };
     }[];
   }>('workflows');
   const steps = fx.workflows[0]?.workflow.stages[1]?.steps ?? [];
-  // The fixture's other back edge to Implement (ci, max 3) would set the budget instead.
+  // The fixture's other back edge to Implement (ci) is dropped so only the review-style step loops.
   const ci = steps.find((x) => x.id === 'ci');
-  if (ci) ci.results = [{ id: 'done', ok: true, description: '', next: 'next', max: 0 }];
+  if (ci) ci.results = [{ id: 'done', ok: true, description: '', next: 'next', loop: false }];
   const tests = steps.find((x) => x.id === 'tests');
-  if (tests)
+  if (tests) {
+    tests.maxReturns = maxReturns;
     tests.results = [
-      { id: 'approved', ok: true, description: '', next: 'next', max: 0 },
-      { id: 'changes', ok: false, description: '', next: 'impl', max },
+      { id: 'approved', ok: true, description: '', next: 'next', loop: false },
+      { id: 'changes', ok: false, description: '', next: 'impl', loop: true },
     ];
+  }
   return { channel: IPC.adeTaskWorkflows, response: fx };
 }
 
@@ -276,7 +278,7 @@ test('a result that loops back shows its route on the step and the sent-back lin
   await open(page, 'T_push');
   const impl = stage(page, 'impl');
   await expect(
-    impl.locator(t('ade-step-route')).filter({ hasText: 'changes ↩ Implement (max 3)' }),
+    impl.locator(t('ade-step-route')).filter({ hasText: 'changes ↩ Implement' }),
   ).toHaveCount(1);
   await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
 });
@@ -304,17 +306,15 @@ function placeRun(b: AdeBoardFx, stepId: string, from: ContractRun): void {
   });
 }
 
-test("contract: a fix round counts against its result's loop budget", async ({ relaunch }) => {
+test("contract: a fix round counts against the step's return limit", async ({ relaunch }) => {
   const rerun = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#impl-rerun');
   const back = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#review-back');
   const { workflows } = contract<{
     workflows: {
-      workflow: { stages: { steps: { id: string; results: { max: number }[] }[] }[] };
+      workflow: { stages: { steps: { id: string; maxReturns: number }[] }[] };
     }[];
   }>('ade-branching', 'AdeTaskService.Workflows');
-  const budget = workflows[0]?.workflow.stages[0]?.steps
-    .find((s) => s.id === 'review')
-    ?.results.find((r) => r.max > 0)?.max;
+  const budget = workflows[0]?.workflow.stages[0]?.steps.find((s) => s.id === 'review')?.maxReturns;
   expect(budget).toBe(2);
   const { window: page } = await openPlan(relaunch, [
     branchingWorkflows(budget),

@@ -129,7 +129,9 @@ interface WorkflowsFx {
 async function openStep(page: Page, step: string, stage = 'impl'): Promise<void> {
   await page.locator(t('ade-tab-workflows')).click();
   await page.locator(t('ade-workflows')).waitFor();
-  await page.locator(`${t('ade-wf-strip-chip')}[data-stage-id="${stage}"]`).click();
+  await page
+    .locator(`${t('ade-wf-stage-node')}[data-stage-id="${stage}"]`)
+    .click({ position: { x: 8, y: 8 } });
   await page.locator(`${t('ade-wf-node')}[data-step-id="${step}"]`).click();
   await expect(page.locator(t('ade-wf-step-sandbox'))).toBeVisible();
 }

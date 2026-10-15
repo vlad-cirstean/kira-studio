@@ -25,8 +25,8 @@ test('workflow graph with a review step', async ({ relaunch }) => {
     tests.prompt = '';
     tests.review = { sendTo: 'implementer', implementer: '' };
     tests.results = [
-      { id: 'approved', ok: true, description: '', next: 'next', max: 0 },
-      { id: 'rejected', ok: false, description: '', next: 'stop', max: 0 },
+      { id: 'approved', ok: true, description: '', next: 'next', loop: false },
+      { id: 'rejected', ok: false, description: '', next: 'stop', loop: false },
     ];
   }
   const { window } = await openPlan(relaunch, [{ channel: IPC.adeTaskWorkflows, response: fx }]);
