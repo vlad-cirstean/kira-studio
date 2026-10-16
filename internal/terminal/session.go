@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/signal"
 	"sort"
 	"sync"
 	"syscall"
@@ -94,6 +95,7 @@ func (s *Session) Shell() string { return s.shell }
 // stays login and interactive either way, so a launched command sees the same PATH a plain
 // terminal in this app sees.
 func newSession(p OpenParams) (*Session, error) {
+	handleIgnoredSighup()
 	shellPath := loginShell()
 	args := []string{"-l", "-i"}
 	if p.Command != "" {
@@ -136,6 +138,20 @@ func newSession(p OpenParams) (*Session, error) {
 		onEnd:  p.OnEnd,
 		done:   make(chan struct{}),
 	}, nil
+}
+
+var sighupOnce sync.Once
+
+// handleIgnoredSighup keeps shells hangable when the app itself started with SIGHUP ignored (nohup,
+// a detached launcher): an ignored signal survives exec, so every shell would ignore the hang-up
+// Close relies on and its jobs would outlive the tab. A handled signal resets to default at exec.
+// Skipped when SIGHUP is not ignored, so the app's own SIGHUP behaviour stays as it was.
+func handleIgnoredSighup() {
+	sighupOnce.Do(func() {
+		if signal.Ignored(syscall.SIGHUP) {
+			signal.Notify(make(chan os.Signal, 1), syscall.SIGHUP)
+		}
+	})
 }
 
 // readLoop is the one reader goroutine per session (§4 rule 1): an io.Reader loop over ptmx into
