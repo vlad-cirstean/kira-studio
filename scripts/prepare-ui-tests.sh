@@ -1,7 +1,8 @@
 #!/bin/sh
 # prepare-ui-tests.sh — fetches the Playwright webkit browser plus the exact system packages it
 # needs, so `bun run test:ui:*` works in a fresh worktree/container (see docs/DEV_ENVIRONMENT.md,
-# "Playwright UI tier"). Chromium is pre-configured; this never touches it. Never runs
+# "Playwright UI tier"). Also fetches the chromium headless shell `ipc-frontend` and `e2e-real`
+# need (the preinstalled chromium is an older build than the repo's Playwright wants). Never runs
 # `playwright install-deps` (pulls far more than webkit needs). Idempotent. Skip: KIRA_SKIP_WEBKIT=1.
 # Failure (offline, apt error) warns with the manual command and still exits 0.
 set -eu
@@ -60,6 +61,21 @@ else
   # Env may set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 for chromium; override for this explicit install.
   (cd "$ROOT_DIR" && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 bunx playwright install webkit) ||
     warn "playwright install webkit failed"
+fi
+
+# ---- chromium headless shell ---------------------------------------------------------------------
+have_shell() {
+  _loc="$(cd "$ROOT_DIR" && bunx playwright install --dry-run --only-shell chromium 2>/dev/null |
+    awk '/Install location:/ {print $3; exit}')"
+  [ -n "$_loc" ] && [ -d "$_loc" ]
+}
+
+if have_shell; then
+  echo "prepare-ui-tests: chromium headless shell already present, skipping"
+else
+  echo "prepare-ui-tests: bunx playwright install --only-shell chromium"
+  (cd "$ROOT_DIR" && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 bunx playwright install --only-shell chromium) ||
+    warn "playwright install chromium headless shell failed"
 fi
 
 echo "prepare-ui-tests: done"
