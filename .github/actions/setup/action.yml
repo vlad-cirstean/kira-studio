@@ -56,7 +56,6 @@ runs:
       shell: bash
       run: bun install --frozen-lockfile
     - name: Cache wails3 CLI (go.mod-keyed, OS-specific binary)
-      id: wails3
       if: inputs.bindings == 'true'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
@@ -70,8 +69,8 @@ runs:
           apps/kira-studio/frontend/bindings
           apps/kira-studio/.task
         key: wails-bindings-${{ hashFiles('go.mod') }}
-    - name: Install GTK4/WebKitGTK headers (cgo builds, and building the wails3 CLI on a cache miss; bindings output is identical without them)
-      if: runner.os == 'Linux' && (inputs.gtk == 'true' || (inputs.bindings == 'true' && steps.wails3.outputs.cache-hit != 'true'))
+    - name: Install GTK4/WebKitGTK headers (cgo builds; also needed at runtime to even invoke a cached wails3 binary for its version check, not just to build one on a cache miss)
+      if: runner.os == 'Linux' && (inputs.gtk == 'true' || inputs.bindings == 'true')
       shell: bash
       run: |
         sudo apt-get update
