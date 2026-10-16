@@ -58,6 +58,9 @@ main() {
 
   # cleanup is the only exit path (trap cleanup EXIT, §2.4). $? is captured first, before anything
   # else here can overwrite it.
+  # Called only via trap cleanup EXIT below; shellcheck's static flow doesn't trace
+  # trap-registered functions, so it misreads this as dead code.
+  # shellcheck disable=SC2317,SC2329
   cleanup() {
     STATUS=$?
 
