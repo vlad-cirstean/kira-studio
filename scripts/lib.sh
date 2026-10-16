@@ -57,3 +57,43 @@ pinned_wails_version() {
 go_directive() {
   awk '/^go /{print $2; exit}' "$ROOT_DIR/go.mod"
 }
+
+# pull_images <label> <mirror 0|1> <image>... — pulls every image in parallel; returns 1 if any
+# failed. Mirror mode pulls mirror.gcr.io/<path> (docs/DEV_ENVIRONMENT.md: Docker Hub blob CDN is
+# blocked in the sandbox) and re-tags it to the plain name; an unnamespaced image lives under
+# library/ there. Fatal on failure by the callers' choice: a mid-run pull failure reads worse than
+# a pre-flight one.
+pull_images() {
+  _label="$1"
+  _mirror="$2"
+  shift 2
+  [ $# -gt 0 ] || return 0
+  _dir="$(mktemp -d)"
+  _n=0
+  for _img in "$@"; do
+    _n=$((_n + 1))
+    (
+      if [ "$_mirror" = "1" ]; then
+        case "$_img" in
+          */*) _src="mirror.gcr.io/$_img" ;;
+          *) _src="mirror.gcr.io/library/$_img" ;;
+        esac
+        docker pull -q "$_src" >/dev/null 2>"$_dir/$_n.err" && docker tag "$_src" "$_img" 2>>"$_dir/$_n.err"
+      else
+        docker pull -q "$_img" >/dev/null 2>"$_dir/$_n.err"
+      fi
+    ) &
+    echo "$! $_img" >>"$_dir/pids"
+  done
+  _failed=0
+  while read -r _pid _img; do
+    if wait "$_pid"; then
+      echo "$_label: pulled $_img"
+    else
+      echo "$_label: FAILED to pull $_img" >&2
+      _failed=1
+    fi
+  done <"$_dir/pids"
+  rm -rf "$_dir"
+  return "$_failed"
+}

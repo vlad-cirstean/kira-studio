@@ -103,46 +103,13 @@ if [ -z "$FILTERED" ]; then
   exit 2
 fi
 
-# --- docs/DEV_ENVIRONMENT.md's mirror.gcr.io workaround: pull the mirrored name, retag it locally
-# The rule: an unnamespaced official image (postgres, mysql, mariadb, mongo, redis) lives under
-# library/ on the real registry, so the mirror path needs that prefix; an already-namespaced one
-# (clickhouse/clickhouse-server, confluentinc/cp-kafka, localstack/localstack) mirrors at the same
-# path with no library/ inserted.
-mirror_path_for() {
-  case "$1" in
-    postgres:*|mysql:*|mariadb:*|mongo:*|redis:*) echo "library/$1" ;;
-    *) echo "$1" ;;
-  esac
-}
-
-pull_image() {
-  image="$1"
-  if [ "$NO_PULL" = "1" ]; then
-    return 0
-  fi
-  if [ "$MIRROR" = "1" ]; then
-    mirror_path="$(mirror_path_for "$image")"
-    echo "db-compat: pulling mirror.gcr.io/$mirror_path -> $image"
-    docker pull "mirror.gcr.io/$mirror_path"
-    docker tag "mirror.gcr.io/$mirror_path" "$image"
-  else
-    echo "db-compat: pulling $image"
-    docker pull "$image"
-  fi
-}
-
-# Unique images across the filtered rows' env assignments, pulled once each up front (§6.2: "pull
-# first, all of it, before running anything" — a mid-run pull failure is much harder to read than
-# a pre-flight one).
+# Unique images across the filtered rows' env assignments, pulled once each up front, in parallel
+# (§6.2: "pull first, all of it, before running anything" — a mid-run pull failure is much harder
+# to read than a pre-flight one). --mirror: see pull_images in lib.sh.
 if [ "$NO_PULL" != "1" ]; then
   IMAGES="$(printf '%s' "$FILTERED" | cut -d'|' -f4 | tr ' ' '\n' | cut -d'=' -f2- | sort -u)"
-  IFS='
-'
-  for image in $IMAGES; do
-    [ -z "$image" ] && continue
-    pull_image "$image"
-  done
-  IFS="$OLDIFS"
+  # shellcheck disable=SC2086
+  pull_images db-compat "$MIRROR" $IMAGES || exit 1
 fi
 
 # --- run every pair, recording pass/fail without letting one abort the rest -------------------

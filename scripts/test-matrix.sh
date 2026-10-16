@@ -71,40 +71,10 @@ if [ -z "$FILTERED" ]; then
   exit 2
 fi
 
-# --- docs/DEV_ENVIRONMENT.md's mirror.gcr.io workaround: pull the mirrored name, retag it locally
-# The rule, identical to db-compat.sh's own: an unnamespaced official image (postgres, mysql,
-# mariadb, mongo, redis) lives under library/ on the real registry; an already-namespaced one
-# (clickhouse/clickhouse-server, confluentinc/cp-kafka, localstack/localstack) mirrors at the same
-# path with no library/ inserted.
-mirror_path_for() {
-  case "$1" in
-    postgres:*|mysql:*|mariadb:*|mongo:*|redis:*) echo "library/$1" ;;
-    *) echo "$1" ;;
-  esac
-}
-
-pull_image() {
-  image="$1"
-  if [ "$MIRROR" = "1" ]; then
-    mirror_path="$(mirror_path_for "$image")"
-    echo "test-matrix: pulling mirror.gcr.io/$mirror_path -> $image"
-    docker pull "mirror.gcr.io/$mirror_path"
-    docker tag "mirror.gcr.io/$mirror_path" "$image"
-  else
-    echo "test-matrix: pulling $image"
-    docker pull "$image"
-  fi
-}
-
 if [ "$NO_PULL" != "1" ]; then
   IMAGES="$(printf '%s' "$FILTERED" | cut -d'|' -f3 | tr ' ' '\n' | sort -u)"
-  IFS='
-'
-  for image in $IMAGES; do
-    [ -z "$image" ] && continue
-    pull_image "$image"
-  done
-  IFS="$OLDIFS"
+  # shellcheck disable=SC2086
+  pull_images test-matrix "$MIRROR" $IMAGES || exit 1
 fi
 
 # --- run every adapter's matrix, recording pass/fail without letting one abort the rest --------
