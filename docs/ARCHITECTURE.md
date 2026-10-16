@@ -2993,7 +2993,7 @@ release-page behavior with this dialog, the deliberate behavior change P119's ow
   (`singleflight.Group` collapses concurrent callers — multiple windows share one in-flight
   request), so the actual network cadence is Go's, not the renderer's.
 - **A failed check is silence, not a surface.** A network error, a `404` (no published release —
-  `release.yml` creates every release as a draft a human publishes by hand; a draft is invisible to
+  `release.yml` publishes only after every gate and asset check passed; a draft is invisible to
   `/releases/latest` by construction), and a `403` (rate-limited) are all the same outcome: no
   item, no error dialog, no console output, logged at debug level and nothing more.
 - **The install itself: a detached, staged hand-off (`internal/appupdate.Installer`).** Clicking

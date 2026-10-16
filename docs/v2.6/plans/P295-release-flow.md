@@ -282,3 +282,29 @@ Trade-off accepted: the macOS build no longer waits for tests, so a failing gate
 - **Draft early in the build job, publish at the end**: leaves drafts on every gate failure.
 - **One `gh release create` without `--draft`**: no point to verify digests before the release is visible.
 - **Developer ID signing / notarisation work**: none runs today (ad-hoc only, deferred by SPEC §3); nothing to cut.
+
+## Result
+
+Implemented per section 8. Commits: parallel pull (`dc6daa1d`), release gate (`410a490e`), setup action
+`cache-save` (`346d9d84`), pending patch (`cbb4ed76`), docs (this commit).
+
+Before numbers: section 1 (runs 10/11: tag to done 31m00s / 29m10s).
+
+After: pending first run. Not measurable here.
+
+Verified in this sandbox:
+- `scripts/release-ci-gate.sh --dry-run`: `bd0c2246` exit 0 (run 38887837248), `a2b96b9` exit 1 (failed
+  run 38739871624), `85a8f34` exit 3 (would dispatch).
+- `sh scripts/db-compat.sh --only redis --min --mirror` PASS in 21.6s total; `sh scripts/test-matrix.sh
+  --only redis --mirror` PASS in 20.5s total. `pull_images` with 2 images plus 1 bad name: 16s, exit 1,
+  failing image named.
+- Patch: `git apply --check` ok on clean tree; actionlint v1.7.7 clean on the patched file; YAML parses.
+  `action.yml` YAML parses; the `cache-save: true` branch equals the old steps plus one `&&` clause.
+- `sh -n` ok on the three scripts; shellcheck not installed.
+- Deviation: `publish` fetches the DMGs with `gh run download` (needs `actions: read`) instead of
+  `actions/download-artifact`; no verified pin for that action was reachable from this session.
+
+Unverifiable until a real run: every section 5 timing; main-scope cache hits on a tag; asset `digest`
+timing; `--prerelease` and `make_latest`; the gate's dispatch path; `gh run download` and `--verify-tag`
+under `GITHUB_TOKEN`. Apply the patch, run "Release" by `workflow_dispatch` with `version: 0.0.0-test`
+for after timings; the first real tag proves `publish`.
