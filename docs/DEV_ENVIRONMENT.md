@@ -88,14 +88,10 @@ needs.
 - **Docker Hub blob downloads are blocked here.** `production.cloudfront.docker.com` (the CDN every
   Hub blob redirects to) and `quay.io` both 403 through the outbound proxy, so a direct pull
   resolves the manifest but never fetches a layer. **`mirror.gcr.io` is not blocked** —
-  `packages/db-fixtures/support/*.ts` hardcode plain Hub names, so pull the mirrored name once per
-  session and re-tag it locally rather than editing source:
-  ```
-  docker pull mirror.gcr.io/library/mariadb:11.4   # official (unnamespaced) image: needs library/
-  docker tag mirror.gcr.io/library/mariadb:11.4 mariadb:11.4
-  docker pull mirror.gcr.io/confluentinc/cp-kafka:8.0.7   # already namespaced: no library/ prefix
-  docker tag mirror.gcr.io/confluentinc/cp-kafka:8.0.7 confluentinc/cp-kafka:8.0.7
-  ```
+  the test fixtures use plain Hub names. Run `bun run test:images` once per session: it pulls every
+  pinned image from the mirror in parallel (60s cold, 7.5 GB) and re-tags it to the plain name. The list
+  comes from `testsupport.Images()`. `alpine:3.20` and `bash:5.2` keep only their `mirror.gcr.io/library/`
+  name: a second plain tag on the same image fails `dockerflow` `TestImageRegistryURL`.
   Rule: a Docker Hub *official* image (no namespace — `mariadb`, `mysql`, `postgres`, `redis`,
   `mongo`) lives under `library/` on the real registry, so the mirror path needs that prefix. An
   already-namespaced image (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`,
@@ -532,6 +528,14 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
 
 ## Load, disk and test scope (P236-P251)
 
+- **Test speed on this box (P294).** 4 cores. Go: `bun run test:go:containers` (81s) and `bun run test:go:rest`
+  (134s) split `go test ./...` for CI; leave `-count=1` off to reuse the test cache. `ade` (44s) never caches.
+  `--project=ui` costs about 10 min (546 tests); `--shard=1/2` and `2/2` cost about 5 min each. Re-run failures with
+  `playwright test --last-failed`; `--only-changed=<ref>` selects spec and support files only, since app code is a
+  built bundle. Hooks run no UI test: pre-commit lints and typechecks only the staged files (full run when config,
+  a lockfile, `scripts/` or a shared package changed), pre-push builds, lints and tests only changed Go packages.
+  `sh scripts/prepare-ui-tests.sh` also installs the chromium headless shell `ipc-frontend` needs.
+- **`nohup` makes SIGHUP ignored, and children inherit it.** The terminal package resets that for its shells (P294). Other code relying on a hang-up misbehaves in a `nohup` run.
 - **Run one heavy suite at a time.** The sandbox has 4 CPUs. Two Go suites, or a Go suite beside Playwright,
   push load above 20. The specs that still fail under load are listed in `ARCHITECTURE.md` Known open items;
   rerun one of those alone before calling it broken.

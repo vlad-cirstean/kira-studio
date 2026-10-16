@@ -345,4 +345,56 @@ Each commit lands as its step completes, so an interrupted run resumes from the 
 
 ## Result
 
-Pending implementation.
+Commits (branch v2.6): `5f23b27` image printer and pull script, `07c4117` Go split, `236c125` composite action,
+`5fa38ac` + `1193efa` pending `pr.yml` patch, `e65856d` headless shell, `589e98c` dockerflow fix, `54d6136`
+terminal fix, `8249b96` scoped hooks, then docs. Not pushed.
+
+Changes against the plan, from user decisions during the run:
+
+- `ui` runs in 2 shards, not 4. Measured alone on this box: 304s and 321s, 273 tests each (balance within 3% of
+  the mean). CI estimate per shard: about 4 min tests plus 1.3 min setup.
+- The image tar cache stays (`go-containers` restores it, loads it in the background beside setup). The parallel
+  pull script runs only on a cache miss, then the tar is saved as before. Existing cache keys and paths are kept;
+  setup-go's `go.sum`-keyed cache is replaced by `gomod-*` (module cache) plus per-job `gobuild-*` entries.
+- CI runs the full suite on every PR: no path filters, no skipped jobs.
+- Hooks scope to changed files (item 3 of the user decisions); see the PERF table.
+- Ryuk image not pulled: `go-containers` sets `TESTCONTAINERS_RYUK_DISABLED=true`.
+- `scripts/pull-test-images.sh` pulls `alpine:3.20` and `bash:5.2` under the mirror name only (C9, below).
+
+C9 root causes (both differ from the plan's guess):
+
+- `TestImageRegistryURL`: not the containerd store. This box also carried a plain `alpine:3.20` tag (from the
+  manual pull/tag recipe), so the registry-link logic picked the implied Hub name. With the plain tag removed
+  the test passes unchanged. The script no longer creates that tag. No test change.
+- Terminal pair: the full suite ran under `setsid nohup`, which leaves SIGHUP ignored; the shells inherited it, so
+  `Close` never hung them up (SigIgn bit 1 in the failure dump). Product bug too (app started via `nohup`). Fix in
+  `internal/terminal/session.go`: when SIGHUP is ignored at start, install a handler so the exec resets it to
+  default. Verified: 5 runs of both tests under `nohup`, whole package under `nohup`, `rest` suite green.
+  Plain runs with 8 busy loops never failed (`-count=40`), so load was not the cause.
+
+### Before and after, this box
+
+| Item | Before | After |
+|---|---|---|
+| Pull 11 images, cold | 83s (manual) | 60s (`bun run test:images`) |
+| Go containers, `-count=1` | 76s (`-p 4`, part of 218s) | 81s, all green |
+| Go rest, `-count=1` | 151s | 134s, all green (terminal pair fixed) |
+| Go rerun, no changes | 218s | containers 1.5s; rest 114s (`ade` 44s and `theme/i18n` are never cached) |
+| `ui` | 598s one run | 304s + 321s (2 shards, run alone) |
+| `ipc-frontend` | 7 of 7 fail | 7 passed, 11s |
+| Pre-commit docs-only / Go-only / studio frontend | 43s warm | 0.5s / 0.1s / 56s |
+| Pre-push, Go-only range | 12s | 10s with tests of the changed package |
+
+Not met: the "under 30s cached" Go target (`ade` and `i18n` do not cache; not investigated further). Frontend
+commits get no hook speedup (the lint rules take 17s and the changed projects must typecheck).
+No `shellcheck` on this box: the two scripts are only `sh -n` checked. The patch passes `git apply --check`
+and actionlint v1.7.7 clean.
+
+### CI (pending: needs the patch applied from a Mac session and two PR runs)
+
+Estimates, not measured. Run wall: 15m47s before, about 6 min warm after (slowest ui shard about 5.3 min incl.
+setup). Billed Linux runner-minutes, run 22 before: `wails-linux-cli` 1.6 + `checks (Linux)` 4.2 + `ui` 9.8 +
+`container-tests` 9.3 = 24.9 (plus macOS 3.3). After, estimate: `checks (Linux)` 3.2 + 2 ui shards 2 x 5.3 +
+`ui-extra` 2.7 + `go` 4.3 + `go-containers` 3 = 23.8 (plus macOS 3.3). Billed time stays about equal; wall time
+drops by about 60%. Per-job rounding up to whole minutes adds about 3 min to the after figure. Cold-cache runs
+add about 1.5 min per job. Also recheck run 22's `mode-switch.spec.ts:339` failure on the new graph.
