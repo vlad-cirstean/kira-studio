@@ -351,7 +351,9 @@ terminal fix, `8249b96` scoped hooks, then docs. Not pushed.
 
 Changes against the plan, from user decisions during the run:
 
-- `ui` runs in 2 shards, not 4. Measured alone on this box: 304s and 321s, 273 tests each (balance within 3% of
+- `ui` first shipped in 2 shards, then moved back to 4 by user decision (follow-up patch
+  `docs/pending-changes/.github__workflows__pr.yml.patch`; per-shard time about half the 2-shard figures,
+  not re-measured). Measured alone with 2 shards on this box: 304s and 321s, 273 tests each (balance within 3% of
   the mean). CI estimate per shard: about 4 min tests plus 1.3 min setup.
 - The image tar cache stays (`go-containers` restores it, loads it in the background beside setup). The parallel
   pull script runs only on a cache miss, then the tar is saved as before. Existing cache keys and paths are kept;

@@ -1815,7 +1815,7 @@ Measured on this box (4 cores, 15 GB, Docker 29, real WebKit). Plan and method:
 | Go containers packages, `-count=1` | in `go test ./...`, 218s total | `bun run test:go:containers` 81s |
 | Go other packages, `-count=1` | same | `bun run test:go:rest` 134s |
 | Go rerun, no changes | 218s | containers 1.5s (cached); rest 114s (`ade` 44s and `i18n` never cache) |
-| Playwright `ui`, 4 workers | 598s, 546 tests | 2 shards 304s + 321s, 273 tests each |
+| Playwright `ui`, 4 workers | 598s, 546 tests | 2 shards 304s + 321s, 273 tests each (CI later moved to 4 shards, not re-measured) |
 | Playwright `ipc-frontend` | 7 of 7 fail, missing headless shell | 7 passed, 11s |
 | Pre-commit, docs-only commit | 43s | 0.5s |
 | Pre-commit, Go-only commit | 43s | 0.1s |

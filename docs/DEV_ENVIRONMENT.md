@@ -530,7 +530,7 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
 
 - **Test speed on this box (P294).** 4 cores. Go: `bun run test:go:containers` (81s) and `bun run test:go:rest`
   (134s) split `go test ./...` for CI; leave `-count=1` off to reuse the test cache. `ade` (44s) never caches.
-  `--project=ui` costs about 10 min (546 tests); `--shard=1/2` and `2/2` cost about 5 min each. Re-run failures with
+  `--project=ui` costs about 10 min (546 tests); `--shard=N/4` costs about 2.5 min each (CI runs 4 shards). Re-run failures with
   `playwright test --last-failed`; `--only-changed=<ref>` selects spec and support files only, since app code is a
   built bundle. Hooks run no UI test: pre-commit lints and typechecks only the staged files (full run when config,
   a lockfile, `scripts/` or a shared package changed), pre-push builds, lints and tests only changed Go packages.
