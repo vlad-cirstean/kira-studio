@@ -15,6 +15,10 @@ inputs:
     description: Build the wails3 CLI and generate bindings (scripts/setup.sh).
     default: "true"
 
+  visual-fonts:
+    description: Install fonts-inter and the fontconfig rule that resolves sans-serif to Inter (visual baselines render Inter).
+    default: "false"
+
 runs:
   using: composite
   steps:
@@ -79,3 +83,12 @@ runs:
       if: inputs.bindings == 'true'
       shell: bash
       run: sh scripts/setup.sh
+    - name: Install visual-baseline fonts (fonts-inter 4.0+ds-1 from noble/universe; the rule makes sans-serif resolve to Inter, as in the baseline-capture sandbox)
+      if: runner.os == 'Linux' && inputs.visual-fonts == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y fonts-inter
+        sudo install -m 644 apps/kira-studio/tests/visual/support/fontconfig/56-prefer-inter.conf /etc/fonts/conf.d/
+        sudo fc-cache -f
+        test "$(fc-match sans-serif -f '%{family}')" = Inter

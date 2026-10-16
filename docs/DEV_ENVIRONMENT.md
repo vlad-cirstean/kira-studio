@@ -639,22 +639,17 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
 - Worker footprint: `grep VmRSS /proc/$(pgrep -f 'memory-embed')/status` while it runs; it should
   vanish about 5 min after the last search.
 
-## `tests/visual/*` pixel diffs — a sandbox font-package mismatch, not a code regression
+## `tests/visual/*` pixel diffs: font mismatch, not a code regression
 
-The `visual` Playwright project's baselines are captured on a specific CI Ubuntu image (P6 plan
-§2(a)/(c), `tests/visual/support/pin-fonts.css`'s own header comment) — a "CI-Linux-only baseline
-policy" precisely because even same-OS machines can disagree on font rendering. A sandbox/container
-session's own font packages can still differ from that CI image's (`fc-match sans-serif`/`fc-match
-monospace` resolve to whatever's installed here — DejaVu Sans/DejaVu Sans Mono at the time of
-writing, not necessarily the CI image's own resolution), which reads as a small (1-4% of pixels),
-uniform, whole-page glyph-antialiasing diff across every `tests/visual/*` spec — a chromatic-fringe
-texture on text, not a layout/element-position regression. Before concluding a `tests/visual/*`
-failure is a real regression: check whether the diff is this uniform text-rendering signature
-(every glyph on the page, not one specific element) rather than an element moving/resizing/changing
-color — the former is this sandbox's font drift, not a bug, and `--update-snapshots` run from here
-would corrupt the real CI baseline with this container's non-canonical rendering rather than fix
-anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification). Baselines were re-recorded in this
-container (P227, P229); regenerate on CI only if the `ui` job disagrees.
+`visual` baselines render Inter. `pin-fonts.css` collapses the UI stack to `sans-serif`; Inter wins
+only via two pieces: apt `fonts-inter` (4.0+ds-1, noble/universe) and fontconfig rule
+`tests/visual/support/fontconfig/56-prefer-inter.conf` in `/etc/fonts/conf.d/`. `fonts-inter`
+alone leaves `sans-serif` on DejaVu Sans. CI installs both in `ui-extra` (setup action input
+`visual-fonts`), so sandbox and CI render identically. Monospace stays DejaVu Sans Mono in both.
+
+Whole-page uniform glyph diff across every spec means fonts differ. Check `fc-match sans-serif`
+prints `Inter`; if not, install both pieces. Never `--update-snapshots` from a mismatched
+environment: it corrupts the baseline. Baselines re-recorded in this container (P227, P229).
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
