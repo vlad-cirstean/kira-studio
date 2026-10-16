@@ -151,9 +151,8 @@ No job `needs` another except `publish`. The macOS build starts at once; only th
 - File: `docs/pending-changes/.github__workflows__release.yml.patch` (DEV_ENVIRONMENT.md "Git push"). Build it by
   editing `.github/workflows/release.yml` in the tree, `git diff > patch` with a one-line why on top, then
   `git checkout -- .github/workflows/release.yml`. Never commit the workflow file itself.
-- Triggers: `push` tags `v*.*.*` (unchanged) plus `workflow_dispatch` with required input `version` (semver
-  without `v`). A dispatch runs every job except `publish`: a full dry run on any branch with no tag, and the way
-  to take after timings.
+- Trigger: `push` tags `v*.*.*` only (unchanged). No `workflow_dispatch`, no dry run: after timings come from a
+  real tag.
 - Top-level `permissions: contents: read`; each job widens only what it needs.
 
 | Job | Runner | Needs | Permissions | Timeout | Steps |
@@ -162,7 +161,7 @@ No job `needs` another except `publish`. The macOS build starts at once; only th
 | `build (macOS)` | macos-15 | none | `contents: read` | 30 | checkout; set version (R5); setup action `cache-save: "false"`, `go-cache: ""`; `package:studio`; `package:space`; name DMGs; `verify:packaging`; bundle assert (unchanged); sha256 of both DMGs to job outputs `studio-sha256`, `space-sha256`; one `upload-artifact` `release-dmgs` (both files, `if-no-files-found: error`, 14 days) |
 | `test-matrix (Linux)` | ubuntu | none | default | 30 | checkout; setup action `bun: "false"`, `bindings: "false"`, `go-cache: go-ct`, `cache-save: "false"`; `sh scripts/test-matrix.sh --mirror` |
 | `db-compat (Linux, min\|max)` | ubuntu, matrix `extreme: [min, max]`, `fail-fast: false` | none | default | 30 | as test-matrix; `sh scripts/db-compat.sh --${{ matrix.extreme }} --mirror` |
-| `publish` | ubuntu | all four (matrix counts as one) | `contents: write` | 10 | `if: github.event_name == 'push'`; R6 |
+| `publish` | ubuntu | all four (matrix counts as one) | `contents: write` | 10 | R6 |
 
 - Removed: `lint`, `typecheck`, `brew install grep` (finding 3; the gate proves `checks (Linux)` passed on this
   sha); the separate `scripts/setup.sh` step (`prepackage:*` already runs it; the setup action restores wails3 and
@@ -174,7 +173,7 @@ No job `needs` another except `publish`. The macOS build starts at once; only th
 
 ### R5. Version step
 
-- `TAG="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"` (`INPUT_VERSION` from `inputs.version` via `env`). Reject anything
+- `TAG="${GITHUB_REF_NAME#v}"`. Reject anything
   not matching `^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`, then the same perl write and assert as today.
 
 ### R6. Publish job
@@ -246,8 +245,8 @@ Trade-off accepted: the macOS build no longer waits for tests, so a failing gate
 - Every timing in section 5; main-scope cache hits on a tag; the `digest` field timing; `--prerelease` and
   `make_latest`; the dispatch path of R3 (no tag is pushed and no workflow is dispatched from this session; a tag
   push is outward-facing).
-- How: once the user applies the patch, run "Release" by `workflow_dispatch` on `main` with `version: 0.0.0-test`
-  (publish skipped) to take after timings; the first real tag then proves `publish`.
+- How: after the user applies the patch, the first real tag takes the after timings and proves `publish`. No
+  dry run exists: `release.yml` is tag-push only.
 
 ## 8. Implementer steps and commits
 
@@ -256,8 +255,7 @@ Trade-off accepted: the macOS build no longer waits for tests, so a failing gate
 3. `ci: restore-only cache mode in the setup action` (R1).
 4. `ci: pending release.yml patch for parallel build and direct publish` (R4 to R6).
 5. `docs: publish-direct release flow`: `docs/PACKAGING.md` §7 "Cutting a release" (new graph, publish is
-   automatic, human §4 hardware checks move after publish, bad-tag handling from section 4, the dispatch dry
-   run); `docs/ARCHITECTURE.md` app-update bullet ("`release.yml` creates every release as a draft…" becomes
+   automatic, human §4 hardware checks move after publish, bad-tag handling from section 4); `docs/ARCHITECTURE.md` app-update bullet ("`release.yml` creates every release as a draft…" becomes
    "publishes only after every gate and asset check"); SPEC P295 status `Done (pending the release.yml patch)`;
    a "Result" section here with before numbers (section 1), the dry-run outputs and "after: pending first run".
 
@@ -290,7 +288,7 @@ Implemented per section 8. Commits: parallel pull (`dc6daa1d`), release gate (`4
 
 Before numbers: section 1 (runs 10/11: tag to done 31m00s / 29m10s).
 
-After: pending first run. Not measurable here.
+After: measurable only on a real tag (`release.yml` has no dry run). Pending first tag.
 
 Verified in this sandbox:
 - `scripts/release-ci-gate.sh --dry-run`: `bd0c2246` exit 0 (run 38887837248), `a2b96b9` exit 1 (failed
@@ -306,5 +304,4 @@ Verified in this sandbox:
 
 Unverifiable until a real run: every section 5 timing; main-scope cache hits on a tag; asset `digest`
 timing; `--prerelease` and `make_latest`; the gate's dispatch path; `gh run download` and `--verify-tag`
-under `GITHUB_TOKEN`. Apply the patch, run "Release" by `workflow_dispatch` with `version: 0.0.0-test`
-for after timings; the first real tag proves `publish`.
+under `GITHUB_TOKEN`. Apply the patch; the first real tag gives after timings and proves `publish`.

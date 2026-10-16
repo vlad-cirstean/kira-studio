@@ -411,9 +411,6 @@ Failed gate: flaky, use "Re-run failed jobs" (artifacts of the first attempt sta
 failure: delete the tag (`git push --delete origin vX.Y.Z`), fix, tag again. PR CI red on the sha:
 rerun or fix PR CI first, then rerun the release's failed jobs.
 
-Dry run: run "Release" by `workflow_dispatch` on any branch with `version` (for example `0.0.0-test`).
-It runs every job except `publish`, creates no release and no tag.
-
 **No *silent* auto-update — P119 adds a real one, gated on an explicit click.** SPEC.md defers
 *silent* auto-update past v1 (§1's deferred list, §3's app-identity line); a user-initiated
 install/update, run through `scripts/install.sh`, is not that. macOS's own silent auto-update

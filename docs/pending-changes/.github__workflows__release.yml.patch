@@ -1,23 +1,9 @@
 # Why: P295. Parallel macOS build, no tag-scoped cache saves, PR CI gate, verified draft then publish. Apply with git apply, then delete this file in the same commit.
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index 50480f77..0eebb8be 100644
+index 50480f7..067960a 100644
 --- a/.github/workflows/release.yml
 +++ b/.github/workflows/release.yml
-@@ -3,6 +3,13 @@ name: Release
- on:
-   push:
-     tags: ['v*.*.*']
-+  # Dry run on any branch: every job except publish. Takes after-timings without a tag.
-+  workflow_dispatch:
-+    inputs:
-+      version:
-+        description: Version to stamp into both apps, without the leading v (e.g. 0.0.0-test)
-+        required: true
-+        type: string
- 
- permissions:
-   contents: read
-@@ -11,136 +18,58 @@ concurrency:
+@@ -11,115 +11,37 @@ concurrency:
    group: release-${{ github.ref }}
    cancel-in-progress: false
  
@@ -155,14 +141,10 @@ index 50480f77..0eebb8be 100644
  
        # P119: one tag versions both apps. Each app's build/config.yml info.version is the one place
        # its build reads a version; from there it is linked into the binary and stamped into
-       # Info.plist, and verify:packaging's A5 asserts both bundles carry it.
-       - name: Set both apps' version from the release tag
-+        env:
-+          INPUT_VERSION: ${{ inputs.version }}
+@@ -128,19 +50,17 @@ jobs:
          run: |
            set -eu
--          TAG="${GITHUB_REF_NAME#v}"
-+          TAG="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+           TAG="${GITHUB_REF_NAME#v}"
 +          printf '%s' "$TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo "bad version '$TAG'" >&2; exit 1; }
            for CONFIG in apps/kira-studio/build/config.yml apps/kira-space/build/config.yml; do
              perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
@@ -185,7 +167,7 @@ index 50480f77..0eebb8be 100644
  
        - run: bun run package:studio
        - run: bun run package:space
-@@ -180,6 +109,95 @@ jobs:
+@@ -180,6 +100,94 @@ jobs:
            assert_app apps/kira-studio "Kira Studio" com.kirathecat.kira-studio /tmp/kira-studio-dmg
            assert_app apps/kira-space "Kira Space" com.kirathecat.kira-space /tmp/kira-space-dmg
  
@@ -240,10 +222,9 @@ index 50480f77..0eebb8be 100644
 +          cache-save: "false"
 +      - run: sh scripts/db-compat.sh --${{ matrix.extreme }} --mirror
 +
-+  # Draft, upload, verify, publish. Skipped on workflow_dispatch and whenever any gate fails.
++  # Draft, upload, verify, publish. Skipped whenever any gate fails.
 +  publish:
 +    name: publish
-+    if: github.event_name == 'push'
 +    needs: [ci-gate, build, test-matrix, db-compat]
 +    runs-on: ubuntu-latest
 +    timeout-minutes: 10
@@ -281,7 +262,7 @@ index 50480f77..0eebb8be 100644
        - name: Compose release notes
          run: |
            cat > release-notes.md <<'EOF'
-@@ -210,24 +228,62 @@ jobs:
+@@ -210,24 +218,62 @@ jobs:
            that click. Installer log: `~/Library/Logs/<app name>/install.log`.
            EOF
  
