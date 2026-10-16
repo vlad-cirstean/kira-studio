@@ -87,6 +87,8 @@
     "verify:packaging": "sh scripts/verify-packaging.sh",
     "test:go": "go test ./...",
     "test:images": "sh scripts/pull-test-images.sh",
+    "test:go:rest": "sh scripts/go-test-split.sh rest",
+    "test:go:containers": "sh scripts/go-test-split.sh containers",
     "test:claude": "bun run test:claude:space && bun run test:claude:studio",
     "test:claude:space": "cd apps/kira-space/tests/claude && CGO_ENABLED=1 go test -v -timeout 15m ./...",
     "eval:memory": "cd apps/kira-space/tests/claude && KIRA_MEMORY_EVAL=1 CGO_ENABLED=1 go test -v -count=1 -timeout 180m -run TestMemoryIngestEval ./...",
