@@ -171,10 +171,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Placeholder frontend/dist (go list ./... in scripts/go-test-split.sh enumerates every package in the module, including the two root mains — their `//go:embed all:frontend/dist` directive fails the whole listing if the directory doesn't exist at all, even though nothing here imports or tests those packages)
+      - name: Placeholder frontend/dist (go list ./... in scripts/go-test-split.sh enumerates every package in the module, including the two root mains — their `//go:embed` directives fail the whole listing if the directories don't exist at all, even though nothing here imports or tests those packages)
         run: |
-          mkdir -p apps/kira-space/frontend/dist apps/kira-studio/frontend/dist
-          touch apps/kira-space/frontend/dist/.keep apps/kira-studio/frontend/dist/.keep
+          mkdir -p apps/kira-space/frontend/dist apps/kira-space/frontend/dist-mobile apps/kira-studio/frontend/dist
+          touch apps/kira-space/frontend/dist/.keep apps/kira-space/frontend/dist-mobile/.keep apps/kira-studio/frontend/dist/.keep
       - name: Restore cached Testcontainers images (keyed on the pinned image tags, so an unchanged adapter-test image set skips re-pulling)
         id: docker-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
