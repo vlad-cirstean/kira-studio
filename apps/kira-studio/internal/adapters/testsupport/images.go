@@ -76,3 +76,18 @@ func MariaServerMajor() string      { return ServerMajor("mariadb", mariaImage) 
 func ClickHouseServerMajor() string { return ServerMajor("clickhouse", clickhouseImage) }
 func MongoServerMajor() string      { return ServerMajor("mongo", MongoImage) }
 func RedisServerMajor() string      { return ServerMajor("redis", RedisImage) }
+
+// Images lists every image the fixtures start, resolved through ImageFor. One source for
+// scripts/pull-test-images.sh.
+func Images() []string {
+	return []string{
+		ImageFor("postgres", defaultPostgresImage),
+		ImageFor("mysql", mysqlImage),
+		ImageFor("mariadb", mariaImage),
+		ImageFor("clickhouse", clickhouseImage),
+		ImageFor("redis", RedisImage),
+		ImageFor("mongo", MongoImage),
+		ImageFor("kafka", kafkaImage),
+		ImageFor("localstack", LocalStackImage),
+	}
+}
