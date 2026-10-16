@@ -1,7 +1,7 @@
-Why: P294 test and CI speed. Drops all 'needs' edges and wails-linux-cli, shards ui 4 ways, splits Go tests across two runners, pulls images in parallel instead of the tar, caches Go build and tsbuildinfo. Apply from a Mac session: git apply docs/pending-changes/.github__workflows__pr.yml.patch, then delete this file in the same commit. Needs .github/actions/setup (already committed).
+Why: P294 test and CI speed. Drops all 'needs' edges and wails-linux-cli, shards ui 2 ways, splits Go tests across two runners, overlaps the cached image load with setup (pull script only on a cache miss), caches Go build and tsbuildinfo. Apply from a Mac session: git apply docs/pending-changes/.github__workflows__pr.yml.patch, then delete this file in the same commit. Needs .github/actions/setup (already committed).
 
 diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
-index 5bd8b5e..fd2e9f0 100644
+index 5bd8b5e..03a48bc 100644
 --- a/.github/workflows/pr.yml
 +++ b/.github/workflows/pr.yml
 @@ -14,48 +14,24 @@ concurrency:
@@ -69,7 +69,7 @@ index 5bd8b5e..fd2e9f0 100644
          run: |
            go test \
              ./apps/kira-studio/internal/secrets/... \
-@@ -72,219 +48,150 @@ jobs:
+@@ -72,158 +48,125 @@ jobs:
              ./apps/kira-space/internal/gitclient \
              ./apps/kira-studio/internal/datagrip/...
  
@@ -87,11 +87,11 @@ index 5bd8b5e..fd2e9f0 100644
      steps:
        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 -      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
--        with:
--          bun-version: 1.3.14
--      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
 +      - uses: ./.github/actions/setup
          with:
+-          bun-version: 1.3.14
+-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+-        with:
 -          go-version-file: go.mod
 -      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
 -        run: |
@@ -141,16 +141,16 @@ index 5bd8b5e..fd2e9f0 100644
 -  # (macOS) — it doesn't consume anything that job produces, so it now starts immediately.
 -  wails-linux-cli:
 -    name: wails-linux-cli (Linux)
-+  # Playwright `ui` project in 4 shards. fail-fast off: a red shard must not hide the others.
++  # Playwright `ui` project in 2 shards. fail-fast off: a red shard must not hide the others.
 +  ui:
-+    name: ui (Linux, shard ${{ matrix.shard }}/4)
++    name: ui (Linux, shard ${{ matrix.shard }}/2)
      runs-on: ubuntu-latest
 -    timeout-minutes: 10
 +    timeout-minutes: 15
 +    strategy:
 +      fail-fast: false
 +      matrix:
-+        shard: [1, 2, 3, 4]
++        shard: [1, 2]
      steps:
        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 -      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -183,7 +183,7 @@ index 5bd8b5e..fd2e9f0 100644
 +      - name: Install WebKit with its system libraries
 +        run: bunx playwright install --with-deps webkit
 +      - run: bun run build:test:studio
-+      - run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=${{ matrix.shard }}/4
++      - run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=${{ matrix.shard }}/2
 +      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
 +        if: failure()
          with:
@@ -282,30 +282,62 @@ index 5bd8b5e..fd2e9f0 100644
 +  # Go packages that start no container, plus every package the container split does not name.
 +  go:
 +    name: go (Linux)
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
++      - uses: ./.github/actions/setup
++        with:
++          go-cache: go-rest
++          gtk: "true"
++      - name: Give git a global author identity (gitsession exercises production code that shells out to real git commit-creating commands through gitclient's own exec runner, which never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; a fresh runner has none)
++        run: |
++          git config --global user.name "CI"
++          git config --global user.email "ci@kira-studio.test"
++      - name: Raise the inotify instance limit (internal/gitsession runs t.Parallel(); each open repo holds one inotify instance, and Ubuntu's stock 128 can hang the parallel suite)
++        run: sudo sysctl -w fs.inotify.max_user_instances=8192
++      - name: Build frontend bundles (the root main packages embed frontend/dist)
++        run: bun run build:studio
++      - run: bun run build:space
++      - run: bun run test:go:rest
++
++  # Go packages that start Testcontainers. No bun, bindings or frontend build: these packages
++  # never link the root main packages that embed frontend/dist.
++  go-containers:
++    name: go-containers (Linux)
      runs-on: ubuntu-latest
      timeout-minutes: 15
      steps:
-       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
--      - name: Restore cached Testcontainers images (keyed on the pinned image tags, so an unchanged adapter-test image set skips re-pulling)
--        id: docker-cache
--        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
--        with:
--          path: ~/docker-images.tar
--          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
+@@ -234,51 +177,36 @@ jobs:
+         with:
+           path: ~/docker-images.tar
+           key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
 -      - name: Load cached Testcontainers images
--        if: steps.docker-cache.outputs.cache-hit == 'true'
++      - name: Load the cached images in the background (overlaps setup and the test compile)
+         if: steps.docker-cache.outputs.cache-hit == 'true'
 -        run: docker load -i ~/docker-images.tar
 -      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-+      - uses: ./.github/actions/setup
-         with:
+-        with:
 -          bun-version: 1.3.14
 -      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
 -        with:
 -          go-version-file: go.mod
 -      - name: Give git a global author identity (gitsession exercises production code that shells out to real git commit-creating commands — restack, global-stash promote — through gitclient's own exec runner, which unlike the tests' own fixture helpers never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; every dev machine already has one from ordinary git use, a fresh runner doesn't)
-+          go-cache: go-rest
++        run: |
++          nohup docker load -i ~/docker-images.tar > "$RUNNER_TEMP/images.log" 2>&1 &
++          echo $! > "$RUNNER_TEMP/images.pid"
++      - uses: ./.github/actions/setup
++        with:
++          bun: "false"
++          bindings: "false"
++          go-cache: go-ct
 +          gtk: "true"
-+      - name: Give git a global author identity (gitsession exercises production code that shells out to real git commit-creating commands through gitclient's own exec runner, which never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; a fresh runner has none)
++      - name: Pull the images in parallel on a cache miss (mirror.gcr.io avoids Docker Hub rate limits on shared runner IPs)
++        if: steps.docker-cache.outputs.cache-hit != 'true'
++        run: |
++          nohup sh scripts/pull-test-images.sh > "$RUNNER_TEMP/images.log" 2>&1 &
++          echo $! > "$RUNNER_TEMP/images.pid"
++      - name: Give git a global author identity (see the go job)
          run: |
            git config --global user.name "CI"
            git config --global user.email "ci@kira-studio.test"
@@ -334,55 +366,22 @@ index 5bd8b5e..fd2e9f0 100644
 -      - name: Generate Wails bindings
 -        run: sh scripts/setup.sh
 -      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can even compile the root package for both apps — checks (macOS) covers this via its own `bun run build:studio`/`build:space`, but container-tests' `go test ./...` reaches both root packages too)
-+      - name: Raise the inotify instance limit (internal/gitsession runs t.Parallel(); each open repo holds one inotify instance, and Ubuntu's stock 128 can hang the parallel suite)
-+        run: sudo sysctl -w fs.inotify.max_user_instances=8192
-+      - name: Build frontend bundles (the root main packages embed frontend/dist)
-         run: bun run build:studio
-       - run: bun run build:space
+-        run: bun run build:studio
+-      - run: bun run build:space
 -      - run: bun run test:unit
 -      - name: Raise the inotify instance limit (v1.4 P1 — internal/gitsession runs t.Parallel(); each open repo holds one fsnotify watcher = one inotify instance, and Ubuntu's stock 128 is low enough for the parallel suite to exhaust it and hang rather than fail cleanly, confirmed by reproducing the hang at 128 and it clearing at 8192)
--        run: sudo sysctl -w fs.inotify.max_user_instances=8192
++      - name: Raise the inotify instance limit (see the go job)
+         run: sudo sysctl -w fs.inotify.max_user_instances=8192
 -      - name: Go adapter tests against real Testcontainers (Docker is available on this runner)
 -        run: bun run test:go
--      - name: Save pulled Testcontainers images (always() so a partial pull from a failed run still seeds the next one)
--        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
--        run: docker save $(docker images -q) -o ~/docker-images.tar
--      - name: Cache pulled Testcontainers images
--        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
--        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-+      - run: bun run test:go:rest
-+
-+  # Go packages that start Testcontainers. No bun, bindings or frontend build: these packages
-+  # never link the root main packages that embed frontend/dist.
-+  go-containers:
-+    name: go-containers (Linux)
-+    runs-on: ubuntu-latest
-+    timeout-minutes: 15
-+    steps:
-+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-+      - uses: ./.github/actions/setup
-         with:
--          path: ~/docker-images.tar
--          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
-+          bun: "false"
-+          bindings: "false"
-+          go-cache: go-ct
-+          gtk: "true"
-+      - name: Start pulling the test images (overlaps the test compile; mirror.gcr.io avoids Docker Hub rate limits on shared runner IPs)
++      - name: Wait for the images
 +        run: |
-+          nohup sh scripts/pull-test-images.sh > "$RUNNER_TEMP/pull-images.log" 2>&1 &
-+          echo $! > "$RUNNER_TEMP/pull-images.pid"
-+      - name: Give git a global author identity (see the go job)
-+        run: |
-+          git config --global user.name "CI"
-+          git config --global user.email "ci@kira-studio.test"
-+      - name: Raise the inotify instance limit (see the go job)
-+        run: sudo sysctl -w fs.inotify.max_user_instances=8192
-+      - name: Wait for the image pull
-+        run: |
-+          while kill -0 "$(cat "$RUNNER_TEMP/pull-images.pid")" 2>/dev/null; do sleep 2; done
-+          cat "$RUNNER_TEMP/pull-images.log"
++          while kill -0 "$(cat "$RUNNER_TEMP/images.pid")" 2>/dev/null; do sleep 2; done
++          cat "$RUNNER_TEMP/images.log"
 +      - name: Go adapter and Docker flow tests against real Testcontainers
 +        env:
 +          TESTCONTAINERS_RYUK_DISABLED: "true"
 +        run: sh scripts/go-test-split.sh containers
+       - name: Save pulled Testcontainers images (always() so a partial pull from a failed run still seeds the next one)
+         if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+         run: docker save $(docker images -q) -o ~/docker-images.tar
