@@ -1,0 +1,388 @@
+Why: P294 test and CI speed. Drops all 'needs' edges and wails-linux-cli, shards ui 4 ways, splits Go tests across two runners, pulls images in parallel instead of the tar, caches Go build and tsbuildinfo. Apply from a Mac session: git apply docs/pending-changes/.github__workflows__pr.yml.patch, then delete this file in the same commit. Needs .github/actions/setup (already committed).
+
+diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
+index 5bd8b5e..fd2e9f0 100644
+--- a/.github/workflows/pr.yml
++++ b/.github/workflows/pr.yml
+@@ -14,48 +14,24 @@ concurrency:
+   group: pr-${{ github.ref }}
+   cancel-in-progress: true
+ 
++# No job `needs` another: nothing consumes another job's output, so every job starts at once.
++# Shared setup lives in .github/actions/setup.
+ jobs:
+   # Only the work that genuinely needs macOS: cgo-aware go vet/build (catches darwin build-tag
+-  # breaks) and the darwin&&cgo-only test packages. Everything else that used to live here (lint,
+-  # typecheck, the frontend builds as their own check, lint:dead, verify:packaging) doesn't touch
+-  # cgo or darwin build tags, so it moved to checks-linux — a cheaper, usually-faster runner, and
+-  # it now runs in parallel with this job instead of serialized in front of it.
++  # breaks) and the darwin&&cgo-only test packages.
+   checks:
+     name: checks (macOS)
+     runs-on: macos-15
+     timeout-minutes: 15
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
++      - uses: ./.github/actions/setup
+         with:
+-          bun-version: 1.3.14
+-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+-        with:
+-          go-version-file: go.mod
+-      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/.bun/install/cache
+-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+-      - run: bun install --frozen-lockfile
+-      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/go/bin/wails3
+-          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+-      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: |
+-            apps/kira-studio/frontend/bindings
+-            apps/kira-studio/.task
+-          key: wails-bindings-${{ hashFiles('go.mod') }}
+-      - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh, apps/kira-studio/frontend/src/bridge/*.ts import them directly; the two caches above make this a no-op on a hit — setup.sh still validates the cached wails3 binary against go.mod's pinned version/toolchain before trusting it)
+-        run: sh scripts/setup.sh
+-      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can even compile the root package for both apps — checks-linux covers the frontend build as its own check; this is only here so the embed below has something to compile)
++          go-cache: macos
++      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can compile the root package for both apps)
+         run: bun run build:studio
+       - run: bun run build:space
+-      - name: Cache golangci-lint binary (P94 — keyed on the install script, which pins the version, and go.mod, which pins the toolchain it's built against; built from source since neither the prebuilt binary nor golangci/golangci-lint-action tolerate this repo's go.mod toolchain pin, docs/DEV_ENVIRONMENT.md)
++      - name: Cache golangci-lint binary (keyed on the install script, which pins the version, and go.mod, which pins the toolchain it's built against)
+         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+         with:
+           path: ~/go/bin/golangci-lint
+@@ -63,7 +39,7 @@ jobs:
+       - run: bun run lint:go
+       - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
+         run: go build ./...
+-      - name: Go unit tests, darwin-relevant packages only (v1.4 P1 — container-tests already runs the full ./... on Linux with Docker, covering every non-container case here too, so a macOS-only full run was pure duplication; these five have real darwin&&cgo test/implementation files — secrets, metrics, localauth, gitclient, datagrip)
++      - name: Go unit tests, darwin-relevant packages only (secrets, metrics, localauth, gitclient, datagrip have darwin&&cgo files; the Linux jobs run every other package)
+         run: |
+           go test \
+             ./apps/kira-studio/internal/secrets/... \
+@@ -72,219 +48,150 @@ jobs:
+             ./apps/kira-space/internal/gitclient \
+             ./apps/kira-studio/internal/datagrip/...
+ 
+-  # Everything checks (macOS) used to also run that doesn't touch cgo or darwin build tags — lint,
+-  # typecheck, the frontend builds as their own check, lint:dead, verify:packaging (its own artifact
+-  # checks are skipped here since this job never packages a .app/.dmg). Runs on ubuntu-latest, in
+-  # parallel with checks (macOS) rather than serialized behind it.
++  # Lint, typecheck, frontend builds, lint:dead, verify:packaging and the bun unit tests: nothing
++  # here touches cgo or darwin build tags.
+   checks-linux:
+     name: checks (Linux)
+-    needs: wails-linux-cli
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+-        with:
+-          bun-version: 1.3.14
+-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
++      - uses: ./.github/actions/setup
+         with:
+-          go-version-file: go.mod
+-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+-        run: |
+-          sudo apt-get update
+-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+-      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/.bun/install/cache
+-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+-      - run: bun install --frozen-lockfile
+-      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/go/bin/wails3
+-          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+-      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
++          go-cache: checks
++          gtk: "true"
++      - run: bun run lint
++      - name: Cache tsbuildinfo (tsc and vue-tsc incremental mode key on file content hashes, so a fresh checkout reuses entries)
+         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+         with:
+-          path: |
+-            apps/kira-studio/frontend/bindings
+-            apps/kira-studio/.task
+-          key: wails-bindings-${{ hashFiles('go.mod') }}
+-      - name: Generate Wails bindings
+-        run: sh scripts/setup.sh
+-      - run: bun run lint
++          path: node_modules/.cache/tsbuildinfo
++          key: tsbuildinfo-${{ hashFiles('bun.lock') }}-${{ github.sha }}
++          restore-keys: |
++            tsbuildinfo-${{ hashFiles('bun.lock') }}-
+       - run: bun run typecheck
+       - run: bun run build:studio
+       - run: bun run build:space
+       - run: bun run lint:dead
+       - run: bun run verify:packaging
++      - run: bun run test:unit
+ 
+-  # Builds and caches the Linux wails3 CLI once, so `checks-linux`, `ui` and `container-tests` —
+-  # all ubuntu-latest, all otherwise independent of each other — don't race to `go install` the
+-  # same binary in parallel on a go.mod-hash cache miss. Their own "Cache wails3 CLI"/"Cache
+-  # generated Wails bindings" steps still run (a job's cache isn't visible until restored on that
+-  # job's own runner), but land as cache hits instead of rebuilding. No longer gated behind checks
+-  # (macOS) — it doesn't consume anything that job produces, so it now starts immediately.
+-  wails-linux-cli:
+-    name: wails-linux-cli (Linux)
++  # Playwright `ui` project in 4 shards. fail-fast off: a red shard must not hide the others.
++  ui:
++    name: ui (Linux, shard ${{ matrix.shard }}/4)
+     runs-on: ubuntu-latest
+-    timeout-minutes: 10
++    timeout-minutes: 15
++    strategy:
++      fail-fast: false
++      matrix:
++        shard: [1, 2, 3, 4]
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+-        with:
+-          bun-version: 1.3.14
+-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+-        with:
+-          go-version-file: go.mod
+-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+-        run: |
+-          sudo apt-get update
+-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+-      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/.bun/install/cache
+-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+-      - run: bun install --frozen-lockfile
+-      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
++      - uses: ./.github/actions/setup
++      - name: Cache Playwright browsers (keyed on the lockfile, which pins the @playwright/test version)
+         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+         with:
+-          path: ~/go/bin/wails3
+-          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+-      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
++          path: ~/.cache/ms-playwright
++          key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
++      - name: Install WebKit with its system libraries
++        run: bunx playwright install --with-deps webkit
++      - run: bun run build:test:studio
++      - run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=${{ matrix.shard }}/4
++      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        if: failure()
+         with:
++          name: playwright-report-ui-${{ matrix.shard }}
+           path: |
+-            apps/kira-studio/frontend/bindings
+-            apps/kira-studio/.task
+-          key: wails-bindings-${{ hashFiles('go.mod') }}
+-      - name: Generate Wails bindings
+-        run: sh scripts/setup.sh
++            playwright-report/
++            test-results/
++            apps/kira-studio/playwright-report/
++            apps/kira-studio/test-results/
++          retention-days: 7
+ 
+-  ui:
+-    name: ui (Linux)
+-    needs: [checks, checks-linux, wails-linux-cli]
++  # ipc-frontend (chromium), visual (webkit), then ui-timing alone on an idle machine. `--no-deps`
++  # skips the `ui` project that ui-timing depends on in local runs.
++  ui-extra:
++    name: ui-extra (Linux)
+     runs-on: ubuntu-latest
+-    timeout-minutes: 25
++    timeout-minutes: 15
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+-        with:
+-          bun-version: 1.3.14
+-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+-        with:
+-          go-version-file: go.mod
+-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+-        run: |
+-          sudo apt-get update
+-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+-      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/.bun/install/cache
+-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+-      - run: bun install --frozen-lockfile
+-      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/go/bin/wails3
+-          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+-      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: |
+-            apps/kira-studio/frontend/bindings
+-            apps/kira-studio/.task
+-          key: wails-bindings-${{ hashFiles('go.mod') }}
+-      - name: Generate Wails bindings
+-        run: sh scripts/setup.sh
++      - uses: ./.github/actions/setup
+       - name: Cache Playwright browsers (keyed on the lockfile, which pins the @playwright/test version)
+         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+         with:
+           path: ~/.cache/ms-playwright
+-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+-      - name: Install WebKit and Chromium with their system libraries (CLAUDE.md — webkit is what `ui`/`ui-timing`/`visual` run against, chromium is what `ipc-frontend` runs against per playwright.config.ts; --with-deps delegates to Playwright's own per-browser dependency list rather than a hand-maintained apt package list that already fell out of sync once when chromium was added)
++          key: playwright-${{ runner.os }}-webkit-chromium-${{ hashFiles('bun.lock') }}
++      - name: Install WebKit and Chromium with their system libraries
+         run: bunx playwright install --with-deps webkit chromium
+-      - run: bun run test:ui:studio
+-      - name: IPC frontend tests (v1.4 P1 — previously in no CI job; consumes the fixtures internal/adapters/*'s own suites generate, closing the anti-drift gap)
+-        run: bun run test:ipc:fe:studio
+-      - name: Visual regression tests (v1.4 P6 — bounded pixel-diff tier, docs/v1.4/plans/P6-visual-regression.md; baselines are only ever captured/updated from this job's own environment, see tests/visual/README.md)
+-        run: bun run test:visual:studio
++      - run: bun run build:test:studio
++      - name: IPC frontend tests (consume the fixtures internal/adapters/*'s own suites generate)
++        run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend
++      - name: Visual regression tests (baselines are only ever captured from this environment, see tests/visual/README.md)
++        run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=visual
++      - name: Wall-clock budget tests (alone, no other browser contending for the CPU)
++        run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui-timing --no-deps
+       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+         if: failure()
+         with:
+-          name: playwright-report
++          name: playwright-report-extra
+           path: |
+             playwright-report/
+             test-results/
++            apps/kira-studio/playwright-report/
++            apps/kira-studio/test-results/
+           retention-days: 7
+ 
+-  container-tests:
+-    name: container-tests (Linux)
+-    needs: [checks, checks-linux, wails-linux-cli]
++  # Go packages that start no container, plus every package the container split does not name.
++  go:
++    name: go (Linux)
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+-      - name: Restore cached Testcontainers images (keyed on the pinned image tags, so an unchanged adapter-test image set skips re-pulling)
+-        id: docker-cache
+-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/docker-images.tar
+-          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
+-      - name: Load cached Testcontainers images
+-        if: steps.docker-cache.outputs.cache-hit == 'true'
+-        run: docker load -i ~/docker-images.tar
+-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
++      - uses: ./.github/actions/setup
+         with:
+-          bun-version: 1.3.14
+-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+-        with:
+-          go-version-file: go.mod
+-      - name: Give git a global author identity (gitsession exercises production code that shells out to real git commit-creating commands — restack, global-stash promote — through gitclient's own exec runner, which unlike the tests' own fixture helpers never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; every dev machine already has one from ordinary git use, a fresh runner doesn't)
++          go-cache: go-rest
++          gtk: "true"
++      - name: Give git a global author identity (gitsession exercises production code that shells out to real git commit-creating commands through gitclient's own exec runner, which never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; a fresh runner has none)
+         run: |
+           git config --global user.name "CI"
+           git config --global user.email "ci@kira-studio.test"
+-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+-        run: |
+-          sudo apt-get update
+-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+-      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/.bun/install/cache
+-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+-      - run: bun install --frozen-lockfile
+-      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: ~/go/bin/wails3
+-          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+-      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+-        with:
+-          path: |
+-            apps/kira-studio/frontend/bindings
+-            apps/kira-studio/.task
+-          key: wails-bindings-${{ hashFiles('go.mod') }}
+-      - name: Generate Wails bindings
+-        run: sh scripts/setup.sh
+-      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can even compile the root package for both apps — checks (macOS) covers this via its own `bun run build:studio`/`build:space`, but container-tests' `go test ./...` reaches both root packages too)
++      - name: Raise the inotify instance limit (internal/gitsession runs t.Parallel(); each open repo holds one inotify instance, and Ubuntu's stock 128 can hang the parallel suite)
++        run: sudo sysctl -w fs.inotify.max_user_instances=8192
++      - name: Build frontend bundles (the root main packages embed frontend/dist)
+         run: bun run build:studio
+       - run: bun run build:space
+-      - run: bun run test:unit
+-      - name: Raise the inotify instance limit (v1.4 P1 — internal/gitsession runs t.Parallel(); each open repo holds one fsnotify watcher = one inotify instance, and Ubuntu's stock 128 is low enough for the parallel suite to exhaust it and hang rather than fail cleanly, confirmed by reproducing the hang at 128 and it clearing at 8192)
+-        run: sudo sysctl -w fs.inotify.max_user_instances=8192
+-      - name: Go adapter tests against real Testcontainers (Docker is available on this runner)
+-        run: bun run test:go
+-      - name: Save pulled Testcontainers images (always() so a partial pull from a failed run still seeds the next one)
+-        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+-        run: docker save $(docker images -q) -o ~/docker-images.tar
+-      - name: Cache pulled Testcontainers images
+-        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
++      - run: bun run test:go:rest
++
++  # Go packages that start Testcontainers. No bun, bindings or frontend build: these packages
++  # never link the root main packages that embed frontend/dist.
++  go-containers:
++    name: go-containers (Linux)
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
++      - uses: ./.github/actions/setup
+         with:
+-          path: ~/docker-images.tar
+-          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
++          bun: "false"
++          bindings: "false"
++          go-cache: go-ct
++          gtk: "true"
++      - name: Start pulling the test images (overlaps the test compile; mirror.gcr.io avoids Docker Hub rate limits on shared runner IPs)
++        run: |
++          nohup sh scripts/pull-test-images.sh > "$RUNNER_TEMP/pull-images.log" 2>&1 &
++          echo $! > "$RUNNER_TEMP/pull-images.pid"
++      - name: Give git a global author identity (see the go job)
++        run: |
++          git config --global user.name "CI"
++          git config --global user.email "ci@kira-studio.test"
++      - name: Raise the inotify instance limit (see the go job)
++        run: sudo sysctl -w fs.inotify.max_user_instances=8192
++      - name: Wait for the image pull
++        run: |
++          while kill -0 "$(cat "$RUNNER_TEMP/pull-images.pid")" 2>/dev/null; do sleep 2; done
++          cat "$RUNNER_TEMP/pull-images.log"
++      - name: Go adapter and Docker flow tests against real Testcontainers
++        env:
++          TESTCONTAINERS_RYUK_DISABLED: "true"
++        run: sh scripts/go-test-split.sh containers
